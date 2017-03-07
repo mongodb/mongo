@@ -56,14 +56,14 @@ public:
      * Thread-safe method to mark a catalog name was changed. This will cause the in-memory
      * view catalog to be marked invalid
      */
-    static void onExternalChange(OperationContext* txn, const NamespaceString& name);
+    static void onExternalChange(OperationContext* opCtx, const NamespaceString& name);
 
     using Callback = stdx::function<Status(const BSONObj& view)>;
-    virtual Status iterate(OperationContext* txn, Callback callback) = 0;
-    virtual void upsert(OperationContext* txn,
+    virtual Status iterate(OperationContext* opCtx, Callback callback) = 0;
+    virtual void upsert(OperationContext* opCtx,
                         const NamespaceString& name,
                         const BSONObj& view) = 0;
-    virtual void remove(OperationContext* txn, const NamespaceString& name) = 0;
+    virtual void remove(OperationContext* opCtx, const NamespaceString& name) = 0;
     virtual const std::string& getName() const = 0;
 };
 
@@ -75,9 +75,9 @@ class DurableViewCatalogImpl final : public DurableViewCatalog {
 public:
     explicit DurableViewCatalogImpl(Database* db) : _db(db) {}
 
-    Status iterate(OperationContext* txn, Callback callback);
-    void upsert(OperationContext* txn, const NamespaceString& name, const BSONObj& view);
-    void remove(OperationContext* txn, const NamespaceString& name);
+    Status iterate(OperationContext* opCtx, Callback callback);
+    void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view);
+    void remove(OperationContext* opCtx, const NamespaceString& name);
     const std::string& getName() const;
 
 private:

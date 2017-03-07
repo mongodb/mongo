@@ -192,7 +192,7 @@ public:
      * returns a non-OK status.  When returning a non-OK status, *version will be set to
      * schemaVersionInvalid (0).
      */
-    Status getAuthorizationVersion(OperationContext* txn, int* version);
+    Status getAuthorizationVersion(OperationContext* opCtx, int* version);
 
     /**
      * Returns the user cache generation identifier.
@@ -207,7 +207,7 @@ public:
      * meaning that once this method returns true it will continue to return true for the
      * lifetime of this process, even if all users are subsequently dropped from the system.
      */
-    bool hasAnyPrivilegeDocuments(OperationContext* txn);
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx);
 
     // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
     // "system.users" collection of database "dbname".
@@ -222,12 +222,12 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getUserDescription(OperationContext* txn, const UserName& userName, BSONObj* result);
+    Status getUserDescription(OperationContext* opCtx, const UserName& userName, BSONObj* result);
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRoleDescription(OperationContext* txn,
+    Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,
                               PrivilegeFormat privilegeFormat,
                               BSONObj* result);
@@ -235,7 +235,7 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRolesDescription(OperationContext* txn,
+    Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roleName,
                                PrivilegeFormat privilegeFormat,
                                BSONObj* result);
@@ -243,7 +243,7 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRoleDescriptionsForDB(OperationContext* txn,
+    Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     const std::string dbname,
                                     PrivilegeFormat privilegeFormat,
                                     bool showBuiltinRoles,
@@ -259,7 +259,7 @@ public:
      *  The AuthorizationManager retains ownership of the returned User object.
      *  On non-OK Status return values, acquiredUser will not be modified.
      */
-    Status acquireUser(OperationContext* txn, const UserName& userName, User** acquiredUser);
+    Status acquireUser(OperationContext* opCtx, const UserName& userName, User** acquiredUser);
 
     /**
      * Decrements the refcount of the given User object.  If the refcount has gone to zero,
@@ -282,7 +282,7 @@ public:
      * system is at, this may involve building up the user cache and/or the roles graph.
      * Call this function at startup and after resynchronizing a slave/secondary.
      */
-    Status initialize(OperationContext* txn);
+    Status initialize(OperationContext* opCtx);
 
     /**
      * Invalidates all of the contents of the user cache.
@@ -301,7 +301,7 @@ public:
      * Hook called by replication code to let the AuthorizationManager observe changes
      * to relevant collections.
      */
-    void logOp(OperationContext* txn,
+    void logOp(OperationContext* opCtx,
                const char* opstr,
                const char* ns,
                const BSONObj& obj,
@@ -339,7 +339,7 @@ private:
      * Fetches user information from a v2-schema user document for the named user,
      * and stores a pointer to a new user object into *acquiredUser on success.
      */
-    Status _fetchUserV2(OperationContext* txn,
+    Status _fetchUserV2(OperationContext* opCtx,
                         const UserName& userName,
                         std::unique_ptr<User>* acquiredUser);
 

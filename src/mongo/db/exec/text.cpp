@@ -55,12 +55,12 @@ using fts::MAX_WEIGHT;
 
 const char* TextStage::kStageType = "TEXT";
 
-TextStage::TextStage(OperationContext* txn,
+TextStage::TextStage(OperationContext* opCtx,
                      const TextStageParams& params,
                      WorkingSet* ws,
                      const MatchExpression* filter)
-    : PlanStage(kStageType, txn), _params(params) {
-    _children.emplace_back(buildTextTree(txn, ws, filter));
+    : PlanStage(kStageType, opCtx), _params(params) {
+    _children.emplace_back(buildTextTree(opCtx, ws, filter));
     _specificStats.indexPrefix = _params.indexPrefix;
     _specificStats.indexName = _params.index->indexName();
     _specificStats.parsedTextQuery = _params.query.toBSON();
@@ -92,10 +92,10 @@ const SpecificStats* TextStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
+unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
                                                WorkingSet* ws,
                                                const MatchExpression* filter) const {
-    auto textScorer = make_unique<TextOrStage>(txn, _params.spec, ws, filter, _params.index);
+    auto textScorer = make_unique<TextOrStage>(opCtx, _params.spec, ws, filter, _params.index);
 
     // Get all the index scans for each term in our query.
     for (const auto& term : _params.query.getTermsForBounds()) {
@@ -110,11 +110,11 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
         ixparams.descriptor = _params.index;
         ixparams.direction = -1;
 
-        textScorer->addChild(make_unique<IndexScan>(txn, ixparams, ws, nullptr));
+        textScorer->addChild(make_unique<IndexScan>(opCtx, ixparams, ws, nullptr));
     }
 
     auto matcher =
-        make_unique<TextMatchStage>(txn, std::move(textScorer), _params.query, _params.spec, ws);
+        make_unique<TextMatchStage>(opCtx, std::move(textScorer), _params.query, _params.spec, ws);
 
     unique_ptr<PlanStage> treeRoot = std::move(matcher);
     return treeRoot;

@@ -96,16 +96,16 @@ public:
     virtual RecordStore* getRecordStore(StringData ns) const = 0;
 
     // Ownership passes to caller
-    virtual IndexAccessMethod* getIndex(OperationContext* txn,
+    virtual IndexAccessMethod* getIndex(OperationContext* opCtx,
                                         const CollectionCatalogEntry* collection,
                                         IndexCatalogEntry* index) = 0;
 
-    virtual Status createCollection(OperationContext* txn,
+    virtual Status createCollection(OperationContext* opCtx,
                                     StringData ns,
                                     const CollectionOptions& options,
                                     bool allocateDefaultSpace) = 0;
 
-    virtual Status renameCollection(OperationContext* txn,
+    virtual Status renameCollection(OperationContext* opCtx,
                                     StringData fromNS,
                                     StringData toNS,
                                     bool stayTemp) = 0;

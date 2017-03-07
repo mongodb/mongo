@@ -85,37 +85,37 @@ public:
 };
 
 TEST_F(OperationDeadlineTests, OperationDeadlineExpiration) {
-    auto txn = client->makeOperationContext();
-    txn->setDeadlineAfterNowBy(Seconds{1});
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(Seconds{1});
     mockClock->advance(Milliseconds{500});
-    ASSERT_OK(txn->checkForInterruptNoAssert());
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
 
     // 1ms before relative deadline reports no interrupt
     mockClock->advance(Milliseconds{499});
-    ASSERT_OK(txn->checkForInterruptNoAssert());
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
 
     // Exactly at deadline reports no interrupt, because setDeadlineAfterNowBy adds one clock
     // precision unit to the deadline, to ensure that the deadline does not expire in less than the
     // requested amount of time.
     mockClock->advance(Milliseconds{1});
-    ASSERT_OK(txn->checkForInterruptNoAssert());
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
 
     // Since the mock clock's precision is 1ms, at test start + 1001 ms, we expect
     // checkForInterruptNoAssert to return ExceededTimeLimit.
     mockClock->advance(Milliseconds{1});
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->checkForInterruptNoAssert());
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, opCtx->checkForInterruptNoAssert());
 
     // Also at times greater than start + 1001ms, we expect checkForInterruptNoAssert to keep
     // returning ExceededTimeLimit.
     mockClock->advance(Milliseconds{1});
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->checkForInterruptNoAssert());
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, opCtx->checkForInterruptNoAssert());
 }
 
 template <typename D>
 void assertLargeRelativeDeadlineLikeInfinity(Client& client, D maxTime) {
-    auto txn = client.makeOperationContext();
-    txn->setDeadlineAfterNowBy(maxTime);
-    ASSERT_FALSE(txn->hasDeadline()) << "Tried to set maxTime to " << maxTime;
+    auto opCtx = client.makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(maxTime);
+    ASSERT_FALSE(opCtx->hasDeadline()) << "Tried to set maxTime to " << maxTime;
 }
 
 TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesHours) {
@@ -142,72 +142,73 @@ TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesMicroseconds) {
 TEST_F(OperationDeadlineTests, VeryLargeRelativeDeadlinesNanoseconds) {
     // Nanoseconds::max() is less than Microseconds::max(), so it is possible to set
     // a deadline of that duration.
-    auto txn = client->makeOperationContext();
-    txn->setDeadlineAfterNowBy(Nanoseconds::max());
-    ASSERT_TRUE(txn->hasDeadline());
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineAfterNowBy(Nanoseconds::max());
+    ASSERT_TRUE(opCtx->hasDeadline());
     ASSERT_EQ(mockClock->now() + mockClock->getPrecision() +
                   duration_cast<Milliseconds>(Nanoseconds::max()),
-              txn->getDeadline());
+              opCtx->getDeadline());
 }
 
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
-    auto txn = client->makeOperationContext();
-    txn->setDeadlineByDate(mockClock->now());
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineByDate(mockClock->now());
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, txn->waitForConditionOrInterruptNoAssert(cv, lk));
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, opCtx->waitForConditionOrInterruptNoAssert(cv, lk));
 }
 
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
-    auto txn = client->makeOperationContext();
-    txn->setDeadlineByDate(mockClock->now());
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineByDate(mockClock->now());
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit,
-              txn->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now() + Seconds{10})
-                  .getStatus());
+    ASSERT_EQ(
+        ErrorCodes::ExceededTimeLimit,
+        opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now() + Seconds{10})
+            .getStatus());
 }
 
 TEST_F(OperationDeadlineTests, WaitForKilledOpCV) {
-    auto txn = client->makeOperationContext();
-    txn->markKilled();
+    auto opCtx = client->makeOperationContext();
+    opCtx->markKilled();
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
-    ASSERT_EQ(ErrorCodes::Interrupted, txn->waitForConditionOrInterruptNoAssert(cv, lk));
+    ASSERT_EQ(ErrorCodes::Interrupted, opCtx->waitForConditionOrInterruptNoAssert(cv, lk));
 }
 
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCV) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
     ASSERT(stdx::cv_status::timeout ==
            unittest::assertGet(
-               txn->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now())));
+               opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now())));
 }
 
 TEST_F(OperationDeadlineTests, WaitForUntilExpiredCVWithMaxTimeSet) {
-    auto txn = client->makeOperationContext();
-    txn->setDeadlineByDate(mockClock->now() + Seconds{10});
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineByDate(mockClock->now() + Seconds{10});
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
     ASSERT(stdx::cv_status::timeout ==
            unittest::assertGet(
-               txn->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now())));
+               opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now())));
 }
 
 TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpiration) {
-    auto txn = client->makeOperationContext();
-    txn->setDeadlineByDate(mockClock->now());
+    auto opCtx = client->makeOperationContext();
+    opCtx->setDeadlineByDate(mockClock->now());
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
     ASSERT(ErrorCodes::ExceededTimeLimit ==
-           txn->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now()));
+           opCtx->waitForConditionOrInterruptNoAssertUntil(cv, lk, mockClock->now()));
 }
 
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
@@ -225,7 +226,7 @@ public:
         bool isSignaled = false;
     };
 
-    stdx::future<stdx::cv_status> startWaiterWithUntilAndMaxTime(OperationContext* txn,
+    stdx::future<stdx::cv_status> startWaiterWithUntilAndMaxTime(OperationContext* opCtx,
                                                                  WaitTestState* state,
                                                                  Date_t until,
                                                                  Date_t maxTime) {
@@ -233,15 +234,15 @@ public:
         auto barrier = std::make_shared<unittest::Barrier>(2);
         auto task = stdx::packaged_task<stdx::cv_status()>([=] {
             if (maxTime < Date_t::max()) {
-                txn->setDeadlineByDate(maxTime);
+                opCtx->setDeadlineByDate(maxTime);
             }
             auto predicate = [state] { return state->isSignaled; };
             stdx::unique_lock<stdx::mutex> lk(state->mutex);
             barrier->countDownAndWait();
             if (until < Date_t::max()) {
-                return txn->waitForConditionOrInterruptUntil(state->cv, lk, until, predicate);
+                return opCtx->waitForConditionOrInterruptUntil(state->cv, lk, until, predicate);
             } else {
-                txn->waitForConditionOrInterrupt(state->cv, lk, predicate);
+                opCtx->waitForConditionOrInterrupt(state->cv, lk, predicate);
                 return stdx::cv_status::no_timeout;
             }
         });
@@ -253,36 +254,36 @@ public:
         // barrier until it does.
         stdx::lock_guard<stdx::mutex> lk(state->mutex);
 
-        // Assuming that txn has not already been interrupted and that maxTime and until are
+        // Assuming that opCtx has not already been interrupted and that maxTime and until are
         // unexpired, we know that the waiter must be blocked in the condition variable, because it
         // held the mutex before we tried to acquire it, and only releases it on condition variable
         // wait.
         return result;
     }
 
-    stdx::future<stdx::cv_status> startWaiter(OperationContext* txn, WaitTestState* state) {
-        return startWaiterWithUntilAndMaxTime(txn, state, Date_t::max(), Date_t::max());
+    stdx::future<stdx::cv_status> startWaiter(OperationContext* opCtx, WaitTestState* state) {
+        return startWaiterWithUntilAndMaxTime(opCtx, state, Date_t::max(), Date_t::max());
     }
 };
 
 TEST_F(ThreadedOperationDeadlineTests, KillArrivesWhileWaiting) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     WaitTestState state;
-    auto waiterResult = startWaiter(txn.get(), &state);
+    auto waiterResult = startWaiter(opCtx.get(), &state);
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     {
-        stdx::lock_guard<Client> clientLock(*txn->getClient());
-        txn->markKilled();
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        opCtx->markKilled();
     }
     ASSERT_THROWS_CODE(waiterResult.get(), DBException, ErrorCodes::Interrupted);
 }
 
 TEST_F(ThreadedOperationDeadlineTests, MaxTimeExpiresWhileWaiting) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     WaitTestState state;
     const auto startDate = mockClock->now();
-    auto waiterResult = startWaiterWithUntilAndMaxTime(txn.get(),
+    auto waiterResult = startWaiterWithUntilAndMaxTime(opCtx.get(),
                                                        &state,
                                                        startDate + Seconds{60},   // until
                                                        startDate + Seconds{10});  // maxTime
@@ -297,10 +298,10 @@ TEST_F(ThreadedOperationDeadlineTests, MaxTimeExpiresWhileWaiting) {
 }
 
 TEST_F(ThreadedOperationDeadlineTests, UntilExpiresWhileWaiting) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     WaitTestState state;
     const auto startDate = mockClock->now();
-    auto waiterResult = startWaiterWithUntilAndMaxTime(txn.get(),
+    auto waiterResult = startWaiterWithUntilAndMaxTime(opCtx.get(),
                                                        &state,
                                                        startDate + Seconds{10},   // until
                                                        startDate + Seconds{60});  // maxTime
@@ -315,9 +316,9 @@ TEST_F(ThreadedOperationDeadlineTests, UntilExpiresWhileWaiting) {
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SignalOne) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     WaitTestState state;
-    auto waiterResult = startWaiter(txn.get(), &state);
+    auto waiterResult = startWaiter(opCtx.get(), &state);
 
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()))
@@ -351,10 +352,10 @@ TEST_F(ThreadedOperationDeadlineTests, KillOneSignalAnother) {
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SignalBeforeUntilExpires) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     WaitTestState state;
     const auto startDate = mockClock->now();
-    auto waiterResult = startWaiterWithUntilAndMaxTime(txn.get(),
+    auto waiterResult = startWaiterWithUntilAndMaxTime(opCtx.get(),
                                                        &state,
                                                        startDate + Seconds{10},   // until
                                                        startDate + Seconds{60});  // maxTime
@@ -369,10 +370,10 @@ TEST_F(ThreadedOperationDeadlineTests, SignalBeforeUntilExpires) {
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SignalBeforeMaxTimeExpires) {
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     WaitTestState state;
     const auto startDate = mockClock->now();
-    auto waiterResult = startWaiterWithUntilAndMaxTime(txn.get(),
+    auto waiterResult = startWaiterWithUntilAndMaxTime(opCtx.get(),
                                                        &state,
                                                        startDate + Seconds{60},   // until
                                                        startDate + Seconds{10});  // maxTime

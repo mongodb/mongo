@@ -64,7 +64,7 @@ public:
      * The object pointed to by "request" must stay in scope for the life of the constructed
      * ParsedUpdate.
      */
-    ParsedUpdate(OperationContext* txn, const UpdateRequest* request);
+    ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request);
 
     /**
      * Parses the update request to a canonical query and an update driver. On success, the
@@ -138,7 +138,7 @@ private:
     Status parseUpdate();
 
     // Unowned pointer to the transactional context.
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // Unowned pointer to the request object to process.
     const UpdateRequest* const _request;

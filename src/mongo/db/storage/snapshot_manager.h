@@ -58,7 +58,7 @@ public:
      * This must be the first method called after starting a ScopedTransaction, and it is
      * illegal to start a WriteUnitOfWork inside of the same ScopedTransaction.
      */
-    virtual Status prepareForCreateSnapshot(OperationContext* txn) = 0;
+    virtual Status prepareForCreateSnapshot(OperationContext* opCtx) = 0;
 
     /**
      * Creates a new named snapshot representing the same point-in-time captured in
@@ -68,7 +68,7 @@ public:
      *
      * Caller guarantees that this name must compare greater than all existing snapshots.
      */
-    virtual Status createSnapshot(OperationContext* txn, const SnapshotName& name) = 0;
+    virtual Status createSnapshot(OperationContext* opCtx, const SnapshotName& name) = 0;
 
     /**
      * Sets the snapshot to be used for committed reads.

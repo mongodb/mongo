@@ -96,7 +96,7 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -106,7 +106,7 @@ public:
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
 
         const auto toElt = cmdObj["to"];
         uassert(ErrorCodes::TypeMismatch,
@@ -118,7 +118,7 @@ public:
             return false;
         }
 
-        const auto toStatus = Grid::get(txn)->shardRegistry()->getShard(txn, toString);
+        const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, toString);
         if (!toStatus.isOK()) {
             string msg(str::stream() << "Could not move chunk in '" << nss.ns() << "' to shard '"
                                      << toString
@@ -132,7 +132,8 @@ public:
         // so far, chunk size serves test purposes; it may or may not become a supported parameter
         long long maxChunkSizeBytes = cmdObj["maxChunkSizeBytes"].numberLong();
         if (maxChunkSizeBytes == 0) {
-            maxChunkSizeBytes = Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes();
+            maxChunkSizeBytes =
+                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes();
         }
 
         BSONObj find = cmdObj.getObjectField("find");
@@ -151,7 +152,7 @@ public:
         if (!find.isEmpty()) {
             // find
             BSONObj shardKey =
-                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(txn, find));
+                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, find));
             if (shardKey.isEmpty()) {
                 errmsg = str::stream() << "no shard key found in chunk query " << find;
                 return false;
@@ -191,7 +192,7 @@ public:
         chunkType.setShard(chunk->getShardId());
         chunkType.setVersion(cm->getVersion());
 
-        uassertStatusOK(configsvr_client::moveChunk(txn,
+        uassertStatusOK(configsvr_client::moveChunk(opCtx,
                                                     chunkType,
                                                     to->getId(),
                                                     maxChunkSizeBytes,
@@ -200,7 +201,7 @@ public:
 
         // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
         // immediately up-to-date the next time it's used.
-        scopedCM.db()->getChunkManagerIfExists(txn, nss.ns(), true);
+        scopedCM.db()->getChunkManagerIfExists(opCtx, nss.ns(), true);
 
         result.append("millis", t.millis());
         return true;

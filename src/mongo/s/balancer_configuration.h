@@ -214,7 +214,7 @@ public:
     /**
      * Synchronous method, which writes the balancer mode to the configuration data.
      */
-    Status setBalancerMode(OperationContext* txn, BalancerSettingsType::BalancerMode mode);
+    Status setBalancerMode(OperationContext* opCtx, BalancerSettingsType::BalancerMode mode);
 
     /**
      * Returns whether balancing is allowed based on both the enabled state of the balancer and the
@@ -254,27 +254,27 @@ public:
      * This method is thread-safe but it doesn't make sense to be called from more than one thread
      * at a time.
      */
-    Status refreshAndCheck(OperationContext* txn);
+    Status refreshAndCheck(OperationContext* opCtx);
 
 private:
     /**
      * Reloads the balancer configuration from the settings document. Fails if the settings document
      * cannot be read, in which case the values will remain unchanged.
      */
-    Status _refreshBalancerSettings(OperationContext* txn);
+    Status _refreshBalancerSettings(OperationContext* opCtx);
 
     /**
      * Reloads the chunk sizes configuration from the settings document. Fails if the settings
      * document cannot be read or if any setting contains invalid value, in which case the offending
      * value will remain unchanged.
      */
-    Status _refreshChunkSizeSettings(OperationContext* txn);
+    Status _refreshChunkSizeSettings(OperationContext* opCtx);
 
     /**
      * Reloads the autosplit configuration from the settings document. Fails if the settings
      * document cannot be read.
      */
-    Status _refreshAutoSplitSettings(OperationContext* txn);
+    Status _refreshAutoSplitSettings(OperationContext* opCtx);
 
     // The latest read balancer settings and a mutex to protect its swaps
     mutable stdx::mutex _balancerSettingsMutex;

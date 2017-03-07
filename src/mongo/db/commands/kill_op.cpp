@@ -128,7 +128,7 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
              int options,
@@ -138,12 +138,12 @@ public:
 
         log() << "going to kill op: " << opId;
         result.append("info", "attempting to kill op");
-        auto swLkAndOp = _findOp(txn->getClient(), opId);
+        auto swLkAndOp = _findOp(opCtx->getClient(), opId);
         if (swLkAndOp.isOK()) {
             stdx::unique_lock<Client> lk;
             OperationContext* opCtx;
             std::tie(lk, opCtx) = std::move(swLkAndOp.getValue());
-            txn->getServiceContext()->killOperation(opCtx);
+            opCtx->getServiceContext()->killOperation(opCtx);
         }
 
         return true;

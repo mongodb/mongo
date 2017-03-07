@@ -43,16 +43,16 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOn
 
 }  // namespace
 
-Status moveChunk(OperationContext* txn,
+Status moveChunk(OperationContext* opCtx,
                  const ChunkType& chunk,
                  const ShardId& newShardId,
                  int64_t maxChunkSizeBytes,
                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
                  bool waitForDelete) {
-    auto shardRegistry = Grid::get(txn)->shardRegistry();
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
     auto cmdResponseStatus = shard->runCommand(
-        txn,
+        opCtx,
         kPrimaryOnlyReadPreference,
         "admin",
         BalanceChunkRequest::serializeToMoveCommandForConfig(
@@ -65,11 +65,11 @@ Status moveChunk(OperationContext* txn,
     return cmdResponseStatus.getValue().commandStatus;
 }
 
-Status rebalanceChunk(OperationContext* txn, const ChunkType& chunk) {
-    auto shardRegistry = Grid::get(txn)->shardRegistry();
+Status rebalanceChunk(OperationContext* opCtx, const ChunkType& chunk) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
     auto cmdResponseStatus = shard->runCommandWithFixedRetryAttempts(
-        txn,
+        opCtx,
         kPrimaryOnlyReadPreference,
         "admin",
         BalanceChunkRequest::serializeToRebalanceCommandForConfig(chunk),

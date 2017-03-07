@@ -56,7 +56,7 @@ class OperationContext;
  * Example usage:
  * beforeMetadata = <get latest local metadata>;
  * remoteMetadata = makeCollectionMetadata( beforeMetadata, remoteMetadata );
- * DBLock lock(txn, dbname, MODE_X);
+ * DBLock lock(opCtx, dbname, MODE_X);
  * afterMetadata = <get latest local metadata>;
  *
  * The loader will go out of its way to try to fetch the smaller amount possible of data
@@ -85,7 +85,7 @@ public:
      * @return HostUnreachable if there was an error contacting the config servers
      * @return RemoteChangeDetected if the data loaded was modified by another operation
      */
-    static Status makeCollectionMetadata(OperationContext* txn,
+    static Status makeCollectionMetadata(OperationContext* opCtx,
                                          ShardingCatalogClient* catalogClient,
                                          const std::string& ns,
                                          const std::string& shard,
@@ -104,7 +104,7 @@ private:
      * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
      *
      */
-    static Status _initCollection(OperationContext* txn,
+    static Status _initCollection(OperationContext* opCtx,
                                   ShardingCatalogClient* catalogClient,
                                   const std::string& ns,
                                   const std::string& shard,
@@ -123,7 +123,7 @@ private:
      * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
      * TODO: @return FailedToParse
      */
-    static Status _initChunks(OperationContext* txn,
+    static Status _initChunks(OperationContext* opCtx,
                               ShardingCatalogClient* catalogClient,
                               const std::string& ns,
                               const std::string& shard,
@@ -148,7 +148,7 @@ private:
      * 'currEpoch'
      * - Other errors in writes/reads to the config.chunks.ns collection fails.
      */
-    static Status _writeNewChunksIfPrimary(OperationContext* txn,
+    static Status _writeNewChunksIfPrimary(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const std::vector<ChunkType>& chunks,
                                            const OID& currEpoch);

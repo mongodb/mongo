@@ -60,7 +60,7 @@ struct CollModRequest {
     BSONElement noPadding = {};
 };
 
-StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
+StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                Collection* coll,
                                                const BSONObj& cmdObj) {
@@ -117,7 +117,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
             }
 
             if (!indexName.empty()) {
-                cmr.idx = coll->getIndexCatalog()->findIndexByName(txn, indexName);
+                cmr.idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
                 if (!cmr.idx) {
                     return Status(ErrorCodes::IndexNotFound,
                                   str::stream() << "cannot find index " << indexName << " for ns "
@@ -125,7 +125,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
                 }
             } else {
                 std::vector<IndexDescriptor*> indexes;
-                coll->getIndexCatalog()->findIndexesByKeyPattern(txn, keyPattern, false, &indexes);
+                coll->getIndexCatalog()->findIndexesByKeyPattern(
+                    opCtx, keyPattern, false, &indexes);
 
                 if (indexes.size() > 1) {
                     return Status(ErrorCodes::AmbiguousIndexKeyPattern,
@@ -214,20 +215,20 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
     return {std::move(cmr)};
 }
 
-Status collMod(OperationContext* txn,
+Status collMod(OperationContext* opCtx,
                const NamespaceString& nss,
                const BSONObj& cmdObj,
                BSONObjBuilder* result) {
     StringData dbName = nss.db();
-    ScopedTransaction transaction(txn, MODE_IX);
-    AutoGetDb autoDb(txn, dbName, MODE_X);
+    ScopedTransaction transaction(opCtx, MODE_IX);
+    AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
     Collection* coll = db ? db->getCollection(nss) : nullptr;
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
     if (db && !coll) {
-        const auto sharedView = db->getViewCatalog()->lookup(txn, nss.ns());
+        const auto sharedView = db->getViewCatalog()->lookup(opCtx, nss.ns());
         if (sharedView) {
             // We copy the ViewDefinition as it is modified below to represent the requested state.
             view = {*sharedView};
@@ -243,10 +244,10 @@ Status collMod(OperationContext* txn,
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 
-    OldClientContext ctx(txn, nss.ns());
+    OldClientContext ctx(opCtx, nss.ns());
 
-    bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss);
+    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
@@ -254,14 +255,14 @@ Status collMod(OperationContext* txn,
                                     << nss.ns());
     }
 
-    auto statusW = parseCollModRequest(txn, nss, coll, cmdObj);
+    auto statusW = parseCollModRequest(opCtx, nss, coll, cmdObj);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
 
     CollModRequest cmr = statusW.getValue();
 
-    WriteUnitOfWork wunit(txn);
+    WriteUnitOfWork wunit(opCtx);
 
     if (view) {
         if (!cmr.viewPipeLine.eoo())
@@ -276,7 +277,8 @@ Status collMod(OperationContext* txn,
         for (auto& item : view->pipeline()) {
             pipeline.append(item);
         }
-        auto errorStatus = catalog->modifyView(txn, nss, view->viewOn(), BSONArray(pipeline.obj()));
+        auto errorStatus =
+            catalog->modifyView(opCtx, nss, view->viewOn(), BSONArray(pipeline.obj()));
         if (!errorStatus.isOK()) {
             return errorStatus;
         }
@@ -289,21 +291,21 @@ Status collMod(OperationContext* txn,
                 result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
                 // Change the value of "expireAfterSeconds" on disk.
                 coll->getCatalogEntry()->updateTTLSetting(
-                    txn, cmr.idx->indexName(), newExpireSecs.safeNumberLong());
+                    opCtx, cmr.idx->indexName(), newExpireSecs.safeNumberLong());
                 // Notify the index catalog that the definition of this index changed.
-                cmr.idx = coll->getIndexCatalog()->refreshEntry(txn, cmr.idx);
+                cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
                 result->appendAs(newExpireSecs, "expireAfterSeconds_new");
             }
         }
 
         if (!cmr.collValidator.eoo())
-            coll->setValidator(txn, cmr.collValidator.Obj());
+            coll->setValidator(opCtx, cmr.collValidator.Obj());
 
         if (!cmr.collValidationAction.empty())
-            coll->setValidationAction(txn, cmr.collValidationAction);
+            coll->setValidationAction(opCtx, cmr.collValidationAction);
 
         if (!cmr.collValidationLevel.empty())
-            coll->setValidationLevel(txn, cmr.collValidationLevel);
+            coll->setValidationLevel(opCtx, cmr.collValidationLevel);
 
         auto setCollectionOption = [&](BSONElement& COElement) {
             typedef CollectionOptions CO;
@@ -315,7 +317,7 @@ Status collMod(OperationContext* txn,
 
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
 
-            const int oldFlags = cce->getCollectionOptions(txn).flags;
+            const int oldFlags = cce->getCollectionOptions(opCtx).flags;
             const bool oldSetting = oldFlags & flag;
             const bool newSetting = COElement.trueValue();
 
@@ -327,9 +329,9 @@ Status collMod(OperationContext* txn,
 
             // NOTE we do this unconditionally to ensure that we note that the user has
             // explicitly set flags, even if they are just setting the default.
-            cce->updateFlags(txn, newFlags);
+            cce->updateFlags(opCtx, newFlags);
 
-            const CollectionOptions newOptions = cce->getCollectionOptions(txn);
+            const CollectionOptions newOptions = cce->getCollectionOptions(opCtx);
             invariant(newOptions.flags == newFlags);
             invariant(newOptions.flagsSet);
         };
@@ -345,7 +347,7 @@ Status collMod(OperationContext* txn,
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
         getGlobalServiceContext()->getOpObserver()->onCollMod(
-            txn, (dbName.toString() + ".$cmd").c_str(), cmdObj);
+            opCtx, (dbName.toString() + ".$cmd").c_str(), cmdObj);
     }
 
     wunit.commit();

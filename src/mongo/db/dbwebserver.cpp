@@ -162,7 +162,7 @@ public:
 
     virtual void init() {}
 
-    virtual void run(OperationContext* txn, stringstream& ss) {
+    virtual void run(OperationContext* opCtx, stringstream& ss) {
         _log->toHTML(ss);
     }
     RamLog* _log;
@@ -172,7 +172,7 @@ class FavIconHandler : public DbWebHandler {
 public:
     FavIconHandler() : DbWebHandler("favicon.ico", 0, false) {}
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,
                         const std::string& url,
                         BSONObj params,
@@ -191,7 +191,7 @@ class StatusHandler : public DbWebHandler {
 public:
     StatusHandler() : DbWebHandler("_status", 1, false) {}
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,
                         const std::string& url,
                         BSONObj params,
@@ -231,7 +231,7 @@ public:
             string errmsg;
 
             BSONObjBuilder sub;
-            if (!c->run(txn, "admin.$cmd", co, 0, errmsg, sub))
+            if (!c->run(opCtx, "admin.$cmd", co, 0, errmsg, sub))
                 buf.append(cmd, errmsg);
             else
                 buf.append(cmd, sub.obj());
@@ -246,7 +246,7 @@ class CommandListHandler : public DbWebHandler {
 public:
     CommandListHandler() : DbWebHandler("_commands", 1, true) {}
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,
                         const std::string& url,
                         BSONObj params,
@@ -305,7 +305,7 @@ public:
         return _cmd(cmd) != 0;
     }
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,
                         const std::string& url,
                         BSONObj params,
@@ -330,7 +330,7 @@ public:
         rpc::CommandRequest cmdRequest{&cmdRequestMsg};
         rpc::CommandReplyBuilder cmdReplyBuilder{};
 
-        Command::execCommand(txn, c, cmdRequest, &cmdReplyBuilder);
+        Command::execCommand(opCtx, c, cmdRequest, &cmdReplyBuilder);
 
         auto cmdReplyMsg = cmdReplyBuilder.done();
         rpc::CommandReply cmdReply{&cmdReplyMsg};
@@ -373,10 +373,10 @@ void DbWebServer::doRequest(const char* rq,
                             vector<string>& headers,
                             const SockAddr& from) {
     Client* client = &cc();
-    auto txn = client->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
 
     if (url.size() > 1) {
-        if (!_allowed(txn.get(), rq, headers, from)) {
+        if (!_allowed(opCtx.get(), rq, headers, from)) {
             responseCode = 401;
             headers.push_back("Content-Type: text/plain;charset=utf-8");
             responseMsg = "not allowed\n";
@@ -403,7 +403,7 @@ void DbWebServer::doRequest(const char* rq,
                             callback.empty() || serverGlobalParams.jsonp);
 
                     handler->handle(
-                        txn.get(), rq, url, params, responseMsg, responseCode, headers, from);
+                        opCtx.get(), rq, url, params, responseMsg, responseCode, headers, from);
 
                     if (responseCode == 200 && !callback.empty()) {
                         responseMsg = callback + '(' + responseMsg + ')';
@@ -427,7 +427,7 @@ void DbWebServer::doRequest(const char* rq,
 
     // generate home page
 
-    if (!_allowed(txn.get(), rq, headers, from)) {
+    if (!_allowed(opCtx.get(), rq, headers, from)) {
         responseCode = 401;
         headers.push_back("Content-Type: text/plain;charset=utf-8");
         responseMsg = "not allowed\n";
@@ -476,23 +476,23 @@ void DbWebServer::doRequest(const char* rq,
 
     doUnlockedStuff(ss);
 
-    WebStatusPlugin::runAll(txn.get(), ss);
+    WebStatusPlugin::runAll(opCtx.get(), ss);
 
     ss << "</body></html>\n";
     responseMsg = ss.str();
     headers.push_back("Content-Type: text/html;charset=utf-8");
 }
 
-bool DbWebServer::_allowed(OperationContext* txn,
+bool DbWebServer::_allowed(OperationContext* opCtx,
                            const char* rq,
                            vector<string>& headers,
                            const SockAddr& from) {
-    AuthorizationSession* authSess = AuthorizationSession::get(txn->getClient());
+    AuthorizationSession* authSess = AuthorizationSession::get(opCtx->getClient());
     if (!authSess->getAuthorizationManager().isAuthEnabled()) {
         return true;
     }
 
-    if (from.isLocalHost() && !_webUsers->haveAdminUsers(txn)) {
+    if (from.isLocalHost() && !_webUsers->haveAdminUsers(opCtx)) {
         authSess->grantInternalAuthorization();
         return true;
     }
@@ -515,7 +515,7 @@ bool DbWebServer::_allowed(OperationContext* txn,
         UserName userName(parms["username"], "admin");
         User* user;
         AuthorizationManager& authzManager = authSess->getAuthorizationManager();
-        Status status = authzManager.acquireUser(txn, userName, &user);
+        Status status = authzManager.acquireUser(opCtx, userName, &user);
         if (!status.isOK()) {
             if (status.code() != ErrorCodes::UserNotFound) {
                 uasserted(17051, status.reason());
@@ -548,7 +548,7 @@ bool DbWebServer::_allowed(OperationContext* txn,
             const string r1 = md5simpledigest(r.str());
 
             if (r1 == parms["response"]) {
-                Status status = authSess->addAndAuthorizeUser(txn, userName);
+                Status status = authSess->addAndAuthorizeUser(opCtx, userName);
                 uassertStatusOK(status);
                 return true;
             }
@@ -593,7 +593,7 @@ void WebStatusPlugin::initAll() {
         (*_plugins)[i]->init();
 }
 
-void WebStatusPlugin::runAll(OperationContext* txn, stringstream& ss) {
+void WebStatusPlugin::runAll(OperationContext* opCtx, stringstream& ss) {
     if (!_plugins)
         return;
 
@@ -606,7 +606,7 @@ void WebStatusPlugin::runAll(OperationContext* txn, stringstream& ss) {
 
         ss << "<br>\n";
 
-        p->run(txn, ss);
+        p->run(opCtx, ss);
     }
 }
 

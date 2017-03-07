@@ -188,7 +188,7 @@ public:
 
     // Used to report replication position only in master-slave, so we keep them as TimeStamp rather
     // than OpTime.
-    void updateSlaveLocation(OperationContext* txn);
+    void updateSlaveLocation(OperationContext* opCtx);
 
     void slaveReadTill(const Timestamp& t) {
         _slaveReadTill = t;

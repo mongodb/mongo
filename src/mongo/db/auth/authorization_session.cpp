@@ -95,14 +95,15 @@ AuthorizationManager& AuthorizationSession::getAuthorizationManager() {
     return _externalState->getAuthorizationManager();
 }
 
-void AuthorizationSession::startRequest(OperationContext* txn) {
-    _externalState->startRequest(txn);
-    _refreshUserInfoAsNeeded(txn);
+void AuthorizationSession::startRequest(OperationContext* opCtx) {
+    _externalState->startRequest(opCtx);
+    _refreshUserInfoAsNeeded(opCtx);
 }
 
-Status AuthorizationSession::addAndAuthorizeUser(OperationContext* txn, const UserName& userName) {
+Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
+                                                 const UserName& userName) {
     User* user;
-    Status status = getAuthorizationManager().acquireUser(txn, userName, &user);
+    Status status = getAuthorizationManager().acquireUser(opCtx, userName, &user);
     if (!status.isOK()) {
         return status;
     }
@@ -370,7 +371,7 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
+Status AuthorizationSession::checkAuthForInsert(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const BSONObj& document) {
     if (ns.coll() == "system.indexes"_sd) {
@@ -388,7 +389,7 @@ Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
         }
     } else {
         ActionSet required{ActionType::insert};
-        if (documentValidationDisabled(txn)) {
+        if (documentValidationDisabled(opCtx)) {
             required.addAction(ActionType::bypassDocumentValidation);
         }
         if (!isAuthorizedForActionsOnNamespace(ns, required)) {
@@ -400,7 +401,7 @@ Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
+Status AuthorizationSession::checkAuthForUpdate(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const BSONObj& query,
                                                 const BSONObj& update,
@@ -413,7 +414,7 @@ Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
         operationType = "upsert"_sd;
     }
 
-    if (documentValidationDisabled(txn)) {
+    if (documentValidationDisabled(opCtx)) {
         required.addAction(ActionType::bypassDocumentValidation);
     }
 
@@ -425,7 +426,7 @@ Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForDelete(OperationContext* txn,
+Status AuthorizationSession::checkAuthForDelete(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const BSONObj& query) {
     if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
@@ -730,7 +731,7 @@ bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleNam
     return false;
 }
 
-void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
+void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
     AuthorizationManager& authMan = getAuthorizationManager();
     UserSet::iterator it = _authenticatedUsers.begin();
     while (it != _authenticatedUsers.end()) {
@@ -742,7 +743,7 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
             UserName name = user->getName();
             User* updatedUser;
 
-            Status status = authMan.acquireUser(txn, name, &updatedUser);
+            Status status = authMan.acquireUser(opCtx, name, &updatedUser);
             switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.

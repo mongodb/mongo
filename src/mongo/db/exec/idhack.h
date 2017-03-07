@@ -48,13 +48,13 @@ class RecordCursor;
 class IDHackStage final : public PlanStage {
 public:
     /** Takes ownership of all the arguments -collection. */
-    IDHackStage(OperationContext* txn,
+    IDHackStage(OperationContext* opCtx,
                 const Collection* collection,
                 CanonicalQuery* query,
                 WorkingSet* ws,
                 const IndexDescriptor* descriptor);
 
-    IDHackStage(OperationContext* txn,
+    IDHackStage(OperationContext* opCtx,
                 Collection* collection,
                 const BSONObj& key,
                 WorkingSet* ws,
@@ -69,7 +69,7 @@ public:
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     /**
      * ID Hack has a very strict criteria for the queries it supports.

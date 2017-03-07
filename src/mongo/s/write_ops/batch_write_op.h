@@ -106,7 +106,7 @@ public:
      *
      * Returned TargetedWriteBatches are owned by the caller.
      */
-    Status targetBatch(OperationContext* txn,
+    Status targetBatch(OperationContext* opCtx,
                        const NSTargeter& targeter,
                        bool recordTargetErrors,
                        std::vector<TargetedWriteBatch*>* targetedBatches);

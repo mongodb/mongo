@@ -86,7 +86,7 @@ public:
                                                         const CollectionOptions& options,
                                                         StringData extraStrings);
 
-    WiredTigerRecordStore(OperationContext* txn,
+    WiredTigerRecordStore(OperationContext* opCtx,
                           StringData ns,
                           StringData uri,
                           std::string engineName,
@@ -102,39 +102,39 @@ public:
     // name of the RecordStore implementation
     virtual const char* name() const;
 
-    virtual long long dataSize(OperationContext* txn) const;
+    virtual long long dataSize(OperationContext* opCtx) const;
 
-    virtual long long numRecords(OperationContext* txn) const;
+    virtual long long numRecords(OperationContext* opCtx) const;
 
     virtual bool isCapped() const;
 
-    virtual int64_t storageSize(OperationContext* txn,
+    virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const;
 
     // CRUD related
 
-    virtual RecordData dataFor(OperationContext* txn, const RecordId& id) const;
+    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& id) const;
 
-    virtual bool findRecord(OperationContext* txn, const RecordId& id, RecordData* out) const;
+    virtual bool findRecord(OperationContext* opCtx, const RecordId& id, RecordData* out) const;
 
-    virtual void deleteRecord(OperationContext* txn, const RecordId& id);
+    virtual void deleteRecord(OperationContext* opCtx, const RecordId& id);
 
-    virtual Status insertRecords(OperationContext* txn,
+    virtual Status insertRecords(OperationContext* opCtx,
                                  std::vector<Record>* records,
                                  bool enforceQuota);
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
                                               const char* data,
                                               int len,
                                               bool enforceQuota);
 
-    virtual Status insertRecordsWithDocWriter(OperationContext* txn,
+    virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,
                                               size_t nDocs,
                                               RecordId* idsOut);
 
-    virtual Status updateRecord(OperationContext* txn,
+    virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
                                 const char* data,
                                 int len,
@@ -143,22 +143,22 @@ public:
 
     virtual bool updateWithDamagesSupported() const;
 
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
                                                      const RecordId& id,
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
 
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* txn) const final;
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const final;
 
-    std::unique_ptr<RecordCursor> getRandomCursorWithOptions(OperationContext* txn,
+    std::unique_ptr<RecordCursor> getRandomCursorWithOptions(OperationContext* opCtx,
                                                              StringData extraConfig) const;
 
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const final;
 
-    virtual Status truncate(OperationContext* txn);
+    virtual Status truncate(OperationContext* opCtx);
 
     virtual bool compactSupported() const {
         return !_isEphemeral;
@@ -167,36 +167,36 @@ public:
         return true;
     }
 
-    virtual Status compact(OperationContext* txn,
+    virtual Status compact(OperationContext* opCtx,
                            RecordStoreCompactAdaptor* adaptor,
                            const CompactOptions* options,
                            CompactStats* stats);
 
-    virtual Status validate(OperationContext* txn,
+    virtual Status validate(OperationContext* opCtx,
                             ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
                             BSONObjBuilder* output);
 
-    virtual void appendCustomStats(OperationContext* txn,
+    virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const;
 
-    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
+    virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
 
-    virtual void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
+    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
-    virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+    virtual boost::optional<RecordId> oplogStartHack(OperationContext* opCtx,
                                                      const RecordId& startingPosition) const;
 
-    virtual Status oplogDiskLocRegister(OperationContext* txn, const Timestamp& opTime);
+    virtual Status oplogDiskLocRegister(OperationContext* opCtx, const Timestamp& opTime);
 
-    virtual void updateStatsAfterRepair(OperationContext* txn,
+    virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize);
 
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override;
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override;
 
     bool isOplog() const {
         return _isOplog;
@@ -229,18 +229,18 @@ public:
 
     bool inShutdown() const;
 
-    void reclaimOplog(OperationContext* txn);
+    void reclaimOplog(OperationContext* opCtx);
 
-    int64_t cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
+    int64_t cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted);
 
-    int64_t cappedDeleteAsNeeded_inlock(OperationContext* txn, const RecordId& justInserted);
+    int64_t cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
 
     boost::timed_mutex& cappedDeleterMutex() {  // NOLINT
         return _cappedDeleterMutex;
     }
 
     // Returns false if the oplog was dropped while waiting for a deletion request.
-    bool yieldAndAwaitOplogDeletionRequest(OperationContext* txn);
+    bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx);
 
     class OplogStones;
 
@@ -257,21 +257,21 @@ private:
     class NumRecordsChange;
     class DataSizeChange;
 
-    static WiredTigerRecoveryUnit* _getRecoveryUnit(OperationContext* txn);
+    static WiredTigerRecoveryUnit* _getRecoveryUnit(OperationContext* opCtx);
 
     static int64_t _makeKey(const RecordId& id);
     static RecordId _fromKey(int64_t k);
 
     void _dealtWithCappedId(SortedRecordIds::iterator it, bool didCommit);
-    void _addUncommittedRecordId_inlock(OperationContext* txn, RecordId id);
+    void _addUncommittedRecordId_inlock(OperationContext* opCtx, RecordId id);
 
-    Status _insertRecords(OperationContext* txn, Record* records, size_t nRecords);
+    Status _insertRecords(OperationContext* opCtx, Record* records, size_t nRecords);
 
     RecordId _nextId();
     void _setId(RecordId id);
     bool cappedAndNeedDelete() const;
-    void _changeNumRecords(OperationContext* txn, int64_t diff);
-    void _increaseDataSize(OperationContext* txn, int64_t amount);
+    void _changeNumRecords(OperationContext* opCtx, int64_t diff);
+    void _increaseDataSize(OperationContext* opCtx, int64_t amount);
     RecordData _getData(const WiredTigerCursor& cursor) const;
     void _oplogSetStartHack(WiredTigerRecoveryUnit* wru) const;
     void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache);

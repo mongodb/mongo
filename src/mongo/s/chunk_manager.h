@@ -103,7 +103,7 @@ public:
     }
 
     // Loads existing ranges based on info in chunk manager
-    void loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager);
+    void loadExistingRanges(OperationContext* opCtx, const ChunkManager* oldManager);
 
     //
     // Methods to use once loaded / created
@@ -133,7 +133,7 @@ public:
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
      * collection default collation for targeting.
      */
-    void getShardIdsForQuery(OperationContext* txn,
+    void getShardIdsForQuery(OperationContext* opCtx,
                              const BSONObj& query,
                              const BSONObj& collation,
                              std::set<ShardId>* shardIds) const;
@@ -218,7 +218,7 @@ private:
      * _chunkRangeMap are consistent with each other. If false is returned, it is not safe to use
      * the chunk manager anymore.
      */
-    bool _load(OperationContext* txn,
+    bool _load(OperationContext* opCtx,
                ChunkMap& chunks,
                std::set<ShardId>& shardIds,
                ShardVersionMap* shardVersions,

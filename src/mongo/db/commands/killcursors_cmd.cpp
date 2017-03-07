@@ -45,7 +45,9 @@ public:
     KillCursorsCmd() = default;
 
 private:
-    Status _killCursor(OperationContext* txn, const NamespaceString& nss, CursorId cursorId) final {
+    Status _killCursor(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       CursorId cursorId) final {
         std::unique_ptr<AutoGetCollectionOrViewForRead> ctx;
 
         CursorManager* cursorManager;
@@ -55,22 +57,22 @@ private:
             // data within a collection.
             cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(txn, nss);
+            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(opCtx, nss);
             Collection* collection = ctx->getCollection();
             ViewDefinition* view = ctx->getView();
             if (view) {
                 Database* db = ctx->getDb();
-                auto resolved = db->getViewCatalog()->resolveView(txn, nss);
+                auto resolved = db->getViewCatalog()->resolveView(opCtx, nss);
                 if (!resolved.isOK()) {
                     return resolved.getStatus();
                 }
                 ctx->releaseLocksForView();
-                Status status = _killCursor(txn, resolved.getValue().getNamespace(), cursorId);
+                Status status = _killCursor(opCtx, resolved.getValue().getNamespace(), cursorId);
                 {
                     // Set the namespace of the curop back to the view namespace so ctx records
                     // stats on this view namespace on destruction.
-                    stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)->setNS_inlock(nss.ns());
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->setNS_inlock(nss.ns());
                 }
                 return status;
             }
@@ -82,7 +84,7 @@ private:
         }
         invariant(cursorManager);
 
-        return cursorManager->eraseCursor(txn, cursorId, true /*shouldAudit*/);
+        return cursorManager->eraseCursor(opCtx, cursorId, true /*shouldAudit*/);
     }
 } killCursorsCmd;
 

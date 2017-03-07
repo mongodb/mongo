@@ -84,7 +84,7 @@ static void noteStaleResponses(const vector<ShardError*>& staleErrors, NSTargete
 // This only applies when no writes are occurring and metadata is not changing on reload
 static const int kMaxRoundsWithoutProgress(5);
 
-void BatchWriteExec::executeBatch(OperationContext* txn,
+void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                   const BatchedCommandRequest& clientRequest,
                                   BatchedCommandResponse* clientResponse,
                                   BatchWriteExecStats* stats) {
@@ -132,7 +132,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
         // record target errors definitively.
         bool recordTargetErrors = refreshedTargeter;
         Status targetStatus =
-            batchOp.targetBatch(txn, *_targeter, recordTargetErrors, &childBatches);
+            batchOp.targetBatch(opCtx, *_targeter, recordTargetErrors, &childBatches);
         if (!targetStatus.isOK()) {
             // Don't do anything until a targeter refresh
             _targeter->noteCouldNotTarget();
@@ -171,8 +171,8 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
 
                 // Figure out what host we need to dispatch our targeted batch
                 const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-                auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(
-                    txn, nextBatch->getEndpoint().shardName);
+                auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(
+                    opCtx, nextBatch->getEndpoint().shardName);
 
                 bool resolvedHost = false;
                 ConnectionString shardHost;
@@ -327,7 +327,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
         //
 
         bool targeterChanged = false;
-        Status refreshStatus = _targeter->refreshIfNeeded(txn, &targeterChanged);
+        Status refreshStatus = _targeter->refreshIfNeeded(opCtx, &targeterChanged);
 
         if (!refreshStatus.isOK()) {
             // It's okay if we can't refresh, we'll just record errors for the ops if

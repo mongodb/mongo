@@ -252,9 +252,9 @@ bool DataReplicator::_isActive_inlock() const {
     return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
-Status DataReplicator::startup(OperationContext* txn,
+Status DataReplicator::startup(OperationContext* opCtx,
                                std::uint32_t initialSyncMaxAttempts) noexcept {
-    invariant(txn);
+    invariant(opCtx);
     invariant(initialSyncMaxAttempts >= 1U);
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -270,7 +270,7 @@ Status DataReplicator::startup(OperationContext* txn,
             return Status(ErrorCodes::ShutdownInProgress, "data replicator completed");
     }
 
-    _setUp_inlock(txn, initialSyncMaxAttempts);
+    _setUp_inlock(opCtx, initialSyncMaxAttempts);
 
     // Start first initial sync attempt.
     std::uint32_t initialSyncAttempt = 0;
@@ -397,32 +397,32 @@ void DataReplicator::setScheduleDbWorkFn_forTest(const CollectionCloner::Schedul
     _scheduleDbWorkFn = work;
 }
 
-void DataReplicator::_setUp_inlock(OperationContext* txn, std::uint32_t initialSyncMaxAttempts) {
+void DataReplicator::_setUp_inlock(OperationContext* opCtx, std::uint32_t initialSyncMaxAttempts) {
     // This will call through to the storageInterfaceImpl to ReplicationCoordinatorImpl.
-    // 'txn' is passed through from startup().
-    _storage->setInitialSyncFlag(txn);
+    // 'opCtx' is passed through from startup().
+    _storage->setInitialSyncFlag(opCtx);
 
     LOG(1) << "Creating oplogBuffer.";
-    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
-    _oplogBuffer->startup(txn);
+    _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(opCtx);
+    _oplogBuffer->startup(opCtx);
 
     _stats.initialSyncStart = _exec->now();
     _stats.maxFailedInitialSyncAttempts = initialSyncMaxAttempts;
     _stats.failedInitialSyncAttempts = 0;
 }
 
-void DataReplicator::_tearDown_inlock(OperationContext* txn,
+void DataReplicator::_tearDown_inlock(OperationContext* opCtx,
                                       const StatusWith<OpTimeWithHash>& lastApplied) {
     _stats.initialSyncEnd = _exec->now();
 
     // This might not be necessary if we failed initial sync.
     invariant(_oplogBuffer);
-    _oplogBuffer->shutdown(txn);
+    _oplogBuffer->shutdown(opCtx);
 
     if (!lastApplied.isOK()) {
         return;
     }
-    _storage->clearInitialSyncFlag(txn);
+    _storage->clearInitialSyncFlag(opCtx);
     _opts.setMyLastOptime(lastApplied.getValue().opTime);
     log() << "initial sync done; took "
           << duration_cast<Seconds>(_stats.initialSyncEnd - _stats.initialSyncStart) << ".";
@@ -570,28 +570,28 @@ Status DataReplicator::_recreateOplogAndDropReplicatedDatabases() {
     LOG(1) << "About to drop+create the oplog, if it exists, ns:" << _opts.localOplogNS
            << ", and drop all user databases (so that we can clone them).";
 
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // We are not replicating nor validating these writes.
-    UnreplicatedWritesBlock unreplicatedWritesBlock(txn.get());
+    UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx.get());
 
     // 1.) Drop the oplog.
     LOG(2) << "Dropping the existing oplog: " << _opts.localOplogNS;
-    auto status = _storage->dropCollection(txn.get(), _opts.localOplogNS);
+    auto status = _storage->dropCollection(opCtx.get(), _opts.localOplogNS);
     if (!status.isOK()) {
         return status;
     }
 
     // 2.) Drop user databases.
     LOG(2) << "Dropping  user databases";
-    status = _storage->dropReplicatedDatabases(txn.get());
+    status = _storage->dropReplicatedDatabases(opCtx.get());
     if (!status.isOK()) {
         return status;
     }
 
     // 3.) Create the oplog.
     LOG(2) << "Creating the oplog: " << _opts.localOplogNS;
-    return _storage->createOplog(txn.get(), _opts.localOplogNS);
+    return _storage->createOplog(opCtx.get(), _opts.localOplogNS);
 }
 
 void DataReplicator::_rollbackCheckerResetCallback(
@@ -833,12 +833,12 @@ void DataReplicator::_lastOplogEntryFetcherCallbackForStopTimestamp(
         const auto& oplogSeedDoc = documents.front();
         LOG(1) << "inserting oplog seed document: " << oplogSeedDoc;
 
-        auto txn = makeOpCtx();
+        auto opCtx = makeOpCtx();
         // StorageInterface::insertDocument() has to be called outside the lock because we may
         // override its behavior in tests. See DataReplicatorReturnsCallbackCanceledAndDoesNot-
         // ScheduleRollbackCheckerIfShutdownAfterInsertingInsertOplogSeedDocument in
         // data_replicator_test.cpp
-        auto status = _storage->insertDocument(txn.get(), _opts.localOplogNS, oplogSeedDoc);
+        auto status = _storage->insertDocument(opCtx.get(), _opts.localOplogNS, oplogSeedDoc);
         if (!status.isOK()) {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
@@ -1048,7 +1048,7 @@ void DataReplicator::_finishInitialSyncAttempt(const StatusWith<OpTimeWithHash>&
     // For example, if CollectionCloner fails while inserting documents into the
     // CollectionBulkLoader, we will get here via one of CollectionCloner's TaskRunner callbacks
     // which has an active OperationContext bound to the current Client. This would lead to an
-    // invariant when we attempt to create a new OperationContext for _tearDown(txn).
+    // invariant when we attempt to create a new OperationContext for _tearDown(opCtx).
     // To avoid this, we schedule _finishCallback against the TaskExecutor rather than calling it
     // here synchronously.
 
@@ -1139,8 +1139,8 @@ void DataReplicator::_finishCallback(StatusWith<OpTimeWithHash> lastApplied) {
     decltype(_onCompletion) onCompletion;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        auto txn = makeOpCtx();
-        _tearDown_inlock(txn.get(), lastApplied);
+        auto opCtx = makeOpCtx();
+        _tearDown_inlock(opCtx.get(), lastApplied);
 
         invariant(_onCompletion);
         std::swap(_onCompletion, onCompletion);
@@ -1395,8 +1395,8 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
     //      * only OplogEntries from before the slaveDelay point
     //      * a single command OplogEntry (including index builds, which appear to be inserts)
     //          * consequently, commands bound the previous batch to be in a batch of their own
-    auto txn = makeOpCtx();
-    while (_oplogBuffer->peek(txn.get(), &op)) {
+    auto opCtx = makeOpCtx();
+    while (_oplogBuffer->peek(opCtx.get(), &op)) {
         auto entry = OplogEntry(std::move(op));
 
         // Check for oplog version change. If it is absent, its value is one.
@@ -1417,7 +1417,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
-                invariant(_oplogBuffer->tryPop(txn.get(), &op));
+                invariant(_oplogBuffer->tryPop(opCtx.get(), &op));
                 dassert(SimpleBSONObjComparator::kInstance.evaluate(ops.back().raw == op));
             }
 
@@ -1451,7 +1451,7 @@ StatusWith<Operations> DataReplicator::_getNextApplierBatch_inlock() {
         // Add op to buffer.
         ops.push_back(std::move(entry));
         totalBytes += ops.back().raw.objsize();
-        invariant(_oplogBuffer->tryPop(txn.get(), &op));
+        invariant(_oplogBuffer->tryPop(opCtx.get(), &op));
         dassert(SimpleBSONObjComparator::kInstance.evaluate(ops.back().raw == op));
     }
     return std::move(ops);

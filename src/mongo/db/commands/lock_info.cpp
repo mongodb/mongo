@@ -79,7 +79,7 @@ public:
 
     CmdLockInfo() : Command("lockInfo", true) {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
              int,
@@ -87,7 +87,7 @@ public:
              BSONObjBuilder& result) {
         std::map<LockerId, BSONObj> lockToClientMap;
 
-        for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+        for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
              Client* client = cursor.next();) {
             invariant(client);
 

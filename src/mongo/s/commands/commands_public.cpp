@@ -85,13 +85,14 @@ using std::vector;
 
 namespace {
 
-bool cursorCommandPassthrough(OperationContext* txn,
+bool cursorCommandPassthrough(OperationContext* opCtx,
                               shared_ptr<DBConfig> conf,
                               const BSONObj& cmdObj,
                               const NamespaceString& nss,
                               int options,
                               BSONObjBuilder* out) {
-    const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+    const auto shardStatus =
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, conf->getPrimaryId());
     if (!shardStatus.isOK()) {
         invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
         return Command::appendCommandStatus(*out, shardStatus.getStatus());
@@ -119,12 +120,12 @@ bool cursorCommandPassthrough(OperationContext* txn,
     }
 
     StatusWith<BSONObj> transformedResponse =
-        storePossibleCursor(txn,
+        storePossibleCursor(opCtx,
                             HostAndPort(cursor->originalHost()),
                             response,
                             nss,
-                            Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(),
-                            Grid::get(txn)->getCursorManager());
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            Grid::get(opCtx)->getCursorManager());
     if (!transformedResponse.isOK()) {
         return Command::appendCommandStatus(*out, transformedResponse.getStatus());
     }
@@ -172,37 +173,37 @@ public:
     // all grid commands are designed not to lock
 
 protected:
-    bool passthrough(OperationContext* txn,
+    bool passthrough(OperationContext* opCtx,
                      DBConfig* conf,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        return _passthrough(txn, conf->name(), conf, cmdObj, 0, result);
+        return _passthrough(opCtx, conf->name(), conf, cmdObj, 0, result);
     }
 
-    bool adminPassthrough(OperationContext* txn,
+    bool adminPassthrough(OperationContext* opCtx,
                           DBConfig* conf,
                           const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
-        return _passthrough(txn, "admin", conf, cmdObj, 0, result);
+        return _passthrough(opCtx, "admin", conf, cmdObj, 0, result);
     }
 
-    bool passthrough(OperationContext* txn,
+    bool passthrough(OperationContext* opCtx,
                      DBConfig* conf,
                      const BSONObj& cmdObj,
                      int options,
                      BSONObjBuilder& result) {
-        return _passthrough(txn, conf->name(), conf, cmdObj, options, result);
+        return _passthrough(opCtx, conf->name(), conf, cmdObj, options, result);
     }
 
 private:
-    bool _passthrough(OperationContext* txn,
+    bool _passthrough(OperationContext* opCtx,
                       const string& db,
                       DBConfig* conf,
                       const BSONObj& cmdObj,
                       int options,
                       BSONObjBuilder& result) {
         const auto shardStatus =
-            Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, conf->getPrimaryId());
         const auto shard = uassertStatusOK(shardStatus);
 
         ShardConnection conn(shard->getConnString(), "");
@@ -229,13 +230,13 @@ public:
                                bool implicitCreateDb = false)
         : RunOnAllShardsCommand(n, oldname, useShardConn, implicitCreateDb) {}
 
-    virtual void getShardIds(OperationContext* txn,
+    virtual void getShardIds(OperationContext* opCtx,
                              const string& dbName,
                              BSONObj& cmdObj,
                              vector<ShardId>& shardIds) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
-        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
+        auto status = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         uassertStatusOK(status.getStatus());
 
         shared_ptr<DBConfig> conf = status.getValue();
@@ -243,7 +244,7 @@ public:
         if (!conf->isSharded(nss.ns())) {
             shardIds.push_back(conf->getPrimaryId());
         } else {
-            Grid::get(txn)->shardRegistry()->getAllShardIds(&shardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
         }
     }
 };
@@ -252,7 +253,7 @@ class NotAllowedOnShardedCollectionCmd : public PublicGridCommand {
 public:
     NotAllowedOnShardedCollectionCmd(const char* n) : PublicGridCommand(n) {}
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbName,
                      BSONObj& cmdObj,
                      int options,
@@ -260,9 +261,9 @@ public:
                      BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
+        auto conf = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
         if (!conf->isSharded(nss.ns())) {
-            return passthrough(txn, conf.get(), cmdObj, options, result);
+            return passthrough(opCtx, conf.get(), cmdObj, options, result);
         }
 
         return appendCommandStatus(
@@ -451,7 +452,7 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int options,
@@ -459,18 +460,24 @@ public:
              BSONObjBuilder& output) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
-        auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
+        auto conf = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
         if (!conf->isSharded(nss.ns())) {
-            return passthrough(txn, conf.get(), cmdObj, output);
+            return passthrough(opCtx, conf.get(), cmdObj, output);
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(opCtx, nss.ns());
         massert(40051, "chunk manager should not be null", cm);
 
         vector<Strategy::CommandResult> results;
         const BSONObj query;
-        Strategy::commandOp(
-            txn, dbName, cmdObj, options, cm->getns(), query, CollationSpec::kSimpleSpec, &results);
+        Strategy::commandOp(opCtx,
+                            dbName,
+                            cmdObj,
+                            options,
+                            cm->getns(),
+                            query,
+                            CollationSpec::kSimpleSpec,
+                            &results);
 
         BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
         bool isValid = true;
@@ -519,19 +526,19 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto dbStatus = ScopedShardDatabase::getOrCreate(txn, dbName);
+        auto dbStatus = ScopedShardDatabase::getOrCreate(opCtx, dbName);
         if (!dbStatus.isOK()) {
             return appendCommandStatus(result, dbStatus.getStatus());
         }
 
         auto scopedDb = std::move(dbStatus.getValue());
-        return passthrough(txn, scopedDb.db(), cmdObj, result);
+        return passthrough(opCtx, scopedDb.db(), cmdObj, result);
     }
 
 } createCmd;
@@ -550,7 +557,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int,
@@ -567,7 +574,7 @@ public:
         const string dbNameFrom = fullnsFrom.db().toString();
 
         auto confFrom =
-            uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbNameFrom));
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNameFrom));
 
         const auto fullnsToElt = cmdObj["to"];
         uassert(ErrorCodes::InvalidNamespace,
@@ -578,7 +585,8 @@ public:
                 str::stream() << "Invalid target namespace: " << fullnsTo.ns(),
                 fullnsTo.isValid());
         const string dbNameTo = fullnsTo.db().toString();
-        auto confTo = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbNameTo));
+        auto confTo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNameTo));
 
         uassert(
             13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom.ns()));
@@ -592,7 +600,7 @@ public:
                 "Source and destination collections must be on same shard",
                 shardFrom == shardTo);
 
-        return adminPassthrough(txn, confFrom.get(), cmdObj, result);
+        return adminPassthrough(opCtx, confFrom.get(), cmdObj, result);
     }
 } renameCollectionCmd;
 
@@ -614,7 +622,7 @@ public:
         return true;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int options,
@@ -629,14 +637,14 @@ public:
                 "Invalid todb argument",
                 NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        auto scopedToDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, todb));
+        auto scopedToDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(opCtx, todb));
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot copy to a sharded database",
                 !scopedToDb.db()->isShardingEnabled());
 
         const string fromhost = cmdObj.getStringField("fromhost");
         if (!fromhost.empty()) {
-            return adminPassthrough(txn, scopedToDb.db(), cmdObj, result);
+            return adminPassthrough(opCtx, scopedToDb.db(), cmdObj, result);
         }
 
         const auto fromDbElt = cmdObj["fromdb"];
@@ -649,7 +657,7 @@ public:
             "invalid fromdb argument",
             NamespaceString::validDBName(fromdb, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        auto scopedFromDb = uassertStatusOK(ScopedShardDatabase::getExisting(txn, fromdb));
+        auto scopedFromDb = uassertStatusOK(ScopedShardDatabase::getExisting(opCtx, fromdb));
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot copy from a sharded database",
                 !scopedFromDb.db()->isShardingEnabled());
@@ -662,12 +670,12 @@ public:
         }
 
         {
-            const auto shard = uassertStatusOK(
-                Grid::get(txn)->shardRegistry()->getShard(txn, scopedFromDb.db()->getPrimaryId()));
+            const auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                opCtx, scopedFromDb.db()->getPrimaryId()));
             b.append("fromhost", shard->getConnString().toString());
         }
 
-        return adminPassthrough(txn, scopedToDb.db(), b.obj(), result);
+        return adminPassthrough(opCtx, scopedToDb.db(), b.obj(), result);
     }
 
 } clusterCopyDBCmd;
@@ -687,7 +695,7 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int,
@@ -695,17 +703,17 @@ public:
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
-        auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
+        auto conf = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
         if (!conf->isSharded(nss.ns())) {
             result.appendBool("sharded", false);
             result.append("primary", conf->getPrimaryId().toString());
 
-            return passthrough(txn, conf.get(), cmdObj, result);
+            return passthrough(opCtx, conf.get(), cmdObj, result);
         }
 
         result.appendBool("sharded", true);
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(opCtx, nss.ns());
         massert(12594, "how could chunk manager be null!", cm);
 
         BSONObjBuilder shardStats;
@@ -720,7 +728,7 @@ public:
         set<ShardId> shardIds;
         cm->getAllShardIds(&shardIds);
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
@@ -865,7 +873,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int,
@@ -874,12 +882,12 @@ public:
         const string fullns = parseNs(dbName, cmdObj);
         const string nsDBName = nsToDatabase(fullns);
 
-        auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, nsDBName));
+        auto conf = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nsDBName));
         if (!conf->isSharded(fullns)) {
-            return passthrough(txn, conf.get(), cmdObj, result);
+            return passthrough(opCtx, conf.get(), cmdObj, result);
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(opCtx, fullns);
         massert(13407, "how could chunk manager be null!", cm);
 
         BSONObj min = cmdObj.getObjectField("min");
@@ -909,7 +917,7 @@ public:
         cm->getShardIdsForRange(min, max, &shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
@@ -990,7 +998,7 @@ public:
         return nss.ns();
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
@@ -1013,7 +1021,7 @@ public:
 
         // Note that this implementation will not handle targeting retries and fails when the
         // sharding metadata is too stale
-        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db());
+        auto status = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db());
         if (!status.isOK()) {
             return Status(status.getStatus().code(),
                           str::stream() << "Passthrough command failed: " << command.toString()
@@ -1033,7 +1041,7 @@ public:
         }
 
         const auto primaryShardStatus =
-            Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, conf->getPrimaryId());
         if (!primaryShardStatus.isOK()) {
             return primaryShardStatus.getStatus();
         }
@@ -1064,7 +1072,7 @@ public:
         cmdResult.target = primaryShardStatus.getValue()->getConnString();
 
         return ClusterExplain::buildExplainResult(
-            txn, {cmdResult}, ClusterExplain::kSingleShard, timer.millis(), out);
+            opCtx, {cmdResult}, ClusterExplain::kSingleShard, timer.millis(), out);
     }
 
 } groupCmd;
@@ -1088,7 +1096,7 @@ public:
         }
         return Status::OK();
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbName,
                      BSONObj& cmdObj,
                      int options,
@@ -1099,7 +1107,8 @@ public:
             errmsg = str::stream() << "doing a splitVector across dbs isn't supported via mongos";
             return false;
         }
-        return NotAllowedOnShardedCollectionCmd::run(txn, dbName, cmdObj, options, errmsg, result);
+        return NotAllowedOnShardedCollectionCmd::run(
+            opCtx, dbName, cmdObj, options, errmsg, result);
     }
     virtual std::string parseNs(const string& dbname, const BSONObj& cmdObj) const {
         return parseNsFullyQualified(dbname, cmdObj);
@@ -1127,7 +1136,7 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int options,
@@ -1135,7 +1144,7 @@ public:
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
-        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
+        auto status = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!status.isOK()) {
             return appendEmptyResultSet(result, status.getStatus(), nss.ns());
         }
@@ -1143,7 +1152,7 @@ public:
         shared_ptr<DBConfig> conf = status.getValue();
         if (!conf->isSharded(nss.ns())) {
 
-            if (passthrough(txn, conf.get(), cmdObj, options, result)) {
+            if (passthrough(opCtx, conf.get(), cmdObj, options, result)) {
                 return true;
             }
 
@@ -1153,7 +1162,7 @@ public:
                 result.resetToEmpty();
 
                 auto parsedDistinct = ParsedDistinct::parse(
-                    txn, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), false);
+                    opCtx, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), false);
                 if (!parsedDistinct.isOK()) {
                     return appendCommandStatus(result, parsedDistinct.getStatus());
                 }
@@ -1170,7 +1179,7 @@ public:
 
                 BSONObjBuilder aggResult;
                 Command::findCommand("aggregate")
-                    ->run(txn, dbName, aggCmd.getValue(), options, errmsg, aggResult);
+                    ->run(opCtx, dbName, aggCmd.getValue(), options, errmsg, aggResult);
 
                 ViewResponseFormatter formatter(aggResult.obj());
                 auto formatStatus = formatter.appendAsDistinctResponse(&result);
@@ -1183,7 +1192,7 @@ public:
             return false;
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(opCtx, nss.ns());
         massert(10420, "how could chunk manager be null!", cm);
 
         BSONObj query = getQuery(cmdObj);
@@ -1195,7 +1204,7 @@ public:
         // Construct collator for deduping.
         std::unique_ptr<CollatorInterface> collator;
         if (!queryCollation.getValue().isEmpty()) {
-            auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+            auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(queryCollation.getValue());
             if (!statusWithCollator.isOK()) {
                 return appendEmptyResultSet(result, statusWithCollator.getStatus(), nss.ns());
@@ -1204,7 +1213,7 @@ public:
         }
 
         set<ShardId> shardIds;
-        cm->getShardIdsForQuery(txn, query, queryCollation.getValue(), &shardIds);
+        cm->getShardIdsForQuery(opCtx, query, queryCollation.getValue(), &shardIds);
 
         BSONObjComparator bsonCmp(BSONObj(),
                                   BSONObjComparator::FieldNamesMode::kConsider,
@@ -1213,7 +1222,7 @@ public:
         BSONObjSet all = bsonCmp.makeBSONObjSet();
 
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
@@ -1248,7 +1257,7 @@ public:
         return true;
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
@@ -1287,7 +1296,7 @@ public:
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(txn,
+        Strategy::commandOp(opCtx,
                             dbname,
                             explainCmdBob.obj(),
                             options,
@@ -1302,7 +1311,7 @@ public:
             ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
             auto resolvedView = ResolvedView::fromBSON(shardResults[0].result);
             auto parsedDistinct = ParsedDistinct::parse(
-                txn, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
+                opCtx, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
             if (!parsedDistinct.isOK()) {
                 return parsedDistinct.getStatus();
             }
@@ -1319,7 +1328,7 @@ public:
 
             std::string errMsg;
             if (Command::findCommand("aggregate")
-                    ->run(txn, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
+                    ->run(opCtx, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
                 return Status::OK();
             }
 
@@ -1329,7 +1338,7 @@ public:
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            txn, shardResults, mongosStageName, millisElapsed, out);
+            opCtx, shardResults, mongosStageName, millisElapsed, out);
     }
 } disinctCmd;
 
@@ -1364,7 +1373,7 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int,
@@ -1372,12 +1381,12 @@ public:
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
+        auto conf = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
         if (!conf->isSharded(nss.ns())) {
-            return passthrough(txn, conf.get(), cmdObj, result);
+            return passthrough(opCtx, conf.get(), cmdObj, result);
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(opCtx, nss.ns());
         massert(13091, "how could chunk manager be null!", cm);
         if (SimpleBSONObjComparator::kInstance.evaluate(cm->getShardKeyPattern().toBSON() ==
                                                         BSON("files_id" << 1))) {
@@ -1385,7 +1394,7 @@ public:
 
             vector<Strategy::CommandResult> results;
             Strategy::commandOp(
-                txn, dbName, cmdObj, 0, nss.ns(), finder, CollationSpec::kSimpleSpec, &results);
+                opCtx, dbName, cmdObj, 0, nss.ns(), finder, CollationSpec::kSimpleSpec, &results);
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
@@ -1418,7 +1427,7 @@ public:
 
                 vector<Strategy::CommandResult> results;
                 try {
-                    Strategy::commandOp(txn,
+                    Strategy::commandOp(opCtx,
                                         dbName,
                                         shardCmd,
                                         0,
@@ -1505,7 +1514,7 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int options,
@@ -1513,12 +1522,12 @@ public:
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
-        auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
+        auto conf = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
         if (!conf->isSharded(nss.ns())) {
-            return passthrough(txn, conf.get(), cmdObj, options, result);
+            return passthrough(opCtx, conf.get(), cmdObj, options, result);
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(opCtx, nss.ns());
         massert(13500, "how could chunk manager be null!", cm);
 
         BSONObj query = getQuery(cmdObj);
@@ -1527,7 +1536,7 @@ public:
             return appendEmptyResultSet(result, collation.getStatus(), nss.ns());
         }
         set<ShardId> shardIds;
-        cm->getShardIdsForQuery(txn, query, collation.getValue(), &shardIds);
+        cm->getShardIdsForQuery(opCtx, query, collation.getValue(), &shardIds);
 
         // We support both "num" and "limit" options to control limit
         int limit = 100;
@@ -1538,7 +1547,7 @@ public:
         list<shared_ptr<Future::CommandResult>> futures;
         BSONArrayBuilder shardArray;
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+            const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
                 continue;
@@ -1559,7 +1568,7 @@ public:
              i != futures.end();
              i++) {
             shared_ptr<Future::CommandResult> res = *i;
-            if (!res->join(txn)) {
+            if (!res->join(opCtx)) {
                 errmsg = res->result()["errmsg"].String();
                 if (res->result().hasField("code")) {
                     result.append(res->result()["code"]);
@@ -1634,7 +1643,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbName,
                      BSONObj& cmdObj,
                      int,
@@ -1657,7 +1666,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbName,
                      BSONObj& cmdObj,
                      int,
@@ -1669,13 +1678,13 @@ public:
 
         // $eval isn't allowed to access sharded collections, but we need to leave the
         // shard to detect that.
-        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
+        auto status = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
 
         shared_ptr<DBConfig> conf = status.getValue();
-        return passthrough(txn, conf.get(), cmdObj, result);
+        return passthrough(opCtx, conf.get(), cmdObj, result);
     }
 } evalCmd;
 
@@ -1706,7 +1715,7 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int options,
@@ -1714,12 +1723,12 @@ public:
              BSONObjBuilder& result) final {
         auto nss = NamespaceString::makeListCollectionsNSS(dbName);
 
-        auto conf = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
+        auto conf = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!conf.isOK()) {
             return appendEmptyResultSet(result, conf.getStatus(), dbName + ".$cmd.listCollections");
         }
 
-        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, nss, options, &result);
+        return cursorCommandPassthrough(opCtx, conf.getValue(), cmdObj, nss, options, &result);
     }
 } cmdListCollections;
 
@@ -1752,13 +1761,13 @@ public:
         return false;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
              int options,
              string& errmsg,
              BSONObjBuilder& result) final {
-        auto conf = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
+        auto conf = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!conf.isOK()) {
             return appendCommandStatus(result, conf.getStatus());
         }
@@ -1768,7 +1777,8 @@ public:
             NamespaceString::makeListIndexesNSS(targetNss.db(), targetNss.coll());
         dassert(targetNss == commandNss.getTargetNSForListIndexes());
 
-        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, commandNss, options, &result);
+        return cursorCommandPassthrough(
+            opCtx, conf.getValue(), cmdObj, commandNss, options, &result);
     }
 
 } cmdListIndexes;

@@ -220,26 +220,26 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         });
         operationContext()->setReplicatedWrites(false);
         replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
-        auto txn = operationContext();
+        auto opCtx = operationContext();
         auto nss = NamespaceString(VersionType::ConfigNS);
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_IX);
-            AutoGetCollection autoColl(txn, nss, MODE_IX);
+            ScopedTransaction transaction(opCtx, MODE_IX);
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             auto coll = autoColl.getCollection();
             ASSERT_TRUE(coll);
-            auto cursor = coll->getCursor(txn);
+            auto cursor = coll->getCursor(opCtx);
             std::vector<RecordId> recordIds;
             while (auto recordId = cursor->next()) {
                 recordIds.push_back(recordId->id);
             }
-            mongo::WriteUnitOfWork wuow(txn);
+            mongo::WriteUnitOfWork wuow(opCtx);
             for (auto recordId : recordIds) {
-                coll->deleteDocument(txn, recordId, nullptr);
+                coll->deleteDocument(opCtx, recordId, nullptr);
             }
             wuow.commit();
-            ASSERT_EQUALS(0UL, coll->numRecords(txn));
+            ASSERT_EQUALS(0UL, coll->numRecords(opCtx));
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "removeConfigDocuments", nss.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "removeConfigDocuments", nss.ns());
     }
 
     // Verify the document was actually removed.

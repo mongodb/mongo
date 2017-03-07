@@ -48,7 +48,7 @@ public:
      *
      * If in a nested context (eg DBDirectClient), does nothing.
      */
-    static void yieldAllLocks(OperationContext* txn,
+    static void yieldAllLocks(OperationContext* opCtx,
                               RecordFetcher* fetcher,
                               const std::string& planExecNS);
 };

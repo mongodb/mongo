@@ -82,7 +82,7 @@ public:
     }
     TouchCmd() : Command("touch") {}
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -102,7 +102,7 @@ public:
             return false;
         }
 
-        AutoGetCollectionForRead context(txn, nss);
+        AutoGetCollectionForRead context(opCtx, nss);
 
         Collection* collection = context.getCollection();
         if (!collection) {
@@ -111,7 +111,7 @@ public:
         }
 
         return appendCommandStatus(result,
-                                   collection->touch(txn, touch_data, touch_indexes, &result));
+                                   collection->touch(opCtx, touch_data, touch_indexes, &result));
     }
 };
 static TouchCmd touchCmd;

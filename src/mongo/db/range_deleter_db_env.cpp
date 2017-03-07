@@ -58,7 +58,7 @@ using std::string;
  * 5. Delete range.
  * 6. Wait until the majority of the secondaries catch up.
  */
-bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
+bool RangeDeleterDBEnv::deleteRange(OperationContext* opCtx,
                                     const RangeDeleteEntry& taskDetails,
                                     long long int* deletedDocs,
                                     std::string* errMsg) {
@@ -73,7 +73,7 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
     Client::initThreadIfNotAlready("RangeDeleter");
 
     *deletedDocs = 0;
-    OperationShardingState::IgnoreVersioningBlock forceVersion(txn, NamespaceString(ns));
+    OperationShardingState::IgnoreVersioningBlock forceVersion(opCtx, NamespaceString(ns));
 
     Helpers::RemoveSaver removeSaver("moveChunk", ns, taskDetails.options.removeSaverReason);
     Helpers::RemoveSaver* removeSaverPtr = NULL;
@@ -82,13 +82,13 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
     }
 
     // log the opId so the user can use it to cancel the delete using killOp.
-    unsigned int opId = txn->getOpID();
+    unsigned int opId = opCtx->getOpID();
     log() << "Deleter starting delete for: " << ns << " from " << redact(inclusiveLower) << " -> "
           << redact(exclusiveUpper) << ", with opId: " << opId;
 
     try {
         *deletedDocs =
-            Helpers::removeRange(txn,
+            Helpers::removeRange(opCtx,
                                  KeyRange(ns, inclusiveLower, exclusiveUpper, keyPattern),
                                  BoundInclusion::kIncludeStartKeyOnly,
                                  writeConcern,
@@ -116,10 +116,10 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
     return true;
 }
 
-void RangeDeleterDBEnv::getCursorIds(OperationContext* txn,
+void RangeDeleterDBEnv::getCursorIds(OperationContext* opCtx,
                                      StringData ns,
                                      std::set<CursorId>* openCursors) {
-    AutoGetCollection autoColl(txn, NamespaceString(ns), MODE_IS);
+    AutoGetCollection autoColl(opCtx, NamespaceString(ns), MODE_IS);
     if (!autoColl.getCollection())
         return;
 

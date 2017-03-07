@@ -210,9 +210,9 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
-    invariant(cbData.txn);
+    invariant(cbData.opCtx);
 
-    Status status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
+    Status status = _externalState->storeLocalLastVoteDocument(cbData.opCtx, lastVote);
     if (!status.isOK()) {
         error() << "failed to store LastVote document when voting for myself: " << status;
         return;

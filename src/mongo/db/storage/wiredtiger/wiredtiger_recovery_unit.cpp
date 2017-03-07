@@ -209,7 +209,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
-    // TODO: use actual wiredtiger txn id
+    // TODO: use actual wiredtiger opCtx id
     return SnapshotId(_mySnapshotId);
 }
 
@@ -257,10 +257,10 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
 WiredTigerCursor::WiredTigerCursor(const std::string& uri,
                                    uint64_t tableId,
                                    bool forRecordStore,
-                                   OperationContext* txn) {
+                                   OperationContext* opCtx) {
     _tableID = tableId;
-    _ru = WiredTigerRecoveryUnit::get(txn);
-    _session = _ru->getSession(txn);
+    _ru = WiredTigerRecoveryUnit::get(opCtx);
+    _session = _ru->getSession(opCtx);
     _cursor = _session->getCursor(uri, tableId, forRecordStore);
     if (!_cursor) {
         error() << "no cursor for uri: " << uri;

@@ -265,7 +265,7 @@ static BSONElement findEqualityElement(const EqualityMatches& equalities, const 
     return extractKeyElementFromMatchable(matchable, suffixStr);
 }
 
-StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* txn,
+StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
     if (!isValid())
         return StatusWith<BSONObj>(BSONObj());
@@ -273,7 +273,8 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(basicQuery);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return StatusWith<BSONObj>(statusWithCQ.getStatus());
     }

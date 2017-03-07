@@ -87,13 +87,14 @@ public:
         return false;
     }
 
-    pair<BSONObj, shared_ptr<Chunk>> rangeFor(OperationContext* txn,
+    pair<BSONObj, shared_ptr<Chunk>> rangeFor(OperationContext* opCtx,
                                               const ChunkType& chunk) const final {
         return std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk));
     }
 
-    ShardId shardFor(OperationContext* txn, const ShardId& shardId) const final {
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+    ShardId shardFor(OperationContext* opCtx, const ShardId& shardId) const final {
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
         return shard->getId();
     }
 
@@ -170,7 +171,7 @@ ChunkManager::ChunkManager(NamespaceString nss,
 
 ChunkManager::~ChunkManager() = default;
 
-void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
+void ChunkManager::loadExistingRanges(OperationContext* opCtx, const ChunkManager* oldManager) {
     invariant(!_version.isSet());
 
     int tries = 3;
@@ -187,7 +188,7 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
               << " sequenceNumber: " << _sequenceNumber
               << " based on: " << (oldManager ? oldManager->getVersion().toString() : "(empty)");
 
-        if (_load(txn, chunkMap, shardIds, &shardVersions, oldManager)) {
+        if (_load(opCtx, chunkMap, shardIds, &shardVersions, oldManager)) {
             // TODO: Merge into diff code above, so we validate in one place
             if (isChunkMapValid(chunkMap)) {
                 _chunkMap = std::move(chunkMap);
@@ -213,7 +214,7 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
                               << " after 3 attempts. Please try again.");
 }
 
-bool ChunkManager::_load(OperationContext* txn,
+bool ChunkManager::_load(OperationContext* opCtx,
                          ChunkMap& chunkMap,
                          set<ShardId>& shardIds,
                          ShardVersionMap* shardVersions,
@@ -252,8 +253,8 @@ bool ChunkManager::_load(OperationContext* txn,
     // Diff tracker should *always* find at least one chunk if collection exists
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
-    uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getChunks(
-        txn,
+    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getChunks(
+        opCtx,
         diffQuery.query,
         diffQuery.sort,
         boost::none,
@@ -264,14 +265,14 @@ bool ChunkManager::_load(OperationContext* txn,
     invariant(opTime >= _configOpTime);
     _configOpTime = opTime;
 
-    int diffsApplied = differ.calculateConfigDiff(txn, chunks);
+    int diffsApplied = differ.calculateConfigDiff(opCtx, chunks);
     if (diffsApplied > 0) {
         LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _nss
                << " with version " << _version;
 
         // Add all existing shards we find to the shards set
         for (ShardVersionMap::iterator it = shardVersions->begin(); it != shardVersions->end();) {
-            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, it->first);
+            auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, it->first);
             if (shardStatus.isOK()) {
                 shardIds.insert(it->first);
                 ++it;
@@ -347,7 +348,7 @@ std::shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(
     return findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
 }
 
-void ChunkManager::getShardIdsForQuery(OperationContext* txn,
+void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        set<ShardId>* shardIds) const {
@@ -360,8 +361,8 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
         qr->setCollation(_defaultCollator->getSpec().toBSON());
     }
 
-    std::unique_ptr<CanonicalQuery> cq =
-        uassertStatusOK(CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop()));
+    std::unique_ptr<CanonicalQuery> cq = uassertStatusOK(
+        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop()));
 
     // Query validation
     if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR)) {

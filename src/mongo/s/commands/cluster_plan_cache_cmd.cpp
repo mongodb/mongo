@@ -86,7 +86,7 @@ public:
     }
 
     // Cluster plan cache command entry point.
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -110,7 +110,7 @@ private:
 // Cluster plan cache command implementation(s) below
 //
 
-bool ClusterPlanCacheCmd::run(OperationContext* txn,
+bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
                               const std::string& dbName,
                               BSONObj& cmdObj,
                               int options,
@@ -124,7 +124,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
     vector<Strategy::CommandResult> results;
     const BSONObj query;
     Strategy::commandOp(
-        txn, dbName, cmdObj, options, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
+        opCtx, dbName, cmdObj, options, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
 
     // Set value of first shard result's "ok" field.
     bool clusterCmdResult = true;

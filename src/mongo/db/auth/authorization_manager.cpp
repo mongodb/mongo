@@ -274,14 +274,14 @@ bool AuthorizationManager::shouldValidateAuthSchemaOnStartup() {
     return _startupAuthSchemaValidation;
 }
 
-Status AuthorizationManager::getAuthorizationVersion(OperationContext* txn, int* version) {
+Status AuthorizationManager::getAuthorizationVersion(OperationContext* opCtx, int* version) {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
     int newVersion = _version;
     if (schemaVersionInvalid == newVersion) {
         while (guard.otherUpdateInFetchPhase())
             guard.wait();
         guard.beginFetchPhase();
-        Status status = _externalState->getStoredAuthorizationVersion(txn, &newVersion);
+        Status status = _externalState->getStoredAuthorizationVersion(opCtx, &newVersion);
         guard.endFetchPhase();
         if (!status.isOK()) {
             warning() << "Problem fetching the stored schema version of authorization data: "
@@ -311,7 +311,7 @@ bool AuthorizationManager::isAuthEnabled() const {
     return _authEnabled;
 }
 
-bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
+bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_privilegeDocsExistMutex);
     if (_privilegeDocsExist) {
         // If we know that a user exists, don't re-check.
@@ -319,7 +319,7 @@ bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
     }
 
     lk.unlock();
-    bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(txn);
+    bool privDocsExist = _externalState->hasAnyPrivilegeDocuments(opCtx);
     lk.lock();
 
     if (privDocsExist) {
@@ -414,37 +414,37 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
     return Status::OK();
 }
 
-Status AuthorizationManager::getUserDescription(OperationContext* txn,
+Status AuthorizationManager::getUserDescription(OperationContext* opCtx,
                                                 const UserName& userName,
                                                 BSONObj* result) {
-    return _externalState->getUserDescription(txn, userName, result);
+    return _externalState->getUserDescription(opCtx, userName, result);
 }
 
-Status AuthorizationManager::getRoleDescription(OperationContext* txn,
+Status AuthorizationManager::getRoleDescription(OperationContext* opCtx,
                                                 const RoleName& roleName,
                                                 PrivilegeFormat privileges,
                                                 BSONObj* result) {
-    return _externalState->getRoleDescription(txn, roleName, privileges, result);
+    return _externalState->getRoleDescription(opCtx, roleName, privileges, result);
 }
 
-Status AuthorizationManager::getRolesDescription(OperationContext* txn,
+Status AuthorizationManager::getRolesDescription(OperationContext* opCtx,
                                                  const std::vector<RoleName>& roleName,
                                                  PrivilegeFormat privileges,
                                                  BSONObj* result) {
-    return _externalState->getRolesDescription(txn, roleName, privileges, result);
+    return _externalState->getRolesDescription(opCtx, roleName, privileges, result);
 }
 
 
-Status AuthorizationManager::getRoleDescriptionsForDB(OperationContext* txn,
+Status AuthorizationManager::getRoleDescriptionsForDB(OperationContext* opCtx,
                                                       const std::string dbname,
                                                       PrivilegeFormat privileges,
                                                       bool showBuiltinRoles,
                                                       vector<BSONObj>* result) {
     return _externalState->getRoleDescriptionsForDB(
-        txn, dbname, privileges, showBuiltinRoles, result);
+        opCtx, dbname, privileges, showBuiltinRoles, result);
 }
 
-Status AuthorizationManager::acquireUser(OperationContext* txn,
+Status AuthorizationManager::acquireUser(OperationContext* opCtx,
                                          const UserName& userName,
                                          User** acquiredUser) {
     if (userName == internalSecurity.user->getName()) {
@@ -481,7 +481,7 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
     Status status = Status::OK();
     for (int i = 0; i < maxAcquireRetries; ++i) {
         if (authzVersion == schemaVersionInvalid) {
-            Status status = _externalState->getStoredAuthorizationVersion(txn, &authzVersion);
+            Status status = _externalState->getStoredAuthorizationVersion(opCtx, &authzVersion);
             if (!status.isOK())
                 return status;
         }
@@ -496,7 +496,7 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
             case schemaVersion28SCRAM:
             case schemaVersion26Final:
             case schemaVersion26Upgrade:
-                status = _fetchUserV2(txn, userName, &user);
+                status = _fetchUserV2(opCtx, userName, &user);
                 break;
             case schemaVersion24:
                 status = Status(ErrorCodes::AuthSchemaIncompatible,
@@ -535,11 +535,11 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
     return Status::OK();
 }
 
-Status AuthorizationManager::_fetchUserV2(OperationContext* txn,
+Status AuthorizationManager::_fetchUserV2(OperationContext* opCtx,
                                           const UserName& userName,
                                           std::unique_ptr<User>* acquiredUser) {
     BSONObj userObj;
-    Status status = getUserDescription(txn, userName, &userObj);
+    Status status = getUserDescription(opCtx, userName, &userObj);
     if (!status.isOK()) {
         return status;
     }
@@ -619,9 +619,9 @@ void AuthorizationManager::_invalidateUserCache_inlock() {
     _version = schemaVersionInvalid;
 }
 
-Status AuthorizationManager::initialize(OperationContext* txn) {
+Status AuthorizationManager::initialize(OperationContext* opCtx) {
     invalidateUserCache();
-    Status status = _externalState->initialize(txn);
+    Status status = _externalState->initialize(opCtx);
     if (!status.isOK())
         return status;
 
@@ -733,9 +733,9 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
 }
 
 void AuthorizationManager::logOp(
-    OperationContext* txn, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
+    OperationContext* opCtx, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
     if (appliesToAuthzData(op, ns, o)) {
-        _externalState->logOp(txn, op, ns, o, o2);
+        _externalState->logOp(opCtx, op, ns, o, o2);
         _invalidateRelevantCacheData(op, ns, o, o2);
     }
 }

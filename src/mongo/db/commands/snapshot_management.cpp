@@ -63,7 +63,7 @@ public:
         h << "Creates a new named snapshot";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int,
@@ -75,14 +75,15 @@ public:
             return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
         }
 
-        ScopedTransaction st(txn, MODE_IX);
-        Lock::GlobalLock lk(txn->lockState(), MODE_IX, UINT_MAX);
+        ScopedTransaction st(opCtx, MODE_IX);
+        Lock::GlobalLock lk(opCtx->lockState(), MODE_IX, UINT_MAX);
 
-        auto status = snapshotManager->prepareForCreateSnapshot(txn);
+        auto status = snapshotManager->prepareForCreateSnapshot(opCtx);
         if (status.isOK()) {
-            const auto name = repl::ReplicationCoordinator::get(txn)->reserveSnapshotName(nullptr);
+            const auto name =
+                repl::ReplicationCoordinator::get(opCtx)->reserveSnapshotName(nullptr);
             result.append("name", static_cast<long long>(name.asU64()));
-            status = snapshotManager->createSnapshot(txn, name);
+            status = snapshotManager->createSnapshot(opCtx, name);
         }
         return appendCommandStatus(result, status);
     }
@@ -113,7 +114,7 @@ public:
         h << "Sets the snapshot for {readConcern: {level: 'majority'}}";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int,
@@ -125,8 +126,8 @@ public:
             return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
         }
 
-        ScopedTransaction st(txn, MODE_IX);
-        Lock::GlobalLock lk(txn->lockState(), MODE_IX, UINT_MAX);
+        ScopedTransaction st(opCtx, MODE_IX);
+        Lock::GlobalLock lk(opCtx->lockState(), MODE_IX, UINT_MAX);
         auto name = SnapshotName(cmdObj.firstElement().Long());
         snapshotManager->setCommittedSnapshot(name);
         return true;

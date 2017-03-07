@@ -63,7 +63,7 @@ class RecordCursor;
 class OplogStart final : public PlanStage {
 public:
     // Does not take ownership.
-    OplogStart(OperationContext* txn,
+    OplogStart(OperationContext* opCtx,
                const Collection* collection,
                MatchExpression* filter,
                WorkingSet* ws);
@@ -71,7 +71,7 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;

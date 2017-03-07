@@ -67,7 +67,7 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -75,7 +75,7 @@ public:
                      BSONObjBuilder& result) {
         NamespaceString ns(parseNs(dbname, cmdObj));
 
-        AutoGetCollectionForRead ctx(txn, ns);
+        AutoGetCollectionForRead ctx(opCtx, ns);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
@@ -83,7 +83,7 @@ public:
                 result, Status(ErrorCodes::NamespaceNotFound, "ns does not exist: " + ns.ns()));
         }
 
-        auto cursor = collection->getRecordStore()->getCursorForRepair(txn);
+        auto cursor = collection->getRecordStore()->getCursorForRepair(opCtx);
         if (!cursor) {
             return appendCommandStatus(
                 result, Status(ErrorCodes::CommandNotSupported, "repair iterator not supported"));
@@ -91,11 +91,11 @@ public:
 
         std::unique_ptr<WorkingSet> ws(new WorkingSet());
         std::unique_ptr<MultiIteratorStage> stage(
-            new MultiIteratorStage(txn, ws.get(), collection));
+            new MultiIteratorStage(opCtx, ws.get(), collection));
         stage->addIterator(std::move(cursor));
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+            opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
         std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -109,7 +109,7 @@ public:
         auto pinnedCursor = collection->getCursorManager()->registerCursor(
             {exec.release(),
              ns.ns(),
-             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+             opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &result);

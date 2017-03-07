@@ -173,7 +173,7 @@ inline Status UpdateDriver::addAndParse(const modifiertable::ModifierType type,
     return Status::OK();
 }
 
-Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* txn,
+Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
                                                      const BSONObj& query,
                                                      const vector<FieldRef*>* immutablePaths,
                                                      mutablebson::Document& doc) const {
@@ -182,7 +182,8 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* txn,
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

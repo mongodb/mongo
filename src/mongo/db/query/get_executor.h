@@ -58,7 +58,7 @@ void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
  * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
  * 'collection'.  Exposed for testing.
  */
-void fillOutPlannerParams(OperationContext* txn,
+void fillOutPlannerParams(OperationContext* opCtx,
                           Collection* collection,
                           CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams);
@@ -72,7 +72,7 @@ void fillOutPlannerParams(OperationContext* txn,
  * If the query cannot be executed, returns a Status indicating why.
  */
 StatusWith<std::unique_ptr<PlanExecutor>> getExecutor(
-    OperationContext* txn,
+    OperationContext* opCtx,
     Collection* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
@@ -87,7 +87,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutor(
  * If the query cannot be executed, returns a Status indicating why.
  */
 StatusWith<std::unique_ptr<PlanExecutor>> getExecutorFind(
-    OperationContext* txn,
+    OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
@@ -110,7 +110,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field)
  * body of method for detail).
  */
 StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDistinct(
-    OperationContext* txn,
+    OperationContext* opCtx,
     Collection* collection,
     const std::string& ns,
     ParsedDistinct* parsedDistinct,
@@ -123,7 +123,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDistinct(
  * As such, with certain covered queries, we can skip the overhead of fetching etc. when
  * executing a count.
  */
-StatusWith<std::unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* opCtx,
                                                            Collection* collection,
                                                            const CountRequest& request,
                                                            bool explain,
@@ -145,7 +145,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* opCtx,
                                                             OpDebug* opDebug,
                                                             Collection* collection,
                                                             ParsedDelete* parsedDelete);
@@ -167,7 +167,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* tx
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-StatusWith<std::unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* opCtx,
                                                             OpDebug* opDebug,
                                                             Collection* collection,
                                                             ParsedUpdate* parsedUpdate);
@@ -180,7 +180,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* tx
  *
  * If an executor could not be created, returns a Status indicating why.
  */
-StatusWith<std::unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* opCtx,
                                                            Collection* collection,
                                                            const GroupRequest& request,
                                                            PlanExecutor::YieldPolicy yieldPolicy);

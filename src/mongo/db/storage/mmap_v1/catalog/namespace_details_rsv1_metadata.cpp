@@ -48,16 +48,17 @@ const DiskLoc& NamespaceDetailsRSV1MetaData::capExtent() const {
     return _details->capExtent;
 }
 
-void NamespaceDetailsRSV1MetaData::setCapExtent(OperationContext* txn, const DiskLoc& loc) {
-    *txn->recoveryUnit()->writing(&_details->capExtent) = loc;
+void NamespaceDetailsRSV1MetaData::setCapExtent(OperationContext* opCtx, const DiskLoc& loc) {
+    *opCtx->recoveryUnit()->writing(&_details->capExtent) = loc;
 }
 
 const DiskLoc& NamespaceDetailsRSV1MetaData::capFirstNewRecord() const {
     return _details->capFirstNewRecord;
 }
 
-void NamespaceDetailsRSV1MetaData::setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc) {
-    *txn->recoveryUnit()->writing(&_details->capFirstNewRecord) = loc;
+void NamespaceDetailsRSV1MetaData::setCapFirstNewRecord(OperationContext* opCtx,
+                                                        const DiskLoc& loc) {
+    *opCtx->recoveryUnit()->writing(&_details->capFirstNewRecord) = loc;
 }
 
 bool NamespaceDetailsRSV1MetaData::capLooped() const {
@@ -71,19 +72,19 @@ long long NamespaceDetailsRSV1MetaData::numRecords() const {
     return _details->stats.nrecords;
 }
 
-void NamespaceDetailsRSV1MetaData::incrementStats(OperationContext* txn,
+void NamespaceDetailsRSV1MetaData::incrementStats(OperationContext* opCtx,
                                                   long long dataSizeIncrement,
                                                   long long numRecordsIncrement) {
     // durability todo : this could be a bit annoying / slow to record constantly
-    NamespaceDetails::Stats* s = txn->recoveryUnit()->writing(&_details->stats);
+    NamespaceDetails::Stats* s = opCtx->recoveryUnit()->writing(&_details->stats);
     s->datasize += dataSizeIncrement;
     s->nrecords += numRecordsIncrement;
 }
 
-void NamespaceDetailsRSV1MetaData::setStats(OperationContext* txn,
+void NamespaceDetailsRSV1MetaData::setStats(OperationContext* opCtx,
                                             long long dataSize,
                                             long long numRecords) {
-    NamespaceDetails::Stats* s = txn->recoveryUnit()->writing(&_details->stats);
+    NamespaceDetails::Stats* s = opCtx->recoveryUnit()->writing(&_details->stats);
     s->datasize = dataSize;
     s->nrecords = numRecords;
 }
@@ -103,45 +104,45 @@ DiskLoc NamespaceDetailsRSV1MetaData::deletedListEntry(int bucket) const {
     return head;
 }
 
-void NamespaceDetailsRSV1MetaData::setDeletedListEntry(OperationContext* txn,
+void NamespaceDetailsRSV1MetaData::setDeletedListEntry(OperationContext* opCtx,
                                                        int bucket,
                                                        const DiskLoc& loc) {
     DiskLoc* head = (bucket < NamespaceDetails::SmallBuckets)
         ? &_details->deletedListSmall[bucket]
         : &_details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
-    *txn->recoveryUnit()->writing(head) = loc;
+    *opCtx->recoveryUnit()->writing(head) = loc;
 }
 
 DiskLoc NamespaceDetailsRSV1MetaData::deletedListLegacyGrabBag() const {
     return _details->deletedListLegacyGrabBag;
 }
 
-void NamespaceDetailsRSV1MetaData::setDeletedListLegacyGrabBag(OperationContext* txn,
+void NamespaceDetailsRSV1MetaData::setDeletedListLegacyGrabBag(OperationContext* opCtx,
                                                                const DiskLoc& loc) {
-    *txn->recoveryUnit()->writing(&_details->deletedListLegacyGrabBag) = loc;
+    *opCtx->recoveryUnit()->writing(&_details->deletedListLegacyGrabBag) = loc;
 }
 
-void NamespaceDetailsRSV1MetaData::orphanDeletedList(OperationContext* txn) {
+void NamespaceDetailsRSV1MetaData::orphanDeletedList(OperationContext* opCtx) {
     for (int i = 0; i < RecordStoreV1Base::Buckets; i++) {
-        setDeletedListEntry(txn, i, DiskLoc());
+        setDeletedListEntry(opCtx, i, DiskLoc());
     }
-    setDeletedListLegacyGrabBag(txn, DiskLoc());
+    setDeletedListLegacyGrabBag(opCtx, DiskLoc());
 }
 
-const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent(OperationContext* txn) const {
+const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent(OperationContext* opCtx) const {
     return _details->firstExtent;
 }
 
-void NamespaceDetailsRSV1MetaData::setFirstExtent(OperationContext* txn, const DiskLoc& loc) {
-    *txn->recoveryUnit()->writing(&_details->firstExtent) = loc;
+void NamespaceDetailsRSV1MetaData::setFirstExtent(OperationContext* opCtx, const DiskLoc& loc) {
+    *opCtx->recoveryUnit()->writing(&_details->firstExtent) = loc;
 }
 
-const DiskLoc& NamespaceDetailsRSV1MetaData::lastExtent(OperationContext* txn) const {
+const DiskLoc& NamespaceDetailsRSV1MetaData::lastExtent(OperationContext* opCtx) const {
     return _details->lastExtent;
 }
 
-void NamespaceDetailsRSV1MetaData::setLastExtent(OperationContext* txn, const DiskLoc& loc) {
-    *txn->recoveryUnit()->writing(&_details->lastExtent) = loc;
+void NamespaceDetailsRSV1MetaData::setLastExtent(OperationContext* opCtx, const DiskLoc& loc) {
+    *opCtx->recoveryUnit()->writing(&_details->lastExtent) = loc;
 }
 
 bool NamespaceDetailsRSV1MetaData::isCapped() const {
@@ -156,38 +157,38 @@ int NamespaceDetailsRSV1MetaData::userFlags() const {
     return _details->userFlags;
 }
 
-bool NamespaceDetailsRSV1MetaData::setUserFlag(OperationContext* txn, int flag) {
+bool NamespaceDetailsRSV1MetaData::setUserFlag(OperationContext* opCtx, int flag) {
     if ((_details->userFlags & flag) == flag)
         return false;
 
-    txn->recoveryUnit()->writingInt(_details->userFlags) |= flag;
+    opCtx->recoveryUnit()->writingInt(_details->userFlags) |= flag;
     return true;
 }
 
-bool NamespaceDetailsRSV1MetaData::clearUserFlag(OperationContext* txn, int flag) {
+bool NamespaceDetailsRSV1MetaData::clearUserFlag(OperationContext* opCtx, int flag) {
     if ((_details->userFlags & flag) == 0)
         return false;
 
-    txn->recoveryUnit()->writingInt(_details->userFlags) &= ~flag;
+    opCtx->recoveryUnit()->writingInt(_details->userFlags) &= ~flag;
     return true;
 }
 
-bool NamespaceDetailsRSV1MetaData::replaceUserFlags(OperationContext* txn, int flags) {
+bool NamespaceDetailsRSV1MetaData::replaceUserFlags(OperationContext* opCtx, int flags) {
     if (_details->userFlags == flags)
         return false;
 
-    txn->recoveryUnit()->writingInt(_details->userFlags) = flags;
+    opCtx->recoveryUnit()->writingInt(_details->userFlags) = flags;
     return true;
 }
 
-int NamespaceDetailsRSV1MetaData::lastExtentSize(OperationContext* txn) const {
+int NamespaceDetailsRSV1MetaData::lastExtentSize(OperationContext* opCtx) const {
     return _details->lastExtentSize;
 }
 
-void NamespaceDetailsRSV1MetaData::setLastExtentSize(OperationContext* txn, int newMax) {
+void NamespaceDetailsRSV1MetaData::setLastExtentSize(OperationContext* opCtx, int newMax) {
     if (_details->lastExtentSize == newMax)
         return;
-    txn->recoveryUnit()->writingInt(_details->lastExtentSize) = newMax;
+    opCtx->recoveryUnit()->writingInt(_details->lastExtentSize) = newMax;
 }
 
 long long NamespaceDetailsRSV1MetaData::maxCappedDocs() const {

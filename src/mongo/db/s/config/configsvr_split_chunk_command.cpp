@@ -96,7 +96,7 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
              int options,
@@ -110,12 +110,12 @@ public:
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
 
         Status splitChunkResult =
-            Grid::get(txn)->catalogManager()->commitChunkSplit(txn,
-                                                               parsedRequest.getNamespace(),
-                                                               parsedRequest.getEpoch(),
-                                                               parsedRequest.getChunkRange(),
-                                                               parsedRequest.getSplitPoints(),
-                                                               parsedRequest.getShardName());
+            Grid::get(opCtx)->catalogManager()->commitChunkSplit(opCtx,
+                                                                 parsedRequest.getNamespace(),
+                                                                 parsedRequest.getEpoch(),
+                                                                 parsedRequest.getChunkRange(),
+                                                                 parsedRequest.getSplitPoints(),
+                                                                 parsedRequest.getShardName());
         if (!splitChunkResult.isOK()) {
             return appendCommandStatus(result, splitChunkResult);
         }

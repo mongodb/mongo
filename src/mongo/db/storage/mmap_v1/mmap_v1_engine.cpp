@@ -305,24 +305,24 @@ DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry(OperationContext* op
     return entry;
 }
 
-Status MMAPV1Engine::closeDatabase(OperationContext* txn, StringData db) {
+Status MMAPV1Engine::closeDatabase(OperationContext* opCtx, StringData db) {
     // Before the files are closed, flush any potentially outstanding changes, which might
     // reference this database. Otherwise we will assert when subsequent applications of the
     // global journal entries occur, which happen to have write intents for the removed files.
-    getDur().syncDataAndTruncateJournal(txn);
+    getDur().syncDataAndTruncateJournal(opCtx);
 
     stdx::lock_guard<stdx::mutex> lk(_entryMapMutex);
     MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
     if (entry) {
-        entry->close(txn);
+        entry->close(opCtx);
     }
     delete entry;
     _entryMap.erase(db.toString());
     return Status::OK();
 }
 
-Status MMAPV1Engine::dropDatabase(OperationContext* txn, StringData db) {
-    Status status = closeDatabase(txn, db);
+Status MMAPV1Engine::dropDatabase(OperationContext* opCtx, StringData db) {
+    Status status = closeDatabase(opCtx, db);
     if (!status.isOK())
         return status;
 
@@ -350,15 +350,15 @@ void MMAPV1Engine::_listDatabases(const std::string& directory, std::vector<std:
     }
 }
 
-int MMAPV1Engine::flushAllFiles(OperationContext* txn, bool sync) {
-    return MongoFile::flushAll(txn, sync);
+int MMAPV1Engine::flushAllFiles(OperationContext* opCtx, bool sync) {
+    return MongoFile::flushAll(opCtx, sync);
 }
 
-Status MMAPV1Engine::beginBackup(OperationContext* txn) {
+Status MMAPV1Engine::beginBackup(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void MMAPV1Engine::endBackup(OperationContext* txn) {
+void MMAPV1Engine::endBackup(OperationContext* opCtx) {
     return;
 }
 
@@ -379,15 +379,15 @@ void MMAPV1Engine::cleanShutdown() {
     // we would only hang here if the file_allocator code generates a
     // synchronous signal, which we don't expect
     log() << "shutdown: waiting for fs preallocator..." << endl;
-    auto txn = cc().getOperationContext();
+    auto opCtx = cc().getOperationContext();
 
     // In some cases we may shutdown early before we have any operation context yet, but we need
     // one for synchronization purposes.
     ServiceContext::UniqueOperationContext newTxn;
-    if (!txn) {
+    if (!opCtx) {
         newTxn = cc().makeOperationContext();
-        txn = newTxn.get();
-        invariant(txn);
+        opCtx = newTxn.get();
+        invariant(opCtx);
     }
 
     FileAllocator::get()->waitUntilFinished();
@@ -395,12 +395,12 @@ void MMAPV1Engine::cleanShutdown() {
     if (storageGlobalParams.dur) {
         log() << "shutdown: final commit..." << endl;
 
-        getDur().commitAndStopDurThread(txn);
+        getDur().commitAndStopDurThread(opCtx);
     }
 
     log() << "shutdown: closing all files..." << endl;
     stringstream ss3;
-    MemoryMappedFile::closeAllFiles(txn, ss3);
+    MemoryMappedFile::closeAllFiles(opCtx, ss3);
     log() << ss3.str() << endl;
 }
 

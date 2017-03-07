@@ -65,7 +65,7 @@ TimerStats prefetchDocStats;
 ServerStatusMetricField<TimerStats> displayPrefetchDocPages("repl.preload.docs", &prefetchDocStats);
 
 // page in pages needed for all index lookups on a given object
-void prefetchIndexPages(OperationContext* txn,
+void prefetchIndexPages(OperationContext* opCtx,
                         Collection* collection,
                         const ReplSettings::IndexPrefetchConfig& prefetchConfig,
                         const BSONObj& obj) {
@@ -80,12 +80,12 @@ void prefetchIndexPages(OperationContext* txn,
             // on the update op case, the call to prefetchRecordPages will touch the _id index.
             // thus perhaps this option isn't very useful?
             try {
-                IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(txn);
+                IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
                 if (!desc)
                     return;
                 IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex(desc);
                 invariant(iam);
-                iam->touch(txn, obj);
+                iam->touch(opCtx, obj);
             } catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchIndexPages(): " << redact(e);
             }
@@ -95,7 +95,7 @@ void prefetchIndexPages(OperationContext* txn,
             // indexCount includes all indexes, including ones
             // in the process of being built
             IndexCatalog::IndexIterator ii =
-                collection->getIndexCatalog()->getIndexIterator(txn, true);
+                collection->getIndexCatalog()->getIndexIterator(opCtx, true);
             while (ii.more()) {
                 TimerHolder timer(&prefetchIndexStats);
                 // This will page in all index pages for the given object.
@@ -103,7 +103,7 @@ void prefetchIndexPages(OperationContext* txn,
                     IndexDescriptor* desc = ii.next();
                     IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex(desc);
                     verify(iam);
-                    iam->touch(txn, obj);
+                    iam->touch(opCtx, obj);
                 } catch (const DBException& e) {
                     LOG(2) << "ignoring exception in prefetchIndexPages(): " << redact(e);
                 }
@@ -116,7 +116,10 @@ void prefetchIndexPages(OperationContext* txn,
 }
 
 // page in the data pages for a record associated with an object
-void prefetchRecordPages(OperationContext* txn, Database* db, const char* ns, const BSONObj& obj) {
+void prefetchRecordPages(OperationContext* opCtx,
+                         Database* db,
+                         const char* ns,
+                         const BSONObj& obj) {
     BSONElement _id;
     if (obj.getObjectID(_id)) {
         TimerHolder timer(&prefetchDocStats);
@@ -124,7 +127,7 @@ void prefetchRecordPages(OperationContext* txn, Database* db, const char* ns, co
         builder.append(_id);
         BSONObj result;
         try {
-            if (Helpers::findById(txn, db, ns, builder.done(), result)) {
+            if (Helpers::findById(opCtx, db, ns, builder.done(), result)) {
                 // do we want to use Record::touch() here?  it's pretty similar.
                 // volatile - avoid compiler optimizations for touching a mmap page
                 volatile char _dummy_char = '\0';  // NOLINT
@@ -144,7 +147,7 @@ void prefetchRecordPages(OperationContext* txn, Database* db, const char* ns, co
 }  // namespace
 
 // prefetch for an oplog operation
-void prefetchPagesForReplicatedOp(OperationContext* txn, Database* db, const BSONObj& op) {
+void prefetchPagesForReplicatedOp(OperationContext* opCtx, Database* db, const BSONObj& op) {
     invariant(db);
     const ReplSettings::IndexPrefetchConfig prefetchConfig =
         getGlobalReplicationCoordinator()->getIndexPrefetchConfig();
@@ -169,7 +172,7 @@ void prefetchPagesForReplicatedOp(OperationContext* txn, Database* db, const BSO
     // This will have to change for engines other than MMAP V1, because they might not have
     // means for directly prefetching pages from the collection. For this purpose, acquire S
     // lock on the database, instead of optimizing with IS.
-    Lock::CollectionLock collLock(txn->lockState(), ns, MODE_S);
+    Lock::CollectionLock collLock(opCtx->lockState(), ns, MODE_S);
 
     Collection* collection = db->getCollection(ns);
     if (!collection) {
@@ -193,7 +196,7 @@ void prefetchPagesForReplicatedOp(OperationContext* txn, Database* db, const BSO
     // a way to achieve that would be to prefetch the record first, and then afterwards do
     // this part.
     //
-    prefetchIndexPages(txn, collection, prefetchConfig, obj);
+    prefetchIndexPages(opCtx, collection, prefetchConfig, obj);
 
     // do not prefetch the data for inserts; it doesn't exist yet
     //
@@ -205,7 +208,7 @@ void prefetchPagesForReplicatedOp(OperationContext* txn, Database* db, const BSO
         // do not prefetch the data for capped collections because
         // they typically do not have an _id index for findById() to use.
         !collection->isCapped()) {
-        prefetchRecordPages(txn, db, ns, obj);
+        prefetchRecordPages(opCtx, db, ns, obj);
     }
 }
 
@@ -234,7 +237,7 @@ public:
         }
     }
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const string& name) {
         b.append(name, _value());
     }
 

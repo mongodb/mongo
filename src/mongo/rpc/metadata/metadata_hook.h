@@ -54,10 +54,11 @@ public:
      * Writes to an outgoing request metadata object. This method must not throw or block on
      * database or network operations and can be called by multiple concurrent threads.
      *
-     * txn may be null as writeRequestMetadata may be called on ASIO background threads, and may not
+     * opCtx may be null as writeRequestMetadata may be called on ASIO background threads, and may
+     * not
      * have an OperationContext as a result.
      */
-    virtual Status writeRequestMetadata(OperationContext* txn,
+    virtual Status writeRequestMetadata(OperationContext* opCtx,
                                         const HostAndPort& requestDestination,
                                         BSONObjBuilder* metadataBob) = 0;
 

@@ -58,7 +58,7 @@ namespace {
 
 const int edebug = 0;
 
-bool dbEval(OperationContext* txn,
+bool dbEval(OperationContext* opCtx,
             const string& dbName,
             const BSONObj& cmd,
             BSONObjBuilder& result,
@@ -92,7 +92,7 @@ bool dbEval(OperationContext* txn,
     }
 
     unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
-    s->registerOperation(txn);
+    s->registerOperation(opCtx);
 
     ScriptingFunction f = s->createFunction(code);
     if (f == 0) {
@@ -100,7 +100,7 @@ bool dbEval(OperationContext* txn,
         return false;
     }
 
-    s->localConnectForDbEval(txn, dbName.c_str());
+    s->localConnectForDbEval(opCtx, dbName.c_str());
 
     if (e.type() == CodeWScope) {
         s->init(e.codeWScopeScopeDataUnsafe());
@@ -171,22 +171,22 @@ public:
 
     CmdEval() : Command("eval", false, "$eval") {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
         if (cmdObj["nolock"].trueValue()) {
-            return dbEval(txn, dbname, cmdObj, result, errmsg);
+            return dbEval(opCtx, dbname, cmdObj, result, errmsg);
         }
 
-        ScopedTransaction transaction(txn, MODE_X);
-        Lock::GlobalWrite lk(txn->lockState());
+        ScopedTransaction transaction(opCtx, MODE_X);
+        Lock::GlobalWrite lk(opCtx->lockState());
 
-        OldClientContext ctx(txn, dbname, false /* no shard version checking */);
+        OldClientContext ctx(opCtx, dbname, false /* no shard version checking */);
 
-        return dbEval(txn, dbname, cmdObj, result, errmsg);
+        return dbEval(opCtx, dbname, cmdObj, result, errmsg);
     }
 
 } cmdeval;

@@ -385,7 +385,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     LockGuard topoLock(_topoMutex);
 
-    invariant(cbData.txn);
+    invariant(cbData.opCtx);
     // TODO Add invariant that we've got global shared or global exclusive lock, when supported
     // by lock manager.
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -496,7 +496,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                      "it is invalid: "
                   << myIndex.getStatus();
     } else {
-        Status status = _externalState->storeLocalConfigDocument(cbd.txn, newConfig.toBSON());
+        Status status = _externalState->storeLocalConfigDocument(cbd.opCtx, newConfig.toBSON());
 
         lk.lock();
         if (!status.isOK()) {
@@ -518,7 +518,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
         if (!isArbiter && isFirstConfig) {
             _externalState->startThreads(_settings);
-            _startDataReplication(cbd.txn);
+            _startDataReplication(cbd.opCtx);
         }
     }
 
@@ -558,7 +558,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
 
-    if (_getMemberState_inlock().primary() && !cbData.txn) {
+    if (_getMemberState_inlock().primary() && !cbData.opCtx) {
         // Not having an OperationContext in the CallbackData means we definitely aren't holding
         // the global lock.  Since we're primary and this reconfig could cause us to stepdown,
         // reschedule this work with the global exclusive lock so the stepdown is safe.

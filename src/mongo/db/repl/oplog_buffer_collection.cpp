@@ -93,27 +93,27 @@ OplogBufferCollection::Options OplogBufferCollection::getOptions() const {
     return _options;
 }
 
-void OplogBufferCollection::startup(OperationContext* txn) {
-    clear(txn);
+void OplogBufferCollection::startup(OperationContext* opCtx) {
+    clear(opCtx);
 }
 
-void OplogBufferCollection::shutdown(OperationContext* txn) {
+void OplogBufferCollection::shutdown(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _dropCollection(txn);
+    _dropCollection(opCtx);
     _size = 0;
     _count = 0;
 }
 
-void OplogBufferCollection::pushEvenIfFull(OperationContext* txn, const Value& value) {
+void OplogBufferCollection::pushEvenIfFull(OperationContext* opCtx, const Value& value) {
     Batch valueBatch = {value};
-    pushAllNonBlocking(txn, valueBatch.begin(), valueBatch.end());
+    pushAllNonBlocking(opCtx, valueBatch.begin(), valueBatch.end());
 }
 
-void OplogBufferCollection::push(OperationContext* txn, const Value& value) {
-    pushEvenIfFull(txn, value);
+void OplogBufferCollection::push(OperationContext* opCtx, const Value& value) {
+    pushEvenIfFull(opCtx, value);
 }
 
-void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
+void OplogBufferCollection::pushAllNonBlocking(OperationContext* opCtx,
                                                Batch::const_iterator begin,
                                                Batch::const_iterator end) {
     if (begin == end) {
@@ -132,7 +132,7 @@ void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
         return doc;
     });
 
-    auto status = _storageInterface->insertDocuments(txn, _nss, docsToInsert);
+    auto status = _storageInterface->insertDocuments(opCtx, _nss, docsToInsert);
     fassertStatusOK(40161, status);
 
     _lastPushedTimestamp = ts;
@@ -144,7 +144,7 @@ void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
     _cvNoLongerEmpty.notify_all();
 }
 
-void OplogBufferCollection::waitForSpace(OperationContext* txn, std::size_t size) {}
+void OplogBufferCollection::waitForSpace(OperationContext* opCtx, std::size_t size) {}
 
 bool OplogBufferCollection::isEmpty() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -165,10 +165,10 @@ std::size_t OplogBufferCollection::getCount() const {
     return _count;
 }
 
-void OplogBufferCollection::clear(OperationContext* txn) {
+void OplogBufferCollection::clear(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _dropCollection(txn);
-    _createCollection(txn);
+    _dropCollection(opCtx);
+    _createCollection(opCtx);
     _size = 0;
     _count = 0;
     _sentinelCount = 0;
@@ -177,12 +177,12 @@ void OplogBufferCollection::clear(OperationContext* txn) {
     _peekCache = std::queue<BSONObj>();
 }
 
-bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
+bool OplogBufferCollection::tryPop(OperationContext* opCtx, Value* value) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_count == 0) {
         return false;
     }
-    return _pop_inlock(txn, value);
+    return _pop_inlock(opCtx, value);
 }
 
 bool OplogBufferCollection::waitForData(Seconds waitDuration) {
@@ -194,24 +194,24 @@ bool OplogBufferCollection::waitForData(Seconds waitDuration) {
     return _count != 0;
 }
 
-bool OplogBufferCollection::peek(OperationContext* txn, Value* value) {
+bool OplogBufferCollection::peek(OperationContext* opCtx, Value* value) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_count == 0) {
         return false;
     }
-    *value = _peek_inlock(txn, PeekMode::kExtractEmbeddedDocument);
+    *value = _peek_inlock(opCtx, PeekMode::kExtractEmbeddedDocument);
     return true;
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
-    OperationContext* txn) const {
+    OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_count == 0) {
         return boost::none;
     }
     const auto docs =
         fassertStatusOK(40348,
-                        _storageInterface->findDocuments(txn,
+                        _storageInterface->findDocuments(opCtx,
                                                          _nss,
                                                          kIdIdxName,
                                                          StorageInterface::ScanDirection::kBackward,
@@ -222,9 +222,9 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
     return extractEmbeddedOplogDocument(docs.front()).getOwned();
 }
 
-bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
+bool OplogBufferCollection::_pop_inlock(OperationContext* opCtx, Value* value) {
     BSONObj docFromCollection =
-        _peek_inlock(txn, PeekMode::kReturnUnmodifiedDocumentFromCollection);
+        _peek_inlock(opCtx, PeekMode::kReturnUnmodifiedDocumentFromCollection);
     _lastPoppedKey = docFromCollection["_id"].wrap("");
     *value = extractEmbeddedOplogDocument(docFromCollection).getOwned();
 
@@ -239,7 +239,7 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
     return true;
 }
 
-BSONObj OplogBufferCollection::_peek_inlock(OperationContext* txn, PeekMode peekMode) {
+BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode peekMode) {
     invariant(_count > 0);
 
     BSONObj startKey;
@@ -259,7 +259,7 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* txn, PeekMode peek
         std::size_t limit = isPeekCacheEnabled ? _options.peekCacheSize : 1U;
         const auto docs = fassertStatusOK(
             40163,
-            _storageInterface->findDocuments(txn,
+            _storageInterface->findDocuments(opCtx,
                                              _nss,
                                              kIdIdxName,
                                              StorageInterface::ScanDirection::kForward,
@@ -286,14 +286,14 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* txn, PeekMode peek
     MONGO_UNREACHABLE;
 }
 
-void OplogBufferCollection::_createCollection(OperationContext* txn) {
+void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     CollectionOptions options;
     options.temp = true;
-    fassert(40154, _storageInterface->createCollection(txn, _nss, options));
+    fassert(40154, _storageInterface->createCollection(opCtx, _nss, options));
 }
 
-void OplogBufferCollection::_dropCollection(OperationContext* txn) {
-    fassert(40155, _storageInterface->dropCollection(txn, _nss));
+void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
+    fassert(40155, _storageInterface->dropCollection(opCtx, _nss));
 }
 
 std::size_t OplogBufferCollection::getSentinelCount_forTest() const {

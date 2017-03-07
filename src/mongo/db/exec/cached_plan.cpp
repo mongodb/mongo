@@ -53,14 +53,14 @@ namespace mongo {
 // static
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
-CachedPlanStage::CachedPlanStage(OperationContext* txn,
+CachedPlanStage::CachedPlanStage(OperationContext* opCtx,
                                  Collection* collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  PlanStage* root)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _canonicalQuery(cq),
@@ -299,13 +299,13 @@ PlanStage::StageState CachedPlanStage::doWork(WorkingSetID* out) {
     return child()->work(out);
 }
 
-void CachedPlanStage::doInvalidate(OperationContext* txn,
+void CachedPlanStage::doInvalidate(OperationContext* opCtx,
                                    const RecordId& dl,
                                    InvalidationType type) {
     for (auto it = _results.begin(); it != _results.end(); ++it) {
         WorkingSetMember* member = _ws->get(*it);
         if (member->hasRecordId() && member->recordId == dl) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
         }
     }
 }

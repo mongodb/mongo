@@ -61,7 +61,7 @@ private:
      * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
      * used to drop the databases.
      */
-    void _dropAllDBs(OperationContext* txn);
+    void _dropAllDBs(OperationContext* opCtx);
 };
 
 }  // namespace mongo

@@ -56,10 +56,10 @@ public:
                   const char* inputStr,
                   const char* expectedStr,
                   CollatorInterface* collator = nullptr) {
-        auto txn = _serviceContext.makeOperationContext();
+        auto opCtx = _serviceContext.makeOperationContext();
 
         WorkingSet ws;
-        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(txn.get(), &ws);
+        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &ws);
         BSONObj inputObj = fromjson(inputStr);
         BSONElement inputElt = inputObj["input"];
         ASSERT(inputElt.isABSONObj());
@@ -79,8 +79,8 @@ public:
         // Initialization.
         BSONObj pattern = fromjson(patternStr);
         auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-            txn.get(), queuedDataStage.release(), &ws, pattern, BSONObj(), collator);
-        EnsureSortedStage ess(txn.get(), pattern, &ws, sortKeyGen.release());
+            opCtx.get(), queuedDataStage.release(), &ws, pattern, BSONObj(), collator);
+        EnsureSortedStage ess(opCtx.get(), pattern, &ws, sortKeyGen.release());
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;
 
@@ -112,13 +112,13 @@ protected:
 };
 
 TEST_F(QueryStageEnsureSortedTest, EnsureSortedEmptyWorkingSet) {
-    auto txn = _serviceContext.makeOperationContext();
+    auto opCtx = _serviceContext.makeOperationContext();
 
     WorkingSet ws;
-    auto queuedDataStage = stdx::make_unique<QueuedDataStage>(txn.get(), &ws);
+    auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx.get(), &ws);
     auto sortKeyGen = stdx::make_unique<SortKeyGeneratorStage>(
-        txn.get(), queuedDataStage.release(), &ws, BSONObj(), BSONObj(), nullptr);
-    EnsureSortedStage ess(txn.get(), BSONObj(), &ws, sortKeyGen.release());
+        opCtx.get(), queuedDataStage.release(), &ws, BSONObj(), BSONObj(), nullptr);
+    EnsureSortedStage ess(opCtx.get(), BSONObj(), &ws, sortKeyGen.release());
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     PlanStage::StageState state = PlanStage::NEED_TIME;

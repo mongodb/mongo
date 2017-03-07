@@ -79,7 +79,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -91,7 +91,7 @@ public:
                 cmdObj.firstElement().type() == BSONType::String);
         const string target = cmdObj.firstElement().str();
 
-        const auto shardStatus = grid.shardRegistry()->getShard(txn, ShardId(target));
+        const auto shardStatus = grid.shardRegistry()->getShard(opCtx, ShardId(target));
         if (!shardStatus.isOK()) {
             string msg(str::stream() << "Could not drop shard '" << target
                                      << "' because it does not exist");
@@ -100,15 +100,15 @@ public:
         }
         const auto s = shardStatus.getValue();
 
-        auto catalogClient = grid.catalogClient(txn);
+        auto catalogClient = grid.catalogClient(opCtx);
         StatusWith<ShardDrainingStatus> removeShardResult =
-            catalogClient->removeShard(txn, s->getId());
+            catalogClient->removeShard(opCtx, s->getId());
         if (!removeShardResult.isOK()) {
             return appendCommandStatus(result, removeShardResult.getStatus());
         }
 
         vector<string> databases;
-        Status status = catalogClient->getDatabasesForShard(txn, s->getId(), &databases);
+        Status status = catalogClient->getDatabasesForShard(opCtx, s->getId(), &databases);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -142,7 +142,7 @@ public:
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
                 Status status =
-                    catalogClient->getChunks(txn,
+                    catalogClient->getChunks(opCtx,
                                              BSON(ChunkType::shard(s->getId().toString())),
                                              BSONObj(),
                                              boost::none,  // return all

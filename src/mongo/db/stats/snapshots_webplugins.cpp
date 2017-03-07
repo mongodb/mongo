@@ -87,7 +87,7 @@ public:
         ss << "</tr>\n";
     }
 
-    void run(OperationContext* txn, stringstream& ss) {
+    void run(OperationContext* opCtx, stringstream& ss) {
         StatusWith<SnapshotDiff> diff = statsSnapshots.computeDelta();
 
         if (!diff.isOK())

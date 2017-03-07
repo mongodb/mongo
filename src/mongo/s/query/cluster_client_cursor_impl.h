@@ -50,7 +50,7 @@ class ClusterClientCursorGuard final {
     MONGO_DISALLOW_COPYING(ClusterClientCursorGuard);
 
 public:
-    ClusterClientCursorGuard(OperationContext* txn, std::unique_ptr<ClusterClientCursor> ccc);
+    ClusterClientCursorGuard(OperationContext* opCtx, std::unique_ptr<ClusterClientCursor> ccc);
 
     /**
      * If a cursor is owned, safely destroys the cursor, cleaning up remote cursor state if
@@ -74,7 +74,7 @@ public:
     std::unique_ptr<ClusterClientCursor> releaseCursor();
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     std::unique_ptr<ClusterClientCursor> _ccc;
 };
 
@@ -85,7 +85,7 @@ public:
     /**
      * Constructs a CCC whose safe cleanup is ensured by an RAII object.
      */
-    static ClusterClientCursorGuard make(OperationContext* txn,
+    static ClusterClientCursorGuard make(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
                                          ClusterClientCursorParams&& params);
 
@@ -95,9 +95,9 @@ public:
     ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root,
                             ClusterClientCursorParams&& params);
 
-    StatusWith<ClusterQueryResult> next(OperationContext* txn) final;
+    StatusWith<ClusterQueryResult> next(OperationContext* opCtx) final;
 
-    void kill(OperationContext* txn) final;
+    void kill(OperationContext* opCtx) final;
 
     bool isTailable() const final;
 

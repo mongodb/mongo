@@ -43,7 +43,7 @@ class RestAdminAccess : public AdminAccess {
 public:
     virtual ~RestAdminAccess() {}
 
-    virtual bool haveAdminUsers(OperationContext* txn) const;
+    virtual bool haveAdminUsers(OperationContext* opCtx) const;
 };
 
 }  // namespace mongo

@@ -120,7 +120,7 @@ private:
         return nss.ns();
     }
 
-    virtual Status explain(OperationContext* txn,
+    virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
@@ -134,11 +134,11 @@ private:
 
         groupRequest.explain = true;
 
-        AutoGetCollectionForRead ctx(txn, groupRequest.ns);
+        AutoGetCollectionForRead ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
         auto statusWithPlanExecutor =
-            getExecutorGroup(txn, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+            getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -149,7 +149,7 @@ private:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -166,20 +166,20 @@ private:
             return appendCommandStatus(result, parseRequestStatus);
         }
 
-        AutoGetCollectionForRead ctx(txn, groupRequest.ns);
+        AutoGetCollectionForRead ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
         auto statusWithPlanExecutor =
-            getExecutorGroup(txn, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+            getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
         unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
 
-        auto curOp = CurOp::get(txn);
+        auto curOp = CurOp::get(opCtx);
         {
-            stdx::lock_guard<Client> lk(*txn->getClient());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(Explain::getPlanSummary(planExecutor.get()));
         }
 
@@ -204,7 +204,7 @@ private:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*planExecutor, &summaryStats);
         if (coll) {
-            coll->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+            coll->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 

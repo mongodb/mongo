@@ -106,13 +106,13 @@ bool DataReplicatorExternalStateImpl::shouldStopFetching(
 }
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOplogBuffer(
-    OperationContext* txn) const {
-    return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(txn);
+    OperationContext* opCtx) const {
+    return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(opCtx);
 }
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOplogBuffer(
-    OperationContext* txn) const {
-    return _replicationCoordinatorExternalState->makeSteadyStateOplogBuffer(txn);
+    OperationContext* opCtx) const {
+    return _replicationCoordinatorExternalState->makeSteadyStateOplogBuffer(opCtx);
 }
 
 StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {
@@ -120,10 +120,10 @@ StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() co
 }
 
 StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
-    OperationContext* txn,
+    OperationContext* opCtx,
     MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return _replicationCoordinatorExternalState->multiApply(txn, std::move(ops), applyOperation);
+    return _replicationCoordinatorExternalState->multiApply(opCtx, std::move(ops), applyOperation);
 }
 
 Status DataReplicatorExternalStateImpl::_multiSyncApply(MultiApplier::OperationPtrs* ops) {

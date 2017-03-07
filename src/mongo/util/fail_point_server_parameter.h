@@ -42,7 +42,7 @@ public:
 
     FailPointServerParameter(std::string name, FailPoint* failpoint);
 
-    void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) override;
+    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) override;
     Status set(const BSONElement& newValueElement) override;
     Status setFromString(const std::string& str) override;
 

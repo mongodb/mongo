@@ -111,7 +111,7 @@ private:
 
 class EphemeralForTestRecordStore::Cursor final : public SeekableRecordCursor {
 public:
-    Cursor(OperationContext* txn, const EphemeralForTestRecordStore& rs)
+    Cursor(OperationContext* opCtx, const EphemeralForTestRecordStore& rs)
         : _records(rs._data->records), _isCapped(rs.isCapped()) {}
 
     boost::optional<Record> next() final {
@@ -160,7 +160,7 @@ public:
     }
 
     void detachFromOperationContext() final {}
-    void reattachToOperationContext(OperationContext* txn) final {}
+    void reattachToOperationContext(OperationContext* opCtx) final {}
 
 private:
     Records::const_iterator _it;
@@ -174,7 +174,7 @@ private:
 
 class EphemeralForTestRecordStore::ReverseCursor final : public SeekableRecordCursor {
 public:
-    ReverseCursor(OperationContext* txn, const EphemeralForTestRecordStore& rs)
+    ReverseCursor(OperationContext* opCtx, const EphemeralForTestRecordStore& rs)
         : _records(rs._data->records), _isCapped(rs.isCapped()) {}
 
     boost::optional<Record> next() final {
@@ -236,7 +236,7 @@ public:
     }
 
     void detachFromOperationContext() final {}
-    void reattachToOperationContext(OperationContext* txn) final {}
+    void reattachToOperationContext(OperationContext* opCtx) final {}
 
 private:
     Records::const_reverse_iterator _it;
@@ -282,7 +282,8 @@ const char* EphemeralForTestRecordStore::name() const {
     return "EphemeralForTest";
 }
 
-RecordData EphemeralForTestRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {
+RecordData EphemeralForTestRecordStore::dataFor(OperationContext* opCtx,
+                                                const RecordId& loc) const {
     return recordFor(loc)->toRecordData();
 }
 
@@ -308,7 +309,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
     return &it->second;
 }
 
-bool EphemeralForTestRecordStore::findRecord(OperationContext* txn,
+bool EphemeralForTestRecordStore::findRecord(OperationContext* opCtx,
                                              const RecordId& loc,
                                              RecordData* rd) const {
     Records::const_iterator it = _data->records.find(loc);
@@ -319,28 +320,28 @@ bool EphemeralForTestRecordStore::findRecord(OperationContext* txn,
     return true;
 }
 
-void EphemeralForTestRecordStore::deleteRecord(OperationContext* txn, const RecordId& loc) {
+void EphemeralForTestRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& loc) {
     EphemeralForTestRecord* rec = recordFor(loc);
-    txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *rec));
+    opCtx->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *rec));
     _data->dataSize -= rec->size;
     invariant(_data->records.erase(loc) == 1);
 }
 
-bool EphemeralForTestRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
+bool EphemeralForTestRecordStore::cappedAndNeedDelete(OperationContext* opCtx) const {
     if (!_isCapped)
         return false;
 
     if (_data->dataSize > _cappedMaxSize)
         return true;
 
-    if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
+    if ((_cappedMaxDocs != -1) && (numRecords(opCtx) > _cappedMaxDocs))
         return true;
 
     return false;
 }
 
-void EphemeralForTestRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-    while (cappedAndNeedDelete(txn)) {
+void EphemeralForTestRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx) {
+    while (cappedAndNeedDelete(opCtx)) {
         invariant(!_data->records.empty());
 
         Records::iterator oldest = _data->records.begin();
@@ -348,9 +349,9 @@ void EphemeralForTestRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
         RecordData data = oldest->second.toRecordData();
 
         if (_cappedCallback)
-            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(txn, id, data));
+            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(opCtx, id, data));
 
-        deleteRecord(txn, id);
+        deleteRecord(opCtx, id);
     }
 }
 
@@ -366,7 +367,7 @@ StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(con
     return status;
 }
 
-StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext* txn,
+StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext* opCtx,
                                                                const char* data,
                                                                int len,
                                                                bool enforceQuota) {
@@ -389,16 +390,16 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext*
         loc = allocateLoc();
     }
 
-    txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+    opCtx->recoveryUnit()->registerChange(new InsertChange(_data, loc));
     _data->dataSize += len;
     _data->records[loc] = rec;
 
-    cappedDeleteAsNeeded(txn);
+    cappedDeleteAsNeeded(opCtx);
 
     return StatusWith<RecordId>(loc);
 }
 
-Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext* txn,
+Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
                                                                const DocWriter* const* docs,
                                                                size_t nDocs,
                                                                RecordId* idsOut) {
@@ -423,11 +424,11 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
             loc = allocateLoc();
         }
 
-        txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+        opCtx->recoveryUnit()->registerChange(new InsertChange(_data, loc));
         _data->dataSize += len;
         _data->records[loc] = rec;
 
-        cappedDeleteAsNeeded(txn);
+        cappedDeleteAsNeeded(opCtx);
 
         if (idsOut)
             idsOut[i] = loc;
@@ -436,7 +437,7 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
     return Status::OK();
 }
 
-Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
+Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
                                                  const RecordId& loc,
                                                  const char* data,
                                                  int len,
@@ -451,7 +452,7 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
     if (notifier) {
         // The in-memory KV engine uses the invalidation framework (does not support
         // doc-locking), and therefore must notify that it is updating a document.
-        Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(txn, loc);
+        Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(opCtx, loc);
         if (!callbackStatus.isOK()) {
             return callbackStatus;
         }
@@ -460,11 +461,11 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* txn,
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);
 
-    txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
+    opCtx->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
     _data->dataSize += len - oldLen;
     *oldRecord = newRecord;
 
-    cappedDeleteAsNeeded(txn);
+    cappedDeleteAsNeeded(opCtx);
 
     return Status::OK();
 }
@@ -474,7 +475,7 @@ bool EphemeralForTestRecordStore::updateWithDamagesSupported() const {
 }
 
 StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const RecordId& loc,
     const RecordData& oldRec,
     const char* damageSource,
@@ -485,10 +486,10 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), oldRecord->data.get(), len);
 
-    txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
+    opCtx->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
     *oldRecord = newRecord;
 
-    cappedDeleteAsNeeded(txn);
+    cappedDeleteAsNeeded(opCtx);
 
     char* root = newRecord.data.get();
     mutablebson::DamageVector::const_iterator where = damages.begin();
@@ -504,33 +505,33 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
     return newRecord.toRecordData();
 }
 
-std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(OperationContext* txn,
-                                                                             bool forward) const {
+std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(
+    OperationContext* opCtx, bool forward) const {
     if (forward)
-        return stdx::make_unique<Cursor>(txn, *this);
-    return stdx::make_unique<ReverseCursor>(txn, *this);
+        return stdx::make_unique<Cursor>(opCtx, *this);
+    return stdx::make_unique<ReverseCursor>(opCtx, *this);
 }
 
-Status EphemeralForTestRecordStore::truncate(OperationContext* txn) {
+Status EphemeralForTestRecordStore::truncate(OperationContext* opCtx) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate
-    txn->recoveryUnit()->registerChange(new TruncateChange(_data));
+    opCtx->recoveryUnit()->registerChange(new TruncateChange(_data));
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::cappedTruncateAfter(OperationContext* txn,
+void EphemeralForTestRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                                       RecordId end,
                                                       bool inclusive) {
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
     while (it != _data->records.end()) {
-        txn->recoveryUnit()->registerChange(new RemoveChange(_data, it->first, it->second));
+        opCtx->recoveryUnit()->registerChange(new RemoveChange(_data, it->first, it->second));
         _data->dataSize -= it->second.size;
         _data->records.erase(it++);
     }
 }
 
-Status EphemeralForTestRecordStore::validate(OperationContext* txn,
+Status EphemeralForTestRecordStore::validate(OperationContext* opCtx,
                                              ValidateCmdLevel level,
                                              ValidateAdaptor* adaptor,
                                              ValidateResults* results,
@@ -558,7 +559,7 @@ Status EphemeralForTestRecordStore::validate(OperationContext* txn,
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::appendCustomStats(OperationContext* txn,
+void EphemeralForTestRecordStore::appendCustomStats(OperationContext* opCtx,
                                                     BSONObjBuilder* result,
                                                     double scale) const {
     result->appendBool("capped", _isCapped);
@@ -568,7 +569,7 @@ void EphemeralForTestRecordStore::appendCustomStats(OperationContext* txn,
     }
 }
 
-Status EphemeralForTestRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
+Status EphemeralForTestRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
     if (output) {
         output->append("numRanges", 1);
         output->append("millis", 0);
@@ -576,18 +577,18 @@ Status EphemeralForTestRecordStore::touch(OperationContext* txn, BSONObjBuilder*
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::increaseStorageSize(OperationContext* txn,
+void EphemeralForTestRecordStore::increaseStorageSize(OperationContext* opCtx,
                                                       int size,
                                                       bool enforceQuota) {
     // unclear what this would mean for this class. For now, just error if called.
     invariant(!"increaseStorageSize not yet implemented");
 }
 
-int64_t EphemeralForTestRecordStore::storageSize(OperationContext* txn,
+int64_t EphemeralForTestRecordStore::storageSize(OperationContext* opCtx,
                                                  BSONObjBuilder* extraInfo,
                                                  int infoLevel) const {
     // Note: not making use of extraInfo or infoLevel since we don't have extents
-    const int64_t recordOverhead = numRecords(txn) * sizeof(EphemeralForTestRecord);
+    const int64_t recordOverhead = numRecords(opCtx) * sizeof(EphemeralForTestRecord);
     return _data->dataSize + recordOverhead;
 }
 
@@ -598,7 +599,7 @@ RecordId EphemeralForTestRecordStore::allocateLoc() {
 }
 
 boost::optional<RecordId> EphemeralForTestRecordStore::oplogStartHack(
-    OperationContext* txn, const RecordId& startingPosition) const {
+    OperationContext* opCtx, const RecordId& startingPosition) const {
     if (!_data->isOplog)
         return boost::none;
 

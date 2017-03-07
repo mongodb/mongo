@@ -91,7 +91,7 @@ public:
      *
      * On success, the output is added to the BSONObj builder 'out'.
      */
-    static Status buildExplainResult(OperationContext* txn,
+    static Status buildExplainResult(OperationContext* opCtx,
                                      const std::vector<Strategy::CommandResult>& shardResults,
                                      const char* mongosStageName,
                                      long long millisElapsed,
@@ -120,7 +120,7 @@ private:
      * The planner info will display 'mongosStageName' as the name of the execution stage
      * performed by mongos after gathering results from the shards.
      */
-    static void buildPlannerInfo(OperationContext* txn,
+    static void buildPlannerInfo(OperationContext* opCtx,
                                  const std::vector<Strategy::CommandResult>& shardResults,
                                  const char* mongosStageName,
                                  BSONObjBuilder* out);

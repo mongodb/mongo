@@ -40,7 +40,7 @@ class OperationContext;
 // to indicate that the call is on behalf of a DBDirectClient.
 extern const HostAndPort kHostAndPortForDirectClient;
 
-void assembleResponse(OperationContext* txn,
+void assembleResponse(OperationContext* opCtx,
                       Message& m,
                       DbResponse& dbresponse,
                       const HostAndPort& client);

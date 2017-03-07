@@ -77,12 +77,12 @@ public:
         return chunk.getShard() == _currShard;
     }
 
-    virtual pair<BSONObj, CachedChunkInfo> rangeFor(OperationContext* txn,
+    virtual pair<BSONObj, CachedChunkInfo> rangeFor(OperationContext* opCtx,
                                                     const ChunkType& chunk) const {
         return make_pair(chunk.getMin(), CachedChunkInfo(chunk.getMax(), chunk.getVersion()));
     }
 
-    virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const {
+    virtual ShardId shardFor(OperationContext* opCtx, const ShardId& name) const {
         return name;
     }
 
@@ -96,27 +96,27 @@ private:
 
 }  // namespace
 
-Status MetadataLoader::makeCollectionMetadata(OperationContext* txn,
+Status MetadataLoader::makeCollectionMetadata(OperationContext* opCtx,
                                               ShardingCatalogClient* catalogClient,
                                               const string& ns,
                                               const string& shard,
                                               const CollectionMetadata* oldMetadata,
                                               CollectionMetadata* metadata) {
-    Status initCollectionStatus = _initCollection(txn, catalogClient, ns, shard, metadata);
+    Status initCollectionStatus = _initCollection(opCtx, catalogClient, ns, shard, metadata);
     if (!initCollectionStatus.isOK()) {
         return initCollectionStatus;
     }
 
-    return _initChunks(txn, catalogClient, ns, shard, oldMetadata, metadata);
+    return _initChunks(opCtx, catalogClient, ns, shard, oldMetadata, metadata);
 }
 
-Status MetadataLoader::_initCollection(OperationContext* txn,
+Status MetadataLoader::_initCollection(OperationContext* opCtx,
                                        ShardingCatalogClient* catalogClient,
                                        const string& ns,
                                        const string& shard,
                                        CollectionMetadata* metadata) {
     // Get the config.collections entry for 'ns'.
-    auto coll = catalogClient->getCollection(txn, ns);
+    auto coll = catalogClient->getCollection(opCtx, ns);
     if (!coll.isOK()) {
         return coll.getStatus();
     }
@@ -138,7 +138,7 @@ Status MetadataLoader::_initCollection(OperationContext* txn,
     return Status::OK();
 }
 
-Status MetadataLoader::_initChunks(OperationContext* txn,
+Status MetadataLoader::_initChunks(OperationContext* opCtx,
                                    ShardingCatalogClient* catalogClient,
                                    const string& ns,
                                    const string& shard,
@@ -186,7 +186,7 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
         const auto diffQuery = SCMConfigDiffTracker::createConfigDiffQuery(NamespaceString(ns),
                                                                            metadata->_collVersion);
         std::vector<ChunkType> chunks;
-        Status status = catalogClient->getChunks(txn,
+        Status status = catalogClient->getChunks(opCtx,
                                                  diffQuery.query,
                                                  diffQuery.sort,
                                                  boost::none,
@@ -200,7 +200,7 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
 
         // If we are the primary, or a standalone, persist new chunks locally.
         status = _writeNewChunksIfPrimary(
-            txn, NamespaceString(ns), chunks, metadata->_collVersion.epoch());
+            opCtx, NamespaceString(ns), chunks, metadata->_collVersion.epoch());
         if (!status.isOK()) {
             return status;
         }
@@ -210,7 +210,7 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
         // last time).  If not, something has changed on the config server (potentially between
         // when we read the collection data and when we read the chunks data).
         //
-        int diffsApplied = differ.calculateConfigDiff(txn, chunks);
+        int diffsApplied = differ.calculateConfigDiff(opCtx, chunks);
         if (diffsApplied > 0) {
             // Chunks found, return ok
             LOG(2) << "loaded " << diffsApplied << " chunks into new metadata for " << ns
@@ -253,7 +253,7 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
     }
 }
 
-Status MetadataLoader::_writeNewChunksIfPrimary(OperationContext* txn,
+Status MetadataLoader::_writeNewChunksIfPrimary(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const std::vector<ChunkType>& chunks,
                                                 const OID& currEpoch) {
@@ -261,13 +261,13 @@ Status MetadataLoader::_writeNewChunksIfPrimary(OperationContext* txn,
 
     // Only do the write(s) if this is a primary or standalone. Otherwise, return OK.
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer ||
-        !repl::ReplicationCoordinator::get(txn)->canAcceptWritesForDatabase_UNSAFE(
-            txn, chunkMetadataNss.ns())) {
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
+            opCtx, chunkMetadataNss.ns())) {
         return Status::OK();
     }
 
     try {
-        DBDirectClient client(txn);
+        DBDirectClient client(opCtx);
 
         /**
          * Here are examples of the operations that can happen on the config server to update

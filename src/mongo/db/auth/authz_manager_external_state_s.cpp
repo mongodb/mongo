@@ -83,7 +83,7 @@ AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
 
 AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
 
-Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
+Status AuthzManagerExternalStateMongos::initialize(OperationContext* opCtx) {
     return Status::OK();
 }
 
@@ -92,7 +92,7 @@ AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationMana
     return stdx::make_unique<AuthzSessionExternalStateMongos>(authzManager);
 }
 
-Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* txn,
+Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,
                                                                       int* outVersion) {
     // Note: we are treating
     // { 'getParameter' : 1, <authSchemaVersionServerParameter> : 1 }
@@ -100,8 +100,8 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     // that runs this command
     BSONObj getParameterCmd = BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1);
     BSONObjBuilder builder;
-    const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-        txn, "admin", getParameterCmd, &builder);
+    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        opCtx, "admin", getParameterCmd, &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -116,10 +116,10 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     return Status::OK();
 }
 
-Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn,
+Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opCtx,
                                                            const UserName& userName,
                                                            BSONObj* result) {
-    if (!shouldUseRolesFromConnection(txn, userName)) {
+    if (!shouldUseRolesFromConnection(opCtx, userName)) {
         BSONObj usersInfoCmd =
             BSON("usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                                 << userName.getUser()
@@ -130,8 +130,8 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
                              << "showCredentials"
                              << true);
         BSONObjBuilder builder;
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-            txn, "admin", usersInfoCmd, &builder);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+            opCtx, "admin", usersInfoCmd, &builder);
         BSONObj cmdResult = builder.obj();
         if (!ok) {
             return getStatusFromCommandResult(cmdResult);
@@ -156,7 +156,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
         // Obtain privilege information from the config servers for all roles acquired from the X509
         // certificate.
         BSONArrayBuilder userRolesBuilder;
-        auto& sslPeerInfo = SSLPeerInfo::forSession(txn->getClient()->session());
+        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
         for (const RoleName& role : sslPeerInfo.roles) {
             userRolesBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
                                          << role.getRole()
@@ -169,8 +169,8 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
                                                 << "asUserFragment");
 
         BSONObjBuilder cmdResultBuilder;
-        const bool cmdOk = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-            txn, "admin", rolesInfoCmd, &cmdResultBuilder);
+        const bool cmdOk = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+            opCtx, "admin", rolesInfoCmd, &cmdResultBuilder);
         BSONObj cmdResult = cmdResultBuilder.obj();
         if (!cmdOk || !cmdResult["userFragment"].ok()) {
             return Status(ErrorCodes::FailedToParse,
@@ -204,7 +204,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
     }
 }
 
-Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn,
+Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* opCtx,
                                                            const RoleName& roleName,
                                                            PrivilegeFormat showPrivileges,
                                                            BSONObj* result) {
@@ -217,8 +217,8 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn
     addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
 
     BSONObjBuilder builder;
-    const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-        txn, "admin", rolesInfoCmd.obj(), &builder);
+    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        opCtx, "admin", rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -239,7 +239,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(OperationContext* txn
     *result = foundRoles[0].Obj().getOwned();
     return Status::OK();
 }
-Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* txn,
+Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* opCtx,
                                                             const std::vector<RoleName>& roles,
                                                             PrivilegeFormat showPrivileges,
                                                             BSONObj* result) {
@@ -257,8 +257,8 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* tx
     addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
 
     BSONObjBuilder builder;
-    const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-        txn, "admin", rolesInfoCmd.obj(), &builder);
+    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        opCtx, "admin", rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -273,7 +273,7 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(OperationContext* tx
 
     return Status::OK();
 }
-Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContext* txn,
+Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContext* opCtx,
                                                                  const std::string dbname,
                                                                  PrivilegeFormat showPrivileges,
                                                                  bool showBuiltinRoles,
@@ -283,8 +283,8 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
     addShowPrivilegesToBuilder(&rolesInfoCmd, showPrivileges);
 
     BSONObjBuilder builder;
-    const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-        txn, dbname, rolesInfoCmd.obj(), &builder);
+    const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        opCtx, dbname, rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);
@@ -297,11 +297,11 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(OperationContex
     return Status::OK();
 }
 
-bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
+bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;
-    bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-        txn, "admin", usersInfoCmd, &userBuilder);
+    bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        opCtx, "admin", usersInfoCmd, &userBuilder);
     if (!ok) {
         // If we were unable to complete the query,
         // it's best to assume that there _are_ privilege documents.  This might happen
@@ -318,8 +318,8 @@ bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext*
 
     BSONObj rolesInfoCmd = BSON("rolesInfo" << 1);
     BSONObjBuilder roleBuilder;
-    ok = Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-        txn, "admin", rolesInfoCmd, &roleBuilder);
+    ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+        opCtx, "admin", rolesInfoCmd, &roleBuilder);
     if (!ok) {
         return true;
     }

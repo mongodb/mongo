@@ -52,9 +52,9 @@ namespace {
  * Calculates the keep alive interval based on the current configuration in the replication
  * coordinator.
  */
-Milliseconds calculateKeepAliveInterval(OperationContext* txn, stdx::mutex& mtx) {
+Milliseconds calculateKeepAliveInterval(OperationContext* opCtx, stdx::mutex& mtx) {
     stdx::lock_guard<stdx::mutex> lock(mtx);
-    auto replCoord = repl::ReplicationCoordinator::get(txn);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto rsConfig = replCoord->getConfig();
     auto keepAliveInterval = rsConfig.getElectionTimeoutPeriod() / 2;
     return keepAliveInterval;
@@ -64,9 +64,9 @@ Milliseconds calculateKeepAliveInterval(OperationContext* txn, stdx::mutex& mtx)
  * Returns function to prepare update command
  */
 Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePositionCommandFn(
-    OperationContext* txn, const HostAndPort& syncTarget, BackgroundSync* bgsync) {
-    return [syncTarget, txn, bgsync](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle
-                                         commandStyle) -> StatusWith<BSONObj> {
+    OperationContext* opCtx, const HostAndPort& syncTarget, BackgroundSync* bgsync) {
+    return [syncTarget, opCtx, bgsync](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle
+                                           commandStyle) -> StatusWith<BSONObj> {
         auto currentSyncTarget = bgsync->getSyncTarget();
         if (currentSyncTarget != syncTarget) {
             if (currentSyncTarget.empty()) {
@@ -82,7 +82,7 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
             }
         }
 
-        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->getMemberState().primary()) {
             // Primary has no one to send updates to.
             return Status(ErrorCodes::InvalidSyncSource,
@@ -149,10 +149,10 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
     Milliseconds keepAliveInterval(0);
 
     while (true) {  // breaks once _shutdownSignaled is true
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         if (keepAliveInterval == Milliseconds(0)) {
-            keepAliveInterval = calculateKeepAliveInterval(txn.get(), _mtx);
+            keepAliveInterval = calculateKeepAliveInterval(opCtx.get(), _mtx);
         }
 
         {
@@ -163,7 +163,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
             while (!_positionChanged && !_shutdownSignaled) {
                 if (_cond.wait_for(lock, keepAliveInterval.toSystemDuration()) ==
                     stdx::cv_status::timeout) {
-                    MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
+                    MemberState state = ReplicationCoordinator::get(opCtx.get())->getMemberState();
                     if (!(state.primary() || state.startup())) {
                         break;
                     }
@@ -179,7 +179,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
 
         {
             stdx::lock_guard<stdx::mutex> lock(_mtx);
-            MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
+            MemberState state = ReplicationCoordinator::get(opCtx.get())->getMemberState();
             if (state.primary() || state.startup()) {
                 continue;
             }
@@ -201,17 +201,18 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
 
             // Update keepalive value from config.
             auto oldKeepAliveInterval = keepAliveInterval;
-            keepAliveInterval = calculateKeepAliveInterval(txn.get(), _mtx);
+            keepAliveInterval = calculateKeepAliveInterval(opCtx.get(), _mtx);
             if (oldKeepAliveInterval != keepAliveInterval) {
                 LOG(1) << "new syncSourceFeedback keep alive duration = " << keepAliveInterval
                        << " (previously " << oldKeepAliveInterval << ")";
             }
         }
 
-        Reporter reporter(executor,
-                          makePrepareReplSetUpdatePositionCommandFn(txn.get(), syncTarget, bgsync),
-                          syncTarget,
-                          keepAliveInterval);
+        Reporter reporter(
+            executor,
+            makePrepareReplSetUpdatePositionCommandFn(opCtx.get(), syncTarget, bgsync),
+            syncTarget,
+            keepAliveInterval);
         {
             stdx::lock_guard<stdx::mutex> lock(_mtx);
             if (_shutdownSignaled) {

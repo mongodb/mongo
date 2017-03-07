@@ -52,7 +52,7 @@ ConnectionString RemoteCommandTargeterMock::connectionString() {
     return _connectionStringReturnValue;
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* txn,
+StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* opCtx,
                                                             const ReadPreferenceSetting& readPref) {
     return _findHostReturnValue;
 }

@@ -47,9 +47,9 @@ ScopedShardDatabase::ScopedShardDatabase(std::shared_ptr<DBConfig> db) : _db(db)
 
 ScopedShardDatabase::~ScopedShardDatabase() = default;
 
-StatusWith<ScopedShardDatabase> ScopedShardDatabase::getExisting(OperationContext* txn,
+StatusWith<ScopedShardDatabase> ScopedShardDatabase::getExisting(OperationContext* opCtx,
                                                                  StringData dbName) {
-    auto dbStatus = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName.toString());
+    auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName.toString());
     if (!dbStatus.isOK()) {
         return {dbStatus.getStatus().code(),
                 str::stream() << "Database " << dbName << " was not found due to "
@@ -59,18 +59,18 @@ StatusWith<ScopedShardDatabase> ScopedShardDatabase::getExisting(OperationContex
     return {ScopedShardDatabase(std::move(dbStatus.getValue()))};
 }
 
-StatusWith<ScopedShardDatabase> ScopedShardDatabase::getOrCreate(OperationContext* txn,
+StatusWith<ScopedShardDatabase> ScopedShardDatabase::getOrCreate(OperationContext* opCtx,
                                                                  StringData dbName) {
-    auto dbStatus = getExisting(txn, dbName);
+    auto dbStatus = getExisting(opCtx, dbName);
     if (dbStatus.isOK()) {
         return dbStatus;
     }
 
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
         auto statusCreateDb =
-            Grid::get(txn)->catalogClient(txn)->createDatabase(txn, dbName.toString());
+            Grid::get(opCtx)->catalogClient(opCtx)->createDatabase(opCtx, dbName.toString());
         if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
-            return getExisting(txn, dbName);
+            return getExisting(opCtx, dbName);
         }
 
         return statusCreateDb;
@@ -87,22 +87,22 @@ ScopedChunkManager::ScopedChunkManager(ScopedShardDatabase db, std::shared_ptr<S
 
 ScopedChunkManager::~ScopedChunkManager() = default;
 
-StatusWith<ScopedChunkManager> ScopedChunkManager::get(OperationContext* txn,
+StatusWith<ScopedChunkManager> ScopedChunkManager::get(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
-    auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, nss.db());
+    auto scopedDbStatus = ScopedShardDatabase::getExisting(opCtx, nss.db());
     if (!scopedDbStatus.isOK()) {
         return scopedDbStatus.getStatus();
     }
 
     auto scopedDb = std::move(scopedDbStatus.getValue());
 
-    auto cm = scopedDb.db()->getChunkManagerIfExists(txn, nss.ns());
+    auto cm = scopedDb.db()->getChunkManagerIfExists(opCtx, nss.ns());
     if (cm) {
         return {ScopedChunkManager(std::move(scopedDb), std::move(cm))};
     }
 
     auto shardStatus =
-        Grid::get(txn)->shardRegistry()->getShard(txn, scopedDb.db()->getPrimaryId());
+        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, scopedDb.db()->getPrimaryId());
     if (!shardStatus.isOK()) {
         return {ErrorCodes::fromInt(40371),
                 str::stream() << "The primary shard for collection " << nss.ns()
@@ -113,19 +113,19 @@ StatusWith<ScopedChunkManager> ScopedChunkManager::get(OperationContext* txn,
     return {ScopedChunkManager(std::move(scopedDb), std::move(shardStatus.getValue()))};
 }
 
-StatusWith<ScopedChunkManager> ScopedChunkManager::getOrCreate(OperationContext* txn,
+StatusWith<ScopedChunkManager> ScopedChunkManager::getOrCreate(OperationContext* opCtx,
                                                                const NamespaceString& nss) {
-    auto scopedDbStatus = ScopedShardDatabase::getOrCreate(txn, nss.db());
+    auto scopedDbStatus = ScopedShardDatabase::getOrCreate(opCtx, nss.db());
     if (!scopedDbStatus.isOK()) {
         return scopedDbStatus.getStatus();
     }
 
-    return ScopedChunkManager::get(txn, nss);
+    return ScopedChunkManager::get(opCtx, nss);
 }
 
-StatusWith<ScopedChunkManager> ScopedChunkManager::refreshAndGet(OperationContext* txn,
+StatusWith<ScopedChunkManager> ScopedChunkManager::refreshAndGet(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
-    auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, nss.db());
+    auto scopedDbStatus = ScopedShardDatabase::getExisting(opCtx, nss.db());
     if (!scopedDbStatus.isOK()) {
         return scopedDbStatus.getStatus();
     }
@@ -134,7 +134,7 @@ StatusWith<ScopedChunkManager> ScopedChunkManager::refreshAndGet(OperationContex
 
     try {
         std::shared_ptr<ChunkManager> cm =
-            scopedDb.db()->getChunkManager(txn, nss.ns(), true, false);
+            scopedDb.db()->getChunkManager(opCtx, nss.ns(), true, false);
 
         if (!cm) {
             return {ErrorCodes::NamespaceNotSharded,

@@ -64,13 +64,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        Grid::get(txn)->catalogCache()->invalidateAll();
+        Grid::get(opCtx)->catalogCache()->invalidateAll();
 
         result.appendBool("flushed", true);
         return true;

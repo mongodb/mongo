@@ -41,13 +41,13 @@
 
 namespace mongo {
 
-ClusterClientCursorGuard::ClusterClientCursorGuard(OperationContext* txn,
+ClusterClientCursorGuard::ClusterClientCursorGuard(OperationContext* opCtx,
                                                    std::unique_ptr<ClusterClientCursor> ccc)
-    : _txn(txn), _ccc(std::move(ccc)) {}
+    : _opCtx(opCtx), _ccc(std::move(ccc)) {}
 
 ClusterClientCursorGuard::~ClusterClientCursorGuard() {
     if (_ccc && !_ccc->remotesExhausted()) {
-        _ccc->kill(_txn);
+        _ccc->kill(_opCtx);
     }
 }
 
@@ -59,12 +59,12 @@ std::unique_ptr<ClusterClientCursor> ClusterClientCursorGuard::releaseCursor() {
     return std::move(_ccc);
 }
 
-ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* txn,
+ClusterClientCursorGuard ClusterClientCursorImpl::make(OperationContext* opCtx,
                                                        executor::TaskExecutor* executor,
                                                        ClusterClientCursorParams&& params) {
     std::unique_ptr<ClusterClientCursor> cursor(
         new ClusterClientCursorImpl(executor, std::move(params)));
-    return ClusterClientCursorGuard(txn, std::move(cursor));
+    return ClusterClientCursorGuard(opCtx, std::move(cursor));
 }
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
@@ -75,7 +75,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock
                                                  ClusterClientCursorParams&& params)
     : _params(std::move(params)), _root(std::move(root)) {}
 
-StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* txn) {
+StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* opCtx) {
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
         auto front = std::move(_stash.front());
@@ -84,15 +84,15 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(OperationContext* t
         return {front};
     }
 
-    auto next = _root->next(txn);
+    auto next = _root->next(opCtx);
     if (next.isOK() && !next.getValue().isEOF()) {
         ++_numReturnedSoFar;
     }
     return next;
 }
 
-void ClusterClientCursorImpl::kill(OperationContext* txn) {
-    _root->kill(txn);
+void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
+    _root->kill(opCtx);
 }
 
 bool ClusterClientCursorImpl::isTailable() const {

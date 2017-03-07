@@ -64,11 +64,11 @@ public:
         return true;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
+    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* opCtx, const ChunkType& chunk) const {
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const {
+    virtual ShardId shardFor(OperationContext* opCtx, const ShardId& name) const {
         return name;
     }
 };
@@ -84,7 +84,7 @@ public:
         return false;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
+    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* opCtx, const ChunkType& chunk) const {
         return make_pair(chunk.getMax(), chunk.getMin());
     }
 };

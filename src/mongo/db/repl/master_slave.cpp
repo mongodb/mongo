@@ -95,7 +95,7 @@ const int restartSync = 0;
 const int restartSyncAfterSleep = 1;
 }  // namespace
 
-void pretouchOperation(OperationContext* txn, const BSONObj& op);
+void pretouchOperation(OperationContext* opCtx, const BSONObj& op);
 void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
 /* if 1 sync() is running */
@@ -114,12 +114,12 @@ struct ReplInfo {
 };
 
 
-ReplSource::ReplSource(OperationContext* txn) {
+ReplSource::ReplSource(OperationContext* opCtx) {
     nClonedThisPass = 0;
-    ensureMe(txn);
+    ensureMe(opCtx);
 }
 
-ReplSource::ReplSource(OperationContext* txn, BSONObj o) : nClonedThisPass(0) {
+ReplSource::ReplSource(OperationContext* opCtx, BSONObj o) : nClonedThisPass(0) {
     only = o.getStringField("only");
     hostName = o.getStringField("host");
     _sourceName = o.getStringField("source");
@@ -155,7 +155,7 @@ ReplSource::ReplSource(OperationContext* txn, BSONObj o) : nClonedThisPass(0) {
             incompleteCloneDbs.insert(e.fieldName());
         }
     }
-    ensureMe(txn);
+    ensureMe(opCtx);
 }
 
 /* Turn our C++ Source object into a BSONObj */
@@ -189,31 +189,31 @@ BSONObj ReplSource::jsobj() {
     return b.obj();
 }
 
-void ReplSource::ensureMe(OperationContext* txn) {
+void ReplSource::ensureMe(OperationContext* opCtx) {
     string myname = getHostName();
 
     // local.me is an identifier for a server for getLastError w:2+
-    bool exists = Helpers::getSingleton(txn, "local.me", _me);
+    bool exists = Helpers::getSingleton(opCtx, "local.me", _me);
 
     if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
-        WriteUnitOfWork wunit(txn);
+        ScopedTransaction transaction(opCtx, MODE_IX);
+        Lock::DBLock dblk(opCtx->lockState(), "local", MODE_X);
+        WriteUnitOfWork wunit(opCtx);
         // clean out local.me
-        Helpers::emptyCollection(txn, "local.me");
+        Helpers::emptyCollection(opCtx, "local.me");
 
         // repopulate
         BSONObjBuilder b;
         b.appendOID("_id", 0, true);
         b.append("host", myname);
         _me = b.obj();
-        Helpers::putSingleton(txn, "local.me", _me);
+        Helpers::putSingleton(opCtx, "local.me", _me);
         wunit.commit();
     }
     _me = _me.getOwned();
 }
 
-void ReplSource::save(OperationContext* txn) {
+void ReplSource::save(OperationContext* opCtx) {
     BSONObjBuilder b;
     verify(!hostName.empty());
     b.append("host", hostName);
@@ -226,7 +226,7 @@ void ReplSource::save(OperationContext* txn) {
     LOG(1) << "Saving repl source: " << o << endl;
 
     {
-        OldClientContext ctx(txn, "local.sources", false);
+        OldClientContext ctx(opCtx, "local.sources", false);
 
         const NamespaceString requestNs("local.sources");
         UpdateRequest request(requestNs);
@@ -235,14 +235,14 @@ void ReplSource::save(OperationContext* txn) {
         request.setUpdates(o);
         request.setUpsert();
 
-        UpdateResult res = update(txn, ctx.db(), request);
+        UpdateResult res = update(opCtx, ctx.db(), request);
 
         verify(!res.modifiers);
         verify(res.numMatched == 1 || !res.upserted.isEmpty());
     }
 }
 
-static void addSourceToList(OperationContext* txn,
+static void addSourceToList(OperationContext* opCtx,
                             ReplSource::SourceVector& v,
                             ReplSource& s,
                             ReplSource::SourceVector& old) {
@@ -263,9 +263,9 @@ static void addSourceToList(OperationContext* txn,
 /* we reuse our existing objects so that we can keep our existing connection
    and cursor in effect.
 */
-void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
+void ReplSource::loadAll(OperationContext* opCtx, SourceVector& v) {
     const char* localSources = "local.sources";
-    OldClientContext ctx(txn, localSources, false);
+    OldClientContext ctx(opCtx, localSources, false);
     SourceVector old = v;
     v.clear();
 
@@ -275,13 +275,16 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
         // check that no items are in sources other than that
         // add if missing
         int n = 0;
-        unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-            txn, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
+        unique_ptr<PlanExecutor> exec(
+            InternalPlanner::collectionScan(opCtx,
+                                            localSources,
+                                            ctx.db()->getCollection(localSources),
+                                            PlanExecutor::YIELD_MANUAL));
         BSONObj obj;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             n++;
-            ReplSource tmp(txn, obj);
+            ReplSource tmp(opCtx, obj);
             if (tmp.hostName != replSettings.getSource()) {
                 log() << "--source " << replSettings.getSource() << " != " << tmp.hostName
                       << " from local.sources collection" << endl;
@@ -303,10 +306,10 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
         uassert(10002, "local.sources collection corrupt?", n < 2);
         if (n == 0) {
             // source missing.  add.
-            ReplSource s(txn);
+            ReplSource s(opCtx);
             s.hostName = replSettings.getSource();
             s.only = replSettings.getOnly();
-            s.save(txn);
+            s.save(opCtx);
         }
     } else {
         try {
@@ -317,41 +320,41 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
     }
 
     unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        txn, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
+        opCtx, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
     BSONObj obj;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-        ReplSource tmp(txn, obj);
+        ReplSource tmp(opCtx, obj);
         if (tmp.syncedTo.isNull()) {
-            DBDirectClient c(txn);
+            DBDirectClient c(opCtx);
             BSONObj op = c.findOne("local.oplog.$main",
                                    QUERY("op" << NE << "n").sort(BSON("$natural" << -1)));
             if (!op.isEmpty()) {
                 tmp.syncedTo = op["ts"].timestamp();
             }
         }
-        addSourceToList(txn, v, tmp, old);
+        addSourceToList(opCtx, v, tmp, old);
     }
     uassert(17066, "Internal error reading from local.sources", PlanExecutor::IS_EOF == state);
 }
 
-bool ReplSource::throttledForceResyncDead(OperationContext* txn, const char* requester) {
+bool ReplSource::throttledForceResyncDead(OperationContext* opCtx, const char* requester) {
     if (time(0) - lastForcedResync > 600) {
-        forceResyncDead(txn, requester);
+        forceResyncDead(opCtx, requester);
         lastForcedResync = time(0);
         return true;
     }
     return false;
 }
 
-void ReplSource::forceResyncDead(OperationContext* txn, const char* requester) {
+void ReplSource::forceResyncDead(OperationContext* opCtx, const char* requester) {
     if (!replAllDead)
         return;
     SourceVector sources;
-    ReplSource::loadAll(txn, sources);
+    ReplSource::loadAll(opCtx, sources);
     for (SourceVector::iterator i = sources.begin(); i != sources.end(); ++i) {
         log() << requester << " forcing resync from " << (*i)->hostName << endl;
-        (*i)->forceResync(txn, requester);
+        (*i)->forceResync(opCtx, requester);
     }
     replAllDead = 0;
 }
@@ -379,7 +382,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      BSONObj& cmdObj,
                      int options,
@@ -391,9 +394,9 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        ReplClientInfo::forClient(txn->getClient()).setRemoteID(handshake.getRid());
+        ReplClientInfo::forClient(opCtx->getClient()).setRemoteID(handshake.getRid());
 
-        status = getGlobalReplicationCoordinator()->processHandshake(txn, handshake);
+        status = getGlobalReplicationCoordinator()->processHandshake(opCtx, handshake);
         return appendCommandStatus(result, status);
     }
 
@@ -429,12 +432,12 @@ bool ReplSource::_connect(OplogReader* reader, const HostAndPort& host, const OI
 }
 
 
-void ReplSource::forceResync(OperationContext* txn, const char* requester) {
+void ReplSource::forceResync(OperationContext* opCtx, const char* requester) {
     BSONObj info;
     {
         // This is always a GlobalWrite lock (so no ns/db used from the context)
-        invariant(txn->lockState()->isW());
-        Lock::TempRelease tempRelease(txn->lockState());
+        invariant(opCtx->lockState()->isW());
+        Lock::TempRelease tempRelease(opCtx->lockState());
 
         if (!_connect(&oplogReader,
                       HostAndPort(hostName),
@@ -456,14 +459,14 @@ void ReplSource::forceResync(OperationContext* txn, const char* requester) {
         if (!e.embeddedObject().getBoolField("empty")) {
             if (name != "local") {
                 if (only.empty() || only == name) {
-                    resyncDrop(txn, name);
+                    resyncDrop(opCtx, name);
                 }
             }
         }
     }
     syncedTo = Timestamp();
     addDbNextPass.clear();
-    save(txn);
+    save(opCtx);
 }
 
 Status ReplSource::_updateIfDoneWithInitialSync() {
@@ -483,23 +486,23 @@ Status ReplSource::_updateIfDoneWithInitialSync() {
     return Status::OK();
 }
 
-void ReplSource::resyncDrop(OperationContext* txn, const string& dbName) {
+void ReplSource::resyncDrop(OperationContext* opCtx, const string& dbName) {
     log() << "resync: dropping database " << dbName;
-    invariant(txn->lockState()->isW());
+    invariant(opCtx->lockState()->isW());
 
-    Database* const db = dbHolder().get(txn, dbName);
+    Database* const db = dbHolder().get(opCtx, dbName);
     if (!db) {
         log() << "resync: dropping database " << dbName
               << " - database does not exist. nothing to do.";
         return;
     }
-    Database::dropDatabase(txn, db);
+    Database::dropDatabase(opCtx, db);
 }
 
 /* grab initial copy of a database from the master */
-void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
+void ReplSource::resync(OperationContext* opCtx, const std::string& dbName) {
     const std::string db(dbName);  // need local copy of the name, we're dropping the original
-    resyncDrop(txn, db);
+    resyncDrop(opCtx, db);
 
     {
         log() << "resync: cloning database " << db << " to get an initial copy" << endl;
@@ -512,11 +515,11 @@ void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
         cloneOptions.snapshot = true;
 
         Cloner cloner;
-        Status status = cloner.copyDb(txn, db, hostName.c_str(), cloneOptions, NULL);
+        Status status = cloner.copyDb(opCtx, db, hostName.c_str(), cloneOptions, NULL);
 
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::DatabaseDifferCase) {
-                resyncDrop(txn, db);
+                resyncDrop(opCtx, db);
                 log() << "resync: database " << db
                       << " not valid on the master due to a name conflict, dropping.";
                 return;
@@ -552,12 +555,12 @@ bool DatabaseIgnorer::ignoreAt(const string& db, const Timestamp& currentOplogTi
     }
 }
 
-bool ReplSource::handleDuplicateDbName(OperationContext* txn,
+bool ReplSource::handleDuplicateDbName(OperationContext* opCtx,
                                        const BSONObj& op,
                                        const char* ns,
                                        const char* db) {
     // We are already locked at this point
-    if (dbHolder().get(txn, ns) != NULL) {
+    if (dbHolder().get(opCtx, ns) != NULL) {
         // Database is already present.
         return true;
     }
@@ -577,8 +580,8 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
     bool dbOk = false;
     {
         // This is always a GlobalWrite lock (so no ns/db used from the context)
-        invariant(txn->lockState()->isW());
-        Lock::TempRelease tempRelease(txn->lockState());
+        invariant(opCtx->lockState()->isW());
+        Lock::TempRelease tempRelease(opCtx->lockState());
 
         // We always log an operation after executing it (never before), so
         // a database list will always be valid as of an oplog entry generated
@@ -634,8 +637,8 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
         incompleteCloneDbs.erase(*i);
         addDbNextPass.erase(*i);
 
-        AutoGetDb autoDb(txn, *i, MODE_X);
-        Database::dropDatabase(txn, autoDb.getDb());
+        AutoGetDb autoDb(opCtx, *i, MODE_X);
+        Database::dropDatabase(opCtx, autoDb.getDb());
     }
 
     massert(14034,
@@ -644,16 +647,16 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
     return true;
 }
 
-void ReplSource::applyCommand(OperationContext* txn, const BSONObj& op) {
+void ReplSource::applyCommand(OperationContext* opCtx, const BSONObj& op) {
     try {
-        Status status = applyCommand_inlock(txn, op, true);
+        Status status = applyCommand_inlock(opCtx, op, true);
         if (!status.isOK()) {
             SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
             sync.setHostname(hostName);
-            if (sync.shouldRetry(txn, op)) {
+            if (sync.shouldRetry(opCtx, op)) {
                 uassert(28639,
                         "Failure retrying initial sync update",
-                        applyCommand_inlock(txn, op, true).isOK());
+                        applyCommand_inlock(opCtx, op, true).isOK());
             }
         }
     } catch (UserException& e) {
@@ -667,16 +670,16 @@ void ReplSource::applyCommand(OperationContext* txn, const BSONObj& op) {
     }
 }
 
-void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONObj& op) {
+void ReplSource::applyOperation(OperationContext* opCtx, Database* db, const BSONObj& op) {
     try {
-        Status status = applyOperation_inlock(txn, db, op);
+        Status status = applyOperation_inlock(opCtx, db, op);
         if (!status.isOK()) {
             SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
             sync.setHostname(hostName);
-            if (sync.shouldRetry(txn, op)) {
+            if (sync.shouldRetry(opCtx, op)) {
                 uassert(15914,
                         "Failure retrying initial sync update",
-                        applyOperation_inlock(txn, db, op).isOK());
+                        applyOperation_inlock(opCtx, db, op).isOK());
             }
         }
     } catch (UserException& e) {
@@ -697,7 +700,7 @@ void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONO
 
    @param alreadyLocked caller already put us in write lock if true
 */
-void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
+void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
                                                 BSONObj& op,
                                                 bool alreadyLocked) {
     LOG(6) << "processing op: " << redact(op) << endl;
@@ -725,10 +728,10 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
     if (!only.empty() && only != dbName)
         return;
 
-    // Push the CurOp stack for "txn" so each individual oplog entry application is separately
+    // Push the CurOp stack for "opCtx" so each individual oplog entry application is separately
     // reported.
-    CurOp individualOp(txn);
-    txn->setReplicatedWrites(false);
+    CurOp individualOp(opCtx);
+    opCtx->setReplicatedWrites(false);
     const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
     if (replSettings.getPretouch() &&
         !alreadyLocked /*doesn't make sense if in write lock already*/) {
@@ -759,16 +762,16 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
                     a += m;
                 }
                 // we do one too...
-                pretouchOperation(txn, op);
+                pretouchOperation(opCtx, op);
                 tp->join();
                 countdown = v.size();
             }
         } else {
-            pretouchOperation(txn, op);
+            pretouchOperation(opCtx, op);
         }
     }
 
-    unique_ptr<Lock::GlobalWrite> lk(alreadyLocked ? 0 : new Lock::GlobalWrite(txn->lockState()));
+    unique_ptr<Lock::GlobalWrite> lk(alreadyLocked ? 0 : new Lock::GlobalWrite(opCtx->lockState()));
 
     if (replAllDead) {
         // hmmm why is this check here and not at top of this function? does it get set between top
@@ -777,20 +780,20 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
         throw SyncException();
     }
 
-    if (!handleDuplicateDbName(txn, op, ns, dbName)) {
+    if (!handleDuplicateDbName(opCtx, op, ns, dbName)) {
         return;
     }
 
     // special case apply for commands to avoid implicit database creation
     if (*op.getStringField("op") == 'c') {
-        applyCommand(txn, op);
+        applyCommand(opCtx, op);
         return;
     }
 
     // This code executes on the slaves only, so it doesn't need to be sharding-aware since
     // mongos will not send requests there. That's why the last argument is false (do not do
     // version checking).
-    OldClientContext ctx(txn, ns, false);
+    OldClientContext ctx(opCtx, ns, false);
 
     bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
     bool incompleteClone = incompleteCloneDbs.count(dbName) != 0;
@@ -813,16 +816,16 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn,
                 log() << "An earlier initial clone of '" << dbName
                       << "' did not complete, now resyncing." << endl;
             }
-            save(txn);
-            OldClientContext ctx(txn, ns, false);
+            save(opCtx);
+            OldClientContext ctx(opCtx, ns, false);
             nClonedThisPass++;
-            resync(txn, ctx.db()->name());
+            resync(opCtx, ctx.db()->name());
             addDbNextPass.erase(dbName);
             incompleteCloneDbs.erase(dbName);
         }
-        save(txn);
+        save(opCtx);
     } else {
-        applyOperation(txn, ctx.db(), op);
+        applyOperation(opCtx, ctx.db(), op);
         addDbNextPass.erase(dbName);
     }
 }
@@ -877,7 +880,7 @@ public:
            0 ok, don't sleep
            1 ok, sleep
 */
-int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
+int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
     int okResultCode = restartSyncAfterSleep;
     string ns = string("local.oplog.$") + sourceName();
     LOG(2) << "sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
@@ -911,9 +914,9 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
             }
             // obviously global isn't ideal, but non-repl set is old so
             // keeping it simple
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
-            save(txn);
+            ScopedTransaction transaction(opCtx, MODE_X);
+            Lock::GlobalWrite lk(opCtx->lockState());
+            save(opCtx);
         }
 
         BSONObjBuilder gte;
@@ -948,7 +951,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
             b.append("ns", *i + '.');
             b.append("op", "db");
             BSONObj op = b.done();
-            _sync_pullOpLog_applyOperation(txn, op, false);
+            _sync_pullOpLog_applyOperation(opCtx, op, false);
         }
     }
 
@@ -974,9 +977,9 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
             log() << ns << " oplog is empty" << endl;
         }
         {
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
-            save(txn);
+            ScopedTransaction transaction(opCtx, MODE_X);
+            Lock::GlobalWrite lk(opCtx->lockState());
+            save(opCtx);
         }
         return okResultCode;
     }
@@ -1042,26 +1045,26 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
             const bool moreInitialSyncsPending = !addDbNextPass.empty() && n;
 
             if (moreInitialSyncsPending || !oplogReader.more()) {
-                ScopedTransaction transaction(txn, MODE_X);
-                Lock::GlobalWrite lk(txn->lockState());
+                ScopedTransaction transaction(opCtx, MODE_X);
+                Lock::GlobalWrite lk(opCtx->lockState());
 
                 if (tailing) {
                     okResultCode = restartSync;  // don't sleep
                 }
 
                 syncedTo = nextOpTime;
-                save(txn);  // note how far we are synced up to now
+                save(opCtx);  // note how far we are synced up to now
                 nApplied = n;
                 break;
             }
 
             OCCASIONALLY if (n > 0 && (n > 100000 || time(0) - saveLast > 60)) {
                 // periodically note our progress, in case we are doing a lot of work and crash
-                ScopedTransaction transaction(txn, MODE_X);
-                Lock::GlobalWrite lk(txn->lockState());
+                ScopedTransaction transaction(opCtx, MODE_X);
+                Lock::GlobalWrite lk(opCtx->lockState());
                 syncedTo = nextOpTime;
                 // can't update local log ts since there are pending operations from our peer
-                save(txn);
+                save(opCtx);
                 log() << "checkpoint applied " << n << " operations" << endl;
                 log() << "syncedTo: " << syncedTo.toStringLong() << endl;
                 saveLast = time(0);
@@ -1072,7 +1075,8 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
 
             int b = replApplyBatchSize.load();
             bool justOne = b == 1;
-            unique_ptr<Lock::GlobalWrite> lk(justOne ? 0 : new Lock::GlobalWrite(txn->lockState()));
+            unique_ptr<Lock::GlobalWrite> lk(justOne ? 0
+                                                     : new Lock::GlobalWrite(opCtx->lockState()));
             while (1) {
                 BSONElement ts = op.getField("ts");
                 if (!(ts.type() == Date || ts.type() == bsonTimestamp)) {
@@ -1104,11 +1108,11 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                     oplogReader.putBack(op);
                     _sleepAdviceTime = nextOpTime.getSecs() +
                         durationCount<Seconds>(replSettings.getSlaveDelaySecs()) + 1;
-                    ScopedTransaction transaction(txn, MODE_X);
-                    Lock::GlobalWrite lk(txn->lockState());
+                    ScopedTransaction transaction(opCtx, MODE_X);
+                    Lock::GlobalWrite lk(opCtx->lockState());
                     if (n > 0) {
                         syncedTo = last;
-                        save(txn);
+                        save(opCtx);
                     }
                     log() << "applied " << n << " operations" << endl;
                     log() << "syncedTo: " << syncedTo.toStringLong() << endl;
@@ -1116,7 +1120,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
                     return okResultCode;
                 }
 
-                _sync_pullOpLog_applyOperation(txn, op, !justOne);
+                _sync_pullOpLog_applyOperation(opCtx, op, !justOne);
                 n++;
 
                 if (--b == 0)
@@ -1139,7 +1143,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
    returns >= 0 if ok.  return -1 if you want to reconnect.
    return value of zero indicates no sleep necessary before next call
 */
-int ReplSource::sync(OperationContext* txn, int& nApplied) {
+int ReplSource::sync(OperationContext* opCtx, int& nApplied) {
     _sleepAdviceTime = 0;
     ReplInfo r("sync");
     if (!serverGlobalParams.quiet.load()) {
@@ -1167,7 +1171,7 @@ int ReplSource::sync(OperationContext* txn, int& nApplied) {
         return -1;
     }
 
-    return _sync_pullOpLog(txn, nApplied);
+    return _sync_pullOpLog(opCtx, nApplied);
 }
 
 /* --------------------------------------------------------------*/
@@ -1184,12 +1188,12 @@ _ reuse that cursor when we can
             0 = no sleep recommended
             1 = special sentinel indicating adaptive sleep recommended
 */
-int _replMain(OperationContext* txn, ReplSource::SourceVector& sources, int& nApplied) {
+int _replMain(OperationContext* opCtx, ReplSource::SourceVector& sources, int& nApplied) {
     {
         ReplInfo r("replMain load sources");
-        ScopedTransaction transaction(txn, MODE_X);
-        Lock::GlobalWrite lk(txn->lockState());
-        ReplSource::loadAll(txn, sources);
+        ScopedTransaction transaction(opCtx, MODE_X);
+        Lock::GlobalWrite lk(opCtx->lockState());
+        ReplSource::loadAll(opCtx, sources);
 
         // only need this param for initial reset
         _replMainStarted = true;
@@ -1208,7 +1212,7 @@ int _replMain(OperationContext* txn, ReplSource::SourceVector& sources, int& nAp
         ReplSource* s = i->get();
         int res = forceReconnect;
         try {
-            res = s->sync(txn, nApplied);
+            res = s->sync(opCtx, nApplied);
             bool moreToSync = s->haveMoreDbsToSync();
             if (res < 0) {
                 sleepAdvice = 3;
@@ -1245,17 +1249,17 @@ int _replMain(OperationContext* txn, ReplSource::SourceVector& sources, int& nAp
     return sleepAdvice;
 }
 
-static void replMain(OperationContext* txn) {
+static void replMain(OperationContext* opCtx) {
     ReplSource::SourceVector sources;
     while (1) {
         auto s = restartSync;
         {
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
+            ScopedTransaction transaction(opCtx, MODE_X);
+            Lock::GlobalWrite lk(opCtx->lockState());
             if (replAllDead) {
                 // throttledForceResyncDead can throw
                 if (!getGlobalReplicationCoordinator()->getSettings().isAutoResyncEnabled() ||
-                    !ReplSource::throttledForceResyncDead(txn, "auto")) {
+                    !ReplSource::throttledForceResyncDead(opCtx, "auto")) {
                     log() << "all sources dead: " << replAllDead << ", sleeping for 5 seconds"
                           << endl;
                     break;
@@ -1268,7 +1272,7 @@ static void replMain(OperationContext* txn) {
 
         try {
             int nApplied = 0;
-            s = _replMain(txn, sources, nApplied);
+            s = _replMain(opCtx, sources, nApplied);
             if (s == restartSyncAfterSleep) {
                 if (nApplied == 0)
                     s = 2;
@@ -1284,8 +1288,8 @@ static void replMain(OperationContext* txn) {
         }
 
         {
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
+            ScopedTransaction transaction(opCtx, MODE_X);
+            Lock::GlobalWrite lk(opCtx->lockState());
             invariant(syncing.swap(0) == 1);
         }
 
@@ -1316,17 +1320,17 @@ static void replMasterThread() {
         // Write a keep-alive like entry to the log. This will make things like
         // printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date even
         // when things are idle.
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
-        AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
 
-        Lock::GlobalWrite globalWrite(txn.lockState(), 1);
+        Lock::GlobalWrite globalWrite(opCtx.lockState(), 1);
         if (globalWrite.isLocked()) {
             toSleep = 10;
 
             try {
-                WriteUnitOfWork wuow(&txn);
-                getGlobalServiceContext()->getOpObserver()->onOpMessage(&txn, BSONObj());
+                WriteUnitOfWork wuow(&opCtx);
+                getGlobalServiceContext()->getOpObserver()->onOpMessage(&opCtx, BSONObj());
                 wuow.commit();
             } catch (...) {
                 log() << "caught exception in replMasterThread()" << endl;
@@ -1342,14 +1346,14 @@ static void replSlaveThread() {
     sleepsecs(1);
     Client::initThread("replslave");
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;
-    AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
-    DisableDocumentValidation validationDisabler(&txn);
+    const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+    OperationContext& opCtx = *opCtxPtr;
+    AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
+    DisableDocumentValidation validationDisabler(&opCtx);
 
     while (1) {
         try {
-            replMain(&txn);
+            replMain(&opCtx);
             sleepsecs(5);
         } catch (AssertionException&) {
             ReplInfo r("Assertion in replSlaveThread(): sleeping 5 minutes before retry");
@@ -1366,15 +1370,15 @@ static void replSlaveThread() {
     }
 }
 
-void startMasterSlave(OperationContext* txn) {
+void startMasterSlave(OperationContext* opCtx) {
     const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
     if (!replSettings.isSlave() && !replSettings.isMaster())
         return;
 
-    AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
 
     {
-        ReplSource temp(txn);  // Ensures local.me is populated
+        ReplSource temp(opCtx);  // Ensures local.me is populated
     }
 
     if (replSettings.isSlave()) {
@@ -1385,7 +1389,7 @@ void startMasterSlave(OperationContext* txn) {
 
     if (replSettings.isMaster()) {
         LOG(1) << "master=true" << endl;
-        createOplog(txn);
+        createOplog(opCtx);
         stdx::thread t(replMasterThread);
         t.detach();
     }
@@ -1400,10 +1404,10 @@ int _dummy_z;
 void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
     Client::initThreadIfNotAlready("pretouchN");
 
-    const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-    OperationContext& txn = *txnPtr;  // XXX
-    ScopedTransaction transaction(&txn, MODE_S);
-    Lock::GlobalRead lk(txn.lockState());
+    const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+    OperationContext& opCtx = *opCtxPtr;  // XXX
+    ScopedTransaction transaction(&opCtx, MODE_S);
+    Lock::GlobalRead lk(opCtx.lockState());
 
     for (unsigned i = a; i <= b; i++) {
         const BSONObj& op = v[i];
@@ -1425,8 +1429,8 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                OldClientContext ctx(&txn, ns, false);
-                if (Helpers::findById(&txn, ctx.db(), ns, b.done(), result))
+                OldClientContext ctx(&opCtx, ns, false);
+                if (Helpers::findById(&opCtx, ctx.db(), ns, b.done(), result))
                     _dummy_z += result.objsize();  // touch
             }
         } catch (DBException& e) {
@@ -1436,8 +1440,8 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
     }
 }
 
-void pretouchOperation(OperationContext* txn, const BSONObj& op) {
-    if (txn->lockState()->isWriteLocked()) {
+void pretouchOperation(OperationContext* opCtx, const BSONObj& op) {
+    if (opCtx->lockState()->isWriteLocked()) {
         // no point pretouching if write locked. not sure if this will ever fire, but just in case.
         return;
     }
@@ -1460,8 +1464,8 @@ void pretouchOperation(OperationContext* txn, const BSONObj& op) {
             BSONObjBuilder b;
             b.append(_id);
             BSONObj result;
-            AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
-            if (Helpers::findById(txn, ctx.getDb(), ns, b.done(), result)) {
+            AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+            if (Helpers::findById(opCtx, ctx.getDb(), ns, b.done(), result)) {
                 _dummy_z += result.objsize();  // touch
             }
         }

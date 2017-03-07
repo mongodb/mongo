@@ -256,10 +256,10 @@ public:
         invariant(_command);
     }
 
-    void collect(OperationContext* txn, BSONObjBuilder& builder) override {
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         std::string errmsg;
 
-        bool ret = _command->run(txn, _ns, _cmdObj, 0, errmsg, builder);
+        bool ret = _command->run(opCtx, _ns, _cmdObj, 0, errmsg, builder);
 
         // Some commands return errmsgs when they return false (collstats)
         // Some commands return bson objs when they return false (replGetStatus)

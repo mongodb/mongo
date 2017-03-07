@@ -64,8 +64,8 @@ static const NamespaceString nss{"unittests.QueryStageCollectionScan"};
 
 class QueryStageCollectionScanBase {
 public:
-    QueryStageCollectionScanBase() : _client(&_txn) {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+    QueryStageCollectionScanBase() : _client(&_opCtx) {
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
 
         for (int i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -75,7 +75,7 @@ public:
     }
 
     virtual ~QueryStageCollectionScanBase() {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -84,7 +84,7 @@ public:
     }
 
     int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForRead ctx(&_opCtx, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -102,10 +102,10 @@ public:
         // Make a scan and have the runner own it.
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         unique_ptr<PlanStage> ps =
-            make_unique<CollectionScan>(&_txn, params, ws.get(), filterExpr.get());
+            make_unique<CollectionScan>(&_opCtx, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -129,7 +129,7 @@ public:
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -147,7 +147,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;
@@ -206,7 +206,7 @@ public:
 class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForRead ctx(&_opCtx, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -216,10 +216,10 @@ public:
 
         // Make a scan and have the runner own it.
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_txn, params, ws.get(), nullptr);
+        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_opCtx, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -242,7 +242,7 @@ public:
 class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForRead ctx(&_opCtx, nss);
 
         CollectionScanParams params;
         params.collection = ctx.getCollection();
@@ -250,10 +250,10 @@ public:
         params.tailable = false;
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_txn, params, ws.get(), nullptr);
+        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_opCtx, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -276,7 +276,7 @@ public:
 class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
 
         Collection* coll = ctx.getCollection();
 
@@ -291,7 +291,7 @@ public:
         params.tailable = false;
 
         WorkingSet ws;
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
 
         int count = 0;
         while (count < 10) {
@@ -299,7 +299,7 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_txn, recordIds[count]).value()["foo"].numberInt(),
+                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
                               member->obj.value()["foo"].numberInt());
                 ++count;
             }
@@ -308,11 +308,11 @@ public:
         // Remove recordIds[count].
         scan->saveState();
         {
-            WriteUnitOfWork wunit(&_txn);
-            scan->invalidate(&_txn, recordIds[count], INVALIDATION_DELETION);
+            WriteUnitOfWork wunit(&_opCtx);
+            scan->invalidate(&_opCtx, recordIds[count], INVALIDATION_DELETION);
             wunit.commit();  // to avoid rollback of the invalidate
         }
-        remove(coll->docFor(&_txn, recordIds[count]).value());
+        remove(coll->docFor(&_opCtx, recordIds[count]).value());
         scan->restoreState();
 
         // Skip over recordIds[count].
@@ -324,7 +324,7 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_txn, recordIds[count]).value()["foo"].numberInt(),
+                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
                               member->obj.value()["foo"].numberInt());
                 ++count;
             }
@@ -342,7 +342,7 @@ public:
 class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
 
         // Get the RecordIds that would be returned by an in-order scan.
@@ -356,7 +356,7 @@ public:
         params.tailable = false;
 
         WorkingSet ws;
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
 
         int count = 0;
         while (count < 10) {
@@ -364,7 +364,7 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_txn, recordIds[count]).value()["foo"].numberInt(),
+                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
                               member->obj.value()["foo"].numberInt());
                 ++count;
             }
@@ -373,11 +373,11 @@ public:
         // Remove recordIds[count].
         scan->saveState();
         {
-            WriteUnitOfWork wunit(&_txn);
-            scan->invalidate(&_txn, recordIds[count], INVALIDATION_DELETION);
+            WriteUnitOfWork wunit(&_opCtx);
+            scan->invalidate(&_opCtx, recordIds[count], INVALIDATION_DELETION);
             wunit.commit();  // to avoid rollback of the invalidate
         }
-        remove(coll->docFor(&_txn, recordIds[count]).value());
+        remove(coll->docFor(&_opCtx, recordIds[count]).value());
         scan->restoreState();
 
         // Skip over recordIds[count].
@@ -389,7 +389,7 @@ public:
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                ASSERT_EQUALS(coll->docFor(&_txn, recordIds[count]).value()["foo"].numberInt(),
+                ASSERT_EQUALS(coll->docFor(&_opCtx, recordIds[count]).value()["foo"].numberInt(),
                               member->obj.value()["foo"].numberInt());
                 ++count;
             }

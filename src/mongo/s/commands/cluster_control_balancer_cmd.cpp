@@ -77,15 +77,15 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponse = uassertStatusOK(
-            configShard->runCommandWithFixedRetryAttempts(txn,
+            configShard->runCommandWithFixedRetryAttempts(opCtx,
                                                           kPrimaryOnlyReadPreference,
                                                           "admin",
                                                           BSON(_configsvrCommandName << 1),

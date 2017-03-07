@@ -78,7 +78,7 @@ public:
      * 'extensionsCallback' allows for additional mongod parsing. If called from mongos, an
      * ExtensionsCallbackNoop object should be passed to skip this parsing.
      */
-    static StatusWith<ParsedDistinct> parse(OperationContext* txn,
+    static StatusWith<ParsedDistinct> parse(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const BSONObj& cmdObj,
                                             const ExtensionsCallback& extensionsCallback,

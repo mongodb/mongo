@@ -145,17 +145,17 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
 
 const StringData kDistLockProcessIdForConfigServer("ConfigServer");
 
-std::string generateDistLockProcessId(OperationContext* txn) {
+std::string generateDistLockProcessId(OperationContext* opCtx) {
     std::unique_ptr<SecureRandom> rng(SecureRandom::create());
 
     return str::stream()
         << HostAndPort(getHostName(), serverGlobalParams.port).toString() << ':'
         << durationCount<Seconds>(
-               txn->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
+               opCtx->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
         << ':' << rng->nextInt64();
 }
 
-Status initializeGlobalShardingState(OperationContext* txn,
+Status initializeGlobalShardingState(OperationContext* opCtx,
                                      const ConnectionString& configCS,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
@@ -189,7 +189,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
     auto catalogClient =
-        makeCatalogClient(txn->getServiceContext(), shardRegistry.get(), distLockProcessId);
+        makeCatalogClient(opCtx->getServiceContext(), shardRegistry.get(), distLockProcessId);
 
     auto rawCatalogClient = catalogClient.get();
 
@@ -227,20 +227,20 @@ Status initializeGlobalShardingState(OperationContext* txn,
     return Status::OK();
 }
 
-Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
+Status reloadShardRegistryUntilSuccess(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
 
     while (!globalInShutdownDeprecated()) {
-        auto stopStatus = txn->checkForInterruptNoAssert();
+        auto stopStatus = opCtx->checkForInterruptNoAssert();
         if (!stopStatus.isOK()) {
             return stopStatus;
         }
 
         try {
-            uassertStatusOK(ClusterIdentityLoader::get(txn)->loadClusterId(
-                txn, repl::ReadConcernLevel::kMajorityReadConcern));
+            uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
+                opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
             if (grid.shardRegistry()->isUp()) {
                 return Status::OK();
             }

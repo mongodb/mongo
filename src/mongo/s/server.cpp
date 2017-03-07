@@ -136,23 +136,23 @@ static void cleanupTask() {
         Client::initThreadIfNotAlready();
         Client& client = cc();
         ServiceContext::UniqueOperationContext uniqueTxn;
-        OperationContext* txn = client.getOperationContext();
-        if (!txn) {
+        OperationContext* opCtx = client.getOperationContext();
+        if (!opCtx) {
             uniqueTxn = client.makeOperationContext();
-            txn = uniqueTxn.get();
+            opCtx = uniqueTxn.get();
         }
 
         if (serviceContext)
             serviceContext->setKillAllOperations();
 
-        if (auto cursorManager = Grid::get(txn)->getCursorManager()) {
+        if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
             cursorManager->shutdown();
         }
-        if (auto pool = Grid::get(txn)->getExecutorPool()) {
+        if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
             pool->shutdownAndJoin();
         }
-        if (auto catalog = Grid::get(txn)->catalogClient(txn)) {
-            catalog->shutDown(txn);
+        if (auto catalog = Grid::get(opCtx)->catalogClient(opCtx)) {
+            catalog->shutDown(opCtx);
         }
     }
 
@@ -173,7 +173,7 @@ static BSONObj buildErrReply(const DBException& ex) {
 
 using namespace mongo;
 
-static Status initializeSharding(OperationContext* txn) {
+static Status initializeSharding(OperationContext* opCtx) {
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
@@ -198,9 +198,9 @@ static Status initializeSharding(OperationContext* txn) {
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     Status status = initializeGlobalShardingState(
-        txn,
+        opCtx,
         mongosGlobalParams.configdbs,
-        generateDistLockProcessId(txn),
+        generateDistLockProcessId(opCtx),
         std::move(shardFactory),
         []() {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
@@ -216,7 +216,7 @@ static Status initializeSharding(OperationContext* txn) {
         return status;
     }
 
-    status = reloadShardRegistryUntilSuccess(txn);
+    status = reloadShardRegistryUntilSuccess(opCtx);
     if (!status.isOK()) {
         return status;
     }

@@ -136,7 +136,7 @@ public:
      * Returns true if the task is queued and false If the given range is blacklisted,
      * is already queued, or stopWorkers() was called.
      */
-    bool queueDelete(OperationContext* txn,
+    bool queueDelete(OperationContext* opCtx,
                      const RangeDeleterOptions& options,
                      Notification<void>* doneSignal,
                      std::string* errMsg);
@@ -148,7 +148,9 @@ public:
      * Returns true if the deletion was performed. False if the range is blacklisted,
      * was already queued, or stopWorkers() was called.
      */
-    bool deleteNow(OperationContext* txn, const RangeDeleterOptions& options, std::string* errMsg);
+    bool deleteNow(OperationContext* opCtx,
+                   const RangeDeleterOptions& options,
+                   std::string* errMsg);
 
     //
     // Introspection methods
@@ -311,7 +313,7 @@ struct RangeDeleterEnv {
      * Must be a synchronous call. Docs should be deleted after call ends.
      * Must not throw Exceptions.
      */
-    virtual bool deleteRange(OperationContext* txn,
+    virtual bool deleteRange(OperationContext* opCtx,
                              const RangeDeleteEntry& taskDetails,
                              long long int* deletedDocs,
                              std::string* errMsg) = 0;
@@ -324,7 +326,7 @@ struct RangeDeleterEnv {
      * Must be a synchronous call. CursorIds should be populated after call.
      * Must not throw exception.
      */
-    virtual void getCursorIds(OperationContext* txn,
+    virtual void getCursorIds(OperationContext* opCtx,
                               StringData ns,
                               std::set<CursorId>* openCursors) = 0;
 };

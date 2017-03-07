@@ -66,7 +66,7 @@ public:
      * If a CommandOnShardedViewNotSupportedOnMongod error is returned, then 'viewDefinition', if
      * not null, will contain a view definition.
      */
-    static StatusWith<CursorId> runQuery(OperationContext* txn,
+    static StatusWith<CursorId> runQuery(OperationContext* opCtx,
                                          const CanonicalQuery& query,
                                          const ReadPreferenceSetting& readPref,
                                          std::vector<BSONObj>* results,
@@ -75,7 +75,7 @@ public:
     /**
      * Executes the getMore request 'request', and on success returns a CursorResponse.
      */
-    static StatusWith<CursorResponse> runGetMore(OperationContext* txn,
+    static StatusWith<CursorResponse> runGetMore(OperationContext* opCtx,
                                                  const GetMoreRequest& request);
 
     /**

@@ -66,7 +66,7 @@ public:
     /**
      * Returns a collection scan.  Caller owns pointer.
      */
-    static std::unique_ptr<PlanExecutor> collectionScan(OperationContext* txn,
+    static std::unique_ptr<PlanExecutor> collectionScan(OperationContext* opCtx,
                                                         StringData ns,
                                                         Collection* collection,
                                                         PlanExecutor::YieldPolicy yieldPolicy,
@@ -77,7 +77,7 @@ public:
      * Returns a FETCH => DELETE plan.
      */
     static std::unique_ptr<PlanExecutor> deleteWithCollectionScan(
-        OperationContext* txn,
+        OperationContext* opCtx,
         Collection* collection,
         const DeleteStageParams& params,
         PlanExecutor::YieldPolicy yieldPolicy,
@@ -87,7 +87,7 @@ public:
     /**
      * Returns an index scan.  Caller owns returned pointer.
      */
-    static std::unique_ptr<PlanExecutor> indexScan(OperationContext* txn,
+    static std::unique_ptr<PlanExecutor> indexScan(OperationContext* opCtx,
                                                    const Collection* collection,
                                                    const IndexDescriptor* descriptor,
                                                    const BSONObj& startKey,
@@ -100,7 +100,7 @@ public:
     /**
      * Returns an IXSCAN => FETCH => DELETE plan.
      */
-    static std::unique_ptr<PlanExecutor> deleteWithIndexScan(OperationContext* txn,
+    static std::unique_ptr<PlanExecutor> deleteWithIndexScan(OperationContext* opCtx,
                                                              Collection* collection,
                                                              const DeleteStageParams& params,
                                                              const IndexDescriptor* descriptor,
@@ -116,7 +116,7 @@ private:
      *
      * Used as a helper for collectionScan() and deleteWithCollectionScan().
      */
-    static std::unique_ptr<PlanStage> _collectionScan(OperationContext* txn,
+    static std::unique_ptr<PlanStage> _collectionScan(OperationContext* opCtx,
                                                       WorkingSet* ws,
                                                       const Collection* collection,
                                                       Direction direction,
@@ -127,7 +127,7 @@ private:
      *
      * Used as a helper for indexScan() and deleteWithIndexScan().
      */
-    static std::unique_ptr<PlanStage> _indexScan(OperationContext* txn,
+    static std::unique_ptr<PlanStage> _indexScan(OperationContext* opCtx,
                                                  WorkingSet* ws,
                                                  const Collection* collection,
                                                  const IndexDescriptor* descriptor,

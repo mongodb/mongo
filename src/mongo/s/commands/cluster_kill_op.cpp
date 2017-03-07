@@ -76,7 +76,7 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
              int options,
@@ -103,7 +103,7 @@ public:
         log() << "want to kill op: " << redact(opToKill);
 
         // Will throw if shard id is not found
-        auto shardStatus = grid.shardRegistry()->getShard(txn, shardIdent);
+        auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardIdent);
         if (!shardStatus.isOK()) {
             return appendCommandStatus(result, shardStatus.getStatus());
         }

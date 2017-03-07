@@ -57,21 +57,21 @@ class AutoGetActiveCloner {
     MONGO_DISALLOW_COPYING(AutoGetActiveCloner);
 
 public:
-    AutoGetActiveCloner(OperationContext* txn, const MigrationSessionId& migrationSessionId)
-        : _scopedXact(txn, MODE_IS) {
-        ShardingState* const gss = ShardingState::get(txn);
+    AutoGetActiveCloner(OperationContext* opCtx, const MigrationSessionId& migrationSessionId)
+        : _scopedXact(opCtx, MODE_IS) {
+        ShardingState* const gss = ShardingState::get(opCtx);
 
         const auto nss = gss->getActiveDonateChunkNss();
         uassert(ErrorCodes::NotYetInitialized, "No active migrations were found", nss);
 
         // Once the collection is locked, the migration status cannot change
-        _autoColl.emplace(txn, *nss, MODE_IS);
+        _autoColl.emplace(opCtx, *nss, MODE_IS);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection " << nss->ns() << " does not exist",
                 _autoColl->getCollection());
 
-        auto css = CollectionShardingState::get(txn, *nss);
+        auto css = CollectionShardingState::get(opCtx, *nss);
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "No active migrations were found for collection " << nss->ns(),
                 css && css->getMigrationSourceManager());
@@ -143,7 +143,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
              int options,
@@ -159,7 +159,7 @@ public:
         int arrSizeAtPrevIteration = -1;
 
         while (!arrBuilder || arrBuilder->arrSize() > arrSizeAtPrevIteration) {
-            AutoGetActiveCloner autoCloner(txn, migrationSessionId);
+            AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
 
             if (!arrBuilder) {
                 arrBuilder.emplace(autoCloner.getCloner()->getCloneBatchBufferAllocationSize());
@@ -168,7 +168,7 @@ public:
             arrSizeAtPrevIteration = arrBuilder->arrSize();
 
             uassertStatusOK(autoCloner.getCloner()->nextCloneBatch(
-                txn, autoCloner.getColl(), arrBuilder.get_ptr()));
+                opCtx, autoCloner.getColl(), arrBuilder.get_ptr()));
         }
 
         invariant(arrBuilder);
@@ -207,7 +207,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
              int options,
@@ -216,9 +216,9 @@ public:
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
-        AutoGetActiveCloner autoCloner(txn, migrationSessionId);
+        AutoGetActiveCloner autoCloner(opCtx, migrationSessionId);
 
-        uassertStatusOK(autoCloner.getCloner()->nextModsBatch(txn, autoCloner.getDb(), &result));
+        uassertStatusOK(autoCloner.getCloner()->nextModsBatch(opCtx, autoCloner.getDb(), &result));
         return true;
     }
 

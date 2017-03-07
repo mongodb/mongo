@@ -88,7 +88,7 @@ public:
         appendParameterNames(help);
         help << "{ getParameter:'*' } to get everything\n";
     }
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
@@ -101,7 +101,7 @@ public:
         const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
         for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
             if (all || cmdObj.hasElement(i->first.c_str())) {
-                i->second->append(txn, result, i->second->name());
+                i->second->append(opCtx, result, i->second->name());
             }
         }
 
@@ -137,7 +137,7 @@ public:
         help << "{ setParameter:1, <param>:<value> }\n";
         appendParameterNames(help);
     }
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
@@ -213,7 +213,7 @@ public:
             }
 
             if (numSet == 0) {
-                foundParameter->second->append(txn, result, "was");
+                foundParameter->second->append(opCtx, result, "was");
             }
 
             Status status = foundParameter->second->set(parameter);
@@ -247,7 +247,7 @@ class LogLevelSetting : public ServerParameter {
 public:
     LogLevelSetting() : ServerParameter(ServerParameterSet::getGlobal(), "logLevel") {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b << name << globalLogDomain()->getMinimumLogSeverity().toInt();
     }
 
@@ -290,7 +290,7 @@ public:
     LogComponentVerbositySetting()
         : ServerParameter(ServerParameterSet::getGlobal(), "logComponentVerbosity") {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         BSONObj currentSettings;
         _get(&currentSettings);
         b << name << currentSettings;
@@ -459,7 +459,7 @@ public:
         }
     }
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b << name << sslModeStr();
     }
 
@@ -530,7 +530,7 @@ public:
         }
     }
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b << name << clusterAuthModeStr();
     }
 
@@ -607,7 +607,7 @@ public:
     AutomationServiceDescriptor()
         : ServerParameter(ServerParameterSet::getGlobal(), kName.toString(), true, true) {}
 
-    virtual void append(OperationContext* txn,
+    virtual void append(OperationContext* opCtx,
                         BSONObjBuilder& builder,
                         const std::string& name) override {
         const stdx::lock_guard<stdx::mutex> lock(_mutex);

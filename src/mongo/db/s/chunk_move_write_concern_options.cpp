@@ -66,10 +66,10 @@ WriteConcernOptions getDefaultWriteConcernForMigration() {
 }  // namespace
 
 StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
-    OperationContext* txn, const MigrationSecondaryThrottleOptions& options) {
+    OperationContext* opCtx, const MigrationSecondaryThrottleOptions& options) {
     auto secondaryThrottle = options.getSecondaryThrottle();
     if (secondaryThrottle == MigrationSecondaryThrottleOptions::kDefault) {
-        if (txn->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
+        if (opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
             secondaryThrottle = MigrationSecondaryThrottleOptions::kOff;
         } else {
             secondaryThrottle = MigrationSecondaryThrottleOptions::kOn;

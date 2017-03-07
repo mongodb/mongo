@@ -80,22 +80,22 @@ std::once_flag assertValidFlag;
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::Builder* BtreeLogic<BtreeLayout>::newBuilder(
-    OperationContext* txn, bool dupsAllowed) {
-    return new Builder(this, txn, dupsAllowed);
+    OperationContext* opCtx, bool dupsAllowed) {
+    return new Builder(this, opCtx, dupsAllowed);
 }
 
 template <class BtreeLayout>
 BtreeLogic<BtreeLayout>::Builder::Builder(BtreeLogic* logic,
-                                          OperationContext* txn,
+                                          OperationContext* opCtx,
                                           bool dupsAllowed)
-    : _logic(logic), _dupsAllowed(dupsAllowed), _txn(txn) {
+    : _logic(logic), _dupsAllowed(dupsAllowed), _opCtx(opCtx) {
     // The normal bulk building path calls initAsEmpty, so we already have an empty root bucket.
     // This isn't the case in some unit tests that use the Builder directly rather than going
     // through an IndexAccessMethod.
-    _rightLeafLoc = DiskLoc::fromRecordId(_logic->_headManager->getHead(txn));
+    _rightLeafLoc = DiskLoc::fromRecordId(_logic->_headManager->getHead(opCtx));
     if (_rightLeafLoc.isNull()) {
-        _rightLeafLoc = _logic->_addBucket(txn);
-        _logic->_headManager->setHead(_txn, _rightLeafLoc.toRecordId());
+        _rightLeafLoc = _logic->_addBucket(opCtx);
+        _logic->_headManager->setHead(_opCtx, _rightLeafLoc.toRecordId());
     }
 
     // must be empty when starting
@@ -146,7 +146,7 @@ Status BtreeLogic<BtreeLayout>::Builder::addKey(const BSONObj& keyObj, const Dis
     BucketType* rightLeaf = _getModifiableBucket(_rightLeafLoc);
     if (!_logic->pushBack(rightLeaf, loc, *key, DiskLoc())) {
         // bucket was full, so split and try with the new node.
-        _txn->recoveryUnit()->registerChange(new SetRightLeafLocChange(this, _rightLeafLoc));
+        _opCtx->recoveryUnit()->registerChange(new SetRightLeafLocChange(this, _rightLeafLoc));
         _rightLeafLoc = newBucket(rightLeaf, _rightLeafLoc);
         rightLeaf = _getModifiableBucket(_rightLeafLoc);
         invariant(_logic->pushBack(rightLeaf, loc, *key, DiskLoc()));
@@ -166,14 +166,14 @@ DiskLoc BtreeLogic<BtreeLayout>::Builder::newBucket(BucketType* leftSib, DiskLoc
 
     if (leftSib->parent.isNull()) {
         // Making a new root
-        invariant(leftSibLoc.toRecordId() == _logic->_headManager->getHead(_txn));
-        const DiskLoc newRootLoc = _logic->_addBucket(_txn);
+        invariant(leftSibLoc.toRecordId() == _logic->_headManager->getHead(_opCtx));
+        const DiskLoc newRootLoc = _logic->_addBucket(_opCtx);
         leftSib->parent = newRootLoc;
-        _logic->_headManager->setHead(_txn, newRootLoc.toRecordId());
+        _logic->_headManager->setHead(_opCtx, newRootLoc.toRecordId());
 
         // Set the newRoot's nextChild to point to leftSib for the invariant below.
         BucketType* newRoot = _getBucket(newRootLoc);
-        *_txn->recoveryUnit()->writing(&newRoot->nextChild) = leftSibLoc;
+        *_opCtx->recoveryUnit()->writing(&newRoot->nextChild) = leftSibLoc;
     }
 
     DiskLoc parentLoc = leftSib->parent;
@@ -198,23 +198,23 @@ DiskLoc BtreeLogic<BtreeLayout>::Builder::newBucket(BucketType* leftSib, DiskLoc
 
     // Create a new bucket to the right of leftSib and set its parent pointer and the downward
     // nextChild pointer from the parent.
-    DiskLoc newBucketLoc = _logic->_addBucket(_txn);
+    DiskLoc newBucketLoc = _logic->_addBucket(_opCtx);
     BucketType* newBucket = _getBucket(newBucketLoc);
-    *_txn->recoveryUnit()->writing(&newBucket->parent) = parentLoc;
-    *_txn->recoveryUnit()->writing(&parent->nextChild) = newBucketLoc;
+    *_opCtx->recoveryUnit()->writing(&newBucket->parent) = parentLoc;
+    *_opCtx->recoveryUnit()->writing(&parent->nextChild) = newBucketLoc;
     return newBucketLoc;
 }
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::BucketType*
 BtreeLogic<BtreeLayout>::Builder::_getModifiableBucket(DiskLoc loc) {
-    return _logic->btreemod(_txn, _logic->getBucket(_txn, loc));
+    return _logic->btreemod(_opCtx, _logic->getBucket(_opCtx, loc));
 }
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::BucketType* BtreeLogic<BtreeLayout>::Builder::_getBucket(
     DiskLoc loc) {
-    return _logic->getBucket(_txn, loc);
+    return _logic->getBucket(_opCtx, loc);
 }
 
 //
@@ -261,8 +261,8 @@ char* BtreeLogic<BtreeLayout>::dataAt(BucketType* bucket, short ofs) {
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::BucketType* BtreeLogic<BtreeLayout>::btreemod(
-    OperationContext* txn, BucketType* bucket) {
-    txn->recoveryUnit()->writingPtr(bucket, BtreeLayout::BucketSize);
+    OperationContext* opCtx, BucketType* bucket) {
+    opCtx->recoveryUnit()->writingPtr(bucket, BtreeLayout::BucketSize);
     return bucket;
 }
 
@@ -433,7 +433,7 @@ bool BtreeLogic<BtreeLayout>::pushBack(BucketType* bucket,
  * Returns false if a split is required.
  */
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* opCtx,
                                           BucketType* bucket,
                                           const DiskLoc bucketLoc,
                                           int& keypos,
@@ -444,13 +444,13 @@ bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* txn,
 
     int bytesNeeded = key.dataSize() + sizeof(KeyHeaderType);
     if (bytesNeeded > bucket->emptySize) {
-        _pack(txn, bucket, bucketLoc, keypos);
+        _pack(opCtx, bucket, bucketLoc, keypos);
         if (bytesNeeded > bucket->emptySize) {
             return false;
         }
     }
 
-    invariant(getBucket(txn, bucketLoc) == bucket);
+    invariant(getBucket(opCtx, bucketLoc) == bucket);
 
     {
         // declare that we will write to [k(keypos),k(n)]
@@ -458,7 +458,7 @@ bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* txn,
         char* end = reinterpret_cast<char*>(&getKeyHeader(bucket, bucket->n + 1));
 
         // Declare that we will write to [k(keypos),k(n)]
-        txn->recoveryUnit()->writingPtr(start, end - start);
+        opCtx->recoveryUnit()->writingPtr(start, end - start);
     }
 
     // e.g. for n==3, keypos==2
@@ -468,7 +468,7 @@ bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* txn,
     }
 
     size_t writeLen = sizeof(bucket->emptySize) + sizeof(bucket->topSize) + sizeof(bucket->n);
-    txn->recoveryUnit()->writingPtr(&bucket->emptySize, writeLen);
+    opCtx->recoveryUnit()->writingPtr(&bucket->emptySize, writeLen);
     bucket->emptySize -= sizeof(KeyHeaderType);
     bucket->n++;
 
@@ -478,7 +478,7 @@ bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* txn,
     kn.recordLoc = recordLoc;
     kn.setKeyDataOfs((short)_alloc(bucket, key.dataSize()));
     char* p = dataAt(bucket, kn.keyDataOfs());
-    txn->recoveryUnit()->writingPtr(p, key.dataSize());
+    opCtx->recoveryUnit()->writingPtr(p, key.dataSize());
     memcpy(p, key.data(), key.dataSize());
     return true;
 }
@@ -515,17 +515,17 @@ int BtreeLogic<BtreeLayout>::_packedDataSize(BucketType* bucket, int refPos) {
  * it.
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::_pack(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::_pack(OperationContext* opCtx,
                                     BucketType* bucket,
                                     const DiskLoc thisLoc,
                                     int& refPos) {
-    invariant(getBucket(txn, thisLoc) == bucket);
+    invariant(getBucket(opCtx, thisLoc) == bucket);
 
     if (bucket->flags & Packed) {
         return;
     }
 
-    _packReadyForMod(btreemod(txn, bucket), refPos);
+    _packReadyForMod(btreemod(opCtx, bucket), refPos);
 }
 
 /**
@@ -669,44 +669,44 @@ void BtreeLogic<BtreeLayout>::dropFront(BucketType* bucket, int nDrop, int& refp
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::customLocate(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::customLocate(OperationContext* opCtx,
                                            DiskLoc* locInOut,
                                            int* keyOfsInOut,
                                            const IndexSeekPoint& seekPoint,
                                            int direction) const {
     pair<DiskLoc, int> unused;
 
-    customLocate(txn, locInOut, keyOfsInOut, seekPoint, direction, unused);
-    skipUnusedKeys(txn, locInOut, keyOfsInOut, direction);
+    customLocate(opCtx, locInOut, keyOfsInOut, seekPoint, direction, unused);
+    skipUnusedKeys(opCtx, locInOut, keyOfsInOut, direction);
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::advance(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::advance(OperationContext* opCtx,
                                       DiskLoc* bucketLocInOut,
                                       int* posInOut,
                                       int direction) const {
-    *bucketLocInOut = advance(txn, *bucketLocInOut, posInOut, direction);
-    skipUnusedKeys(txn, bucketLocInOut, posInOut, direction);
+    *bucketLocInOut = advance(opCtx, *bucketLocInOut, posInOut, direction);
+    skipUnusedKeys(opCtx, bucketLocInOut, posInOut, direction);
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::skipUnusedKeys(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::skipUnusedKeys(OperationContext* opCtx,
                                              DiskLoc* loc,
                                              int* pos,
                                              int direction) const {
-    while (!loc->isNull() && !keyIsUsed(txn, *loc, *pos)) {
-        *loc = advance(txn, *loc, pos, direction);
+    while (!loc->isNull() && !keyIsUsed(opCtx, *loc, *pos)) {
+        *loc = advance(opCtx, *loc, pos, direction);
     }
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::advanceTo(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::advanceTo(OperationContext* opCtx,
                                         DiskLoc* thisLocInOut,
                                         int* keyOfsInOut,
                                         const IndexSeekPoint& seekPoint,
                                         int direction) const {
-    advanceToImpl(txn, thisLocInOut, keyOfsInOut, seekPoint, direction);
-    skipUnusedKeys(txn, thisLocInOut, keyOfsInOut, direction);
+    advanceToImpl(opCtx, thisLocInOut, keyOfsInOut, seekPoint, direction);
+    skipUnusedKeys(opCtx, thisLocInOut, keyOfsInOut, direction);
 }
 
 /**
@@ -719,12 +719,12 @@ void BtreeLogic<BtreeLayout>::advanceTo(OperationContext* txn,
  * and reverse implementations would be more efficient
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::advanceToImpl(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::advanceToImpl(OperationContext* opCtx,
                                             DiskLoc* thisLocInOut,
                                             int* keyOfsInOut,
                                             const IndexSeekPoint& seekPoint,
                                             int direction) const {
-    BucketType* bucket = getBucket(txn, *thisLocInOut);
+    BucketType* bucket = getBucket(opCtx, *thisLocInOut);
 
     int l, h;
     bool dontGoUp;
@@ -745,14 +745,14 @@ void BtreeLogic<BtreeLayout>::advanceToImpl(OperationContext* txn,
 
     if (dontGoUp) {
         // this comparison result assures h > l
-        if (!customFind(txn, l, h, seekPoint, direction, thisLocInOut, keyOfsInOut, bestParent)) {
+        if (!customFind(opCtx, l, h, seekPoint, direction, thisLocInOut, keyOfsInOut, bestParent)) {
             return;
         }
     } else {
         // go up parents until rightmost/leftmost node is >=/<= target or at top
         while (!bucket->parent.isNull()) {
             *thisLocInOut = bucket->parent;
-            bucket = getBucket(txn, *thisLocInOut);
+            bucket = getBucket(opCtx, *thisLocInOut);
 
             if (direction > 0) {
                 if (customBSONCmp(getFullKey(bucket, bucket->n - 1).data.toBson(),
@@ -768,17 +768,17 @@ void BtreeLogic<BtreeLayout>::advanceToImpl(OperationContext* txn,
         }
     }
 
-    customLocate(txn, thisLocInOut, keyOfsInOut, seekPoint, direction, bestParent);
+    customLocate(opCtx, thisLocInOut, keyOfsInOut, seekPoint, direction, bestParent);
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::customLocate(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::customLocate(OperationContext* opCtx,
                                            DiskLoc* locInOut,
                                            int* keyOfsInOut,
                                            const IndexSeekPoint& seekPoint,
                                            int direction,
                                            pair<DiskLoc, int>& bestParent) const {
-    BucketType* bucket = getBucket(txn, *locInOut);
+    BucketType* bucket = getBucket(opCtx, *locInOut);
 
     if (0 == bucket->n) {
         *locInOut = DiskLoc();
@@ -809,7 +809,7 @@ void BtreeLogic<BtreeLayout>::customLocate(OperationContext* txn,
             if (!next.isNull()) {
                 bestParent = pair<DiskLoc, int>(*locInOut, *keyOfsInOut);
                 *locInOut = next;
-                bucket = getBucket(txn, *locInOut);
+                bucket = getBucket(opCtx, *locInOut);
                 continue;
             } else {
                 return;
@@ -832,21 +832,21 @@ void BtreeLogic<BtreeLayout>::customLocate(OperationContext* txn,
                 return;
             } else {
                 *locInOut = next;
-                bucket = getBucket(txn, *locInOut);
+                bucket = getBucket(opCtx, *locInOut);
                 continue;
             }
         }
 
-        if (!customFind(txn, l, h, seekPoint, direction, locInOut, keyOfsInOut, bestParent)) {
+        if (!customFind(opCtx, l, h, seekPoint, direction, locInOut, keyOfsInOut, bestParent)) {
             return;
         }
 
-        bucket = getBucket(txn, *locInOut);
+        bucket = getBucket(opCtx, *locInOut);
     }
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::customFind(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::customFind(OperationContext* opCtx,
                                          int low,
                                          int high,
                                          const IndexSeekPoint& seekPoint,
@@ -854,7 +854,7 @@ bool BtreeLogic<BtreeLayout>::customFind(OperationContext* txn,
                                          DiskLoc* thisLocInOut,
                                          int* keyOfsInOut,
                                          pair<DiskLoc, int>& bestParent) const {
-    const BucketType* bucket = getBucket(txn, *thisLocInOut);
+    const BucketType* bucket = getBucket(opCtx, *thisLocInOut);
 
     for (;;) {
         if (low + 1 == high) {
@@ -942,31 +942,31 @@ int BtreeLogic<BtreeLayout>::customBSONCmp(const BSONObj& left,
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::exists(OperationContext* txn, const KeyDataType& key) const {
+bool BtreeLogic<BtreeLayout>::exists(OperationContext* opCtx, const KeyDataType& key) const {
     int position = 0;
 
     // Find the DiskLoc
     bool found;
 
-    DiskLoc bucket = _locate(txn, getRootLoc(txn), key, &position, &found, DiskLoc::min(), 1);
+    DiskLoc bucket = _locate(opCtx, getRootLoc(opCtx), key, &position, &found, DiskLoc::min(), 1);
 
     while (!bucket.isNull()) {
-        FullKey fullKey = getFullKey(getBucket(txn, bucket), position);
+        FullKey fullKey = getFullKey(getBucket(opCtx, bucket), position);
         if (fullKey.header.isUsed()) {
             return fullKey.data.woEqual(key);
         }
-        bucket = advance(txn, bucket, &position, 1);
+        bucket = advance(opCtx, bucket, &position, 1);
     }
 
     return false;
 }
 
 template <class BtreeLayout>
-Status BtreeLogic<BtreeLayout>::dupKeyCheck(OperationContext* txn,
+Status BtreeLogic<BtreeLayout>::dupKeyCheck(OperationContext* opCtx,
                                             const BSONObj& key,
                                             const DiskLoc& loc) const {
     KeyDataOwnedType theKey(key);
-    if (!wouldCreateDup(txn, theKey, loc)) {
+    if (!wouldCreateDup(opCtx, theKey, loc)) {
         return Status::OK();
     }
 
@@ -974,16 +974,16 @@ Status BtreeLogic<BtreeLayout>::dupKeyCheck(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::wouldCreateDup(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::wouldCreateDup(OperationContext* opCtx,
                                              const KeyDataType& key,
                                              const DiskLoc self) const {
     int position;
     bool found;
 
-    DiskLoc posLoc = _locate(txn, getRootLoc(txn), key, &position, &found, DiskLoc::min(), 1);
+    DiskLoc posLoc = _locate(opCtx, getRootLoc(opCtx), key, &position, &found, DiskLoc::min(), 1);
 
     while (!posLoc.isNull()) {
-        FullKey fullKey = getFullKey(getBucket(txn, posLoc), position);
+        FullKey fullKey = getFullKey(getBucket(opCtx, posLoc), position);
         if (fullKey.header.isUsed()) {
             // TODO: we may not need fullKey.data until we know fullKey.header.isUsed() here
             // and elsewhere.
@@ -993,7 +993,7 @@ bool BtreeLogic<BtreeLayout>::wouldCreateDup(OperationContext* txn,
             break;
         }
 
-        posLoc = advance(txn, posLoc, &position, 1);
+        posLoc = advance(opCtx, posLoc, &position, 1);
     }
     return false;
 }
@@ -1022,7 +1022,7 @@ string BtreeLogic<BtreeLayout>::dupKeyError(const KeyDataType& key) const {
  * note result might be an Unused location!
  */
 template <class BtreeLayout>
-Status BtreeLogic<BtreeLayout>::_find(OperationContext* txn,
+Status BtreeLogic<BtreeLayout>::_find(OperationContext* opCtx,
                                       BucketType* bucket,
                                       const KeyDataType& key,
                                       const DiskLoc& recordLoc,
@@ -1056,8 +1056,8 @@ Status BtreeLogic<BtreeLayout>::_find(OperationContext* txn,
                         // This is expensive and we only want to do it once(? -- when would
                         // it happen twice).
                         dupsCheckedYet = true;
-                        if (exists(txn, key)) {
-                            if (wouldCreateDup(txn, key, genericRecordLoc)) {
+                        if (exists(opCtx, key)) {
+                            if (wouldCreateDup(opCtx, key, genericRecordLoc)) {
                                 return Status(ErrorCodes::DuplicateKey, dupKeyError(key), 11000);
                             } else {
                                 return Status(ErrorCodes::DuplicateKeyValue,
@@ -1123,54 +1123,54 @@ Status BtreeLogic<BtreeLayout>::_find(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::delBucket(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::delBucket(OperationContext* opCtx,
                                         BucketType* bucket,
                                         const DiskLoc bucketLoc) {
-    invariant(bucketLoc != getRootLoc(txn));
+    invariant(bucketLoc != getRootLoc(opCtx));
 
     _cursorRegistry->invalidateCursorsForBucket(bucketLoc);
 
-    BucketType* p = getBucket(txn, bucket->parent);
-    int parentIdx = indexInParent(txn, bucket, bucketLoc);
-    *txn->recoveryUnit()->writing(&childLocForPos(p, parentIdx)) = DiskLoc();
-    deallocBucket(txn, bucket, bucketLoc);
+    BucketType* p = getBucket(opCtx, bucket->parent);
+    int parentIdx = indexInParent(opCtx, bucket, bucketLoc);
+    *opCtx->recoveryUnit()->writing(&childLocForPos(p, parentIdx)) = DiskLoc();
+    deallocBucket(opCtx, bucket, bucketLoc);
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::deallocBucket(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::deallocBucket(OperationContext* opCtx,
                                             BucketType* bucket,
                                             const DiskLoc bucketLoc) {
     bucket->n = BtreeLayout::INVALID_N_SENTINEL;
     bucket->parent.Null();
-    _recordStore->deleteRecord(txn, bucketLoc.toRecordId());
+    _recordStore->deleteRecord(opCtx, bucketLoc.toRecordId());
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::restorePosition(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::restorePosition(OperationContext* opCtx,
                                               const BSONObj& savedKey,
                                               const DiskLoc& savedLoc,
                                               int direction,
                                               DiskLoc* bucketLocInOut,
                                               int* keyOffsetInOut) const {
     // The caller has to ensure validity of the saved cursor using the SavedCursorRegistry
-    BucketType* bucket = getBucket(txn, *bucketLocInOut);
+    BucketType* bucket = getBucket(opCtx, *bucketLocInOut);
     invariant(bucket);
     invariant(BtreeLayout::INVALID_N_SENTINEL != bucket->n);
 
     if (_keyIsAt(savedKey, savedLoc, bucket, *keyOffsetInOut)) {
-        skipUnusedKeys(txn, bucketLocInOut, keyOffsetInOut, direction);
+        skipUnusedKeys(opCtx, bucketLocInOut, keyOffsetInOut, direction);
         return;
     }
 
     if (*keyOffsetInOut > 0) {
         (*keyOffsetInOut)--;
         if (_keyIsAt(savedKey, savedLoc, bucket, *keyOffsetInOut)) {
-            skipUnusedKeys(txn, bucketLocInOut, keyOffsetInOut, direction);
+            skipUnusedKeys(opCtx, bucketLocInOut, keyOffsetInOut, direction);
             return;
         }
     }
 
-    locate(txn, savedKey, savedLoc, direction, keyOffsetInOut, bucketLocInOut);
+    locate(opCtx, savedKey, savedLoc, direction, keyOffsetInOut, bucketLocInOut);
 }
 
 template <class BtreeLayout>
@@ -1193,7 +1193,7 @@ bool BtreeLogic<BtreeLayout>::_keyIsAt(const BSONObj& savedKey,
  * May delete the bucket 'bucket' rendering 'bucketLoc' invalid.
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* opCtx,
                                           BucketType* bucket,
                                           const DiskLoc bucketLoc,
                                           int p) {
@@ -1205,24 +1205,24 @@ void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* txn,
             if (isHead(bucket)) {
                 // we don't delete the top bucket ever
             } else {
-                if (!mayBalanceWithNeighbors(txn, bucket, bucketLoc)) {
+                if (!mayBalanceWithNeighbors(opCtx, bucket, bucketLoc)) {
                     // An empty bucket is only allowed as a txnient state.  If
                     // there are no neighbors to balance with, we delete ourself.
                     // This condition is only expected in legacy btrees.
-                    delBucket(txn, bucket, bucketLoc);
+                    delBucket(opCtx, bucket, bucketLoc);
                 }
             }
             return;
         }
-        deleteInternalKey(txn, bucket, bucketLoc, p);
+        deleteInternalKey(opCtx, bucket, bucketLoc, p);
         return;
     }
 
     if (left.isNull()) {
         _delKeyAtPos(bucket, p);
-        mayBalanceWithNeighbors(txn, bucket, bucketLoc);
+        mayBalanceWithNeighbors(opCtx, bucket, bucketLoc);
     } else {
-        deleteInternalKey(txn, bucket, bucketLoc, p);
+        deleteInternalKey(opCtx, bucket, bucketLoc, p);
     }
 }
 
@@ -1250,7 +1250,7 @@ void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* txn,
  * legacy btree.
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* opCtx,
                                                 BucketType* bucket,
                                                 const DiskLoc bucketLoc,
                                                 int keypos) {
@@ -1259,11 +1259,11 @@ void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* txn,
     invariant(!lchild.isNull() || !rchild.isNull());
     int advanceDirection = lchild.isNull() ? 1 : -1;
     int advanceKeyOfs = keypos;
-    DiskLoc advanceLoc = advance(txn, bucketLoc, &advanceKeyOfs, advanceDirection);
+    DiskLoc advanceLoc = advance(opCtx, bucketLoc, &advanceKeyOfs, advanceDirection);
     // advanceLoc must be a descentant of thisLoc, because thisLoc has a
     // child in the proper direction and all descendants of thisLoc must be
     // nonempty because they are not the root.
-    BucketType* advanceBucket = getBucket(txn, advanceLoc);
+    BucketType* advanceBucket = getBucket(opCtx, advanceLoc);
 
     if (!childLocForPos(advanceBucket, advanceKeyOfs).isNull() ||
         !childLocForPos(advanceBucket, advanceKeyOfs + 1).isNull()) {
@@ -1275,7 +1275,7 @@ void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* txn,
     // Because advanceLoc is a descendant of thisLoc, updating thisLoc will
     // not affect packing or keys of advanceLoc and kn will be stable
     // during the following setInternalKey()
-    setInternalKey(txn,
+    setInternalKey(opCtx,
                    bucket,
                    bucketLoc,
                    keypos,
@@ -1283,31 +1283,31 @@ void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* txn,
                    kn.data,
                    childLocForPos(bucket, keypos),
                    childLocForPos(bucket, keypos + 1));
-    delKeyAtPos(txn, btreemod(txn, advanceBucket), advanceLoc, advanceKeyOfs);
+    delKeyAtPos(opCtx, btreemod(opCtx, advanceBucket), advanceLoc, advanceKeyOfs);
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::replaceWithNextChild(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::replaceWithNextChild(OperationContext* opCtx,
                                                    BucketType* bucket,
                                                    const DiskLoc bucketLoc) {
     invariant(bucket->n == 0 && !bucket->nextChild.isNull());
     if (bucket->parent.isNull()) {
-        invariant(getRootLoc(txn) == bucketLoc);
-        _headManager->setHead(txn, bucket->nextChild.toRecordId());
+        invariant(getRootLoc(opCtx) == bucketLoc);
+        _headManager->setHead(opCtx, bucket->nextChild.toRecordId());
     } else {
-        BucketType* parentBucket = getBucket(txn, bucket->parent);
-        int bucketIndexInParent = indexInParent(txn, bucket, bucketLoc);
-        *txn->recoveryUnit()->writing(&childLocForPos(parentBucket, bucketIndexInParent)) =
+        BucketType* parentBucket = getBucket(opCtx, bucket->parent);
+        int bucketIndexInParent = indexInParent(opCtx, bucket, bucketLoc);
+        *opCtx->recoveryUnit()->writing(&childLocForPos(parentBucket, bucketIndexInParent)) =
             bucket->nextChild;
     }
 
-    *txn->recoveryUnit()->writing(&getBucket(txn, bucket->nextChild)->parent) = bucket->parent;
+    *opCtx->recoveryUnit()->writing(&getBucket(opCtx, bucket->nextChild)->parent) = bucket->parent;
     _cursorRegistry->invalidateCursorsForBucket(bucketLoc);
-    deallocBucket(txn, bucket, bucketLoc);
+    deallocBucket(opCtx, bucket, bucketLoc);
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::canMergeChildren(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::canMergeChildren(OperationContext* opCtx,
                                                BucketType* bucket,
                                                const DiskLoc bucketLoc,
                                                const int leftIndex) {
@@ -1322,8 +1322,8 @@ bool BtreeLogic<BtreeLayout>::canMergeChildren(OperationContext* txn,
 
     int pos = 0;
 
-    BucketType* leftBucket = getBucket(txn, leftNodeLoc);
-    BucketType* rightBucket = getBucket(txn, rightNodeLoc);
+    BucketType* leftBucket = getBucket(opCtx, leftNodeLoc);
+    BucketType* rightBucket = getBucket(opCtx, rightNodeLoc);
 
     int sum = BucketType::HeaderSize + _packedDataSize(leftBucket, pos) +
         _packedDataSize(rightBucket, pos) + getFullKey(bucket, leftIndex).data.dataSize() +
@@ -1337,14 +1337,14 @@ bool BtreeLogic<BtreeLayout>::canMergeChildren(OperationContext* txn,
  * splitPos().
  */
 template <class BtreeLayout>
-int BtreeLogic<BtreeLayout>::_rebalancedSeparatorPos(OperationContext* txn,
+int BtreeLogic<BtreeLayout>::_rebalancedSeparatorPos(OperationContext* opCtx,
                                                      BucketType* bucket,
                                                      int leftIndex) {
     int split = -1;
     int rightSize = 0;
 
-    const BucketType* l = childForPos(txn, bucket, leftIndex);
-    const BucketType* r = childForPos(txn, bucket, leftIndex + 1);
+    const BucketType* l = childForPos(opCtx, bucket, leftIndex);
+    const BucketType* r = childForPos(opCtx, bucket, leftIndex + 1);
 
     int KNS = sizeof(KeyHeaderType);
     int rightSizeLimit = (l->topSize + l->n * KNS + getFullKey(bucket, leftIndex).data.dataSize() +
@@ -1391,15 +1391,15 @@ int BtreeLogic<BtreeLayout>::_rebalancedSeparatorPos(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* opCtx,
                                               BucketType* bucket,
                                               const DiskLoc bucketLoc,
                                               int leftIndex) {
     DiskLoc leftNodeLoc = childLocForPos(bucket, leftIndex);
     DiskLoc rightNodeLoc = childLocForPos(bucket, leftIndex + 1);
 
-    BucketType* l = btreemod(txn, getBucket(txn, leftNodeLoc));
-    BucketType* r = btreemod(txn, getBucket(txn, rightNodeLoc));
+    BucketType* l = btreemod(opCtx, getBucket(opCtx, leftNodeLoc));
+    BucketType* r = btreemod(opCtx, getBucket(opCtx, rightNodeLoc));
 
     int pos = 0;
     _packReadyForMod(l, pos);
@@ -1417,8 +1417,8 @@ void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* txn,
     }
 
     l->nextChild = r->nextChild;
-    fixParentPtrs(txn, l, leftNodeLoc, oldLNum);
-    delBucket(txn, r, rightNodeLoc);
+    fixParentPtrs(opCtx, l, leftNodeLoc, oldLNum);
+    delBucket(opCtx, r, rightNodeLoc);
 
     childLocForPos(bucket, leftIndex + 1) = leftNodeLoc;
     childLocForPos(bucket, leftIndex) = DiskLoc();
@@ -1429,18 +1429,18 @@ void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* txn,
         //
         // TODO To ensure all leaves are of equal height, we should ensure this is only called
         // on the root.
-        replaceWithNextChild(txn, bucket, bucketLoc);
+        replaceWithNextChild(opCtx, bucket, bucketLoc);
     } else {
-        mayBalanceWithNeighbors(txn, bucket, bucketLoc);
+        mayBalanceWithNeighbors(opCtx, bucket, bucketLoc);
     }
 }
 
 template <class BtreeLayout>
-int BtreeLogic<BtreeLayout>::indexInParent(OperationContext* txn,
+int BtreeLogic<BtreeLayout>::indexInParent(OperationContext* opCtx,
                                            BucketType* bucket,
                                            const DiskLoc bucketLoc) const {
     invariant(!bucket->parent.isNull());
-    const BucketType* p = getBucket(txn, bucket->parent);
+    const BucketType* p = getBucket(opCtx, bucket->parent);
     if (p->nextChild == bucketLoc) {
         return p->n;
     }
@@ -1461,22 +1461,22 @@ int BtreeLogic<BtreeLayout>::indexInParent(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::tryBalanceChildren(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::tryBalanceChildren(OperationContext* opCtx,
                                                  BucketType* bucket,
                                                  const DiskLoc bucketLoc,
                                                  int leftIndex) {
     // If we can merge, then we must merge rather than balance to preserve bucket utilization
     // constraints.
-    if (canMergeChildren(txn, bucket, bucketLoc, leftIndex)) {
+    if (canMergeChildren(opCtx, bucket, bucketLoc, leftIndex)) {
         return false;
     }
 
-    doBalanceChildren(txn, btreemod(txn, bucket), bucketLoc, leftIndex);
+    doBalanceChildren(opCtx, btreemod(opCtx, bucket), bucketLoc, leftIndex);
     return true;
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* opCtx,
                                                    BucketType* bucket,
                                                    const DiskLoc bucketLoc,
                                                    int leftIndex,
@@ -1500,14 +1500,14 @@ void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* txn,
     FullKey leftIndexKN = getFullKey(bucket, leftIndex);
     setKey(r, rAdd - 1, leftIndexKN.recordLoc, leftIndexKN.data, l->nextChild);
 
-    fixParentPtrs(txn, r, rchild, 0, rAdd - 1);
+    fixParentPtrs(opCtx, r, rchild, 0, rAdd - 1);
 
     FullKey kn = getFullKey(l, split);
     l->nextChild = kn.prevChildBucket;
 
     // Because lchild is a descendant of thisLoc, updating thisLoc will not affect packing or
     // keys of lchild and kn will be stable during the following setInternalKey()
-    setInternalKey(txn, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
+    setInternalKey(opCtx, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
 
     // lchild and rchild cannot be merged, so there must be >0 (actually more) keys to the left
     // of split.
@@ -1516,7 +1516,7 @@ void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* opCtx,
                                                    BucketType* bucket,
                                                    const DiskLoc bucketLoc,
                                                    int leftIndex,
@@ -1546,11 +1546,11 @@ void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* txn,
         FullKey kn = getFullKey(r, split - lN - 1);
         l->nextChild = kn.prevChildBucket;
         // Child lN was lchild's old nextChild, and don't need to fix that one.
-        fixParentPtrs(txn, l, lchild, lN + 1, l->n);
+        fixParentPtrs(opCtx, l, lchild, lN + 1, l->n);
         // Because rchild is a descendant of thisLoc, updating thisLoc will
         // not affect packing or keys of rchild and kn will be stable
         // during the following setInternalKey()
-        setInternalKey(txn, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
+        setInternalKey(opCtx, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
     }
 
     // lchild and rchild cannot be merged, so there must be >0 (actually more)
@@ -1560,7 +1560,7 @@ void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::doBalanceChildren(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::doBalanceChildren(OperationContext* opCtx,
                                                 BucketType* bucket,
                                                 const DiskLoc bucketLoc,
                                                 int leftIndex) {
@@ -1568,26 +1568,26 @@ void BtreeLogic<BtreeLayout>::doBalanceChildren(OperationContext* txn,
     DiskLoc rchild = childLocForPos(bucket, leftIndex + 1);
 
     int zeropos = 0;
-    BucketType* l = btreemod(txn, getBucket(txn, lchild));
+    BucketType* l = btreemod(opCtx, getBucket(opCtx, lchild));
     _packReadyForMod(l, zeropos);
 
-    BucketType* r = btreemod(txn, getBucket(txn, rchild));
+    BucketType* r = btreemod(opCtx, getBucket(opCtx, rchild));
     _packReadyForMod(r, zeropos);
 
-    int split = _rebalancedSeparatorPos(txn, bucket, leftIndex);
+    int split = _rebalancedSeparatorPos(opCtx, bucket, leftIndex);
 
     // By definition, if we are below the low water mark and cannot merge
     // then we must actively balance.
     invariant(split != l->n);
     if (split < l->n) {
-        doBalanceLeftToRight(txn, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
+        doBalanceLeftToRight(opCtx, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
     } else {
-        doBalanceRightToLeft(txn, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
+        doBalanceRightToLeft(opCtx, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
     }
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* opCtx,
                                                       BucketType* bucket,
                                                       const DiskLoc bucketLoc) {
     if (bucket->parent.isNull()) {
@@ -1598,8 +1598,8 @@ bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* txn,
         return false;
     }
 
-    BucketType* p = getBucket(txn, bucket->parent);
-    int parentIdx = indexInParent(txn, bucket, bucketLoc);
+    BucketType* p = getBucket(opCtx, bucket->parent);
+    int parentIdx = indexInParent(opCtx, bucket, bucketLoc);
 
     // TODO will missing neighbor case be possible long term?  Should we try to merge/balance
     // somehow in that case if so?
@@ -1609,20 +1609,20 @@ bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* txn,
     // Balance if possible on one side - we merge only if absolutely necessary to preserve btree
     // bucket utilization constraints since that's a more heavy duty operation (especially if we
     // must re-split later).
-    if (mayBalanceRight && tryBalanceChildren(txn, p, bucket->parent, parentIdx)) {
+    if (mayBalanceRight && tryBalanceChildren(opCtx, p, bucket->parent, parentIdx)) {
         return true;
     }
 
-    if (mayBalanceLeft && tryBalanceChildren(txn, p, bucket->parent, parentIdx - 1)) {
+    if (mayBalanceLeft && tryBalanceChildren(opCtx, p, bucket->parent, parentIdx - 1)) {
         return true;
     }
 
-    BucketType* pm = btreemod(txn, getBucket(txn, bucket->parent));
+    BucketType* pm = btreemod(opCtx, getBucket(opCtx, bucket->parent));
     if (mayBalanceRight) {
-        doMergeChildren(txn, pm, bucket->parent, parentIdx);
+        doMergeChildren(opCtx, pm, bucket->parent, parentIdx);
         return true;
     } else if (mayBalanceLeft) {
-        doMergeChildren(txn, pm, bucket->parent, parentIdx - 1);
+        doMergeChildren(opCtx, pm, bucket->parent, parentIdx - 1);
         return true;
     }
 
@@ -1630,25 +1630,25 @@ bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::unindex(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::unindex(OperationContext* opCtx,
                                       const BSONObj& key,
                                       const DiskLoc& recordLoc) {
     int pos;
     bool found = false;
     KeyDataOwnedType ownedKey(key);
 
-    DiskLoc loc = _locate(txn, getRootLoc(txn), ownedKey, &pos, &found, recordLoc, 1);
+    DiskLoc loc = _locate(opCtx, getRootLoc(opCtx), ownedKey, &pos, &found, recordLoc, 1);
     if (found) {
-        BucketType* bucket = btreemod(txn, getBucket(txn, loc));
-        delKeyAtPos(txn, bucket, loc, pos);
-        assertValid(_indexName, getRoot(txn), _ordering);
+        BucketType* bucket = btreemod(opCtx, getBucket(opCtx, loc));
+        delKeyAtPos(opCtx, bucket, loc, pos);
+        assertValid(_indexName, getRoot(opCtx), _ordering);
     }
     return found;
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::isEmpty(OperationContext* txn) const {
-    return getRoot(txn)->n == 0;
+bool BtreeLogic<BtreeLayout>::isEmpty(OperationContext* opCtx) const {
+    return getRoot(opCtx)->n == 0;
 }
 
 /**
@@ -1656,12 +1656,12 @@ bool BtreeLogic<BtreeLayout>::isEmpty(OperationContext* txn) const {
  * Maybe get rid of parent ptrs?
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::fixParentPtrs(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::fixParentPtrs(OperationContext* opCtx,
                                             BucketType* bucket,
                                             const DiskLoc bucketLoc,
                                             int firstIndex,
                                             int lastIndex) {
-    invariant(getBucket(txn, bucketLoc) == bucket);
+    invariant(getBucket(opCtx, bucketLoc) == bucket);
 
     if (lastIndex == -1) {
         lastIndex = bucket->n;
@@ -1670,13 +1670,13 @@ void BtreeLogic<BtreeLayout>::fixParentPtrs(OperationContext* txn,
     for (int i = firstIndex; i <= lastIndex; i++) {
         const DiskLoc childLoc = childLocForPos(bucket, i);
         if (!childLoc.isNull()) {
-            *txn->recoveryUnit()->writing(&getBucket(txn, childLoc)->parent) = bucketLoc;
+            *opCtx->recoveryUnit()->writing(&getBucket(opCtx, childLoc)->parent) = bucketLoc;
         }
     }
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* opCtx,
                                              BucketType* bucket,
                                              const DiskLoc bucketLoc,
                                              int keypos,
@@ -1696,7 +1696,7 @@ void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* txn,
     // Just set temporarily - required to pass validation in insertHere()
     childLocForPos(bucket, keypos) = lchild;
 
-    insertHere(txn, bucketLoc, keypos, key, recordLoc, lchild, rchild);
+    insertHere(opCtx, bucketLoc, keypos, key, recordLoc, lchild, rchild);
 }
 
 /**
@@ -1710,19 +1710,19 @@ void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* txn,
  * intent code in basicInsert().
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::insertHere(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::insertHere(OperationContext* opCtx,
                                          const DiskLoc bucketLoc,
                                          int pos,
                                          const KeyDataType& key,
                                          const DiskLoc recordLoc,
                                          const DiskLoc leftChildLoc,
                                          const DiskLoc rightChildLoc) {
-    BucketType* bucket = getBucket(txn, bucketLoc);
+    BucketType* bucket = getBucket(opCtx, bucketLoc);
 
-    if (!basicInsert(txn, bucket, bucketLoc, pos, key, recordLoc)) {
+    if (!basicInsert(opCtx, bucket, bucketLoc, pos, key, recordLoc)) {
         // If basicInsert() fails, the bucket will be packed as required by split().
-        split(txn,
-              btreemod(txn, bucket),
+        split(opCtx,
+              btreemod(opCtx, bucket),
               bucketLoc,
               pos,
               recordLoc,
@@ -1741,9 +1741,9 @@ void BtreeLogic<BtreeLayout>::insertHere(OperationContext* txn,
         }
         kn->prevChildBucket = bucket->nextChild;
         invariant(kn->prevChildBucket == leftChildLoc);
-        *txn->recoveryUnit()->writing(&bucket->nextChild) = rightChildLoc;
+        *opCtx->recoveryUnit()->writing(&bucket->nextChild) = rightChildLoc;
         if (!rightChildLoc.isNull()) {
-            *txn->recoveryUnit()->writing(&getBucket(txn, rightChildLoc)->parent) = bucketLoc;
+            *opCtx->recoveryUnit()->writing(&getBucket(opCtx, rightChildLoc)->parent) = bucketLoc;
         }
     } else {
         kn->prevChildBucket = leftChildLoc;
@@ -1755,13 +1755,13 @@ void BtreeLogic<BtreeLayout>::insertHere(OperationContext* txn,
         // Intent declared in basicInsert()
         *const_cast<LocType*>(pc) = rightChildLoc;
         if (!rightChildLoc.isNull()) {
-            *txn->recoveryUnit()->writing(&getBucket(txn, rightChildLoc)->parent) = bucketLoc;
+            *opCtx->recoveryUnit()->writing(&getBucket(opCtx, rightChildLoc)->parent) = bucketLoc;
         }
     }
 }
 
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::split(OperationContext* opCtx,
                                     BucketType* bucket,
                                     const DiskLoc bucketLoc,
                                     int keypos,
@@ -1770,8 +1770,8 @@ void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
                                     const DiskLoc lchild,
                                     const DiskLoc rchild) {
     int split = splitPos(bucket, keypos);
-    DiskLoc rLoc = _addBucket(txn);
-    BucketType* r = btreemod(txn, getBucket(txn, rLoc));
+    DiskLoc rLoc = _addBucket(opCtx);
+    BucketType* r = btreemod(opCtx, getBucket(opCtx, rLoc));
 
     for (int i = split + 1; i < bucket->n; i++) {
         FullKey kn = getFullKey(bucket, i);
@@ -1781,7 +1781,7 @@ void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
     assertValid(_indexName, r, _ordering);
 
     r = NULL;
-    fixParentPtrs(txn, getBucket(txn, rLoc), rLoc);
+    fixParentPtrs(opCtx, getBucket(opCtx, rLoc), rLoc);
 
     FullKey splitkey = getFullKey(bucket, split);
     // splitkey key gets promoted, its children will be thisLoc (l) and rLoc (r)
@@ -1792,20 +1792,20 @@ void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
 
     if (bucket->parent.isNull()) {
         // promote splitkey to a parent this->node make a new parent if we were the root
-        DiskLoc L = _addBucket(txn);
-        BucketType* p = btreemod(txn, getBucket(txn, L));
+        DiskLoc L = _addBucket(opCtx);
+        BucketType* p = btreemod(opCtx, getBucket(opCtx, L));
         invariant(pushBack(p, splitkey.recordLoc, splitkey.data, bucketLoc));
         p->nextChild = rLoc;
         assertValid(_indexName, p, _ordering);
         bucket->parent = L;
-        _headManager->setHead(txn, L.toRecordId());
-        *txn->recoveryUnit()->writing(&getBucket(txn, rLoc)->parent) = bucket->parent;
+        _headManager->setHead(opCtx, L.toRecordId());
+        *opCtx->recoveryUnit()->writing(&getBucket(opCtx, rLoc)->parent) = bucket->parent;
     } else {
         // set this before calling _insert - if it splits it will do fixParent() logic and
         // change the value.
-        *txn->recoveryUnit()->writing(&getBucket(txn, rLoc)->parent) = bucket->parent;
-        _insert(txn,
-                getBucket(txn, bucket->parent),
+        *opCtx->recoveryUnit()->writing(&getBucket(opCtx, rLoc)->parent) = bucket->parent;
+        _insert(opCtx,
+                getBucket(opCtx, bucket->parent),
                 bucket->parent,
                 splitkey.data,
                 splitkey.recordLoc,
@@ -1820,11 +1820,11 @@ void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
 
     // add our this->new key, there is room this->now
     if (keypos <= split) {
-        insertHere(txn, bucketLoc, newpos, key, recordLoc, lchild, rchild);
+        insertHere(opCtx, bucketLoc, newpos, key, recordLoc, lchild, rchild);
     } else {
         int kp = keypos - split - 1;
         invariant(kp >= 0);
-        insertHere(txn, rLoc, kp, key, recordLoc, lchild, rchild);
+        insertHere(opCtx, rLoc, kp, key, recordLoc, lchild, rchild);
     }
 }
 
@@ -1842,24 +1842,24 @@ private:
 };
 
 template <class BtreeLayout>
-Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* txn) {
-    if (!_headManager->getHead(txn).isNull()) {
+Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* opCtx) {
+    if (!_headManager->getHead(opCtx).isNull()) {
         return Status(ErrorCodes::InternalError, "index already initialized");
     }
 
-    _headManager->setHead(txn, _addBucket(txn).toRecordId());
+    _headManager->setHead(opCtx, _addBucket(opCtx).toRecordId());
     return Status::OK();
 }
 
 template <class BtreeLayout>
-DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* txn) {
+DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* opCtx) {
     DummyDocWriter docWriter(BtreeLayout::BucketSize);
-    StatusWith<RecordId> loc = _recordStore->insertRecordWithDocWriter(txn, &docWriter);
+    StatusWith<RecordId> loc = _recordStore->insertRecordWithDocWriter(opCtx, &docWriter);
     // XXX: remove this(?) or turn into massert or sanely bubble it back up.
     uassertStatusOK(loc.getStatus());
 
     // this is a new bucket, not referenced by anyone, probably don't need this lock
-    BucketType* b = btreemod(txn, getBucket(txn, loc.getValue()));
+    BucketType* b = btreemod(opCtx, getBucket(opCtx, loc.getValue()));
     init(b);
     return DiskLoc::fromRecordId(loc.getValue());
 }
@@ -1888,20 +1888,20 @@ void BtreeLogic<BtreeLayout>::dumpBucket(const BucketType* bucket, int indentLen
 }
 
 template <class BtreeLayout>
-DiskLoc BtreeLogic<BtreeLayout>::getDiskLoc(OperationContext* txn,
+DiskLoc BtreeLogic<BtreeLayout>::getDiskLoc(OperationContext* opCtx,
                                             const DiskLoc& bucketLoc,
                                             const int keyOffset) const {
     invariant(!bucketLoc.isNull());
-    BucketType* bucket = getBucket(txn, bucketLoc);
+    BucketType* bucket = getBucket(opCtx, bucketLoc);
     return getKeyHeader(bucket, keyOffset).recordLoc;
 }
 
 template <class BtreeLayout>
-BSONObj BtreeLogic<BtreeLayout>::getKey(OperationContext* txn,
+BSONObj BtreeLogic<BtreeLayout>::getKey(OperationContext* opCtx,
                                         const DiskLoc& bucketLoc,
                                         const int keyOffset) const {
     invariant(!bucketLoc.isNull());
-    BucketType* bucket = getBucket(txn, bucketLoc);
+    BucketType* bucket = getBucket(opCtx, bucketLoc);
     int n = bucket->n;
     invariant(n != BtreeLayout::INVALID_N_SENTINEL);
     invariant(n >= 0);
@@ -1920,7 +1920,7 @@ BSONObj BtreeLogic<BtreeLayout>::getKey(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-IndexKeyEntry BtreeLogic<BtreeLayout>::getRandomEntry(OperationContext* txn) const {
+IndexKeyEntry BtreeLogic<BtreeLayout>::getRandomEntry(OperationContext* opCtx) const {
     // To ensure a uniform distribution, all keys must have an equal probability of being selected.
     // Specifically, a key from the root should have the same probability of being selected as a key
     // from a leaf.
@@ -1934,19 +1934,19 @@ IndexKeyEntry BtreeLogic<BtreeLayout>::getRandomEntry(OperationContext* txn) con
     // As a simplification, we treat all buckets in a given level as having the same number of
     // children. While this is inaccurate if the tree isn't perfectly balanced or if key-size
     // greatly varies, it is assumed to be good enough for this purpose.
-    invariant(!isEmpty(txn));
-    BucketType* root = getRoot(txn);
+    invariant(!isEmpty(opCtx));
+    BucketType* root = getRoot(opCtx);
 
     vector<int64_t> nKeysInLevel;
     vector<FullKey> selectedKeys;
 
-    auto& prng = txn->getClient()->getPrng();
+    auto& prng = opCtx->getClient()->getPrng();
 
     int nRetries = 0;
     const int kMaxRetries = 5;
     do {
         // See documentation below for description of parameters.
-        recordRandomWalk(txn, &prng, root, 1, &nKeysInLevel, &selectedKeys);
+        recordRandomWalk(opCtx, &prng, root, 1, &nKeysInLevel, &selectedKeys);
     } while (selectedKeys.empty() && nRetries++ < kMaxRetries);
     massert(28826,
             str::stream() << "index " << _indexName << " may be corrupt, please repair",
@@ -1989,7 +1989,7 @@ IndexKeyEntry BtreeLogic<BtreeLayout>::getRandomEntry(OperationContext* txn) con
  * from the bucket we went through on the ith level of the B-tree.
  */
 template <class BtreeLayout>
-void BtreeLogic<BtreeLayout>::recordRandomWalk(OperationContext* txn,
+void BtreeLogic<BtreeLayout>::recordRandomWalk(OperationContext* opCtx,
                                                PseudoRandom* prng,
                                                BucketType* curBucket,
                                                int64_t nBucketsInCurrentLevel,
@@ -2008,34 +2008,34 @@ void BtreeLogic<BtreeLayout>::recordRandomWalk(OperationContext* txn,
     // Select a random child and descend (if there are any).
     int nChildren = nKeys + 1;
     int nextChild = prng->nextInt32(nChildren);
-    if (auto child = childForPos(txn, curBucket, nextChild)) {
+    if (auto child = childForPos(opCtx, curBucket, nextChild)) {
         recordRandomWalk(
-            txn, prng, child, nBucketsInCurrentLevel * nChildren, nKeysInLevel, selectedKeys);
+            opCtx, prng, child, nBucketsInCurrentLevel * nChildren, nKeysInLevel, selectedKeys);
     }
 }
 
 template <class BtreeLayout>
-Status BtreeLogic<BtreeLayout>::touch(OperationContext* txn) const {
-    return _recordStore->touch(txn, NULL);
+Status BtreeLogic<BtreeLayout>::touch(OperationContext* opCtx) const {
+    return _recordStore->touch(opCtx, NULL);
 }
 
 template <class BtreeLayout>
-long long BtreeLogic<BtreeLayout>::fullValidate(OperationContext* txn,
+long long BtreeLogic<BtreeLayout>::fullValidate(OperationContext* opCtx,
                                                 long long* unusedCount,
                                                 bool strict,
                                                 bool dumpBuckets,
                                                 unsigned depth) const {
-    return _fullValidate(txn, getRootLoc(txn), unusedCount, strict, dumpBuckets, depth);
+    return _fullValidate(opCtx, getRootLoc(opCtx), unusedCount, strict, dumpBuckets, depth);
 }
 
 template <class BtreeLayout>
-long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* txn,
+long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* opCtx,
                                                  const DiskLoc bucketLoc,
                                                  long long* unusedCount,
                                                  bool strict,
                                                  bool dumpBuckets,
                                                  unsigned depth) const {
-    BucketType* bucket = getBucket(txn, bucketLoc);
+    BucketType* bucket = getBucket(opCtx, bucketLoc);
     assertValid(_indexName, bucket, _ordering, true);
 
     if (dumpBuckets) {
@@ -2056,7 +2056,7 @@ long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* txn,
 
         if (!kn.prevChildBucket.isNull()) {
             DiskLoc left = kn.prevChildBucket;
-            BucketType* b = getBucket(txn, left);
+            BucketType* b = getBucket(opCtx, left);
 
             if (strict) {
                 invariant(b->parent == bucketLoc);
@@ -2064,12 +2064,12 @@ long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* txn,
                 wassert(b->parent == bucketLoc);
             }
 
-            keyCount += _fullValidate(txn, left, unusedCount, strict, dumpBuckets, depth + 1);
+            keyCount += _fullValidate(opCtx, left, unusedCount, strict, dumpBuckets, depth + 1);
         }
     }
 
     if (!bucket->nextChild.isNull()) {
-        BucketType* b = getBucket(txn, bucket->nextChild);
+        BucketType* b = getBucket(opCtx, bucket->nextChild);
         if (strict) {
             invariant(b->parent == bucketLoc);
         } else {
@@ -2077,7 +2077,7 @@ long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* txn,
         }
 
         keyCount +=
-            _fullValidate(txn, bucket->nextChild, unusedCount, strict, dumpBuckets, depth + 1);
+            _fullValidate(opCtx, bucket->nextChild, unusedCount, strict, dumpBuckets, depth + 1);
     }
 
     return keyCount;
@@ -2149,7 +2149,7 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
 }
 
 template <class BtreeLayout>
-Status BtreeLogic<BtreeLayout>::insert(OperationContext* txn,
+Status BtreeLogic<BtreeLayout>::insert(OperationContext* opCtx,
                                        const BSONObj& rawKey,
                                        const DiskLoc& value,
                                        bool dupsAllowed) {
@@ -2161,15 +2161,15 @@ Status BtreeLogic<BtreeLayout>::insert(OperationContext* txn,
         return Status(ErrorCodes::KeyTooLong, msg);
     }
 
-    Status status =
-        _insert(txn, getRoot(txn), getRootLoc(txn), key, value, dupsAllowed, DiskLoc(), DiskLoc());
+    Status status = _insert(
+        opCtx, getRoot(opCtx), getRootLoc(opCtx), key, value, dupsAllowed, DiskLoc(), DiskLoc());
 
-    assertValid(_indexName, getRoot(txn), _ordering);
+    assertValid(_indexName, getRoot(opCtx), _ordering);
     return status;
 }
 
 template <class BtreeLayout>
-Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
+Status BtreeLogic<BtreeLayout>::_insert(OperationContext* opCtx,
                                         BucketType* bucket,
                                         const DiskLoc bucketLoc,
                                         const KeyDataType& key,
@@ -2181,7 +2181,7 @@ Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
 
     int pos;
     bool found;
-    Status findStatus = _find(txn, bucket, key, recordLoc, !dupsAllowed, &pos, &found);
+    Status findStatus = _find(opCtx, bucket, key, recordLoc, !dupsAllowed, &pos, &found);
     if (!findStatus.isOK()) {
         return findStatus;
     }
@@ -2192,7 +2192,7 @@ Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
             LOG(4) << "btree _insert: reusing unused key" << endl;
             massert(17433, "_insert: reuse key but lchild is not null", leftChild.isNull());
             massert(17434, "_insert: reuse key but rchild is not null", rightChild.isNull());
-            txn->recoveryUnit()->writing(&header)->setUsed();
+            opCtx->recoveryUnit()->writing(&header)->setUsed();
             return Status::OK();
         }
         // The logic in _find() prohibits finding and returning a position if the 'used' bit
@@ -2210,11 +2210,11 @@ Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
     // promoting a split key.  These are the only two cases where _insert() is called
     // currently.
     if (childLoc.isNull() || !rightChild.isNull()) {
-        insertHere(txn, bucketLoc, pos, key, recordLoc, leftChild, rightChild);
+        insertHere(opCtx, bucketLoc, pos, key, recordLoc, leftChild, rightChild);
         return Status::OK();
     } else {
-        return _insert(txn,
-                       getBucket(txn, childLoc),
+        return _insert(opCtx,
+                       getBucket(opCtx, childLoc),
                        childLoc,
                        key,
                        recordLoc,
@@ -2225,11 +2225,11 @@ Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-DiskLoc BtreeLogic<BtreeLayout>::advance(OperationContext* txn,
+DiskLoc BtreeLogic<BtreeLayout>::advance(OperationContext* opCtx,
                                          const DiskLoc& bucketLoc,
                                          int* posInOut,
                                          int direction) const {
-    BucketType* bucket = getBucket(txn, bucketLoc);
+    BucketType* bucket = getBucket(opCtx, bucketLoc);
 
     if (*posInOut < 0 || *posInOut >= bucket->n) {
         log() << "ASSERT failure advancing btree bucket" << endl;
@@ -2246,7 +2246,7 @@ DiskLoc BtreeLogic<BtreeLayout>::advance(OperationContext* txn,
 
     // Look down if we need to.
     DiskLoc nextDownLoc = childLocForPos(bucket, ko + adj);
-    BucketType* nextDown = getBucket(txn, nextDownLoc);
+    BucketType* nextDown = getBucket(opCtx, nextDownLoc);
     if (NULL != nextDown) {
         for (;;) {
             if (direction > 0) {
@@ -2255,7 +2255,7 @@ DiskLoc BtreeLogic<BtreeLayout>::advance(OperationContext* txn,
                 *posInOut = nextDown->n - 1;
             }
             DiskLoc newNextDownLoc = childLocForPos(nextDown, *posInOut + adj);
-            BucketType* newNextDownBucket = getBucket(txn, newNextDownLoc);
+            BucketType* newNextDownBucket = getBucket(opCtx, newNextDownLoc);
             if (NULL == newNextDownBucket) {
                 break;
             }
@@ -2273,12 +2273,12 @@ DiskLoc BtreeLogic<BtreeLayout>::advance(OperationContext* txn,
 
     // Hit the end of the bucket, move up and over.
     DiskLoc childLoc = bucketLoc;
-    DiskLoc ancestor = getBucket(txn, bucketLoc)->parent;
+    DiskLoc ancestor = getBucket(opCtx, bucketLoc)->parent;
     for (;;) {
         if (ancestor.isNull()) {
             break;
         }
-        BucketType* an = getBucket(txn, ancestor);
+        BucketType* an = getBucket(opCtx, ancestor);
         for (int i = 0; i < an->n; i++) {
             if (childLocForPos(an, i + adj) == childLoc) {
                 *posInOut = i;
@@ -2295,14 +2295,14 @@ DiskLoc BtreeLogic<BtreeLayout>::advance(OperationContext* txn,
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::keyIsUsed(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::keyIsUsed(OperationContext* opCtx,
                                         const DiskLoc& loc,
                                         const int& pos) const {
-    return getKeyHeader(getBucket(txn, loc), pos).isUsed();
+    return getKeyHeader(getBucket(opCtx, loc), pos).isUsed();
 }
 
 template <class BtreeLayout>
-bool BtreeLogic<BtreeLayout>::locate(OperationContext* txn,
+bool BtreeLogic<BtreeLayout>::locate(OperationContext* opCtx,
                                      const BSONObj& key,
                                      const DiskLoc& recordLoc,
                                      const int direction,
@@ -2315,13 +2315,13 @@ bool BtreeLogic<BtreeLayout>::locate(OperationContext* txn,
     bool found = false;
     KeyDataOwnedType owned(key);
 
-    *bucketLocOut = _locate(txn, getRootLoc(txn), owned, posOut, &found, recordLoc, direction);
+    *bucketLocOut = _locate(opCtx, getRootLoc(opCtx), owned, posOut, &found, recordLoc, direction);
 
     if (!found) {
         return false;
     }
 
-    skipUnusedKeys(txn, bucketLocOut, posOut, direction);
+    skipUnusedKeys(opCtx, bucketLocOut, posOut, direction);
 
     return found;
 }
@@ -2331,7 +2331,7 @@ bool BtreeLogic<BtreeLayout>::locate(OperationContext* txn,
  * Caller should have acquired lock on bucketLoc.
  */
 template <class BtreeLayout>
-DiskLoc BtreeLogic<BtreeLayout>::_locate(OperationContext* txn,
+DiskLoc BtreeLogic<BtreeLayout>::_locate(OperationContext* opCtx,
                                          const DiskLoc& bucketLoc,
                                          const KeyDataType& key,
                                          int* posOut,
@@ -2339,9 +2339,9 @@ DiskLoc BtreeLogic<BtreeLayout>::_locate(OperationContext* txn,
                                          const DiskLoc& recordLoc,
                                          const int direction) const {
     int position;
-    BucketType* bucket = getBucket(txn, bucketLoc);
+    BucketType* bucket = getBucket(opCtx, bucketLoc);
     // XXX: owned to not owned conversion(?)
-    _find(txn, bucket, key, recordLoc, false, &position, foundOut);
+    _find(opCtx, bucket, key, recordLoc, false, &position, foundOut);
 
     // Look in our current bucket.
     if (*foundOut) {
@@ -2353,7 +2353,7 @@ DiskLoc BtreeLogic<BtreeLayout>::_locate(OperationContext* txn,
     DiskLoc childLoc = childLocForPos(bucket, position);
 
     if (!childLoc.isNull()) {
-        DiskLoc inChild = _locate(txn, childLoc, key, posOut, foundOut, recordLoc, direction);
+        DiskLoc inChild = _locate(opCtx, childLoc, key, posOut, foundOut, recordLoc, direction);
         if (!inChild.isNull()) {
             return inChild;
         }
@@ -2389,12 +2389,12 @@ bool BtreeLogic<BtreeLayout>::isHead(BucketType* bucket) {
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::BucketType* BtreeLogic<BtreeLayout>::getBucket(
-    OperationContext* txn, const RecordId id) const {
+    OperationContext* opCtx, const RecordId id) const {
     if (id.isNull()) {
         return NULL;
     }
 
-    RecordData recordData = _recordStore->dataFor(txn, id);
+    RecordData recordData = _recordStore->dataFor(opCtx, id);
 
     // we need to be working on the raw bytes, not a transient copy
     invariant(!recordData.isOwned());
@@ -2404,20 +2404,20 @@ typename BtreeLogic<BtreeLayout>::BucketType* BtreeLogic<BtreeLayout>::getBucket
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::BucketType* BtreeLogic<BtreeLayout>::getRoot(
-    OperationContext* txn) const {
-    return getBucket(txn, _headManager->getHead(txn));
+    OperationContext* opCtx) const {
+    return getBucket(opCtx, _headManager->getHead(opCtx));
 }
 
 template <class BtreeLayout>
-DiskLoc BtreeLogic<BtreeLayout>::getRootLoc(OperationContext* txn) const {
-    return DiskLoc::fromRecordId(_headManager->getHead(txn));
+DiskLoc BtreeLogic<BtreeLayout>::getRootLoc(OperationContext* opCtx) const {
+    return DiskLoc::fromRecordId(_headManager->getHead(opCtx));
 }
 
 template <class BtreeLayout>
 typename BtreeLogic<BtreeLayout>::BucketType* BtreeLogic<BtreeLayout>::childForPos(
-    OperationContext* txn, BucketType* bucket, int pos) const {
+    OperationContext* opCtx, BucketType* bucket, int pos) const {
     DiskLoc loc = childLocForPos(bucket, pos);
-    return getBucket(txn, loc);
+    return getBucket(opCtx, loc);
 }
 
 template <class BtreeLayout>

@@ -39,46 +39,46 @@ public:
     OpObserverNoop() = default;
     virtual ~OpObserverNoop() = default;
 
-    void onCreateIndex(OperationContext* txn,
+    void onCreateIndex(OperationContext* opCtx,
                        const std::string& ns,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
-    void onInserts(OperationContext* txn,
+    void onInserts(OperationContext* opCtx,
                    const NamespaceString& ns,
                    std::vector<BSONObj>::const_iterator begin,
                    std::vector<BSONObj>::const_iterator end,
                    bool fromMigrate) override;
-    void onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) override;
-    CollectionShardingState::DeleteState aboutToDelete(OperationContext* txn,
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
+    CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
                                                        const NamespaceString& ns,
                                                        const BSONObj& doc) override;
-    void onDelete(OperationContext* txn,
+    void onDelete(OperationContext* opCtx,
                   const NamespaceString& ns,
                   CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate) override;
-    void onOpMessage(OperationContext* txn, const BSONObj& msgObj) override;
-    void onCreateCollection(OperationContext* txn,
+    void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) override;
+    void onCreateCollection(OperationContext* opCtx,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex) override;
-    void onCollMod(OperationContext* txn,
+    void onCollMod(OperationContext* opCtx,
                    const std::string& dbName,
                    const BSONObj& collModCmd) override;
-    void onDropDatabase(OperationContext* txn, const std::string& dbName) override;
-    void onDropCollection(OperationContext* txn, const NamespaceString& collectionName) override;
-    void onDropIndex(OperationContext* txn,
+    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
+    void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName) override;
+    void onDropIndex(OperationContext* opCtx,
                      const std::string& dbName,
                      const BSONObj& idxDescriptor) override;
-    void onRenameCollection(OperationContext* txn,
+    void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             bool dropTarget,
                             bool stayTemp) override;
-    void onApplyOps(OperationContext* txn,
+    void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
                     const BSONObj& applyOpCmd) override;
-    void onEmptyCapped(OperationContext* txn, const NamespaceString& collectionName);
-    void onConvertToCapped(OperationContext* txn,
+    void onEmptyCapped(OperationContext* opCtx, const NamespaceString& collectionName);
+    void onConvertToCapped(OperationContext* opCtx,
                            const NamespaceString& collectionName,
                            double size) override;
 };

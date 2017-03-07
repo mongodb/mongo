@@ -73,7 +73,7 @@ public:
            blocks until command is done
            returns ok()
          */
-        bool join(OperationContext* txn, int maxRetries = 1);
+        bool join(OperationContext* opCtx, int maxRetries = 1);
 
     private:
         CommandResult(const std::string& server,
@@ -137,7 +137,7 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
  *
  * Throws exception on errors.
  */
-std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* txn,
+std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
                                                            StringData dbName);
 
 }  // namespace mongo

@@ -51,10 +51,10 @@ using std::endl;
 using std::list;
 using std::string;
 
-NamespaceIndex::NamespaceIndex(OperationContext* txn,
+NamespaceIndex::NamespaceIndex(OperationContext* opCtx,
                                const std::string& dir,
                                const std::string& database)
-    : _dir(dir), _database(database), _f(txn, MongoFile::Options::SEQUENTIAL), _ht(nullptr) {}
+    : _dir(dir), _database(database), _f(opCtx, MongoFile::Options::SEQUENTIAL), _ht(nullptr) {}
 
 NamespaceIndex::~NamespaceIndex() {}
 
@@ -67,33 +67,38 @@ NamespaceDetails* NamespaceIndex::details(const Namespace& ns) const {
     return _ht->get(ns);
 }
 
-void NamespaceIndex::add_ns(OperationContext* txn, StringData ns, const DiskLoc& loc, bool capped) {
+void NamespaceIndex::add_ns(OperationContext* opCtx,
+                            StringData ns,
+                            const DiskLoc& loc,
+                            bool capped) {
     NamespaceDetails details(loc, capped);
-    add_ns(txn, ns, &details);
+    add_ns(opCtx, ns, &details);
 }
 
-void NamespaceIndex::add_ns(OperationContext* txn, StringData ns, const NamespaceDetails* details) {
+void NamespaceIndex::add_ns(OperationContext* opCtx,
+                            StringData ns,
+                            const NamespaceDetails* details) {
     Namespace n(ns);
-    add_ns(txn, n, details);
+    add_ns(opCtx, n, details);
 }
 
-void NamespaceIndex::add_ns(OperationContext* txn,
+void NamespaceIndex::add_ns(OperationContext* opCtx,
                             const Namespace& ns,
                             const NamespaceDetails* details) {
     const NamespaceString nss(ns.toString());
-    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     massert(17315, "no . in ns", nsIsFull(nss.toString()));
 
-    uassert(10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
+    uassert(10081, "too many namespaces/collections", _ht->put(opCtx, ns, *details));
 }
 
-void NamespaceIndex::kill_ns(OperationContext* txn, StringData ns) {
+void NamespaceIndex::kill_ns(OperationContext* opCtx, StringData ns) {
     const NamespaceString nss(ns.toString());
-    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     const Namespace n(ns);
-    _ht->kill(txn, n);
+    _ht->kill(opCtx, n);
 
     if (ns.size() <= Namespace::MaxNsColletionLen) {
         // Larger namespace names don't have room for $extras so they can't exist. The code
@@ -102,7 +107,7 @@ void NamespaceIndex::kill_ns(OperationContext* txn, StringData ns) {
         for (int i = 0; i <= 1; i++) {
             try {
                 Namespace extra(n.extraName(i));
-                _ht->kill(txn, extra);
+                _ht->kill(opCtx, extra);
             } catch (DBException&) {
                 LOG(3) << "caught exception in kill_ns" << endl;
             }
@@ -147,7 +152,7 @@ void NamespaceIndex::maybeMkdir() const {
                                            "create dir for db ");
 }
 
-void NamespaceIndex::init(OperationContext* txn) {
+void NamespaceIndex::init(OperationContext* opCtx) {
     invariant(!_ht.get());
 
     unsigned long long len = 0;
@@ -158,7 +163,7 @@ void NamespaceIndex::init(OperationContext* txn) {
     void* p = 0;
 
     if (boost::filesystem::exists(nsPath)) {
-        if (_f.open(txn, pathString)) {
+        if (_f.open(opCtx, pathString)) {
             len = _f.length();
 
             if (len % (1024 * 1024) != 0) {
@@ -217,7 +222,7 @@ void NamespaceIndex::init(OperationContext* txn) {
             massert(18826, str::stream() << "failure writing file " << pathString, !file.bad());
         }
 
-        if (_f.create(txn, pathString, l)) {
+        if (_f.create(opCtx, pathString, l)) {
             // The writes done in this function must not be rolled back. This will leave the
             // file empty, but available for future use. That is why we go directly to the
             // global dur dirty list rather than going through the OperationContext.
@@ -226,7 +231,7 @@ void NamespaceIndex::init(OperationContext* txn) {
             // Commit the journal and all changes to disk so that even if exceptions occur
             // during subsequent initialization, we won't have uncommited changes during file
             // close.
-            getDur().commitNow(txn);
+            getDur().commitNow(opCtx);
 
             len = l;
             invariant(len == mmapv1GlobalOptions.lenForNewNsFiles);

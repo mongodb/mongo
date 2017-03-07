@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-Status dropCollection(OperationContext* txn,
+Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result) {
     if (!serverGlobalParams.quiet.load()) {
@@ -59,22 +59,23 @@ Status dropCollection(OperationContext* txn,
     const std::string dbname = collectionName.db().toString();
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
+        ScopedTransaction transaction(opCtx, MODE_IX);
 
-        AutoGetDb autoDb(txn, dbname, MODE_X);
+        AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection(collectionName) : nullptr;
-        auto view = db && !coll ? db->getViewCatalog()->lookup(txn, collectionName.ns()) : nullptr;
+        auto view =
+            db && !coll ? db->getViewCatalog()->lookup(opCtx, collectionName.ns()) : nullptr;
 
         if (!db || (!coll && !view)) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
         const bool shardVersionCheck = true;
-        OldClientContext context(txn, collectionName.ns(), shardVersionCheck);
+        OldClientContext context(opCtx, collectionName.ns(), shardVersionCheck);
 
-        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, collectionName);
+        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
@@ -82,16 +83,16 @@ Status dropCollection(OperationContext* txn,
                                         << collectionName.ns());
         }
 
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         result.append("ns", collectionName.ns());
 
         if (coll) {
             invariant(!view);
-            int numIndexes = coll->getIndexCatalog()->numIndexesTotal(txn);
+            int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
 
             BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
-            Status s = db->dropCollection(txn, collectionName.ns());
+            Status s = db->dropCollection(opCtx, collectionName.ns());
 
             if (!s.isOK()) {
                 return s;
@@ -100,14 +101,14 @@ Status dropCollection(OperationContext* txn,
             result.append("nIndexesWas", numIndexes);
         } else {
             invariant(view);
-            Status status = db->dropView(txn, collectionName.ns());
+            Status status = db->dropView(opCtx, collectionName.ns());
             if (!status.isOK()) {
                 return status;
             }
         }
         wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", collectionName.ns());
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "drop", collectionName.ns());
 
     return Status::OK();
 }

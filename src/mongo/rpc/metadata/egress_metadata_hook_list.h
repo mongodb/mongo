@@ -58,7 +58,7 @@ public:
      * early if one of hooks returned a non OK status and return it. Note that metadataBob should
      * not be used if Status is not OK as the contents can be partial.
      */
-    Status writeRequestMetadata(OperationContext* txn,
+    Status writeRequestMetadata(OperationContext* opCtx,
                                 const HostAndPort& requestDestination,
                                 BSONObjBuilder* metadataBob) override;
 

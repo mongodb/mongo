@@ -65,12 +65,12 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHostWithMaxWait(
     return _rsMonitor->getHostOrRefresh(readPref, maxWait);
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* txn,
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCtx,
                                                           const ReadPreferenceSetting& readPref) {
-    auto clock = txn->getServiceContext()->getFastClockSource();
+    auto clock = opCtx->getServiceContext()->getFastClockSource();
     auto startDate = clock->now();
     while (true) {
-        const auto interruptStatus = txn->checkForInterruptNoAssert();
+        const auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK()) {
             return interruptStatus;
         }

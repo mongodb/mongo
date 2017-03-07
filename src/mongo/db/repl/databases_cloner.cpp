@@ -354,13 +354,13 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
         auto adminStatus = Status(ErrorCodes::NotYetInitialized, "");
         {
             // TODO: Move isAdminDbValid() out of the collection/database cloner code paths.
-            OperationContext* txn = cc().getOperationContext();
-            ServiceContext::UniqueOperationContext txnPtr;
-            if (!txn) {
-                txnPtr = cc().makeOperationContext();
-                txn = txnPtr.get();
+            OperationContext* opCtx = cc().getOperationContext();
+            ServiceContext::UniqueOperationContext opCtxPtr;
+            if (!opCtx) {
+                opCtxPtr = cc().makeOperationContext();
+                opCtx = opCtxPtr.get();
             }
-            adminStatus = _storage->isAdminDbValid(txn);
+            adminStatus = _storage->isAdminDbValid(opCtx);
         }
         if (!adminStatus.isOK()) {
             LOG(1) << "Validation failed on 'admin' db due to " << adminStatus;

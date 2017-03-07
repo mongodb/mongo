@@ -58,7 +58,7 @@ public:
         return false;
     }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
         RangeDeleter* deleter = getDeleter();
         if (!deleter) {
             return BSONObj();

@@ -44,7 +44,7 @@ class ReadConcernArgs;
  * Given the specified command and whether it supports read concern, returns an effective read
  * concern which should be used.
  */
-StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* txn,
+StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* opCtx,
                                                      const BSONObj& cmdObj,
                                                      bool supportsReadConcern);
 
@@ -53,12 +53,12 @@ StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* txn,
  * satisfied given the current state of the server and if so calls into the replication subsystem to
  * perform the wait.
  */
-Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& readConcernArgs);
+Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs);
 
 /*
  * Given a linearizable read command, confirm that
  * current primary is still the true primary of the replica set.
  */
-Status waitForLinearizableReadConcern(OperationContext* txn);
+Status waitForLinearizableReadConcern(OperationContext* opCtx);
 
 }  // namespace mongo

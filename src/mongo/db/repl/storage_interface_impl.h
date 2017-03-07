@@ -62,19 +62,19 @@ public:
      */
     NamespaceString getMinValidNss() const;
 
-    bool getInitialSyncFlag(OperationContext* txn) const override;
+    bool getInitialSyncFlag(OperationContext* opCtx) const override;
 
-    void setInitialSyncFlag(OperationContext* txn) override;
+    void setInitialSyncFlag(OperationContext* opCtx) override;
 
-    void clearInitialSyncFlag(OperationContext* txn) override;
+    void clearInitialSyncFlag(OperationContext* opCtx) override;
 
-    OpTime getMinValid(OperationContext* txn) const override;
-    void setMinValid(OperationContext* txn, const OpTime& minValid) override;
-    void setMinValidToAtLeast(OperationContext* txn, const OpTime& endOpTime) override;
-    void setOplogDeleteFromPoint(OperationContext* txn, const Timestamp& timestamp) override;
-    Timestamp getOplogDeleteFromPoint(OperationContext* txn) override;
-    void setAppliedThrough(OperationContext* txn, const OpTime& optime) override;
-    OpTime getAppliedThrough(OperationContext* txn) override;
+    OpTime getMinValid(OperationContext* opCtx) const override;
+    void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
+    void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& endOpTime) override;
+    void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
+    Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) override;
+    void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
+    OpTime getAppliedThrough(OperationContext* opCtx) override;
 
     /**
      *  Allocates a new TaskRunner for use by the passed in collection.
@@ -85,26 +85,27 @@ public:
         const BSONObj idIndexSpec,
         const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
-    Status insertDocument(OperationContext* txn,
+    Status insertDocument(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const BSONObj& doc) override;
 
-    Status insertDocuments(OperationContext* txn,
+    Status insertDocuments(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const std::vector<BSONObj>& docs) override;
 
-    Status dropReplicatedDatabases(OperationContext* txn) override;
+    Status dropReplicatedDatabases(OperationContext* opCtx) override;
 
-    Status createOplog(OperationContext* txn, const NamespaceString& nss) override;
-    StatusWith<size_t> getOplogMaxSize(OperationContext* txn, const NamespaceString& nss) override;
+    Status createOplog(OperationContext* opCtx, const NamespaceString& nss) override;
+    StatusWith<size_t> getOplogMaxSize(OperationContext* opCtx,
+                                       const NamespaceString& nss) override;
 
-    Status createCollection(OperationContext* txn,
+    Status createCollection(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionOptions& options) override;
 
-    Status dropCollection(OperationContext* txn, const NamespaceString& nss) override;
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
-    StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* txn,
+    StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    boost::optional<StringData> indexName,
                                                    ScanDirection scanDirection,
@@ -112,7 +113,7 @@ public:
                                                    BoundInclusion boundInclusion,
                                                    std::size_t limit) override;
 
-    StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* txn,
+    StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      boost::optional<StringData> indexName,
                                                      ScanDirection scanDirection,
@@ -120,12 +121,12 @@ public:
                                                      BoundInclusion boundInclusion,
                                                      std::size_t limit) override;
 
-    Status isAdminDbValid(OperationContext* txn) override;
+    Status isAdminDbValid(OperationContext* opCtx) override;
 
 private:
     // Returns empty document if not present.
-    BSONObj getMinValidDocument(OperationContext* txn) const;
-    void updateMinValidDocument(OperationContext* txn, const BSONObj& updateSpec);
+    BSONObj getMinValidDocument(OperationContext* opCtx) const;
+    void updateMinValidDocument(OperationContext* opCtx, const BSONObj& updateSpec);
 
     const NamespaceString _minValidNss;
 };

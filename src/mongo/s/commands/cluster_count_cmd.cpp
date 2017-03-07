@@ -100,7 +100,7 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -168,7 +168,7 @@ public:
         }
 
         vector<Strategy::CommandResult> countResult;
-        Strategy::commandOp(txn,
+        Strategy::commandOp(opCtx,
                             dbname,
                             countCmdBuilder.done(),
                             options,
@@ -198,7 +198,7 @@ public:
 
             BSONObjBuilder aggResult;
             Command::findCommand("aggregate")
-                ->run(txn, dbname, aggCmd.getValue(), options, errmsg, aggResult);
+                ->run(opCtx, dbname, aggCmd.getValue(), options, errmsg, aggResult);
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult.obj());
@@ -247,7 +247,7 @@ public:
         return true;
     }
 
-    virtual Status explain(OperationContext* txn,
+    virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
@@ -285,7 +285,7 @@ public:
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(txn,
+        Strategy::commandOp(opCtx,
                             dbname,
                             explainCmdBob.obj(),
                             options,
@@ -316,7 +316,7 @@ public:
 
             std::string errMsg;
             if (Command::findCommand("aggregate")
-                    ->run(txn, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
+                    ->run(opCtx, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
                 return Status::OK();
             }
 
@@ -326,7 +326,7 @@ public:
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            txn, shardResults, mongosStageName, millisElapsed, out);
+            opCtx, shardResults, mongosStageName, millisElapsed, out);
     }
 
 } clusterCountCmd;

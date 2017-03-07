@@ -77,34 +77,34 @@ public:
             return false;
         }
 
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
 
         try {
-            ScopedTransaction transaction(&txn, MODE_IX);
+            ScopedTransaction transaction(&opCtx, MODE_IX);
 
-            AutoGetDb autoDb(&txn, _ns.db(), MODE_IX);
+            AutoGetDb autoDb(&opCtx, _ns.db(), MODE_IX);
             Database* db = autoDb.getDb();
             if (!db) {
                 LOG(2) << "no local database yet";
                 return false;
             }
 
-            Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
+            Lock::CollectionLock collectionLock(opCtx.lockState(), _ns.ns(), MODE_IX);
             Collection* collection = db->getCollection(_ns);
             if (!collection) {
                 LOG(2) << "no collection " << _ns;
                 return false;
             }
 
-            OldClientContext ctx(&txn, _ns.ns(), false);
+            OldClientContext ctx(&opCtx, _ns.ns(), false);
             WiredTigerRecordStore* rs =
                 checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
 
-            if (!rs->yieldAndAwaitOplogDeletionRequest(&txn)) {
+            if (!rs->yieldAndAwaitOplogDeletionRequest(&opCtx)) {
                 return false;  // Oplog went away.
             }
-            rs->reclaimOplog(&txn);
+            rs->reclaimOplog(&opCtx);
         } catch (const std::exception& e) {
             severe() << "error in WiredTigerRecordStoreThread: " << e.what();
             fassertFailedNoTrace(!"error in WiredTigerRecordStoreThread");

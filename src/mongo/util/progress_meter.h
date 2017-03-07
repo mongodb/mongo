@@ -126,7 +126,7 @@ private:
 };
 
 // e.g.:
-// CurOp * op = CurOp::get(txn);
+// CurOp * op = CurOp::get(opCtx);
 // ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
 // "Index: External Sort Progress", d->stats.nrecords, 10)); loop { pm.hit(); }
 class ProgressMeterHolder {

@@ -75,29 +75,29 @@ CollectionRangeDeleter::CollectionRangeDeleter(NamespaceString nss) : _nss(std::
 void CollectionRangeDeleter::run() {
     Client::initThread(getThreadName().c_str());
     ON_BLOCK_EXIT([&] { Client::destroy(); });
-    auto txn = cc().makeOperationContext().get();
+    auto opCtx = cc().makeOperationContext().get();
 
     const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
-    bool hasNextRangeToClean = cleanupNextRange(txn, maxToDelete);
+    bool hasNextRangeToClean = cleanupNextRange(opCtx, maxToDelete);
 
     // If there are more ranges to run, we add <this> back onto the task executor to run again.
     if (hasNextRangeToClean) {
-        auto executor = ShardingState::get(txn)->getRangeDeleterTaskExecutor();
+        auto executor = ShardingState::get(opCtx)->getRangeDeleterTaskExecutor();
         executor->scheduleWork([this](const CallbackArgs& cbArgs) { run(); });
     } else {
         delete this;
     }
 }
 
-bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn, int maxToDelete) {
+bool CollectionRangeDeleter::cleanupNextRange(OperationContext* opCtx, int maxToDelete) {
 
     {
-        AutoGetCollection autoColl(txn, _nss, MODE_IX);
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
         auto* collection = autoColl.getCollection();
         if (!collection) {
             return false;
         }
-        auto* collectionShardingState = CollectionShardingState::get(txn, _nss);
+        auto* collectionShardingState = CollectionShardingState::get(opCtx, _nss);
         dassert(collectionShardingState != nullptr);  // every collection gets one
 
         auto& metadataManager = collectionShardingState->_metadataManager;
@@ -117,7 +117,7 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn, int maxToDe
 
         auto scopedCollectionMetadata = collectionShardingState->getMetadata();
         int numDocumentsDeleted =
-            _doDeletion(txn, collection, scopedCollectionMetadata->getKeyPattern(), maxToDelete);
+            _doDeletion(opCtx, collection, scopedCollectionMetadata->getKeyPattern(), maxToDelete);
         if (numDocumentsDeleted <= 0) {
             metadataManager.removeRangeToClean(_rangeInProgress.get());
             _rangeInProgress = boost::none;
@@ -127,8 +127,9 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn, int maxToDe
 
     // wait for replication
     WriteConcernResult wcResult;
-    auto currentClientOpTime = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-    Status status = waitForWriteConcern(txn, currentClientOpTime, kMajorityWriteConcern, &wcResult);
+    auto currentClientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    Status status =
+        waitForWriteConcern(opCtx, currentClientOpTime, kMajorityWriteConcern, &wcResult);
     if (!status.isOK()) {
         warning() << "Error when waiting for write concern after removing chunks in " << _nss
                   << " : " << status.reason();
@@ -137,7 +138,7 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn, int maxToDe
     return true;
 }
 
-int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
+int CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
                                         Collection* collection,
                                         const BSONObj& keyPattern,
                                         int maxToDelete) {
@@ -147,7 +148,7 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
     const IndexDescriptor* idx =
-        collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn, keyPattern, false);
+        collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
     if (idx == NULL) {
         warning() << "Unable to find shard key index for " << keyPattern.toString() << " in "
                   << _nss;
@@ -165,7 +166,7 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
     LOG(1) << "begin removal of " << min << " to " << max << " in " << _nss;
 
     auto indexName = idx->indexName();
-    IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexName);
+    IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!desc) {
         warning() << "shard key index with name " << indexName << " on '" << _nss
                   << "' was dropped";
@@ -174,7 +175,7 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
 
     int numDeleted = 0;
     do {
-        auto exec = InternalPlanner::indexScan(txn,
+        auto exec = InternalPlanner::indexScan(opCtx,
                                                collection,
                                                desc,
                                                min,
@@ -198,14 +199,14 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
         }
 
         invariant(PlanExecutor::ADVANCED == state);
-        WriteUnitOfWork wuow(txn);
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, _nss)) {
+        WriteUnitOfWork wuow(opCtx);
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, _nss)) {
             warning() << "stepped down from primary while deleting chunk; orphaning data in "
                       << _nss << " in range [" << min << ", " << max << ")";
             break;
         }
         OpDebug* const nullOpDebug = nullptr;
-        collection->deleteDocument(txn, rloc, nullOpDebug, true);
+        collection->deleteDocument(opCtx, rloc, nullOpDebug, true);
         wuow.commit();
     } while (++numDeleted < maxToDelete);
     return numDeleted;

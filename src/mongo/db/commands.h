@@ -134,7 +134,7 @@ public:
 
        return value is true if succeeded.  if false, set errmsg text.
     */
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      BSONObj& cmdObj,
                      int options,
@@ -147,7 +147,7 @@ public:
      * Then we won't need to mutate the command object. At that point we can also make
      * this method virtual so commands can override it directly.
      */
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const rpc::RequestInterface& request,
              rpc::ReplyBuilderInterface* replyBuilder);
 
@@ -210,11 +210,11 @@ public:
      *   which knows how to convert an execution stage tree into explain output.
      *
      * TODO: Remove the 'serverSelectionMetadata' parameter in favor of reading the
-     * ServerSelectionMetadata off 'txn'. Once OP_COMMAND is implemented in mongos, this metadata
+     * ServerSelectionMetadata off 'opCtx'. Once OP_COMMAND is implemented in mongos, this metadata
      * will be parsed and attached as a decoration on the OperationContext, as is already done on
      * the mongod side.
      */
-    virtual Status explain(OperationContext* txn,
+    virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
@@ -222,10 +222,11 @@ public:
                            BSONObjBuilder* out) const;
 
     /**
-     * Checks if the client associated with the given OperationContext, "txn", is authorized to run
+     * Checks if the client associated with the given OperationContext, "opCtx", is authorized to
+     * run
      * this command on database "dbname" with the invocation described by "cmdObj".
      */
-    virtual Status checkAuthForOperation(OperationContext* txn,
+    virtual Status checkAuthForOperation(OperationContext* opCtx,
                                          const std::string& dbname,
                                          const BSONObj& cmdObj);
 
@@ -313,7 +314,7 @@ public:
      *
      * This is currently used by mongod and dbwebserver.
      */
-    static void execCommand(OperationContext* txn,
+    static void execCommand(OperationContext* opCtx,
                             Command* command,
                             const rpc::RequestInterface& request,
                             rpc::ReplyBuilderInterface* replyBuilder);
@@ -388,7 +389,7 @@ public:
      * Generates a reply from the 'help' information associated with a command. The state of
      * the passed ReplyBuilder will be in kOutputDocs after calling this method.
      */
-    static void generateHelpResponse(OperationContext* txn,
+    static void generateHelpResponse(OperationContext* opCtx,
                                      const rpc::RequestInterface& request,
                                      rpc::ReplyBuilderInterface* replyBuilder,
                                      const Command& command);
@@ -400,7 +401,7 @@ public:
      * already an active exception when this function is called, so there
      * is little that can be done if it fails.
      */
-    static void generateErrorResponse(OperationContext* txn,
+    static void generateErrorResponse(OperationContext* opCtx,
                                       rpc::ReplyBuilderInterface* replyBuilder,
                                       const DBException& exception,
                                       const rpc::RequestInterface& request,
@@ -411,7 +412,7 @@ public:
      * Generates a command error response. This overload of generateErrorResponse is intended
      * to also add an operationTime.
      */
-    static void generateErrorResponse(OperationContext* txn,
+    static void generateErrorResponse(OperationContext* opCtx,
                                       rpc::ReplyBuilderInterface* replyBuilder,
                                       const DBException& exception,
                                       const rpc::RequestInterface& request,
@@ -424,7 +425,7 @@ public:
      * a handle to the actual Command object. This can happen, for example, when the command
      * is not found.
      */
-    static void generateErrorResponse(OperationContext* txn,
+    static void generateErrorResponse(OperationContext* opCtx,
                                       rpc::ReplyBuilderInterface* replyBuilder,
                                       const DBException& exception,
                                       const rpc::RequestInterface& request);
@@ -435,7 +436,7 @@ public:
      * neccessary, for example, if there is
      * an assertion hit while parsing the command.
      */
-    static void generateErrorResponse(OperationContext* txn,
+    static void generateErrorResponse(OperationContext* opCtx,
                                       rpc::ReplyBuilderInterface* replyBuilder,
                                       const DBException& exception);
 
@@ -443,7 +444,7 @@ public:
      * Records the error on to the OperationContext. This hook is needed because mongos
      * does not have CurOp linked in to it.
      */
-    static void registerError(OperationContext* txn, const DBException& exception);
+    static void registerError(OperationContext* opCtx, const DBException& exception);
 
     /**
      * Registers the implementation of the `registerError` function. This hook is needed because
@@ -459,7 +460,7 @@ public:
     static bool isUserManagementCommand(const std::string& name);
 
     /**
-     * Checks to see if the client executing "txn" is authorized to run the given command with the
+     * Checks to see if the client executing "opCtx" is authorized to run the given command with the
      * given parameters on the given named database.
      *
      * Returns Status::OK() if the command is authorized.  Most likely returns
@@ -505,14 +506,14 @@ private:
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
 
-    friend void mongo::execCommandClient(OperationContext* txn,
+    friend void mongo::execCommandClient(OperationContext* opCtx,
                                          Command* c,
                                          int queryOptions,
                                          const char* ns,
                                          BSONObj& cmdObj,
                                          BSONObjBuilder& result);
 
-    friend void mongo::execCommandDatabase(OperationContext* txn,
+    friend void mongo::execCommandDatabase(OperationContext* opCtx,
                                            Command* command,
                                            const rpc::RequestInterface& request,
                                            rpc::ReplyBuilderInterface* replyBuilder);

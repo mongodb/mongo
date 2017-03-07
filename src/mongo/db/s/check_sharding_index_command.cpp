@@ -82,7 +82,7 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& jsobj,
              int options,
@@ -108,7 +108,7 @@ public:
             return false;
         }
 
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
@@ -117,7 +117,7 @@ public:
         }
 
         IndexDescriptor* idx =
-            collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn,
+            collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
                                                                      keyPattern,
                                                                      true);  // requireSingleKey
         if (idx == NULL) {
@@ -136,7 +136,7 @@ public:
         }
 
         unique_ptr<PlanExecutor> exec(
-            InternalPlanner::indexScan(txn,
+            InternalPlanner::indexScan(opCtx,
                                        collection,
                                        idx,
                                        min,
@@ -150,7 +150,7 @@ public:
         // this index.
         // NOTE A local copy of 'missingField' is made because indices may be
         // invalidated during a db lock yield.
-        BSONObj missingFieldObj = IndexLegacy::getMissingField(txn, collection, idx->infoObj());
+        BSONObj missingFieldObj = IndexLegacy::getMissingField(opCtx, collection, idx->infoObj());
         BSONElement missingField = missingFieldObj.firstElement();
 
         // for now, the only check is that all shard keys are filled
@@ -180,7 +180,7 @@ public:
 
                 // This is a fetch, but it's OK.  The underlying code won't throw a page fault
                 // exception.
-                BSONObj obj = collection->docFor(txn, loc).value();
+                BSONObj obj = collection->docFor(opCtx, loc).value();
                 BSONObjIterator j(keyPattern);
                 BSONElement real;
                 for (int x = 0; x <= k; x++)

@@ -59,7 +59,7 @@ using std::string;
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
-Status rebuildIndexesOnCollection(OperationContext* txn,
+Status rebuildIndexesOnCollection(OperationContext* opCtx,
                                   DatabaseCatalogEntry* dbce,
                                   const std::string& collectionName) {
     CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collectionName);
@@ -68,12 +68,12 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
     std::vector<BSONObj> indexSpecs;
     {
         // Fetch all indexes
-        cce->getAllIndexes(txn, &indexNames);
+        cce->getAllIndexes(opCtx, &indexNames);
         indexSpecs.reserve(indexNames.size());
 
         for (size_t i = 0; i < indexNames.size(); i++) {
             const string& name = indexNames[i];
-            BSONObj spec = cce->getIndexSpec(txn, name);
+            BSONObj spec = cce->getIndexSpec(opCtx, name);
 
             IndexVersion newIndexVersion = IndexVersion::kV0;
             {
@@ -129,11 +129,11 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
         // 2) Open the Collection
         // 3) Start the index build process.
 
-        WriteUnitOfWork wuow(txn);
+        WriteUnitOfWork wuow(opCtx);
 
         {  // 1
             for (size_t i = 0; i < indexNames.size(); i++) {
-                Status s = cce->removeIndex(txn, indexNames[i]);
+                Status s = cce->removeIndex(opCtx, indexNames[i]);
                 if (!s.isOK())
                     return s;
             }
@@ -143,9 +143,9 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
         // open a bad index and fail.
         // TODO see if MultiIndexBlock can be made to work without a Collection.
         const StringData ns = cce->ns().ns();
-        collection.reset(new Collection(txn, ns, cce, dbce->getRecordStore(ns), dbce));
+        collection.reset(new Collection(opCtx, ns, cce, dbce->getRecordStore(ns), dbce));
 
-        indexer.reset(new MultiIndexBlock(txn, collection.get()));
+        indexer.reset(new MultiIndexBlock(opCtx, collection.get()));
         Status status = indexer->init(indexSpecs).getStatus();
         if (!status.isOK()) {
             // The WUOW will handle cleanup, so the indexer shouldn't do its own.
@@ -163,7 +163,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
     long long dataSize = 0;
 
     RecordStore* rs = collection->getRecordStore();
-    auto cursor = rs->getCursor(txn);
+    auto cursor = rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         RecordId id = record->id;
         RecordData& data = record->data;
@@ -175,8 +175,8 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
             log() << "Invalid BSON detected at " << id << ": " << redact(status) << ". Deleting.";
             cursor->save();  // 'data' is no longer valid.
             {
-                WriteUnitOfWork wunit(txn);
-                rs->deleteRecord(txn, id);
+                WriteUnitOfWork wunit(opCtx);
+                rs->deleteRecord(opCtx, id);
                 wunit.commit();
             }
             cursor->restore();
@@ -188,7 +188,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
 
         // Now index the record.
         // TODO SERVER-14812 add a mode that drops duplicates rather than failing
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         status = indexer->insert(data.releaseToBson(), id);
         if (!status.isOK())
             return status;
@@ -200,9 +200,9 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
         return status;
 
     {
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         indexer->commit();
-        rs->updateStatsAfterRepair(txn, numRecords, dataSize);
+        rs->updateStatsAfterRepair(opCtx, numRecords, dataSize);
         wunit.commit();
     }
 
@@ -210,27 +210,27 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
 }
 }  // namespace
 
-Status repairDatabase(OperationContext* txn,
+Status repairDatabase(OperationContext* opCtx,
                       StorageEngine* engine,
                       const std::string& dbName,
                       bool preserveClonedFilesOnFailure,
                       bool backupOriginalFiles) {
-    DisableDocumentValidation validationDisabler(txn);
+    DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
-    invariant(txn->lockState()->isLocked());
+    invariant(opCtx->lockState()->isLocked());
     invariant(dbName.find('.') == string::npos);
 
     log() << "repairDatabase " << dbName << endl;
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
-    txn->checkForInterrupt();
+    opCtx->checkForInterrupt();
 
     if (engine->isMmapV1()) {
         // MMAPv1 is a layering violation so it implements its own repairDatabase.
         return static_cast<MMAPV1Engine*>(engine)->repairDatabase(
-            txn, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
+            opCtx, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
     }
 
     // These are MMAPv1 specific
@@ -242,17 +242,17 @@ Status repairDatabase(OperationContext* txn,
     }
 
     // Close the db to invalidate all current users and caches.
-    dbHolder().close(txn, dbName);
-    ON_BLOCK_EXIT([&dbName, &txn] {
+    dbHolder().close(opCtx, dbName);
+    ON_BLOCK_EXIT([&dbName, &opCtx] {
         try {
             // Open the db after everything finishes.
-            auto db = dbHolder().openDb(txn, dbName);
+            auto db = dbHolder().openDb(opCtx, dbName);
 
             // Set the minimum snapshot for all Collections in this db. This ensures that readers
             // using majority readConcern level can only use the collections after their repaired
             // versions are in the committed view.
-            auto replCoord = repl::ReplicationCoordinator::get(txn);
-            auto snapshotName = replCoord->reserveSnapshotName(txn);
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            auto snapshotName = replCoord->reserveSnapshotName(opCtx);
             replCoord->forceSnapshotCreation();  // Ensure a newer snapshot is created even if idle.
 
             for (auto&& collection : *db) {
@@ -264,7 +264,7 @@ Status repairDatabase(OperationContext* txn,
         }
     });
 
-    DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(txn, dbName);
+    DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(opCtx, dbName);
 
     std::list<std::string> colls;
     dbce->getCollectionNamespaces(&colls);
@@ -272,15 +272,15 @@ Status repairDatabase(OperationContext* txn,
     for (std::list<std::string>::const_iterator it = colls.begin(); it != colls.end(); ++it) {
         // Don't check for interrupt after starting to repair a collection otherwise we can
         // leave data in an inconsistent state. Interrupting between collections is ok, however.
-        txn->checkForInterrupt();
+        opCtx->checkForInterrupt();
 
         log() << "Repairing collection " << *it;
 
-        Status status = engine->repairRecordStore(txn, *it);
+        Status status = engine->repairRecordStore(opCtx, *it);
         if (!status.isOK())
             return status;
 
-        status = rebuildIndexesOnCollection(txn, dbce, *it);
+        status = rebuildIndexesOnCollection(opCtx, dbce, *it);
         if (!status.isOK())
             return status;
 

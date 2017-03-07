@@ -139,13 +139,13 @@ BSONArray buildMergeChunksApplyOpsPrecond(const std::vector<ChunkType>& chunksTo
  * has not been dropped and recreated since the migration began, unbeknown to the shard when the
  * command was sent.
  */
-Status checkCollectionVersionEpoch(OperationContext* txn,
+Status checkCollectionVersionEpoch(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const ChunkType& aChunk,
                                    const OID& collectionEpoch) {
     auto findResponseWith =
-        Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            txn,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
             NamespaceString(ChunkType::ConfigNS),
@@ -192,7 +192,7 @@ Status checkCollectionVersionEpoch(OperationContext* txn,
     return Status::OK();
 }
 
-Status checkChunkIsOnShard(OperationContext* txn,
+Status checkChunkIsOnShard(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& min,
                            const BSONObj& max,
@@ -204,8 +204,8 @@ Status checkChunkIsOnShard(OperationContext* txn,
 
     // Must use local read concern because we're going to perform subsequent writes.
     auto findResponseWith =
-        Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            txn,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
             NamespaceString(ChunkType::ConfigNS),
@@ -288,7 +288,7 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
 
 }  // namespace
 
-Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
+Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* opCtx,
                                                     const NamespaceString& ns,
                                                     const OID& requestEpoch,
                                                     const ChunkRange& range,
@@ -298,11 +298,11 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel
-    Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
     // Get the chunk with highest version for this namespace
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        txn,
+    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString(ChunkType::ConfigNS),
@@ -429,8 +429,8 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     }
 
     // apply the batch of updates to remote and local metadata
-    Status applyOpsStatus = Grid::get(txn)->catalogClient(txn)->applyChunkOpsDeprecated(
-        txn,
+    Status applyOpsStatus = Grid::get(opCtx)->catalogClient(opCtx)->applyChunkOpsDeprecated(
+        opCtx,
         updates.arr(),
         preCond.arr(),
         ns.ns(),
@@ -454,8 +454,8 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
         appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
         appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
 
-        Grid::get(txn)->catalogClient(txn)->logChange(
-            txn, "split", ns.ns(), logDetail.obj(), WriteConcernOptions());
+        Grid::get(opCtx)->catalogClient(opCtx)->logChange(
+            opCtx, "split", ns.ns(), logDetail.obj(), WriteConcernOptions());
     } else {
         BSONObj beforeDetailObj = logDetail.obj();
         BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -468,15 +468,15 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
             chunkDetail.append("of", newChunksSize);
             appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
 
-            Grid::get(txn)->catalogClient(txn)->logChange(
-                txn, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions());
+            Grid::get(opCtx)->catalogClient(opCtx)->logChange(
+                opCtx, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions());
         }
     }
 
     return applyOpsStatus;
 }
 
-Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
+Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* opCtx,
                                                     const NamespaceString& ns,
                                                     const OID& requestEpoch,
                                                     const std::vector<BSONObj>& chunkBoundaries,
@@ -488,11 +488,11 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     // migrations
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel
-    Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
     // Get the chunk with the highest version for this namespace
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        txn,
+    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString(ChunkType::ConfigNS),
@@ -554,8 +554,8 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     auto preCond = buildMergeChunksApplyOpsPrecond(chunksToMerge, collVersion);
 
     // apply the batch of updates to remote and local metadata
-    Status applyOpsStatus = Grid::get(txn)->catalogClient(txn)->applyChunkOpsDeprecated(
-        txn,
+    Status applyOpsStatus = Grid::get(opCtx)->catalogClient(opCtx)->applyChunkOpsDeprecated(
+        opCtx,
         updates,
         preCond,
         ns.ns(),
@@ -577,14 +577,14 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     collVersion.addToBSON(logDetail, "prevShardVersion");
     mergeVersion.addToBSON(logDetail, "mergedVersion");
 
-    Grid::get(txn)->catalogClient(txn)->logChange(
-        txn, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions());
+    Grid::get(opCtx)->catalogClient(opCtx)->logChange(
+        opCtx, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions());
 
     return applyOpsStatus;
 }
 
 StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& migratedChunk,
     const boost::optional<ChunkType>& controlChunk,
@@ -602,11 +602,11 @@ StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
     // (Note: This is not needed while we have a global lock, taken here only for consistency.)
-    Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
     // Ensure that the epoch passed in still matches the real state of the database.
 
-    auto epochCheck = checkCollectionVersionEpoch(txn, nss, migratedChunk, collectionEpoch);
+    auto epochCheck = checkCollectionVersionEpoch(opCtx, nss, migratedChunk, collectionEpoch);
     if (!epochCheck.isOK()) {
         return epochCheck;
     }
@@ -614,22 +614,22 @@ StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
     // Check that migratedChunk and controlChunk are where they should be, on fromShard.
 
     auto migratedOnShard =
-        checkChunkIsOnShard(txn, nss, migratedChunk.getMin(), migratedChunk.getMax(), fromShard);
+        checkChunkIsOnShard(opCtx, nss, migratedChunk.getMin(), migratedChunk.getMax(), fromShard);
     if (!migratedOnShard.isOK()) {
         return migratedOnShard;
     }
 
     if (controlChunk) {
         auto controlOnShard = checkChunkIsOnShard(
-            txn, nss, controlChunk->getMin(), controlChunk->getMax(), fromShard);
+            opCtx, nss, controlChunk->getMin(), controlChunk->getMax(), fromShard);
         if (!controlOnShard.isOK()) {
             return controlOnShard;
         }
     }
 
     // Must use local read concern because we will perform subsequent writes.
-    auto findResponse = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        txn,
+    auto findResponse = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString(ChunkType::ConfigNS),
@@ -671,8 +671,8 @@ StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
         nss, newMigratedChunk, newControlChunk, fromShard.toString(), toShard.toString());
 
     StatusWith<Shard::CommandResponse> applyOpsCommandResponse =
-        Grid::get(txn)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            txn,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             nss.db().toString(),
             command,

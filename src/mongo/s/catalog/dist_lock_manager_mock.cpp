@@ -59,7 +59,7 @@ DistLockManagerMock::DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalo
 
 void DistLockManagerMock::startUp() {}
 
-void DistLockManagerMock::shutDown(OperationContext* txn) {
+void DistLockManagerMock::shutDown(OperationContext* opCtx) {
     uassert(28659, "DistLockManagerMock shut down with outstanding locks present", _locks.empty());
 }
 
@@ -67,7 +67,7 @@ std::string DistLockManagerMock::getProcessID() {
     return "Mock dist lock manager process id";
 }
 
-StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationContext* txn,
+StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationContext* opCtx,
                                                                   StringData name,
                                                                   StringData whyMessage,
                                                                   const OID& lockSessionID,
@@ -95,17 +95,17 @@ StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationConte
 }
 
 StatusWith<DistLockHandle> DistLockManagerMock::tryLockWithLocalWriteConcern(
-    OperationContext* txn, StringData name, StringData whyMessage, const OID& lockSessionID) {
+    OperationContext* opCtx, StringData name, StringData whyMessage, const OID& lockSessionID) {
     // Not yet implemented
     MONGO_UNREACHABLE;
 }
 
-void DistLockManagerMock::unlockAll(OperationContext* txn, const std::string& processID) {
+void DistLockManagerMock::unlockAll(OperationContext* opCtx, const std::string& processID) {
     // Not yet implemented
     MONGO_UNREACHABLE;
 }
 
-void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lockHandle) {
+void DistLockManagerMock::unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) {
     std::vector<LockInfo>::iterator it =
         std::find_if(_locks.begin(), _locks.end(), [&lockHandle](LockInfo info) -> bool {
             return info.lockID == lockHandle;
@@ -116,7 +116,7 @@ void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lo
     _locks.erase(it);
 }
 
-void DistLockManagerMock::unlock(OperationContext* txn,
+void DistLockManagerMock::unlock(OperationContext* opCtx,
                                  const DistLockHandle& lockHandle,
                                  StringData name) {
     std::vector<LockInfo>::iterator it =
@@ -129,7 +129,7 @@ void DistLockManagerMock::unlock(OperationContext* txn,
     _locks.erase(it);
 }
 
-Status DistLockManagerMock::checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) {
+Status DistLockManagerMock::checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) {
     return Status::OK();
 }
 

@@ -56,12 +56,12 @@ using stdx::make_unique;
 
 const char* SubplanStage::kStageType = "SUBPLAN";
 
-SubplanStage::SubplanStage(OperationContext* txn,
+SubplanStage::SubplanStage(OperationContext* opCtx,
                            Collection* collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _plannerParams(params),

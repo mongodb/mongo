@@ -52,26 +52,26 @@ InitialSync::~InitialSync() {}
 
 /* initial oplog application, during initial sync, after cloning.
 */
-void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
+void InitialSync::oplogApplication(OperationContext* opCtx, const OpTime& endOpTime) {
     if (replSetForceInitialSyncFailure > 0) {
         log() << "test code invoked, forced InitialSync failure: "
               << replSetForceInitialSyncFailure;
         replSetForceInitialSyncFailure--;
         throw DBException("forced error", 0);
     }
-    _applyOplogUntil(txn, endOpTime);
+    _applyOplogUntil(opCtx, endOpTime);
 }
 
 
 /* applies oplog from "now" until endOpTime using the applier threads for initial sync*/
-void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) {
+void InitialSync::_applyOplogUntil(OperationContext* opCtx, const OpTime& endOpTime) {
     unsigned long long bytesApplied = 0;
     unsigned long long entriesApplied = 0;
     while (true) {
         OpQueue ops;
 
-        auto replCoord = repl::ReplicationCoordinator::get(txn);
-        while (!tryPopAndWaitForMore(txn, &ops, BatchLimits{})) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        while (!tryPopAndWaitForMore(opCtx, &ops, BatchLimits{})) {
             if (globalInShutdownDeprecated()) {
                 return;
             }
@@ -108,10 +108,10 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         // Tally operation information and apply batch. Don't use ops again after these lines.
         bytesApplied += ops.getBytes();
         entriesApplied += ops.getCount();
-        const OpTime lastOpTime = multiApply(txn, ops.releaseBatch());
+        const OpTime lastOpTime = multiApply(opCtx, ops.releaseBatch());
 
         replCoord->setMyLastAppliedOpTime(lastOpTime);
-        setNewTimestamp(txn->getServiceContext(), lastOpTime.getTimestamp());
+        setNewTimestamp(opCtx->getServiceContext(), lastOpTime.getTimestamp());
 
         if (globalInShutdownDeprecated()) {
             return;

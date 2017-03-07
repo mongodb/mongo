@@ -58,7 +58,7 @@ namespace dps = ::mongo::dotted_path_support;
 
 class QueryStageSortTestBase {
 public:
-    QueryStageSortTestBase() : _client(&_txn) {}
+    QueryStageSortTestBase() : _client(&_opCtx) {}
 
     void fillData() {
         for (int i = 0; i < numObj(); ++i) {
@@ -75,7 +75,7 @@ public:
     }
 
     void getRecordIds(set<RecordId>* out, Collection* coll) {
-        auto cursor = coll->getCursor(&_txn);
+        auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
         }
@@ -97,7 +97,7 @@ public:
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
             member->recordId = *it;
-            member->obj = coll->docFor(&_txn, *it);
+            member->obj = coll->docFor(&_opCtx, *it);
             ws->transitionToRecordIdAndObj(id);
             ms->pushBack(id);
         }
@@ -110,7 +110,7 @@ public:
     PlanExecutor* makePlanExecutorWithSortStage(Collection* coll) {
         // Build the mock scan stage which feeds the data.
         auto ws = make_unique<WorkingSet>();
-        auto queuedDataStage = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
 
         SortStageParams params;
@@ -119,14 +119,14 @@ public:
         params.limit = limit();
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_txn, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
+            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
 
-        auto ss = make_unique<SortStage>(&_txn, params, ws.get(), keyGenStage.release());
+        auto ss = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
-        auto statusWithPlanExecutor =
-            PlanExecutor::make(&_txn, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_opCtx, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
         return statusWithPlanExecutor.getValue().release();
     }
@@ -147,7 +147,7 @@ public:
      */
     void sortAndCheck(int direction, Collection* coll) {
         auto ws = make_unique<WorkingSet>();
-        auto queuedDataStage = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
 
         // Insert a mix of the various types of data.
         insertVarietyOfObjects(ws.get(), queuedDataStage.get(), coll);
@@ -158,16 +158,16 @@ public:
         params.limit = limit();
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_txn, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
+            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
 
-        auto sortStage = make_unique<SortStage>(&_txn, params, ws.get(), keyGenStage.release());
+        auto sortStage = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
         auto fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), sortStage.release(), nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), sortStage.release(), nullptr, coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -222,7 +222,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient _client;
 };
 
@@ -235,12 +235,12 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -257,12 +257,12 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -288,12 +288,12 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -313,12 +313,12 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -347,7 +347,7 @@ public:
         // Since it's in the WorkingSet, the updates should not be reflected in the output.
         exec->saveState();
         set<RecordId>::iterator it = recordIds.begin();
-        Snapshotted<BSONObj> oldDoc = coll->docFor(&_txn, *it);
+        Snapshotted<BSONObj> oldDoc = coll->docFor(&_opCtx, *it);
 
         OID updatedId = oldDoc.value().getField("_id").OID();
         SnapshotId idBeforeUpdate = oldDoc.snapshotId();
@@ -358,8 +358,8 @@ public:
         OplogUpdateEntryArgs args;
         args.ns = coll->ns().ns();
         {
-            WriteUnitOfWork wuow(&_txn);
-            coll->updateDocument(&_txn, *it, oldDoc, newDoc, false, false, NULL, &args);
+            WriteUnitOfWork wuow(&_opCtx);
+            coll->updateDocument(&_opCtx, *it, oldDoc, newDoc, false, false, NULL, &args);
             wuow.commit();
         }
         exec->restoreState();
@@ -374,10 +374,10 @@ public:
         // should be fetched.
         exec->saveState();
         while (it != recordIds.end()) {
-            oldDoc = coll->docFor(&_txn, *it);
+            oldDoc = coll->docFor(&_opCtx, *it);
             {
-                WriteUnitOfWork wuow(&_txn);
-                coll->updateDocument(&_txn, *it++, oldDoc, newDoc, false, false, NULL, &args);
+                WriteUnitOfWork wuow(&_opCtx);
+                coll->updateDocument(&_opCtx, *it++, oldDoc, newDoc, false, false, NULL, &args);
                 wuow.commit();
             }
         }
@@ -422,12 +422,12 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -457,8 +457,8 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         set<RecordId>::iterator it = recordIds.begin();
         {
-            WriteUnitOfWork wuow(&_txn);
-            coll->deleteDocument(&_txn, *it++, nullOpDebug);
+            WriteUnitOfWork wuow(&_opCtx);
+            coll->deleteDocument(&_opCtx, *it++, nullOpDebug);
             wuow.commit();
         }
         exec->restoreState();
@@ -473,8 +473,8 @@ public:
         exec->saveState();
         while (it != recordIds.end()) {
             {
-                WriteUnitOfWork wuow(&_txn);
-                coll->deleteDocument(&_txn, *it++, nullOpDebug);
+                WriteUnitOfWork wuow(&_opCtx);
+                coll->deleteDocument(&_opCtx, *it++, nullOpDebug);
                 wuow.commit();
             }
         }
@@ -521,17 +521,17 @@ public:
     }
 
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
         auto ws = make_unique<WorkingSet>();
-        auto queuedDataStage = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
 
         for (int i = 0; i < numObj(); ++i) {
             {
@@ -557,16 +557,16 @@ public:
         params.limit = 0;
 
         auto keyGenStage = make_unique<SortKeyGeneratorStage>(
-            &_txn, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
+            &_opCtx, queuedDataStage.release(), ws.get(), params.pattern, BSONObj(), nullptr);
 
-        auto sortStage = make_unique<SortStage>(&_txn, params, ws.get(), keyGenStage.release());
+        auto sortStage = make_unique<SortStage>(&_opCtx, params, ws.get(), keyGenStage.release());
 
         auto fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), sortStage.release(), nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), sortStage.release(), nullptr, coll);
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);

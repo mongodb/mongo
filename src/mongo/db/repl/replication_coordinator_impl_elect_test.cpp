@@ -157,15 +157,15 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
         << getReplCoord()->getMemberState().toString();
     ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
 
-    const auto txnPtr = makeOperationContext();
-    auto& txn = *txnPtr;
+    const auto opCtxPtr = makeOperationContext();
+    auto& opCtx = *opCtxPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-    getReplCoord()->signalDrainComplete(&txn, getReplCoord()->getTerm());
+    getReplCoord()->signalDrainComplete(&opCtx, getReplCoord()->getTerm());
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -191,15 +191,15 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
         << getReplCoord()->getMemberState().toString();
     ASSERT(getReplCoord()->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
 
-    const auto txnPtr = makeOperationContext();
-    auto& txn = *txnPtr;
+    const auto opCtxPtr = makeOperationContext();
+    auto& opCtx = *opCtxPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-    getReplCoord()->signalDrainComplete(&txn, getReplCoord()->getTerm());
+    getReplCoord()->signalDrainComplete(&opCtx, getReplCoord()->getTerm());
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -218,7 +218,7 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenAllNodesVoteYea) {
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345")));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     getReplCoord()->setMyLastAppliedOpTime(OpTime{{100, 1}, 0});
     getExternalState()->setLastOpTime(OpTime{{100, 1}, 0});
 
@@ -246,7 +246,7 @@ TEST_F(ReplCoordElectTest, ElectionFailsWhenOneNodeVotesNay) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -293,7 +293,7 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -341,7 +341,7 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -363,7 +363,7 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
 TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version"
@@ -419,7 +419,7 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     args.force = false;
     args.newConfigObj = config.toBSON();
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
-                  getReplCoord()->processReplSetReconfig(&txn, args, &result));
+                  getReplCoord()->processReplSetReconfig(&opCtx, args, &result));
 
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
     startCapturingLogMessages();
@@ -477,7 +477,7 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
 
     auto replCoord = getReplCoord();
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -583,8 +583,8 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringFresh
         true};
 
     BSONObjBuilder result;
-    const auto txn = makeOperationContext();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), config, &result));
+    const auto opCtx = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), config, &result));
     // Wait until election cancels.
     net->enterNetwork();
     net->runReadyNetworkOperations();
@@ -629,8 +629,8 @@ TEST_F(ReplCoordElectTest, NodeCancelsElectionUponReceivingANewConfigDuringElect
         true};
 
     BSONObjBuilder result;
-    const auto txn = makeOperationContext();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), config, &result));
+    const auto opCtx = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), config, &result));
     // Wait until election cancels.
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();

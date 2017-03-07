@@ -43,7 +43,7 @@ class ClusterWriter {
 public:
     ClusterWriter(bool autoSplit, int timeoutMillis);
 
-    void write(OperationContext* txn,
+    void write(OperationContext* opCtx,
                const BatchedCommandRequest& request,
                BatchedCommandResponse* response);
 
@@ -61,7 +61,7 @@ private:
  * max size of a shard attempt to split the chunk. This call is opportunistic and swallows any
  * errors.
  */
-void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
+void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                            ChunkManager* manager,
                                            Chunk* chunk,
                                            long dataWritten);

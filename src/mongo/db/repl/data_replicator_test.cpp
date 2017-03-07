@@ -265,31 +265,32 @@ protected:
     void setUp() override {
         executor::ThreadPoolExecutorTest::setUp();
         _storageInterface = stdx::make_unique<StorageInterfaceMock>();
-        _storageInterface->createOplogFn = [this](OperationContext* txn,
+        _storageInterface->createOplogFn = [this](OperationContext* opCtx,
                                                   const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
         _storageInterface->insertDocumentFn =
-            [this](OperationContext* txn, const NamespaceString& nss, const BSONObj& doc) {
+            [this](OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
                 LockGuard lock(_storageInterfaceWorkDoneMutex);
                 ++_storageInterfaceWorkDone.documentsInsertedCount;
                 return Status::OK();
             };
         _storageInterface->insertDocumentsFn = [this](
-            OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
+            OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.insertedOplogEntries = true;
             ++_storageInterfaceWorkDone.oplogEntriesInserted;
             return Status::OK();
         };
-        _storageInterface->dropCollFn = [this](OperationContext* txn, const NamespaceString& nss) {
+        _storageInterface->dropCollFn = [this](OperationContext* opCtx,
+                                               const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns());
             return Status::OK();
         };
-        _storageInterface->dropUserDBsFn = [this](OperationContext* txn) {
+        _storageInterface->dropUserDBsFn = [this](OperationContext* opCtx) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.droppedUserDBs = true;
             return Status::OK();
@@ -577,66 +578,66 @@ const std::uint32_t maxAttempts = 1U;
 
 TEST_F(DataReplicatorTest, StartupReturnsIllegalOperationIfAlreadyActive) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
     ASSERT_FALSE(dr->isActive());
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(dr->isActive());
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr->startup(txn.get(), maxAttempts));
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(dr->isActive());
 }
 
 TEST_F(DataReplicatorTest, StartupReturnsShutdownInProgressIfDataReplicatorIsShuttingDown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
     ASSERT_FALSE(dr->isActive());
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(dr->isActive());
     // SyncSourceSelector returns an invalid sync source so DataReplicator is stuck waiting for
     // another sync source in 'Options::syncSourceRetryWait' ms.
     ASSERT_OK(dr->shutdown());
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(txn.get(), maxAttempts));
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(opCtx.get(), maxAttempts));
 }
 
 TEST_F(DataReplicatorTest, StartupReturnsShutdownInProgressIfExecutorIsShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
     getExecutor().shutdown();
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(txn.get(), maxAttempts));
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(opCtx.get(), maxAttempts));
     ASSERT_FALSE(dr->isActive());
 
     // Cannot startup data replicator again since it's in the Complete state.
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(txn.get(), maxAttempts));
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(opCtx.get(), maxAttempts));
 }
 
 TEST_F(DataReplicatorTest, ShutdownTransitionsStateToCompleteIfCalledBeforeStartup) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
     ASSERT_OK(dr->shutdown());
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(txn.get(), maxAttempts));
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(opCtx.get(), maxAttempts));
     // Data replicator is inactive when it's in the Complete state.
     ASSERT_FALSE(dr->isActive());
 }
 
 TEST_F(DataReplicatorTest, StartupSetsInitialSyncFlagOnSuccess) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Initial sync flag should not be set before starting.
-    ASSERT_FALSE(getStorage().getInitialSyncFlag(txn.get()));
+    ASSERT_FALSE(getStorage().getInitialSyncFlag(opCtx.get()));
 
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(dr->isActive());
 
     // Initial sync flag should be set.
-    ASSERT_TRUE(getStorage().getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(getStorage().getInitialSyncFlag(opCtx.get()));
 }
 
 TEST_F(DataReplicatorTest, DataReplicatorReturnsCallbackCanceledIfShutdownImmediatelyAfterStartup) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     // This will cancel the _startInitialSyncAttemptCallback() task scheduled by startup().
     ASSERT_OK(dr->shutdown());
@@ -655,13 +656,13 @@ TEST_F(DataReplicatorTest, DataReplicatorReturnsCallbackCanceledIfShutdownImmedi
 TEST_F(DataReplicatorTest,
        DataReplicatorRetriesSyncSourceSelectionIfChooseNewSyncSourceReturnsInvalidSyncSource) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Override chooseNewSyncSource() result in SyncSourceSelectorMock before calling startup()
     // because DataReplicator will look for a valid sync source immediately after startup.
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
 
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     // Run first sync source selection attempt.
     executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
@@ -697,13 +698,13 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorReturnsInitialSyncOplogSourceMissingIfNoValidSyncSourceCanBeFoundAfterTenFailedChooseSyncSourceAttempts) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Override chooseNewSyncSource() result in SyncSourceSelectorMock before calling startup()
     // because DataReplicator will look for a valid sync source immediately after startup.
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
 
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     _simulateChooseSyncSourceFailure(getNet(), _options.syncSourceRetryWait);
 
@@ -718,12 +719,12 @@ TEST_F(
 TEST_F(DataReplicatorTest,
        DataReplicatorRetriesInitialSyncUpToMaxAttemptsAndReturnsLastAttemptError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
 
     const std::uint32_t initialSyncMaxAttempts = 3U;
-    ASSERT_OK(dr->startup(txn.get(), initialSyncMaxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), initialSyncMaxAttempts));
 
     auto net = getNet();
     for (std::uint32_t i = 0; i < initialSyncMaxAttempts; ++i) {
@@ -748,10 +749,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsCallbackCanceledIfShutdownWhileRetryingSyncSourceSelection) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -774,11 +775,11 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorReturnsScheduleErrorIfTaskExecutorFailsToScheduleNextChooseSyncSourceCallback) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
     _executorProxy->shouldFailScheduleWorkAt = true;
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     dr->join();
 
@@ -788,13 +789,13 @@ TEST_F(
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsScheduleErrorIfTaskExecutorFailsToScheduleNextInitialSyncAttempt) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
 
     ASSERT_EQUALS(DataReplicator::State::kPreStart, dr->getState_forTest());
 
-    ASSERT_OK(dr->startup(txn.get(), 2U));
+    ASSERT_OK(dr->startup(opCtx.get(), 2U));
     ASSERT_EQUALS(DataReplicator::State::kRunning, dr->getState_forTest());
 
     // Advance clock so that we run all but the last sync source callback.
@@ -816,7 +817,7 @@ TEST_F(DataReplicatorTest,
 // the completion callback function throws an exception.
 TEST_F(DataReplicatorTest, DataReplicatorTransitionsToCompleteWhenFinishCallbackThrowsException) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _onCompletion = [this](const StatusWith<OpTimeWithHash>& lastApplied) {
         _lastApplied = lastApplied;
@@ -824,7 +825,7 @@ TEST_F(DataReplicatorTest, DataReplicatorTransitionsToCompleteWhenFinishCallback
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     ASSERT_OK(dr->shutdown());
     dr->join();
@@ -862,9 +863,9 @@ TEST_F(DataReplicatorTest, DataReplicatorResetsOnCompletionCallbackFunctionPoint
         });
     ON_BLOCK_EXIT([this]() { getExecutor().shutdown(); });
 
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     sharedCallbackData.reset();
     ASSERT_FALSE(sharedCallbackStateDestroyed);
@@ -891,17 +892,17 @@ TEST_F(DataReplicatorTest, DataReplicatorRecreatesOplogAndDropsReplicatedDatabas
     // We are not interested in proceeding beyond the oplog creation stage so we inject a failure
     // after setting '_storageInterfaceWorkDone.createOplogCalled' to true.
     auto oldCreateOplogFn = _storageInterface->createOplogFn;
-    _storageInterface->createOplogFn = [oldCreateOplogFn](OperationContext* txn,
+    _storageInterface->createOplogFn = [oldCreateOplogFn](OperationContext* opCtx,
                                                           const NamespaceString& nss) {
-        oldCreateOplogFn(txn, nss);
+        oldCreateOplogFn(opCtx, nss);
         return Status(ErrorCodes::OperationFailed, "oplog creation failed");
     };
 
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     dr->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
@@ -913,7 +914,7 @@ TEST_F(DataReplicatorTest, DataReplicatorRecreatesOplogAndDropsReplicatedDatabas
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughGetRollbackIdScheduleError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // replSetGetRBID is the first remote command to be scheduled by the data replicator after
     // creating the oplog collection.
@@ -925,7 +926,7 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughGetRollbackIdScheduleError
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     dr->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
@@ -942,18 +943,18 @@ TEST_F(
     // down before returning from createOplog() to make the scheduleRemoteCommand() call for
     // replSetGetRBID fail.
     auto oldCreateOplogFn = _storageInterface->createOplogFn;
-    _storageInterface->createOplogFn = [oldCreateOplogFn, this](OperationContext* txn,
+    _storageInterface->createOplogFn = [oldCreateOplogFn, this](OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
-        auto status = oldCreateOplogFn(txn, nss);
+        auto status = oldCreateOplogFn(opCtx, nss);
         getExecutor().shutdown();
         return status;
     };
 
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     dr->join();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _lastApplied);
@@ -964,14 +965,14 @@ TEST_F(
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsRollbackCheckerOnShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
 
     ASSERT_EQUALS(DataReplicator::State::kPreStart, dr->getState_forTest());
 
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
     ASSERT_EQUALS(DataReplicator::State::kRunning, dr->getState_forTest());
 
     auto net = getNet();
@@ -1000,10 +1001,10 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsRollbackCheckerOnShutdown) {
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughRollbackCheckerCallbackError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1021,7 +1022,7 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughRollbackCheckerCallbackErr
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughLastOplogEntryFetcherScheduleError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // The last oplog entry fetcher is the first component that sends a find command so we reject
     // any find commands and save the request for inspection at the end of this test case.
@@ -1033,7 +1034,7 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughLastOplogEntryFetcherSched
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1056,10 +1057,10 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughLastOplogEntryFetcherSched
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughLastOplogEntryFetcherCallbackError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1082,10 +1083,10 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughLastOplogEntryFetcherCallb
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsLastOplogEntryFetcherOnShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1108,10 +1109,10 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsLastOplogEntryFetcherOnShutdown)
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsNoMatchingDocumentIfLastOplogEntryFetcherReturnsEmptyBatchOfDocuments) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1132,10 +1133,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorResendsFindCommandIfLastOplogEntryFetcherReturnsRetriableError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     executor::NetworkInterfaceMock::InNetworkGuard guard(net);
@@ -1159,10 +1160,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsNoSuchKeyIfLastOplogEntryFetcherReturnsEntryWithMissingHash) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1183,10 +1184,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsNoSuchKeyIfLastOplogEntryFetcherReturnsEntryWithMissingTimestamp) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1207,12 +1208,12 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorPassesThroughErrorFromDataReplicatorExternalStateGetCurrentConfig) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     getExternalState()->replSetConfigResult = Status(ErrorCodes::OperationFailed, "");
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1232,7 +1233,7 @@ TEST_F(DataReplicatorTest,
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughOplogFetcherScheduleError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Make the tailable oplog query fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
@@ -1247,7 +1248,7 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughOplogFetcherScheduleError)
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1273,10 +1274,10 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughOplogFetcherScheduleError)
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughOplogFetcherCallbackError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1311,10 +1312,10 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughOplogFetcherCallbackError)
 TEST_F(DataReplicatorTest,
        DataReplicatorSucceedsOnEarlyOplogFetcherCompletionIfThereAreNoOperationsToApply) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1363,10 +1364,10 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorSucceedsOnEarlyOplogFetcherCompletionIfThereAreEnoughOperationsInTheOplogBufferToReachEndTimestamp) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1412,10 +1413,10 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorReturnsRemoteResultsUnavailableOnEarlyOplogFetcherCompletionIfThereAreNotEnoughOperationsInTheOplogBufferToReachEndTimestamp) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1456,7 +1457,7 @@ TEST_F(
 TEST_F(DataReplicatorTest,
        DataReplicatorPassesThroughDatabasesClonerScheduleErrorAndCancelsOplogFetcher) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Make the listDatabases command fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
@@ -1470,7 +1471,7 @@ TEST_F(DataReplicatorTest,
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1504,10 +1505,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorPassesThroughDatabasesClonerCallbackErrorAndCancelsOplogFetcher) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1544,10 +1545,10 @@ TEST_F(DataReplicatorTest,
 
 TEST_F(DataReplicatorTest, DataReplicatorIgnoresLocalDatabasesWhenCloningDatabases) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1604,10 +1605,10 @@ TEST_F(DataReplicatorTest, DataReplicatorIgnoresLocalDatabasesWhenCloningDatabas
 TEST_F(DataReplicatorTest,
        DataReplicatorIgnoresDatabaseInfoDocumentWithoutNameFieldWhenCloningDatabases) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1670,10 +1671,10 @@ TEST_F(DataReplicatorTest,
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsBothOplogFetcherAndDatabasesClonerOnShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1697,7 +1698,7 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsBothOplogFetcherAndDatabasesClon
 TEST_F(DataReplicatorTest,
        DataReplicatorPassesThroughSecondLastOplogEntryFetcherScheduleErrorAndCancelsOplogFetcher) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Make the second last oplog entry fetcher command fail. Allow all other requests to be
     // scheduled.
@@ -1718,7 +1719,7 @@ TEST_F(DataReplicatorTest,
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1758,10 +1759,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorPassesThroughSecondLastOplogEntryFetcherCallbackErrorAndCancelsOplogFetcher) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1810,10 +1811,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorCancelsBothSecondLastOplogEntryFetcherAndOplogFetcherOnShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1857,10 +1858,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorCancelsSecondLastOplogEntryFetcherOnOplogFetcherCallbackError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -1914,10 +1915,10 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorReturnsTypeMismatchErrorWhenSecondLastOplogEntryFetcherReturnsMalformedDocument) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -1963,10 +1964,10 @@ TEST_F(
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsOplogOutOfOrderIfStopTimestampPrecedesBeginTimestamp) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     {
@@ -2010,7 +2011,7 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorPassesThroughInsertOplogSeedDocumentErrorAfterDataCloningFinishesWithNoOperationsToApply) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     NamespaceString insertDocumentNss;
     BSONObj insertDocumentDoc;
@@ -2022,7 +2023,7 @@ TEST_F(
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2069,7 +2070,7 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorReturnsCallbackCanceledAndDoesNotScheduleRollbackCheckerIfShutdownAfterInsertingInsertOplogSeedDocument) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     NamespaceString insertDocumentNss;
     BSONObj insertDocumentDoc;
@@ -2082,7 +2083,7 @@ TEST_F(
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2129,7 +2130,7 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorPassesThroughRollbackCheckerScheduleErrorAfterCloningFinishesWithNoOperationsToApply) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Make the second replSetGetRBID command fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
@@ -2147,7 +2148,7 @@ TEST_F(
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2192,10 +2193,10 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorPassesThroughRollbackCheckerCallbackErrorAfterCloningFinishesWithNoOperationsToApply) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2245,10 +2246,10 @@ TEST_F(
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsLastRollbackCheckerOnShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2299,10 +2300,10 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsLastRollbackCheckerOnShutdown) {
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsLastRollbackCheckerOnOplogFetcherCallbackError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2357,10 +2358,10 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsLastRollbackCheckerOnOplogFetche
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsUnrecoverableRollbackErrorIfSyncSourceRolledBackAfterCloningData) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2405,12 +2406,12 @@ TEST_F(DataReplicatorTest,
 
 TEST_F(DataReplicatorTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCloning) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     auto oplogEntry = makeOplogEntry(1);
     auto net = getNet();
@@ -2488,17 +2489,17 @@ TEST_F(DataReplicatorTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfte
     dr->join();
     ASSERT_EQUALS(OplogEntry(oplogEntry).getOpTime(), unittest::assertGet(_lastApplied).opTime);
     ASSERT_EQUALS(oplogEntry["h"].Long(), unittest::assertGet(_lastApplied).value);
-    ASSERT_FALSE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_FALSE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 }
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughGetNextApplierBatchScheduleError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -2547,12 +2548,12 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughGetNextApplierBatchSchedul
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughSecondGetNextApplierBatchScheduleError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -2601,12 +2602,12 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughSecondGetNextApplierBatchS
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsGetNextApplierBatchOnShutdown) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -2651,12 +2652,12 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsGetNextApplierBatchOnShutdown) {
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughGetNextApplierBatchInLockError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     // _getNextApplierBatch_inlock() returns BadValue when it gets an oplog entry with an unexpected
     // version (not OplogEntry::kOplogVersion).
@@ -2715,12 +2716,12 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorReturnsEmptyBatchFromGetNextApplierBatchInLockIfRsSyncApplyStopFailPointIsEnabled) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     // _getNextApplierBatch_inlock() returns BadValue when it gets an oplog entry with an unexpected
     // version (not OplogEntry::kOplogVersion).
@@ -2790,12 +2791,12 @@ TEST_F(
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsNoSuchKeyIfApplierBatchContainsAnOplogEntryWithoutHash) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     // This oplog entry (without a required "h" field) will be read by OplogFetcher and inserted
     // into OplogBuffer to be retrieved by _getNextApplierBatch_inlock().
@@ -2848,12 +2849,12 @@ TEST_F(DataReplicatorTest,
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughMultiApplierScheduleError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(txn.get()));
+    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -2920,14 +2921,14 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughMultiApplierScheduleError)
 
 TEST_F(DataReplicatorTest, DataReplicatorPassesThroughMultiApplierCallbackError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     getExternalState()->multiApplyFn =
         [](OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn) {
             return Status(ErrorCodes::OperationFailed, "multiApply failed");
         };
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -2975,10 +2976,10 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughMultiApplierCallbackError)
 
 TEST_F(DataReplicatorTest, DataReplicatorCancelsGetNextApplierBatchCallbackOnOplogFetcherError) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -3026,10 +3027,10 @@ TEST_F(DataReplicatorTest, DataReplicatorCancelsGetNextApplierBatchCallbackOnOpl
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsLastAppliedOnReachingStopTimestampAfterApplyingOneBatch) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto lastOp = makeOplogEntry(2);
 
@@ -3088,10 +3089,10 @@ TEST_F(DataReplicatorTest,
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsLastAppliedOnReachingStopTimestampAfterApplyingMultipleBatches) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     // To make DataReplicator apply multiple batches, we make the third and last operation a command
     // so that it will go into a separate batch from the second operation. First operation is the
@@ -3186,7 +3187,7 @@ TEST_F(
     DataReplicatorTest,
     DataReplicatorSchedulesLastOplogEntryFetcherToGetNewStopTimestampIfMissingDocumentsHaveBeenFetchedDuringMultiInitialSyncApply) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // Override DataReplicatorExternalState::_multiInitialSyncApply() so that it will also fetch a
     // missing document.
@@ -3210,7 +3211,7 @@ TEST_F(
     };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     // Use command for third and last operation to ensure we have two batches to apply.
     auto lastOp = makeOplogEntry(3, "c");
@@ -3281,7 +3282,7 @@ TEST_F(
 TEST_F(DataReplicatorTest,
        DataReplicatorReturnsInvalidSyncSourceWhenFailInitialSyncWithBadHostFailpointIsEnabled) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     // This fail point makes chooseSyncSourceCallback fail with an InvalidSyncSource error.
     auto failPoint = getGlobalFailPointRegistry()->getFailPoint("failInitialSyncWithBadHost");
@@ -3289,7 +3290,7 @@ TEST_F(DataReplicatorTest,
     ON_BLOCK_EXIT([failPoint]() { failPoint->setMode(FailPoint::off); });
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     dr->join();
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _lastApplied);
@@ -3297,10 +3298,10 @@ TEST_F(DataReplicatorTest,
 
 TEST_F(DataReplicatorTest, OplogOutOfOrderOnOplogFetchFinish) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+    ASSERT_OK(dr->startup(opCtx.get(), maxAttempts));
 
     auto net = getNet();
     int baseRollbackId = 1;
@@ -3346,10 +3347,10 @@ TEST_F(DataReplicatorTest, OplogOutOfOrderOnOplogFetchFinish) {
 
 TEST_F(DataReplicatorTest, GetInitialSyncProgressReturnsCorrectProgress) {
     auto dr = &getDR();
-    auto txn = makeOpCtx();
+    auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
-    ASSERT_OK(dr->startup(txn.get(), 2U));
+    ASSERT_OK(dr->startup(opCtx.get(), 2U));
 
     auto net = getNet();
     int baseRollbackId = 1;

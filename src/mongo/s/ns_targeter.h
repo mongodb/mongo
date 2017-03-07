@@ -83,7 +83,7 @@ public:
      *
      * Returns !OK with message if document could not be targeted for other reasons.
      */
-    virtual Status targetInsert(OperationContext* txn,
+    virtual Status targetInsert(OperationContext* opCtx,
                                 const BSONObj& doc,
                                 ShardEndpoint** endpoint) const = 0;
 
@@ -92,7 +92,7 @@ public:
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetUpdate(OperationContext* txn,
+    virtual Status targetUpdate(OperationContext* opCtx,
                                 const BatchedUpdateDocument& updateDoc,
                                 std::vector<ShardEndpoint*>* endpoints) const = 0;
 
@@ -101,7 +101,7 @@ public:
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetDelete(OperationContext* txn,
+    virtual Status targetDelete(OperationContext* opCtx,
                                 const BatchedDeleteDocument& deleteDoc,
                                 std::vector<ShardEndpoint*>* endpoints) const = 0;
 
@@ -147,7 +147,7 @@ public:
      * NOTE: This function may block for shared resources or network calls.
      * Returns !OK with message if could not refresh
      */
-    virtual Status refreshIfNeeded(OperationContext* txn, bool* wasChanged) = 0;
+    virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
 };
 
 /**

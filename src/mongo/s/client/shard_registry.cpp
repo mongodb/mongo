@@ -103,7 +103,7 @@ ConnectionString ShardRegistry::getConfigServerConnectionString() const {
     return getConfigShard()->getConnString();
 }
 
-StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* txn,
+StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,
                                                       const ShardId& shardId) {
     // If we know about the shard, return it.
     auto shard = _data.findByShardId(shardId);
@@ -112,7 +112,7 @@ StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* txn,
     }
 
     // If we can't find the shard, attempt to reload the ShardRegistry.
-    bool didReload = reload(txn);
+    bool didReload = reload(opCtx);
     shard = _data.findByShardId(shardId);
 
     // If we found the shard, return it.
@@ -128,7 +128,7 @@ StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* txn,
 
     // If we did not perform the reload ourselves (because there was a concurrent reload), force a
     // reload again to ensure that we have seen data at least as up to date as our first reload.
-    reload(txn);
+    reload(opCtx);
     shard = _data.findByShardId(shardId);
 
     if (shard) {
@@ -226,10 +226,10 @@ void ShardRegistry::_internalReload(const CallbackArgs& cbArgs) {
     }
 
     Client::initThreadIfNotAlready("shard registry reload");
-    auto txn = cc().makeOperationContext();
+    auto opCtx = cc().makeOperationContext();
 
     try {
-        reload(txn.get());
+        reload(opCtx.get());
     } catch (const DBException& e) {
         log() << "Periodic reload of shard registry failed " << causedBy(e) << "; will retry after "
               << kRefreshPeriod;
@@ -257,7 +257,7 @@ bool ShardRegistry::isUp() const {
     return _isUp;
 }
 
-bool ShardRegistry::reload(OperationContext* txn) {
+bool ShardRegistry::reload(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> reloadLock(_reloadMutex);
 
     if (_reloadState == ReloadState::Reloading) {
@@ -290,7 +290,7 @@ bool ShardRegistry::reload(OperationContext* txn) {
     });
 
 
-    ShardRegistryData currData(txn, _shardFactory.get());
+    ShardRegistryData currData(opCtx, _shardFactory.get());
     currData.addConfigShard(_data.getConfigShard());
     _data.swap(currData);
 
@@ -325,10 +325,10 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
                                                            const std::string& newConnectionString) {
     // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
     Client::initThread("replSetChange");
-    auto txn = cc().makeOperationContext();
+    auto opCtx = cc().makeOperationContext();
 
     try {
-        std::shared_ptr<Shard> s = Grid::get(txn.get())->shardRegistry()->lookupRSName(setName);
+        std::shared_ptr<Shard> s = Grid::get(opCtx.get())->shardRegistry()->lookupRSName(setName);
         if (!s) {
             LOG(1) << "shard not found for set: " << newConnectionString
                    << " when attempting to inform config servers of updated set membership";
@@ -340,13 +340,15 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
             return;
         }
 
-        auto status = Grid::get(txn.get())->catalogClient(txn.get())->updateConfigDocument(
-            txn.get(),
-            ShardType::ConfigNS,
-            BSON(ShardType::name(s->getId().toString())),
-            BSON("$set" << BSON(ShardType::host(newConnectionString))),
-            false,
-            ShardingCatalogClient::kMajorityWriteConcern);
+        auto status =
+            Grid::get(opCtx.get())
+                ->catalogClient(opCtx.get())
+                ->updateConfigDocument(opCtx.get(),
+                                       ShardType::ConfigNS,
+                                       BSON(ShardType::name(s->getId().toString())),
+                                       BSON("$set" << BSON(ShardType::host(newConnectionString))),
+                                       false,
+                                       ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             error() << "RSChangeWatcher: could not update config db for set: " << setName
                     << " to: " << newConnectionString << causedBy(status.getStatus());
@@ -360,13 +362,13 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
 
 ////////////// ShardRegistryData //////////////////
 
-ShardRegistryData::ShardRegistryData(OperationContext* txn, ShardFactory* shardFactory) {
-    _init(txn, shardFactory);
+ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory) {
+    _init(opCtx, shardFactory);
 }
 
-void ShardRegistryData::_init(OperationContext* txn, ShardFactory* shardFactory) {
-    auto shardsStatus =
-        grid.catalogClient(txn)->getAllShards(txn, repl::ReadConcernLevel::kMajorityReadConcern);
+void ShardRegistryData::_init(OperationContext* opCtx, ShardFactory* shardFactory) {
+    auto shardsStatus = grid.catalogClient(opCtx)->getAllShards(
+        opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
     if (!shardsStatus.isOK()) {
         uasserted(shardsStatus.getStatus().code(),

@@ -81,8 +81,8 @@ public:
      * Must be called with some lock held on the specific collection being looked up and the
      * returned pointer should never be stored.
      */
-    static CollectionShardingState* get(OperationContext* txn, const NamespaceString& nss);
-    static CollectionShardingState* get(OperationContext* txn, const std::string& ns);
+    static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
+    static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
     /**
      * Returns the chunk metadata for the collection.
@@ -96,7 +96,7 @@ public:
      *
      * Must always be called with an exclusive collection lock.
      */
-    void refreshMetadata(OperationContext* txn, std::unique_ptr<CollectionMetadata> newMetadata);
+    void refreshMetadata(OperationContext* opCtx, std::unique_ptr<CollectionMetadata> newMetadata);
 
     /**
      * Marks the collection as not sharded at stepdown time so that no filtering will occur for
@@ -128,14 +128,14 @@ public:
      * collection X lock. May not be called if there is a migration source manager already
      * installed. Must be followed by a call to clearMigrationSourceManager.
      */
-    void setMigrationSourceManager(OperationContext* txn, MigrationSourceManager* sourceMgr);
+    void setMigrationSourceManager(OperationContext* opCtx, MigrationSourceManager* sourceMgr);
 
     /**
      * Removes a migration source manager from this collection's sharding state. Must be called with
      * collection X lock. May not be called if there isn't a migration source manager installed
      * already through a previous call to setMigrationSourceManager.
      */
-    void clearMigrationSourceManager(OperationContext* txn);
+    void clearMigrationSourceManager(OperationContext* opCtx);
 
     /**
      * Checks whether the shard version in the context is compatible with the shard version of the
@@ -146,7 +146,7 @@ public:
      * response is constructed, this function should be the only means of checking for shard version
      * match.
      */
-    void checkShardVersionOrThrow(OperationContext* txn);
+    void checkShardVersionOrThrow(OperationContext* opCtx);
 
     /**
      * Returns whether this collection is sharded. Valid only if mongoD is primary.
@@ -157,15 +157,15 @@ public:
     // Replication subsystem hooks. If this collection is serving as a source for migration, these
     // methods inform it of any changes to its contents.
 
-    bool isDocumentInMigratingChunk(OperationContext* txn, const BSONObj& doc);
+    bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc);
 
-    void onInsertOp(OperationContext* txn, const BSONObj& insertedDoc);
+    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc);
 
-    void onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc);
+    void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc);
 
-    void onDeleteOp(OperationContext* txn, const DeleteState& deleteState);
+    void onDeleteOp(OperationContext* opCtx, const DeleteState& deleteState);
 
-    void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
+    void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
     MetadataManager* getMetadataManagerForTest() {
         return &_metadataManager;
@@ -176,7 +176,7 @@ private:
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *
-     * txn - Operation context from which to retrieve the operation's expected version.
+     * opCtx - Operation context from which to retrieve the operation's expected version.
      * errmsg (out) - On false return contains an explanatory error message.
      * expectedShardVersion (out) - On false return contains the expected collection version on this
      *  shard. Obtained from the operation sharding state.
@@ -186,7 +186,7 @@ private:
      * Returns true if the expected collection version on the shard matches its actual version on
      * the shard and false otherwise. Upon false return, the output parameters will be set.
      */
-    bool _checkShardVersionOk(OperationContext* txn,
+    bool _checkShardVersionOk(OperationContext* opCtx,
                               std::string* errmsg,
                               ChunkVersion* expectedShardVersion,
                               ChunkVersion* actualShardVersion);

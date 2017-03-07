@@ -53,24 +53,24 @@ class DirectClientScope {
     MONGO_DISALLOW_COPYING(DirectClientScope);
 
 public:
-    explicit DirectClientScope(OperationContext* txn)
-        : _txn(txn), _prev(_txn->getClient()->isInDirectClient()) {
-        _txn->getClient()->setInDirectClient(true);
+    explicit DirectClientScope(OperationContext* opCtx)
+        : _opCtx(opCtx), _prev(_opCtx->getClient()->isInDirectClient()) {
+        _opCtx->getClient()->setInDirectClient(true);
     }
 
     ~DirectClientScope() {
-        _txn->getClient()->setInDirectClient(_prev);
+        _opCtx->getClient()->setInDirectClient(_prev);
     }
 
 private:
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
     const bool _prev;
 };
 
 }  // namespace
 
 
-DBDirectClient::DBDirectClient(OperationContext* txn) : _txn(txn) {}
+DBDirectClient::DBDirectClient(OperationContext* opCtx) : _opCtx(opCtx) {}
 
 bool DBDirectClient::isFailed() const {
     return false;
@@ -110,8 +110,8 @@ bool DBDirectClient::lazySupported() const {
     return true;
 }
 
-void DBDirectClient::setOpCtx(OperationContext* txn) {
-    _txn = txn;
+void DBDirectClient::setOpCtx(OperationContext* opCtx) {
+    _opCtx = opCtx;
 }
 
 QueryOptions DBDirectClient::_lookupAvailableOptions() {
@@ -120,12 +120,12 @@ QueryOptions DBDirectClient::_lookupAvailableOptions() {
 }
 
 bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, string* actualServer) {
-    DirectClientScope directClientScope(_txn);
-    LastError::get(_txn->getClient()).startRequest();
+    DirectClientScope directClientScope(_opCtx);
+    LastError::get(_opCtx->getClient()).startRequest();
 
     DbResponse dbResponse;
-    CurOp curOp(_txn);
-    assembleResponse(_txn, toSend, dbResponse, kHostAndPortForDirectClient);
+    CurOp curOp(_opCtx);
+    assembleResponse(_opCtx, toSend, dbResponse, kHostAndPortForDirectClient);
     verify(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
 
@@ -133,12 +133,12 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
 }
 
 void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
-    DirectClientScope directClientScope(_txn);
-    LastError::get(_txn->getClient()).startRequest();
+    DirectClientScope directClientScope(_opCtx);
+    LastError::get(_opCtx->getClient()).startRequest();
 
     DbResponse dbResponse;
-    CurOp curOp(_txn);
-    assembleResponse(_txn, toSend, dbResponse, kHostAndPortForDirectClient);
+    CurOp curOp(_opCtx);
+    assembleResponse(_opCtx, toSend, dbResponse, kHostAndPortForDirectClient);
 }
 
 unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
@@ -164,7 +164,7 @@ unsigned long long DBDirectClient::count(
 
     std::string errmsg;
     BSONObjBuilder result;
-    bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result);
+    bool runRetval = countCmd->run(_opCtx, dbname, cmdObj, options, errmsg, result);
     if (!runRetval) {
         Command::appendCommandStatus(result, runRetval, errmsg);
         Status commandStatus = getStatusFromCommandResult(result.obj());

@@ -233,7 +233,7 @@ static void cancelBatches(const WriteErrorDetail& why,
     batchMap->clear();
 }
 
-Status BatchWriteOp::targetBatch(OperationContext* txn,
+Status BatchWriteOp::targetBatch(OperationContext* opCtx,
                                  const NSTargeter& targeter,
                                  bool recordTargetErrors,
                                  vector<TargetedWriteBatch*>* targetedBatches) {
@@ -293,7 +293,7 @@ Status BatchWriteOp::targetBatch(OperationContext* txn,
         OwnedPointerVector<TargetedWrite> writesOwned;
         vector<TargetedWrite*>& writes = writesOwned.mutableVector();
 
-        Status targetStatus = writeOp.targetWrites(txn, targeter, &writes);
+        Status targetStatus = writeOp.targetWrites(opCtx, targeter, &writes);
 
         if (!targetStatus.isOK()) {
             WriteErrorDetail targetError;

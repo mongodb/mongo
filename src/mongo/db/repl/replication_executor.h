@@ -280,7 +280,7 @@ private:
      * Executes the callback referenced by "cbHandle", and moves the underlying
      * WorkQueue::iterator from "workQueue" into the _freeQueue.
      *
-     * "txn" is a pointer to the OperationContext.
+     * "opCtx" is a pointer to the OperationContext.
      *
      * "status" is the callback status from the task runner. Only possible values are
      * Status::OK and ErrorCodes::CallbackCanceled (when task runner is canceled).
@@ -288,7 +288,7 @@ private:
      * If "terribleExLockSyncMutex" is not null, serializes execution of "cbHandle" with the
      * execution of other callbacks.
      */
-    void _doOperation(OperationContext* txn,
+    void _doOperation(OperationContext* opCtx,
                       const Status& taskRunnerStatus,
                       const CallbackHandle& cbHandle,
                       WorkQueue* workQueue,

@@ -74,14 +74,14 @@ public:
     PlanRankingTestBase()
         : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans.load()),
           _enableHashIntersection(internalQueryPlannerEnableHashIntersection.load()),
-          _client(&_txn) {
+          _client(&_opCtx) {
         // Run all tests with hash-based intersection enabled.
         internalQueryPlannerEnableHashIntersection.store(true);
 
         // Ensure N is significantly larger then internalQueryPlanEvaluationWorks.
         ASSERT_GTE(N, internalQueryPlanEvaluationWorks.load() + 1000);
 
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -92,12 +92,12 @@ public:
     }
 
     void insert(const BSONObj& obj) {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         _client.insert(nss.ns(), obj);
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
     }
 
     /**
@@ -107,11 +107,11 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForRead ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection, cq, &plannerParams);
         // Turn this off otherwise it pops up in some plans.
         plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
@@ -123,18 +123,18 @@ public:
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
         // Fill out the MPR.
-        _mps.reset(new MultiPlanStage(&_txn, collection, cq));
+        _mps.reset(new MultiPlanStage(&_opCtx, collection, cq));
         unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
             PlanStage* root;
-            ASSERT(StageBuilder::build(&_txn, collection, *cq, *solutions[i], ws.get(), &root));
+            ASSERT(StageBuilder::build(&_opCtx, collection, *cq, *solutions[i], ws.get(), &root));
             // Takes ownership of all (actually some) arguments.
             _mps->addPlan(solutions[i], root, ws.get());
         }
         // This is what sets a backup plan, should we test for it.
         PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
-                                    _txn.getServiceContext()->getFastClockSource());
+                                    _opCtx.getServiceContext()->getFastClockSource());
         _mps->pickBestPlan(&yieldPolicy);
         ASSERT(_mps->bestPlanChosen());
 
@@ -153,8 +153,8 @@ public:
         return _mps->hasBackupPlan();
     }
 
-    OperationContext* txn() {
-        return &_txn;
+    OperationContext* opCtx() {
+        return &_opCtx;
     }
 
 protected:
@@ -164,7 +164,7 @@ protected:
     const int N = 12000;
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
@@ -202,7 +202,7 @@ public:
             auto qr = stdx::make_unique<QueryRequest>(nss);
             qr->setFilter(BSON("a" << 100 << "b" << 1));
             auto statusWithCQ = CanonicalQuery::canonicalize(
-                txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+                opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
             ASSERT(cq.get());
@@ -222,7 +222,7 @@ public:
             auto qr = stdx::make_unique<QueryRequest>(nss);
             qr->setFilter(BSON("a" << 100 << "b" << 1));
             auto statusWithCQ = CanonicalQuery::canonicalize(
-                txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+                opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
             verify(statusWithCQ.isOK());
             cq = std::move(statusWithCQ.getValue());
         }
@@ -258,7 +258,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 1 << "b" << BSON("$gt" << 1)));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -300,7 +300,7 @@ public:
         qr->setFilter(BSON("a" << 27));
         qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -335,7 +335,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 99));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -375,7 +375,7 @@ public:
         qr->setProj(BSON("_id" << 0 << "a" << 1 << "b" << 1));
 
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -409,7 +409,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << N + 1 << "b" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -446,7 +446,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("a" << BSON("$gte" << N + 1) << "b" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -477,7 +477,7 @@ public:
         qr->setFilter(BSON("_id" << BSON("$gte" << 20 << "$lte" << 200)));
         qr->setSort(BSON("c" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -507,7 +507,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("foo" << 2001));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -542,7 +542,7 @@ public:
         qr->setFilter(BSON("a" << 1));
         qr->setSort(BSON("d" << 1));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -580,7 +580,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{a: 1, b: 1, c: {$gte: 5000}}"));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());
@@ -613,7 +613,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{a: 9, b: {$ne: 10}, c: 9}"));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         ASSERT(NULL != cq.get());

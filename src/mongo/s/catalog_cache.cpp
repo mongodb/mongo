@@ -45,7 +45,7 @@ CatalogCache::CatalogCache() = default;
 
 CatalogCache::~CatalogCache() = default;
 
-StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
+StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* opCtx,
                                                                 StringData dbName) {
     stdx::lock_guard<stdx::mutex> guard(_mutex);
 
@@ -55,7 +55,7 @@ StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext
     }
 
     // Need to load from the store
-    auto status = Grid::get(txn)->catalogClient(txn)->getDatabase(txn, dbName.toString());
+    auto status = Grid::get(opCtx)->catalogClient(opCtx)->getDatabase(opCtx, dbName.toString());
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -63,7 +63,7 @@ StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext
     const auto& dbOpTimePair = status.getValue();
     auto db = std::make_shared<DBConfig>(dbOpTimePair.value, dbOpTimePair.opTime);
     try {
-        db->load(txn);
+        db->load(opCtx);
         auto emplaceResult = _databases.try_emplace(dbName, std::move(db));
         return emplaceResult.first->second;
     } catch (const DBException& ex) {

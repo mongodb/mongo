@@ -89,7 +89,7 @@ public:
      * the command that you are explaining. The auth check is performed recursively
      * on the nested command.
      */
-    virtual Status checkAuthForOperation(OperationContext* txn,
+    virtual Status checkAuthForOperation(OperationContext* opCtx,
                                          const std::string& dbname,
                                          const BSONObj& cmdObj) {
         if (Object != cmdObj.firstElement().type()) {
@@ -105,10 +105,10 @@ public:
             return Status(ErrorCodes::CommandNotFound, ss);
         }
 
-        return commToExplain->checkAuthForOperation(txn, dbname, explainObj);
+        return commToExplain->checkAuthForOperation(opCtx, dbname, explainObj);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -135,12 +135,12 @@ public:
         // copied from Command::execCommand and should be abstracted. Until then, make
         // sure to keep it up to date.
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(txn, dbname);
+        bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
         bool commandCanRunOnSecondary = commToExplain->slaveOk();
 
         bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
-            rpc::ServerSelectionMetadata::get(txn).canRunOnSecondary();
-        bool iAmStandalone = !txn->writesAreReplicated();
+            rpc::ServerSelectionMetadata::get(opCtx).canRunOnSecondary();
+        bool iAmStandalone = !opCtx->writesAreReplicated();
 
         const bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||
             commandIsOverriddenToRunOnSecondary || iAmStandalone;
@@ -154,8 +154,12 @@ public:
         }
 
         // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(
-            txn, dbname, explainObj, verbosity, rpc::ServerSelectionMetadata::get(txn), &result);
+        Status explainStatus = commToExplain->explain(opCtx,
+                                                      dbname,
+                                                      explainObj,
+                                                      verbosity,
+                                                      rpc::ServerSelectionMetadata::get(opCtx),
+                                                      &result);
         if (!explainStatus.isOK()) {
             return appendCommandStatus(result, explainStatus);
         }

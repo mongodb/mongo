@@ -46,9 +46,9 @@ static const bool isExplain = true;
 TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     QueryTestServiceContext serviceContext;
     auto uniqueTxn = serviceContext.makeOperationContext();
-    OperationContext* txn = uniqueTxn.get();
+    OperationContext* opCtx = uniqueTxn.get();
 
-    auto pd = ParsedDistinct::parse(txn,
+    auto pd = ParsedDistinct::parse(opCtx,
                                     testns,
                                     fromjson("{distinct: 'testcoll', key: 'x'}"),
                                     ExtensionsCallbackDisallowExtensions(),
@@ -82,9 +82,9 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
 TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
     QueryTestServiceContext serviceContext;
     auto uniqueTxn = serviceContext.makeOperationContext();
-    OperationContext* txn = uniqueTxn.get();
+    OperationContext* opCtx = uniqueTxn.get();
 
-    auto pd = ParsedDistinct::parse(txn,
+    auto pd = ParsedDistinct::parse(opCtx,
                                     testns,
                                     fromjson("{distinct: 'testcoll', key: 'y', query: {z: 7}}"),
                                     ExtensionsCallbackDisallowExtensions(),
@@ -119,9 +119,9 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
 TEST(ParsedDistinctTest, ConvertToAggregationWithExplain) {
     QueryTestServiceContext serviceContext;
     auto uniqueTxn = serviceContext.makeOperationContext();
-    OperationContext* txn = uniqueTxn.get();
+    OperationContext* opCtx = uniqueTxn.get();
 
-    auto pd = ParsedDistinct::parse(txn,
+    auto pd = ParsedDistinct::parse(opCtx,
                                     testns,
                                     fromjson("{distinct: 'testcoll', key: 'x'}"),
                                     ExtensionsCallbackDisallowExtensions(),

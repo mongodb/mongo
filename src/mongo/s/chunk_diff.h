@@ -103,7 +103,7 @@ public:
     // Applies changes to the config data from a vector of chunks passed in. Also includes minor
     // version changes for particular major-version chunks if explicitly specified.
     // Returns the number of diffs processed, or -1 if the diffs were inconsistent.
-    int calculateConfigDiff(OperationContext* txn, const std::vector<ChunkType>& chunks);
+    int calculateConfigDiff(OperationContext* opCtx, const std::vector<ChunkType>& chunks);
 
 protected:
     /**
@@ -119,10 +119,10 @@ protected:
         return true;
     }
 
-    virtual std::pair<BSONObj, ValType> rangeFor(OperationContext* txn,
+    virtual std::pair<BSONObj, ValType> rangeFor(OperationContext* opCtx,
                                                  const ChunkType& chunk) const = 0;
 
-    virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const = 0;
+    virtual ShardId shardFor(OperationContext* opCtx, const ShardId& name) const = 0;
 
 private:
     // Whether or not a range exists in the min/max region

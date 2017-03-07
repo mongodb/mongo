@@ -61,7 +61,7 @@ public:
 
         // Note: this assumes that globalInit will always be called on the same thread as the main
         // test thread.
-        ShardingState::get(txn())->setGlobalInitMethodForTest(
+        ShardingState::get(opCtx())->setGlobalInitMethodForTest(
             [this](OperationContext*, const ConnectionString&, StringData) {
                 _initCallCount++;
                 return Status::OK();
@@ -70,7 +70,7 @@ public:
 
     void tearDown() override {}
 
-    OperationContext* txn() {
+    OperationContext* opCtx() {
         return _opCtx.get();
     }
 
@@ -102,8 +102,8 @@ TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    WriteUnitOfWork wuow(txn());
-    collShardingState.onInsertOp(txn(), shardIdentity.toBSON());
+    WriteUnitOfWork wuow(opCtx());
+    collShardingState.onInsertOp(opCtx(), shardIdentity.toBSON());
 
     ASSERT_EQ(0, getInitCallCount());
 
@@ -123,8 +123,8 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
     shardIdentity.setClusterId(OID::gen());
 
     {
-        WriteUnitOfWork wuow(txn());
-        collShardingState.onInsertOp(txn(), shardIdentity.toBSON());
+        WriteUnitOfWork wuow(opCtx());
+        collShardingState.onInsertOp(opCtx(), shardIdentity.toBSON());
 
         ASSERT_EQ(0, getInitCallCount());
     }
@@ -141,8 +141,8 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentit
     shardIdentity.setShardName("a");
     shardIdentity.setClusterId(OID::gen());
 
-    WriteUnitOfWork wuow(txn());
-    collShardingState.onInsertOp(txn(), shardIdentity.toBSON());
+    WriteUnitOfWork wuow(opCtx());
+    collShardingState.onInsertOp(opCtx(), shardIdentity.toBSON());
 
     ASSERT_EQ(0, getInitCallCount());
 
@@ -158,15 +158,16 @@ TEST_F(CollShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument
     ShardIdentityType shardIdentity;
     shardIdentity.setShardName("a");
 
-    ASSERT_THROWS(collShardingState.onInsertOp(txn(), shardIdentity.toBSON()), AssertionException);
+    ASSERT_THROWS(collShardingState.onInsertOp(opCtx(), shardIdentity.toBSON()),
+                  AssertionException);
 }
 
 TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfShardIdentityDocWasNotInserted) {
     CollectionShardingState collShardingState(getServiceContext(),
                                               NamespaceString::kConfigCollectionNamespace);
 
-    WriteUnitOfWork wuow(txn());
-    collShardingState.onInsertOp(txn(), BSON("_id" << 1));
+    WriteUnitOfWork wuow(opCtx());
+    collShardingState.onInsertOp(opCtx(), BSON("_id" << 1));
 
     ASSERT_EQ(0, getInitCallCount());
 

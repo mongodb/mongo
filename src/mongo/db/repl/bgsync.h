@@ -84,17 +84,17 @@ public:
     /**
      * Starts oplog buffer, task executor and producer thread, in that order.
      */
-    void startup(OperationContext* txn);
+    void startup(OperationContext* opCtx);
 
     /**
      * Signals producer thread to stop.
      */
-    void shutdown(OperationContext* txn);
+    void shutdown(OperationContext* opCtx);
 
     /**
      * Waits for producer thread to stop before shutting down the task executor and oplog buffer.
      */
-    void join(OperationContext* txn);
+    void join(OperationContext* opCtx);
 
     /**
      * Returns true if shutdown() has been called.
@@ -109,8 +109,8 @@ public:
 
     // Interface implementation
 
-    bool peek(OperationContext* txn, BSONObj* op);
-    void consume(OperationContext* txn);
+    bool peek(OperationContext* opCtx, BSONObj* op);
+    void consume(OperationContext* opCtx);
     void clearSyncTarget();
     void waitForMore();
 
@@ -118,7 +118,7 @@ public:
     BSONObj getCounters();
 
     // Clears any fetched and buffered oplog entries.
-    void clearBuffer(OperationContext* txn);
+    void clearBuffer(OperationContext* opCtx);
 
     /**
      * Returns true if any of the following is true:
@@ -134,7 +134,7 @@ public:
     void startProducerIfStopped();
 
     // Adds a fake oplog entry to buffer. Used for testing only.
-    void pushTestOpToBuffer(OperationContext* txn, const BSONObj& op);
+    void pushTestOpToBuffer(OperationContext* opCtx, const BSONObj& op);
 
 private:
     bool _inShutdown_inlock() const;
@@ -148,7 +148,7 @@ private:
     void _run();
     // Production thread inner loop.
     void _runProducer();
-    void _produce(OperationContext* txn);
+    void _produce(OperationContext* opCtx);
 
     /**
      * Checks current background sync state before pushing operations into blocking queue and
@@ -165,15 +165,15 @@ private:
      * Executes a rollback.
      * 'getConnection' returns a connection to the sync source.
      */
-    void _rollback(OperationContext* txn,
+    void _rollback(OperationContext* opCtx,
                    const HostAndPort& source,
                    boost::optional<int> requiredRBID,
                    stdx::function<DBClientBase*()> getConnection);
 
     // restart syncing
-    void start(OperationContext* txn);
+    void start(OperationContext* opCtx);
 
-    OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* txn);
+    OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* opCtx);
 
     // Production thread
     std::unique_ptr<OplogBuffer> _oplogBuffer;

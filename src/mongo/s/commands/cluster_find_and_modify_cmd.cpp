@@ -82,7 +82,7 @@ public:
         find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
     }
 
-    virtual Status explain(OperationContext* txn,
+    virtual Status explain(OperationContext* opCtx,
                            const std::string& dbName,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
@@ -90,20 +90,21 @@ public:
                            BSONObjBuilder* out) const {
         const NamespaceString nss = parseNsCollectionRequired(dbName, cmdObj);
 
-        auto scopedDB = uassertStatusOK(ScopedShardDatabase::getExisting(txn, dbName));
+        auto scopedDB = uassertStatusOK(ScopedShardDatabase::getExisting(opCtx, dbName));
         const auto conf = scopedDB.db();
 
         shared_ptr<ChunkManager> chunkMgr;
         shared_ptr<Shard> shard;
 
         if (!conf->isSharded(nss.ns())) {
-            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            auto shardStatus =
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, conf->getPrimaryId());
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
             shard = shardStatus.getValue();
         } else {
-            chunkMgr = _getChunkManager(txn, conf, nss);
+            chunkMgr = _getChunkManager(opCtx, conf, nss);
 
             const BSONObj query = cmdObj.getObjectField("query");
 
@@ -117,7 +118,7 @@ public:
                 return collationElementStatus;
             }
 
-            StatusWith<BSONObj> status = _getShardKey(txn, chunkMgr, query);
+            StatusWith<BSONObj> status = _getShardKey(opCtx, chunkMgr, query);
             if (!status.isOK()) {
                 return status.getStatus();
             }
@@ -125,7 +126,8 @@ public:
             BSONObj shardKey = status.getValue();
             auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
-            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, chunk->getShardId());
+            auto shardStatus =
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk->getShardId());
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
@@ -141,7 +143,7 @@ public:
         Timer timer;
 
         BSONObjBuilder result;
-        bool ok = _runCommand(txn, conf, chunkMgr, shard->getId(), nss, explainCmd.obj(), result);
+        bool ok = _runCommand(opCtx, conf, chunkMgr, shard->getId(), nss, explainCmd.obj(), result);
         long long millisElapsed = timer.millis();
 
         if (!ok) {
@@ -159,10 +161,10 @@ public:
         shardResults.push_back(cmdResult);
 
         return ClusterExplain::buildExplainResult(
-            txn, shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
+            opCtx, shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbName,
                      BSONObj& cmdObj,
                      int options,
@@ -172,14 +174,14 @@ public:
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
-        auto scopedDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, dbName));
+        auto scopedDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(opCtx, dbName));
         const auto conf = scopedDb.db();
 
         if (!conf->isSharded(nss.ns())) {
-            return _runCommand(txn, conf, nullptr, conf->getPrimaryId(), nss, cmdObj, result);
+            return _runCommand(opCtx, conf, nullptr, conf->getPrimaryId(), nss, cmdObj, result);
         }
 
-        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, nss);
+        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(opCtx, conf, nss);
 
         const BSONObj query = cmdObj.getObjectField("query");
 
@@ -193,7 +195,7 @@ public:
             return appendCommandStatus(result, collationElementStatus);
         }
 
-        StatusWith<BSONObj> status = _getShardKey(txn, chunkMgr, query);
+        StatusWith<BSONObj> status = _getShardKey(opCtx, chunkMgr, query);
         if (!status.isOK()) {
             // Bad query
             return appendCommandStatus(result, status.getStatus());
@@ -202,31 +204,32 @@ public:
         BSONObj shardKey = status.getValue();
         auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
-        const bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
+        const bool ok =
+            _runCommand(opCtx, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
         if (ok) {
             updateChunkWriteStatsAndSplitIfNeeded(
-                txn, chunkMgr.get(), chunk.get(), cmdObj.getObjectField("update").objsize());
+                opCtx, chunkMgr.get(), chunk.get(), cmdObj.getObjectField("update").objsize());
         }
 
         return ok;
     }
 
 private:
-    shared_ptr<ChunkManager> _getChunkManager(OperationContext* txn,
+    shared_ptr<ChunkManager> _getChunkManager(OperationContext* opCtx,
                                               DBConfig* conf,
                                               const NamespaceString& nss) const {
-        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(txn, nss.ns());
+        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(opCtx, nss.ns());
         massert(13002, "shard internal error chunk manager should never be null", chunkMgr);
 
         return chunkMgr;
     }
 
-    StatusWith<BSONObj> _getShardKey(OperationContext* txn,
+    StatusWith<BSONObj> _getShardKey(OperationContext* opCtx,
                                      shared_ptr<ChunkManager> chunkMgr,
                                      const BSONObj& query) const {
         // Verify that the query has an equality predicate using the shard key
         StatusWith<BSONObj> status =
-            chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, query);
+            chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(opCtx, query);
 
         if (!status.isOK()) {
             return status;
@@ -242,7 +245,7 @@ private:
         return shardKey;
     }
 
-    bool _runCommand(OperationContext* txn,
+    bool _runCommand(OperationContext* opCtx,
                      DBConfig* conf,
                      shared_ptr<ChunkManager> chunkManager,
                      const ShardId& shardId,
@@ -251,7 +254,8 @@ private:
                      BSONObjBuilder& result) const {
         BSONObj res;
 
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
         ShardConnection conn(shard->getConnString(), nss.ns(), chunkManager);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);

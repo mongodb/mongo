@@ -96,11 +96,11 @@ public:
 
     OperationContext* getOpContext() const;
 
-    void registerOperation(OperationContext* txn) override;
+    void registerOperation(OperationContext* opCtx) override;
 
     void unregisterOperation() override;
 
-    void localConnectForDbEval(OperationContext* txn, const char* dbName) override;
+    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) override;
 
     void externalSetup() override;
 

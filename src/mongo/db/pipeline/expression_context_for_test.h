@@ -42,8 +42,8 @@ class ExpressionContextForTest : public ExpressionContext {
 public:
     ExpressionContextForTest() = default;
 
-    ExpressionContextForTest(OperationContext* txn, const AggregationRequest& request)
-        : ExpressionContext(txn, request, nullptr, {}) {}
+    ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
+        : ExpressionContext(opCtx, request, nullptr, {}) {}
 
     /**
      * Changes the collation used by this ExpressionContext. Must not be changed after parsing a

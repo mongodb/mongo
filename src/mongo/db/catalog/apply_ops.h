@@ -37,7 +37,7 @@ class OperationContext;
  * Applies ops contained in "applyOpCmd" and populates fields in "result" to be returned to the
  * user.
  */
-Status applyOps(OperationContext* txn,
+Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 BSONObjBuilder* result);

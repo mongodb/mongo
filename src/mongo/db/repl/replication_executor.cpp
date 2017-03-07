@@ -404,8 +404,8 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleDBW
                                handle.getValue(),
                                &_dbWorkInProgressQueue,
                                nullptr);
-        auto task = [doOp](OperationContext* txn, const Status& status) {
-            makeNoExcept(stdx::bind(doOp, txn, status))();
+        auto task = [doOp](OperationContext* opCtx, const Status& status) {
+            makeNoExcept(stdx::bind(doOp, opCtx, status))();
             return TaskRunner::NextAction::kDisposeOperationContext;
         };
         if (mode == MODE_NONE && nss.ns().empty()) {
@@ -418,7 +418,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleDBW
     return handle;
 }
 
-void ReplicationExecutor::_doOperation(OperationContext* txn,
+void ReplicationExecutor::_doOperation(OperationContext* opCtx,
                                        const Status& taskRunnerStatus,
                                        const CallbackHandle& cbHandle,
                                        WorkQueue* workQueue,
@@ -442,7 +442,7 @@ void ReplicationExecutor::_doOperation(OperationContext* txn,
                          (callback->_isCanceled || !taskRunnerStatus.isOK()
                               ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
                               : Status::OK()),
-                         txn));
+                         opCtx));
     }
     lk.lock();
     signalEvent_inlock(callback->_finishedEvent);
@@ -461,8 +461,8 @@ ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock(const CallbackFn& work)
                                &_exclusiveLockInProgressQueue,
                                &_terribleExLockSyncMutex);
         _dblockExclusiveLockTaskRunner.schedule(DatabaseTask::makeGlobalExclusiveLockTask(
-            [doOp](OperationContext* txn, const Status& status) {
-                makeNoExcept(stdx::bind(doOp, txn, status))();
+            [doOp](OperationContext* opCtx, const Status& status) {
+                makeNoExcept(stdx::bind(doOp, opCtx, status))();
                 return TaskRunner::NextAction::kDisposeOperationContext;
             }));
     }

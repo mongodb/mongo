@@ -79,7 +79,7 @@ class ReplicationCoordinatorRollbackMock : public ReplicationCoordinatorMock {
 public:
     ReplicationCoordinatorRollbackMock(ServiceContext* service)
         : ReplicationCoordinatorMock(service, createReplSettings()) {}
-    void resetLastOpTimesFromOplog(OperationContext* txn) override {}
+    void resetLastOpTimesFromOplog(OperationContext* opCtx) override {}
 };
 
 
@@ -90,7 +90,8 @@ public:
     const OplogInterface& getOplog() const override;
     BSONObj getLastOperation() const override;
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
-    void copyCollectionFromRemote(OperationContext* txn, const NamespaceString& nss) const override;
+    void copyCollectionFromRemote(OperationContext* opCtx,
+                                  const NamespaceString& nss) const override;
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 
 private:
@@ -119,7 +120,7 @@ BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& f
     return BSONObj();
 }
 
-void RollbackSourceMock::copyCollectionFromRemote(OperationContext* txn,
+void RollbackSourceMock::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {}
 
 StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {
@@ -128,7 +129,7 @@ StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString&
 
 class RSRollbackTest : public ServiceContextMongoDTest {
 protected:
-    ServiceContext::UniqueOperationContext _txn;
+    ServiceContext::UniqueOperationContext _opCtx;
 
     // Owned by service context
     ReplicationCoordinator* _coordinator;
@@ -140,8 +141,8 @@ private:
 
 void RSRollbackTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    _txn = cc().makeOperationContext();
-    _coordinator = new ReplicationCoordinatorRollbackMock(_txn->getServiceContext());
+    _opCtx = cc().makeOperationContext();
+    _coordinator = new ReplicationCoordinatorRollbackMock(_opCtx->getServiceContext());
 
     auto serviceContext = getServiceContext();
     ReplicationCoordinator::set(serviceContext,
@@ -149,22 +150,22 @@ void RSRollbackTest::setUp() {
     StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceMock>());
 
     setOplogCollectionName();
-    repl::StorageInterface::get(_txn.get())->setAppliedThrough(_txn.get(), OpTime{});
-    repl::StorageInterface::get(_txn.get())->setMinValid(_txn.get(), OpTime{});
+    repl::StorageInterface::get(_opCtx.get())->setAppliedThrough(_opCtx.get(), OpTime{});
+    repl::StorageInterface::get(_opCtx.get())->setMinValid(_opCtx.get(), OpTime{});
 }
 
 void RSRollbackTest::tearDown() {
-    _txn.reset();
+    _opCtx.reset();
     ServiceContextMongoDTest::tearDown();
     setGlobalReplicationCoordinator(nullptr);
 }
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
-    repl::StorageInterface::get(_txn.get())
-        ->setAppliedThrough(_txn.get(), OpTime(Timestamp(Seconds(0), 0), 0));
-    repl::StorageInterface::get(_txn.get())
-        ->setMinValid(_txn.get(), OpTime(Timestamp(Seconds(1), 0), 0));
-    auto status = syncRollback(_txn.get(),
+    repl::StorageInterface::get(_opCtx.get())
+        ->setAppliedThrough(_opCtx.get(), OpTime(Timestamp(Seconds(0), 0), 0));
+    repl::StorageInterface::get(_opCtx.get())
+        ->setMinValid(_opCtx.get(), OpTime(Timestamp(Seconds(1), 0), 0));
+    auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock(kEmptyMockOperations),
                                RollbackSourceMock(std::unique_ptr<OplogInterface>(
                                    new OplogInterfaceMock(kEmptyMockOperations))),
@@ -180,7 +181,7 @@ TEST_F(RSRollbackTest, OplogStartMissing) {
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId());
     ASSERT_EQUALS(
         ErrorCodes::OplogStartMissing,
-        syncRollback(_txn.get(),
+        syncRollback(_opCtx.get(),
                      OplogInterfaceMock(kEmptyMockOperations),
                      RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                          operation,
@@ -194,7 +195,7 @@ TEST_F(RSRollbackTest, NoRemoteOpLog) {
     OpTime ts(Timestamp(Seconds(1), 0), 0);
     auto operation =
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId());
-    auto status = syncRollback(_txn.get(),
+    auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock({operation}),
                                RollbackSourceMock(std::unique_ptr<OplogInterface>(
                                    new OplogInterfaceMock(kEmptyMockOperations))),
@@ -216,7 +217,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
             uassert(ErrorCodes::UnknownError, "getRollbackId() failed", false);
         }
     };
-    ASSERT_THROWS_CODE(syncRollback(_txn.get(),
+    ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
                                     OplogInterfaceMock({operation}),
                                     RollbackSourceLocal(std::unique_ptr<OplogInterface>(
                                         new OplogInterfaceMock(kEmptyMockOperations))),
@@ -239,7 +240,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
         }
     };
 
-    ASSERT_THROWS_CODE(syncRollback(_txn.get(),
+    ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
                                     OplogInterfaceMock({operation}),
                                     RollbackSourceLocal(std::unique_ptr<OplogInterface>(
                                         new OplogInterfaceMock(kEmptyMockOperations))),
@@ -250,12 +251,12 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
 }
 
 TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     OpTime ts(Timestamp(Seconds(1), 0), 1);
     auto operation =
         std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId(1));
     ASSERT_OK(
-        syncRollback(_txn.get(),
+        syncRollback(_opCtx.get(),
                      OplogInterfaceMock({operation}),
                      RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                          operation,
@@ -268,24 +269,24 @@ TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
  * Create test collection.
  * Returns collection.
  */
-Collection* _createCollection(OperationContext* txn,
+Collection* _createCollection(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const CollectionOptions& options) {
-    Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
-    mongo::WriteUnitOfWork wuow(txn);
-    auto db = dbHolder().openDb(txn, nss.db());
+    Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_X);
+    mongo::WriteUnitOfWork wuow(opCtx);
+    auto db = dbHolder().openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
-    db->dropCollection(txn, nss.ns());
-    auto coll = db->createCollection(txn, nss.ns(), options);
+    db->dropCollection(opCtx, nss.ns());
+    auto coll = db->createCollection(opCtx, nss.ns(), options);
     ASSERT_TRUE(coll);
     wuow.commit();
     return coll;
 }
 
-Collection* _createCollection(OperationContext* txn,
+Collection* _createCollection(OperationContext* opCtx,
                               const std::string& nss,
                               const CollectionOptions& options) {
-    return _createCollection(txn, NamespaceString(nss), options);
+    return _createCollection(opCtx, NamespaceString(nss), options);
 }
 
 /**
@@ -293,7 +294,7 @@ Collection* _createCollection(OperationContext* txn,
  * Returns number of records in collection after rolling back delete operation.
  * If collection does not exist after rolling back, returns -1.
  */
-int _testRollbackDelete(OperationContext* txn,
+int _testRollbackDelete(OperationContext* opCtx,
                         ReplicationCoordinator* coordinator,
                         const BSONObj& documentAtSource) {
     auto commonOperation =
@@ -325,54 +326,54 @@ int _testRollbackDelete(OperationContext* txn,
                                        std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                                            commonOperation,
                                        })));
-    ASSERT_OK(syncRollback(txn,
+    ASSERT_OK(syncRollback(opCtx,
                            OplogInterfaceMock({deleteOperation, commonOperation}),
                            rollbackSource,
                            {},
                            coordinator));
     ASSERT_TRUE(rollbackSource.called);
 
-    Lock::DBLock dbLock(txn->lockState(), "test", MODE_S);
-    Lock::CollectionLock collLock(txn->lockState(), "test.t", MODE_S);
-    auto db = dbHolder().get(txn, "test");
+    Lock::DBLock dbLock(opCtx->lockState(), "test", MODE_S);
+    Lock::CollectionLock collLock(opCtx->lockState(), "test.t", MODE_S);
+    auto db = dbHolder().get(opCtx, "test");
     ASSERT_TRUE(db);
     auto collection = db->getCollection("test.t");
     if (!collection) {
         return -1;
     }
-    return collection->getRecordStore()->numRecords(txn);
+    return collection->getRecordStore()->numRecords(opCtx);
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionDoesNotExist) {
-    createOplog(_txn.get());
-    ASSERT_EQUALS(-1, _testRollbackDelete(_txn.get(), _coordinator, BSONObj()));
+    createOplog(_opCtx.get());
+    ASSERT_EQUALS(-1, _testRollbackDelete(_opCtx.get(), _coordinator, BSONObj()));
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsNonCapped) {
-    createOplog(_txn.get());
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
-    _testRollbackDelete(_txn.get(), _coordinator, BSONObj());
-    ASSERT_EQUALS(0, _testRollbackDelete(_txn.get(), _coordinator, BSONObj()));
+    createOplog(_opCtx.get());
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    _testRollbackDelete(_opCtx.get(), _coordinator, BSONObj());
+    ASSERT_EQUALS(0, _testRollbackDelete(_opCtx.get(), _coordinator, BSONObj()));
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsCapped) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     CollectionOptions options;
     options.capped = true;
-    _createCollection(_txn.get(), "test.t", options);
-    ASSERT_EQUALS(0, _testRollbackDelete(_txn.get(), _coordinator, BSONObj()));
+    _createCollection(_opCtx.get(), "test.t", options);
+    ASSERT_EQUALS(0, _testRollbackDelete(_opCtx.get(), _coordinator, BSONObj()));
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteRestoreDocument) {
-    createOplog(_txn.get());
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
+    createOplog(_opCtx.get());
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     BSONObj doc = BSON("_id" << 0 << "a" << 1);
-    _testRollbackDelete(_txn.get(), _coordinator, doc);
-    ASSERT_EQUALS(1, _testRollbackDelete(_txn.get(), _coordinator, doc));
+    _testRollbackDelete(_opCtx.get(), _coordinator, doc);
+    ASSERT_EQUALS(1, _testRollbackDelete(_opCtx.get(), _coordinator, doc));
 }
 
 TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto insertDocumentOperation =
@@ -400,7 +401,7 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_txn.get(),
+    auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                {},
@@ -413,8 +414,8 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
 }
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
-    createOplog(_txn.get());
-    auto collection = _createCollection(_txn.get(), "test.t", CollectionOptions());
+    createOplog(_opCtx.get());
+    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     auto indexSpec = BSON("ns"
                           << "test.t"
                           << "key"
@@ -424,15 +425,15 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
                           << "v"
                           << static_cast<int>(kIndexVersion));
     {
-        Lock::DBLock dbLock(_txn->lockState(), "test", MODE_X);
-        MultiIndexBlock indexer(_txn.get(), collection);
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_X);
+        MultiIndexBlock indexer(_opCtx.get(), collection);
         ASSERT_OK(indexer.init(indexSpec).getStatus());
-        WriteUnitOfWork wunit(_txn.get());
+        WriteUnitOfWork wunit(_opCtx.get());
         indexer.commit();
         wunit.commit();
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
-        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_txn.get()));
+        ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
     }
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -448,7 +449,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             called = true;
         }
@@ -464,7 +465,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     // This can happen when an index is re-created with different options.
     startCapturingLogMessages();
     ASSERT_OK(syncRollback(
-        _txn.get(),
+        _opCtx.get(),
         OplogInterfaceMock({insertDocumentOperation, insertDocumentOperation, commonOperation}),
         rollbackSource,
         {},
@@ -474,16 +475,16 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
                   countLogLinesContaining("rollback drop index: collection: test.t. index: a_1"));
     ASSERT_FALSE(rollbackSource.called);
     {
-        Lock::DBLock dbLock(_txn->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_txn.get()));
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
     }
 }
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
-    createOplog(_txn.get());
-    auto collection = _createCollection(_txn.get(), "test.t", CollectionOptions());
+    createOplog(_opCtx.get());
+    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     auto indexSpec = BSON("ns"
                           << "test.t"
                           << "key"
@@ -492,10 +493,10 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
                           << "a_1");
     // Skip index creation to trigger warning during rollback.
     {
-        Lock::DBLock dbLock(_txn->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_txn.get()));
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
     }
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -511,7 +512,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             called = true;
         }
@@ -524,7 +525,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    ASSERT_OK(syncRollback(_txn.get(),
+    ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                            rollbackSource,
                            {},
@@ -535,15 +536,15 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     ASSERT_EQUALS(1, countLogLinesContaining("rollback failed to drop index a_1 in test.t"));
     ASSERT_FALSE(rollbackSource.called);
     {
-        Lock::DBLock dbLock(_txn->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
-        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_txn.get()));
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
     }
 }
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto insertDocumentOperation =
@@ -559,7 +560,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             called = true;
         }
@@ -572,7 +573,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_txn.get(),
+    auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                {},
@@ -586,7 +587,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
 }
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto insertDocumentOperation =
@@ -606,7 +607,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             called = true;
         }
@@ -619,7 +620,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_txn.get(),
+    auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                {},
@@ -633,7 +634,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
 }
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto insertDocumentOperation =
@@ -651,7 +652,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             called = true;
         }
@@ -664,7 +665,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
         commonOperation,
     })));
     startCapturingLogMessages();
-    auto status = syncRollback(_txn.get(),
+    auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock({insertDocumentOperation, commonOperation}),
                                rollbackSource,
                                {},
@@ -677,7 +678,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
 }
 
 TEST_F(RSRollbackTest, RollbackUnknownCommand) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto unknownCommandOperation =
@@ -690,15 +691,15 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                                          << "t")),
                        RecordId(2));
     {
-        Lock::DBLock dbLock(_txn->lockState(), "test", MODE_X);
-        mongo::WriteUnitOfWork wuow(_txn.get());
-        auto db = dbHolder().openDb(_txn.get(), "test");
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_X);
+        mongo::WriteUnitOfWork wuow(_opCtx.get());
+        auto db = dbHolder().openDb(_opCtx.get(), "test");
         ASSERT_TRUE(db);
-        ASSERT_TRUE(db->getOrCreateCollection(_txn.get(), "test.t"));
+        ASSERT_TRUE(db->getOrCreateCollection(_opCtx.get(), "test.t"));
         wuow.commit();
     }
     auto status =
-        syncRollback(_txn.get(),
+        syncRollback(_opCtx.get(),
                      OplogInterfaceMock({unknownCommandOperation, commonOperation}),
                      RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                          commonOperation,
@@ -710,7 +711,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
 }
 
 TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto dropCollectionOperation =
@@ -726,7 +727,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             called = true;
         }
@@ -735,8 +736,8 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
-    ASSERT_OK(syncRollback(_txn.get(),
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({dropCollectionOperation, commonOperation}),
                            rollbackSource,
                            {},
@@ -745,7 +746,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
 }
 
 TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSyncingCollection) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto dropCollectionOperation =
@@ -763,7 +764,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
         int getRollbackId() const override {
             return copyCollectionCalled ? 1 : 0;
         }
-        void copyCollectionFromRemote(OperationContext* txn,
+        void copyCollectionFromRemote(OperationContext* opCtx,
                                       const NamespaceString& nss) const override {
             copyCollectionCalled = true;
         }
@@ -773,8 +774,8 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
         commonOperation,
     })));
 
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
-    ASSERT_THROWS_CODE(syncRollback(_txn.get(),
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
                                     OplogInterfaceMock({dropCollectionOperation, commonOperation}),
                                     rollbackSource,
                                     {0},
@@ -815,22 +816,22 @@ OpTime getOpTimeFromOplogEntry(const BSONObj& entry) {
 }
 
 TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
 
     {
-        AutoGetOrCreateDb autoDb(_txn.get(), "test", MODE_X);
-        mongo::WriteUnitOfWork wuow(_txn.get());
+        AutoGetOrCreateDb autoDb(_opCtx.get(), "test", MODE_X);
+        mongo::WriteUnitOfWork wuow(_opCtx.get());
         auto coll = autoDb.getDb()->getCollection("test.t");
         if (!coll) {
-            coll = autoDb.getDb()->createCollection(_txn.get(), "test.t");
+            coll = autoDb.getDb()->createCollection(_opCtx.get(), "test.t");
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
         ASSERT_OK(
-            coll->insertDocument(_txn.get(), BSON("_id" << 1 << "v" << 2), nullOpDebug, false));
+            coll->insertDocument(_opCtx.get(), BSON("_id" << 1 << "v" << 2), nullOpDebug, false));
         ASSERT_OK(
-            coll->insertDocument(_txn.get(), BSON("_id" << 2 << "v" << 4), nullOpDebug, false));
-        ASSERT_OK(coll->insertDocument(_txn.get(), BSON("_id" << 4), nullOpDebug, false));
+            coll->insertDocument(_opCtx.get(), BSON("_id" << 2 << "v" << 4), nullOpDebug, false));
+        ASSERT_OK(coll->insertDocument(_opCtx.get(), BSON("_id" << 4), nullOpDebug, false));
         wuow.commit();
     }
     const auto commonOperation =
@@ -897,8 +898,8 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         mutable std::multiset<int> searchedIds;
     } rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
 
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
-    ASSERT_OK(syncRollback(_txn.get(),
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({applyOpsOperation, commonOperation}),
                            rollbackSource,
                            {},
@@ -909,20 +910,20 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(3));
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(4));
 
-    AutoGetCollectionForRead acr(_txn.get(), NamespaceString("test.t"));
+    AutoGetCollectionForRead acr(_opCtx.get(), NamespaceString("test.t"));
     BSONObj result;
-    ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 1), result));
+    ASSERT(Helpers::findOne(_opCtx.get(), acr.getCollection(), BSON("_id" << 1), result));
     ASSERT_EQUALS(1, result["v"].numberInt()) << result;
-    ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 2), result));
+    ASSERT(Helpers::findOne(_opCtx.get(), acr.getCollection(), BSON("_id" << 2), result));
     ASSERT_EQUALS(3, result["v"].numberInt()) << result;
-    ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 3), result));
+    ASSERT(Helpers::findOne(_opCtx.get(), acr.getCollection(), BSON("_id" << 3), result));
     ASSERT_EQUALS(5, result["v"].numberInt()) << result;
-    ASSERT_FALSE(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 4), result))
+    ASSERT_FALSE(Helpers::findOne(_opCtx.get(), acr.getCollection(), BSON("_id" << 4), result))
         << result;
 }
 
 TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto createCollectionOperation =
@@ -937,22 +938,22 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
     RollbackSourceMock rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
-    ASSERT_OK(syncRollback(_txn.get(),
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({createCollectionOperation, commonOperation}),
                            rollbackSource,
                            {},
                            _coordinator));
     {
-        Lock::DBLock dbLock(_txn->lockState(), "test", MODE_S);
-        auto db = dbHolder().get(_txn.get(), "test");
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        auto db = dbHolder().get(_opCtx.get(), "test");
         ASSERT_TRUE(db);
         ASSERT_FALSE(db->getCollection("test.t"));
     }
 }
 
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto collectionModificationOperation =
@@ -979,9 +980,9 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     startCapturingLogMessages();
-    ASSERT_OK(syncRollback(_txn.get(),
+    ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                            rollbackSource,
                            {},
@@ -995,7 +996,7 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
 }
 
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOptions) {
-    createOplog(_txn.get());
+    createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
     auto collectionModificationOperation =
@@ -1020,9 +1021,9 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
     RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
         commonOperation,
     })));
-    _createCollection(_txn.get(), "test.t", CollectionOptions());
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     auto status =
-        syncRollback(_txn.get(),
+        syncRollback(_opCtx.get(),
                      OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                      rollbackSource,
                      {},

@@ -78,7 +78,7 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -86,10 +86,10 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedDb = uassertStatusOK(ScopedShardDatabase::getExisting(txn, nss.db()));
+        auto scopedDb = uassertStatusOK(ScopedShardDatabase::getExisting(opCtx, nss.db()));
         auto config = scopedDb.db();
 
-        auto cm = config->getChunkManagerIfExists(txn, nss.ns());
+        auto cm = config->getChunkManagerIfExists(opCtx, nss.ns());
         uassert(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded.", cm);
 
         for (const auto& cmEntry : cm->getChunkMap()) {

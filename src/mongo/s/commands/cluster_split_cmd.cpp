@@ -55,7 +55,7 @@ namespace {
  * Asks the mongod holding this chunk to find a key that approximately divides the specified chunk
  * in two. Throws on error or if the chunk is empty.
  */
-BSONObj selectMedianKey(OperationContext* txn,
+BSONObj selectMedianKey(OperationContext* opCtx,
                         const ShardId& shardId,
                         const NamespaceString& nss,
                         const ShardKeyPattern& shardKeyPattern,
@@ -66,10 +66,10 @@ BSONObj selectMedianKey(OperationContext* txn,
     chunkRange.append(&cmd);
     cmd.appendBool("force", true);
 
-    auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
     auto cmdResponse = uassertStatusOK(
-        shard->runCommandWithFixedRetryAttempts(txn,
+        shard->runCommandWithFixedRetryAttempts(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 "admin",
                                                 cmd.obj(),
@@ -126,7 +126,7 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -134,7 +134,7 @@ public:
                      BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
 
         const BSONField<BSONObj> findField("find", BSONObj());
         const BSONField<BSONArray> boundsField("bounds", BSONArray());
@@ -197,7 +197,7 @@ public:
         if (!find.isEmpty()) {
             // find
             BSONObj shardKey =
-                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(txn, find));
+                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, find));
             if (shardKey.isEmpty()) {
                 errmsg = stream() << "no shard key found in chunk query " << find;
                 return false;
@@ -255,7 +255,7 @@ public:
         // middle of the chunk.
         const BSONObj splitPoint = !middle.isEmpty()
             ? middle
-            : selectMedianKey(txn,
+            : selectMedianKey(opCtx,
                               chunk->getShardId(),
                               nss,
                               cm->getShardKeyPattern(),
@@ -267,7 +267,7 @@ public:
               << redact(splitPoint);
 
         uassertStatusOK(
-            shardutil::splitChunkAtMultiplePoints(txn,
+            shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   chunk->getShardId(),
                                                   nss,
                                                   cm->getShardKeyPattern(),
@@ -277,7 +277,7 @@ public:
 
         // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
         // immediately up-to-date the next time it's used.
-        scopedCM.db()->getChunkManagerIfExists(txn, nss.ns(), true);
+        scopedCM.db()->getChunkManagerIfExists(opCtx, nss.ns(), true);
 
         return true;
     }

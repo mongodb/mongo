@@ -208,12 +208,12 @@ KVDatabaseCatalogEntryBase* KVStorageEngine::getDatabaseCatalogEntry(OperationCo
     return db;
 }
 
-Status KVStorageEngine::closeDatabase(OperationContext* txn, StringData db) {
+Status KVStorageEngine::closeDatabase(OperationContext* opCtx, StringData db) {
     // This is ok to be a no-op as there is no database layer in kv.
     return Status::OK();
 }
 
-Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
+Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
     KVDatabaseCatalogEntryBase* entry;
     {
         stdx::lock_guard<stdx::mutex> lk(_dbsLock);
@@ -228,14 +228,14 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
     // wherever possible. Eventually we want to move this up so that it can include the logOp
     // inside of the WUOW, but that would require making DB dropping happen inside the Dur
     // system for MMAPv1.
-    WriteUnitOfWork wuow(txn);
+    WriteUnitOfWork wuow(opCtx);
 
     std::list<std::string> toDrop;
     entry->getCollectionNamespaces(&toDrop);
 
     for (std::list<std::string>::iterator it = toDrop.begin(); it != toDrop.end(); ++it) {
         string coll = *it;
-        entry->dropCollection(txn, coll);
+        entry->dropCollection(opCtx, coll);
     }
     toDrop.clear();
     entry->getCollectionNamespaces(&toDrop);
@@ -243,7 +243,7 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
 
     {
         stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-        txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
+        opCtx->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
         _dbs.erase(db.toString());
     }
 
@@ -251,24 +251,24 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
     return Status::OK();
 }
 
-int KVStorageEngine::flushAllFiles(OperationContext* txn, bool sync) {
-    return _engine->flushAllFiles(txn, sync);
+int KVStorageEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
+    return _engine->flushAllFiles(opCtx, sync);
 }
 
-Status KVStorageEngine::beginBackup(OperationContext* txn) {
+Status KVStorageEngine::beginBackup(OperationContext* opCtx) {
     // We should not proceed if we are already in backup mode
     if (_inBackupMode)
         return Status(ErrorCodes::BadValue, "Already in Backup Mode");
-    Status status = _engine->beginBackup(txn);
+    Status status = _engine->beginBackup(opCtx);
     if (status.isOK())
         _inBackupMode = true;
     return status;
 }
 
-void KVStorageEngine::endBackup(OperationContext* txn) {
+void KVStorageEngine::endBackup(OperationContext* opCtx) {
     // We should never reach here if we aren't already in backup mode
     invariant(_inBackupMode);
-    _engine->endBackup(txn);
+    _engine->endBackup(opCtx);
     _inBackupMode = false;
 }
 
@@ -284,12 +284,12 @@ SnapshotManager* KVStorageEngine::getSnapshotManager() const {
     return _engine->getSnapshotManager();
 }
 
-Status KVStorageEngine::repairRecordStore(OperationContext* txn, const std::string& ns) {
-    Status status = _engine->repairIdent(txn, _catalog->getCollectionIdent(ns));
+Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::string& ns) {
+    Status status = _engine->repairIdent(opCtx, _catalog->getCollectionIdent(ns));
     if (!status.isOK())
         return status;
 
-    _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(txn, ns);
+    _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(opCtx, ns);
     return Status::OK();
 }
 

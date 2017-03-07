@@ -48,14 +48,14 @@ public:
      * Otherwise, either returns NamespaceNotFound if the database does not exist, or any other
      * error code indicating why the database could not be loaded.
      */
-    static StatusWith<ScopedShardDatabase> getExisting(OperationContext* txn, StringData dbName);
+    static StatusWith<ScopedShardDatabase> getExisting(OperationContext* opCtx, StringData dbName);
 
     /**
      * If the specified database exists already, loads it in the cache (if not already there) and
      * returns it. Otherwise, if it does not exis, this call will implicitly create it as
      * non-sharded.
      */
-    static StatusWith<ScopedShardDatabase> getOrCreate(OperationContext* txn, StringData dbName);
+    static StatusWith<ScopedShardDatabase> getOrCreate(OperationContext* opCtx, StringData dbName);
 
     /**
      * Returns the underlying database cache entry.
@@ -94,13 +94,13 @@ public:
      * Returns NamespaceNotFound if the database does not exist, or any other error indicating
      * problem communicating with the config server.
      */
-    static StatusWith<ScopedChunkManager> get(OperationContext* txn, const NamespaceString& nss);
+    static StatusWith<ScopedChunkManager> get(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * If the database holding the specified namespace does not exist, creates it and then behaves
      * like the 'get' method above.
      */
-    static StatusWith<ScopedChunkManager> getOrCreate(OperationContext* txn,
+    static StatusWith<ScopedChunkManager> getOrCreate(OperationContext* opCtx,
                                                       const NamespaceString& nss);
 
     /**
@@ -110,7 +110,7 @@ public:
      * metadata and if so incorporates those. Otherwise, if it does not exist or any other error
      * occurs, passes that error back.
      */
-    static StatusWith<ScopedChunkManager> refreshAndGet(OperationContext* txn,
+    static StatusWith<ScopedChunkManager> refreshAndGet(OperationContext* opCtx,
                                                         const NamespaceString& nss);
 
     /**

@@ -122,7 +122,7 @@ public:
      * Returns !OK if the targeting process itself fails
      *             (no TargetedWrites will be added, state unchanged)
      */
-    Status targetWrites(OperationContext* txn,
+    Status targetWrites(OperationContext* opCtx,
                         const NSTargeter& targeter,
                         std::vector<TargetedWrite*>* targetedWrites);
 

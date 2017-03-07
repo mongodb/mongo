@@ -68,12 +68,12 @@ using stdx::make_unique;
 // static
 const char* CountScan::kStageType = "COUNT_SCAN";
 
-CountScan::CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet)
-    : PlanStage(kStageType, txn),
+CountScan::CountScan(OperationContext* opCtx, const CountScanParams& params, WorkingSet* workingSet)
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-      _shouldDedup(params.descriptor->isMultikey(txn)),
+      _shouldDedup(params.descriptor->isMultikey(opCtx)),
       _params(params) {
     _specificStats.keyPattern = _params.descriptor->keyPattern();
     if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
@@ -81,8 +81,8 @@ CountScan::CountScan(OperationContext* txn, const CountScanParams& params, Worki
         _specificStats.collation = collationElement.Obj().getOwned();
     }
     _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
-    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(txn);
+    _specificStats.isMultiKey = _params.descriptor->isMultikey(opCtx);
+    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(opCtx);
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
@@ -170,7 +170,7 @@ void CountScan::doReattachToOperationContext() {
         _cursor->reattachToOperationContext(getOpCtx());
 }
 
-void CountScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void CountScan::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // The only state we're responsible for holding is what RecordIds to drop.  If a document
     // mutates the underlying index cursor will deal with it.
     if (INVALIDATION_MUTATION == type) {

@@ -101,7 +101,7 @@ public:
         return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
@@ -116,7 +116,7 @@ public:
         }
 
         auto result = Strategy::explainFind(
-            txn, cmdObj, *qr.getValue(), verbosity, serverSelectionMetadata, out);
+            opCtx, cmdObj, *qr.getValue(), verbosity, serverSelectionMetadata, out);
 
         if (result == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
             auto resolvedView = ResolvedView::fromBSON(out->asTempObj());
@@ -136,8 +136,8 @@ public:
             ClusterAggregate::Namespaces nsStruct;
             nsStruct.requestedNss = std::move(nss);
             nsStruct.executionNss = std::move(resolvedView.getNamespace());
-            auto status =
-                ClusterAggregate::runAggregate(txn, nsStruct, aggCmd.getValue(), queryOptions, out);
+            auto status = ClusterAggregate::runAggregate(
+                opCtx, nsStruct, aggCmd.getValue(), queryOptions, out);
             appendCommandStatus(*out, status);
             return status;
         }
@@ -145,7 +145,7 @@ public:
         return result;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -163,7 +163,7 @@ public:
         }
 
         auto cq =
-            CanonicalQuery::canonicalize(txn, std::move(qr.getValue()), ExtensionsCallbackNoop());
+            CanonicalQuery::canonicalize(opCtx, std::move(qr.getValue()), ExtensionsCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }
@@ -181,7 +181,7 @@ public:
         std::vector<BSONObj> batch;
         BSONObj viewDefinition;
         auto cursorId = ClusterFind::runQuery(
-            txn, *cq.getValue(), readPref.getValue(), &batch, &viewDefinition);
+            opCtx, *cq.getValue(), readPref.getValue(), &batch, &viewDefinition);
         if (!cursorId.isOK()) {
             if (cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
                 auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();
@@ -203,7 +203,7 @@ public:
                 nsStruct.requestedNss = std::move(nss);
                 nsStruct.executionNss = std::move(resolvedView.getNamespace());
                 auto status = ClusterAggregate::runAggregate(
-                    txn, nsStruct, aggCmd.getValue(), options, &result);
+                    opCtx, nsStruct, aggCmd.getValue(), options, &result);
                 appendCommandStatus(result, status);
                 return status.isOK();
             }

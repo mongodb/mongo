@@ -56,7 +56,7 @@ public:
 
     virtual void reset() = 0;
     virtual void init(const BSONObj* data) = 0;
-    virtual void registerOperation(OperationContext* txn) = 0;
+    virtual void registerOperation(OperationContext* opCtx) = 0;
     virtual void unregisterOperation() = 0;
 
     void init(const char* data) {
@@ -64,7 +64,7 @@ public:
         init(&o);
     }
 
-    virtual void localConnectForDbEval(OperationContext* txn, const char* dbName) = 0;
+    virtual void localConnectForDbEval(OperationContext* opCtx, const char* dbName) = 0;
     virtual void externalSetup() = 0;
     virtual void setLocalDB(const std::string& localDBName) {
         _localDBName = localDBName;
@@ -161,13 +161,13 @@ public:
 
     void execCoreFiles();
 
-    virtual void loadStored(OperationContext* txn, bool ignoreNotConnected = false);
+    virtual void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false);
 
     /**
      * if any changes are made to .system.js, call this
      * right now its just global - slightly inefficient, but a lot simpler
      */
-    static void storedFuncMod(OperationContext* txn);
+    static void storedFuncMod(OperationContext* opCtx);
 
     static void validateObjectIdString(const std::string& str);
 
@@ -261,7 +261,7 @@ public:
      *                  This must include authenticated users.
      * @return the scope
      */
-    std::unique_ptr<Scope> getPooledScope(OperationContext* txn,
+    std::unique_ptr<Scope> getPooledScope(OperationContext* opCtx,
                                           const std::string& db,
                                           const std::string& scopeType);
 

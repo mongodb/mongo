@@ -119,9 +119,9 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _documents(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
       _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
-          auto task = [work](OperationContext* txn,
+          auto task = [work](OperationContext* opCtx,
                              const Status& status) -> TaskRunner::NextAction {
-              work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, txn));
+              work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
               return TaskRunner::NextAction::kDisposeOperationContext;
           };
           _dbWorkTaskRunner.schedule(task);
@@ -337,9 +337,10 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
                     _finishCallback(cbd.status);
                     return;
                 }
-                auto txn = cbd.txn;
-                txn->setReplicatedWrites(false);
-                auto&& createStatus = _storageInterface->createCollection(txn, _destNss, _options);
+                auto opCtx = cbd.opCtx;
+                opCtx->setReplicatedWrites(false);
+                auto&& createStatus =
+                    _storageInterface->createCollection(opCtx, _destNss, _options);
                 _finishCallback(createStatus);
             });
         if (!scheduleResult.isOK()) {

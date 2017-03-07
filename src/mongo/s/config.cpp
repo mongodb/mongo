@@ -81,7 +81,7 @@ void DBConfig::markNSNotSharded(const std::string& ns) {
     }
 }
 
-std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext* txn,
+std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext* opCtx,
                                                                 const std::string& ns,
                                                                 bool shouldReload,
                                                                 bool forceReload) {
@@ -89,13 +89,13 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext
     LastError::Disabled ignoreForGLE(&LastError::get(cc()));
 
     try {
-        return getChunkManager(txn, ns, shouldReload, forceReload);
+        return getChunkManager(opCtx, ns, shouldReload, forceReload);
     } catch (const DBException&) {
         return nullptr;
     }
 }
 
-std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
+std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* opCtx,
                                                         const std::string& ns,
                                                         bool shouldReload,
                                                         bool forceReload) {
@@ -113,7 +113,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             // Note: read the _reloadCount inside the _lock mutex, so _loadIfNeeded will always
             // be forced to perform a reload.
             const auto currentReloadIteration = _reloadCount.load();
-            _loadIfNeeded(txn, currentReloadIteration);
+            _loadIfNeeded(opCtx, currentReloadIteration);
 
             it = _collections.find(ns);
         }
@@ -139,8 +139,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     // currently
     std::vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
-        uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getChunks(
-            txn,
+        uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getChunks(
+            opCtx,
             BSON(ChunkType::ns(ns)),
             BSON(ChunkType::DEPRECATED_lastmod() << -1),
             1,
@@ -200,7 +200,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             oldManager->getShardKeyPattern(),
             oldManager->getDefaultCollator() ? oldManager->getDefaultCollator()->clone() : nullptr,
             oldManager->isUnique()));
-        tempChunkManager->loadExistingRanges(txn, oldManager.get());
+        tempChunkManager->loadExistingRanges(opCtx, oldManager.get());
 
         if (!tempChunkManager->numChunks()) {
             // Maybe we're not sharded any more, so do a full reload
@@ -208,16 +208,16 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
 
             const bool successful = [&]() {
                 stdx::lock_guard<stdx::mutex> lk(_lock);
-                return _loadIfNeeded(txn, currentReloadIteration);
+                return _loadIfNeeded(opCtx, currentReloadIteration);
             }();
 
             // If we aren't successful loading the database entry, we don't want to keep the stale
             // object around which has invalid data.
             if (!successful) {
-                Grid::get(txn)->catalogCache()->invalidate(_name);
+                Grid::get(opCtx)->catalogCache()->invalidate(_name);
             }
 
-            return getChunkManager(txn, ns);
+            return getChunkManager(opCtx, ns);
         }
     }
 
@@ -277,20 +277,20 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     return ci.cm;
 }
 
-bool DBConfig::load(OperationContext* txn) {
+bool DBConfig::load(OperationContext* opCtx) {
     const auto currentReloadIteration = _reloadCount.load();
     stdx::lock_guard<stdx::mutex> lk(_lock);
-    return _loadIfNeeded(txn, currentReloadIteration);
+    return _loadIfNeeded(opCtx, currentReloadIteration);
 }
 
-bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
+bool DBConfig::_loadIfNeeded(OperationContext* opCtx, Counter reloadIteration) {
     if (reloadIteration != _reloadCount.load()) {
         return true;
     }
 
-    const auto catalogClient = Grid::get(txn)->catalogClient(txn);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
 
-    auto status = catalogClient->getDatabase(txn, _name);
+    auto status = catalogClient->getDatabase(opCtx, _name);
     if (status == ErrorCodes::NamespaceNotFound) {
         return false;
     }
@@ -310,7 +310,7 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     std::vector<CollectionType> collections;
     repl::OpTime configOpTimeWhenLoadingColl;
     uassertStatusOK(
-        catalogClient->getCollections(txn, &_name, &collections, &configOpTimeWhenLoadingColl));
+        catalogClient->getCollections(opCtx, &_name, &collections, &configOpTimeWhenLoadingColl));
 
     invariant(configOpTimeWhenLoadingColl >= _configOpTime);
 
@@ -325,7 +325,7 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
         if (!coll.getDropped()) {
             std::unique_ptr<CollatorInterface> defaultCollator;
             if (!coll.getDefaultCollation().isEmpty()) {
-                auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+                auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                               ->makeFromBSON(coll.getDefaultCollation());
 
                 // The collation was validated upon collection creation.
@@ -342,7 +342,7 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
                                                 coll.getUnique()));
 
             // Do the blocking collection load
-            manager->loadExistingRanges(txn, nullptr);
+            manager->loadExistingRanges(opCtx, nullptr);
 
             // Collections with no chunks are unsharded, no matter what the collections entry says
             if (manager->numChunks()) {

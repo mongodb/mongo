@@ -82,7 +82,7 @@ public:
     WiredTigerSession* getSession(OperationContext* opCtx);
 
     /**
-     * Returns a session without starting a new WT txn on the session. Will not close any already
+     * Returns a session without starting a new WT opCtx on the session. Will not close any already
      * running session.
      */
 
@@ -101,8 +101,8 @@ public:
         return _oplogReadTill;
     }
 
-    static WiredTigerRecoveryUnit* get(OperationContext* txn) {
-        return checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+    static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
+        return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
     }
 
     static void appendGlobalStats(BSONObjBuilder& b);
@@ -146,7 +146,7 @@ public:
     WiredTigerCursor(const std::string& uri,
                      uint64_t tableID,
                      bool forRecordStore,
-                     OperationContext* txn);
+                     OperationContext* opCtx);
 
     ~WiredTigerCursor();
 

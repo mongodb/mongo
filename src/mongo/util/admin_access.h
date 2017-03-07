@@ -50,14 +50,14 @@ public:
     /** @return if there are any priviledge users. This should not
      *          block for long and throw if can't get a lock if needed.
      */
-    virtual bool haveAdminUsers(OperationContext* txn) const = 0;
+    virtual bool haveAdminUsers(OperationContext* opCtx) const = 0;
 };
 
 class NoAdminAccess : public AdminAccess {
 public:
     virtual ~NoAdminAccess() {}
 
-    virtual bool haveAdminUsers(OperationContext* txn) const {
+    virtual bool haveAdminUsers(OperationContext* opCtx) const {
         return false;
     }
 };

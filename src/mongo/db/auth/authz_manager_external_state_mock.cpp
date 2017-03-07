@@ -107,7 +107,7 @@ AuthzManagerExternalStateMock::makeAuthzSessionExternalState(AuthorizationManage
     return stdx::make_unique<AuthzSessionExternalStateMock>(authzManager);
 }
 
-Status AuthzManagerExternalStateMock::findOne(OperationContext* txn,
+Status AuthzManagerExternalStateMock::findOne(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const BSONObj& query,
                                               BSONObj* result) {
@@ -120,7 +120,7 @@ Status AuthzManagerExternalStateMock::findOne(OperationContext* txn,
 }
 
 Status AuthzManagerExternalStateMock::query(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const NamespaceString& collectionName,
     const BSONObj& query,
     const BSONObj&,
@@ -142,7 +142,7 @@ Status AuthzManagerExternalStateMock::query(
     return status;
 }
 
-Status AuthzManagerExternalStateMock::insert(OperationContext* txn,
+Status AuthzManagerExternalStateMock::insert(OperationContext* opCtx,
                                              const NamespaceString& collectionName,
                                              const BSONObj& document,
                                              const BSONObj&) {
@@ -158,19 +158,19 @@ Status AuthzManagerExternalStateMock::insert(OperationContext* txn,
     _documents[collectionName].push_back(toInsert);
 
     if (_authzManager) {
-        _authzManager->logOp(txn, "i", collectionName.ns().c_str(), toInsert, NULL);
+        _authzManager->logOp(opCtx, "i", collectionName.ns().c_str(), toInsert, NULL);
     }
 
     return Status::OK();
 }
 
-Status AuthzManagerExternalStateMock::insertPrivilegeDocument(OperationContext* txn,
+Status AuthzManagerExternalStateMock::insertPrivilegeDocument(OperationContext* opCtx,
                                                               const BSONObj& userObj,
                                                               const BSONObj& writeConcern) {
-    return insert(txn, AuthorizationManager::usersCollectionNamespace, userObj, writeConcern);
+    return insert(opCtx, AuthorizationManager::usersCollectionNamespace, userObj, writeConcern);
 }
 
-Status AuthzManagerExternalStateMock::updateOne(OperationContext* txn,
+Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
                                                 const NamespaceString& collectionName,
                                                 const BSONObj& query,
                                                 const BSONObj& updatePattern,
@@ -197,7 +197,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* txn,
         BSONObj idQuery = driver.makeOplogEntryQuery(newObj, false);
 
         if (_authzManager) {
-            _authzManager->logOp(txn, "u", collectionName.ns().c_str(), logObj, &idQuery);
+            _authzManager->logOp(opCtx, "u", collectionName.ns().c_str(), logObj, &idQuery);
         }
 
         return Status::OK();
@@ -205,7 +205,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* txn,
         if (query.hasField("_id")) {
             document.root().appendElement(query["_id"]);
         }
-        status = driver.populateDocumentWithQueryFields(txn, query, NULL, document);
+        status = driver.populateDocumentWithQueryFields(opCtx, query, NULL, document);
         if (!status.isOK()) {
             return status;
         }
@@ -213,13 +213,13 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* txn,
         if (!status.isOK()) {
             return status;
         }
-        return insert(txn, collectionName, document.getObject(), writeConcern);
+        return insert(opCtx, collectionName, document.getObject(), writeConcern);
     } else {
         return status;
     }
 }
 
-Status AuthzManagerExternalStateMock::update(OperationContext* txn,
+Status AuthzManagerExternalStateMock::update(OperationContext* opCtx,
                                              const NamespaceString& collectionName,
                                              const BSONObj& query,
                                              const BSONObj& updatePattern,
@@ -231,7 +231,7 @@ Status AuthzManagerExternalStateMock::update(OperationContext* txn,
                   "AuthzManagerExternalStateMock::update not implemented in mock.");
 }
 
-Status AuthzManagerExternalStateMock::remove(OperationContext* txn,
+Status AuthzManagerExternalStateMock::remove(OperationContext* opCtx,
                                              const NamespaceString& collectionName,
                                              const BSONObj& query,
                                              const BSONObj&,
@@ -244,7 +244,7 @@ Status AuthzManagerExternalStateMock::remove(OperationContext* txn,
         ++n;
 
         if (_authzManager) {
-            _authzManager->logOp(txn, "d", collectionName.ns().c_str(), idQuery, NULL);
+            _authzManager->logOp(opCtx, "d", collectionName.ns().c_str(), idQuery, NULL);
         }
     }
     *numRemoved = n;

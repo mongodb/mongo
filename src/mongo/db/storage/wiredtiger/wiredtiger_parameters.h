@@ -41,7 +41,7 @@ class WiredTigerEngineRuntimeConfigParameter : public ServerParameter {
 public:
     explicit WiredTigerEngineRuntimeConfigParameter(WiredTigerKVEngine* engine);
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
     virtual Status set(const BSONElement& newValueElement);
 
     virtual Status setFromString(const std::string& str);

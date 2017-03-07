@@ -49,11 +49,12 @@ public:
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
         std::valarray<int> clientStatusCounts(5);
 
         // This returns the blocked lock states
-        for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+        for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
              Client* client = cursor.next();) {
             invariant(client);
             stdx::unique_lock<Client> uniqueLock(*client);
@@ -108,7 +109,8 @@ public:
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
         BSONObjBuilder ret;
 
         SingleThreadedLockStats stats;

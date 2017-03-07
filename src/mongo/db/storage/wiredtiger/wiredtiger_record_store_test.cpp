@@ -96,7 +96,7 @@ public:
     }
     std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
         WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit(_sessionCache);
-        OperationContextNoop txn(ru);
+        OperationContextNoop opCtx(ru);
         string uri = "table:" + ns;
 
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
@@ -105,14 +105,14 @@ public:
         std::string config = result.getValue();
 
         {
-            WriteUnitOfWork uow(&txn);
-            WT_SESSION* s = ru->getSession(&txn)->getSession();
+            WriteUnitOfWork uow(&opCtx);
+            WT_SESSION* s = ru->getSession(&opCtx)->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
             uow.commit();
         }
 
         return stdx::make_unique<WiredTigerRecordStore>(
-            &txn, ns, uri, kWiredTigerEngineName, false, false);
+            &opCtx, ns, uri, kWiredTigerEngineName, false, false);
     }
 
     std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
@@ -124,7 +124,7 @@ public:
                                                       int64_t cappedMaxSize,
                                                       int64_t cappedMaxDocs) {
         WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit(_sessionCache);
-        OperationContextNoop txn(ru);
+        OperationContextNoop opCtx(ru);
         string uri = "table:a.b";
 
         CollectionOptions options;
@@ -136,14 +136,14 @@ public:
         std::string config = result.getValue();
 
         {
-            WriteUnitOfWork uow(&txn);
-            WT_SESSION* s = ru->getSession(&txn)->getSession();
+            WriteUnitOfWork uow(&opCtx);
+            WT_SESSION* s = ru->getSession(&opCtx)->getSession();
             invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
             uow.commit();
         }
 
         return stdx::make_unique<WiredTigerRecordStore>(
-            &txn, ns, uri, kWiredTigerEngineName, true, false, cappedMaxSize, cappedMaxDocs);
+            &opCtx, ns, uri, kWiredTigerEngineName, true, false, cappedMaxSize, cappedMaxDocs);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
@@ -782,13 +782,15 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
     ASSERT(!cursor->next());
 }
 
-RecordId _oplogOrderInsertOplog(OperationContext* txn, const unique_ptr<RecordStore>& rs, int inc) {
+RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
+                                const unique_ptr<RecordStore>& rs,
+                                int inc) {
     Timestamp opTime = Timestamp(5, inc);
     WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
-    Status status = wrs->oplogDiskLocRegister(txn, opTime);
+    Status status = wrs->oplogDiskLocRegister(opCtx, opTime);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
-    StatusWith<RecordId> res = rs->insertRecord(txn, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), false);
     ASSERT_OK(res.getStatus());
     return res.getValue();
 }
@@ -879,8 +881,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
     // the visibility rules aren't violated. See SERVER-21645
     {
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
-        auto txn = harnessHelper->newOperationContext(client2.get());
-        rs->cappedTruncateAfter(txn.get(), id1, /*inclusive*/ false);
+        auto opCtx = harnessHelper->newOperationContext(client2.get());
+        rs->cappedTruncateAfter(opCtx.get(), id1, /*inclusive*/ false);
     }
 
     {

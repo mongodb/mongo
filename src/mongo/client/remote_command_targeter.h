@@ -65,7 +65,7 @@ public:
      * TODO(schwerin): Once operation max-time behavior is more uniformly integrated into sharding,
      * remove the 20-second ceiling on wait time.
      */
-    virtual StatusWith<HostAndPort> findHost(OperationContext* txn,
+    virtual StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                              const ReadPreferenceSetting& readPref) = 0;
 
 

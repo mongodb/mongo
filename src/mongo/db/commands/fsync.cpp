@@ -117,13 +117,13 @@ public:
         actions.addAction(ActionType::fsync);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        if (txn->lockState()->isLocked()) {
+        if (opCtx->lockState()->isLocked()) {
             errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
             return false;
         }
@@ -138,23 +138,23 @@ public:
             // the simple fsync command case
             if (sync) {
                 // can this be GlobalRead? and if it can, it should be nongreedy.
-                ScopedTransaction transaction(txn, MODE_X);
-                Lock::GlobalWrite w(txn->lockState());
+                ScopedTransaction transaction(opCtx, MODE_X);
+                Lock::GlobalWrite w(opCtx->lockState());
                 // TODO SERVER-26822: Replace MMAPv1 specific calls with ones that are storage
                 // engine agnostic.
-                getDur().commitNow(txn);
+                getDur().commitNow(opCtx);
 
                 //  No WriteUnitOfWork needed, as this does no writes of its own.
             }
 
             // Take a global IS lock to ensure the storage engine is not shutdown
-            Lock::GlobalLock global(txn->lockState(), MODE_IS, UINT_MAX);
+            Lock::GlobalLock global(opCtx->lockState(), MODE_IS, UINT_MAX);
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            result.append("numFiles", storageEngine->flushAllFiles(txn, sync));
+            result.append("numFiles", storageEngine->flushAllFiles(opCtx, sync));
             return true;
         }
 
-        Lock::ExclusiveLock lk(txn->lockState(), commandMutex);
+        Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);
         if (!sync) {
             errmsg = "fsync: sync option must be true when using lock";
             return false;
@@ -292,7 +292,7 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
              int options,
@@ -300,7 +300,7 @@ public:
              BSONObjBuilder& result) override {
         log() << "command: unlock requested";
 
-        Lock::ExclusiveLock lk(txn->lockState(), commandMutex);
+        Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);
 
         if (unlockFsync()) {
             const auto lockCount = fsyncCmd.getLockCount();
@@ -343,26 +343,26 @@ void FSyncLockThread::run() {
     invariant(fsyncCmd.getLockCount_inLock() == 1);
 
     try {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
-        ScopedTransaction transaction(&txn, MODE_X);
-        Lock::GlobalWrite global(txn.lockState());  // No WriteUnitOfWork needed
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        ScopedTransaction transaction(&opCtx, MODE_X);
+        Lock::GlobalWrite global(opCtx.lockState());  // No WriteUnitOfWork needed
 
         try {
             // TODO SERVER-26822: Replace MMAPv1 specific calls with ones that are storage engine
             // agnostic.
-            getDur().syncDataAndTruncateJournal(&txn);
+            getDur().syncDataAndTruncateJournal(&opCtx);
         } catch (const std::exception& e) {
             error() << "error doing syncDataAndTruncateJournal: " << e.what();
             fsyncCmd.threadStatus = Status(ErrorCodes::CommandFailed, e.what());
             fsyncCmd.acquireFsyncLockSyncCV.notify_one();
             return;
         }
-        txn.lockState()->downgradeGlobalXtoSForMMAPV1();
+        opCtx.lockState()->downgradeGlobalXtoSForMMAPV1();
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
         try {
-            storageEngine->flushAllFiles(&txn, true);
+            storageEngine->flushAllFiles(&opCtx, true);
         } catch (const std::exception& e) {
             error() << "error doing flushAll: " << e.what();
             fsyncCmd.threadStatus = Status(ErrorCodes::CommandFailed, e.what());
@@ -371,9 +371,9 @@ void FSyncLockThread::run() {
         }
         try {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                uassertStatusOK(storageEngine->beginBackup(&txn));
+                uassertStatusOK(storageEngine->beginBackup(&opCtx));
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "beginBackup", "global");
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&opCtx, "beginBackup", "global");
         } catch (const DBException& e) {
             error() << "storage engine unable to begin backup : " << e.toString();
             fsyncCmd.threadStatus = e.toStatus();
@@ -388,7 +388,7 @@ void FSyncLockThread::run() {
             fsyncCmd.releaseFsyncLockSyncCV.wait(lk);
         }
 
-        storageEngine->endBackup(&txn);
+        storageEngine->endBackup(&opCtx);
 
     } catch (const std::exception& e) {
         severe() << "FSyncLockThread exception: " << e.what();

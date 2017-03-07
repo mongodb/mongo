@@ -152,7 +152,7 @@ Status OplogReader::_compareRequiredOpTimeWithQueryResponse(const OpTime& requir
     return Status::OK();
 }
 
-void OplogReader::connectToSyncSource(OperationContext* txn,
+void OplogReader::connectToSyncSource(OperationContext* opCtx,
                                       const OpTime& lastOpTimeFetched,
                                       const OpTime& requiredOpTime,
                                       ReplicationCoordinator* replCoord) {

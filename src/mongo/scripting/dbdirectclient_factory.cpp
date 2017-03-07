@@ -48,18 +48,18 @@ DBDirectClientFactory& DBDirectClientFactory::get(ServiceContext* context) {
     return forService(context);
 }
 
-DBDirectClientFactory& DBDirectClientFactory::get(OperationContext* txn) {
-    fassert(40152, txn);
-    return get(txn->getServiceContext());
+DBDirectClientFactory& DBDirectClientFactory::get(OperationContext* opCtx) {
+    fassert(40152, opCtx);
+    return get(opCtx->getServiceContext());
 }
 
 void DBDirectClientFactory::registerImplementation(Impl implementation) {
     _implementation = std::move(implementation);
 }
 
-auto DBDirectClientFactory::create(OperationContext* txn) -> Result {
+auto DBDirectClientFactory::create(OperationContext* opCtx) -> Result {
     uassert(40153, "Cannot create a direct client in this context", _implementation);
-    return _implementation(txn);
+    return _implementation(opCtx);
 }
 
 }  // namespace mongo

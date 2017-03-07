@@ -76,34 +76,34 @@ void ServiceContextMongoDTest::setUp() {
 
 void ServiceContextMongoDTest::tearDown() {
     ON_BLOCK_EXIT([&] { Client::destroy(); });
-    auto txn = cc().makeOperationContext();
-    _dropAllDBs(txn.get());
+    auto opCtx = cc().makeOperationContext();
+    _dropAllDBs(opCtx.get());
 }
 
 ServiceContext* ServiceContextMongoDTest::getServiceContext() {
     return getGlobalServiceContext();
 }
 
-void ServiceContextMongoDTest::_dropAllDBs(OperationContext* txn) {
-    dropAllDatabasesExceptLocal(txn);
+void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
+    dropAllDatabasesExceptLocal(opCtx);
 
-    ScopedTransaction transaction(txn, MODE_X);
-    Lock::GlobalWrite lk(txn->lockState());
-    AutoGetDb autoDBLocal(txn, "local", MODE_X);
+    ScopedTransaction transaction(opCtx, MODE_X);
+    Lock::GlobalWrite lk(opCtx->lockState());
+    AutoGetDb autoDBLocal(opCtx, "local", MODE_X);
     const auto localDB = autoDBLocal.getDb();
     if (localDB) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             // Do not wrap in a WriteUnitOfWork until SERVER-17103 is addressed.
-            autoDBLocal.getDb()->dropDatabase(txn, localDB);
+            autoDBLocal.getDb()->dropDatabase(opCtx, localDB);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "_dropAllDBs", "local");
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "_dropAllDBs", "local");
     }
 
     // dropAllDatabasesExceptLocal() does not close empty databases. However the holder still
     // allocates resources to track these empty databases. These resources not released by
     // dropAllDatabasesExceptLocal() will be leaked at exit unless we call DatabaseHolder::closeAll.
     BSONObjBuilder unused;
-    invariant(dbHolder().closeAll(txn, unused, false));
+    invariant(dbHolder().closeAll(opCtx, unused, false));
 }
 
 }  // namespace mongo

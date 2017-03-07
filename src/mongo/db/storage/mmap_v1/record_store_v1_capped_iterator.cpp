@@ -39,10 +39,10 @@ namespace mongo {
 //
 // Capped collection traversal
 //
-CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator(OperationContext* txn,
+CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator(OperationContext* opCtx,
                                                          const CappedRecordStoreV1* collection,
                                                          bool forward)
-    : _txn(txn), _recordStore(collection), _forward(forward) {
+    : _opCtx(opCtx), _recordStore(collection), _forward(forward) {
     const RecordStoreV1MetaData* nsd = _recordStore->details();
 
     // If a start position isn't specified, we fill one out from the start of the
@@ -51,7 +51,7 @@ CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator(OperationContext* txn,
         // Going forwards.
         if (!nsd->capLooped()) {
             // If our capped collection doesn't loop around, the first record is easy.
-            _curr = collection->firstRecord(_txn);
+            _curr = collection->firstRecord(_opCtx);
         } else {
             // Our capped collection has "looped' around.
             // Copied verbatim from ForwardCappedCursor::init.
@@ -66,7 +66,7 @@ CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator(OperationContext* txn,
         // Going backwards
         if (!nsd->capLooped()) {
             // Start at the end.
-            _curr = collection->lastRecord(_txn);
+            _curr = collection->lastRecord(_opCtx);
         } else {
             _curr = _getExtent(nsd->capExtent())->lastRecord;
         }
@@ -78,15 +78,15 @@ boost::optional<Record> CappedRecordStoreV1Iterator::next() {
         return {};
     auto toReturn = _curr.toRecordId();
     _curr = getNextCapped(_curr);
-    return {{toReturn, _recordStore->RecordStore::dataFor(_txn, toReturn)}};
+    return {{toReturn, _recordStore->RecordStore::dataFor(_opCtx, toReturn)}};
 }
 
 boost::optional<Record> CappedRecordStoreV1Iterator::seekExact(const RecordId& id) {
     _curr = getNextCapped(DiskLoc::fromRecordId(id));
-    return {{id, _recordStore->RecordStore::dataFor(_txn, id)}};
+    return {{id, _recordStore->RecordStore::dataFor(_opCtx, id)}};
 }
 
-void CappedRecordStoreV1Iterator::invalidate(OperationContext* txn, const RecordId& id) {
+void CappedRecordStoreV1Iterator::invalidate(OperationContext* opCtx, const RecordId& id) {
     const DiskLoc dl = DiskLoc::fromRecordId(id);
     if (dl == _curr) {
         // We *could* move to the next thing, since there is actually a next
@@ -179,7 +179,7 @@ DiskLoc CappedRecordStoreV1Iterator::nextLoop(const DiskLoc& prev) {
     if (!next.isNull()) {
         return next;
     }
-    return _recordStore->firstRecord(_txn);
+    return _recordStore->firstRecord(_opCtx);
 }
 
 DiskLoc CappedRecordStoreV1Iterator::prevLoop(const DiskLoc& curr) {
@@ -188,7 +188,7 @@ DiskLoc CappedRecordStoreV1Iterator::prevLoop(const DiskLoc& curr) {
     if (!prev.isNull()) {
         return prev;
     }
-    return _recordStore->lastRecord(_txn);
+    return _recordStore->lastRecord(_opCtx);
 }
 
 
@@ -197,11 +197,11 @@ Extent* CappedRecordStoreV1Iterator::_getExtent(const DiskLoc& loc) {
 }
 
 DiskLoc CappedRecordStoreV1Iterator::_getNextRecord(const DiskLoc& loc) {
-    return _recordStore->getNextRecord(_txn, loc);
+    return _recordStore->getNextRecord(_opCtx, loc);
 }
 
 DiskLoc CappedRecordStoreV1Iterator::_getPrevRecord(const DiskLoc& loc) {
-    return _recordStore->getPrevRecord(_txn, loc);
+    return _recordStore->getPrevRecord(_opCtx, loc);
 }
 
 std::unique_ptr<RecordFetcher> CappedRecordStoreV1Iterator::fetcherForNext() const {

@@ -677,8 +677,8 @@ void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 0)
         uasserted(ErrorCodes::BadValue, "local Mongo constructor takes no args");
 
-    auto txn = scope->getOpContext();
-    auto conn = DBDirectClientFactory::get(txn).create(txn);
+    auto opCtx = scope->getOpContext();
+    auto conn = DBDirectClientFactory::get(opCtx).create(opCtx);
 
     JS::RootedObject thisv(cx);
     scope->getProto<MongoLocalInfo>().newObject(&thisv);

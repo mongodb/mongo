@@ -156,12 +156,12 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
  * form stored in the IndexCatalog should any of these indexes already exist.
  */
 StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
-    OperationContext* txn, const Collection* collection, std::vector<BSONObj> indexSpecs) {
+    OperationContext* opCtx, const Collection* collection, std::vector<BSONObj> indexSpecs) {
     std::vector<BSONObj> indexSpecsWithDefaults = std::move(indexSpecs);
 
     for (size_t i = 0, numIndexSpecs = indexSpecsWithDefaults.size(); i < numIndexSpecs; ++i) {
         auto indexSpecStatus = index_key_validate::validateIndexSpecCollation(
-            txn, indexSpecsWithDefaults[i], collection->getDefaultCollator());
+            opCtx, indexSpecsWithDefaults[i], collection->getDefaultCollator());
         if (!indexSpecStatus.isOK()) {
             return indexSpecStatus.getStatus();
         }
@@ -171,7 +171,7 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
                 indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj())) {
             std::unique_ptr<CollatorInterface> indexCollator;
             if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
-                auto collatorStatus = CollatorFactoryInterface::get(txn->getServiceContext())
+                auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(collationElem.Obj());
                 // validateIndexSpecCollation() should have checked that the index collation spec is
                 // valid.
@@ -225,7 +225,7 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -246,56 +246,56 @@ public:
 
         // now we know we have to create index(es)
         // Note: createIndexes command does not currently respect shard versioning.
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns)) {
+        ScopedTransaction transaction(opCtx, MODE_IX);
+        Lock::DBLock dbLock(opCtx->lockState(), ns.db(), MODE_X);
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::NotMaster,
                        str::stream() << "Not primary while creating indexes in " << ns.ns()));
         }
 
-        Database* db = dbHolder().get(txn, ns.db());
+        Database* db = dbHolder().get(opCtx, ns.db());
         if (!db) {
-            db = dbHolder().openDb(txn, ns.db());
+            db = dbHolder().openDb(opCtx, ns.db());
         }
 
         Collection* collection = db->getCollection(ns.ns());
         if (collection) {
             result.appendBool("createdCollectionAutomatically", false);
         } else {
-            if (db->getViewCatalog()->lookup(txn, ns.ns())) {
+            if (db->getViewCatalog()->lookup(opCtx, ns.ns())) {
                 errmsg = "Cannot create indexes on a view";
                 return appendCommandStatus(result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
             }
 
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wunit(txn);
-                collection = db->createCollection(txn, ns.ns(), CollectionOptions());
+                WriteUnitOfWork wunit(opCtx);
+                collection = db->createCollection(opCtx, ns.ns(), CollectionOptions());
                 invariant(collection);
                 wunit.commit();
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, kCommandName, ns.ns());
             result.appendBool("createdCollectionAutomatically", true);
         }
 
         auto indexSpecsWithDefaults =
-            resolveCollectionDefaultProperties(txn, collection, std::move(specs));
+            resolveCollectionDefaultProperties(opCtx, collection, std::move(specs));
         if (!indexSpecsWithDefaults.isOK()) {
             return appendCommandStatus(result, indexSpecsWithDefaults.getStatus());
         }
         specs = std::move(indexSpecsWithDefaults.getValue());
 
-        const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
+        const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
         result.append("numIndexesBefore", numIndexesBefore);
 
-        auto client = txn->getClient();
+        auto client = opCtx->getClient();
         ScopeGuard lastOpSetterGuard =
             MakeObjGuard(repl::ReplClientInfo::forClient(client),
                          &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         txn);
+                         opCtx);
 
-        MultiIndexBlock indexer(txn, collection);
+        MultiIndexBlock indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
 
@@ -315,7 +315,7 @@ public:
         for (size_t i = 0; i < specs.size(); i++) {
             const BSONObj& spec = specs[i];
             if (spec["unique"].trueValue()) {
-                status = checkUniqueIndexConstraints(txn, ns.ns(), spec["key"].Obj());
+                status = checkUniqueIndexConstraints(opCtx, ns.ns(), spec["key"].Obj());
 
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
@@ -327,14 +327,14 @@ public:
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             indexInfoObjs = uassertStatusOK(indexer.init(specs));
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, kCommandName, ns.ns());
 
         // If we're a background index, replace exclusive db lock with an intent lock, so that
         // other readers and writers can proceed during this phase.
         if (indexer.getBuildInBackground()) {
-            txn->recoveryUnit()->abandonSnapshot();
+            opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_IX);
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns)) {
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
                 return appendCommandStatus(
                     result,
                     Status(ErrorCodes::NotMaster,
@@ -344,7 +344,7 @@ public:
         }
 
         try {
-            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+            Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
         } catch (const DBException& e) {
             invariant(e.getCode() != ErrorCodes::WriteConflict);
@@ -354,9 +354,9 @@ public:
                 try {
                     // This function cannot throw today, but we will preemptively prepare for
                     // that day, to avoid data corruption due to lack of index cleanup.
-                    txn->recoveryUnit()->abandonSnapshot();
+                    opCtx->recoveryUnit()->abandonSnapshot();
                     dbLock.relockWithMode(MODE_X);
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns)) {
+                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
                         return appendCommandStatus(
                             result,
                             Status(ErrorCodes::NotMaster,
@@ -374,33 +374,33 @@ public:
         }
         // Need to return db lock back to exclusive, to complete the index build.
         if (indexer.getBuildInBackground()) {
-            txn->recoveryUnit()->abandonSnapshot();
+            opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_X);
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Not primary while completing index build in " << dbname,
-                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns));
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns));
 
-            Database* db = dbHolder().get(txn, ns.db());
+            Database* db = dbHolder().get(opCtx, ns.db());
             uassert(28551, "database dropped during index build", db);
             uassert(28552, "collection dropped during index build", db->getCollection(ns.ns()));
         }
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            WriteUnitOfWork wunit(txn);
+            WriteUnitOfWork wunit(opCtx);
 
             indexer.commit();
 
             for (auto&& infoObj : indexInfoObjs) {
                 std::string systemIndexes = ns.getSystemIndexesCollection();
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    txn, systemIndexes, infoObj, false);
+                    opCtx, systemIndexes, infoObj, false);
             }
 
             wunit.commit();
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, kCommandName, ns.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, kCommandName, ns.ns());
 
-        result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn));
+        result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(opCtx));
 
         lastOpSetterGuard.Dismiss();
 
@@ -408,12 +408,12 @@ public:
     }
 
 private:
-    static Status checkUniqueIndexConstraints(OperationContext* txn,
+    static Status checkUniqueIndexConstraints(OperationContext* opCtx,
                                               StringData ns,
                                               const BSONObj& newIdxKey) {
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        invariant(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_X));
 
-        auto metadata(CollectionShardingState::get(txn, ns.toString())->getMetadata());
+        auto metadata(CollectionShardingState::get(opCtx, ns.toString())->getMetadata());
         if (metadata) {
             ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
             if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {

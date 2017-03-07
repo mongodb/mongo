@@ -41,12 +41,12 @@ using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
-NearStage::NearStage(OperationContext* txn,
+NearStage::NearStage(OperationContext* opCtx,
                      const char* typeName,
                      StageType type,
                      WorkingSet* workingSet,
                      Collection* collection)
-    : PlanStage(typeName, txn),
+    : PlanStage(typeName, opCtx),
       _workingSet(workingSet),
       _collection(collection),
       _searchState(SearchState_Initializing),
@@ -283,7 +283,7 @@ bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
 }
 
-void NearStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void NearStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // If a result is in _resultBuffer and has a RecordId it will be in _seenDocuments as
     // well. It's safe to return the result w/o the RecordId, so just fetch the result.
     unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
@@ -292,7 +292,7 @@ void NearStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invalida
     if (seenIt != _seenDocuments.end()) {
         WorkingSetMember* member = _workingSet->get(seenIt->second);
         verify(member->hasRecordId());
-        WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
         verify(!member->hasRecordId());
 
         // Don't keep it around in the seen map since there's no valid RecordId anymore

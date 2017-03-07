@@ -67,7 +67,7 @@ class OperationContext;
  */
 class SubplanStage final : public PlanStage {
 public:
-    SubplanStage(OperationContext* txn,
+    SubplanStage(OperationContext* opCtx,
                  Collection* collection,
                  WorkingSet* ws,
                  const QueryPlannerParams& params,

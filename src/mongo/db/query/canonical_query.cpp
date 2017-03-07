@@ -102,19 +102,19 @@ bool matchExpressionLessThan(const MatchExpression* lhs, const MatchExpression* 
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* txn, const QueryMessage& qm, const ExtensionsCallback& extensionsCallback) {
+    OperationContext* opCtx, const QueryMessage& qm, const ExtensionsCallback& extensionsCallback) {
     // Make QueryRequest.
     auto qrStatus = QueryRequest::fromLegacyQueryMessage(qm);
     if (!qrStatus.isOK()) {
         return qrStatus.getStatus();
     }
 
-    return CanonicalQuery::canonicalize(txn, std::move(qrStatus.getValue()), extensionsCallback);
+    return CanonicalQuery::canonicalize(opCtx, std::move(qrStatus.getValue()), extensionsCallback);
 }
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* txn,
+    OperationContext* opCtx,
     std::unique_ptr<QueryRequest> qr,
     const ExtensionsCallback& extensionsCallback) {
     auto qrStatus = qr->validate();
@@ -124,7 +124,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
     std::unique_ptr<CollatorInterface> collator;
     if (!qr->getCollation().isEmpty()) {
-        auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+        auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                       ->makeFromBSON(qr->getCollation());
         if (!statusWithCollator.isOK()) {
             return statusWithCollator.getStatus();
@@ -154,7 +154,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const CanonicalQuery& baseQuery,
     MatchExpression* root,
     const ExtensionsCallback& extensionsCallback) {

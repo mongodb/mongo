@@ -82,7 +82,7 @@ void _appendUserInfo(const CurOp& c, BSONObjBuilder& builder, AuthorizationSessi
 }  // namespace
 
 
-void profile(OperationContext* txn, NetworkOp op) {
+void profile(OperationContext* opCtx, NetworkOp op) {
     // Initialize with 1kb at start in order to avoid realloc later
     BufBuilder profileBufBuilder(1024);
 
@@ -90,15 +90,15 @@ void profile(OperationContext* txn, NetworkOp op) {
 
     {
         Locker::LockerInfo lockerInfo;
-        txn->lockState()->getLockerInfo(&lockerInfo);
-        CurOp::get(txn)->debug().append(*CurOp::get(txn), lockerInfo.stats, b);
+        opCtx->lockState()->getLockerInfo(&lockerInfo);
+        CurOp::get(opCtx)->debug().append(*CurOp::get(opCtx), lockerInfo.stats, b);
     }
 
     b.appendDate("ts", jsTime());
-    b.append("client", txn->getClient()->clientAddress());
+    b.append("client", opCtx->getClient()->clientAddress());
 
     const auto& clientMetadata =
-        ClientMetadataIsMasterState::get(txn->getClient()).getClientMetadata();
+        ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
     if (clientMetadata) {
         auto appName = clientMetadata.get().getApplicationName();
         if (!appName.empty()) {
@@ -106,50 +106,50 @@ void profile(OperationContext* txn, NetworkOp op) {
         }
     }
 
-    AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
-    _appendUserInfo(*CurOp::get(txn), b, authSession);
+    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+    _appendUserInfo(*CurOp::get(opCtx), b, authSession);
 
     const BSONObj p = b.done();
 
-    const bool wasLocked = txn->lockState()->isLocked();
+    const bool wasLocked = opCtx->lockState()->isLocked();
 
-    const string dbName(nsToDatabase(CurOp::get(txn)->getNS()));
+    const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
 
     try {
         bool acquireDbXLock = false;
         while (true) {
-            ScopedTransaction scopedXact(txn, MODE_IX);
+            ScopedTransaction scopedXact(opCtx, MODE_IX);
 
             std::unique_ptr<AutoGetDb> autoGetDb;
             if (acquireDbXLock) {
-                autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_X));
+                autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
                 if (autoGetDb->getDb()) {
-                    createProfileCollection(txn, autoGetDb->getDb());
+                    createProfileCollection(opCtx, autoGetDb->getDb());
                 }
             } else {
-                autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_IX));
+                autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_IX));
             }
 
             Database* const db = autoGetDb->getDb();
             if (!db) {
                 // Database disappeared
                 log() << "note: not profiling because db went away for "
-                      << CurOp::get(txn)->getNS();
+                      << CurOp::get(opCtx)->getNS();
                 break;
             }
 
-            Lock::CollectionLock collLock(txn->lockState(), db->getProfilingNS(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx->lockState(), db->getProfilingNS(), MODE_IX);
 
             Collection* const coll = db->getCollection(db->getProfilingNS());
             if (coll) {
-                WriteUnitOfWork wuow(txn);
+                WriteUnitOfWork wuow(opCtx);
                 OpDebug* const nullOpDebug = nullptr;
-                coll->insertDocument(txn, p, nullOpDebug, false);
+                coll->insertDocument(opCtx, p, nullOpDebug, false);
                 wuow.commit();
 
                 break;
             } else if (!acquireDbXLock &&
-                       (!wasLocked || txn->lockState()->isDbLockedForMode(dbName, MODE_X))) {
+                       (!wasLocked || opCtx->lockState()->isDbLockedForMode(dbName, MODE_X))) {
                 // Try to create the collection only if we are not under lock, in order to
                 // avoid deadlocks due to lock conversion. This would only be hit if someone
                 // deletes the profiler collection after setting profile level.
@@ -161,13 +161,13 @@ void profile(OperationContext* txn, NetworkOp op) {
         }
     } catch (const AssertionException& assertionEx) {
         warning() << "Caught Assertion while trying to profile " << networkOpToString(op)
-                  << " against " << CurOp::get(txn)->getNS() << ": " << redact(assertionEx);
+                  << " against " << CurOp::get(opCtx)->getNS() << ": " << redact(assertionEx);
     }
 }
 
 
-Status createProfileCollection(OperationContext* txn, Database* db) {
-    invariant(txn->lockState()->isDbLockedForMode(db->name(), MODE_X));
+Status createProfileCollection(OperationContext* opCtx, Database* db) {
+    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_X));
 
     const std::string dbProfilingNS(db->getProfilingNS());
 
@@ -188,11 +188,11 @@ Status createProfileCollection(OperationContext* txn, Database* db) {
     collectionOptions.capped = true;
     collectionOptions.cappedSize = 1024 * 1024;
 
-    WriteUnitOfWork wunit(txn);
-    bool shouldReplicateWrites = txn->writesAreReplicated();
-    txn->setReplicatedWrites(false);
-    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
-    invariant(db->createCollection(txn, dbProfilingNS, collectionOptions));
+    WriteUnitOfWork wunit(opCtx);
+    bool shouldReplicateWrites = opCtx->writesAreReplicated();
+    opCtx->setReplicatedWrites(false);
+    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, opCtx, shouldReplicateWrites);
+    invariant(db->createCollection(opCtx, dbProfilingNS, collectionOptions));
     wunit.commit();
 
     return Status::OK();

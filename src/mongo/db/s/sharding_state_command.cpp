@@ -67,13 +67,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        ShardingState::get(txn)->appendInfo(txn, result);
+        ShardingState::get(opCtx)->appendInfo(opCtx, result);
         return true;
     }
 

@@ -38,7 +38,7 @@ class OperationContext;
  * Drops the index from collection "ns" that matches the "idxDescriptor" and populates
  * "result" with some statistics about the dropped index.
  */
-Status dropIndexes(OperationContext* txn,
+Status dropIndexes(OperationContext* opCtx,
                    const NamespaceString& ns,
                    const BSONObj& idxDescriptor,
                    BSONObjBuilder* result);

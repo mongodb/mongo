@@ -61,22 +61,22 @@ public:
                                      HostAndPort recipientHost);
     ~MigrationChunkClonerSourceLegacy();
 
-    Status startClone(OperationContext* txn) override;
+    Status startClone(OperationContext* opCtx) override;
 
-    Status awaitUntilCriticalSectionIsAppropriate(OperationContext* txn,
+    Status awaitUntilCriticalSectionIsAppropriate(OperationContext* opCtx,
                                                   Milliseconds maxTimeToWait) override;
 
-    Status commitClone(OperationContext* txn) override;
+    Status commitClone(OperationContext* opCtx) override;
 
-    void cancelClone(OperationContext* txn) override;
+    void cancelClone(OperationContext* opCtx) override;
 
-    bool isDocumentInMigratingChunk(OperationContext* txn, const BSONObj& doc) override;
+    bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc) override;
 
-    void onInsertOp(OperationContext* txn, const BSONObj& insertedDoc) override;
+    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) override;
 
-    void onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) override;
+    void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc) override;
 
-    void onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) override;
+    void onDeleteOp(OperationContext* opCtx, const BSONObj& deletedDocId) override;
 
     // Legacy cloner specific functionality
 
@@ -108,7 +108,7 @@ public:
      *
      * NOTE: Must be called with the collection lock held in at least IS mode.
      */
-    Status nextCloneBatch(OperationContext* txn,
+    Status nextCloneBatch(OperationContext* opCtx,
                           Collection* collection,
                           BSONArrayBuilder* arrBuilder);
 
@@ -119,7 +119,7 @@ public:
      *
      * NOTE: Must be called with the collection lock held in at least IS mode.
      */
-    Status nextModsBatch(OperationContext* txn, Database* db, BSONObjBuilder* builder);
+    Status nextModsBatch(OperationContext* opCtx, Database* db, BSONObjBuilder* builder);
 
 private:
     friend class DeleteNotificationStage;
@@ -132,7 +132,7 @@ private:
      * Idempotent method, which cleans up any previously initialized state. It is safe to be called
      * at any time, but no methods should be called after it.
      */
-    void _cleanup(OperationContext* txn);
+    void _cleanup(OperationContext* opCtx);
 
     /**
      * Synchronously invokes the recipient shard with the specified command and either returns the
@@ -146,7 +146,7 @@ private:
      *
      * Returns OK or any error status otherwise.
      */
-    Status _storeCurrentLocs(OperationContext* txn);
+    Status _storeCurrentLocs(OperationContext* opCtx);
 
     /**
      * Insert items from docIdList to a new array with the given fieldName in the given builder. If
@@ -156,7 +156,7 @@ private:
      *
      * Should be holding the collection lock for ns if explode is true.
      */
-    void _xfer(OperationContext* txn,
+    void _xfer(OperationContext* opCtx,
                Database* db,
                std::list<BSONObj>* docIdList,
                BSONObjBuilder* builder,

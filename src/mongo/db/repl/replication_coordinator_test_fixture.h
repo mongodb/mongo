@@ -233,7 +233,7 @@ protected:
     /**
      * Shuts down the objects under test.
      */
-    void shutdown(OperationContext* txn);
+    void shutdown(OperationContext* opCtx);
 
     /**
      * Receive the heartbeat request from replication coordinator and reply with a response.

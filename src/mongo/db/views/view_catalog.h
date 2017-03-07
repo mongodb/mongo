@@ -70,7 +70,7 @@ public:
      * executes under the catalog's mutex, so it must not access other methods of the catalog,
      * acquire locks or run for a long time.
      */
-    void iterate(OperationContext* txn, ViewIteratorCallback callback);
+    void iterate(OperationContext* opCtx, ViewIteratorCallback callback);
 
     /**
      * Create a new view 'viewName' with contents defined by running the specified aggregation
@@ -81,7 +81,7 @@ public:
      *
      * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
      */
-    Status createView(OperationContext* txn,
+    Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline,
@@ -92,14 +92,14 @@ public:
      *
      * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
      */
-    Status dropView(OperationContext* txn, const NamespaceString& viewName);
+    Status dropView(OperationContext* opCtx, const NamespaceString& viewName);
 
     /**
      * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
      *
      * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
      */
-    Status modifyView(OperationContext* txn,
+    Status modifyView(OperationContext* opCtx,
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline);
@@ -108,14 +108,14 @@ public:
      * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition, or
      * nullptr if it doesn't exist.
      */
-    std::shared_ptr<ViewDefinition> lookup(OperationContext* txn, StringData nss);
+    std::shared_ptr<ViewDefinition> lookup(OperationContext* opCtx, StringData nss);
 
     /**
      * Resolve the views on 'nss', transforming the pipeline appropriately. This function returns a
      * fully-resolved view definition containing the backing namespace, the resolved pipeline and
      * the collation to use for the operation.
      */
-    StatusWith<ResolvedView> resolveView(OperationContext* txn, const NamespaceString& nss);
+    StatusWith<ResolvedView> resolveView(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Reload the views catalog if marked invalid. No-op if already valid. Does only minimal
@@ -124,7 +124,7 @@ public:
      * cycle detection etc. This is implicitly called by other methods when the ViewCatalog is
      * marked invalid, and on first opening a database.
      */
-    Status reloadIfNeeded(OperationContext* txn);
+    Status reloadIfNeeded(OperationContext* opCtx);
 
     /**
      * To be called when direct modifications to the DurableViewCatalog have been committed, so
@@ -136,7 +136,7 @@ public:
     }
 
 private:
-    Status _createOrUpdateView_inlock(OperationContext* txn,
+    Status _createOrUpdateView_inlock(OperationContext* opCtx,
                                       const NamespaceString& viewName,
                                       const NamespaceString& viewOn,
                                       const BSONArray& pipeline,
@@ -145,21 +145,21 @@ private:
      * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
      * the graph if necessary. Returns an error status if the resulting graph would be invalid.
      */
-    Status _upsertIntoGraph(OperationContext* txn, const ViewDefinition& viewDef);
+    Status _upsertIntoGraph(OperationContext* opCtx, const ViewDefinition& viewDef);
 
     /**
      * Returns Status::OK if each view namespace in 'refs' has the same default collation as 'view'.
      * Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
-    Status _validateCollation_inlock(OperationContext* txn,
+    Status _validateCollation_inlock(OperationContext* opCtx,
                                      const ViewDefinition& view,
                                      const std::vector<NamespaceString>& refs);
 
-    std::shared_ptr<ViewDefinition> _lookup_inlock(OperationContext* txn, StringData ns);
-    Status _reloadIfNeeded_inlock(OperationContext* txn);
+    std::shared_ptr<ViewDefinition> _lookup_inlock(OperationContext* opCtx, StringData ns);
+    Status _reloadIfNeeded_inlock(OperationContext* opCtx);
 
-    void _requireValidCatalog_inlock(OperationContext* txn) {
-        uassertStatusOK(_reloadIfNeeded_inlock(txn));
+    void _requireValidCatalog_inlock(OperationContext* opCtx) {
+        uassertStatusOK(_reloadIfNeeded_inlock(opCtx));
         invariant(_valid.load());
     }
 

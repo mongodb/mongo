@@ -56,7 +56,7 @@ class IndexCatalogEntry {
     MONGO_DISALLOW_COPYING(IndexCatalogEntry);
 
 public:
-    IndexCatalogEntry(OperationContext* txn,
+    IndexCatalogEntry(OperationContext* opCtx,
                       StringData ns,
                       CollectionCatalogEntry* collection,  // not owned
                       IndexDescriptor* descriptor,         // ownership passes to me
@@ -98,9 +98,9 @@ public:
 
     /// ---------------------
 
-    const RecordId& head(OperationContext* txn) const;
+    const RecordId& head(OperationContext* opCtx) const;
 
-    void setHead(OperationContext* txn, RecordId newHead);
+    void setHead(OperationContext* opCtx, RecordId newHead);
 
     void setIsReady(bool newIsReady);
 
@@ -124,7 +124,7 @@ public:
      * returns a vector with size equal to the number of elements in the index key pattern where
      * each element in the vector is an empty set.
      */
-    MultikeyPaths getMultikeyPaths(OperationContext* txn) const;
+    MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const;
 
     /**
      * Sets this index to be multikey. Information regarding which newly detected path components
@@ -136,10 +136,10 @@ public:
      * with size equal to the number of elements in the index key pattern. Additionally, at least
      * one path component of the indexed fields must cause this index to be multikey.
      */
-    void setMultikey(OperationContext* txn, const MultikeyPaths& multikeyPaths);
+    void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths);
 
     // if this ready is ready for queries
-    bool isReady(OperationContext* txn) const;
+    bool isReady(OperationContext* opCtx) const;
 
     /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
@@ -157,15 +157,15 @@ private:
     class SetMultikeyChange;
     class SetHeadChange;
 
-    bool _catalogIsReady(OperationContext* txn) const;
-    RecordId _catalogHead(OperationContext* txn) const;
+    bool _catalogIsReady(OperationContext* opCtx) const;
+    RecordId _catalogHead(OperationContext* opCtx) const;
 
     /**
      * Retrieves the multikey information associated with this index from '_collection',
      *
      * See CollectionCatalogEntry::isIndexMultikey() for more details.
      */
-    bool _catalogIsMultikey(OperationContext* txn, MultikeyPaths* multikeyPaths) const;
+    bool _catalogIsMultikey(OperationContext* opCtx, MultikeyPaths* multikeyPaths) const;
 
     // -----
 

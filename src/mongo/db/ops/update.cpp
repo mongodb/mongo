@@ -57,17 +57,17 @@
 
 namespace mongo {
 
-UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& request) {
+UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request) {
     invariant(db);
 
     // Explain should never use this helper.
     invariant(!request.isExplain());
 
-    auto client = txn->getClient();
+    auto client = opCtx->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                                                txn);
+                                                opCtx);
 
     const NamespaceString& nsString = request.getNamespaceString();
     Collection* collection = db->getCollection(nsString.ns());
@@ -82,16 +82,16 @@ UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& re
     if (!collection && request.isUpsert()) {
         // We have to have an exclusive lock on the db to be allowed to create the collection.
         // Callers should either get an X or create the collection.
-        const Locker* locker = txn->lockState();
+        const Locker* locker = opCtx->lockState();
         invariant(locker->isW() ||
                   locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_X));
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+            ScopedTransaction transaction(opCtx, MODE_IX);
+            Lock::DBLock lk(opCtx->lockState(), nsString.db(), MODE_X);
 
-            const bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nsString);
+            const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString);
 
             if (userInitiatedWritesAndNotPrimary) {
                 uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
@@ -99,21 +99,21 @@ UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& re
                                                      << nsString.ns()
                                                      << " during upsert"));
             }
-            WriteUnitOfWork wuow(txn);
-            collection = db->createCollection(txn, nsString.ns(), CollectionOptions());
+            WriteUnitOfWork wuow(opCtx);
+            collection = db->createCollection(opCtx, nsString.ns(), CollectionOptions());
             invariant(collection);
             wuow.commit();
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nsString.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", nsString.ns());
     }
 
     // Parse the update, get an executor for it, run the executor, get stats out.
-    ParsedUpdate parsedUpdate(txn, &request);
+    ParsedUpdate parsedUpdate(opCtx, &request);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;
     std::unique_ptr<PlanExecutor> exec =
-        uassertStatusOK(getExecutorUpdate(txn, nullOpDebug, collection, &parsedUpdate));
+        uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
 
     uassertStatusOK(exec->executePlan());
     if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {

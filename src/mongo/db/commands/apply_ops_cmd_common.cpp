@@ -46,11 +46,11 @@ namespace mongo {
 
 namespace {
 
-Status checkOperationAuthorization(OperationContext* txn,
+Status checkOperationAuthorization(OperationContext* opCtx,
                                    const std::string& dbname,
                                    const BSONObj& oplogEntry,
                                    bool alwaysUpsert) {
-    AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
+    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
     BSONElement opTypeElem = oplogEntry["op"];
     checkBSONType(BSONType::String, opTypeElem);
@@ -79,11 +79,11 @@ Status checkOperationAuthorization(OperationContext* txn,
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }
 
-        return Command::checkAuthorization(command, txn, dbname, o);
+        return Command::checkAuthorization(command, opCtx, dbname, o);
     }
 
     if (opType == "i"_sd) {
-        return authSession->checkAuthForInsert(txn, ns, o);
+        return authSession->checkAuthForInsert(opCtx, ns, o);
     } else if (opType == "u"_sd) {
         BSONElement o2Elem = oplogEntry["o2"];
         checkBSONType(BSONType::Object, o2Elem);
@@ -97,10 +97,10 @@ Status checkOperationAuthorization(OperationContext* txn,
 
         const bool upsert = b || alwaysUpsert;
 
-        return authSession->checkAuthForUpdate(txn, ns, o, o2, upsert);
+        return authSession->checkAuthForUpdate(opCtx, ns, o, o2, upsert);
     } else if (opType == "d"_sd) {
 
-        return authSession->checkAuthForDelete(txn, ns, o);
+        return authSession->checkAuthForDelete(opCtx, ns, o);
     } else if (opType == "db"_sd) {
         // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
         ActionSet allActions;
@@ -175,10 +175,10 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     return ApplyOpsValidity::kOk;
 }
 
-Status checkAuthForApplyOpsCommand(OperationContext* txn,
+Status checkAuthForApplyOpsCommand(OperationContext* opCtx,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) {
-    AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
+    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
     ApplyOpsValidity validity = validateApplyOpsCommand(cmdObj);
     if (validity == ApplyOpsValidity::kNeedsSuperuser) {
@@ -193,7 +193,7 @@ Status checkAuthForApplyOpsCommand(OperationContext* txn,
 
     boost::optional<DisableDocumentValidation> maybeDisableValidation;
     if (shouldBypassDocumentValidationForCommand(cmdObj))
-        maybeDisableValidation.emplace(txn);
+        maybeDisableValidation.emplace(opCtx);
 
 
     const bool alwaysUpsert =
@@ -202,7 +202,7 @@ Status checkAuthForApplyOpsCommand(OperationContext* txn,
     checkBSONType(BSONType::Array, cmdObj.firstElement());
     for (const BSONElement& e : cmdObj.firstElement().Array()) {
         checkBSONType(BSONType::Object, e);
-        Status status = checkOperationAuthorization(txn, dbname, e.Obj(), alwaysUpsert);
+        Status status = checkOperationAuthorization(opCtx, dbname, e.Obj(), alwaysUpsert);
         if (!status.isOK()) {
             return status;
         }

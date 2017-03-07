@@ -88,7 +88,7 @@ public:
         help << "{ buildinfo:1 }";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& jsobj,
              int,  // options
@@ -118,7 +118,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& badns,
                      BSONObj& cmdObj,
                      int,
@@ -144,7 +144,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      BSONObj& cmdObj,
                      int,
@@ -187,7 +187,7 @@ public:
         actions.addAction(ActionType::hostInfo);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
@@ -235,7 +235,7 @@ public:
         actions.addAction(ActionType::logRotate);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      BSONObj& cmdObj,
                      int,
@@ -267,7 +267,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      BSONObj& cmdObj,
                      int,
@@ -366,7 +366,7 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
     CmdForceError() : Command("forceerror") {}
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbnamne,
              BSONObj& cmdObj,
              int,
@@ -401,7 +401,7 @@ public:
         help << "{ getLog : '*' }  OR { getLog : 'global' }";
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -471,7 +471,7 @@ public:
         actions.addAction(ActionType::getCmdLineOpts);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,

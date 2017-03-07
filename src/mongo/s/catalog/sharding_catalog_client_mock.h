@@ -43,11 +43,11 @@ public:
 
     Status startup() override;
 
-    void shutDown(OperationContext* txn) override;
+    void shutDown(OperationContext* opCtx) override;
 
-    Status enableSharding(OperationContext* txn, const std::string& dbName);
+    Status enableSharding(OperationContext* opCtx, const std::string& dbName);
 
-    Status shardCollection(OperationContext* txn,
+    Status shardCollection(OperationContext* opCtx,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
                            const BSONObj& defaultCollation,
@@ -55,35 +55,35 @@ public:
                            const std::vector<BSONObj>& initPoints,
                            const std::set<ShardId>& initShardIds) override;
 
-    StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
+    StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
                                                 const ShardId& name) override;
 
-    Status updateDatabase(OperationContext* txn,
+    Status updateDatabase(OperationContext* opCtx,
                           const std::string& dbName,
                           const DatabaseType& db) override;
 
-    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* txn,
+    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
                                                            const std::string& dbName) override;
 
-    Status updateCollection(OperationContext* txn,
+    Status updateCollection(OperationContext* opCtx,
                             const std::string& collNs,
                             const CollectionType& coll) override;
 
-    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* txn,
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
                                                                const std::string& collNs) override;
 
-    Status getCollections(OperationContext* txn,
+    Status getCollections(OperationContext* opCtx,
                           const std::string* dbName,
                           std::vector<CollectionType>* collections,
                           repl::OpTime* optime) override;
 
-    Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
 
-    Status getDatabasesForShard(OperationContext* txn,
+    Status getDatabasesForShard(OperationContext* opCtx,
                                 const ShardId& shardName,
                                 std::vector<std::string>* dbs) override;
 
-    Status getChunks(OperationContext* txn,
+    Status getChunks(OperationContext* opCtx,
                      const BSONObj& filter,
                      const BSONObj& sort,
                      boost::optional<int> limit,
@@ -91,25 +91,25 @@ public:
                      repl::OpTime* opTime,
                      repl::ReadConcernLevel readConcern) override;
 
-    Status getTagsForCollection(OperationContext* txn,
+    Status getTagsForCollection(OperationContext* opCtx,
                                 const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
 
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-        OperationContext* txn, repl::ReadConcernLevel readConcern) override;
+        OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;
 
-    bool runUserManagementWriteCommand(OperationContext* txn,
+    bool runUserManagementWriteCommand(OperationContext* opCtx,
                                        const std::string& commandName,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    bool runUserManagementReadCommand(OperationContext* txn,
+    bool runUserManagementReadCommand(OperationContext* opCtx,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj,
                                       BSONObjBuilder* result) override;
 
-    Status applyChunkOpsDeprecated(OperationContext* txn,
+    Status applyChunkOpsDeprecated(OperationContext* opCtx,
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition,
                                    const std::string& nss,
@@ -117,48 +117,48 @@ public:
                                    const WriteConcernOptions& writeConcern,
                                    repl::ReadConcernLevel readConcern) override;
 
-    Status logAction(OperationContext* txn,
+    Status logAction(OperationContext* opCtx,
                      const std::string& what,
                      const std::string& ns,
                      const BSONObj& detail) override;
 
-    Status logChange(OperationContext* txn,
+    Status logChange(OperationContext* opCtx,
                      const std::string& what,
                      const std::string& ns,
                      const BSONObj& detail,
                      const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) override;
+    StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) override;
 
-    StatusWith<VersionType> getConfigVersion(OperationContext* txn,
+    StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                              repl::ReadConcernLevel readConcern) override;
 
-    void writeConfigServerDirect(OperationContext* txn,
+    void writeConfigServerDirect(OperationContext* opCtx,
                                  const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
-    Status insertConfigDocument(OperationContext* txn,
+    Status insertConfigDocument(OperationContext* opCtx,
                                 const std::string& ns,
                                 const BSONObj& doc,
                                 const WriteConcernOptions& writeConcern) override;
 
-    StatusWith<bool> updateConfigDocument(OperationContext* txn,
+    StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
                                           const std::string& ns,
                                           const BSONObj& query,
                                           const BSONObj& update,
                                           bool upsert,
                                           const WriteConcernOptions& writeConcern) override;
 
-    Status removeConfigDocuments(OperationContext* txn,
+    Status removeConfigDocuments(OperationContext* opCtx,
                                  const std::string& ns,
                                  const BSONObj& query,
                                  const WriteConcernOptions& writeConcern) override;
 
-    Status createDatabase(OperationContext* txn, const std::string& dbName);
+    Status createDatabase(OperationContext* opCtx, const std::string& dbName);
 
     DistLockManager* getDistLockManager() override;
 
-    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+    Status appendInfoForConfigServerDatabases(OperationContext* opCtx,
                                               const BSONObj& listDatabasesCmd,
                                               BSONArrayBuilder* builder) override;
 

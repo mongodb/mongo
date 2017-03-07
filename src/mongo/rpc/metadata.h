@@ -53,12 +53,12 @@ BSONObj makeEmptyMetadata();
 /**
  * Reads metadata from a metadata object and sets it on this OperationContext.
  */
-Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj);
+Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj);
 
 /**
  * Writes metadata from an OperationContext to a metadata object.
  */
-Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob);
+Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob);
 
 /**
  * A command object and a corresponding metadata object.

@@ -92,7 +92,7 @@ public:
         return status;
     }
 
-    virtual Status explain(OperationContext* txn,
+    virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
@@ -120,16 +120,16 @@ public:
         BatchItemRef targetingBatchItem(&request, 0);
         vector<Strategy::CommandResult> shardResults;
         Status status =
-            _commandOpWrite(txn, dbname, explainCmdBob.obj(), targetingBatchItem, &shardResults);
+            _commandOpWrite(opCtx, dbname, explainCmdBob.obj(), targetingBatchItem, &shardResults);
         if (!status.isOK()) {
             return status;
         }
 
         return ClusterExplain::buildExplainResult(
-            txn, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), out);
+            opCtx, shardResults, ClusterExplain::kWriteOnShards, timer.millis(), out);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -152,7 +152,7 @@ public:
                 response.setErrCode(ErrorCodes::FailedToParse);
                 response.setErrMessage(errmsg);
             } else {
-                writer.write(txn, request, &response);
+                writer.write(opCtx, request, &response);
             }
 
             dassert(response.isValid(NULL));
@@ -220,7 +220,7 @@ private:
      *
      * Does *not* retry or retarget if the metadata is stale.
      */
-    static Status _commandOpWrite(OperationContext* txn,
+    static Status _commandOpWrite(OperationContext* opCtx,
                                   const std::string& dbName,
                                   const BSONObj& command,
                                   BatchItemRef targetingBatchItem,
@@ -230,7 +230,7 @@ private:
         TargeterStats stats;
         ChunkManagerTargeter targeter(
             NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()), &stats);
-        Status status = targeter.init(txn);
+        Status status = targeter.init(opCtx);
         if (!status.isOK())
             return status;
 
@@ -239,22 +239,25 @@ private:
 
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             ShardEndpoint* endpoint;
-            Status status = targeter.targetInsert(txn, targetingBatchItem.getDocument(), &endpoint);
+            Status status =
+                targeter.targetInsert(opCtx, targetingBatchItem.getDocument(), &endpoint);
             if (!status.isOK())
                 return status;
             endpoints.push_back(endpoint);
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            Status status = targeter.targetUpdate(txn, *targetingBatchItem.getUpdate(), &endpoints);
+            Status status =
+                targeter.targetUpdate(opCtx, *targetingBatchItem.getUpdate(), &endpoints);
             if (!status.isOK())
                 return status;
         } else {
             invariant(targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete);
-            Status status = targeter.targetDelete(txn, *targetingBatchItem.getDelete(), &endpoints);
+            Status status =
+                targeter.targetDelete(opCtx, *targetingBatchItem.getDelete(), &endpoints);
             if (!status.isOK())
                 return status;
         }
 
-        auto shardRegistry = Grid::get(txn)->shardRegistry();
+        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         // Assemble requests
         std::vector<AsyncRequestsSender::Request> requests;
@@ -262,7 +265,7 @@ private:
              ++it) {
             const ShardEndpoint* endpoint = *it;
 
-            auto shardStatus = shardRegistry->getShard(txn, endpoint->shardName);
+            auto shardStatus = shardRegistry->getShard(opCtx, endpoint->shardName);
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
@@ -272,12 +275,12 @@ private:
         // Send the requests and wait to receive all the responses.
 
         const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-        AsyncRequestsSender ars(txn,
-                                Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(),
+        AsyncRequestsSender ars(opCtx,
+                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                 dbName,
                                 requests,
                                 readPref);
-        auto responses = ars.waitForResponses(txn);
+        auto responses = ars.waitForResponses(opCtx);
 
         // Parse the responses.
 
@@ -294,7 +297,7 @@ private:
             invariant(response.shardHostAndPort);
             result.target = ConnectionString(std::move(*response.shardHostAndPort));
 
-            auto shardStatus = shardRegistry->getShard(txn, result.target.toString());
+            auto shardStatus = shardRegistry->getShard(opCtx, result.target.toString());
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }

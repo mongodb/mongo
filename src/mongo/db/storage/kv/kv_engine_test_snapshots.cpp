@@ -52,36 +52,37 @@ public:
     public:
         Operation() = default;
         Operation(ServiceContext::UniqueClient client, RecoveryUnit* ru)
-            : _client(std::move(client)), _txn(_client->makeOperationContext()) {
-            delete _txn->releaseRecoveryUnit();
-            _txn->setRecoveryUnit(ru, OperationContext::kNotInUnitOfWork);
+            : _client(std::move(client)), _opCtx(_client->makeOperationContext()) {
+            delete _opCtx->releaseRecoveryUnit();
+            _opCtx->setRecoveryUnit(ru, OperationContext::kNotInUnitOfWork);
         }
 
 
         Operation(Operation&& other) = default;
 
         Operation& operator=(Operation&& other) {
-            // Need to assign to _txn first if active. Otherwise we'd destroy _client before _txn.
-            _txn = std::move(other._txn);
+            // Need to assign to _opCtx first if active. Otherwise we'd destroy _client before
+            // _opCtx.
+            _opCtx = std::move(other._opCtx);
             _client = std::move(other._client);
             return *this;
         }
 
         OperationContext& operator*() const {
-            return *_txn;
+            return *_opCtx;
         }
 
         OperationContext* operator->() const {
-            return _txn.get();
+            return _opCtx.get();
         }
 
         operator OperationContext*() const {
-            return _txn.get();
+            return _opCtx.get();
         }
 
     private:
         ServiceContext::UniqueClient _client;
-        ServiceContext::UniqueOperationContext _txn;
+        ServiceContext::UniqueOperationContext _opCtx;
     };
 
     Operation makeOperation() {
@@ -104,8 +105,8 @@ public:
         return createSnapshot();
     }
 
-    RecordId insertRecord(OperationContext* txn, std::string contents = "abcd") {
-        auto id = rs->insertRecord(txn, contents.c_str(), contents.length() + 1, false);
+    RecordId insertRecord(OperationContext* opCtx, std::string contents = "abcd") {
+        auto id = rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, false);
         ASSERT_OK(id);
         return id.getValue();
     }
@@ -136,8 +137,8 @@ public:
     /**
      * Returns the number of records seen iterating rs using the passed-in OperationContext.
      */
-    int itCountOn(OperationContext* txn) {
-        auto cursor = rs->getCursor(txn);
+    int itCountOn(OperationContext* opCtx) {
+        auto cursor = rs->getCursor(opCtx);
         int count = 0;
         while (auto record = cursor->next()) {
             count++;

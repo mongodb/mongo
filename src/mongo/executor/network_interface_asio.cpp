@@ -232,7 +232,7 @@ Status attachMetadataIfNeeded(RemoteCommandRequest& request,
 
         auto writeStatus = callNoexcept(*metadataHook,
                                         &rpc::EgressMetadataHook::writeRequestMetadata,
-                                        request.txn,
+                                        request.opCtx,
                                         request.target,
                                         &augmentedBob);
         if (!writeStatus.isOK()) {

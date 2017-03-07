@@ -51,19 +51,19 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 class Base {
 public:
     Base()
-        : _scopedXact(&_txn, MODE_IX),
-          _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
-          _context(&_txn, ns()),
-          _client(&_txn) {
+        : _scopedXact(&_opCtx, MODE_IX),
+          _lk(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
+          _context(&_opCtx, ns()),
+          _client(&_opCtx) {
         _database = _context.db();
 
         {
-            WriteUnitOfWork wunit(&_txn);
+            WriteUnitOfWork wunit(&_opCtx);
             _collection = _database->getCollection(ns());
             if (_collection) {
-                _database->dropCollection(&_txn, ns());
+                _database->dropCollection(&_opCtx, ns());
             }
-            _collection = _database->createCollection(&_txn, ns());
+            _collection = _database->createCollection(&_opCtx, ns());
             wunit.commit();
         }
 
@@ -71,8 +71,8 @@ public:
     }
     ~Base() {
         try {
-            WriteUnitOfWork wunit(&_txn);
-            uassertStatusOK(_database->dropCollection(&_txn, ns()));
+            WriteUnitOfWork wunit(&_opCtx);
+            uassertStatusOK(_database->dropCollection(&_opCtx, ns()));
             wunit.commit();
         } catch (...) {
             FAIL("Exception while cleaning up collection");
@@ -85,7 +85,7 @@ protected:
     }
 
     void addIndex(const BSONObj& key) {
-        Helpers::ensureIndex(&_txn,
+        Helpers::ensureIndex(&_opCtx,
                              _collection,
                              key,
                              kIndexVersion,
@@ -94,7 +94,7 @@ protected:
     }
 
     void insert(const char* s) {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
         const BSONObj o = fromjson(s);
         OpDebug* const nullOpDebug = nullptr;
 
@@ -104,16 +104,16 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            _collection->insertDocument(&_txn, b.obj(), nullOpDebug, false);
+            _collection->insertDocument(&_opCtx, b.obj(), nullOpDebug, false);
         } else {
-            _collection->insertDocument(&_txn, o, nullOpDebug, false);
+            _collection->insertDocument(&_opCtx, o, nullOpDebug, false);
         }
         wunit.commit();
     }
 
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     ScopedTransaction _scopedXact;
     Lock::DBLock _lk;
 

@@ -83,7 +83,7 @@ public:
 
     CmdListDatabases() : Command("listDatabases", true) {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
              int,
@@ -114,8 +114,8 @@ public:
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         {
-            ScopedTransaction transaction(txn, MODE_IS);
-            Lock::GlobalLock lk(txn->lockState(), MODE_IS, UINT_MAX);
+            ScopedTransaction transaction(opCtx, MODE_IS);
+            Lock::GlobalLock lk(opCtx->lockState(), MODE_IS, UINT_MAX);
             storageEngine->listDatabases(&dbNames);
         }
 
@@ -135,17 +135,17 @@ public:
                 if (filterNameOnly && !filter->matchesBSON(b.asTempObj()))
                     continue;
 
-                ScopedTransaction transaction(txn, MODE_IS);
-                Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
+                ScopedTransaction transaction(opCtx, MODE_IS);
+                Lock::DBLock dbLock(opCtx->lockState(), dbname, MODE_IS);
 
-                Database* db = dbHolder().get(txn, dbname);
+                Database* db = dbHolder().get(opCtx, dbname);
                 if (!db)
                     continue;
 
                 const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
                 invariant(entry);
 
-                size = entry->sizeOnDisk(txn);
+                size = entry->sizeOnDisk(opCtx);
                 b.append("sizeOnDisk", static_cast<double>(size));
 
                 b.appendBool("empty", entry->isEmpty());

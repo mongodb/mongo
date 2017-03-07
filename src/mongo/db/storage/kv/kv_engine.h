@@ -91,14 +91,14 @@ public:
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) = 0;
 
     // optional
-    virtual int flushAllFiles(OperationContext* txn, bool sync) {
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync) {
         return 0;
     }
 
     /**
      * See StorageEngine::beginBackup for details
      */
-    virtual Status beginBackup(OperationContext* txn) {
+    virtual Status beginBackup(OperationContext* opCtx) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
@@ -106,7 +106,7 @@ public:
     /**
      * See StorageEngine::endBackup for details
      */
-    virtual void endBackup(OperationContext* txn) {
+    virtual void endBackup(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }
 

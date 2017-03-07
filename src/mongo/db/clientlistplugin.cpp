@@ -57,7 +57,7 @@ public:
     ClientListPlugin() : WebStatusPlugin("clients", 20) {}
     virtual void init() {}
 
-    virtual void run(OperationContext* txn, std::stringstream& ss) {
+    virtual void run(OperationContext* opCtx, std::stringstream& ss) {
         using namespace html;
 
         ss << "\n<table border=1 cellpadding=2 cellspacing=0>";
@@ -78,7 +78,7 @@ public:
 
            << "</tr>\n";
 
-        _processAllClients(txn->getClient()->getServiceContext(), ss);
+        _processAllClients(opCtx->getClient()->getServiceContext(), ss);
 
         ss << "</table>\n";
     }
@@ -92,23 +92,23 @@ private:
 
             // Make the client stable
             stdx::lock_guard<Client> lk(*client);
-            const OperationContext* txn = client->getOperationContext();
-            if (!txn)
+            const OperationContext* opCtx = client->getOperationContext();
+            if (!opCtx)
                 continue;
 
-            CurOp* curOp = CurOp::get(txn);
+            CurOp* curOp = CurOp::get(opCtx);
             if (!curOp)
                 continue;
 
             ss << "<tr><td>" << client->desc() << "</td>";
 
-            tablecell(ss, txn->getOpID());
+            tablecell(ss, opCtx->getOpID());
             tablecell(ss, true);
 
             // LockState
             {
                 Locker::LockerInfo lockerInfo;
-                txn->lockState()->getLockerInfo(&lockerInfo);
+                opCtx->lockState()->getLockerInfo(&lockerInfo);
 
                 BSONObjBuilder lockerInfoBuilder;
                 fillLockerInfo(lockerInfo, lockerInfoBuilder);

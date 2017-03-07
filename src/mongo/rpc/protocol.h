@@ -81,12 +81,12 @@ const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly;
 /**
  * Returns the protocol used to initiate the current operation.
  */
-Protocol getOperationProtocol(OperationContext* txn);
+Protocol getOperationProtocol(OperationContext* opCtx);
 
 /**
  * Sets the protocol used to initiate the current operation.
  */
-void setOperationProtocol(OperationContext* txn, Protocol protocol);
+void setOperationProtocol(OperationContext* opCtx, Protocol protocol);
 
 /**
  * Returns the newest protocol supported by two parties.

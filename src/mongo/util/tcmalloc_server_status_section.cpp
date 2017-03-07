@@ -100,7 +100,8 @@ public:
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
         long long verbosity = 1;
         if (configElement) {
             // Relies on the fact that safeNumberLong turns non-numbers into 0.

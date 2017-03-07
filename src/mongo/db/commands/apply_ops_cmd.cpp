@@ -80,13 +80,13 @@ public:
     }
 
 
-    virtual Status checkAuthForOperation(OperationContext* txn,
+    virtual Status checkAuthForOperation(OperationContext* opCtx,
                                          const std::string& dbname,
                                          const BSONObj& cmdObj) {
-        return checkAuthForApplyOpsCommand(txn, dbname, cmdObj);
+        return checkAuthForApplyOpsCommand(opCtx, dbname, cmdObj);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -96,7 +96,7 @@ public:
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
-            maybeDisableValidation.emplace(txn);
+            maybeDisableValidation.emplace(opCtx);
 
         if (cmdObj.firstElement().type() != Array) {
             errmsg = "ops has to be an array";
@@ -116,14 +116,14 @@ public:
             }
         }
 
-        auto client = txn->getClient();
+        auto client = opCtx->getClient();
         auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
         ScopeGuard lastOpSetterGuard =
             MakeObjGuard(repl::ReplClientInfo::forClient(client),
                          &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         txn);
+                         opCtx);
 
-        auto applyOpsStatus = appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
+        auto applyOpsStatus = appendCommandStatus(result, applyOps(opCtx, dbname, cmdObj, &result));
 
         if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it

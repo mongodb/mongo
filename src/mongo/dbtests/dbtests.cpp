@@ -80,7 +80,7 @@ void initWireSpec() {
     spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
 }
 
-Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bool unique) {
+Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
     specBuilder.append("name", DBClientBase::genIndexName(keys));
     specBuilder.append("ns", ns);
@@ -89,19 +89,19 @@ Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bo
     if (unique) {
         specBuilder.appendBool("unique", true);
     }
-    return createIndexFromSpec(txn, ns, specBuilder.done());
+    return createIndexFromSpec(opCtx, ns, specBuilder.done());
 }
 
-Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& spec) {
-    AutoGetOrCreateDb autoDb(txn, nsToDatabaseSubstring(ns), MODE_X);
+Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
+    AutoGetOrCreateDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
     Collection* coll;
     {
-        WriteUnitOfWork wunit(txn);
-        coll = autoDb.getDb()->getOrCreateCollection(txn, ns);
+        WriteUnitOfWork wunit(opCtx);
+        coll = autoDb.getDb()->getOrCreateCollection(opCtx, ns);
         invariant(coll);
         wunit.commit();
     }
-    MultiIndexBlock indexer(txn, coll);
+    MultiIndexBlock indexer(opCtx, coll);
     Status status = indexer.init(spec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
@@ -113,7 +113,7 @@ Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& 
     if (!status.isOK()) {
         return status;
     }
-    WriteUnitOfWork wunit(txn);
+    WriteUnitOfWork wunit(opCtx);
     indexer.commit();
     wunit.commit();
     return Status::OK();

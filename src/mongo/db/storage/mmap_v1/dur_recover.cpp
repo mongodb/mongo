@@ -268,23 +268,23 @@ RecoveryJob::~RecoveryJob() {
     invariant(!"RecoveryJob is intentionally leaked with a bare call to operator new()");
 }
 
-void RecoveryJob::close(OperationContext* txn) {
+void RecoveryJob::close(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mx);
-    _close(txn);
+    _close(opCtx);
 }
 
-void RecoveryJob::_close(OperationContext* txn) {
-    MongoFile::flushAll(txn, true);
-    LockMongoFilesExclusive lock(txn);
+void RecoveryJob::_close(OperationContext* opCtx) {
+    MongoFile::flushAll(opCtx, true);
+    LockMongoFilesExclusive lock(opCtx);
     for (auto& durFile : _mmfs) {
-        durFile->close(txn);
+        durFile->close(opCtx);
     }
     _mmfs.clear();
 }
 
-RecoveryJob::Last::Last(OperationContext* txn) : _txn(txn), mmf(NULL), fileNo(-1) {
+RecoveryJob::Last::Last(OperationContext* opCtx) : _opCtx(opCtx), mmf(NULL), fileNo(-1) {
     // Make sure the files list does not change from underneath
-    LockMongoFilesShared::assertAtLeastReadLocked(txn);
+    LockMongoFilesShared::assertAtLeastReadLocked(opCtx);
 }
 
 DurableMappedFile* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& entry,
@@ -296,7 +296,7 @@ DurableMappedFile* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& en
     string fn = fileName(entry.dbName, num);
     MongoFile* file;
     {
-        MongoFileFinder finder(_txn);  // must release lock before creating new DurableMappedFile
+        MongoFileFinder finder(_opCtx);  // must release lock before creating new DurableMappedFile
         file = finder.findByPath(fn);
     }
 
@@ -308,8 +308,8 @@ DurableMappedFile* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& en
             log() << "journal error applying writes, file " << fn << " is not open" << endl;
             verify(false);
         }
-        std::shared_ptr<DurableMappedFile> sp(new DurableMappedFile(_txn));
-        verify(sp->open(_txn, fn));
+        std::shared_ptr<DurableMappedFile> sp(new DurableMappedFile(_opCtx));
+        verify(sp->open(_opCtx, fn));
         rj._mmfs.push_back(sp);
         mmf = sp.get();
     }
@@ -363,14 +363,14 @@ void RecoveryJob::applyEntry(Last& last, const ParsedJournalEntry& entry, bool a
         }
         if (apply) {
             if (entry.op->needFilesClosed()) {
-                _close(last.txn());  // locked in processSection
+                _close(last.opCtx());  // locked in processSection
             }
             entry.op->replay();
         }
     }
 }
 
-void RecoveryJob::applyEntries(OperationContext* txn, const vector<ParsedJournalEntry>& entries) {
+void RecoveryJob::applyEntries(OperationContext* opCtx, const vector<ParsedJournalEntry>& entries) {
     const bool apply = (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalScanOnly) == 0;
     const bool dump = (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalDumpJournal);
 
@@ -378,7 +378,7 @@ void RecoveryJob::applyEntries(OperationContext* txn, const vector<ParsedJournal
         log() << "BEGIN section" << endl;
     }
 
-    Last last(txn);
+    Last last(opCtx);
     for (vector<ParsedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
         applyEntry(last, *i, apply, dump);
     }
@@ -388,12 +388,12 @@ void RecoveryJob::applyEntries(OperationContext* txn, const vector<ParsedJournal
     }
 }
 
-void RecoveryJob::processSection(OperationContext* txn,
+void RecoveryJob::processSection(OperationContext* opCtx,
                                  const JSectHeader* h,
                                  const void* p,
                                  unsigned len,
                                  const JSectFooter* f) {
-    LockMongoFilesShared lkFiles(txn);  // for RecoveryJob::Last
+    LockMongoFilesShared lkFiles(opCtx);  // for RecoveryJob::Last
     stdx::lock_guard<stdx::mutex> lk(_mx);
 
     if (_recovering) {
@@ -467,14 +467,14 @@ void RecoveryJob::processSection(OperationContext* txn,
     }
 
     // got all the entries for one group commit.  apply them:
-    applyEntries(txn, entries);
+    applyEntries(opCtx, entries);
 }
 
 /** apply a specific journal file, that is already mmap'd
     @param p start of the memory mapped file
     @return true if this is detected to be the last file (ends abruptly)
 */
-bool RecoveryJob::processFileBuffer(OperationContext* txn, const void* p, unsigned len) {
+bool RecoveryJob::processFileBuffer(OperationContext* opCtx, const void* p, unsigned len) {
     try {
         unsigned long long fileId;
         BufReader br(p, len);
@@ -529,7 +529,8 @@ bool RecoveryJob::processFileBuffer(OperationContext* txn, const void* p, unsign
             const char* hdr = (const char*)br.skip(h.sectionLenWithPadding());
             const char* data = hdr + sizeof(JSectHeader);
             const char* footer = data + dataLen;
-            processSection(txn, (const JSectHeader*)hdr, data, dataLen, (const JSectFooter*)footer);
+            processSection(
+                opCtx, (const JSectHeader*)hdr, data, dataLen, (const JSectFooter*)footer);
 
             // ctrl c check
             uassert(ErrorCodes::Interrupted,
@@ -550,7 +551,7 @@ bool RecoveryJob::processFileBuffer(OperationContext* txn, const void* p, unsign
 }
 
 /** apply a specific journal file */
-bool RecoveryJob::processFile(OperationContext* txn, boost::filesystem::path journalfile) {
+bool RecoveryJob::processFile(OperationContext* opCtx, boost::filesystem::path journalfile) {
     log() << "recover " << journalfile.string() << endl;
 
     try {
@@ -564,20 +565,20 @@ bool RecoveryJob::processFile(OperationContext* txn, boost::filesystem::path jou
         log() << "recover exception checking filesize" << endl;
     }
 
-    MemoryMappedFile f{txn, MongoFile::Options::READONLY | MongoFile::Options::SEQUENTIAL};
-    ON_BLOCK_EXIT([&f, &txn] {
-        LockMongoFilesExclusive lock(txn);
-        f.close(txn);
+    MemoryMappedFile f{opCtx, MongoFile::Options::READONLY | MongoFile::Options::SEQUENTIAL};
+    ON_BLOCK_EXIT([&f, &opCtx] {
+        LockMongoFilesExclusive lock(opCtx);
+        f.close(opCtx);
     });
-    void* p = f.map(txn, journalfile.string().c_str());
+    void* p = f.map(opCtx, journalfile.string().c_str());
     massert(13544, str::stream() << "recover error couldn't open " << journalfile.string(), p);
-    return processFileBuffer(txn, p, (unsigned)f.length());
+    return processFileBuffer(opCtx, p, (unsigned)f.length());
 }
 
 /** @param files all the j._0 style files we need to apply for recovery */
-void RecoveryJob::go(OperationContext* txn, vector<boost::filesystem::path>& files) {
+void RecoveryJob::go(OperationContext* opCtx, vector<boost::filesystem::path>& files) {
     log() << "recover begin" << endl;
-    LockMongoFilesExclusive lkFiles(txn);  // for RecoveryJob::Last
+    LockMongoFilesExclusive lkFiles(opCtx);  // for RecoveryJob::Last
     _recovering = true;
 
     // load the last sequence number synced to the datafiles on disk before the last crash
@@ -585,11 +586,11 @@ void RecoveryJob::go(OperationContext* txn, vector<boost::filesystem::path>& fil
     log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
     for (unsigned i = 0; i != files.size(); ++i) {
-        bool abruptEnd = processFile(txn, files[i]);
+        bool abruptEnd = processFile(opCtx, files[i]);
         if (abruptEnd && i + 1 < files.size()) {
             log() << "recover error: abrupt end to file " << files[i].string()
                   << ", yet it isn't the last journal file" << endl;
-            close(txn);
+            close(opCtx);
             uasserted(13535, "recover abrupt journal file end");
         }
     }
@@ -600,7 +601,7 @@ void RecoveryJob::go(OperationContext* txn, vector<boost::filesystem::path>& fil
               << "Last skipped sections had sequence number " << _lastSeqSkipped;
     }
 
-    close(txn);
+    close(opCtx);
 
     if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalScanOnly) {
         uasserted(13545,
@@ -615,7 +616,7 @@ void RecoveryJob::go(OperationContext* txn, vector<boost::filesystem::path>& fil
     _recovering = false;
 }
 
-void _recover(OperationContext* txn) {
+void _recover(OperationContext* opCtx) {
     verify(storageGlobalParams.dur);
 
     boost::filesystem::path p = getJournalDir();
@@ -635,7 +636,7 @@ void _recover(OperationContext* txn) {
         return;
     }
 
-    RecoveryJob::get().go(txn, journalFiles);
+    RecoveryJob::get().go(opCtx, journalFiles);
 }
 
 /** recover from a crash
@@ -645,11 +646,11 @@ void _recover(OperationContext* txn) {
 void replayJournalFilesAtStartup() {
     // we use a lock so that exitCleanly will wait for us
     // to finish (or at least to notice what is up and stop)
-    auto txn = cc().makeOperationContext();
-    ScopedTransaction transaction(txn.get(), MODE_X);
-    Lock::GlobalWrite lk(txn->lockState());
+    auto opCtx = cc().makeOperationContext();
+    ScopedTransaction transaction(opCtx.get(), MODE_X);
+    Lock::GlobalWrite lk(opCtx->lockState());
 
-    _recover(txn.get());  // throws on interruption
+    _recover(opCtx.get());  // throws on interruption
 }
 
 struct BufReaderY {

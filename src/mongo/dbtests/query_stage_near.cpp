@@ -78,7 +78,7 @@ public:
         _intervals.mutableVector().push_back(new MockInterval(data, min, max));
     }
 
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                                       WorkingSet* workingSet,
                                                       Collection* collection) {
         if (_pos == static_cast<int>(_intervals.size()))
@@ -88,7 +88,7 @@ public:
 
         bool lastInterval = _pos == static_cast<int>(_intervals.vector().size());
 
-        auto queuedStage = make_unique<QueuedDataStage>(txn, workingSet);
+        auto queuedStage = make_unique<QueuedDataStage>(opCtx, workingSet);
 
         for (unsigned int i = 0; i < interval.data.size(); i++) {
             // Add all documents from the lastInterval into the QueuedDataStage.
@@ -109,7 +109,7 @@ public:
         return StatusWith<double>(member->obj.value()["distance"].numberDouble());
     }
 
-    virtual StageState initialize(OperationContext* txn,
+    virtual StageState initialize(OperationContext* opCtx,
                                   WorkingSet* workingSet,
                                   Collection* collection,
                                   WorkingSetID* out) {

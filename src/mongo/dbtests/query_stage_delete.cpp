@@ -61,8 +61,8 @@ static const NamespaceString nss("unittests.QueryStageDelete");
 
 class QueryStageDeleteBase {
 public:
-    QueryStageDeleteBase() : _client(&_txn) {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+    QueryStageDeleteBase() : _client(&_opCtx) {
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
 
         for (size_t i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -73,7 +73,7 @@ public:
     }
 
     virtual ~QueryStageDeleteBase() {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -91,7 +91,7 @@ public:
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -107,7 +107,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
+            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }
@@ -118,7 +118,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;
@@ -132,7 +132,7 @@ private:
 class QueryStageDeleteInvalidateUpcomingObject : public QueryStageDeleteBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
 
         Collection* coll = ctx.getCollection();
 
@@ -151,11 +151,11 @@ public:
         deleteStageParams.isMulti = true;
 
         WorkingSet ws;
-        DeleteStage deleteStage(&_txn,
+        DeleteStage deleteStage(&_opCtx,
                                 deleteStageParams,
                                 &ws,
                                 coll,
-                                new CollectionScan(&_txn, collScanParams, &ws, NULL));
+                                new CollectionScan(&_opCtx, collScanParams, &ws, NULL));
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
 
@@ -170,11 +170,11 @@ public:
         // Remove recordIds[targetDocIndex];
         deleteStage.saveState();
         {
-            WriteUnitOfWork wunit(&_txn);
-            deleteStage.invalidate(&_txn, recordIds[targetDocIndex], INVALIDATION_DELETION);
+            WriteUnitOfWork wunit(&_opCtx);
+            deleteStage.invalidate(&_opCtx, recordIds[targetDocIndex], INVALIDATION_DELETION);
             wunit.commit();
         }
-        BSONObj targetDoc = coll->docFor(&_txn, recordIds[targetDocIndex]).value();
+        BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
         deleteStage.restoreState();
@@ -198,7 +198,7 @@ class QueryStageDeleteReturnOldDoc : public QueryStageDeleteBase {
 public:
     void run() {
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
@@ -211,7 +211,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -226,7 +226,7 @@ public:
         deleteParams.canonicalQuery = cq.get();
 
         const auto deleteStage =
-            make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release());
+            make_unique<DeleteStage>(&_opCtx, deleteParams, ws.get(), coll, qds.release());
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
 
@@ -267,14 +267,14 @@ class QueryStageDeleteSkipOwnedObjects : public QueryStageDeleteBase {
 public:
     void run() {
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         Collection* coll = ctx.getCollection();
         const BSONObj query = BSONObj();
         const auto ws = make_unique<WorkingSet>();
         const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the delete stage.
-        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
         {
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
@@ -289,7 +289,7 @@ public:
         deleteParams.canonicalQuery = cq.get();
 
         const auto deleteStage =
-            make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release());
+            make_unique<DeleteStage>(&_opCtx, deleteParams, ws.get(), coll, qds.release());
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
 
         // Call work, passing the set up member to the delete stage.

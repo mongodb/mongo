@@ -55,8 +55,9 @@ namespace mongo {
  *
  * Typical usage is:
  *
- * AsyncRequestsSender ars(txn, executor, db, requests, readPrefSetting);  // schedule the requests
- * auto responses = ars.waitForResponses(txn);  // wait for responses; retries on retriable erors
+ * AsyncRequestsSender ars(opCtx, executor, db, requests, readPrefSetting);  // schedule the
+ * requests
+ * auto responses = ars.waitForResponses(opCtx);  // wait for responses; retries on retriable erors
  *
  * Additionally, you can interrupt() (if you want waitForResponses() to wait for responses for
  * outstanding requests but stop scheduling retries) or kill() (if you want to cancel outstanding
@@ -103,7 +104,7 @@ public:
      * Constructs a new AsyncRequestsSender. The TaskExecutor* must remain valid for the lifetime of
      * the ARS.
      */
-    AsyncRequestsSender(OperationContext* txn,
+    AsyncRequestsSender(OperationContext* opCtx,
                         executor::TaskExecutor* executor,
                         StringData db,
                         const std::vector<AsyncRequestsSender::Request>& requests,
@@ -122,7 +123,7 @@ public:
      *
      * Must only be called once.
      */
-    std::vector<Response> waitForResponses(OperationContext* txn);
+    std::vector<Response> waitForResponses(OperationContext* opCtx);
 
     /**
      * Stops the ARS from retrying requests. Causes waitForResponses() to wait until any outstanding
@@ -161,7 +162,7 @@ private:
      *
      * Invalid to call if there is an existing Notification and it has not yet been signaled.
      */
-    void _scheduleRequestsIfNeeded(OperationContext* txn);
+    void _scheduleRequestsIfNeeded(OperationContext* opCtx);
 
     /**
      * Helper to schedule a command to a remote.
@@ -171,7 +172,7 @@ private:
      *
      * Returns success if the command to retrieve the next batch was scheduled successfully.
      */
-    Status _scheduleRequest_inlock(OperationContext* txn, size_t remoteIndex);
+    Status _scheduleRequest_inlock(OperationContext* opCtx, size_t remoteIndex);
 
     /**
      * The callback for a remote command.
@@ -185,7 +186,7 @@ private:
      * On a non-retriable error, if allowPartialResults is false, sets _stopRetrying to true.
      */
     void _handleResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-                         OperationContext* txn,
+                         OperationContext* opCtx,
                          size_t remoteIndex);
 
     /**

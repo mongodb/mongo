@@ -50,20 +50,20 @@ class ReplSettings;
 /**
  * Truncates the oplog after, and including, the "truncateTimestamp" entry.
  */
-void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp);
+void truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp);
 
 /**
  * Create a new capped collection for the oplog if it doesn't yet exist.
  * If the collection already exists (and isReplSet is false),
  * set the 'last' Timestamp from the last entry of the oplog collection (side effect!)
  */
-void createOplog(OperationContext* txn, const std::string& oplogCollectionName, bool isReplSet);
+void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet);
 
 /*
  * Shortcut for above function using oplogCollectionName = _oplogCollectionName,
  * and replEnabled = replCoord::isReplSet();
  */
-void createOplog(OperationContext* txn);
+void createOplog(OperationContext* opCtx);
 
 extern std::string rsOplogName;
 extern std::string masterSlaveOplogName;
@@ -81,7 +81,7 @@ extern int OPLOG_VERSION;
  *  "db" declares presence of a database (ns is set to the db name + '.')
  */
 
-void logOps(OperationContext* txn,
+void logOps(OperationContext* opCtx,
             const char* opstr,
             const NamespaceString& nss,
             std::vector<BSONObj>::const_iterator begin,
@@ -91,7 +91,7 @@ void logOps(OperationContext* txn,
 /* For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
  */
-void logOp(OperationContext* txn,
+void logOp(OperationContext* opCtx,
            const char* opstr,
            const char* ns,
            const BSONObj& obj,
@@ -100,7 +100,7 @@ void logOp(OperationContext* txn,
 
 // Flush out the cached pointers to the local database and oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.
-void oplogCheckCloseDatabase(OperationContext* txn, Database* db);
+void oplogCheckCloseDatabase(OperationContext* opCtx, Database* db);
 
 using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 /**
@@ -110,7 +110,7 @@ using IncrementOpsAppliedStatsFn = stdx::function<void()>;
  * @param incrementOpsAppliedStats is called whenever an op is applied.
  * Returns failure status if the op was an update that could not be applied.
  */
-Status applyOperation_inlock(OperationContext* txn,
+Status applyOperation_inlock(OperationContext* opCtx,
                              Database* db,
                              const BSONObj& op,
                              bool inSteadyStateReplication = false,
@@ -123,17 +123,19 @@ Status applyOperation_inlock(OperationContext* txn,
  * initial sync.
  * Returns failure status if the op that could not be applied.
  */
-Status applyCommand_inlock(OperationContext* txn, const BSONObj& op, bool inSteadyStateReplication);
+Status applyCommand_inlock(OperationContext* opCtx,
+                           const BSONObj& op,
+                           bool inSteadyStateReplication);
 
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
  */
-void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS);
+void initTimestampFromOplog(OperationContext* opCtx, const std::string& oplogNS);
 
 /**
  * Sets the global Timestamp to be 'newTime'.
  */
-void setNewTimestamp(ServiceContext* txn, const Timestamp& newTime);
+void setNewTimestamp(ServiceContext* opCtx, const Timestamp& newTime);
 
 /**
  * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.

@@ -79,9 +79,9 @@ class MmapV1RecordFetcher : public RecordFetcher {
 public:
     explicit MmapV1RecordFetcher(const MmapV1RecordHeader* record) : _record(record) {}
 
-    virtual void setup(OperationContext* txn) {
+    virtual void setup(OperationContext* opCtx) {
         invariant(!_filesLock.get());
-        _filesLock.reset(new LockMongoFilesShared(txn));
+        _filesLock.reset(new LockMongoFilesShared(opCtx));
     }
 
     virtual void fetch() {
@@ -138,7 +138,7 @@ boost::filesystem::path MmapV1ExtentManager::_fileName(int n) const {
 }
 
 
-Status MmapV1ExtentManager::init(OperationContext* txn) {
+Status MmapV1ExtentManager::init(OperationContext* opCtx) {
     invariant(_files.empty());
 
     for (int n = 0; n < DiskLoc::MaxFiles; n++) {
@@ -172,18 +172,18 @@ Status MmapV1ExtentManager::init(OperationContext* txn) {
             }
         }
 
-        unique_ptr<DataFile> df(new DataFile(txn, n));
+        unique_ptr<DataFile> df(new DataFile(opCtx, n));
 
-        Status s = df->openExisting(txn, fullNameString.c_str());
+        Status s = df->openExisting(opCtx, fullNameString.c_str());
         if (!s.isOK()) {
-            df->close(txn);
+            df->close(opCtx);
             return s;
         }
 
         invariant(!df->getHeader()->uninitialized());
 
         // We only checkUpgrade on files that we are keeping, not preallocs.
-        df->getHeader()->checkUpgrade(txn);
+        df->getHeader()->checkUpgrade(opCtx);
 
         _files.push_back(df.release());
     }
@@ -191,13 +191,13 @@ Status MmapV1ExtentManager::init(OperationContext* txn) {
     // If this is a new database being created, instantiate the first file and one extent so
     // we can have a coherent database.
     if (_files.empty()) {
-        WriteUnitOfWork wuow(txn);
-        _createExtent(txn, initialSize(128), false);
+        WriteUnitOfWork wuow(opCtx);
+        _createExtent(opCtx, initialSize(128), false);
         wuow.commit();
 
         // Commit the journal and all changes to disk so that even if exceptions occur during
         // subsequent initialization, we won't have uncommited changes during file close.
-        getDur().commitNow(txn);
+        getDur().commitNow(opCtx);
     }
 
     return Status::OK();
@@ -221,12 +221,12 @@ DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) {
     return _files[fileId];
 }
 
-DataFile* MmapV1ExtentManager::_addAFile(OperationContext* txn,
+DataFile* MmapV1ExtentManager::_addAFile(OperationContext* opCtx,
                                          int sizeNeeded,
                                          bool preallocateNextFile) {
     // Database must be stable and we need to be in some sort of an update operation in order
     // to add a new file.
-    invariant(txn->lockState()->isDbLockedForMode(_dbname, MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbname, MODE_IX));
 
     const int allocFileId = _files.size();
 
@@ -241,15 +241,15 @@ DataFile* MmapV1ExtentManager::_addAFile(OperationContext* txn,
     }
 
     {
-        unique_ptr<DataFile> allocFile(new DataFile(txn, allocFileId));
+        unique_ptr<DataFile> allocFile(new DataFile(opCtx, allocFileId));
         const string allocFileName = _fileName(allocFileId).string();
 
         Timer t;
 
         try {
-            allocFile->open(txn, allocFileName.c_str(), minSize, false);
+            allocFile->open(opCtx, allocFileName.c_str(), minSize, false);
         } catch (...) {
-            allocFile->close(txn);
+            allocFile->close(opCtx);
             throw;
         }
         if (t.seconds() > 1) {
@@ -263,13 +263,13 @@ DataFile* MmapV1ExtentManager::_addAFile(OperationContext* txn,
 
     // Preallocate is asynchronous
     if (preallocateNextFile) {
-        unique_ptr<DataFile> nextFile(new DataFile(txn, allocFileId + 1));
+        unique_ptr<DataFile> nextFile(new DataFile(opCtx, allocFileId + 1));
         const string nextFileName = _fileName(allocFileId + 1).string();
 
         try {
-            nextFile->open(txn, nextFileName.c_str(), minSize, false);
+            nextFile->open(opCtx, nextFileName.c_str(), minSize, false);
         } catch (...) {
-            nextFile->close(txn);
+            nextFile->close(opCtx);
             throw;
         }
     }
@@ -366,26 +366,26 @@ int MmapV1ExtentManager::maxSize() const {
 }
 
 DiskLoc MmapV1ExtentManager::_createExtentInFile(
-    OperationContext* txn, int fileNo, DataFile* f, int size, bool enforceQuota) {
+    OperationContext* opCtx, int fileNo, DataFile* f, int size, bool enforceQuota) {
     _checkQuota(enforceQuota, fileNo - 1);
 
     massert(10358, "bad new extent size", size >= minSize() && size <= maxSize());
 
-    DiskLoc loc = f->allocExtentArea(txn, size);
+    DiskLoc loc = f->allocExtentArea(opCtx, size);
     loc.assertOk();
 
     Extent* e = getExtent(loc, false);
     verify(e);
 
-    *txn->recoveryUnit()->writing(&e->magic) = Extent::extentSignature;
-    *txn->recoveryUnit()->writing(&e->myLoc) = loc;
-    *txn->recoveryUnit()->writing(&e->length) = size;
+    *opCtx->recoveryUnit()->writing(&e->magic) = Extent::extentSignature;
+    *opCtx->recoveryUnit()->writing(&e->myLoc) = loc;
+    *opCtx->recoveryUnit()->writing(&e->length) = size;
 
     return loc;
 }
 
 
-DiskLoc MmapV1ExtentManager::_createExtent(OperationContext* txn, int size, bool enforceQuota) {
+DiskLoc MmapV1ExtentManager::_createExtent(OperationContext* opCtx, int size, bool enforceQuota) {
     size = quantizeExtentSize(size);
 
     if (size > maxSize())
@@ -398,7 +398,7 @@ DiskLoc MmapV1ExtentManager::_createExtent(OperationContext* txn, int size, bool
         invariant(f);
 
         if (f->getHeader()->unusedLength >= size) {
-            return _createExtentInFile(txn, i, f, size, enforceQuota);
+            return _createExtentInFile(opCtx, i, f, size, enforceQuota);
         }
     }
 
@@ -407,10 +407,10 @@ DiskLoc MmapV1ExtentManager::_createExtent(OperationContext* txn, int size, bool
     // no space in an existing file
     // allocate files until we either get one big enough or hit maxSize
     for (int i = 0; i < 8; i++) {
-        DataFile* f = _addAFile(txn, size, false);
+        DataFile* f = _addAFile(opCtx, size, false);
 
         if (f->getHeader()->unusedLength >= size) {
-            return _createExtentInFile(txn, numFiles() - 1, f, size, enforceQuota);
+            return _createExtentInFile(opCtx, numFiles() - 1, f, size, enforceQuota);
         }
     }
 
@@ -418,7 +418,7 @@ DiskLoc MmapV1ExtentManager::_createExtent(OperationContext* txn, int size, bool
     msgasserted(14810, "couldn't allocate space for a new extent");
 }
 
-DiskLoc MmapV1ExtentManager::_allocFromFreeList(OperationContext* txn,
+DiskLoc MmapV1ExtentManager::_allocFromFreeList(OperationContext* opCtx,
                                                 int approxSize,
                                                 bool capped) {
     // setup extent constraints
@@ -493,27 +493,27 @@ DiskLoc MmapV1ExtentManager::_allocFromFreeList(OperationContext* txn,
 
     // remove from the free list
     if (!best->xprev.isNull())
-        *txn->recoveryUnit()->writing(&getExtent(best->xprev)->xnext) = best->xnext;
+        *opCtx->recoveryUnit()->writing(&getExtent(best->xprev)->xnext) = best->xnext;
     if (!best->xnext.isNull())
-        *txn->recoveryUnit()->writing(&getExtent(best->xnext)->xprev) = best->xprev;
+        *opCtx->recoveryUnit()->writing(&getExtent(best->xnext)->xprev) = best->xprev;
     if (_getFreeListStart() == best->myLoc)
-        _setFreeListStart(txn, best->xnext);
+        _setFreeListStart(opCtx, best->xnext);
     if (_getFreeListEnd() == best->myLoc)
-        _setFreeListEnd(txn, best->xprev);
+        _setFreeListEnd(opCtx, best->xprev);
 
     return best->myLoc;
 }
 
-DiskLoc MmapV1ExtentManager::allocateExtent(OperationContext* txn,
+DiskLoc MmapV1ExtentManager::allocateExtent(OperationContext* opCtx,
                                             bool capped,
                                             int size,
                                             bool enforceQuota) {
-    Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_X);
+    Lock::ResourceLock rlk(opCtx->lockState(), _rid, MODE_X);
     bool fromFreeList = true;
-    DiskLoc eloc = _allocFromFreeList(txn, size, capped);
+    DiskLoc eloc = _allocFromFreeList(opCtx, size, capped);
     if (eloc.isNull()) {
         fromFreeList = false;
-        eloc = _createExtent(txn, size, enforceQuota);
+        eloc = _createExtent(opCtx, size, enforceQuota);
     }
 
     invariant(!eloc.isNull());
@@ -525,29 +525,29 @@ DiskLoc MmapV1ExtentManager::allocateExtent(OperationContext* txn,
     return eloc;
 }
 
-void MmapV1ExtentManager::freeExtent(OperationContext* txn, DiskLoc firstExt) {
-    Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_X);
+void MmapV1ExtentManager::freeExtent(OperationContext* opCtx, DiskLoc firstExt) {
+    Lock::ResourceLock rlk(opCtx->lockState(), _rid, MODE_X);
     Extent* e = getExtent(firstExt);
-    txn->recoveryUnit()->writing(&e->xnext)->Null();
-    txn->recoveryUnit()->writing(&e->xprev)->Null();
-    txn->recoveryUnit()->writing(&e->firstRecord)->Null();
-    txn->recoveryUnit()->writing(&e->lastRecord)->Null();
+    opCtx->recoveryUnit()->writing(&e->xnext)->Null();
+    opCtx->recoveryUnit()->writing(&e->xprev)->Null();
+    opCtx->recoveryUnit()->writing(&e->firstRecord)->Null();
+    opCtx->recoveryUnit()->writing(&e->lastRecord)->Null();
 
 
     if (_getFreeListStart().isNull()) {
-        _setFreeListStart(txn, firstExt);
-        _setFreeListEnd(txn, firstExt);
+        _setFreeListStart(opCtx, firstExt);
+        _setFreeListEnd(opCtx, firstExt);
     } else {
         DiskLoc a = _getFreeListStart();
         invariant(getExtent(a)->xprev.isNull());
-        *txn->recoveryUnit()->writing(&getExtent(a)->xprev) = firstExt;
-        *txn->recoveryUnit()->writing(&getExtent(firstExt)->xnext) = a;
-        _setFreeListStart(txn, firstExt);
+        *opCtx->recoveryUnit()->writing(&getExtent(a)->xprev) = firstExt;
+        *opCtx->recoveryUnit()->writing(&getExtent(firstExt)->xnext) = a;
+        _setFreeListStart(opCtx, firstExt);
     }
 }
 
-void MmapV1ExtentManager::freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt) {
-    Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_X);
+void MmapV1ExtentManager::freeExtents(OperationContext* opCtx, DiskLoc firstExt, DiskLoc lastExt) {
+    Lock::ResourceLock rlk(opCtx->lockState(), _rid, MODE_X);
 
     if (firstExt.isNull() && lastExt.isNull())
         return;
@@ -563,14 +563,14 @@ void MmapV1ExtentManager::freeExtents(OperationContext* txn, DiskLoc firstExt, D
     }
 
     if (_getFreeListStart().isNull()) {
-        _setFreeListStart(txn, firstExt);
-        _setFreeListEnd(txn, lastExt);
+        _setFreeListStart(opCtx, firstExt);
+        _setFreeListEnd(opCtx, lastExt);
     } else {
         DiskLoc a = _getFreeListStart();
         invariant(getExtent(a)->xprev.isNull());
-        *txn->recoveryUnit()->writing(&getExtent(a)->xprev) = lastExt;
-        *txn->recoveryUnit()->writing(&getExtent(lastExt)->xnext) = a;
-        _setFreeListStart(txn, firstExt);
+        *opCtx->recoveryUnit()->writing(&getExtent(a)->xprev) = lastExt;
+        *opCtx->recoveryUnit()->writing(&getExtent(lastExt)->xnext) = a;
+        _setFreeListStart(opCtx, firstExt);
     }
 }
 
@@ -588,22 +588,22 @@ DiskLoc MmapV1ExtentManager::_getFreeListEnd() const {
     return file->header()->freeListEnd;
 }
 
-void MmapV1ExtentManager::_setFreeListStart(OperationContext* txn, DiskLoc loc) {
+void MmapV1ExtentManager::_setFreeListStart(OperationContext* opCtx, DiskLoc loc) {
     invariant(!_files.empty());
     DataFile* file = _files[0];
-    *txn->recoveryUnit()->writing(&file->header()->freeListStart) = loc;
+    *opCtx->recoveryUnit()->writing(&file->header()->freeListStart) = loc;
 }
 
-void MmapV1ExtentManager::_setFreeListEnd(OperationContext* txn, DiskLoc loc) {
+void MmapV1ExtentManager::_setFreeListEnd(OperationContext* opCtx, DiskLoc loc) {
     invariant(!_files.empty());
     DataFile* file = _files[0];
-    *txn->recoveryUnit()->writing(&file->header()->freeListEnd) = loc;
+    *opCtx->recoveryUnit()->writing(&file->header()->freeListEnd) = loc;
 }
 
-void MmapV1ExtentManager::freeListStats(OperationContext* txn,
+void MmapV1ExtentManager::freeListStats(OperationContext* opCtx,
                                         int* numExtents,
                                         int64_t* totalFreeSizeBytes) const {
-    Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_S);
+    Lock::ResourceLock rlk(opCtx->lockState(), _rid, MODE_S);
 
     invariant(numExtents);
     invariant(totalFreeSizeBytes);
@@ -644,9 +644,9 @@ MmapV1ExtentManager::FilesArray::~FilesArray() {
     }
 }
 
-void MmapV1ExtentManager::FilesArray::close(OperationContext* txn) {
+void MmapV1ExtentManager::FilesArray::close(OperationContext* opCtx) {
     for (int i = 0; i < size(); i++) {
-        _files[i]->close(txn);
+        _files[i]->close(opCtx);
     }
 }
 
@@ -659,7 +659,7 @@ void MmapV1ExtentManager::FilesArray::push_back(DataFile* val) {
     _size.store(n + 1);
 }
 
-DataFileVersion MmapV1ExtentManager::getFileFormat(OperationContext* txn) const {
+DataFileVersion MmapV1ExtentManager::getFileFormat(OperationContext* opCtx) const {
     if (numFiles() == 0)
         return DataFileVersion(0, 0);
 
@@ -667,12 +667,12 @@ DataFileVersion MmapV1ExtentManager::getFileFormat(OperationContext* txn) const 
     return _getOpenFile(0)->getHeader()->version;
 }
 
-void MmapV1ExtentManager::setFileFormat(OperationContext* txn, DataFileVersion newVersion) {
+void MmapV1ExtentManager::setFileFormat(OperationContext* opCtx, DataFileVersion newVersion) {
     invariant(numFiles() > 0);
 
     DataFile* df = _getOpenFile(0);
     invariant(df);
 
-    *txn->recoveryUnit()->writing(&df->getHeader()->version) = newVersion;
+    *opCtx->recoveryUnit()->writing(&df->getHeader()->version) = newVersion;
 }
 }

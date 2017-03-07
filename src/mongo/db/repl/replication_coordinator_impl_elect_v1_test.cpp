@@ -162,15 +162,15 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     simulateCatchUpTimeout();
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
 
-    const auto txnPtr = makeOperationContext();
-    auto& txn = *txnPtr;
+    const auto opCtxPtr = makeOperationContext();
+    auto& opCtx = *opCtxPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-    getReplCoord()->signalDrainComplete(&txn, getReplCoord()->getTerm());
+    getReplCoord()->signalDrainComplete(&opCtx, getReplCoord()->getTerm());
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -226,15 +226,15 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     simulateCatchUpTimeout();
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
 
-    const auto txnPtr = makeOperationContext();
-    auto& txn = *txnPtr;
+    const auto opCtxPtr = makeOperationContext();
+    auto& opCtx = *opCtxPtr;
 
     // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
     IsMasterResponse imResponse;
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-    getReplCoord()->signalDrainComplete(&txn, getReplCoord()->getTerm());
+    getReplCoord()->signalDrainComplete(&opCtx, getReplCoord()->getTerm());
     getReplCoord()->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
@@ -255,7 +255,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -296,7 +296,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -332,7 +332,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -391,7 +391,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -439,7 +439,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
 TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version"
@@ -497,7 +497,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     args.force = false;
     args.newConfigObj = config.toBSON();
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
-                  getReplCoord()->processReplSetReconfig(&txn, args, &result));
+                  getReplCoord()->processReplSetReconfig(&opCtx, args, &result));
 
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
     startCapturingLogMessages();
@@ -568,7 +568,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -619,7 +619,7 @@ TEST_F(ReplCoordTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -657,7 +657,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -713,7 +713,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -752,7 +752,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime time1(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastAppliedOpTime(time1);
     getReplCoord()->setMyLastDurableOpTime(time1);
@@ -761,7 +761,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
     // update to a future term before the election completes
-    getReplCoord()->updateTerm(&txn, 1000);
+    getReplCoord()->updateTerm(&opCtx, 1000);
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -942,7 +942,7 @@ TEST_F(PriorityTakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime myOptime(Timestamp(100, 1), 0);
     replCoord->setMyLastAppliedOpTime(myOptime);
     replCoord->setMyLastDurableOpTime(myOptime);
@@ -963,7 +963,7 @@ TEST_F(PriorityTakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
     assertValidTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
     // Also make sure that updating the term cancels the scheduled priority takeover.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&txn, replCoord->getTerm() + 1));
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&opCtx, replCoord->getTerm() + 1));
     ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
 }
 
@@ -989,7 +989,7 @@ TEST_F(PriorityTakeoverTest, SuccessfulPriorityTakeover) {
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime myOptime(Timestamp(100, 1), 0);
     replCoord->setMyLastAppliedOpTime(myOptime);
     replCoord->setMyLastDurableOpTime(myOptime);
@@ -1043,7 +1043,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     auto timeZero = getNet()->now();
     auto now = getNet()->now();
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime currentOpTime(Timestamp(100, 5000), 0);
     OpTime behindOpTime(Timestamp(100, 3999), 0);
     OpTime closeEnoughOpTime(Timestamp(100, 4000), 0);
@@ -1119,7 +1119,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecon
     auto timeZero = getNet()->now();
     auto now = getNet()->now();
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     OpTime currentOpTime(Timestamp(100, 0), 0);
     OpTime behindOpTime(Timestamp(97, 0), 0);
     OpTime closeEnoughOpTime(Timestamp(98, 0), 0);
@@ -1218,8 +1218,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
         true};
 
     BSONObjBuilder result;
-    const auto txn = makeOperationContext();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), config, &result));
+    const auto opCtx = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), config, &result));
     // Wait until election cancels.
     net->enterNetwork();
     net->runReadyNetworkOperations();
@@ -1264,8 +1264,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
         true};
 
     BSONObjBuilder result;
-    const auto txn = makeOperationContext();
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), config, &result));
+    const auto opCtx = makeOperationContext();
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), config, &result));
     // Wait until election cancels.
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();
@@ -1429,10 +1429,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoNotNeedToCatchUp) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("My optime is most up-to-date, skipping catch-up"));
-    auto txn = makeOperationContext();
-    getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
@@ -1453,10 +1453,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Could not access any nodes within timeout"));
-    auto txn = makeOperationContext();
-    getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
@@ -1483,10 +1483,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Finished catch-up oplog after becoming primary."));
-    auto txn = makeOperationContext();
-    getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
@@ -1507,10 +1507,10 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Draining);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
-    auto txn = makeOperationContext();
-    getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
@@ -1536,9 +1536,9 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Stopped transition to primary"));
-    auto txn = makeOperationContext();
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    auto opCtx = makeOperationContext();
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
@@ -1564,15 +1564,15 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     net->enterNetwork();
     net->runReadyNetworkOperations();
     net->exitNetwork();
-    auto txn = makeOperationContext();
+    auto opCtx = makeOperationContext();
     // Simulate the applier signaling replCoord to exit drain mode.
     // At this point, we see the stepdown and reset the states.
-    getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
+    getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
@@ -1618,15 +1618,15 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         getNet()->scheduleResponse(noi, getNet()->now(), makeFreshnessScanResponse(OpTime()));
     });
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
-    auto txn = makeOperationContext();
+    auto opCtx = makeOperationContext();
     {
-        Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(txn.get(), "test"));
+        Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
     }
-    replCoord->signalDrainComplete(txn.get(), replCoord->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
+    replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
     ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
-    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
 }  // namespace

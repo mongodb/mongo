@@ -77,7 +77,7 @@ class UpdateStage final : public PlanStage {
     MONGO_DISALLOW_COPYING(UpdateStage);
 
 public:
-    UpdateStage(OperationContext* txn,
+    UpdateStage(OperationContext* opCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
                 Collection* collection,
@@ -134,7 +134,7 @@ public:
      *
      * Returns the document to insert in *out.
      */
-    static Status applyUpdateOpsForInsert(OperationContext* txn,
+    static Status applyUpdateOpsForInsert(OperationContext* opCtx,
                                           const CanonicalQuery* cq,
                                           const BSONObj& query,
                                           UpdateDriver* driver,

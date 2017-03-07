@@ -67,12 +67,12 @@ static const NamespaceString nss("test.collection");
  */
 unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(queryObj);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -87,7 +87,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* projStr,
                                         const char* collationStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
@@ -95,7 +95,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setProj(fromjson(projStr));
     qr->setCollation(fromjson(collationStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -109,7 +109,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* minStr,
                                         const char* maxStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
@@ -125,7 +125,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setMin(fromjson(minStr));
     qr->setMax(fromjson(maxStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -141,7 +141,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         bool snapshot,
                                         bool explain) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
@@ -159,7 +159,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setSnapshot(snapshot);
     qr->setExplain(explain);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -539,7 +539,7 @@ protected:
                       const BSONObj& maxObj,
                       bool snapshot) {
         QueryTestServiceContext serviceContext;
-        auto txn = serviceContext.makeOperationContext();
+        auto opCtx = serviceContext.makeOperationContext();
 
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
@@ -563,7 +563,7 @@ protected:
         qr->setMax(maxObj);
         qr->setSnapshot(snapshot);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
         ASSERT_OK(s);
@@ -571,7 +571,7 @@ protected:
 
     void runQueryAsCommand(const BSONObj& cmdObj) {
         QueryTestServiceContext serviceContext;
-        auto txn = serviceContext.makeOperationContext();
+        auto opCtx = serviceContext.makeOperationContext();
 
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
@@ -585,7 +585,7 @@ protected:
             assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
         ASSERT_OK(s);
@@ -658,7 +658,7 @@ protected:
                                       const BSONObj& collation,
                                       const QuerySolution& soln) const {
         QueryTestServiceContext serviceContext;
-        auto txn = serviceContext.makeOperationContext();
+        auto opCtx = serviceContext.makeOperationContext();
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
@@ -666,7 +666,7 @@ protected:
         qr->setProj(proj);
         qr->setCollation(collation);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 

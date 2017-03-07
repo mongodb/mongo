@@ -86,7 +86,7 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              BSONObj& cmdObj,
              int options,
@@ -105,7 +105,7 @@ public:
         }
         auto parsedRequest = std::move(swParsedRequest.getValue());
 
-        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto rsConfig = replCoord->getConfig();
 
         auto validationStatus = parsedRequest.validate(rsConfig.isLocalHostAllowed());
@@ -119,8 +119,8 @@ public:
                            parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize()
                                                       : kMaxSizeMBDefault);
 
-        StatusWith<string> addShardResult = Grid::get(txn)->catalogManager()->addShard(
-            txn,
+        StatusWith<string> addShardResult = Grid::get(opCtx)->catalogManager()->addShard(
+            opCtx,
             parsedRequest.hasName() ? &parsedRequest.getName() : nullptr,
             parsedRequest.getConnString(),
             parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize() : kMaxSizeMBDefault);

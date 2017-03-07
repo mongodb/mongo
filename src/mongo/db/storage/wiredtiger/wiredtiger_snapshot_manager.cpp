@@ -41,13 +41,14 @@
 
 namespace mongo {
 
-Status WiredTigerSnapshotManager::prepareForCreateSnapshot(OperationContext* txn) {
-    WiredTigerRecoveryUnit::get(txn)->prepareForCreateSnapshot(txn);
+Status WiredTigerSnapshotManager::prepareForCreateSnapshot(OperationContext* opCtx) {
+    WiredTigerRecoveryUnit::get(opCtx)->prepareForCreateSnapshot(opCtx);
     return Status::OK();
 }
 
-Status WiredTigerSnapshotManager::createSnapshot(OperationContext* txn, const SnapshotName& name) {
-    auto session = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
+Status WiredTigerSnapshotManager::createSnapshot(OperationContext* opCtx,
+                                                 const SnapshotName& name) {
+    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession();
     const std::string config = str::stream() << "name=" << name.asU64();
     return wtRCToStatus(session->snapshot(session, config.c_str()));
 }

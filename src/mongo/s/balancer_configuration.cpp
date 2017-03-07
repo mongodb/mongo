@@ -77,10 +77,10 @@ BalancerSettingsType::BalancerMode BalancerConfiguration::getBalancerMode() cons
     return _balancerSettings.getMode();
 }
 
-Status BalancerConfiguration::setBalancerMode(OperationContext* txn,
+Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
                                               BalancerSettingsType::BalancerMode mode) {
-    auto updateStatus = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
-        txn,
+    auto updateStatus = Grid::get(opCtx)->catalogClient(opCtx)->updateConfigDocument(
+        opCtx,
         kSettingsNamespace.ns(),
         BSON("_id" << BalancerSettingsType::kKey),
         BSON("$set" << BSON(kStopped << (mode == BalancerSettingsType::kOff) << kMode
@@ -88,7 +88,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* txn,
         true,
         ShardingCatalogClient::kMajorityWriteConcern);
 
-    Status refreshStatus = refreshAndCheck(txn);
+    Status refreshStatus = refreshAndCheck(opCtx);
     if (!refreshStatus.isOK()) {
         return refreshStatus;
     }
@@ -131,9 +131,9 @@ bool BalancerConfiguration::waitForDelete() const {
     return _balancerSettings.waitForDelete();
 }
 
-Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
+Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
     // Balancer configuration
-    Status balancerSettingsStatus = _refreshBalancerSettings(txn);
+    Status balancerSettingsStatus = _refreshBalancerSettings(opCtx);
     if (!balancerSettingsStatus.isOK()) {
         return {balancerSettingsStatus.code(),
                 str::stream() << "Failed to refresh the balancer settings due to "
@@ -141,7 +141,7 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
     }
 
     // Chunk size settings
-    Status chunkSizeStatus = _refreshChunkSizeSettings(txn);
+    Status chunkSizeStatus = _refreshChunkSizeSettings(opCtx);
     if (!chunkSizeStatus.isOK()) {
         return {chunkSizeStatus.code(),
                 str::stream() << "Failed to refresh the chunk sizes settings due to "
@@ -149,7 +149,7 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
     }
 
     // AutoSplit settings
-    Status autoSplitStatus = _refreshAutoSplitSettings(txn);
+    Status autoSplitStatus = _refreshAutoSplitSettings(opCtx);
     if (!autoSplitStatus.isOK()) {
         return {autoSplitStatus.code(),
                 str::stream() << "Failed to refresh the autoSplit settings due to "
@@ -159,11 +159,11 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* txn) {
     return Status::OK();
 }
 
-Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
+Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* opCtx) {
     BalancerSettingsType settings = BalancerSettingsType::createDefault();
 
-    auto settingsObjStatus =
-        Grid::get(txn)->catalogClient(txn)->getGlobalSettings(txn, BalancerSettingsType::kKey);
+    auto settingsObjStatus = Grid::get(opCtx)->catalogClient(opCtx)->getGlobalSettings(
+        opCtx, BalancerSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = BalancerSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {
@@ -181,11 +181,11 @@ Status BalancerConfiguration::_refreshBalancerSettings(OperationContext* txn) {
     return Status::OK();
 }
 
-Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
+Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* opCtx) {
     ChunkSizeSettingsType settings = ChunkSizeSettingsType::createDefault();
 
     auto settingsObjStatus =
-        grid.catalogClient(txn)->getGlobalSettings(txn, ChunkSizeSettingsType::kKey);
+        grid.catalogClient(opCtx)->getGlobalSettings(opCtx, ChunkSizeSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = ChunkSizeSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {
@@ -207,11 +207,11 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* txn) {
     return Status::OK();
 }
 
-Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* txn) {
+Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* opCtx) {
     AutoSplitSettingsType settings = AutoSplitSettingsType::createDefault();
 
     auto settingsObjStatus =
-        grid.catalogClient(txn)->getGlobalSettings(txn, AutoSplitSettingsType::kKey);
+        grid.catalogClient(opCtx)->getGlobalSettings(opCtx, AutoSplitSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = AutoSplitSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {

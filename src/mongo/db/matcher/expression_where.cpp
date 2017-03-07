@@ -50,9 +50,9 @@ using std::string;
 using std::stringstream;
 using stdx::make_unique;
 
-WhereMatchExpression::WhereMatchExpression(OperationContext* txn, WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)), _txn(txn) {
-    invariant(_txn != NULL);
+WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx, WhereParams params)
+    : WhereMatchExpressionBase(std::move(params)), _opCtx(opCtx) {
+    invariant(_opCtx != NULL);
 
     _func = 0;
 }
@@ -72,7 +72,7 @@ Status WhereMatchExpression::init(StringData dbName) {
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
     try {
-        _scope = getGlobalScriptEngine()->getPooledScope(_txn, _dbName, "where" + userToken);
+        _scope = getGlobalScriptEngine()->getPooledScope(_opCtx, _dbName, "where" + userToken);
         _func = _scope->createFunction(getCode().c_str());
     } catch (...) {
         return exceptionToStatus();
@@ -112,7 +112,8 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     WhereParams params;
     params.code = getCode();
     params.scope = getScope();
-    unique_ptr<WhereMatchExpression> e = make_unique<WhereMatchExpression>(_txn, std::move(params));
+    unique_ptr<WhereMatchExpression> e =
+        make_unique<WhereMatchExpression>(_opCtx, std::move(params));
     e->init(_dbName);
     if (getTag()) {
         e->setTag(getTag()->clone());

@@ -87,12 +87,12 @@ MONGO_FP_DECLARE(dontUpsertShardIdentityOnNewShards);
 /**
  * Generates a unique name to be given to a newly added shard.
  */
-StatusWith<std::string> generateNewShardName(OperationContext* txn) {
+StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
     BSONObjBuilder shardNameRegex;
     shardNameRegex.appendRegex(ShardType::name(), "^shard");
 
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        txn,
+    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+        opCtx,
         kConfigReadSelector,
         repl::ReadConcernLevel::kMajorityReadConcern,
         NamespaceString(ShardType::ConfigNS),
@@ -130,11 +130,11 @@ StatusWith<std::string> generateNewShardName(OperationContext* txn) {
 }  // namespace
 
 StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAddShard(
-    OperationContext* txn,
+    OperationContext* opCtx,
     RemoteCommandTargeter* targeter,
     const std::string& dbName,
     const BSONObj& cmdObj) {
-    auto host = targeter->findHost(txn, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+    auto host = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -198,13 +198,13 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
 }
 
 StatusWith<boost::optional<ShardType>> ShardingCatalogManagerImpl::_checkIfShardExists(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ConnectionString& proposedShardConnectionString,
     const std::string* proposedShardName,
     long long proposedShardMaxSize) {
     // Check whether any host in the connection is already part of the cluster.
-    const auto existingShards = Grid::get(txn)->catalogClient(txn)->getAllShards(
-        txn, repl::ReadConcernLevel::kLocalReadConcern);
+    const auto existingShards = Grid::get(opCtx)->catalogClient(opCtx)->getAllShards(
+        opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!existingShards.isOK()) {
         return Status(existingShards.getStatus().code(),
                       str::stream() << "Failed to load existing shards during addShard"
@@ -293,7 +293,7 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManagerImpl::_checkIfShard
 }
 
 StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
-    OperationContext* txn,
+    OperationContext* opCtx,
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
     const ConnectionString& connectionString) {
@@ -301,7 +301,7 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
     // Check if the node being added is a mongos or a version of mongod too old to speak the current
     // communication protocol.
     auto swCommandResponse =
-        _runCommandForAddShard(txn, targeter.get(), "admin", BSON("isMaster" << 1));
+        _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("isMaster" << 1));
     if (!swCommandResponse.isOK()) {
         if (swCommandResponse.getStatus() == ErrorCodes::RPCProtocolNegotiationFailed) {
             // Mongos to mongos commands are no longer supported in the wire protocol
@@ -479,10 +479,10 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
 }
 
 StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesListFromShard(
-    OperationContext* txn, std::shared_ptr<RemoteCommandTargeter> targeter) {
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
     auto swCommandResponse =
-        _runCommandForAddShard(txn, targeter.get(), "admin", BSON("listDatabases" << 1));
+        _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("listDatabases" << 1));
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -509,7 +509,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesList
 }
 
 StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
     const long long maxSize) {
@@ -522,12 +522,12 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     }
 
     // Only one addShard operation can be in progress at a time.
-    Lock::ExclusiveLock lk(txn->lockState(), _kShardMembershipLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kShardMembershipLock);
 
     // Check if this shard has already been added (can happen in the case of a retry after a network
     // error, for example) and thus this addShard request should be considered a no-op.
     auto existingShard =
-        _checkIfShardExists(txn, shardConnectionString, shardProposedName, maxSize);
+        _checkIfShardExists(opCtx, shardConnectionString, shardProposedName, maxSize);
     if (!existingShard.isOK()) {
         return existingShard.getStatus();
     }
@@ -536,7 +536,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
         // addShard request.  Make sure to set the last optime for the client to the system last
         // optime so that we'll still wait for replication so that this state is visible in the
         // committed snapshot.
-        repl::ReplClientInfo::forClient(txn->getClient()).setLastOpToSystemLastOpTime(txn);
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return existingShard.getValue()->getName();
     }
 
@@ -547,15 +547,15 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     // Note: This is necessary because as of 3.4, removeShard is performed by mongos (unlike
     // addShard), so the ShardRegistry is not synchronously reloaded on the config server when a
     // shard is removed.
-    if (!Grid::get(txn)->shardRegistry()->reload(txn)) {
+    if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
         // If the first reload joined an existing one, call reload again to ensure the reload is
         // fresh.
-        Grid::get(txn)->shardRegistry()->reload(txn);
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
     }
 
     // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shard{
-        Grid::get(txn)->shardRegistry()->createConnection(shardConnectionString)};
+        Grid::get(opCtx)->shardRegistry()->createConnection(shardConnectionString)};
     invariant(shard);
     auto targeter = shard->getTargeter();
 
@@ -571,20 +571,20 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
 
     // Validate the specified connection string may serve as shard at all
     auto shardStatus =
-        _validateHostAsShard(txn, targeter, shardProposedName, shardConnectionString);
+        _validateHostAsShard(opCtx, targeter, shardProposedName, shardConnectionString);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
     ShardType& shardType = shardStatus.getValue();
 
     // Check that none of the existing shard candidate's dbs exist already
-    auto dbNamesStatus = _getDBNamesListFromShard(txn, targeter);
+    auto dbNamesStatus = _getDBNamesListFromShard(opCtx, targeter);
     if (!dbNamesStatus.isOK()) {
         return dbNamesStatus.getStatus();
     }
 
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        auto dbt = Grid::get(txn)->catalogClient(txn)->getDatabase(txn, dbName);
+        auto dbt = Grid::get(opCtx)->catalogClient(opCtx)->getDatabase(opCtx, dbName);
         if (dbt.isOK()) {
             const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,
@@ -603,7 +603,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
 
     // If a name for a shard wasn't provided, generate one
     if (shardType.getName().empty()) {
-        auto result = generateNewShardName(txn);
+        auto result = generateNewShardName(opCtx);
         if (!result.isOK()) {
             return result.getStatus();
         }
@@ -619,7 +619,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     if (serverGlobalParams.featureCompatibility.version.load() ==
         ServerGlobalParams::FeatureCompatibility::Version::k34) {
         auto versionResponse =
-            _runCommandForAddShard(txn,
+            _runCommandForAddShard(opCtx,
                                    targeter.get(),
                                    "admin",
                                    BSON(FeatureCompatibilityVersion::kCommandName
@@ -640,12 +640,12 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     }
 
     if (!MONGO_FAIL_POINT(dontUpsertShardIdentityOnNewShards)) {
-        auto commandRequest = createShardIdentityUpsertForAddShard(txn, shardType.getName());
+        auto commandRequest = createShardIdentityUpsertForAddShard(opCtx, shardType.getName());
 
         LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
 
         auto swCommandResponse =
-            _runCommandForAddShard(txn, targeter.get(), "admin", commandRequest);
+            _runCommandForAddShard(opCtx, targeter.get(), "admin", commandRequest);
         if (!swCommandResponse.isOK()) {
             return swCommandResponse.getStatus();
         }
@@ -662,8 +662,11 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
 
     log() << "going to insert new entry for shard into config.shards: " << shardType.toString();
 
-    Status result = Grid::get(txn)->catalogClient(txn)->insertConfigDocument(
-        txn, ShardType::ConfigNS, shardType.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
+    Status result = Grid::get(opCtx)->catalogClient(opCtx)->insertConfigDocument(
+        opCtx,
+        ShardType::ConfigNS,
+        shardType.toBSON(),
+        ShardingCatalogClient::kMajorityWriteConcern);
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
         return result;
@@ -676,7 +679,7 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
         dbt.setPrimary(shardType.getName());
         dbt.setSharded(false);
 
-        Status status = Grid::get(txn)->catalogClient(txn)->updateDatabase(txn, dbName, dbt);
+        Status status = Grid::get(opCtx)->catalogClient(opCtx)->updateDatabase(opCtx, dbName, dbt);
         if (!status.isOK()) {
             log() << "adding shard " << shardConnectionString.toString()
                   << " even though could not add database " << dbName;
@@ -688,12 +691,12 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    Grid::get(txn)->catalogClient(txn)->logChange(
-        txn, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
+    Grid::get(opCtx)->catalogClient(opCtx)->logChange(
+        opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // Ensure the added shard is visible to this process.
-    auto shardRegistry = Grid::get(txn)->shardRegistry();
-    if (!shardRegistry->getShard(txn, shardType.getName()).isOK()) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    if (!shardRegistry->getShard(opCtx, shardType.getName()).isOK()) {
         return {ErrorCodes::OperationFailed,
                 "Could not find shard metadata for shard after adding it. This most likely "
                 "indicates that the shard was removed immediately after it was added."};
@@ -708,13 +711,13 @@ void ShardingCatalogManagerImpl::appendConnectionStats(executor::ConnectionPoolS
 }
 
 BSONObj ShardingCatalogManagerImpl::createShardIdentityUpsertForAddShard(
-    OperationContext* txn, const std::string& shardName) {
+    OperationContext* opCtx, const std::string& shardName) {
     std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
 
     BSONObjBuilder query;
     query.append("_id", "shardIdentity");
     query.append(ShardIdentityType::shardName(), shardName);
-    query.append(ShardIdentityType::clusterId(), ClusterIdentityLoader::get(txn)->getClusterId());
+    query.append(ShardIdentityType::clusterId(), ClusterIdentityLoader::get(opCtx)->getClusterId());
     updateDoc->setQuery(query.obj());
 
     BSONObjBuilder update;
@@ -722,7 +725,7 @@ BSONObj ShardingCatalogManagerImpl::createShardIdentityUpsertForAddShard(
         BSONObjBuilder set(update.subobjStart("$set"));
         set.append(
             ShardIdentityType::configsvrConnString(),
-            repl::ReplicationCoordinator::get(txn)->getConfig().getConnectionString().toString());
+            repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString().toString());
     }
     updateDoc->setUpdateExpr(update.obj());
     updateDoc->setUpsert(true);

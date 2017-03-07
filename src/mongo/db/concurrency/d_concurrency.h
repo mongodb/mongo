@@ -358,5 +358,5 @@ public:
  * WUOW. This ensures that a MODE_X lock on this resource will wait for all in-flight capped
  * inserts to either commit or rollback and block new ones from starting.
  */
-void synchronizeOnCappedInFlightResource(Locker* txn, const NamespaceString& cappedNs);
+void synchronizeOnCappedInFlightResource(Locker* opCtx, const NamespaceString& cappedNs);
 }

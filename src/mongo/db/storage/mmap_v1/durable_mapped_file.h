@@ -51,16 +51,16 @@ protected:
     }
 
 public:
-    explicit DurableMappedFile(OperationContext* txn, OptionSet options = NONE);
+    explicit DurableMappedFile(OperationContext* opCtx, OptionSet options = NONE);
     virtual ~DurableMappedFile();
 
     /**
      * Callers must be holding a `LockMongoFilesExclusive`.
      */
-    virtual void close(OperationContext* txn);
+    virtual void close(OperationContext* opCtx);
 
     /** @return true if opened ok. */
-    bool open(OperationContext* txn, const std::string& fname);
+    bool open(OperationContext* opCtx, const std::string& fname);
 
     /** @return file length */
     unsigned long long length() const {
@@ -79,7 +79,7 @@ public:
        passed length.
        @return true for ok
     */
-    bool create(OperationContext* txn, const std::string& fname, unsigned long long& len);
+    bool create(OperationContext* opCtx, const std::string& fname, unsigned long long& len);
 
     /* Get the "standard" view (which is the private one).
        @return the private view.
@@ -123,7 +123,7 @@ public:
         _willNeedRemap = true;
     }
 
-    void remapThePrivateView(OperationContext* txn);
+    void remapThePrivateView(OperationContext* opCtx);
 
     virtual bool isDurableMappedFile() {
         return true;

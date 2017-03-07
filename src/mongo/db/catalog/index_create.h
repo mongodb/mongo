@@ -65,7 +65,7 @@ public:
     /**
      * Neither pointer is owned.
      */
-    MultiIndexBlock(OperationContext* txn, Collection* collection);
+    MultiIndexBlock(OperationContext* opCtx, Collection* collection);
     ~MultiIndexBlock();
 
     /**
@@ -206,7 +206,7 @@ private:
 
     // Pointers not owned here and must outlive 'this'
     Collection* _collection;
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     bool _buildInBackground;
     bool _allowInterruption;

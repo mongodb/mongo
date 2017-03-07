@@ -51,7 +51,7 @@ const int kMaxNumFailedHostRetryAttempts = 3;
 
 }  // namespace
 
-AsyncRequestsSender::AsyncRequestsSender(OperationContext* txn,
+AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
                                          StringData db,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
@@ -73,7 +73,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* txn,
     _metadataObj = metadataBuilder.obj();
 
     // Schedule the requests immediately.
-    _scheduleRequestsIfNeeded(txn);
+    _scheduleRequestsIfNeeded(opCtx);
 }
 
 AsyncRequestsSender::~AsyncRequestsSender() {
@@ -81,7 +81,7 @@ AsyncRequestsSender::~AsyncRequestsSender() {
 }
 
 std::vector<AsyncRequestsSender::Response> AsyncRequestsSender::waitForResponses(
-    OperationContext* txn) {
+    OperationContext* opCtx) {
     invariant(!_remotes.empty());
 
     // Until all remotes have received a response or error, keep scheduling retries and waiting on
@@ -91,7 +91,7 @@ std::vector<AsyncRequestsSender::Response> AsyncRequestsSender::waitForResponses
 
         // Note: if we have been interrupt()'d or if some remote had a non-retriable error and
         // allowPartialResults is false, no retries will be scheduled.
-        _scheduleRequestsIfNeeded(txn);
+        _scheduleRequestsIfNeeded(opCtx);
     }
 
     // Construct the responses.
@@ -152,7 +152,7 @@ bool AsyncRequestsSender::_done_inlock() {
  * 2. Remotes that already successfully received a response will have a non-empty 'response'.
  * 3. Remotes that have reached maximum retries will have an error status.
  */
-void AsyncRequestsSender::_scheduleRequestsIfNeeded(OperationContext* txn) {
+void AsyncRequestsSender::_scheduleRequestsIfNeeded(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // We can't make a new notification if there was a previous one that has not been signaled.
@@ -175,7 +175,7 @@ void AsyncRequestsSender::_scheduleRequestsIfNeeded(OperationContext* txn) {
         // If we have not yet received a response or error for this remote, and we do not have an
         // outstanding request for this remote, schedule remote work to send the command.
         if (!remote.swResponse && !remote.cbHandle.isValid()) {
-            auto scheduleStatus = _scheduleRequest_inlock(txn, i);
+            auto scheduleStatus = _scheduleRequest_inlock(opCtx, i);
             if (!scheduleStatus.isOK()) {
                 // Being unable to schedule a request to a remote is a non-retriable error.
                 remote.swResponse = std::move(scheduleStatus);
@@ -191,7 +191,7 @@ void AsyncRequestsSender::_scheduleRequestsIfNeeded(OperationContext* txn) {
     }
 }
 
-Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_t remoteIndex) {
+Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* opCtx, size_t remoteIndex) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
@@ -203,12 +203,15 @@ Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_
     }
 
     executor::RemoteCommandRequest request(
-        remote.getTargetHost(), _db.toString(), remote.cmdObj, _metadataObj, txn);
+        remote.getTargetHost(), _db.toString(), remote.cmdObj, _metadataObj, opCtx);
 
-    auto callbackStatus = _executor->scheduleRemoteCommand(
-        request,
-        stdx::bind(
-            &AsyncRequestsSender::_handleResponse, this, stdx::placeholders::_1, txn, remoteIndex));
+    auto callbackStatus =
+        _executor->scheduleRemoteCommand(request,
+                                         stdx::bind(&AsyncRequestsSender::_handleResponse,
+                                                    this,
+                                                    stdx::placeholders::_1,
+                                                    opCtx,
+                                                    remoteIndex));
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
     }
@@ -219,7 +222,7 @@ Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_
 
 void AsyncRequestsSender::_handleResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-    OperationContext* txn,
+    OperationContext* opCtx,
     size_t remoteIndex) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 

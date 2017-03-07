@@ -186,7 +186,7 @@ public:
     /**
      * Starts initial sync process, with the provided number of attempts
      */
-    Status startup(OperationContext* txn, std::uint32_t maxAttempts) noexcept;
+    Status startup(OperationContext* opCtx, std::uint32_t maxAttempts) noexcept;
 
     /**
      * Shuts down replication if "start" has been called, and blocks until shutdown has completed.
@@ -336,12 +336,12 @@ private:
     /**
      * Sets up internal state to begin initial sync.
      */
-    void _setUp_inlock(OperationContext* txn, std::uint32_t initialSyncMaxAttempts);
+    void _setUp_inlock(OperationContext* opCtx, std::uint32_t initialSyncMaxAttempts);
 
     /**
      * Tears down internal state before reporting final status to caller.
      */
-    void _tearDown_inlock(OperationContext* txn, const StatusWith<OpTimeWithHash>& lastApplied);
+    void _tearDown_inlock(OperationContext* opCtx, const StatusWith<OpTimeWithHash>& lastApplied);
 
     /**
      * Callback to start a single initial sync attempt.

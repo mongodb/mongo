@@ -55,7 +55,7 @@ public:
     explicit TcmallocNumericPropertyServerParameter(const std::string& serverParameterName,
                                                     const std::string& tcmallocPropertyName);
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
     virtual Status set(const BSONElement& newValueElement);
     virtual Status setFromString(const std::string& str);
 
@@ -71,7 +71,7 @@ TcmallocNumericPropertyServerParameter::TcmallocNumericPropertyServerParameter(
                       true /* change at runtime */),
       _tcmallocPropertyName(tcmallocPropertyName) {}
 
-void TcmallocNumericPropertyServerParameter::append(OperationContext* txn,
+void TcmallocNumericPropertyServerParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder& b,
                                                     const std::string& name) {
     size_t value;

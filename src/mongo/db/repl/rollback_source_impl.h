@@ -64,7 +64,8 @@ public:
 
     BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
 
-    void copyCollectionFromRemote(OperationContext* txn, const NamespaceString& nss) const override;
+    void copyCollectionFromRemote(OperationContext* opCtx,
+                                  const NamespaceString& nss) const override;
 
     StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
 

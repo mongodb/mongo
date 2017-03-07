@@ -148,13 +148,13 @@ void ClientCursor::resetIdleTime() {
     _idleAgeMillis = 0;
 }
 
-void ClientCursor::updateSlaveLocation(OperationContext* txn) {
+void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
     if (_slaveReadTill.isNull())
         return;
 
     verify(str::startsWith(_ns.c_str(), "local.oplog."));
 
-    Client* c = txn->getClient();
+    Client* c = opCtx->getClient();
     verify(c);
     OID rid = repl::ReplClientInfo::forClient(c).getRemoteID();
     if (!rid.isSet())
@@ -275,10 +275,10 @@ public:
         Timer t;
         while (!globalInShutdownDeprecated()) {
             {
-                const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-                OperationContext& txn = *txnPtr;
+                const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+                OperationContext& opCtx = *opCtxPtr;
                 cursorStatsTimedOut.increment(
-                    CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
+                    CursorManager::timeoutCursorsGlobal(&opCtx, t.millisReset()));
             }
             sleepsecs(clientCursorMonitorFrequencySecs.load());
         }

@@ -59,12 +59,12 @@ public:
     HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) {}
     virtual ~HeadManagerImpl() {}
 
-    const RecordId getHead(OperationContext* txn) const {
-        return _catalogEntry->head(txn);
+    const RecordId getHead(OperationContext* opCtx) const {
+        return _catalogEntry->head(opCtx);
     }
 
-    void setHead(OperationContext* txn, const RecordId newHead) {
-        _catalogEntry->setHead(txn, newHead);
+    void setHead(OperationContext* opCtx, const RecordId newHead) {
+        _catalogEntry->setHead(opCtx, newHead);
     }
 
 private:
@@ -72,7 +72,7 @@ private:
     IndexCatalogEntry* _catalogEntry;
 };
 
-IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
+IndexCatalogEntry::IndexCatalogEntry(OperationContext* opCtx,
                                      StringData ns,
                                      CollectionCatalogEntry* collection,
                                      IndexDescriptor* descriptor,
@@ -86,12 +86,12 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
       _isReady(false) {
     _descriptor->_cachedEntry = this;
 
-    _isReady = _catalogIsReady(txn);
-    _head = _catalogHead(txn);
+    _isReady = _catalogIsReady(opCtx);
+    _head = _catalogHead(opCtx);
 
     {
         stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        _isMultikey.store(_catalogIsMultikey(txn, &_indexMultikeyPaths));
+        _isMultikey.store(_catalogIsMultikey(opCtx, &_indexMultikeyPaths));
         _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
     }
 
@@ -99,7 +99,7 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
         invariant(collationElement.isABSONObj());
         BSONObj collation = collationElement.Obj();
         auto statusWithCollator =
-            CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collation);
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
 
         // Index spec should have already been validated.
         invariantOK(statusWithCollator.getStatus());
@@ -132,13 +132,13 @@ void IndexCatalogEntry::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
     _accessMethod = std::move(accessMethod);
 }
 
-const RecordId& IndexCatalogEntry::head(OperationContext* txn) const {
-    DEV invariant(_head == _catalogHead(txn));
+const RecordId& IndexCatalogEntry::head(OperationContext* opCtx) const {
+    DEV invariant(_head == _catalogHead(opCtx));
     return _head;
 }
 
-bool IndexCatalogEntry::isReady(OperationContext* txn) const {
-    DEV invariant(_isReady == _catalogIsReady(txn));
+bool IndexCatalogEntry::isReady(OperationContext* opCtx) const {
+    DEV invariant(_isReady == _catalogIsReady(opCtx));
     return _isReady;
 }
 
@@ -146,7 +146,7 @@ bool IndexCatalogEntry::isMultikey() const {
     return _isMultikey.load();
 }
 
-MultikeyPaths IndexCatalogEntry::getMultikeyPaths(OperationContext* txn) const {
+MultikeyPaths IndexCatalogEntry::getMultikeyPaths(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
     return _indexMultikeyPaths;
 }
@@ -170,10 +170,10 @@ public:
     const RecordId _oldHead;
 };
 
-void IndexCatalogEntry::setHead(OperationContext* txn, RecordId newHead) {
-    _collection->setIndexHead(txn, _descriptor->indexName(), newHead);
+void IndexCatalogEntry::setHead(OperationContext* opCtx, RecordId newHead) {
+    _collection->setIndexHead(opCtx, _descriptor->indexName(), newHead);
 
-    txn->recoveryUnit()->registerChange(new SetHeadChange(this, _head));
+    opCtx->recoveryUnit()->registerChange(new SetHeadChange(this, _head));
     _head = newHead;
 }
 
@@ -185,21 +185,21 @@ void IndexCatalogEntry::setHead(OperationContext* txn, RecordId newHead) {
  */
 class RecoveryUnitSwap {
 public:
-    RecoveryUnitSwap(OperationContext* txn, RecoveryUnit* newRecoveryUnit)
-        : _txn(txn),
-          _oldRecoveryUnit(_txn->releaseRecoveryUnit()),
+    RecoveryUnitSwap(OperationContext* opCtx, RecoveryUnit* newRecoveryUnit)
+        : _opCtx(opCtx),
+          _oldRecoveryUnit(_opCtx->releaseRecoveryUnit()),
           _oldRecoveryUnitState(
-              _txn->setRecoveryUnit(newRecoveryUnit, OperationContext::kNotInUnitOfWork)),
+              _opCtx->setRecoveryUnit(newRecoveryUnit, OperationContext::kNotInUnitOfWork)),
           _newRecoveryUnit(newRecoveryUnit) {}
 
     ~RecoveryUnitSwap() {
-        _txn->releaseRecoveryUnit();
-        _txn->setRecoveryUnit(_oldRecoveryUnit, _oldRecoveryUnitState);
+        _opCtx->releaseRecoveryUnit();
+        _opCtx->setRecoveryUnit(_oldRecoveryUnit, _oldRecoveryUnitState);
     }
 
 private:
     // Not owned
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
 
     // Owned, but life-time is not controlled
     RecoveryUnit* const _oldRecoveryUnit;
@@ -209,7 +209,7 @@ private:
     const std::unique_ptr<RecoveryUnit> _newRecoveryUnit;
 };
 
-void IndexCatalogEntry::setMultikey(OperationContext* txn, const MultikeyPaths& multikeyPaths) {
+void IndexCatalogEntry::setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) {
     if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
         // If the index is already set as multikey and we don't have any path-level information to
         // update, then there's nothing more for us to do.
@@ -243,7 +243,8 @@ void IndexCatalogEntry::setMultikey(OperationContext* txn, const MultikeyPaths& 
     {
         // Only one thread should set the multi-key value per collection, because the metadata for a
         // collection is one large document.
-        Lock::ResourceLock collMDLock(txn->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X);
+        Lock::ResourceLock collMDLock(
+            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X);
 
         if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
             // It's possible that we raced with another thread when acquiring the MD lock. If the
@@ -257,9 +258,9 @@ void IndexCatalogEntry::setMultikey(OperationContext* txn, const MultikeyPaths& 
         // snapshot isolation.
         {
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            RecoveryUnitSwap ruSwap(txn, storageEngine->newRecoveryUnit());
+            RecoveryUnitSwap ruSwap(opCtx, storageEngine->newRecoveryUnit());
 
-            WriteUnitOfWork wuow(txn);
+            WriteUnitOfWork wuow(opCtx);
 
             // It's possible that the index type (e.g. ascending/descending index) supports tracking
             // path-level multikey information, but this particular index doesn't.
@@ -267,7 +268,7 @@ void IndexCatalogEntry::setMultikey(OperationContext* txn, const MultikeyPaths& 
             // multikey information in order to avoid unintentionally setting path-level multikey
             // information on an index created before 3.4.
             if (_collection->setIndexIsMultikey(
-                    txn,
+                    opCtx,
                     _descriptor->indexName(),
                     _indexTracksPathLevelMultikeyInfo ? multikeyPaths : MultikeyPaths{})) {
                 if (_infoCache) {
@@ -293,17 +294,17 @@ void IndexCatalogEntry::setMultikey(OperationContext* txn, const MultikeyPaths& 
 
 // ----
 
-bool IndexCatalogEntry::_catalogIsReady(OperationContext* txn) const {
-    return _collection->isIndexReady(txn, _descriptor->indexName());
+bool IndexCatalogEntry::_catalogIsReady(OperationContext* opCtx) const {
+    return _collection->isIndexReady(opCtx, _descriptor->indexName());
 }
 
-RecordId IndexCatalogEntry::_catalogHead(OperationContext* txn) const {
-    return _collection->getIndexHead(txn, _descriptor->indexName());
+RecordId IndexCatalogEntry::_catalogHead(OperationContext* opCtx) const {
+    return _collection->getIndexHead(opCtx, _descriptor->indexName());
 }
 
-bool IndexCatalogEntry::_catalogIsMultikey(OperationContext* txn,
+bool IndexCatalogEntry::_catalogIsMultikey(OperationContext* opCtx,
                                            MultikeyPaths* multikeyPaths) const {
-    return _collection->isIndexMultikey(txn, _descriptor->indexName(), multikeyPaths);
+    return _collection->isIndexMultikey(opCtx, _descriptor->indexName(), multikeyPaths);
 }
 
 // ------------------

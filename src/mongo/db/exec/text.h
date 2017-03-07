@@ -71,7 +71,7 @@ struct TextStageParams {
  */
 class TextStage final : public PlanStage {
 public:
-    TextStage(OperationContext* txn,
+    TextStage(OperationContext* opCtx,
               const TextStageParams& params,
               WorkingSet* ws,
               const MatchExpression* filter);
@@ -94,7 +94,7 @@ private:
     /**
      * Helper method to built the query execution plan for the text stage.
      */
-    unique_ptr<PlanStage> buildTextTree(OperationContext* txn,
+    unique_ptr<PlanStage> buildTextTree(OperationContext* opCtx,
                                         WorkingSet* ws,
                                         const MatchExpression* filter) const;
 

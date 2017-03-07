@@ -99,7 +99,7 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
@@ -111,7 +111,7 @@ public:
         }
 
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
-        AutoGetCollectionForRead ctx(txn, nss);
+        AutoGetCollectionForRead ctx(opCtx, nss);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
@@ -126,7 +126,8 @@ public:
         // We seek to populate this.
         string nearFieldName;
         bool using2DIndex = false;
-        if (!getFieldName(txn, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
+        if (!getFieldName(
+                opCtx, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
             return false;
         }
 
@@ -224,8 +225,8 @@ public:
         qr->setProj(projObj);
         qr->setLimit(numWanted);
         qr->setCollation(collation);
-        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
-        auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;
@@ -237,7 +238,7 @@ public:
         RangePreserver preserver(collection);
 
         auto statusWithPlanExecutor =
-            getExecutor(txn, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);
+            getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);
         if (!statusWithPlanExecutor.isOK()) {
             errmsg = "can't get query executor";
             return false;
@@ -245,9 +246,9 @@ public:
 
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
-        auto curOp = CurOp::get(txn);
+        auto curOp = CurOp::get(opCtx);
         {
-            stdx::lock_guard<Client> lk(*txn->getClient());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
 
@@ -334,7 +335,7 @@ public:
         stats.appendIntOrLL("time", curOp->elapsedMicros() / 1000);
         stats.done();
 
-        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+        collection->infoCache()->notifyOfQuery(opCtx, summary.indexesUsed);
 
         curOp->debug().setPlanSummaryMetrics(summary);
 
@@ -348,7 +349,7 @@ public:
     }
 
 private:
-    bool getFieldName(OperationContext* txn,
+    bool getFieldName(OperationContext* opCtx,
                       Collection* collection,
                       IndexCatalog* indexCatalog,
                       string* fieldOut,
@@ -357,7 +358,7 @@ private:
         vector<IndexDescriptor*> idxs;
 
         // First, try 2d.
-        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2D, idxs);
+        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2D, idxs);
         if (idxs.size() > 1) {
             *errOut = "more than one 2d index, not sure which to run geoNear on";
             return false;
@@ -378,7 +379,7 @@ private:
 
         // Next, 2dsphere.
         idxs.clear();
-        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2DSPHERE, idxs);
+        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2DSPHERE, idxs);
         if (0 == idxs.size()) {
             *errOut = "no geo indices for geoNear";
             return false;

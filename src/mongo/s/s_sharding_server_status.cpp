@@ -45,16 +45,16 @@ public:
         return true;
     }
 
-    BSONObj generateSection(OperationContext* txn,
+    BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        auto shardRegistry = Grid::get(txn)->shardRegistry();
+        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         invariant(shardRegistry);
 
         BSONObjBuilder result;
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
 
-        Grid::get(txn)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+        Grid::get(opCtx)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
 
         return result.obj();
     }

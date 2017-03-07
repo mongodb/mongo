@@ -63,7 +63,7 @@ public:
      * Executes an aggregation command. 'cmdObj' specifies the aggregation to run. Fills in 'result'
      * with the command response.
      */
-    static Status runAggregate(OperationContext* txn,
+    static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
                                BSONObj cmdObj,
                                int options,
@@ -82,13 +82,13 @@ private:
     // could be different from conn->getServerAddress() for connections that map to
     // multiple servers such as for replica sets. These also take care of registering
     // returned cursors.
-    static BSONObj aggRunCommand(OperationContext* txn,
+    static BSONObj aggRunCommand(OperationContext* opCtx,
                                  DBClientBase* conn,
                                  const Namespaces& namespaces,
                                  BSONObj cmd,
                                  int queryOptions);
 
-    static Status aggPassthrough(OperationContext* txn,
+    static Status aggPassthrough(OperationContext* opCtx,
                                  const Namespaces& namespaces,
                                  DBConfig* conf,
                                  BSONObj cmd,

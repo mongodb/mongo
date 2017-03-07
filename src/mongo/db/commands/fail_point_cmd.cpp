@@ -90,7 +90,7 @@ public:
         h << "modifies the settings of a fail point";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,

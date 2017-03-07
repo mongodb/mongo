@@ -75,7 +75,7 @@ Status ShardingCatalogManagerImpl::startup() {
     return Status::OK();
 }
 
-void ShardingCatalogManagerImpl::shutDown(OperationContext* txn) {
+void ShardingCatalogManagerImpl::shutDown(OperationContext* opCtx) {
     LOG(1) << "ShardingCatalogManagerImpl::shutDown() called.";
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -86,7 +86,7 @@ void ShardingCatalogManagerImpl::shutDown(OperationContext* txn) {
     _executorForAddShard->join();
 }
 
-Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationContext* txn) {
+Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationContext* opCtx) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_configInitialized) {
@@ -95,7 +95,7 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
         }
     }
 
-    Status status = _initConfigIndexes(txn);
+    Status status = _initConfigIndexes(opCtx);
     if (!status.isOK()) {
         return status;
     }
@@ -103,7 +103,7 @@ Status ShardingCatalogManagerImpl::initializeConfigDatabaseIfNeeded(OperationCon
     // Make sure to write config.version last since we detect rollbacks of config.version and
     // will re-run initializeConfigDatabaseIfNeeded if that happens, but we don't detect rollback
     // of the index builds.
-    status = _initConfigVersion(txn);
+    status = _initConfigVersion(opCtx);
     if (!status.isOK()) {
         return status;
     }
@@ -119,11 +119,11 @@ void ShardingCatalogManagerImpl::discardCachedConfigDatabaseInitializationState(
     _configInitialized = false;
 }
 
-Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* txn) {
-    const auto catalogClient = Grid::get(txn)->catalogClient(txn);
+Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* opCtx) {
+    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
 
     auto versionStatus =
-        catalogClient->getConfigVersion(txn, repl::ReadConcernLevel::kLocalReadConcern);
+        catalogClient->getConfigVersion(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!versionStatus.isOK()) {
         return versionStatus.getStatus();
     }
@@ -144,7 +144,7 @@ Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* txn) {
 
         BSONObj versionObj(newVersion.toBSON());
         auto insertStatus = catalogClient->insertConfigDocument(
-            txn, VersionType::ConfigNS, versionObj, kNoWaitWriteConcern);
+            opCtx, VersionType::ConfigNS, versionObj, kNoWaitWriteConcern);
 
         return insertStatus;
     }
@@ -168,12 +168,12 @@ Status ShardingCatalogManagerImpl::_initConfigVersion(OperationContext* txn) {
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
+Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
-    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     Status result =
-        configShard->createIndexOnConfig(txn,
+        configShard->createIndexOnConfig(opCtx,
                                          NamespaceString(ChunkType::ConfigNS),
                                          BSON(ChunkType::ns() << 1 << ChunkType::min() << 1),
                                          unique);
@@ -184,7 +184,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result = configShard->createIndexOnConfig(
-        txn,
+        opCtx,
         NamespaceString(ChunkType::ConfigNS),
         BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
         unique);
@@ -195,7 +195,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result = configShard->createIndexOnConfig(
-        txn,
+        opCtx,
         NamespaceString(ChunkType::ConfigNS),
         BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
         unique);
@@ -206,7 +206,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result = configShard->createIndexOnConfig(
-        txn,
+        opCtx,
         NamespaceString(MigrationType::ConfigNS),
         BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
         unique);
@@ -217,7 +217,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result = configShard->createIndexOnConfig(
-        txn, NamespaceString(ShardType::ConfigNS), BSON(ShardType::host() << 1), unique);
+        opCtx, NamespaceString(ShardType::ConfigNS), BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create host_1 index on config db"
@@ -225,7 +225,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result = configShard->createIndexOnConfig(
-        txn, NamespaceString(LocksType::ConfigNS), BSON(LocksType::lockID() << 1), !unique);
+        opCtx, NamespaceString(LocksType::ConfigNS), BSON(LocksType::lockID() << 1), !unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create lock id index on config db"
@@ -233,7 +233,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result =
-        configShard->createIndexOnConfig(txn,
+        configShard->createIndexOnConfig(opCtx,
                                          NamespaceString(LocksType::ConfigNS),
                                          BSON(LocksType::state() << 1 << LocksType::process() << 1),
                                          !unique);
@@ -244,14 +244,14 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     }
 
     result = configShard->createIndexOnConfig(
-        txn, NamespaceString(LockpingsType::ConfigNS), BSON(LockpingsType::ping() << 1), !unique);
+        opCtx, NamespaceString(LockpingsType::ConfigNS), BSON(LockpingsType::ping() << 1), !unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create lockping ping time index on config db"
                                     << causedBy(result));
     }
 
-    result = configShard->createIndexOnConfig(txn,
+    result = configShard->createIndexOnConfig(opCtx,
                                               NamespaceString(TagsType::ConfigNS),
                                               BSON(TagsType::ns() << 1 << TagsType::min() << 1),
                                               unique);
@@ -261,7 +261,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
                                     << causedBy(result));
     }
 
-    result = configShard->createIndexOnConfig(txn,
+    result = configShard->createIndexOnConfig(opCtx,
                                               NamespaceString(TagsType::ConfigNS),
                                               BSON(TagsType::ns() << 1 << TagsType::tag() << 1),
                                               !unique);
@@ -275,22 +275,22 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
 }
 
 Status ShardingCatalogManagerImpl::setFeatureCompatibilityVersionOnShards(
-    OperationContext* txn, const std::string& version) {
+    OperationContext* opCtx, const std::string& version) {
 
     // No shards should be added until we have forwarded featureCompatibilityVersion to all shards.
-    Lock::SharedLock lk(txn->lockState(), _kShardMembershipLock);
+    Lock::SharedLock lk(opCtx->lockState(), _kShardMembershipLock);
 
     std::vector<ShardId> shardIds;
-    Grid::get(txn)->shardRegistry()->getAllShardIds(&shardIds);
+    Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
     for (const ShardId& shardId : shardIds) {
-        const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+        const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
         if (!shardStatus.isOK()) {
             continue;
         }
         const auto shard = shardStatus.getValue();
 
         auto response = shard->runCommandWithFixedRetryAttempts(
-            txn,
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "admin",
             BSON(FeatureCompatibilityVersion::kCommandName << version),

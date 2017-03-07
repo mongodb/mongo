@@ -134,7 +134,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
 }
 
 // static
-StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* txn,
+StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                                                         unique_ptr<WorkingSet> ws,
                                                         unique_ptr<PlanStage> rt,
                                                         unique_ptr<QuerySolution> qs,
@@ -143,7 +143,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* txn,
                                                         const string& ns,
                                                         YieldPolicy yieldPolicy) {
     unique_ptr<PlanExecutor> exec(new PlanExecutor(
-        txn, std::move(ws), std::move(rt), std::move(qs), std::move(cq), collection, ns));
+        opCtx, std::move(ws), std::move(rt), std::move(qs), std::move(cq), collection, ns));
 
     // Perform plan selection, if necessary.
     Status status = exec->pickBestPlan(yieldPolicy, collection);
@@ -322,21 +322,21 @@ void PlanExecutor::detachFromOperationContext() {
     _everDetachedFromOperationContext = true;
 }
 
-void PlanExecutor::reattachToOperationContext(OperationContext* txn) {
+void PlanExecutor::reattachToOperationContext(OperationContext* opCtx) {
     invariant(_currentState == kDetached);
 
     // We're reattaching for a getMore now.  Reset the yield timer in order to prevent from
     // yielding again right away.
     _yieldPolicy->resetTimer();
 
-    _opCtx = txn;
-    _root->reattachToOperationContext(txn);
+    _opCtx = opCtx;
+    _root->reattachToOperationContext(opCtx);
     _currentState = kSaved;
 }
 
-void PlanExecutor::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void PlanExecutor::invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     if (!killed()) {
-        _root->invalidate(txn, dl, type);
+        _root->invalidate(opCtx, dl, type);
     }
 }
 

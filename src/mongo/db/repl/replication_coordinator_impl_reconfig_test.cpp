@@ -60,9 +60,9 @@ TEST_F(ReplCoordTest, NodeReturnsNotYetInitializedWhenReconfigReceivedPriorToIni
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
 
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NotYetInitialized,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
@@ -87,9 +87,9 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
     args.force = false;
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NotMaster,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
@@ -128,10 +128,10 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                                                          << "node2:12345"
                                                          << "arbiterOnly"
                                                          << true)));
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     // ErrorCodes::BadValue should be propagated from ReplSetConfig::initialize()
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
@@ -165,9 +165,9 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
 
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
@@ -205,9 +205,9 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                              << "settings"
                              << BSON("replicaSetId" << OID::gen()));
 
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
@@ -242,18 +242,18 @@ TEST_F(ReplCoordTest,
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
 
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
 void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord,
                        Status* status,
-                       OperationContext* txn) {
+                       OperationContext* opCtx) {
     BSONObjBuilder garbage;
     *status =
-        replCoord->processReplSetInitiate(txn,
+        replCoord->processReplSetInitiate(opCtx,
                                           BSON("_id"
                                                << "mySet"
                                                << "version"
@@ -268,7 +268,7 @@ void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord,
 
 void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
                        Status* status,
-                       OperationContext* txn) {
+                       OperationContext* opCtx) {
     BSONObjBuilder garbage;
     ReplSetReconfigArgs args;
     args.force = false;
@@ -284,7 +284,7 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
                                                          << "node2:12345"
                                                          << "priority"
                                                          << 3)));
-    *status = replCoord->processReplSetReconfig(txn, args, &garbage);
+    *status = replCoord->processReplSetReconfig(opCtx, args, &garbage);
 }
 
 TEST_F(ReplCoordTest,
@@ -307,8 +307,9 @@ TEST_F(ReplCoordTest,
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto txn = makeOperationContext();
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status, txn.get()));
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread(
+        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
 
     NetworkInterfaceMock* net = getNet();
     getNet()->enterNetwork();
@@ -350,8 +351,9 @@ TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringRe
     Status status(ErrorCodes::InternalError, "Not Set");
     getExternalState()->setStoreLocalConfigDocumentStatus(
         Status(ErrorCodes::OutOfDiskSpace, "The test set this"));
-    const auto txn = makeOperationContext();
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status, txn.get()));
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread(
+        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
 
     replyToReceivedHeartbeat();
     reconfigThread.join();
@@ -377,9 +379,10 @@ TEST_F(ReplCoordTest,
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     // first reconfig
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status, txn.get()));
+    stdx::thread reconfigThread(
+        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
     getNet()->enterNetwork();
     getNet()->blackHole(getNet()->getNextReadyRequest());
     getNet()->exitNetwork();
@@ -398,10 +401,10 @@ TEST_F(ReplCoordTest,
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 
-    shutdown(txn.get());
+    shutdown(opCtx.get());
     reconfigThread.join();
 }
 
@@ -415,8 +418,8 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
 
     // initiate
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto txn = makeOperationContext();
-    stdx::thread initateThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status, txn.get()));
+    const auto opCtx = makeOperationContext();
+    stdx::thread initateThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status, opCtx.get()));
     getNet()->enterNetwork();
     getNet()->blackHole(getNet()->getNextReadyRequest());
     getNet()->exitNetwork();
@@ -435,10 +438,10 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 
-    shutdown(txn.get());
+    shutdown(opCtx.get());
     initateThread.join();
 }
 
@@ -462,8 +465,9 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
     simulateSuccessfulV1Election();
 
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto txn = makeOperationContext();
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status, txn.get()));
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread(
+        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
 
     NetworkInterfaceMock* net = getNet();
     getNet()->enterNetwork();
@@ -541,9 +545,9 @@ TEST_F(
     ReplSetReconfigArgs args;
     args.force = false;
     args.newConfigObj = config.toBSON();
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 
     getExternalState()->setStoreLocalConfigDocumentToHang(false);
 }
@@ -568,8 +572,9 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
 
     // start reconfigThread
     Status status(ErrorCodes::InternalError, "Not Set");
-    const auto txn = makeOperationContext();
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status, txn.get()));
+    const auto opCtx = makeOperationContext();
+    stdx::thread reconfigThread(
+        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
 
     // wait for reconfigThread to create network requests to ensure the replication coordinator
     // is in state kConfigReconfiguring
@@ -609,7 +614,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("because already in the midst of a configuration process"));
-    shutdown(txn.get());
+    shutdown(opCtx.get());
     reconfigThread.join();
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
 }
@@ -644,13 +649,13 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
                                                       << "node1:12345")
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
-    const auto txn = makeOperationContext();
+    const auto opCtx = makeOperationContext();
     ASSERT_EQUALS(ErrorCodes::NotMaster,
-                  getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+                  getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 
     // forced should succeed
     args.force = true;
-    ASSERT_OK(getReplCoord()->processReplSetReconfig(txn.get(), args, &result));
+    ASSERT_OK(getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     getReplCoord()->processReplSetGetConfig(&result);
 
     // ensure forced reconfig results in a random larger version

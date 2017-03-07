@@ -43,7 +43,7 @@ public:
 
     ConnectionString connectionString() override;
 
-    StatusWith<HostAndPort> findHost(OperationContext* txn,
+    StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;
 
     StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,

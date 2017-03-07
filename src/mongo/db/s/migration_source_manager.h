@@ -83,7 +83,7 @@ public:
      *  - SendStaleConfigException if the expected collection version does not match what we find it
      *      to be after acquiring the distributed lock.
      */
-    MigrationSourceManager(OperationContext* txn,
+    MigrationSourceManager(OperationContext* opCtx,
                            MoveChunkRequest request,
                            ConnectionString donorConnStr,
                            HostAndPort recipientHost);
@@ -101,7 +101,7 @@ public:
      * Expected state: kCreated
      * Resulting state: kCloning on success, kDone on failure
      */
-    Status startClone(OperationContext* txn);
+    Status startClone(OperationContext* opCtx);
 
     /**
      * Waits for the cloning to catch up sufficiently so we won't have to stay in the critical
@@ -111,7 +111,7 @@ public:
      * Expected state: kCloning
      * Resulting state: kCloneCaughtUp on success, kDone on failure
      */
-    Status awaitToCatchUp(OperationContext* txn);
+    Status awaitToCatchUp(OperationContext* opCtx);
 
     /**
      * Waits for the active clone operation to catch up and enters critical section. Once this call
@@ -122,7 +122,7 @@ public:
      * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
-    Status enterCriticalSection(OperationContext* txn);
+    Status enterCriticalSection(OperationContext* opCtx);
 
     /**
      * Tells the recipient of the chunk to commit the chunk contents, which it received.
@@ -130,7 +130,7 @@ public:
      * Expected state: kCriticalSection
      * Resulting state: kCloneCompleted on success, kDone on failure
      */
-    Status commitChunkOnRecipient(OperationContext* txn);
+    Status commitChunkOnRecipient(OperationContext* opCtx);
 
     /**
      * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
@@ -144,7 +144,7 @@ public:
      * Expected state: kCloneCompleted
      * Resulting state: kDone
      */
-    Status commitChunkMetadataOnConfig(OperationContext* txn);
+    Status commitChunkMetadataOnConfig(OperationContext* opCtx);
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
@@ -154,7 +154,7 @@ public:
      * Expected state: Any
      * Resulting state: kDone
      */
-    void cleanupOnError(OperationContext* txn);
+    void cleanupOnError(OperationContext* opCtx);
 
     /**
      * Returns the key pattern object for the stored committed metadata.
@@ -200,7 +200,7 @@ private:
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
-    void _cleanup(OperationContext* txn);
+    void _cleanup(OperationContext* opCtx);
 
     // The parameters to the moveChunk command
     const MoveChunkRequest _args;

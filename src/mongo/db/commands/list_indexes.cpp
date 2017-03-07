@@ -116,7 +116,7 @@ public:
 
     CmdListIndexes() : Command("listIndexes") {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
@@ -132,7 +132,7 @@ public:
             return appendCommandStatus(result, parseCursorStatus);
         }
 
-        AutoGetCollectionForRead autoColl(txn, ns);
+        AutoGetCollectionForRead autoColl(opCtx, ns);
         if (!autoColl.getDb()) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::NamespaceNotFound, "no database"));
@@ -150,19 +150,19 @@ public:
         vector<string> indexNames;
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             indexNames.clear();
-            cce->getAllIndexes(txn, &indexNames);
+            cce->getAllIndexes(opCtx, &indexNames);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "listIndexes", ns.ns());
 
         auto ws = make_unique<WorkingSet>();
-        auto root = make_unique<QueuedDataStage>(txn, ws.get());
+        auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
 
         for (size_t i = 0; i < indexNames.size(); i++) {
             BSONObj indexSpec;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                indexSpec = cce->getIndexSpec(txn, indexNames[i]);
+                indexSpec = cce->getIndexSpec(opCtx, indexNames[i]);
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "listIndexes", ns.ns());
 
             if (ns.ns() == FeatureCompatibilityVersion::kCollection &&
                 indexNames[i] == FeatureCompatibilityVersion::k32IncompatibleIndexName) {
@@ -198,7 +198,7 @@ public:
         dassert(ns == cursorNss.getTargetNSForListIndexes());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
+            opCtx, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -230,7 +230,7 @@ public:
             auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
                 {exec.release(),
                  cursorNss.ns(),
-                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
             cursorId = pinnedCursor.getCursor()->cursorid();
         }
 

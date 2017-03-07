@@ -65,7 +65,7 @@ namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
-bool checkIfSingleDoc(OperationContext* txn,
+bool checkIfSingleDoc(OperationContext* opCtx,
                       Collection* collection,
                       const IndexDescriptor* idx,
                       const ChunkType* chunk) {
@@ -73,7 +73,7 @@ bool checkIfSingleDoc(OperationContext* txn,
     BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
     BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
 
-    unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+    unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(opCtx,
                                                              collection,
                                                              idx,
                                                              newmin,
@@ -100,16 +100,16 @@ bool checkIfSingleDoc(OperationContext* txn,
 // using the specified splitPoints. Returns false if the metadata's chunks don't match
 // the new chunk boundaries exactly.
 //
-bool _checkMetadataForSuccess(OperationContext* txn,
+bool _checkMetadataForSuccess(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const ChunkRange& chunkRange,
                               const std::vector<BSONObj>& splitKeys) {
     ScopedCollectionMetadata metadataAfterSplit;
     {
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
         // Get collection metadata
-        metadataAfterSplit = CollectionShardingState::get(txn, nss.ns())->getMetadata();
+        metadataAfterSplit = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
     }
 
     auto newChunkBounds(splitKeys);
@@ -167,13 +167,13 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        auto shardingState = ShardingState::get(txn);
+        auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         //
@@ -233,8 +233,8 @@ public:
         const string whyMessage(str::stream() << "splitting chunk [" << min << ", " << max
                                               << ") in "
                                               << nss.toString());
-        auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
-            txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        auto scopedDistLock = grid.catalogClient(opCtx)->getDistLockManager()->lock(
+            opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
                                    << " to split chunk [" << redact(min) << "," << redact(max)
@@ -245,7 +245,7 @@ public:
 
         // Always check our version remotely
         ChunkVersion shardVersion;
-        Status refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersion);
+        Status refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &shardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
@@ -266,7 +266,7 @@ public:
             return false;
         }
 
-        const auto& oss = OperationShardingState::get(txn);
+        const auto& oss = OperationShardingState::get(opCtx);
         uassert(ErrorCodes::InvalidOptions, "collection version is missing", oss.hasShardVersion());
 
         // Even though the splitChunk command transmits a value in the operation's shardVersion
@@ -286,10 +286,10 @@ public:
 
         ScopedCollectionMetadata collMetadata;
         {
-            AutoGetCollection autoColl(txn, nss, MODE_IS);
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
             // Get collection metadata
-            collMetadata = CollectionShardingState::get(txn, nss.ns())->getMetadata();
+            collMetadata = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
         }
 
         // With nonzero shard version, we must have metadata
@@ -313,8 +313,8 @@ public:
             request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
         auto cmdResponseStatus =
-            Grid::get(txn)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-                txn,
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
                 kPrimaryOnlyReadPreference,
                 "admin",
                 configCmdObj,
@@ -325,7 +325,7 @@ public:
         //
         {
             ChunkVersion unusedShardVersion;
-            refreshStatus = shardingState->refreshMetadataNow(txn, nss, &unusedShardVersion);
+            refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
 
             if (!refreshStatus.isOK()) {
                 errmsg = str::stream() << "failed to refresh metadata for split chunk ["
@@ -368,7 +368,7 @@ public:
         // succeeds, thus the automatic retry fails with a precondition violation, for example.
         //
         if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
-            _checkMetadataForSuccess(txn, nss, chunkRange, splitKeys)) {
+            _checkMetadataForSuccess(opCtx, nss, chunkRange, splitKeys)) {
 
             LOG(1) << "splitChunk [" << redact(min) << "," << redact(max)
                    << ") has already been committed.";
@@ -381,7 +381,7 @@ public:
         // Select chunk to move out for "top chunk optimization".
         KeyPattern shardKeyPattern(collMetadata->getKeyPattern());
 
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
         Collection* const collection = autoColl.getCollection();
         if (!collection) {
@@ -393,7 +393,7 @@ public:
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
         IndexDescriptor* idx =
-            collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn, keyPatternObj, false);
+            collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPatternObj, false);
         if (!idx) {
             return true;
         }
@@ -407,11 +407,11 @@ public:
         frontChunk.setMax(splitKeys.front());
 
         if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
-            checkIfSingleDoc(txn, collection, idx, &backChunk)) {
+            checkIfSingleDoc(opCtx, collection, idx, &backChunk)) {
             result.append("shouldMigrate",
                           BSON("min" << backChunk.getMin() << "max" << backChunk.getMax()));
         } else if (shardKeyPattern.globalMin().woCompare(frontChunk.getMin()) == 0 &&
-                   checkIfSingleDoc(txn, collection, idx, &frontChunk)) {
+                   checkIfSingleDoc(opCtx, collection, idx, &frontChunk)) {
             result.append("shouldMigrate",
                           BSON("min" << frontChunk.getMin() << "max" << frontChunk.getMax()));
         }

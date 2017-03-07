@@ -80,11 +80,11 @@ public:
      */
     bool isSharded(const std::string& ns);
 
-    std::shared_ptr<ChunkManager> getChunkManager(OperationContext* txn,
+    std::shared_ptr<ChunkManager> getChunkManager(OperationContext* opCtx,
                                                   const std::string& ns,
                                                   bool reload = false,
                                                   bool forceReload = false);
-    std::shared_ptr<ChunkManager> getChunkManagerIfExists(OperationContext* txn,
+    std::shared_ptr<ChunkManager> getChunkManagerIfExists(OperationContext* opCtx,
                                                           const std::string& ns,
                                                           bool reload = false,
                                                           bool forceReload = false);
@@ -93,7 +93,7 @@ public:
      * Returns true if it is successful at loading the DBConfig, false if the database is not found,
      * and throws on all other errors.
      */
-    bool load(OperationContext* txn);
+    bool load(OperationContext* opCtx);
 
 protected:
     typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
@@ -105,7 +105,7 @@ protected:
      * Also returns true without reloading if reloadIteration is not equal to the _reloadCount.
      * This is to avoid multiple threads attempting to reload do duplicate work.
      */
-    bool _loadIfNeeded(OperationContext* txn, Counter reloadIteration);
+    bool _loadIfNeeded(OperationContext* opCtx, Counter reloadIteration);
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

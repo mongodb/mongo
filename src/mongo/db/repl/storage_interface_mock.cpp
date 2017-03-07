@@ -40,53 +40,53 @@ namespace mongo {
 namespace repl {
 void StorageInterfaceMock::startup() {}
 void StorageInterfaceMock::shutdown() {}
-bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* txn) const {
+bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     return _initialSyncFlag;
 }
 
-void StorageInterfaceMock::setInitialSyncFlag(OperationContext* txn) {
+void StorageInterfaceMock::setInitialSyncFlag(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     _initialSyncFlag = true;
 }
 
-void StorageInterfaceMock::clearInitialSyncFlag(OperationContext* txn) {
+void StorageInterfaceMock::clearInitialSyncFlag(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     _initialSyncFlag = false;
 }
 
-OpTime StorageInterfaceMock::getMinValid(OperationContext* txn) const {
+OpTime StorageInterfaceMock::getMinValid(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     return _minValid;
 }
 
-void StorageInterfaceMock::setMinValid(OperationContext* txn, const OpTime& minValid) {
+void StorageInterfaceMock::setMinValid(OperationContext* opCtx, const OpTime& minValid) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     _minValid = minValid;
 }
 
-void StorageInterfaceMock::setMinValidToAtLeast(OperationContext* txn, const OpTime& minValid) {
+void StorageInterfaceMock::setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     _minValid = std::max(_minValid, minValid);
 }
 
-void StorageInterfaceMock::setOplogDeleteFromPoint(OperationContext* txn,
+void StorageInterfaceMock::setOplogDeleteFromPoint(OperationContext* opCtx,
                                                    const Timestamp& timestamp) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     _oplogDeleteFromPoint = timestamp;
 }
 
-Timestamp StorageInterfaceMock::getOplogDeleteFromPoint(OperationContext* txn) {
+Timestamp StorageInterfaceMock::getOplogDeleteFromPoint(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     return _oplogDeleteFromPoint;
 }
 
-void StorageInterfaceMock::setAppliedThrough(OperationContext* txn, const OpTime& optime) {
+void StorageInterfaceMock::setAppliedThrough(OperationContext* opCtx, const OpTime& optime) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     _appliedThrough = optime;
 }
 
-OpTime StorageInterfaceMock::getAppliedThrough(OperationContext* txn) {
+OpTime StorageInterfaceMock::getAppliedThrough(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     return _appliedThrough;
 }

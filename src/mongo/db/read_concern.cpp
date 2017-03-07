@@ -59,7 +59,7 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshot
 
 }  // namespace
 
-StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* txn,
+StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* opCtx,
                                                      const BSONObj& cmdObj,
                                                      bool supportsReadConcern) {
     repl::ReadConcernArgs readConcernArgs;
@@ -77,8 +77,8 @@ StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* txn,
     return readConcernArgs;
 }
 
-Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& readConcernArgs) {
-    repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(txn);
+Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs) {
+    repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
@@ -108,7 +108,7 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
 
     // Skip waiting for the OpTime when testing snapshot behavior
     if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
-        Status status = replCoord->waitUntilOpTimeForRead(txn, readConcernArgs);
+        Status status = replCoord->waitUntilOpTimeForRead(opCtx, readConcernArgs);
         if (!status.isOK()) {
             return status;
         }
@@ -129,57 +129,57 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
         LOG(debugLevel) << "Waiting for 'committed' snapshot to be available for reading: "
                         << readConcernArgs;
 
-        Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        Status status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
         // Wait until a snapshot is available.
         while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
             LOG(debugLevel) << "Snapshot not available yet.";
-            replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
-            status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+            replCoord->waitUntilSnapshotCommitted(opCtx, SnapshotName::min());
+            status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
         }
 
         if (!status.isOK()) {
             return status;
         }
 
-        LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(txn)->query();
+        LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->query();
     }
 
     return Status::OK();
 }
 
-Status waitForLinearizableReadConcern(OperationContext* txn) {
+Status waitForLinearizableReadConcern(OperationContext* opCtx) {
 
     repl::ReplicationCoordinator* replCoord =
-        repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
     {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-        Lock::CollectionLock lock(txn->lockState(), "local.oplog.rs", MODE_IX);
+        ScopedTransaction transaction(opCtx, MODE_IX);
+        Lock::DBLock lk(opCtx->lockState(), "local", MODE_IX);
+        Lock::CollectionLock lock(opCtx->lockState(), "local.oplog.rs", MODE_IX);
 
-        if (!replCoord->canAcceptWritesForDatabase(txn, "admin")) {
+        if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
             return {ErrorCodes::NotMaster,
                     "No longer primary when waiting for linearizable read concern"};
         }
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
 
-            WriteUnitOfWork uow(txn);
-            txn->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                txn,
+            WriteUnitOfWork uow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx,
                 BSON("msg"
                      << "linearizable read"));
             uow.commit();
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-            txn, "waitForLinearizableReadConcern", "local.rs.oplog");
+            opCtx, "waitForLinearizableReadConcern", "local.rs.oplog");
     }
     WriteConcernOptions wc = WriteConcernOptions(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
 
-    repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-    auto awaitReplResult = replCoord->awaitReplication(txn, lastOpApplied, wc);
+    repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    auto awaitReplResult = replCoord->awaitReplication(opCtx, lastOpApplied, wc);
     if (awaitReplResult.status == ErrorCodes::WriteConcernFailed) {
         return Status(ErrorCodes::LinearizableReadConcernError,
                       "Failed to confirm that read was linearizable.");

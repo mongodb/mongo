@@ -58,20 +58,20 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
-    Status createIndexOnConfig(OperationContext* txn,
+    Status createIndexOnConfig(OperationContext* opCtx,
                                const NamespaceString& ns,
                                const BSONObj& keys,
                                bool unique) override;
 
 private:
-    Shard::HostWithResponse _runCommand(OperationContext* txn,
+    Shard::HostWithResponse _runCommand(OperationContext* opCtx,
                                         const ReadPreferenceSetting& unused,
                                         const std::string& dbName,
                                         Milliseconds maxTimeMSOverrideUnused,
                                         const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,
@@ -90,7 +90,7 @@ private:
      * 'previousOpTimeOnClient' then the command we just ran didn't do a write, and we should leave
      * _lastOpTime alone.
      */
-    void _updateLastOpTimeFromClient(OperationContext* txn,
+    void _updateLastOpTimeFromClient(OperationContext* opCtx,
                                      const repl::OpTime& previousOpTimeOnClient);
 
     repl::OpTime _getLastOpTime();

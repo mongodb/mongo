@@ -37,7 +37,7 @@ class OperationContext;
 
 class WhereMatchExpression final : public WhereMatchExpressionBase {
 public:
-    WhereMatchExpression(OperationContext* txn, WhereParams params);
+    WhereMatchExpression(OperationContext* opCtx, WhereParams params);
 
     Status init(StringData dbName);
 
@@ -51,7 +51,7 @@ private:
     std::unique_ptr<Scope> _scope;
     ScriptingFunction _func;
 
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
 };
 
 }  // namespace mongo

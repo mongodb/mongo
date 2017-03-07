@@ -148,8 +148,8 @@ static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
     return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
 }
 
-void MemoryMappedFile::close(OperationContext* txn) {
-    LockMongoFilesShared::assertExclusivelyLocked(txn);
+void MemoryMappedFile::close(OperationContext* opCtx) {
+    LockMongoFilesShared::assertExclusivelyLocked(opCtx);
 
     // Prevent flush and close from concurrently running
     stdx::lock_guard<stdx::mutex> lk(_flushMutex);
@@ -174,18 +174,18 @@ void MemoryMappedFile::close(OperationContext* txn) {
         fd = 0;
     }
 
-    destroyed(txn);  // cleans up from the master list of mmaps
+    destroyed(opCtx);  // cleans up from the master list of mmaps
 }
 
 bool MemoryMappedFile::isClosed() {
     return !len && !fd && !views.size();
 }
 
-void* MemoryMappedFile::map(OperationContext* txn,
+void* MemoryMappedFile::map(OperationContext* opCtx,
                             const char* filenameIn,
                             unsigned long long& length) {
     verify(fd == 0 && len == 0);  // can't open more than once
-    setFilename(txn, filenameIn);
+    setFilename(opCtx, filenameIn);
     FileAllocator::get()->allocateAsap(filenameIn, length);
     /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary
      * perhaps. */
@@ -244,8 +244,8 @@ void* MemoryMappedFile::map(OperationContext* txn,
             severe() << "CreateFileMappingW for " << filename << " failed with "
                      << errnoWithDescription(dosError) << " (file size is " << length << ")"
                      << " in MemoryMappedFile::map" << endl;
-            LockMongoFilesExclusive lock(txn);
-            close(txn);
+            LockMongoFilesExclusive lock(opCtx);
+            close(opCtx);
             fassertFailed(16225);
         }
     }
@@ -296,8 +296,8 @@ void* MemoryMappedFile::map(OperationContext* txn,
                          << length << ")"
                          << " in MemoryMappedFile::map" << endl;
 
-                LockMongoFilesExclusive lock(txn);
-                close(txn);
+                LockMongoFilesExclusive lock(opCtx);
+                close(opCtx);
                 fassertFailed(16166);
             }
 
@@ -359,8 +359,8 @@ void* MemoryMappedFile::createPrivateMap() {
     return privateMapAddress;
 }
 
-void* MemoryMappedFile::remapPrivateView(OperationContext* txn, void* oldPrivateAddr) {
-    LockMongoFilesExclusive lockMongoFiles(txn);
+void* MemoryMappedFile::remapPrivateView(OperationContext* opCtx, void* oldPrivateAddr) {
+    LockMongoFilesExclusive lockMongoFiles(opCtx);
 
     privateViews.clearWritableBits(oldPrivateAddr, len);
 
@@ -406,12 +406,12 @@ public:
           _filename(filename),
           _flushMutex(flushMutex) {}
 
-    void flush(OperationContext* txn) {
+    void flush(OperationContext* opCtx) {
         if (!_view || !_fd)
             return;
 
         {
-            LockMongoFilesShared mmfilesLock(txn);
+            LockMongoFilesShared mmfilesLock(opCtx);
 
             std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
             std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
@@ -475,9 +475,9 @@ void MemoryMappedFile::flush(bool sync) {
     uassert(13056, "Async flushing not supported on windows", sync);
     if (!views.empty()) {
         WindowsFlushable f(this, viewForFlushing(), fd, _uniqueId, filename(), _flushMutex);
-        auto txn = cc().getOperationContext();
-        invariant(txn);
-        f.flush(txn);
+        auto opCtx = cc().getOperationContext();
+        invariant(opCtx);
+        f.flush(opCtx);
     }
 }
 

@@ -69,7 +69,7 @@ bool isAuthorizedCommon(SaslAuthenticationSession* session,
 
 SaslAuthenticationSession::SaslAuthenticationSession(AuthorizationSession* authzSession)
     : AuthenticationSession(AuthenticationSession::SESSION_TYPE_SASL),
-      _txn(nullptr),
+      _opCtx(nullptr),
       _authzSession(authzSession),
       _saslStep(0),
       _conversationId(0),

@@ -48,7 +48,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
 }
 
 StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-    OperationContext* txn, const ReadPreferenceSetting& readPref) {
+    OperationContext* opCtx, const ReadPreferenceSetting& readPref) {
     return _hostAndPort;
 }
 

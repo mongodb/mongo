@@ -48,8 +48,8 @@
 
 namespace mongo {
 
-ParsedDelete::ParsedDelete(OperationContext* txn, const DeleteRequest* request)
-    : _txn(txn), _request(request) {}
+ParsedDelete::ParsedDelete(OperationContext* opCtx, const DeleteRequest* request)
+    : _opCtx(opCtx), _request(request) {}
 
 Status ParsedDelete::parseRequest() {
     dassert(!_canonicalQuery.get());
@@ -79,7 +79,7 @@ Status ParsedDelete::parseRequest() {
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    const ExtensionsCallbackReal extensionsCallback(_txn, &_request->getNamespaceString());
+    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
@@ -99,7 +99,7 @@ Status ParsedDelete::parseQueryToCQ() {
         qr->setLimit(1);
     }
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(_txn, std::move(qr), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(_opCtx, std::move(qr), extensionsCallback);
 
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());

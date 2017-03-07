@@ -86,7 +86,7 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -94,7 +94,7 @@ public:
                      BSONObjBuilder& result) {
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-            maybeDisableValidation.emplace(txn);
+            maybeDisableValidation.emplace(opCtx);
         }
 
         string from = cmdObj.getStringField("clone");
@@ -119,11 +119,11 @@ public:
 
         set<string> clonedColls;
 
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
+        ScopedTransaction transaction(opCtx, MODE_IX);
+        Lock::DBLock dbXLock(opCtx->lockState(), dbname, MODE_X);
 
         Cloner cloner;
-        Status status = cloner.copyDb(txn, dbname, from, opts, &clonedColls);
+        Status status = cloner.copyDb(opCtx, dbname, from, opts, &clonedColls);
 
         BSONArrayBuilder barr;
         barr.append(clonedColls);

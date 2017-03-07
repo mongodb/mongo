@@ -101,7 +101,7 @@ public:
     WindowsSystemMetricsCollector(std::unique_ptr<PerfCounterCollector> collector)
         : _collector(std::move(collector)) {}
 
-    void collect(OperationContext* txn, BSONObjBuilder& builder) override {
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         processStatusErrors(_collector->collect(&builder), &builder);
     }
 

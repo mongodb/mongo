@@ -111,7 +111,7 @@ public:
      */
     Status canAcceptShardedCommands() const;
 
-    ConnectionString getConfigServer(OperationContext* txn);
+    ConnectionString getConfigServer(OperationContext* opCtx);
 
     std::string getShardName();
 
@@ -122,21 +122,21 @@ public:
     /**
      * Initializes the sharding state of this server from the shard identity document argument.
      */
-    Status initializeFromShardIdentity(OperationContext* txn,
+    Status initializeFromShardIdentity(OperationContext* opCtx,
                                        const ShardIdentityType& shardIdentity);
 
     /**
      * Shuts down sharding machinery on the shard.
      */
-    void shutDown(OperationContext* txn);
+    void shutDown(OperationContext* opCtx);
 
     /**
      * Updates the ShardRegistry's stored notion of the config server optime based on the
      * ConfigServerMetadata decoration attached to the OperationContext.
      */
-    Status updateConfigServerOpTimeFromMetadata(OperationContext* txn);
+    Status updateConfigServerOpTimeFromMetadata(OperationContext* opCtx);
 
-    CollectionShardingState* getNS(const std::string& ns, OperationContext* txn);
+    CollectionShardingState* getNS(const std::string& ns, OperationContext* opCtx);
 
     /**
      * Iterates through all known sharded collections and marks them (in memory only) as not sharded
@@ -148,7 +148,7 @@ public:
      * Refreshes the local metadata based on whether the expected version is higher than what we
      * have cached.
      */
-    Status onStaleShardVersion(OperationContext* txn,
+    Status onStaleShardVersion(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const ChunkVersion& expectedVersion);
 
@@ -174,13 +174,13 @@ public:
      * @return !OK if something else went wrong during reload
      * @return latestShardVersion the version that is now stored for this collection
      */
-    Status refreshMetadataNow(OperationContext* txn,
+    Status refreshMetadataNow(OperationContext* opCtx,
                               const NamespaceString& nss,
                               ChunkVersion* latestShardVersion);
 
-    void appendInfo(OperationContext* txn, BSONObjBuilder& b);
+    void appendInfo(OperationContext* opCtx, BSONObjBuilder& b);
 
-    bool needCollectionMetadata(OperationContext* txn, const std::string& ns);
+    bool needCollectionMetadata(OperationContext* opCtx, const std::string& ns);
 
     /**
      * Updates the config server field of the shardIdentity document with the given connection
@@ -188,7 +188,7 @@ public:
      *
      * Note: this can return NotMaster error.
      */
-    Status updateShardIdentityConfigString(OperationContext* txn,
+    Status updateShardIdentityConfigString(OperationContext* opCtx,
                                            const std::string& newConnectionString);
 
     /**
@@ -229,7 +229,7 @@ public:
      *
      * Takes an IS lock on the namespace of the active migration, if one is active.
      */
-    BSONObj getActiveMigrationStatusReport(OperationContext* txn);
+    BSONObj getActiveMigrationStatusReport(OperationContext* opCtx);
 
     /**
      * For testing only. Mock the initialization method used by initializeFromConfigConnString and
@@ -266,7 +266,7 @@ public:
      * exception of the duplicate ShardRegistry reload in ShardRegistry::startup() (see
      * SERVER-26123). Outgoing networking calls to cluster members can now be made.
      */
-    StatusWith<bool> initializeShardingAwarenessIfNeeded(OperationContext* txn);
+    StatusWith<bool> initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
 
 private:
     // Map from a namespace into the sharding state for each collection we have
@@ -307,7 +307,7 @@ private:
      * The metadataForDiff argument indicates that the specified metadata should be used as a base
      * from which to only load the differences. If nullptr is passed, a full reload will be done.
      */
-    StatusWith<ChunkVersion> _refreshMetadata(OperationContext* txn,
+    StatusWith<ChunkVersion> _refreshMetadata(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const CollectionMetadata* metadataForDiff);
 

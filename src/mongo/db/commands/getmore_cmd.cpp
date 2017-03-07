@@ -144,23 +144,23 @@ public:
             request.nss, request.cursorid, request.term.is_initialized());
     }
 
-    bool runParsed(OperationContext* txn,
+    bool runParsed(OperationContext* opCtx,
                    const NamespaceString& origNss,
                    const GetMoreRequest& request,
                    BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) {
 
-        auto curOp = CurOp::get(txn);
+        auto curOp = CurOp::get(opCtx);
         curOp->debug().cursorid = request.cursorid;
 
         // Disable shard version checking - getmore commands are always unversioned
-        OperationShardingState::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
+        OperationShardingState::get(opCtx).setShardVersion(request.nss, ChunkVersion::IGNORED());
 
         // Validate term before acquiring locks, if provided.
         if (request.term) {
-            auto replCoord = repl::ReplicationCoordinator::get(txn);
-            Status status = replCoord->updateTerm(txn, *request.term);
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            Status status = replCoord->updateTerm(opCtx, *request.term);
             // Note: updateTerm returns ok if term stayed the same.
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -193,7 +193,7 @@ public:
         if (request.nss.isListIndexesCursorNS() || request.nss.isListCollectionsCursorNS()) {
             cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(txn, request.nss);
+            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(opCtx, request.nss);
             auto viewCtx = static_cast<AutoGetCollectionOrViewForRead*>(ctx.get());
             Collection* collection = ctx->getCollection();
             if (!collection) {
@@ -202,7 +202,7 @@ public:
                 // unknown, resulting in an appropriate error.
                 if (viewCtx->getView()) {
                     auto resolved =
-                        viewCtx->getDb()->getViewCatalog()->resolveView(txn, request.nss);
+                        viewCtx->getDb()->getViewCatalog()->resolveView(opCtx, request.nss);
                     if (!resolved.isOK()) {
                         return appendCommandStatus(result, resolved.getStatus());
                     }
@@ -210,7 +210,7 @@ public:
 
                     // Only one shardversion can be set at a time for an operation, so unset it
                     // here to allow setting it on the underlying namespace.
-                    OperationShardingState::get(txn).unsetShardVersion(request.nss);
+                    OperationShardingState::get(opCtx).unsetShardVersion(request.nss);
 
                     GetMoreRequest newRequest(resolved.getValue().getNamespace(),
                                               request.cursorid,
@@ -219,11 +219,11 @@ public:
                                               request.term,
                                               request.lastKnownCommittedOpTime);
 
-                    bool retVal = runParsed(txn, origNss, newRequest, cmdObj, errmsg, result);
+                    bool retVal = runParsed(opCtx, origNss, newRequest, cmdObj, errmsg, result);
                     {
                         // Set the namespace of the curop back to the view namespace so ctx records
                         // stats on this view namespace on destruction.
-                        stdx::lock_guard<Client> lk(*txn->getClient());
+                        stdx::lock_guard<Client> lk(*opCtx->getClient());
                         curOp->setNS_inlock(origNss.ns());
                     }
                     return retVal;
@@ -251,7 +251,7 @@ public:
             invariant(!unpinCollLock);
             sleepFor(Milliseconds(10));
             ctx.reset();
-            ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, request.nss);
+            ctx = stdx::make_unique<AutoGetCollectionForRead>(opCtx, request.nss);
         }
 
         if (request.nss.ns() != cursor->ns()) {
@@ -289,15 +289,15 @@ public:
 
         // On early return, get rid of the cursor.
         ScopeGuard cursorFreer =
-            MakeGuard(&GetMoreCmd::cleanupCursor, txn, &ccPin.getValue(), request);
+            MakeGuard(&GetMoreCmd::cleanupCursor, opCtx, &ccPin.getValue(), request);
 
         if (cursor->isReadCommitted())
-            uassertStatusOK(txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+            uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         // Reset timeout timer on the cursor since the cursor is still in use.
         cursor->resetIdleTime();
 
-        const bool hasOwnMaxTime = txn->hasDeadline();
+        const bool hasOwnMaxTime = opCtx->hasDeadline();
 
         if (!hasOwnMaxTime) {
             // There is no time limit set directly on this getMore command. If the cursor is
@@ -307,16 +307,16 @@ public:
             if (isCursorAwaitData(cursor)) {
                 uassert(40117,
                         "Illegal attempt to set operation deadline within DBDirectClient",
-                        !txn->getClient()->isInDirectClient());
-                txn->setDeadlineAfterNowBy(Seconds{1});
+                        !opCtx->getClient()->isInDirectClient());
+                opCtx->setDeadlineAfterNowBy(Seconds{1});
             } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
                 uassert(40118,
                         "Illegal attempt to set operation deadline within DBDirectClient",
-                        !txn->getClient()->isInDirectClient());
-                txn->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
+                        !opCtx->getClient()->isInDirectClient());
+                opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
             }
         }
-        txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+        opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
         if (cursor->isAggCursor()) {
             // Agg cursors handle their own locking internally.
@@ -324,12 +324,12 @@ public:
         }
 
         PlanExecutor* exec = cursor->getExecutor();
-        exec->reattachToOperationContext(txn);
+        exec->reattachToOperationContext(opCtx);
         exec->restoreState();
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
-            stdx::lock_guard<Client> lk(*txn->getClient());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(planSummary);
 
             // Ensure that the original query or command object is available in the slow query log,
@@ -378,7 +378,7 @@ public:
         // If this is an await data cursor, and we hit EOF without generating any results, then
         // we block waiting for new data to arrive.
         if (isCursorAwaitData(cursor) && state == PlanExecutor::IS_EOF && numResults == 0) {
-            auto replCoord = repl::ReplicationCoordinator::get(txn);
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             // Return immediately if we need to update the commit time.
             if (!request.lastKnownCommittedOpTime ||
                 (request.lastKnownCommittedOpTime == replCoord->getLastCommittedOpTime())) {
@@ -393,7 +393,7 @@ public:
                 ctx.reset();
 
                 // Block waiting for data.
-                const auto timeout = txn->getRemainingMaxTimeMicros();
+                const auto timeout = opCtx->getRemainingMaxTimeMicros();
                 notifier->wait(notifierVersion, timeout);
                 notifier.reset();
 
@@ -402,7 +402,7 @@ public:
                 // CappedInsertNotifier.
                 curOp->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
-                ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
+                ctx.reset(new AutoGetCollectionForRead(opCtx, request.nss));
                 exec->restoreState();
 
                 // We woke up because either the timed_wait expired, or there was more data. Either
@@ -440,7 +440,7 @@ public:
             // from a previous find, then don't roll remaining micros over to the next
             // getMore.
             if (!hasOwnMaxTime) {
-                cursor->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+                cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
             }
 
             cursor->incPos(numResults);
@@ -463,16 +463,16 @@ public:
             // earlier and need to reacquire it in order to clean up our ClientCursorPin.
             if (cursor->isAggCursor()) {
                 invariant(NULL == ctx.get());
-                unpinDBLock.reset(new Lock::DBLock(txn->lockState(), request.nss.db(), MODE_IS));
+                unpinDBLock.reset(new Lock::DBLock(opCtx->lockState(), request.nss.db(), MODE_IS));
                 unpinCollLock.reset(
-                    new Lock::CollectionLock(txn->lockState(), request.nss.ns(), MODE_IS));
+                    new Lock::CollectionLock(opCtx->lockState(), request.nss.ns(), MODE_IS));
             }
         }
 
         return true;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -481,7 +481,7 @@ public:
         // Counted as a getMore, not as a command.
         globalOpCounters.gotGetMore();
 
-        if (txn->getClient()->isInDirectClient()) {
+        if (opCtx->getClient()->isInDirectClient()) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation, "Cannot run getMore command from eval()"));
@@ -492,7 +492,7 @@ public:
             return appendCommandStatus(result, parsedRequest.getStatus());
         }
         auto request = parsedRequest.getValue();
-        return runParsed(txn, request.nss, request, cmdObj, errmsg, result);
+        return runParsed(opCtx, request.nss, request, cmdObj, errmsg, result);
     }
 
     /**
@@ -558,7 +558,7 @@ public:
      * Called via a ScopeGuard on early return in order to ensure that the ClientCursor gets
      * cleaned up properly.
      */
-    static void cleanupCursor(OperationContext* txn,
+    static void cleanupCursor(OperationContext* opCtx,
                               ClientCursorPin* ccPin,
                               const GetMoreRequest& request) {
         ClientCursor* cursor = ccPin->getCursor();
@@ -567,9 +567,9 @@ public:
         std::unique_ptr<Lock::CollectionLock> unpinCollLock;
 
         if (cursor->isAggCursor()) {
-            unpinDBLock.reset(new Lock::DBLock(txn->lockState(), request.nss.db(), MODE_IS));
+            unpinDBLock.reset(new Lock::DBLock(opCtx->lockState(), request.nss.db(), MODE_IS));
             unpinCollLock.reset(
-                new Lock::CollectionLock(txn->lockState(), request.nss.ns(), MODE_IS));
+                new Lock::CollectionLock(opCtx->lockState(), request.nss.ns(), MODE_IS));
         }
 
         ccPin->deleteUnderlying();

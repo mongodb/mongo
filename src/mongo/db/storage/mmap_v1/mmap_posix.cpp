@@ -79,7 +79,7 @@ static size_t fetchMinOSPageSizeBytes() {
 const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
 
-void MemoryMappedFile::close(OperationContext* txn) {
+void MemoryMappedFile::close(OperationContext* opCtx) {
     for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
         munmap(*i, len);
     }
@@ -91,7 +91,7 @@ void MemoryMappedFile::close(OperationContext* txn) {
         ::close(fd);
         fd = 0;
     }
-    destroyed(txn);  // cleans up from the master list of mmaps
+    destroyed(opCtx);  // cleans up from the master list of mmaps
 }
 
 #ifndef O_NOATIME
@@ -159,11 +159,11 @@ MAdvise::~MAdvise() {
 }
 #endif
 
-void* MemoryMappedFile::map(OperationContext* txn,
+void* MemoryMappedFile::map(OperationContext* opCtx,
                             const char* filename,
                             unsigned long long& length) {
     // length may be updated by callee.
-    setFilename(txn, filename);
+    setFilename(opCtx, filename);
     FileAllocator::get()->allocateAsap(filename, length);
 
     const bool readOnly = isOptionSet(READONLY);
@@ -243,9 +243,9 @@ void* MemoryMappedFile::createPrivateMap() {
     return x;
 }
 
-void* MemoryMappedFile::remapPrivateView(OperationContext* txn, void* oldPrivateAddr) {
+void* MemoryMappedFile::remapPrivateView(OperationContext* opCtx, void* oldPrivateAddr) {
 #if defined(__sun)  // SERVER-8795
-    LockMongoFilesExclusive lockMongoFiles(txn);
+    LockMongoFilesExclusive lockMongoFiles(opCtx);
 #endif
 
     // don't unmap, just mmap over the old region
@@ -288,7 +288,7 @@ public:
     PosixFlushable(MemoryMappedFile* theFile, void* view, HANDLE fd, long len)
         : _theFile(theFile), _view(view), _fd(fd), _len(len), _id(_theFile->getUniqueId()) {}
 
-    void flush(OperationContext* txn) {
+    void flush(OperationContext* opCtx) {
         if (_view == NULL || _fd == 0)
             return;
 
@@ -303,7 +303,7 @@ public:
         }
 
         // some error, lets see if we're supposed to exist
-        LockMongoFilesShared mmfilesLock(txn);
+        LockMongoFilesShared mmfilesLock(opCtx);
         std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
         std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
         if ((it == mmfs.end()) || ((*it)->getUniqueId() != _id)) {

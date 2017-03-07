@@ -98,7 +98,7 @@ public:
      * Returns a pointer to a ShardingCatalogClient to use for accessing catalog data stored on the
      * config servers.
      */
-    ShardingCatalogClient* catalogClient(OperationContext* txn) {
+    ShardingCatalogClient* catalogClient(OperationContext* opCtx) {
         return _catalogClient.get();
     }
 

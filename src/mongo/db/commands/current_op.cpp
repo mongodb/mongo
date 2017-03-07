@@ -85,7 +85,7 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
              int options,
@@ -117,14 +117,14 @@ public:
         std::vector<BSONObj> inprogInfos;
         BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
 
-        for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+        for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
              Client* client = cursor.next();) {
             invariant(client);
 
             stdx::lock_guard<Client> lk(*client);
 
             if (ownOpsOnly &&
-                !AuthorizationSession::get(txn->getClient())->isCoauthorizedWithClient(client)) {
+                !AuthorizationSession::get(opCtx->getClient())->isCoauthorizedWithClient(client)) {
                 continue;
             }
 
@@ -183,7 +183,7 @@ public:
             // don't have a collection, we pass in a fake collection name (and this is okay,
             // because $where parsing only relies on the database part of the namespace).
             const NamespaceString fakeNS(db, "$dummyNamespaceForCurrop");
-            const Matcher matcher(filter, ExtensionsCallbackReal(txn, &fakeNS), nullptr);
+            const Matcher matcher(filter, ExtensionsCallbackReal(opCtx, &fakeNS), nullptr);
 
             for (const auto& info : inprogInfos) {
                 if (matcher.matches(info)) {

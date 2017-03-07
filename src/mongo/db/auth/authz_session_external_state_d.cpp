@@ -46,11 +46,11 @@ AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(AuthorizationMa
     : AuthzSessionExternalStateServerCommon(authzManager) {}
 AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
-void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
+void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {
     // No locks should be held as this happens before any database accesses occur
-    dassert(!txn->lockState()->isLocked());
+    dassert(!opCtx->lockState()->isLocked());
 
-    _checkShouldAllowLocalhost(txn);
+    _checkShouldAllowLocalhost(opCtx);
 }
 
 bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {

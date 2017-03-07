@@ -78,9 +78,9 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         });
     }
     conn->setRequestMetadataWriter(
-        [this](OperationContext* txn, BSONObjBuilder* metadataBob, StringData hostStringData) {
+        [this](OperationContext* opCtx, BSONObjBuilder* metadataBob, StringData hostStringData) {
             return _egressHook->writeRequestMetadata(
-                _shardedConnections, txn, hostStringData, metadataBob);
+                _shardedConnections, opCtx, hostStringData, metadataBob);
         });
 
 

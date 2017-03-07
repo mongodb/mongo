@@ -86,7 +86,7 @@ public:
         @return true if --dur is on.
         @return false if --dur is off. (in which case there is action)
         */
-    virtual bool commitNow(OperationContext* txn) = 0;
+    virtual bool commitNow(OperationContext* opCtx) = 0;
 
     /** Commit if enough bytes have been modified. Current threshold is 50MB
 
@@ -112,7 +112,7 @@ public:
         *
         * Must be called under the global X lock.
         */
-    virtual void commitAndStopDurThread(OperationContext* txn) = 0;
+    virtual void commitAndStopDurThread(OperationContext* opCtx) = 0;
 
     /**
      * Commits pending changes, flushes all changes to main data files, then removes the
@@ -125,7 +125,7 @@ public:
      * through recovery and be applied to files that have had changes made after this call
      * applied.
      */
-    virtual void syncDataAndTruncateJournal(OperationContext* txn) = 0;
+    virtual void syncDataAndTruncateJournal(OperationContext* opCtx) = 0;
 
     virtual bool isDurable() const = 0;
 

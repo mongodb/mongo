@@ -988,7 +988,7 @@ public:
     TestMetadataHook(bool* wroteRequestMetadata, bool* gotReplyMetadata)
         : _wroteRequestMetadata(wroteRequestMetadata), _gotReplyMetadata(gotReplyMetadata) {}
 
-    Status writeRequestMetadata(OperationContext* txn,
+    Status writeRequestMetadata(OperationContext* opCtx,
                                 const HostAndPort& requestDestination,
                                 BSONObjBuilder* metadataBob) override {
         metadataBob->append("foo", "bar");

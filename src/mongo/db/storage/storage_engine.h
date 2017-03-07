@@ -197,17 +197,17 @@ public:
     /**
      * Closes all file handles associated with a database.
      */
-    virtual Status closeDatabase(OperationContext* txn, StringData db) = 0;
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db) = 0;
 
     /**
      * Deletes all data and metadata for a database.
      */
-    virtual Status dropDatabase(OperationContext* txn, StringData db) = 0;
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db) = 0;
 
     /**
      * @return number of files flushed
      */
-    virtual int flushAllFiles(OperationContext* txn, bool sync) = 0;
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync) = 0;
 
     /**
      * Transitions the storage engine into backup mode.
@@ -228,7 +228,7 @@ public:
      * retried, returns a non-OK status. This function may throw a WriteConflictException, which
      * should trigger a retry by the caller. All other exceptions should be treated as errors.
      */
-    virtual Status beginBackup(OperationContext* txn) {
+    virtual Status beginBackup(OperationContext* opCtx) {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
@@ -240,7 +240,7 @@ public:
      *
      * Storage engines implementing this feature should fassert when unable to leave backup mode.
      */
-    virtual void endBackup(OperationContext* txn) {
+    virtual void endBackup(OperationContext* opCtx) {
         return;
     }
 
@@ -253,7 +253,7 @@ public:
      *
      * NOTE: MMAPv1 does not support this method and has its own repairDatabase() method.
      */
-    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns) = 0;
+    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) = 0;
 
     /**
      * This method will be called before there is a clean shutdown.  Storage engines should

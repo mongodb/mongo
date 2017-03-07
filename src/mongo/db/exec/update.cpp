@@ -435,8 +435,9 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
     return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
 };
 
-const std::vector<FieldRef*>* getImmutableFields(OperationContext* txn, const NamespaceString& ns) {
-    auto metadata = CollectionShardingState::get(txn, ns)->getMetadata();
+const std::vector<FieldRef*>* getImmutableFields(OperationContext* opCtx,
+                                                 const NamespaceString& ns) {
+    auto metadata = CollectionShardingState::get(opCtx, ns)->getMetadata();
     if (metadata) {
         const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.
@@ -449,12 +450,12 @@ const std::vector<FieldRef*>* getImmutableFields(OperationContext* txn, const Na
 
 const char* UpdateStage::kStageType = "UPDATE";
 
-UpdateStage::UpdateStage(OperationContext* txn,
+UpdateStage::UpdateStage(OperationContext* opCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _params(params),
       _ws(ws),
       _collection(collection),
@@ -649,7 +650,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     return newObj;
 }
 
-Status UpdateStage::applyUpdateOpsForInsert(OperationContext* txn,
+Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
                                             const CanonicalQuery* cq,
                                             const BSONObj& query,
                                             UpdateDriver* driver,
@@ -667,7 +668,7 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* txn,
 
     const vector<FieldRef*>* immutablePaths = NULL;
     if (!isInternalRequest)
-        immutablePaths = getImmutableFields(txn, ns);
+        immutablePaths = getImmutableFields(opCtx, ns);
 
     // The original document we compare changes to - immutable paths must not change
     BSONObj original;

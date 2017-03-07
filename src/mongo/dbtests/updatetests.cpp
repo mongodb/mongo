@@ -56,11 +56,11 @@ namespace dps = ::mongo::dotted_path_support;
 
 class ClientBase {
 public:
-    ClientBase() : _client(&_txn) {
-        mongo::LastError::get(_txn.getClient()).reset();
+    ClientBase() : _client(&_opCtx) {
+        mongo::LastError::get(_opCtx.getClient()).reset();
     }
     virtual ~ClientBase() {
-        mongo::LastError::get(_txn.getClient()).reset();
+        mongo::LastError::get(_opCtx.getClient()).reset();
     }
 
 protected:
@@ -75,7 +75,7 @@ protected:
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient _client;
 };
 
@@ -1717,7 +1717,7 @@ public:
 class IndexParentOfMod : public SetBase {
 public:
     void run() {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("a" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1)));
         _client.insert(ns(), fromjson("{'_id':0}"));
         _client.update(ns(), Query(), fromjson("{$set:{'a.b':4}}"));
         ASSERT_BSONOBJ_EQ(fromjson("{'_id':0,a:{b:4}}"), _client.findOne(ns(), Query()));

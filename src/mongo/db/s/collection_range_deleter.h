@@ -56,7 +56,7 @@ public:
      * Returns true if there are more entries in rangesToClean, false if there is no more progress
      * to be made.
      */
-    bool cleanupNextRange(OperationContext* txn, int maxToDelete);
+    bool cleanupNextRange(OperationContext* opCtx, int maxToDelete);
 
 private:
     /**
@@ -65,7 +65,7 @@ private:
      *
      * Returns the number of documents deleted (0 if deletion is finished), or -1 for error.
      */
-    int _doDeletion(OperationContext* txn,
+    int _doDeletion(OperationContext* opCtx,
                     Collection* collection,
                     const BSONObj& keyPattern,
                     int maxToDelete);

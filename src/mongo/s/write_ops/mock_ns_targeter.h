@@ -85,7 +85,9 @@ public:
     /**
      * Returns a ShardEndpoint for the doc from the mock ranges
      */
-    Status targetInsert(OperationContext* txn, const BSONObj& doc, ShardEndpoint** endpoint) const {
+    Status targetInsert(OperationContext* opCtx,
+                        const BSONObj& doc,
+                        ShardEndpoint** endpoint) const {
         std::vector<ShardEndpoint*> endpoints;
         Status status = targetQuery(doc, &endpoints);
         if (!status.isOK())
@@ -99,7 +101,7 @@ public:
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    Status targetUpdate(OperationContext* txn,
+    Status targetUpdate(OperationContext* opCtx,
                         const BatchedUpdateDocument& updateDoc,
                         std::vector<ShardEndpoint*>* endpoints) const {
         return targetQuery(updateDoc.getQuery(), endpoints);
@@ -109,7 +111,7 @@ public:
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    Status targetDelete(OperationContext* txn,
+    Status targetDelete(OperationContext* opCtx,
                         const BatchedDeleteDocument& deleteDoc,
                         std::vector<ShardEndpoint*>* endpoints) const {
         return targetQuery(deleteDoc.getQuery(), endpoints);
@@ -140,7 +142,7 @@ public:
         // No-op
     }
 
-    Status refreshIfNeeded(OperationContext* txn, bool* wasChanged) {
+    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {
         // No-op
         if (wasChanged)
             *wasChanged = false;

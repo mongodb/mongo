@@ -89,8 +89,8 @@ void ReplCoordTest::tearDown() {
         _externalState->setStoreLocalConfigDocumentToHang(false);
     }
     if (_callShutdown) {
-        auto txn = makeOperationContext();
-        shutdown(txn.get());
+        auto opCtx = makeOperationContext();
+        shutdown(opCtx.get());
     }
 }
 
@@ -165,8 +165,8 @@ void ReplCoordTest::start() {
         init();
     }
 
-    const auto txn = makeOperationContext();
-    _repl->startup(txn.get());
+    const auto opCtx = makeOperationContext();
+    _repl->startup(opCtx.get());
     _repl->waitForStartUpComplete_forTest();
     _callShutdown = true;
 }
@@ -362,8 +362,8 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
     {
-        auto txn = makeOperationContext();
-        replCoord->signalDrainComplete(txn.get(), replCoord->getTerm());
+        auto opCtx = makeOperationContext();
+        replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
     }
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
     replCoord->fillIsMasterForReplSet(&imResponse);
@@ -425,8 +425,8 @@ void ReplCoordTest::simulateSuccessfulElection() {
     ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
     ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
     {
-        auto txn = makeOperationContext();
-        replCoord->signalDrainComplete(txn.get(), replCoord->getTerm());
+        auto opCtx = makeOperationContext();
+        replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
     }
     replCoord->fillIsMasterForReplSet(&imResponse);
     ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
@@ -435,10 +435,10 @@ void ReplCoordTest::simulateSuccessfulElection() {
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 }
 
-void ReplCoordTest::shutdown(OperationContext* txn) {
+void ReplCoordTest::shutdown(OperationContext* opCtx) {
     invariant(_callShutdown);
     _net->exitNetwork();
-    _repl->shutdown(txn);
+    _repl->shutdown(opCtx);
     _callShutdown = false;
 }
 

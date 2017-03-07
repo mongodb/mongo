@@ -54,8 +54,8 @@ using std::unique_ptr;
 
 class IndexScanBase {
 public:
-    IndexScanBase() : _client(&_txn) {
-        OldClientWriteContext ctx(&_txn, ns());
+    IndexScanBase() : _client(&_opCtx) {
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         for (int i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
@@ -70,16 +70,16 @@ public:
     }
 
     virtual ~IndexScanBase() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         _client.dropCollection(ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
-        AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns()));
+        AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns()));
 
         const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
@@ -89,10 +89,10 @@ public:
 
         unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
         unique_ptr<IndexScan> ix =
-            stdx::make_unique<IndexScan>(&_txn, params, ws.get(), filterExpr.get());
+            stdx::make_unique<IndexScan>(&_opCtx, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(ix), ctx.getCollection(), PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ix), ctx.getCollection(), PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -107,7 +107,7 @@ public:
     }
 
     void makeGeoData() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         for (int i = 0; i < numObj(); ++i) {
             double lat = double(rand()) / RAND_MAX;
@@ -117,10 +117,10 @@ public:
     }
 
     IndexDescriptor* getIndex(const BSONObj& obj) {
-        AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns()));
+        AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns()));
         Collection* collection = ctx.getCollection();
         std::vector<IndexDescriptor*> indexes;
-        collection->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 
@@ -133,7 +133,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;

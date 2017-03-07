@@ -61,11 +61,11 @@ using stdx::make_unique;
 // static
 const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 
-MultiPlanStage::MultiPlanStage(OperationContext* txn,
+MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
                                const Collection* collection,
                                CanonicalQuery* cq,
                                CachingMode cachingMode)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _cachingMode(cachingMode),
       _query(cq),
@@ -169,7 +169,7 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 }
 
 // static
-size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* txn, const Collection* collection) {
+size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* opCtx, const Collection* collection) {
     // Run each plan some number of times. This number is at least as great as
     // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
     size_t numWorks = internalQueryPlanEvaluationWorks.load();
@@ -179,7 +179,7 @@ size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* txn, const Collecti
         double fraction = internalQueryPlanEvaluationCollFraction;
 
         numWorks = std::max(static_cast<size_t>(internalQueryPlanEvaluationWorks.load()),
-                            static_cast<size_t>(fraction * collection->numRecords(txn)));
+                            static_cast<size_t>(fraction * collection->numRecords(opCtx)));
     }
 
     return numWorks;
@@ -405,7 +405,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
 
 namespace {
 
-void invalidateHelper(OperationContext* txn,
+void invalidateHelper(OperationContext* opCtx,
                       WorkingSet* ws,  // may flag for review
                       const RecordId& recordId,
                       list<WorkingSetID>* idsToInvalidate,
@@ -413,14 +413,14 @@ void invalidateHelper(OperationContext* txn,
     for (auto it = idsToInvalidate->begin(); it != idsToInvalidate->end(); ++it) {
         WorkingSetMember* member = ws->get(*it);
         if (member->hasRecordId() && member->recordId == recordId) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, collection);
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, collection);
         }
     }
 }
 
 }  // namespace
 
-void MultiPlanStage::doInvalidate(OperationContext* txn,
+void MultiPlanStage::doInvalidate(OperationContext* opCtx,
                                   const RecordId& recordId,
                                   InvalidationType type) {
     if (_failure) {
@@ -429,15 +429,15 @@ void MultiPlanStage::doInvalidate(OperationContext* txn,
 
     if (bestPlanChosen()) {
         CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
-        invalidateHelper(txn, bestPlan.ws, recordId, &bestPlan.results, _collection);
+        invalidateHelper(opCtx, bestPlan.ws, recordId, &bestPlan.results, _collection);
         if (hasBackupPlan()) {
             CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
-            invalidateHelper(txn, backupPlan.ws, recordId, &backupPlan.results, _collection);
+            invalidateHelper(opCtx, backupPlan.ws, recordId, &backupPlan.results, _collection);
         }
     } else {
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
             invalidateHelper(
-                txn, _candidates[ix].ws, recordId, &_candidates[ix].results, _collection);
+                opCtx, _candidates[ix].ws, recordId, &_candidates[ix].results, _collection);
         }
     }
 }

@@ -60,7 +60,7 @@ protected:
     ServiceContext::UniqueOperationContext makeOperationContext() const;
 
     StorageInterface* _storageInterface = nullptr;
-    ServiceContext::UniqueOperationContext _txn;
+    ServiceContext::UniqueOperationContext _opCtx;
 
 private:
     void setUp() override;
@@ -82,11 +82,11 @@ void OplogBufferCollectionTest::setUp() {
     _storageInterface = storageInterface.get();
     StorageInterface::set(service, std::move(storageInterface));
 
-    _txn = makeOperationContext();
+    _opCtx = makeOperationContext();
 }
 
 void OplogBufferCollectionTest::tearDown() {
-    _txn.reset();
+    _opCtx.reset();
     _storageInterface = nullptr;
     ServiceContextMongoDTest::tearDown();
 }
@@ -131,50 +131,50 @@ TEST_F(OplogBufferCollectionTest, GetNamespace) {
     ASSERT_EQUALS(nss, OplogBufferCollection(_storageInterface, nss).getNamespace());
 }
 
-void testStartupCreatesCollection(OperationContext* txn,
+void testStartupCreatesCollection(OperationContext* opCtx,
                                   StorageInterface* storageInterface,
                                   const NamespaceString& nss) {
     OplogBufferCollection oplogBuffer(storageInterface, nss);
 
     // Collection should not exist until startup() is called.
-    ASSERT_FALSE(AutoGetCollectionForRead(txn, nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForRead(opCtx, nss).getCollection());
 
-    oplogBuffer.startup(txn);
-    ASSERT_TRUE(AutoGetCollectionForRead(txn, nss).getCollection());
+    oplogBuffer.startup(opCtx);
+    ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithDefaultNamespaceCreatesCollection) {
     auto nss = OplogBufferCollection::getDefaultNamespace();
     ASSERT_FALSE(nss.isOplog());
-    testStartupCreatesCollection(_txn.get(), _storageInterface, nss);
+    testStartupCreatesCollection(_opCtx.get(), _storageInterface, nss);
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithUserProvidedNamespaceCreatesCollection) {
-    testStartupCreatesCollection(_txn.get(), _storageInterface, makeNamespace(_agent));
+    testStartupCreatesCollection(_opCtx.get(), _storageInterface, makeNamespace(_agent));
 }
 
 TEST_F(OplogBufferCollectionTest, StartupDropsExistingCollectionBeforeCreatingNewCollection) {
     auto nss = makeNamespace(_agent);
-    ASSERT_OK(_storageInterface->createCollection(_txn.get(), nss, CollectionOptions()));
+    ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
-    oplogBuffer.startup(_txn.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    oplogBuffer.startup(_opCtx.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
 }
 
 DEATH_TEST_F(OplogBufferCollectionTest,
              StartupWithOplogNamespaceTriggersFatalAssertion,
              "Fatal assertion 40154 Location28838: cannot create a non-capped oplog collection") {
-    testStartupCreatesCollection(_txn.get(), _storageInterface, NamespaceString("local.oplog.Z"));
+    testStartupCreatesCollection(_opCtx.get(), _storageInterface, NamespaceString("local.oplog.Z"));
 }
 
 TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
-    oplogBuffer.shutdown(_txn.get());
-    ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    oplogBuffer.startup(_opCtx.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    oplogBuffer.shutdown(_opCtx.get());
+    ASSERT_FALSE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
 }
 
 TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimestamp) {
@@ -250,7 +250,7 @@ DEATH_TEST_F(OplogBufferCollectionTest,
 /**
  * Check collection contents. OplogInterface returns documents in reverse natural order.
  */
-void _assertDocumentsInCollectionEquals(OperationContext* txn,
+void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const std::vector<BSONObj>& docs) {
     std::vector<BSONObj> reversedTransformedDocs;
@@ -269,7 +269,7 @@ void _assertDocumentsInCollectionEquals(OperationContext* txn,
         ASSERT_GT(ts, previousTimestamp);
     }
     std::reverse(reversedTransformedDocs.begin(), reversedTransformedDocs.end());
-    OplogInterfaceLocal oplog(txn, nss.ns());
+    OplogInterfaceLocal oplog(opCtx, nss.ns());
     auto iter = oplog.makeIterator();
     for (const auto& doc : reversedTransformedDocs) {
         ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
@@ -281,13 +281,13 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocum
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
+    oplogBuffer.pushAllNonBlocking(_opCtx.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest,
@@ -295,7 +295,7 @@ TEST_F(OplogBufferCollectionTest,
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> emptyOplogEntries;
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     oplogBuffer.pushAllNonBlocking(nullptr, emptyOplogEntries.begin(), emptyOplogEntries.end());
@@ -306,163 +306,163 @@ TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAddsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     BSONObj oplog = makeOplogEntry(1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.push(_txn.get(), oplog);
+    oplogBuffer.push(_opCtx.get(), oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog});
 }
 
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushEvenIfFullAddsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     BSONObj oplog = makeOplogEntry(1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
     ASSERT_EQUALS(0UL, oplogBuffer.getSentinelCount_forTest());
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog});
 }
 
 TEST_F(OplogBufferCollectionTest, PeekDoesNotRemoveDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     BSONObj oplog1 = makeOplogEntry(1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.push(_txn.get(), oplog1);
+    oplogBuffer.push(_opCtx.get(), oplog1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
     // _peekOneSide should provide correct bound inclusion to storage engine when collection has one
     // document.
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
     BSONObj oplog2 = makeOplogEntry(2);
-    oplogBuffer.push(_txn.get(), oplog2);
+    oplogBuffer.push(_opCtx.get(), oplog2);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
     // _peekOneSide should return same result after adding new oplog entry.
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog1, oplog2});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog1, oplog2});
 }
 
 TEST_F(OplogBufferCollectionTest, PeekWithNoDocumentsReturnsFalse) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     BSONObj doc;
-    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});
 }
 
 TEST_F(OplogBufferCollectionTest, PopDoesNotRemoveDocumentFromCollection) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     BSONObj oplog = makeOplogEntry(1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.push(_txn.get(), oplog);
+    oplogBuffer.push(_opCtx.get(), oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog});
 }
 
 TEST_F(OplogBufferCollectionTest, PopWithNoDocumentsReturnsFalse) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     BSONObj doc;
-    ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});
 }
 
 TEST_F(OplogBufferCollectionTest, PopAndPeekReturnDocumentsInOrder) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {
         makeOplogEntry(1), makeOplogEntry(2), makeOplogEntry(3),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
+    oplogBuffer.pushAllNonBlocking(_opCtx.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[2]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[2]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     // tryPop does not remove documents from collection.
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNewestOplogEntry) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {
         makeOplogEntry(1), makeOplogEntry(2), makeOplogEntry(3),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
+    oplogBuffer.pushAllNonBlocking(_opCtx.get(), oplog.begin(), oplog.end());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    auto doc = oplogBuffer.lastObjectPushed(_txn.get());
+    auto doc = oplogBuffer.lastObjectPushed(_opCtx.get());
     ASSERT_BSONOBJ_EQ(*doc, oplog[2]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 }
@@ -471,9 +471,9 @@ TEST_F(OplogBufferCollectionTest, LastObjectPushedReturnsNoneWithNoEntries) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
-    auto doc = oplogBuffer.lastObjectPushed(_txn.get());
+    auto doc = oplogBuffer.lastObjectPushed(_opCtx.get());
     ASSERT_EQUALS(doc, boost::none);
 }
 
@@ -481,10 +481,10 @@ TEST_F(OplogBufferCollectionTest, IsEmptyReturnsTrueWhenEmptyAndFalseWhenNot) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     BSONObj oplog = makeOplogEntry(1);
     ASSERT_TRUE(oplogBuffer.isEmpty());
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog);
     ASSERT_FALSE(oplogBuffer.isEmpty());
 }
 
@@ -492,7 +492,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
     ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
@@ -500,27 +500,27 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     BSONObj oplog = makeOplogEntry(1);
-    oplogBuffer.push(_txn.get(), oplog);
+    oplogBuffer.push(_opCtx.get(), oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
     ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog});
 
     BSONObj sentinel;
-    oplogBuffer.push(_txn.get(), sentinel);
+    oplogBuffer.push(_opCtx.get(), sentinel);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize() + BSONObj().objsize()));
     ASSERT_EQUALS(1U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog, sentinel});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog, sentinel});
 
     BSONObj oplog2 = makeOplogEntry(2);
-    oplogBuffer.push(_txn.get(), oplog2);
+    oplogBuffer.push(_opCtx.get(), oplog2);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
     ASSERT_EQUALS(oplogBuffer.getSize(),
                   std::size_t(oplog.objsize() + BSONObj().objsize() + oplog2.objsize()));
@@ -528,10 +528,10 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplog2["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog, sentinel, oplog2});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog, sentinel, oplog2});
 
     BSONObj poppedDoc;
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &poppedDoc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &poppedDoc));
     ASSERT_BSONOBJ_EQ(oplog, poppedDoc);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(BSONObj().objsize() + oplog2.objsize()));
@@ -539,29 +539,29 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplog2["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {oplog, sentinel, oplog2});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog, sentinel, oplog2});
 
-    oplogBuffer.clear(_txn.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    oplogBuffer.clear(_opCtx.get());
+    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
     ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, {});
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});
 
     BSONObj doc;
-    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
-    ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
 }
 
 TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
     unittest::Barrier barrier(2U);
     BSONObj oplog = makeOplogEntry(1);
@@ -578,11 +578,11 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
 
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     barrier.countDownAndWait();
-    oplogBuffer.push(_txn.get(), oplog);
+    oplogBuffer.push(_opCtx.get(), oplog);
     peekingThread.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success);
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog);
     ASSERT_EQUALS(count, 1UL);
 }
@@ -590,7 +590,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
 TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
     unittest::Barrier barrier(3U);
     BSONObj oplog = makeOplogEntry(1);
@@ -616,13 +616,13 @@ TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocum
 
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     barrier.countDownAndWait();
-    oplogBuffer.push(_txn.get(), oplog);
+    oplogBuffer.push(_opCtx.get(), oplog);
     peekingThread1.join();
     peekingThread2.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success1);
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog);
     ASSERT_EQUALS(count1, 1UL);
     ASSERT_TRUE(success2);
@@ -632,7 +632,7 @@ TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocum
 TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindDocument) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
     BSONObj doc;
     bool success = false;
@@ -648,95 +648,95 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindD
     peekingThread.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_FALSE(success);
-    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(count, 0UL);
 }
 
 void _testPushSentinelsProperly(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const NamespaceString& nss,
     StorageInterface* storageInterface,
-    stdx::function<void(OperationContext* txn,
+    stdx::function<void(OperationContext* opCtx,
                         OplogBufferCollection* oplogBuffer,
                         const std::vector<BSONObj>& oplog)> pushDocsFn) {
     OplogBufferCollection oplogBuffer(storageInterface, nss);
-    oplogBuffer.startup(txn);
+    oplogBuffer.startup(opCtx);
     const std::vector<BSONObj> oplog = {
         BSONObj(), makeOplogEntry(1), BSONObj(), BSONObj(), makeOplogEntry(2), BSONObj(),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    pushDocsFn(txn, &oplogBuffer, oplog);
+    pushDocsFn(opCtx, &oplogBuffer, oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 6UL);
-    _assertDocumentsInCollectionEquals(txn, nss, oplog);
+    _assertDocumentsInCollectionEquals(opCtx, nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest, PushPushesOnSentinelsProperly) {
     auto nss = makeNamespace(_agent);
-    _testPushSentinelsProperly(_txn.get(),
+    _testPushSentinelsProperly(_opCtx.get(),
                                nss,
                                _storageInterface,
-                               [](OperationContext* txn,
+                               [](OperationContext* opCtx,
                                   OplogBufferCollection* oplogBuffer,
                                   const std::vector<BSONObj>& oplog) {
-                                   oplogBuffer->push(txn, oplog[0]);
+                                   oplogBuffer->push(opCtx, oplog[0]);
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->push(txn, oplog[1]);
+                                   oplogBuffer->push(opCtx, oplog[1]);
                                    ASSERT_EQUALS(0U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->push(txn, oplog[2]);
+                                   oplogBuffer->push(opCtx, oplog[2]);
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->push(txn, oplog[3]);
+                                   oplogBuffer->push(opCtx, oplog[3]);
                                    ASSERT_EQUALS(2U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->push(txn, oplog[4]);
+                                   oplogBuffer->push(opCtx, oplog[4]);
                                    ASSERT_EQUALS(0U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->push(txn, oplog[5]);
+                                   oplogBuffer->push(opCtx, oplog[5]);
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
                                });
 }
 
 TEST_F(OplogBufferCollectionTest, PushEvenIfFullPushesOnSentinelsProperly) {
     auto nss = makeNamespace(_agent);
-    _testPushSentinelsProperly(_txn.get(),
+    _testPushSentinelsProperly(_opCtx.get(),
                                nss,
                                _storageInterface,
-                               [](OperationContext* txn,
+                               [](OperationContext* opCtx,
                                   OplogBufferCollection* oplogBuffer,
                                   const std::vector<BSONObj>& oplog) {
-                                   oplogBuffer->pushEvenIfFull(txn, oplog[0]);
+                                   oplogBuffer->pushEvenIfFull(opCtx, oplog[0]);
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->pushEvenIfFull(txn, oplog[1]);
+                                   oplogBuffer->pushEvenIfFull(opCtx, oplog[1]);
                                    ASSERT_EQUALS(0U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->pushEvenIfFull(txn, oplog[2]);
+                                   oplogBuffer->pushEvenIfFull(opCtx, oplog[2]);
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->pushEvenIfFull(txn, oplog[3]);
+                                   oplogBuffer->pushEvenIfFull(opCtx, oplog[3]);
                                    ASSERT_EQUALS(2U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->pushEvenIfFull(txn, oplog[4]);
+                                   oplogBuffer->pushEvenIfFull(opCtx, oplog[4]);
                                    ASSERT_EQUALS(0U, oplogBuffer->getSentinelCount_forTest());
 
-                                   oplogBuffer->pushEvenIfFull(txn, oplog[5]);
+                                   oplogBuffer->pushEvenIfFull(opCtx, oplog[5]);
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
                                });
 }
 
 TEST_F(OplogBufferCollectionTest, PushAllNonBlockingPushesOnSentinelsProperly) {
     auto nss = makeNamespace(_agent);
-    _testPushSentinelsProperly(_txn.get(),
+    _testPushSentinelsProperly(_opCtx.get(),
                                nss,
                                _storageInterface,
-                               [](OperationContext* txn,
+                               [](OperationContext* opCtx,
                                   OplogBufferCollection* oplogBuffer,
                                   const std::vector<BSONObj>& oplog) {
                                    oplogBuffer->pushAllNonBlocking(
-                                       txn, oplog.cbegin(), oplog.cend());
+                                       opCtx, oplog.cbegin(), oplog.cend());
                                    ASSERT_EQUALS(1U, oplogBuffer->getSentinelCount_forTest());
                                });
 }
@@ -748,207 +748,207 @@ DEATH_TEST_F(
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {
         makeOplogEntry(2), makeOplogEntry(1),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
+    oplogBuffer.pushAllNonBlocking(_opCtx.get(), oplog.begin(), oplog.end());
 }
 
 TEST_F(OplogBufferCollectionTest, SentinelInMiddleIsReturnedInOrder) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {
         makeOplogEntry(1), makeOplogEntry(2), BSONObj(), makeOplogEntry(3),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[0]);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[1]);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[2]);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[3]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[0]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[1]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[2]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[3]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 4UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 4UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[3]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[3]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     // tryPop does not remove documents from collection.
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest, SentinelAtBeginningIsReturnedAtBeginning) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {BSONObj(), makeOplogEntry(1)};
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[0]);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[1]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[0]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     // tryPop does not remove documents from collection.
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest, SentinelAtEndIsReturnedAtEnd) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {makeOplogEntry(1), BSONObj()};
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[0]);
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog[1]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[0]);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[0]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     // tryPop does not remove documents from collection.
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest, MultipleSentinelsAreReturnedInOrder) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
     const std::vector<BSONObj> oplog = {
         BSONObj(), makeOplogEntry(1), BSONObj(), BSONObj(), makeOplogEntry(2), BSONObj(),
     };
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
-    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.cbegin(), oplog.cend());
+    oplogBuffer.pushAllNonBlocking(_opCtx.get(), oplog.cbegin(), oplog.cend());
     ASSERT_EQUALS(oplogBuffer.getCount(), 6UL);
 
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 6UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 5UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 5UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[1]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 4UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 4UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[4]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(doc, oplog[4]);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
 
     // tryPop does not remove documents from collection.
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 }
 
 TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsSentinel) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
     unittest::Barrier barrier(2U);
     BSONObj oplog;
@@ -965,11 +965,11 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsSentinel) {
 
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     barrier.countDownAndWait();
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog);
     peekingThread.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success);
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(count, 1UL);
 }
@@ -977,7 +977,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsSentinel) {
 TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameSentinel) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
     unittest::Barrier barrier(3U);
     BSONObj oplog;
@@ -1003,13 +1003,13 @@ TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameSenti
 
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     barrier.countDownAndWait();
-    oplogBuffer.pushEvenIfFull(_txn.get(), oplog);
+    oplogBuffer.pushEvenIfFull(_opCtx.get(), oplog);
     peekingThread1.join();
     peekingThread2.join();
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_TRUE(success1);
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_TRUE(doc.isEmpty());
     ASSERT_EQUALS(count1, 1UL);
     ASSERT_TRUE(success2);
@@ -1041,74 +1041,74 @@ TEST_F(OplogBufferCollectionTest, PeekFillsCacheWithDocumentsFromCollection) {
     std::size_t peekCacheSize = 3U;
     OplogBufferCollection oplogBuffer(_storageInterface, nss, _makeOptions(3));
     ASSERT_EQUALS(peekCacheSize, oplogBuffer.getOptions().peekCacheSize);
-    oplogBuffer.startup(_txn.get());
+    oplogBuffer.startup(_opCtx.get());
 
     std::vector<BSONObj> oplog;
     for (int i = 0; i < 5; ++i) {
         oplog.push_back(makeOplogEntry(i + 1));
     };
-    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.cbegin(), oplog.cend());
-    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+    oplogBuffer.pushAllNonBlocking(_opCtx.get(), oplog.cbegin(), oplog.cend());
+    _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
     // Before any peek operations, peek cache should be empty.
     _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
 
     // First peek operation should trigger a read of 'peekCacheSize' documents from the collection.
     BSONObj doc;
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[0], doc);
     _assertDocumentsEqualCache({oplog[0], oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
 
     // Repeated peek operation should not modify the cache.
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[0], doc);
     _assertDocumentsEqualCache({oplog[0], oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
 
     // Pop operation should remove the first element in the cache
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[0], doc);
     _assertDocumentsEqualCache({oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
 
     // Next peek operation should not modify the cache.
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[1], doc);
     _assertDocumentsEqualCache({oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
 
     // Pop the rest of the items in the cache.
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[1], doc);
     _assertDocumentsEqualCache({oplog[2]}, oplogBuffer.getPeekCache_forTest());
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[2], doc);
     _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
 
     // Next peek operation should replenish the cache.
     // Cache size will be less than the configured 'peekCacheSize' because
     // there will not be enough documents left unread in the collection.
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[3], doc);
     _assertDocumentsEqualCache({oplog[3], oplog[4]}, oplogBuffer.getPeekCache_forTest());
 
     // Pop the remaining documents from the buffer.
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[3], doc);
     _assertDocumentsEqualCache({oplog[4]}, oplogBuffer.getPeekCache_forTest());
 
     // Verify state of cache between pops using peek.
-    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.peek(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[4], doc);
     _assertDocumentsEqualCache({oplog[4]}, oplogBuffer.getPeekCache_forTest());
 
-    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_TRUE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     ASSERT_BSONOBJ_EQ(oplog[4], doc);
     _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
 
     // Nothing left in the collection.
-    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.peek(_opCtx.get(), &doc));
     _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
 
-    ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_FALSE(oplogBuffer.tryPop(_opCtx.get(), &doc));
     _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
 }
 

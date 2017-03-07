@@ -72,13 +72,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        ShardedConnectionInfo::reset(txn->getClient());
+        ShardedConnectionInfo::reset(opCtx->getClient());
         return true;
     }
 

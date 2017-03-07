@@ -65,14 +65,14 @@ static const NamespaceString nss("unittests.QueryStageUpdate");
 
 class QueryStageUpdateBase {
 public:
-    QueryStageUpdateBase() : _client(&_txn) {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+    QueryStageUpdateBase() : _client(&_opCtx) {
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
         _client.createCollection(nss.ns());
     }
 
     virtual ~QueryStageUpdateBase() {
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
@@ -92,7 +92,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
+            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         return std::move(statusWithCQ.getValue());
     }
@@ -124,7 +124,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -146,7 +146,7 @@ public:
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -174,7 +174,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;
@@ -188,8 +188,8 @@ public:
     void run() {
         // Run the update.
         {
-            OldClientWriteContext ctx(&_txn, nss.ns());
-            CurOp& curOp = *CurOp::get(_txn);
+            OldClientWriteContext ctx(&_opCtx, nss.ns());
+            CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver((UpdateDriver::Options()));
             Collection* collection = ctx.getCollection();
@@ -217,17 +217,17 @@ public:
             params.canonicalQuery = cq.get();
 
             auto ws = make_unique<WorkingSet>();
-            auto eofStage = make_unique<EOFStage>(&_txn);
+            auto eofStage = make_unique<EOFStage>(&_opCtx);
 
             auto updateStage =
-                make_unique<UpdateStage>(&_txn, params, ws.get(), collection, eofStage.release());
+                make_unique<UpdateStage>(&_opCtx, params, ws.get(), collection, eofStage.release());
 
             runUpdate(updateStage.get());
         }
 
         // Verify the contents of the resulting collection.
         {
-            AutoGetCollectionForRead ctx(&_txn, nss);
+            AutoGetCollectionForRead ctx(&_opCtx, nss);
             Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;
@@ -249,7 +249,7 @@ public:
     void run() {
         // Run the update.
         {
-            OldClientWriteContext ctx(&_txn, nss.ns());
+            OldClientWriteContext ctx(&_opCtx, nss.ns());
 
             // Populate the collection.
             for (int i = 0; i < 10; ++i) {
@@ -257,7 +257,7 @@ public:
             }
             ASSERT_EQUALS(10U, count(BSONObj()));
 
-            CurOp& curOp = *CurOp::get(_txn);
+            CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver((UpdateDriver::Options()));
             Database* db = ctx.db();
@@ -294,10 +294,10 @@ public:
             updateParams.canonicalQuery = cq.get();
 
             auto ws = make_unique<WorkingSet>();
-            auto cs = make_unique<CollectionScan>(&_txn, collScanParams, ws.get(), cq->root());
+            auto cs = make_unique<CollectionScan>(&_opCtx, collScanParams, ws.get(), cq->root());
 
             auto updateStage =
-                make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, cs.release());
+                make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, cs.release());
 
             const UpdateStats* stats =
                 static_cast<const UpdateStats*>(updateStage->getSpecificStats());
@@ -313,11 +313,11 @@ public:
             // Remove recordIds[targetDocIndex];
             updateStage->saveState();
             {
-                WriteUnitOfWork wunit(&_txn);
-                updateStage->invalidate(&_txn, recordIds[targetDocIndex], INVALIDATION_DELETION);
+                WriteUnitOfWork wunit(&_opCtx);
+                updateStage->invalidate(&_opCtx, recordIds[targetDocIndex], INVALIDATION_DELETION);
                 wunit.commit();
             }
-            BSONObj targetDoc = coll->docFor(&_txn, recordIds[targetDocIndex]).value();
+            BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);
             updateStage->restoreState();
@@ -336,7 +336,7 @@ public:
 
         // Check the contents of the collection.
         {
-            AutoGetCollectionForRead ctx(&_txn, nss);
+            AutoGetCollectionForRead ctx(&_opCtx, nss);
             Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;
@@ -370,8 +370,8 @@ public:
         ASSERT_EQUALS(10U, count(BSONObj()));
 
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_txn, nss.ns());
-        OpDebug* opDebug = &CurOp::get(_txn)->debug();
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
         UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
@@ -397,7 +397,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -411,7 +411,7 @@ public:
         updateParams.canonicalQuery = cq.get();
 
         const auto updateStage =
-            make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release());
+            make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -458,8 +458,8 @@ public:
         ASSERT_EQUALS(50U, count(BSONObj()));
 
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_txn, nss.ns());
-        OpDebug* opDebug = &CurOp::get(_txn)->debug();
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
         UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
@@ -485,7 +485,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
-        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->recordId = recordIds[targetDocIndex];
@@ -499,7 +499,7 @@ public:
         updateParams.canonicalQuery = cq.get();
 
         auto updateStage =
-            make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release());
+            make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, qds.release());
 
         // Should return advanced.
         id = WorkingSet::INVALID_ID;
@@ -542,8 +542,8 @@ class QueryStageUpdateSkipOwnedObjects : public QueryStageUpdateBase {
 public:
     void run() {
         // Various variables we'll need.
-        OldClientWriteContext ctx(&_txn, nss.ns());
-        OpDebug* opDebug = &CurOp::get(_txn)->debug();
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
         Collection* coll = ctx.getCollection();
         UpdateLifecycleImpl updateLifecycle(nss);
         UpdateRequest request(nss);
@@ -562,7 +562,7 @@ public:
         ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
-        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto qds = make_unique<QueuedDataStage>(&_opCtx, ws.get());
         {
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
@@ -576,7 +576,7 @@ public:
         updateParams.canonicalQuery = cq.get();
 
         const auto updateStage =
-            make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release());
+            make_unique<UpdateStage>(&_opCtx, updateParams, ws.get(), coll, qds.release());
         const UpdateStats* stats = static_cast<const UpdateStats*>(updateStage->getSpecificStats());
 
         // Call work, passing the set up member to the update stage.

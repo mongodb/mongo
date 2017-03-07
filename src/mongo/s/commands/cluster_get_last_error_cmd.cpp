@@ -81,7 +81,7 @@ BSONObj buildGLECmdWithOpTime(const BSONObj& gleOptions,
  * Returns OK with the LegacyWCResponses containing only write concern error information
  * Returns !OK if there was an error getting a GLE response
  */
-Status enforceLegacyWriteConcern(OperationContext* txn,
+Status enforceLegacyWriteConcern(OperationContext* opCtx,
                                  StringData dbName,
                                  const BSONObj& options,
                                  const HostOpTimeMap& hostOpTimes,
@@ -98,7 +98,7 @@ Status enforceLegacyWriteConcern(OperationContext* txn,
         const repl::OpTime& opTime = hot.opTime;
         const OID& electionId = hot.electionId;
 
-        auto swShard = Grid::get(txn)->shardRegistry()->getShard(txn, shardConnStr.toString());
+        auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardConnStr.toString());
         if (!swShard.isOK()) {
             return swShard.getStatus();
         }
@@ -114,9 +114,12 @@ Status enforceLegacyWriteConcern(OperationContext* txn,
     // Send the requests and wait to receive all the responses.
 
     const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-    AsyncRequestsSender ars(
-        txn, Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(), dbName, requests, readPref);
-    auto responses = ars.waitForResponses(txn);
+    AsyncRequestsSender ars(opCtx,
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            dbName,
+                            requests,
+                            readPref);
+    auto responses = ars.waitForResponses(opCtx);
 
     // Parse the responses.
 
@@ -201,7 +204,7 @@ public:
         // No auth required for getlasterror
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -239,7 +242,7 @@ public:
         const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc()).getPrevHostOpTimes());
 
         std::vector<LegacyWCResponse> wcResponses;
-        auto status = enforceLegacyWriteConcern(txn, dbname, cmdObj, hostOpTimes, &wcResponses);
+        auto status = enforceLegacyWriteConcern(opCtx, dbname, cmdObj, hostOpTimes, &wcResponses);
 
         // Don't forget about our last hosts, reset the client info
         ClusterLastErrorInfo::get(cc()).disableForCommand();

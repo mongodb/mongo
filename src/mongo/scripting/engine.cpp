@@ -192,8 +192,8 @@ public:
     void rollback() {}
 };
 
-void Scope::storedFuncMod(OperationContext* txn) {
-    txn->recoveryUnit()->registerChange(new StoredFuncModLogOpHandler());
+void Scope::storedFuncMod(OperationContext* opCtx) {
+    opCtx->recoveryUnit()->registerChange(new StoredFuncModLogOpHandler());
 }
 
 void Scope::validateObjectIdString(const string& str) {
@@ -202,7 +202,7 @@ void Scope::validateObjectIdString(const string& str) {
         uassert(10430, "invalid object id: not hex", std::isxdigit(str.at(i)));
 }
 
-void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
+void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_localDBName.size() == 0) {
         if (ignoreNotConnected)
             return;
@@ -216,7 +216,7 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
     _loadedVersion = lastVersion;
     string coll = _localDBName + ".system.js";
 
-    auto directDBClient = DBDirectClientFactory::get(txn).create(txn);
+    auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 
     unique_ptr<DBClientCursor> c =
         directDBClient->query(coll, Query(), 0, 0, NULL, QueryOption_SlaveOk, 0);
@@ -344,7 +344,7 @@ public:
         _pools.push_front(toStore);
     }
 
-    std::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
+    std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const string& poolName) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
@@ -353,7 +353,7 @@ public:
                 _pools.erase(it);
                 scope->incTimesUsed();
                 scope->reset();
-                scope->registerOperation(txn);
+                scope->registerOperation(opCtx);
                 return scope;
             }
         }
@@ -402,8 +402,8 @@ public:
     void reset() {
         _real->reset();
     }
-    void registerOperation(OperationContext* txn) {
-        _real->registerOperation(txn);
+    void registerOperation(OperationContext* opCtx) {
+        _real->registerOperation(opCtx);
     }
     void unregisterOperation() {
         _real->unregisterOperation();
@@ -411,14 +411,14 @@ public:
     void init(const BSONObj* data) {
         _real->init(data);
     }
-    void localConnectForDbEval(OperationContext* txn, const char* dbName) {
+    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
         invariant(!"localConnectForDbEval should only be called from dbEval");
     }
     void setLocalDB(const string& dbName) {
         _real->setLocalDB(dbName);
     }
-    void loadStored(OperationContext* txn, bool ignoreNotConnected = false) {
-        _real->loadStored(txn, ignoreNotConnected);
+    void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false) {
+        _real->loadStored(opCtx, ignoreNotConnected);
     }
     void externalSetup() {
         _real->externalSetup();
@@ -532,20 +532,20 @@ private:
 };
 
 /** Get a scope from the pool of scopes matching the supplied pool name */
-unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* txn,
+unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
                                                const string& db,
                                                const string& scopeType) {
     const string fullPoolName = db + scopeType;
-    std::shared_ptr<Scope> s = scopeCache.tryAcquire(txn, fullPoolName);
+    std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());
-        s->registerOperation(txn);
+        s->registerOperation(opCtx);
     }
 
     unique_ptr<Scope> p;
     p.reset(new PooledScope(fullPoolName, s));
     p->setLocalDB(db);
-    p->loadStored(txn, true);
+    p->loadStored(opCtx, true);
     return p;
 }
 

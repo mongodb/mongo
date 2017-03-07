@@ -93,7 +93,7 @@ public:
         return Status::OK();
     }
     CmdReplSetTest() : ReplSetCommand("replSetTest") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -165,7 +165,7 @@ MONGO_INITIALIZER(RegisterReplSetTestCmd)(InitializerContext* context) {
 class CmdReplSetGetRBID : public ReplSetCommand {
 public:
     CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -188,14 +188,14 @@ public:
         help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         if (cmdObj["forShell"].trueValue())
-            LastError::get(txn->getClient()).disable();
+            LastError::get(opCtx->getClient()).disable();
 
         Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
         if (!status.isOK())
@@ -230,7 +230,7 @@ public:
         help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig", true) {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -330,7 +330,7 @@ public:
         h << "Initiate/christen a replica set.";
         h << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -342,7 +342,7 @@ public:
         }
 
         std::string replSetString =
-            ReplicationCoordinator::get(txn)->getSettings().getReplSetString();
+            ReplicationCoordinator::get(opCtx)->getSettings().getReplSetString();
         if (replSetString.empty()) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::NoReplicationEnabled,
@@ -356,7 +356,7 @@ public:
             result.append("info2", noConfigMessage);
             log() << "initiate : " << noConfigMessage;
 
-            ReplicationCoordinatorExternalStateImpl externalState(StorageInterface::get(txn));
+            ReplicationCoordinatorExternalStateImpl externalState(StorageInterface::get(opCtx));
             std::string name;
             std::vector<HostAndPort> seeds;
             parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...
@@ -386,7 +386,7 @@ public:
         }
 
         Status status =
-            getGlobalReplicationCoordinator()->processReplSetInitiate(txn, configObj, &result);
+            getGlobalReplicationCoordinator()->processReplSetInitiate(opCtx, configObj, &result);
         return appendCommandStatus(result, status);
     }
 
@@ -404,7 +404,7 @@ public:
         help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -424,15 +424,15 @@ public:
         parsedArgs.newConfigObj = cmdObj["replSetReconfig"].Obj();
         parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
         status =
-            getGlobalReplicationCoordinator()->processReplSetReconfig(txn, parsedArgs, &result);
+            getGlobalReplicationCoordinator()->processReplSetReconfig(opCtx, parsedArgs, &result);
 
-        ScopedTransaction scopedXact(txn, MODE_X);
-        Lock::GlobalWrite globalWrite(txn->lockState());
+        ScopedTransaction scopedXact(opCtx, MODE_X);
+        Lock::GlobalWrite globalWrite(opCtx->lockState());
 
-        WriteUnitOfWork wuow(txn);
+        WriteUnitOfWork wuow(opCtx);
         if (status.isOK() && !parsedArgs.force) {
             getGlobalServiceContext()->getOpObserver()->onOpMessage(
-                txn,
+                opCtx,
                 BSON("msg"
                      << "Reconfig set"
                      << "version"
@@ -462,7 +462,7 @@ public:
         help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -494,7 +494,7 @@ public:
         help << "http://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -543,7 +543,7 @@ public:
         log() << "Attempting to step down in response to replSetStepDown command";
 
         status = getGlobalReplicationCoordinator()->stepDown(
-            txn, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
+            opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
         return appendCommandStatus(result, status);
     }
 
@@ -560,7 +560,7 @@ public:
         help << "Enable or disable maintenance mode.";
     }
     CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -589,7 +589,7 @@ public:
                 "in-progress initial sync.";
     }
     CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -606,7 +606,7 @@ public:
 
         return appendCommandStatus(result,
                                    getGlobalReplicationCoordinator()->processReplSetSyncFrom(
-                                       txn, targetHostAndPort, &result));
+                                       opCtx, targetHostAndPort, &result));
     }
 
 private:
@@ -618,13 +618,13 @@ private:
 class CmdReplSetUpdatePosition : public ReplSetCommand {
 public:
     CmdReplSetUpdatePosition() : ReplSetCommand("replSetUpdatePosition") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        auto replCoord = repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
         Status status = replCoord->checkReplEnabledForCommand(&result);
         if (!status.isOK())
@@ -684,7 +684,7 @@ namespace {
  * The "local" database does NOT count except for "rs.oplog" collection.
  * Used to set the hasData field on replset heartbeat command response.
  */
-bool replHasDatabases(OperationContext* txn) {
+bool replHasDatabases(OperationContext* opCtx) {
     std::vector<string> names;
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
     storageEngine->listDatabases(&names);
@@ -697,7 +697,7 @@ bool replHasDatabases(OperationContext* txn) {
 
         // we have a local database.  return true if oplog isn't empty
         BSONObj o;
-        if (Helpers::getSingleton(txn, repl::rsOplogName.c_str(), o)) {
+        if (Helpers::getSingleton(opCtx, repl::rsOplogName.c_str(), o)) {
             return true;
         }
     }
@@ -718,7 +718,7 @@ MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
 class CmdReplSetHeartbeat : public ReplSetCommand {
 public:
     CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") {}
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -740,7 +740,7 @@ public:
         /* we want to keep heartbeat connections open when relinquishing primary.
            tag them here. */
         transport::Session::TagMask originalTag = 0;
-        auto session = txn->getClient()->session();
+        auto session = opCtx->getClient()->session();
         if (session) {
             originalTag = session->getTags();
             session->replaceTags(originalTag | transport::Session::kKeepOpen);
@@ -777,7 +777,7 @@ public:
 
         // ugh.
         if (args.getCheckEmpty()) {
-            result.append("hasData", replHasDatabases(txn));
+            result.append("hasData", replHasDatabases(opCtx));
         }
 
         ReplSetHeartbeatResponse response;
@@ -795,7 +795,7 @@ class CmdReplSetFresh : public ReplSetCommand {
 public:
     CmdReplSetFresh() : ReplSetCommand("replSetFresh") {}
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -828,7 +828,7 @@ public:
     CmdReplSetElect() : ReplSetCommand("replSetElect") {}
 
 private:
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,
@@ -862,7 +862,7 @@ class CmdReplSetStepUp : public ReplSetCommand {
 public:
     CmdReplSetStepUp() : ReplSetCommand("replSetStepUp") {}
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
                      int,

@@ -115,128 +115,134 @@ private:
 
 /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
 TEST(SimpleRecordStoreV1, AllocQuantized) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
 
     string myns = "test.AllocQuantized";
-    SimpleRecordStoreV1 rs(&txn, myns, md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BSONObj obj = docForRecordSize(300);
-    StatusWith<RecordId> result = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> result = rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), false);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
-    ASSERT_EQUALS(512, rs.dataFor(&txn, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
+    ASSERT_EQUALS(512,
+                  rs.dataFor(&opCtx, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
 }
 
 TEST(SimpleRecordStoreV1, AllocNonQuantized) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
+    md->setUserFlag(&opCtx, CollectionOptions::Flag_NoPadding);
 
     string myns = "test.AllocQuantized";
-    SimpleRecordStoreV1 rs(&txn, myns, md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BSONObj obj = docForRecordSize(300);
-    StatusWith<RecordId> result = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> result = rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), false);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
-    ASSERT_EQUALS(300, rs.dataFor(&txn, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
+    ASSERT_EQUALS(300,
+                  rs.dataFor(&opCtx, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
 }
 
 TEST(SimpleRecordStoreV1, AllocNonQuantizedStillAligned) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
+    md->setUserFlag(&opCtx, CollectionOptions::Flag_NoPadding);
 
     string myns = "test.AllocQuantized";
-    SimpleRecordStoreV1 rs(&txn, myns, md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BSONObj obj = docForRecordSize(298);
-    StatusWith<RecordId> result = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), false);
+    StatusWith<RecordId> result = rs.insertRecord(&opCtx, obj.objdata(), obj.objsize(), false);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
-    ASSERT_EQUALS(300, rs.dataFor(&txn, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
+    ASSERT_EQUALS(300,
+                  rs.dataFor(&opCtx, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
 }
 
 /** alloc() quantizes the requested size if DocWriter::addPadding() returns true. */
 TEST(SimpleRecordStoreV1, AllocQuantizedWithDocWriter) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
 
     string myns = "test.AllocQuantized";
-    SimpleRecordStoreV1 rs(&txn, myns, md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, myns, md, &em, false);
 
     BsonDocWriter docWriter(docForRecordSize(300), true);
-    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT(result.isOK());
 
     // The length of the allocated record is quantized.
-    ASSERT_EQUALS(512, rs.dataFor(&txn, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
+    ASSERT_EQUALS(512,
+                  rs.dataFor(&opCtx, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
 }
 
 /**
  * alloc() does not quantize records if DocWriter::addPadding() returns false
  */
 TEST(SimpleRecordStoreV1, AllocNonQuantizedDocWriter) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
 
     string myns = "test.AllocIndexNamespaceNotQuantized";
-    SimpleRecordStoreV1 rs(&txn, myns + "$x", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, myns + "$x", md, &em, false);
 
     BsonDocWriter docWriter(docForRecordSize(300), false);
-    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT(result.isOK());
 
     // The length of the allocated record is not quantized.
-    ASSERT_EQUALS(300, rs.dataFor(&txn, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
+    ASSERT_EQUALS(300,
+                  rs.dataFor(&opCtx, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
 }
 
 /** alloc() aligns record sizes up to 4 bytes even if DocWriter::addPadding returns false. */
 TEST(SimpleRecordStoreV1, AllocAlignedDocWriter) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
 
     string myns = "test.AllocIndexNamespaceNotQuantized";
-    SimpleRecordStoreV1 rs(&txn, myns + "$x", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, myns + "$x", md, &em, false);
 
     BsonDocWriter docWriter(docForRecordSize(298), false);
-    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> result = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT(result.isOK());
 
-    ASSERT_EQUALS(300, rs.dataFor(&txn, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
+    ASSERT_EQUALS(300,
+                  rs.dataFor(&opCtx, result.getValue()).size() + MmapV1RecordHeader::HeaderSize);
 }
 /**
  * alloc() with quantized size doesn't split if enough room left over.
  */
 TEST(SimpleRecordStoreV1, AllocUseQuantizedDeletedRecordWithoutSplit) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 512 + 31}, {}};
-        initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, NULL, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), true);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 512 + 31}, {}};
         LocAndSize drecs[] = {{}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
     }
 }
 
@@ -244,24 +250,24 @@ TEST(SimpleRecordStoreV1, AllocUseQuantizedDeletedRecordWithoutSplit) {
  * alloc() with quantized size splits if enough room left over.
  */
 TEST(SimpleRecordStoreV1, AllocUseQuantizedDeletedRecordWithSplit) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 512 + 32}, {}};
-        initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, NULL, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), true);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 512}, {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1512), 32}, {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
     }
 }
 
@@ -269,24 +275,24 @@ TEST(SimpleRecordStoreV1, AllocUseQuantizedDeletedRecordWithSplit) {
  * alloc() with non quantized size doesn't split if enough room left over.
  */
 TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecordWithoutSplit) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 331}, {}};
-        initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, NULL, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 331}, {}};
         LocAndSize drecs[] = {{}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
     }
 }
 
@@ -294,24 +300,24 @@ TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecordWithoutSplit) {
  * alloc() with non quantized size splits if enough room left over.
  */
 TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecordWithSplit) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 332}, {}};
-        initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, NULL, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(300), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 300}, {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1300), 32}, {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
     }
 }
 
@@ -319,27 +325,27 @@ TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecordWithSplit) {
  * alloc() will use from the legacy grab bag if it can.
  */
 TEST(SimpleRecordStoreV1, GrabBagIsUsed) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{}};
         LocAndSize grabBag[] = {
             {DiskLoc(0, 1000), 4 * 1024 * 1024}, {DiskLoc(1, 1000), 4 * 1024 * 1024}, {}};
-        initializeV1RS(&txn, NULL, drecs, grabBag, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, grabBag, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(256), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 256}, {}};
         LocAndSize drecs[] = {{DiskLoc(0, 1256), 4 * 1024 * 1024 - 256}, {}};
         LocAndSize grabBag[] = {{DiskLoc(1, 1000), 4 * 1024 * 1024}, {}};
-        assertStateV1RS(&txn, recs, drecs, grabBag, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, grabBag, &em, md);
     }
 }
 
@@ -347,27 +353,27 @@ TEST(SimpleRecordStoreV1, GrabBagIsUsed) {
  * alloc() will pull from the legacy grab bag even if it isn't needed.
  */
 TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnneeded) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
         LocAndSize grabBag[] = {
             {DiskLoc(1, 1000), 4 * 1024 * 1024}, {DiskLoc(2, 1000), 4 * 1024 * 1024}, {}};
-        initializeV1RS(&txn, NULL, drecs, grabBag, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, grabBag, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(1000), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 1000}, {}};
         LocAndSize drecs[] = {{DiskLoc(1, 1000), 4 * 1024 * 1024}, {}};
         LocAndSize grabBag[] = {{DiskLoc(2, 1000), 4 * 1024 * 1024}, {}};
-        assertStateV1RS(&txn, recs, drecs, grabBag, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, grabBag, &em, md);
     }
 }
 
@@ -375,54 +381,54 @@ TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnneeded) {
  * alloc() will pull from the legacy grab bag even if it can't be used
  */
 TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnusable) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 8 * 1024 * 1024}, {}};
         LocAndSize grabBag[] = {
             {DiskLoc(1, 1000), 4 * 1024 * 1024}, {DiskLoc(2, 1000), 4 * 1024 * 1024}, {}};
-        initializeV1RS(&txn, NULL, drecs, grabBag, &em, md);
+        initializeV1RS(&opCtx, NULL, drecs, grabBag, &em, md);
     }
 
     BsonDocWriter docWriter(docForRecordSize(8 * 1024 * 1024), false);
-    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&txn, &docWriter);
+    StatusWith<RecordId> actualLocation = rs.insertRecordWithDocWriter(&opCtx, &docWriter);
     ASSERT_OK(actualLocation.getStatus());
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 8 * 1024 * 1024}, {}};
         LocAndSize drecs[] = {{DiskLoc(1, 1000), 4 * 1024 * 1024}, {}};
         LocAndSize grabBag[] = {{DiskLoc(2, 1000), 4 * 1024 * 1024}, {}};
-        assertStateV1RS(&txn, recs, drecs, grabBag, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, grabBag, &em, md);
     }
 }
 
 // -----------------
 
 TEST(SimpleRecordStoreV1, FullSimple1) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
 
     ASSERT_EQUALS(0, md->numRecords());
-    StatusWith<RecordId> result = rs.insertRecord(&txn, "abc", 4, 1000);
+    StatusWith<RecordId> result = rs.insertRecord(&opCtx, "abc", 4, 1000);
     ASSERT_TRUE(result.isOK());
     ASSERT_EQUALS(1, md->numRecords());
-    RecordData recordData = rs.dataFor(&txn, result.getValue());
+    RecordData recordData = rs.dataFor(&opCtx, result.getValue());
     ASSERT_EQUALS(string("abc"), string(recordData.data()));
 }
 
 // -----------------
 
 TEST(SimpleRecordStoreV1, Truncate) {
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
-    SimpleRecordStoreV1 rs(&txn, "test.foo", md, &em, false);
+    SimpleRecordStoreV1 rs(&opCtx, "test.foo", md, &em, false);
 
     {
         LocAndSize recs[] = {{DiskLoc(0, 1000), 100},
@@ -433,12 +439,12 @@ TEST(SimpleRecordStoreV1, Truncate) {
         LocAndSize drecs[] = {
             {DiskLoc(0, 1200), 100}, {DiskLoc(2, 1000), 100}, {DiskLoc(1, 1000), 1000}, {}};
 
-        initializeV1RS(&txn, recs, drecs, NULL, &em, md);
+        initializeV1RS(&opCtx, recs, drecs, NULL, &em, md);
 
         ASSERT_EQUALS(em.getExtent(DiskLoc(0, 0))->length, em.minSize());
     }
 
-    rs.truncate(&txn);
+    rs.truncate(&opCtx);
 
     {
         LocAndSize recs[] = {{}};
@@ -446,7 +452,7 @@ TEST(SimpleRecordStoreV1, Truncate) {
             // One extent filled with a single deleted record.
             {DiskLoc(0, Extent::HeaderSize()), em.minSize() - Extent::HeaderSize()},
             {}};
-        assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        assertStateV1RS(&opCtx, recs, drecs, NULL, &em, md);
     }
 }
 }

@@ -164,7 +164,7 @@ Status handleOplogInsert(RoleGraph* roleGraph, const BSONObj& insertedObj) {
  *
  * Treats all updates as upserts.
  */
-Status handleOplogUpdate(OperationContext* txn,
+Status handleOplogUpdate(OperationContext* opCtx,
                          RoleGraph* roleGraph,
                          const BSONObj& updatePattern,
                          const BSONObj& queryPattern) {
@@ -183,7 +183,7 @@ Status handleOplogUpdate(OperationContext* txn,
     status = AuthorizationManager::getBSONForRole(roleGraph, roleToUpdate, roleDocument.root());
     if (status == ErrorCodes::RoleNotFound) {
         // The query pattern will only contain _id, no other immutable fields are present
-        status = driver.populateDocumentWithQueryFields(txn, queryPattern, NULL, roleDocument);
+        status = driver.populateDocumentWithQueryFields(opCtx, queryPattern, NULL, roleDocument);
     }
     if (!status.isOK())
         return status;
@@ -278,7 +278,7 @@ Status RoleGraph::addRoleFromDocument(const BSONObj& doc) {
     return status;
 }
 
-Status RoleGraph::handleLogOp(OperationContext* txn,
+Status RoleGraph::handleLogOp(OperationContext* opCtx,
                               const char* op,
                               const NamespaceString& ns,
                               const BSONObj& o,
@@ -313,7 +313,7 @@ Status RoleGraph::handleLogOp(OperationContext* txn,
                 return Status(ErrorCodes::InternalError,
                               "Missing query pattern in update oplog entry.");
             }
-            return handleOplogUpdate(txn, this, o, *o2);
+            return handleOplogUpdate(opCtx, this, o, *o2);
         case 'd':
             return handleOplogDelete(this, o);
         case 'n':

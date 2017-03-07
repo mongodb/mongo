@@ -108,11 +108,11 @@ public:
                               StringData ident,
                               const RecordStore* originalRecordStore) const;
 
-    virtual int flushAllFiles(OperationContext* txn, bool sync);
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
 
-    virtual Status beginBackup(OperationContext* txn);
+    virtual Status beginBackup(OperationContext* opCtx);
 
-    virtual void endBackup(OperationContext* txn);
+    virtual void endBackup(OperationContext* opCtx);
 
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 

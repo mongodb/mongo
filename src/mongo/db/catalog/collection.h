@@ -178,7 +178,7 @@ private:
  */
 class Collection final : CappedCallback, UpdateNotifier {
 public:
-    Collection(OperationContext* txn,
+    Collection(OperationContext* opCtx,
                StringData fullNS,
                CollectionCatalogEntry* details,  // does not own
                RecordStore* recordStore,         // does not own
@@ -228,22 +228,22 @@ public:
 
     bool requiresIdIndex() const;
 
-    Snapshotted<BSONObj> docFor(OperationContext* txn, const RecordId& loc) const;
+    Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const;
 
     /**
      * @param out - contents set to the right docs if exists, or nothing.
      * @return true iff loc exists
      */
-    bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
+    bool findDoc(OperationContext* opCtx, const RecordId& loc, Snapshotted<BSONObj>* out) const;
 
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward = true) const;
 
     /**
      * Returns many cursors that partition the Collection into many disjoint sets. Iterating
      * all returned cursors is equivalent to iterating the full collection.
      */
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const;
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const;
 
     /**
      * Deletes the document with the given RecordId from the collection.
@@ -257,7 +257,7 @@ public:
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
      */
-    void deleteDocument(OperationContext* txn,
+    void deleteDocument(OperationContext* opCtx,
                         const RecordId& loc,
                         OpDebug* opDebug,
                         bool fromMigrate = false,
@@ -270,7 +270,7 @@ public:
      *
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      */
-    Status insertDocuments(OperationContext* txn,
+    Status insertDocuments(OperationContext* opCtx,
                            std::vector<BSONObj>::const_iterator begin,
                            std::vector<BSONObj>::const_iterator end,
                            OpDebug* opDebug,
@@ -284,7 +284,7 @@ public:
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * 'enforceQuota' If false, quotas will be ignored.
      */
-    Status insertDocument(OperationContext* txn,
+    Status insertDocument(OperationContext* opCtx,
                           const BSONObj& doc,
                           OpDebug* opDebug,
                           bool enforceQuota,
@@ -294,7 +294,7 @@ public:
      * Callers must ensure no document validation is performed for this collection when calling
      * this method.
      */
-    Status insertDocumentsForOplog(OperationContext* txn,
+    Status insertDocumentsForOplog(OperationContext* opCtx,
                                    const DocWriter* const* docs,
                                    size_t nDocs);
 
@@ -303,7 +303,7 @@ public:
      *
      * NOTE: It is up to caller to commit the indexes.
      */
-    Status insertDocument(OperationContext* txn,
+    Status insertDocument(OperationContext* opCtx,
                           const BSONObj& doc,
                           const std::vector<MultiIndexBlock*>& indexBlocks,
                           bool enforceQuota);
@@ -317,7 +317,7 @@ public:
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
-    StatusWith<RecordId> updateDocument(OperationContext* txn,
+    StatusWith<RecordId> updateDocument(OperationContext* opCtx,
                                         const RecordId& oldLocation,
                                         const Snapshotted<BSONObj>& oldDoc,
                                         const BSONObj& newDoc,
@@ -335,7 +335,7 @@ public:
      * success.
      * @return the contents of the updated record.
      */
-    StatusWith<RecordData> updateDocumentWithDamages(OperationContext* txn,
+    StatusWith<RecordData> updateDocumentWithDamages(OperationContext* opCtx,
                                                      const RecordId& loc,
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
@@ -344,21 +344,21 @@ public:
 
     // -----------
 
-    StatusWith<CompactStats> compact(OperationContext* txn, const CompactOptions* options);
+    StatusWith<CompactStats> compact(OperationContext* opCtx, const CompactOptions* options);
 
     /**
      * removes all documents as fast as possible
      * indexes before and after will be the same
      * as will other characteristics
      */
-    Status truncate(OperationContext* txn);
+    Status truncate(OperationContext* opCtx);
 
     /**
      * @return OK if the validate run successfully
      *         OK will be returned even if corruption is found
      *         deatils will be in result
      */
-    Status validate(OperationContext* txn,
+    Status validate(OperationContext* opCtx,
                     ValidateCmdLevel level,
                     ValidateResults* results,
                     BSONObjBuilder* output);
@@ -366,7 +366,7 @@ public:
     /**
      * forces data into cache
      */
-    Status touch(OperationContext* txn,
+    Status touch(OperationContext* opCtx,
                  bool touchData,
                  bool touchIndexes,
                  BSONObjBuilder* output) const;
@@ -377,7 +377,7 @@ public:
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
      */
-    void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
+    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
@@ -395,10 +395,10 @@ public:
      * An empty validator removes all validation.
      * Requires an exclusive lock on the collection.
      */
-    Status setValidator(OperationContext* txn, BSONObj validator);
+    Status setValidator(OperationContext* opCtx, BSONObj validator);
 
-    Status setValidationLevel(OperationContext* txn, StringData newLevel);
-    Status setValidationAction(OperationContext* txn, StringData newAction);
+    Status setValidationLevel(OperationContext* opCtx, StringData newLevel);
+    Status setValidationAction(OperationContext* opCtx, StringData newAction);
 
     StringData getValidationLevel() const;
     StringData getValidationAction() const;
@@ -419,15 +419,15 @@ public:
      */
     std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const;
 
-    uint64_t numRecords(OperationContext* txn) const;
+    uint64_t numRecords(OperationContext* opCtx) const;
 
-    uint64_t dataSize(OperationContext* txn) const;
+    uint64_t dataSize(OperationContext* opCtx) const;
 
-    int averageObjectSize(OperationContext* txn) const {
-        uint64_t n = numRecords(txn);
+    int averageObjectSize(OperationContext* opCtx) const {
+        uint64_t n = numRecords(opCtx);
         if (n == 0)
             return 5;
-        return static_cast<int>(dataSize(txn) / n);
+        return static_cast<int>(dataSize(opCtx) / n);
     }
 
     uint64_t getIndexSize(OperationContext* opCtx, BSONObjBuilder* details = NULL, int scale = 1);
@@ -459,20 +459,20 @@ private:
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
      */
-    Status checkValidation(OperationContext* txn, const BSONObj& document) const;
+    Status checkValidation(OperationContext* opCtx, const BSONObj& document) const;
 
-    Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc);
+    Status recordStoreGoingToUpdateInPlace(OperationContext* opCtx, const RecordId& loc);
 
-    Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data);
+    Status aboutToDeleteCapped(OperationContext* opCtx, const RecordId& loc, RecordData data);
 
     /**
      * same semantics as insertDocument, but doesn't do:
      *  - some user error checks
      *  - adjust padding
      */
-    Status _insertDocument(OperationContext* txn, const BSONObj& doc, bool enforceQuota);
+    Status _insertDocument(OperationContext* opCtx, const BSONObj& doc, bool enforceQuota);
 
-    Status _insertDocuments(OperationContext* txn,
+    Status _insertDocuments(OperationContext* opCtx,
                             std::vector<BSONObj>::const_iterator begin,
                             std::vector<BSONObj>::const_iterator end,
                             bool enforceQuota,
@@ -482,7 +482,7 @@ private:
     /**
      * Perform update when document move will be required.
      */
-    StatusWith<RecordId> _updateDocumentWithMove(OperationContext* txn,
+    StatusWith<RecordId> _updateDocumentWithMove(OperationContext* opCtx,
                                                  const RecordId& oldLocation,
                                                  const Snapshotted<BSONObj>& oldDoc,
                                                  const BSONObj& newDoc,

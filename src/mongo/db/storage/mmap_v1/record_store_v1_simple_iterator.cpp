@@ -39,18 +39,18 @@ namespace mongo {
 // Regular / non-capped collection traversal
 //
 
-SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* txn,
+SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* opCtx,
                                                          const SimpleRecordStoreV1* collection,
                                                          bool forward)
-    : _txn(txn), _recordStore(collection), _forward(forward) {
+    : _opCtx(opCtx), _recordStore(collection), _forward(forward) {
     // Eagerly seek to first Record on creation since it is cheap.
     const ExtentManager* em = _recordStore->_extentManager;
-    if (_recordStore->details()->firstExtent(txn).isNull()) {
+    if (_recordStore->details()->firstExtent(opCtx).isNull()) {
         // nothing in the collection
-        verify(_recordStore->details()->lastExtent(txn).isNull());
+        verify(_recordStore->details()->lastExtent(opCtx).isNull());
     } else if (_forward) {
         // Find a non-empty extent and start with the first record in it.
-        Extent* e = em->getExtent(_recordStore->details()->firstExtent(txn));
+        Extent* e = em->getExtent(_recordStore->details()->firstExtent(opCtx));
 
         while (e->firstRecord.isNull() && !e->xnext.isNull()) {
             e = em->getExtent(e->xnext);
@@ -62,7 +62,7 @@ SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(OperationContext* txn,
     } else {
         // Walk backwards, skipping empty extents, and use the last record in the first
         // non-empty extent we see.
-        Extent* e = em->getExtent(_recordStore->details()->lastExtent(txn));
+        Extent* e = em->getExtent(_recordStore->details()->lastExtent(opCtx));
 
         // TODO ELABORATE
         // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
@@ -81,33 +81,33 @@ boost::optional<Record> SimpleRecordStoreV1Iterator::next() {
         return {};
     auto toReturn = _curr.toRecordId();
     advance();
-    return {{toReturn, _recordStore->RecordStore::dataFor(_txn, toReturn)}};
+    return {{toReturn, _recordStore->RecordStore::dataFor(_opCtx, toReturn)}};
 }
 
 boost::optional<Record> SimpleRecordStoreV1Iterator::seekExact(const RecordId& id) {
     _curr = DiskLoc::fromRecordId(id);
     advance();
-    return {{id, _recordStore->RecordStore::dataFor(_txn, id)}};
+    return {{id, _recordStore->RecordStore::dataFor(_opCtx, id)}};
 }
 
 void SimpleRecordStoreV1Iterator::advance() {
     // Move to the next thing.
     if (!isEOF()) {
         if (_forward) {
-            _curr = _recordStore->getNextRecord(_txn, _curr);
+            _curr = _recordStore->getNextRecord(_opCtx, _curr);
         } else {
-            _curr = _recordStore->getPrevRecord(_txn, _curr);
+            _curr = _recordStore->getPrevRecord(_opCtx, _curr);
         }
     }
 }
 
-void SimpleRecordStoreV1Iterator::invalidate(OperationContext* txn, const RecordId& dl) {
+void SimpleRecordStoreV1Iterator::invalidate(OperationContext* opCtx, const RecordId& dl) {
     // Just move past the thing being deleted.
     if (dl == _curr.toRecordId()) {
         const DiskLoc origLoc = _curr;
 
         // Undo the advance on rollback, as the deletion that forced it "never happened".
-        txn->recoveryUnit()->onRollback([this, origLoc]() { this->_curr = origLoc; });
+        opCtx->recoveryUnit()->onRollback([this, origLoc]() { this->_curr = origLoc; });
         advance();
     }
 }

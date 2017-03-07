@@ -155,7 +155,7 @@ public:
      * sync source blacklist.
      * This function may throw DB exceptions.
      */
-    void connectToSyncSource(OperationContext* txn,
+    void connectToSyncSource(OperationContext* opCtx,
                              const OpTime& lastOpTimeFetched,
                              const OpTime& requiredOpTime,
                              ReplicationCoordinator* replCoord);

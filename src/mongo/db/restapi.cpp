@@ -70,7 +70,7 @@ public:
         return url[0] == '/' && url.find_last_of('/') > 0;
     }
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,
                         const std::string& url,
                         BSONObj params,
@@ -78,7 +78,7 @@ public:
                         int& responseCode,
                         vector<string>& headers,
                         const SockAddr& from) {
-        DBDirectClient db(txn);
+        DBDirectClient db(opCtx);
 
         string::size_type first = url.find("/", 1);
         if (first == string::npos) {
@@ -115,10 +115,10 @@ public:
 
         if (method == "GET") {
             responseCode = 200;
-            html = handleRESTQuery(txn, fullns, action, params, responseCode, ss);
+            html = handleRESTQuery(opCtx, fullns, action, params, responseCode, ss);
         } else if (method == "POST") {
             responseCode = 201;
-            handlePost(txn, fullns, MiniWebServer::body(rq), params, responseCode, ss);
+            handlePost(opCtx, fullns, MiniWebServer::body(rq), params, responseCode, ss);
         } else {
             responseCode = 400;
             headers.push_back("X_err: bad request");
@@ -134,7 +134,7 @@ public:
         responseMsg = ss.str();
     }
 
-    bool handleRESTQuery(OperationContext* txn,
+    bool handleRESTQuery(OperationContext* opCtx,
                          const std::string& ns,
                          const std::string& action,
                          BSONObj& params,
@@ -177,7 +177,7 @@ public:
 
         BSONObj query = queryBuilder.obj();
 
-        DBDirectClient db(txn);
+        DBDirectClient db(opCtx);
         unique_ptr<DBClientCursor> cursor = db.query(ns.c_str(), query, num, skip);
         uassert(13085, "query failed for dbwebserver", cursor.get());
 
@@ -235,7 +235,7 @@ public:
     }
 
     // TODO Generate id and revision per couch POST spec
-    void handlePost(OperationContext* txn,
+    void handlePost(OperationContext* opCtx,
                     const std::string& ns,
                     const char* body,
                     BSONObj& params,
@@ -244,7 +244,7 @@ public:
         try {
             BSONObj obj = fromjson(body);
 
-            DBDirectClient db(txn);
+            DBDirectClient db(opCtx);
             db.insert(ns.c_str(), obj);
         } catch (...) {
             responseCode = 400;  // Bad Request.  Seems reasonable for now.
@@ -265,9 +265,9 @@ public:
     }
 } restHandler;
 
-bool RestAdminAccess::haveAdminUsers(OperationContext* txn) const {
-    AuthorizationSession* authzSession = AuthorizationSession::get(txn->getClient());
-    return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments(txn);
+bool RestAdminAccess::haveAdminUsers(OperationContext* opCtx) const {
+    AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+    return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments(opCtx);
 }
 
 class LowLevelMongodStatus : public WebStatusPlugin {
@@ -304,9 +304,9 @@ public:
         ss << "</pre>\n";
     }
 
-    virtual void run(OperationContext* txn, stringstream& ss) {
+    virtual void run(OperationContext* opCtx, stringstream& ss) {
         Timer t;
-        Lock::GlobalLock globalSLock(txn->lockState(), MODE_S, 300);
+        Lock::GlobalLock globalSLock(opCtx->lockState(), MODE_S, 300);
         if (globalSLock.isLocked()) {
             _gotLock(t.millis(), ss);
         } else {

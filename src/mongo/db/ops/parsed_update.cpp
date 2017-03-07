@@ -39,8 +39,8 @@
 
 namespace mongo {
 
-ParsedUpdate::ParsedUpdate(OperationContext* txn, const UpdateRequest* request)
-    : _txn(txn), _request(request), _driver(UpdateDriver::Options()), _canonicalQuery() {}
+ParsedUpdate::ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request)
+    : _opCtx(opCtx), _request(request), _driver(UpdateDriver::Options()), _canonicalQuery() {}
 
 Status ParsedUpdate::parseRequest() {
     // It is invalid to request that the UpdateStage return the prior or newly-updated version
@@ -59,7 +59,7 @@ Status ParsedUpdate::parseRequest() {
                           "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
         }
 
-        auto collator = CollatorFactoryInterface::get(_txn->getServiceContext())
+        auto collator = CollatorFactoryInterface::get(_opCtx->getServiceContext())
                             ->makeFromBSON(_request->getCollation());
         if (!collator.isOK()) {
             return collator.getStatus();
@@ -93,7 +93,7 @@ Status ParsedUpdate::parseQuery() {
 Status ParsedUpdate::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    const ExtensionsCallbackReal extensionsCallback(_txn, &_request->getNamespaceString());
+    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
 
     // The projection needs to be applied after the update operation, so we do not specify a
     // projection during canonicalization.
@@ -113,7 +113,7 @@ Status ParsedUpdate::parseQueryToCQ() {
         qr->setLimit(1);
     }
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(_txn, std::move(qr), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(_opCtx, std::move(qr), extensionsCallback);
     if (statusWithCQ.isOK()) {
         _canonicalQuery = std::move(statusWithCQ.getValue());
     }
@@ -129,11 +129,11 @@ Status ParsedUpdate::parseUpdate() {
     // Config db docs shouldn't get checked for valid field names since the shard key can have
     // a dot (".") in it.
     const bool shouldValidate =
-        !(!_txn->writesAreReplicated() || ns.isConfigDB() || _request->isFromMigration());
+        !(!_opCtx->writesAreReplicated() || ns.isConfigDB() || _request->isFromMigration());
 
     _driver.setLogOp(true);
-    _driver.setModOptions(
-        ModifierInterface::Options(!_txn->writesAreReplicated(), shouldValidate, _collator.get()));
+    _driver.setModOptions(ModifierInterface::Options(
+        !_opCtx->writesAreReplicated(), shouldValidate, _collator.get()));
 
     return _driver.parse(_request->getUpdates(), _request->isMulti());
 }

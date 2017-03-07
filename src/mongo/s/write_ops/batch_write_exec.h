@@ -72,7 +72,7 @@ public:
      *
      * This function does not throw, any errors are reported via the clientResponse.
      */
-    void executeBatch(OperationContext* txn,
+    void executeBatch(OperationContext* opCtx,
                       const BatchedCommandRequest& clientRequest,
                       BatchedCommandResponse* clientResponse,
                       BatchWriteExecStats* stats);

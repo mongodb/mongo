@@ -142,7 +142,7 @@ public:
      * given "retryPolicy".  Retries indefinitely until/unless a non-retriable error is encountered,
      * the maxTimeMs on the OperationContext expires, or the operation is interrupted.
      */
-    StatusWith<CommandResponse> runCommand(OperationContext* txn,
+    StatusWith<CommandResponse> runCommand(OperationContext* opCtx,
                                            const ReadPreferenceSetting& readPref,
                                            const std::string& dbName,
                                            const BSONObj& cmdObj,
@@ -153,7 +153,7 @@ public:
      * Runs for the lesser of the remaining time on the operation context or the specified maxTimeMS
      * override.
      */
-    StatusWith<CommandResponse> runCommand(OperationContext* txn,
+    StatusWith<CommandResponse> runCommand(OperationContext* opCtx,
                                            const ReadPreferenceSetting& readPref,
                                            const std::string& dbName,
                                            const BSONObj& cmdObj,
@@ -166,7 +166,7 @@ public:
      * Wherever possible this method should be avoided in favor of runCommand.
      */
     StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const std::string& dbName,
         const BSONObj& cmdObj,
@@ -178,7 +178,7 @@ public:
      * Wherever possible this method should be avoided in favor of runCommand.
      */
     StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const std::string& dbName,
         const BSONObj& cmdObj,
@@ -189,7 +189,7 @@ public:
      * Expects a single-entry batch wrtie command and runs it on the config server's primary using
      * the specified retry policy.
      */
-    BatchedCommandResponse runBatchWriteCommandOnConfig(OperationContext* txn,
+    BatchedCommandResponse runBatchWriteCommandOnConfig(OperationContext* opCtx,
                                                         const BatchedCommandRequest& batchRequest,
                                                         RetryPolicy retryPolicy);
 
@@ -201,7 +201,7 @@ public:
     * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
     * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
     */
-    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
+    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* opCtx,
                                                      const ReadPreferenceSetting& readPref,
                                                      const repl::ReadConcernLevel& readConcernLevel,
                                                      const NamespaceString& nss,
@@ -214,7 +214,7 @@ public:
      * so long as the options are the same.
      * NOTE: Currently only supported for LocalShard.
      */
-    virtual Status createIndexOnConfig(OperationContext* txn,
+    virtual Status createIndexOnConfig(OperationContext* opCtx,
                                        const NamespaceString& ns,
                                        const BSONObj& keys,
                                        bool unique) = 0;
@@ -252,14 +252,14 @@ private:
      *
      * NOTE: LocalShard implementation will not return a valid host and so should be ignored.
      */
-    virtual HostWithResponse _runCommand(OperationContext* txn,
+    virtual HostWithResponse _runCommand(OperationContext* opCtx,
                                          const ReadPreferenceSetting& readPref,
                                          const std::string& dbname,
                                          Milliseconds maxTimeMSOverride,
                                          const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,

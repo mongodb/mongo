@@ -56,14 +56,14 @@ using stdx::make_unique;
 
 class QueryStageFetchBase {
 public:
-    QueryStageFetchBase() : _client(&_txn) {}
+    QueryStageFetchBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageFetchBase() {
         _client.dropCollection(ns());
     }
 
     void getRecordIds(set<RecordId>* out, Collection* coll) {
-        auto cursor = coll->getCursor(&_txn);
+        auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
         }
@@ -83,7 +83,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient _client;
 };
 
@@ -94,12 +94,12 @@ protected:
 class FetchStageAlreadyFetched : public QueryStageFetchBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -112,14 +112,14 @@ public:
         ASSERT_EQUALS(size_t(1), recordIds.size());
 
         // Create a mock stage that returns the WSM.
-        auto mockStage = make_unique<QueuedDataStage>(&_txn, &ws);
+        auto mockStage = make_unique<QueuedDataStage>(&_opCtx, &ws);
 
         // Mock data.
         {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* mockMember = ws.get(id);
             mockMember->recordId = *recordIds.begin();
-            mockMember->obj = coll->docFor(&_txn, mockMember->recordId);
+            mockMember->obj = coll->docFor(&_opCtx, mockMember->recordId);
             ws.transitionToRecordIdAndObj(id);
             // Points into our DB.
             mockStage->pushBack(id);
@@ -135,7 +135,7 @@ public:
         }
 
         unique_ptr<FetchStage> fetchStage(
-            new FetchStage(&_txn, &ws, mockStage.release(), NULL, coll));
+            new FetchStage(&_opCtx, &ws, mockStage.release(), NULL, coll));
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state;
@@ -158,14 +158,14 @@ public:
 class FetchStageFilter : public QueryStageFetchBase {
 public:
     void run() {
-        ScopedTransaction transaction(&_txn, MODE_IX);
-        Lock::DBLock lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
-        OldClientContext ctx(&_txn, ns());
+        ScopedTransaction transaction(&_opCtx, MODE_IX);
+        Lock::DBLock lk(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
+        OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -178,7 +178,7 @@ public:
         ASSERT_EQUALS(size_t(1), recordIds.size());
 
         // Create a mock stage that returns the WSM.
-        auto mockStage = make_unique<QueuedDataStage>(&_txn, &ws);
+        auto mockStage = make_unique<QueuedDataStage>(&_opCtx, &ws);
 
         // Mock data.
         {
@@ -203,7 +203,7 @@ public:
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         unique_ptr<FetchStage> fetchStage(
-            new FetchStage(&_txn, &ws, mockStage.release(), filterExpr.get(), coll));
+            new FetchStage(&_opCtx, &ws, mockStage.release(), filterExpr.get(), coll));
 
         // First call should return a fetch request as it's not in memory.
         WorkingSetID id = WorkingSet::INVALID_ID;

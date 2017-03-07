@@ -107,11 +107,11 @@ public:
     /**
      * works globally
      */
-    bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth);
+    bool eraseCursor(OperationContext* opCtx, CursorId id, bool checkAuth);
 
     void appendStats(BSONObjBuilder& builder);
 
-    std::size_t timeoutCursors(OperationContext* txn, int millisSinceLastCall);
+    std::size_t timeoutCursors(OperationContext* opCtx, int millisSinceLastCall);
 
     int64_t nextSeed();
 
@@ -178,7 +178,7 @@ void GlobalCursorIdCache::destroyed(unsigned id, const std::string& ns) {
     _idToNS.erase(id);
 }
 
-bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
+bool GlobalCursorIdCache::eraseCursor(OperationContext* opCtx, CursorId id, bool checkAuth) {
     // Figure out what the namespace of this cursor is.
     std::string ns;
     if (globalCursorManager->ownsCursorId(id)) {
@@ -206,17 +206,17 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool c
 
     // Check if we are authorized to erase this cursor.
     if (checkAuth) {
-        AuthorizationSession* as = AuthorizationSession::get(txn->getClient());
+        AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
         Status authorizationStatus = as->checkAuthForKillCursors(nss, id);
         if (!authorizationStatus.isOK()) {
-            audit::logKillCursorsAuthzCheck(txn->getClient(), nss, id, ErrorCodes::Unauthorized);
+            audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, ErrorCodes::Unauthorized);
             return false;
         }
     }
 
     // If this cursor is owned by the global cursor manager, ask it to erase the cursor for us.
     if (globalCursorManager->ownsCursorId(id)) {
-        Status eraseStatus = globalCursorManager->eraseCursor(txn, id, checkAuth);
+        Status eraseStatus = globalCursorManager->eraseCursor(opCtx, id, checkAuth);
         massert(28697,
                 eraseStatus.reason(),
                 eraseStatus.code() == ErrorCodes::OK ||
@@ -226,15 +226,16 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool c
 
     // If not, then the cursor must be owned by a collection.  Erase the cursor under the
     // collection lock (to prevent the collection from going away during the erase).
-    AutoGetCollectionForRead ctx(txn, nss);
+    AutoGetCollectionForRead ctx(opCtx, nss);
     Collection* collection = ctx.getCollection();
     if (!collection) {
         if (checkAuth)
-            audit::logKillCursorsAuthzCheck(txn->getClient(), nss, id, ErrorCodes::CursorNotFound);
+            audit::logKillCursorsAuthzCheck(
+                opCtx->getClient(), nss, id, ErrorCodes::CursorNotFound);
         return false;
     }
 
-    Status eraseStatus = collection->getCursorManager()->eraseCursor(txn, id, checkAuth);
+    Status eraseStatus = collection->getCursorManager()->eraseCursor(opCtx, id, checkAuth);
     massert(16089,
             eraseStatus.reason(),
             eraseStatus.code() == ErrorCodes::OK ||
@@ -242,7 +243,7 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool c
     return eraseStatus.isOK();
 }
 
-std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
+std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, int millisSinceLastCall) {
     size_t totalTimedOut = 0;
 
     // Time out the cursors from the global cursor manager.
@@ -265,7 +266,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int milli
     // For each collection, time out its cursors under the collection lock (to prevent the
     // collection from going away during the erase).
     for (unsigned i = 0; i < todo.size(); i++) {
-        AutoGetCollectionOrViewForRead ctx(txn, NamespaceString(todo[i]));
+        AutoGetCollectionOrViewForRead ctx(opCtx, NamespaceString(todo[i]));
         if (!ctx.getDb()) {
             continue;
         }
@@ -287,26 +288,26 @@ CursorManager* CursorManager::getGlobalCursorManager() {
     return globalCursorManager.get();
 }
 
-std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall) {
-    return globalCursorIdCache->timeoutCursors(txn, millisSinceLastCall);
+std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, int millisSinceLastCall) {
+    return globalCursorIdCache->timeoutCursors(opCtx, millisSinceLastCall);
 }
 
-int CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, const char* _ids) {
+int CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* _ids) {
     ConstDataCursor ids(_ids);
     int numDeleted = 0;
     for (int i = 0; i < n; i++) {
-        if (eraseCursorGlobalIfAuthorized(txn, ids.readAndAdvance<LittleEndian<int64_t>>()))
+        if (eraseCursorGlobalIfAuthorized(opCtx, ids.readAndAdvance<LittleEndian<int64_t>>()))
             numDeleted++;
         if (globalInShutdownDeprecated())
             break;
     }
     return numDeleted;
 }
-bool CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id) {
-    return globalCursorIdCache->eraseCursor(txn, id, true);
+bool CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id) {
+    return globalCursorIdCache->eraseCursor(opCtx, id, true);
 }
-bool CursorManager::eraseCursorGlobal(OperationContext* txn, CursorId id) {
-    return globalCursorIdCache->eraseCursor(txn, id, false);
+bool CursorManager::eraseCursorGlobal(OperationContext* opCtx, CursorId id) {
+    return globalCursorIdCache->eraseCursor(opCtx, id, false);
 }
 
 
@@ -397,7 +398,7 @@ void CursorManager::invalidateAll(bool collectionGoingAway, const std::string& r
     }
 }
 
-void CursorManager::invalidateDocument(OperationContext* txn,
+void CursorManager::invalidateDocument(OperationContext* opCtx,
                                        const RecordId& dl,
                                        InvalidationType type) {
     if (supportsDocLocking()) {
@@ -411,13 +412,13 @@ void CursorManager::invalidateDocument(OperationContext* txn,
     for (ExecSet::iterator it = _nonCachedExecutors.begin(); it != _nonCachedExecutors.end();
          ++it) {
         PlanExecutor* exec = *it;
-        exec->invalidate(txn, dl, type);
+        exec->invalidate(opCtx, dl, type);
     }
 
     for (CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
         PlanExecutor* exec = i->second->getExecutor();
         if (exec) {
-            exec->invalidate(txn, dl, type);
+            exec->invalidate(opCtx, dl, type);
         }
     }
 }
@@ -543,7 +544,7 @@ void CursorManager::deregisterCursor(ClientCursor* cc) {
     _deregisterCursor_inlock(cc);
 }
 
-Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit) {
+Status CursorManager::eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit) {
     ClientCursor* cursor;
 
     {
@@ -553,7 +554,7 @@ Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shoul
         if (it == _cursors.end()) {
             if (shouldAudit) {
                 audit::logKillCursorsAuthzCheck(
-                    txn->getClient(), _nss, id, ErrorCodes::CursorNotFound);
+                    opCtx->getClient(), _nss, id, ErrorCodes::CursorNotFound);
             }
             return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
         }
@@ -563,14 +564,14 @@ Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shoul
         if (cursor->_isPinned) {
             if (shouldAudit) {
                 audit::logKillCursorsAuthzCheck(
-                    txn->getClient(), _nss, id, ErrorCodes::OperationFailed);
+                    opCtx->getClient(), _nss, id, ErrorCodes::OperationFailed);
             }
             return {ErrorCodes::OperationFailed,
                     str::stream() << "Cannot kill pinned cursor: " << id};
         }
 
         if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(txn->getClient(), _nss, id, ErrorCodes::OK);
+            audit::logKillCursorsAuthzCheck(opCtx->getClient(), _nss, id, ErrorCodes::OK);
         }
 
         cursor->kill();

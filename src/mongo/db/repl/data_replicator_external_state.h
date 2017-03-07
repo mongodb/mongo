@@ -110,13 +110,13 @@ public:
      * This function creates an oplog buffer of the type specified at server startup.
      */
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* txn) const = 0;
+        OperationContext* opCtx) const = 0;
 
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* txn) const = 0;
+        OperationContext* opCtx) const = 0;
 
     /**
      * Returns the current replica set config if there is one, or an error why there isn't.
@@ -130,7 +130,7 @@ private:
      *
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
-    virtual StatusWith<OpTime> _multiApply(OperationContext* txn,
+    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
                                            MultiApplier::Operations ops,
                                            MultiApplier::ApplyOperationFn applyOperation) = 0;
 

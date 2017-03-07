@@ -81,12 +81,12 @@ void DataFileSync::run() {
             break;
         }
 
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
         Date_t start = jsTime();
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
         dur::notifyPreDataFileFlush();
-        int numFiles = storageEngine->flushAllFiles(txn.get(), true);
+        int numFiles = storageEngine->flushAllFiles(opCtx.get(), true);
         dur::notifyPostDataFileFlush();
 
         time_flushing = durationCount<Milliseconds>(jsTime() - start);
@@ -100,7 +100,7 @@ void DataFileSync::run() {
     }
 }
 
-BSONObj DataFileSync::generateSection(OperationContext* txn,
+BSONObj DataFileSync::generateSection(OperationContext* opCtx,
                                       const BSONElement& configElement) const {
     if (!running()) {
         return BSONObj();

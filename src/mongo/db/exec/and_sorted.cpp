@@ -242,7 +242,7 @@ PlanStage::StageState AndSortedStage::moveTowardTargetRecordId(WorkingSetID* out
 }
 
 
-void AndSortedStage::doInvalidate(OperationContext* txn,
+void AndSortedStage::doInvalidate(OperationContext* opCtx,
                                   const RecordId& dl,
                                   InvalidationType type) {
     // TODO remove this since calling isEOF is illegal inside of doInvalidate().
@@ -259,7 +259,7 @@ void AndSortedStage::doInvalidate(OperationContext* txn,
         ++_specificStats.flagged;
 
         // The RecordId could still be a valid result so flag it and save it for later.
-        WorkingSetCommon::fetchAndInvalidateRecordId(txn, _ws->get(_targetId), _collection);
+        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, _ws->get(_targetId), _collection);
         _ws->flagForReview(_targetId);
 
         _targetId = WorkingSet::INVALID_ID;

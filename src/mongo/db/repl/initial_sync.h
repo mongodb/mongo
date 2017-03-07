@@ -47,7 +47,7 @@ public:
     /**
      * applies up to endOpTime, fetching missing documents as needed.
      */
-    void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
+    void oplogApplication(OperationContext* opCtx, const OpTime& endOpTime);
 
 private:
     /**
@@ -55,7 +55,7 @@ private:
      *
      * NOTE:Will not transition or check states
      */
-    void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+    void _applyOplogUntil(OperationContext* opCtx, const OpTime& endOpTime);
 };
 
 // Used for ReplSetTest testing.

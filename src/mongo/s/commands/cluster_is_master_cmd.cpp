@@ -67,14 +67,14 @@ public:
         // No auth required
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
 
-        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(txn->getClient());
+        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
         if (!seenIsMaster) {
             clientMetadataIsMasterState.setSeenIsMaster();
@@ -97,10 +97,10 @@ public:
 
             invariant(swParseClientMetadata.getValue());
 
-            swParseClientMetadata.getValue().get().logClientMetadata(txn->getClient());
+            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
 
             clientMetadataIsMasterState.setClientMetadata(
-                txn->getClient(), std::move(swParseClientMetadata.getValue()));
+                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
         }
 
         result.appendBool("ismaster", true);
@@ -119,9 +119,9 @@ public:
                                                   "automationServiceDescriptor",
                                                   static_cast<ServerParameter*>(nullptr));
         if (parameter)
-            parameter->append(txn, result, "automationServiceDescriptor");
+            parameter->append(opCtx, result, "automationServiceDescriptor");
 
-        MessageCompressorManager::forSession(txn->getClient()->session())
+        MessageCompressorManager::forSession(opCtx->getClient()->session())
             .serverNegotiate(cmdObj, &result);
 
         return true;

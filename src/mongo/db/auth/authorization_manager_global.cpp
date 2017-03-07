@@ -46,7 +46,7 @@ class AuthzVersionParameter : public ServerParameter {
 
 public:
     AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
     virtual Status set(const BSONElement& newValueElement);
     virtual Status setFromString(const std::string& str);
 };
@@ -62,11 +62,11 @@ MONGO_INITIALIZER_GENERAL(AuthzSchemaParameter,
 AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name)
     : ServerParameter(sps, name, false, false) {}
 
-void AuthzVersionParameter::append(OperationContext* txn,
+void AuthzVersionParameter::append(OperationContext* opCtx,
                                    BSONObjBuilder& b,
                                    const std::string& name) {
     int authzVersion;
-    uassertStatusOK(getGlobalAuthorizationManager()->getAuthorizationVersion(txn, &authzVersion));
+    uassertStatusOK(getGlobalAuthorizationManager()->getAuthorizationVersion(opCtx, &authzVersion));
     b.append(name, authzVersion);
 }
 

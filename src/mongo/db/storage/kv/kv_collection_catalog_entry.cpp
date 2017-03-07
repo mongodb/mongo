@@ -96,10 +96,10 @@ KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVEngine* engine,
 
 KVCollectionCatalogEntry::~KVCollectionCatalogEntry() {}
 
-bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
+bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* opCtx,
                                                   StringData indexName,
                                                   const MultikeyPaths& multikeyPaths) {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
 
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
@@ -146,45 +146,45 @@ bool KVCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
         }
     }
 
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
     return true;
 }
 
-void KVCollectionCatalogEntry::setIndexHead(OperationContext* txn,
+void KVCollectionCatalogEntry::setIndexHead(OperationContext* opCtx,
                                             StringData indexName,
                                             const RecordId& newHead) {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     md.indexes[offset].head = newHead;
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 }
 
-Status KVCollectionCatalogEntry::removeIndex(OperationContext* txn, StringData indexName) {
-    MetaData md = _getMetaData(txn);
+Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData indexName) {
+    MetaData md = _getMetaData(opCtx);
 
     if (md.findIndexOffset(indexName) < 0)
         return Status::OK();  // never had the index so nothing to do.
 
-    const string ident = _catalog->getIndexIdent(txn, ns().ns(), indexName);
+    const string ident = _catalog->getIndexIdent(opCtx, ns().ns(), indexName);
 
     md.eraseIndex(indexName);
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 
     // Lazily remove to isolate underlying engine from rollback.
-    txn->recoveryUnit()->registerChange(new RemoveIndexChange(txn, this, ident));
+    opCtx->recoveryUnit()->registerChange(new RemoveIndexChange(opCtx, this, ident));
     return Status::OK();
 }
 
-Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* txn,
+Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
                                                       const IndexDescriptor* spec) {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
     IndexMetaData imd(spec->infoObj(), false, RecordId(), false);
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
         const auto feature =
             KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
-        if (!_catalog->getFeatureTracker()->isRepairableFeatureInUse(txn, feature)) {
-            _catalog->getFeatureTracker()->markRepairableFeatureAsInUse(txn, feature);
+        if (!_catalog->getFeatureTracker()->isRepairableFeatureInUse(opCtx, feature)) {
+            _catalog->getFeatureTracker()->markRepairableFeatureAsInUse(opCtx, feature);
         }
         imd.multikeyPaths = MultikeyPaths{static_cast<size_t>(spec->keyPattern().nFields())};
     }
@@ -192,62 +192,62 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* txn,
     // Mark collation feature as in use if the index has a non-simple collation.
     if (imd.spec["collation"]) {
         const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
-        if (!_catalog->getFeatureTracker()->isNonRepairableFeatureInUse(txn, feature)) {
-            _catalog->getFeatureTracker()->markNonRepairableFeatureAsInUse(txn, feature);
+        if (!_catalog->getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
+            _catalog->getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
         }
     }
 
     md.indexes.push_back(imd);
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 
-    string ident = _catalog->getIndexIdent(txn, ns().ns(), spec->indexName());
+    string ident = _catalog->getIndexIdent(opCtx, ns().ns(), spec->indexName());
 
-    const Status status = _engine->createSortedDataInterface(txn, ident, spec);
+    const Status status = _engine->createSortedDataInterface(opCtx, ident, spec);
     if (status.isOK()) {
-        txn->recoveryUnit()->registerChange(new AddIndexChange(txn, this, ident));
+        opCtx->recoveryUnit()->registerChange(new AddIndexChange(opCtx, this, ident));
     }
 
     return status;
 }
 
-void KVCollectionCatalogEntry::indexBuildSuccess(OperationContext* txn, StringData indexName) {
-    MetaData md = _getMetaData(txn);
+void KVCollectionCatalogEntry::indexBuildSuccess(OperationContext* opCtx, StringData indexName) {
+    MetaData md = _getMetaData(opCtx);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     md.indexes[offset].ready = true;
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 }
 
-void KVCollectionCatalogEntry::updateTTLSetting(OperationContext* txn,
+void KVCollectionCatalogEntry::updateTTLSetting(OperationContext* opCtx,
                                                 StringData idxName,
                                                 long long newExpireSeconds) {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
     int offset = md.findIndexOffset(idxName);
     invariant(offset >= 0);
     md.indexes[offset].updateTTLSetting(newExpireSeconds);
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 }
 
-void KVCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
-    MetaData md = _getMetaData(txn);
+void KVCollectionCatalogEntry::updateFlags(OperationContext* opCtx, int newValue) {
+    MetaData md = _getMetaData(opCtx);
     md.options.flags = newValue;
     md.options.flagsSet = true;
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 }
 
-void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,
+void KVCollectionCatalogEntry::updateValidator(OperationContext* opCtx,
                                                const BSONObj& validator,
                                                StringData validationLevel,
                                                StringData validationAction) {
-    MetaData md = _getMetaData(txn);
+    MetaData md = _getMetaData(opCtx);
     md.options.validator = validator;
     md.options.validationLevel = validationLevel.toString();
     md.options.validationAction = validationAction.toString();
-    _catalog->putMetaData(txn, ns().toString(), md);
+    _catalog->putMetaData(opCtx, ns().toString(), md);
 }
 
 BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData(
-    OperationContext* txn) const {
-    return _catalog->getMetaData(txn, ns().toString());
+    OperationContext* opCtx) const {
+    return _catalog->getMetaData(opCtx, ns().toString());
 }
 }

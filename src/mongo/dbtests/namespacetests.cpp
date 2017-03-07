@@ -69,11 +69,11 @@ namespace MissingFieldTests {
 class BtreeIndexMissingField {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
         BSONObj spec(BSON("key" << BSON("a" << 1)));
         ASSERT_EQUALS(jstNULL,
-                      IndexLegacy::getMissingField(&txn, NULL, spec).firstElement().type());
+                      IndexLegacy::getMissingField(&opCtx, NULL, spec).firstElement().type());
     }
 };
 
@@ -81,12 +81,12 @@ public:
 class TwoDIndexMissingField {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
         BSONObj spec(BSON("key" << BSON("a"
                                         << "2d")));
         ASSERT_EQUALS(jstNULL,
-                      IndexLegacy::getMissingField(&txn, NULL, spec).firstElement().type());
+                      IndexLegacy::getMissingField(&opCtx, NULL, spec).firstElement().type());
     }
 };
 
@@ -94,8 +94,8 @@ public:
 class HashedIndexMissingField {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
         BSONObj spec(BSON("key" << BSON("a"
                                         << "hashed")));
         BSONObj nullObj = BSON("a" << BSONNULL);
@@ -109,7 +109,7 @@ public:
         ASSERT_EQUALS(ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), 0, 0),
                       nullFieldFromKey.Long());
 
-        BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL, spec);
+        BSONObj missingField = IndexLegacy::getMissingField(&opCtx, NULL, spec);
         ASSERT_EQUALS(NumberLong, missingField.firstElement().type());
         ASSERT_BSONELT_EQ(nullFieldFromKey, missingField.firstElement());
     }
@@ -122,8 +122,8 @@ public:
 class HashedIndexMissingFieldAlternateSeed {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
         BSONObj spec(BSON("key" << BSON("a"
                                         << "hashed")
                                 << "seed"
@@ -141,7 +141,7 @@ public:
 
         // Ensure that getMissingField recognizes that the seed is different (and returns
         // the right key).
-        BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL, spec);
+        BSONObj missingField = IndexLegacy::getMissingField(&opCtx, NULL, spec);
         ASSERT_EQUALS(NumberLong, missingField.firstElement().type());
         ASSERT_BSONELT_EQ(nullFieldFromKey, missingField.firstElement());
     }
@@ -159,16 +159,16 @@ namespace NamespaceDetailsTests {
     public:
         Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
         virtual ~Base() {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
             if ( !nsd() )
                 return;
-            _context.db()->dropCollection( &txn, ns() );
+            _context.db()->dropCollection( &opCtx, ns() );
         }
     protected:
         void create() {
             Lock::GlobalWrite lk;
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
-            ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
+            ASSERT( userCreateNS( &opCtx, db(), ns(), fromjson( spec() ), false ).isOK() );
         }
         virtual string spec() const = 0;
         int nRecords() const {
@@ -250,10 +250,10 @@ namespace NamespaceDetailsTests {
     class SingleAlloc : public Base {
     public:
         void run() {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
             create();
             BSONObj b = bigObj();
-            ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
+            ASSERT( collection()->insertDocument( &opCtx, b, true ).isOK() );
             ASSERT_EQUALS( 1, nRecords() );
         }
         virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
@@ -262,7 +262,7 @@ namespace NamespaceDetailsTests {
     class Realloc : public Base {
     public:
         void run() {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
             create();
 
             const int N = 20;
@@ -272,7 +272,7 @@ namespace NamespaceDetailsTests {
             for ( int i = 0; i < N; ++i ) {
                 BSONObj b = bigObj();
                 StatusWith<RecordId> status =
-                ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
+                ASSERT( collection()->insertDocument( &opCtx, b, true ).isOK() );
                 l[ i ] = status.getValue();
                 ASSERT( !l[ i ].isNull() );
                 ASSERT( nRecords() <= Q );
@@ -287,14 +287,14 @@ namespace NamespaceDetailsTests {
     class TwoExtent : public Base {
     public:
         void run() {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
             create();
             ASSERT_EQUALS( 2, nExtents() );
 
             RecordId l[ 8 ];
             for ( int i = 0; i < 8; ++i ) {
                 StatusWith<RecordId> status =
-                ASSERT( collection()->insertDocument( &txn, bigObj(), true ).isOK() );
+                ASSERT( collection()->insertDocument( &opCtx, bigObj(), true ).isOK() );
                 l[ i ] = status.getValue();
                 ASSERT( !l[ i ].isNull() );
                 //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
@@ -308,7 +308,7 @@ namespace NamespaceDetailsTests {
             bob.appendOID( "_id", NULL, true );
             bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
             BSONObj bigger = bob.done();
-            ASSERT( !collection()->insertDocument( &txn, bigger, false ).isOK() );
+            ASSERT( !collection()->insertDocument( &opCtx, bigger, false ).isOK() );
             ASSERT_EQUALS( 0, nRecords() );
         }
     private:
@@ -335,13 +335,13 @@ namespace NamespaceDetailsTests {
     class AllocCappedNotQuantized : public Base {
     public:
         void run() {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
             create();
             ASSERT( nsd()->isCapped() );
             ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
 
             StatusWith<RecordId> result =
-                collection()->insertDocument( &txn, docForRecordSize( 300 ), false );
+                collection()->insertDocument( &opCtx, docForRecordSize( 300 ), false );
             ASSERT( result.isOK() );
             Record* record = collection()->getRecordStore()->recordFor( result.getValue() );
             // Check that no quantization is performed.
@@ -358,7 +358,7 @@ namespace NamespaceDetailsTests {
             return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
         }
         void pass(int p) {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
             create();
             ASSERT_EQUALS( 2, nExtents() );
 
@@ -371,7 +371,7 @@ namespace NamespaceDetailsTests {
             //RecordId l[ 8 ];
             for ( int i = 0; i < N; ++i ) {
                 BSONObj bb = bigObj();
-                StatusWith<RecordId> status = collection()->insertDocument( &txn, bb, true );
+                StatusWith<RecordId> status = collection()->insertDocument( &opCtx, bb, true );
                 ASSERT( status.isOK() );
                 RecordId a = status.getValue();
                 if( T == i )
@@ -385,7 +385,7 @@ namespace NamespaceDetailsTests {
 
             RecordId last, first;
             {
-                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&opCtx,
                                                                         ns(),
                                                                         collection(),
                                                                         InternalPlanner::BACKWARD));
@@ -393,7 +393,7 @@ namespace NamespaceDetailsTests {
                 ASSERT( !last.isNull() );
             }
             {
-                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&opCtx,
                                                                         ns(),
                                                                         collection(),
                                                                         InternalPlanner::FORWARD));
@@ -402,12 +402,12 @@ namespace NamespaceDetailsTests {
                 ASSERT( first != last ) ;
             }
 
-            collection()->cappedTruncateAfter(&txn, truncAt, false);
+            collection()->cappedTruncateAfter(&opCtx, truncAt, false);
             ASSERT_EQUALS( collection()->numRecords() , 28u );
 
             {
                 RecordId loc;
-                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&opCtx,
                                                                         ns(),
                                                                         collection(),
                                                                         InternalPlanner::FORWARD));
@@ -415,7 +415,7 @@ namespace NamespaceDetailsTests {
                 ASSERT( first == loc);
             }
             {
-                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&opCtx,
                                                                         ns(),
                                                                         collection(),
                                                                         InternalPlanner::BACKWARD));
@@ -430,7 +430,7 @@ namespace NamespaceDetailsTests {
             bob.appendOID("_id", 0, true);
             bob.append( "a", string( MinExtentSize + 300, 'a' ) );
             BSONObj bigger = bob.done();
-            ASSERT( !collection()->insertDocument( &txn, bigger, true ).isOK() );
+            ASSERT( !collection()->insertDocument( &opCtx, bigger, true ).isOK() );
             ASSERT_EQUALS( 0, nRecords() );
         }
     public:
@@ -503,28 +503,28 @@ namespace NamespaceDetailsTests {
                 create();
                 NamespaceDetails *nsd = collection()->detailsWritable();
 
-                const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext(); OperationContext& txn = *txnPtr;
+                const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext(); OperationContext& opCtx = *opCtxPtr;
                 // Set 2 & 54 as multikey
-                nsd->setIndexIsMultikey(&txn, 2, true);
-                nsd->setIndexIsMultikey(&txn, 54, true);
+                nsd->setIndexIsMultikey(&opCtx, 2, true);
+                nsd->setIndexIsMultikey(&opCtx, 54, true);
                 ASSERT(nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(54));
 
                 // Flip 2 & 47
-                nsd->setIndexIsMultikey(&txn, 2, false);
-                nsd->setIndexIsMultikey(&txn, 47, true);
+                nsd->setIndexIsMultikey(&opCtx, 2, false);
+                nsd->setIndexIsMultikey(&opCtx, 47, true);
                 ASSERT(!nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(47));
 
                 // Reset entries that are already true
-                nsd->setIndexIsMultikey(&txn, 54, true);
-                nsd->setIndexIsMultikey(&txn, 47, true);
+                nsd->setIndexIsMultikey(&opCtx, 54, true);
+                nsd->setIndexIsMultikey(&opCtx, 47, true);
                 ASSERT(nsd->isMultikey(54));
                 ASSERT(nsd->isMultikey(47));
 
                 // Two non-multi-key
-                nsd->setIndexIsMultikey(&txn, 2, false);
-                nsd->setIndexIsMultikey(&txn, 43, false);
+                nsd->setIndexIsMultikey(&opCtx, 2, false);
+                nsd->setIndexIsMultikey(&opCtx, 43, false);
                 ASSERT(!nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(54));
                 ASSERT(nsd->isMultikey(47));
@@ -544,21 +544,21 @@ public:
         const string committedName = dbName + ".committed";
         const string rolledBackName = dbName + ".rolled_back";
 
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
 
-        ScopedTransaction transaction(&txn, MODE_IX);
-        Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
+        ScopedTransaction transaction(&opCtx, MODE_IX);
+        Lock::DBLock lk(opCtx.lockState(), dbName, MODE_X);
 
         bool justCreated;
-        Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
+        Database* db = dbHolder().openDb(&opCtx, dbName, &justCreated);
         ASSERT(justCreated);
 
         Collection* committedColl;
         {
-            WriteUnitOfWork wunit(&txn);
+            WriteUnitOfWork wunit(&opCtx);
             ASSERT_FALSE(db->getCollection(committedName));
-            committedColl = db->createCollection(&txn, committedName);
+            committedColl = db->createCollection(&opCtx, committedName);
             ASSERT_EQUALS(db->getCollection(committedName), committedColl);
             wunit.commit();
         }
@@ -566,9 +566,9 @@ public:
         ASSERT_EQUALS(db->getCollection(committedName), committedColl);
 
         {
-            WriteUnitOfWork wunit(&txn);
+            WriteUnitOfWork wunit(&opCtx);
             ASSERT_FALSE(db->getCollection(rolledBackName));
-            Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
+            Collection* rolledBackColl = db->createCollection(&opCtx, rolledBackName);
             ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
             // not committing so creation should be rolled back
         }
@@ -589,23 +589,23 @@ public:
         const string droppedName = dbName + ".dropped";
         const string rolledBackName = dbName + ".rolled_back";
 
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
 
-        ScopedTransaction transaction(&txn, MODE_IX);
-        Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
+        ScopedTransaction transaction(&opCtx, MODE_IX);
+        Lock::DBLock lk(opCtx.lockState(), dbName, MODE_X);
 
         bool justCreated;
-        Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
+        Database* db = dbHolder().openDb(&opCtx, dbName, &justCreated);
         ASSERT(justCreated);
 
         {
-            WriteUnitOfWork wunit(&txn);
+            WriteUnitOfWork wunit(&opCtx);
             ASSERT_FALSE(db->getCollection(droppedName));
             Collection* droppedColl;
-            droppedColl = db->createCollection(&txn, droppedName);
+            droppedColl = db->createCollection(&opCtx, droppedName);
             ASSERT_EQUALS(db->getCollection(droppedName), droppedColl);
-            db->dropCollection(&txn, droppedName);
+            db->dropCollection(&opCtx, droppedName);
             wunit.commit();
         }
 
@@ -613,12 +613,12 @@ public:
         ASSERT_FALSE(db->getCollection(droppedName));
 
         {
-            WriteUnitOfWork wunit(&txn);
+            WriteUnitOfWork wunit(&opCtx);
             ASSERT_FALSE(db->getCollection(rolledBackName));
-            Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
+            Collection* rolledBackColl = db->createCollection(&opCtx, rolledBackName);
             wunit.commit();
             ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
-            db->dropCollection(&txn, rolledBackName);
+            db->dropCollection(&opCtx, rolledBackName);
             // not committing so dropping should be rolled back
         }
 

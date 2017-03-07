@@ -89,11 +89,12 @@ public:
     using GetLockByNameFunc = stdx::function<void(StringData name)>;
     using GetServerInfoFunc = stdx::function<void()>;
 
-    virtual StatusWith<LockpingsType> getPing(OperationContext* txn, StringData processID) override;
+    virtual StatusWith<LockpingsType> getPing(OperationContext* opCtx,
+                                              StringData processID) override;
 
-    virtual Status ping(OperationContext* txn, StringData processID, Date_t ping) override;
+    virtual Status ping(OperationContext* opCtx, StringData processID, Date_t ping) override;
 
-    virtual StatusWith<LocksType> grabLock(OperationContext* txn,
+    virtual StatusWith<LocksType> grabLock(OperationContext* opCtx,
                                            StringData lockID,
                                            const OID& lockSessionID,
                                            StringData who,
@@ -102,7 +103,7 @@ public:
                                            StringData why,
                                            const WriteConcernOptions& writeConcern) override;
 
-    virtual StatusWith<LocksType> overtakeLock(OperationContext* txn,
+    virtual StatusWith<LocksType> overtakeLock(OperationContext* opCtx,
                                                StringData lockID,
                                                const OID& lockSessionID,
                                                const OID& currentHolderTS,
@@ -111,22 +112,22 @@ public:
                                                Date_t time,
                                                StringData why) override;
 
-    virtual Status unlock(OperationContext* txn, const OID& lockSessionID) override;
+    virtual Status unlock(OperationContext* opCtx, const OID& lockSessionID) override;
 
-    virtual Status unlock(OperationContext* txn,
+    virtual Status unlock(OperationContext* opCtx,
                           const OID& lockSessionID,
                           StringData name) override;
 
-    virtual Status unlockAll(OperationContext* txn, const std::string& processID) override;
+    virtual Status unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
-    virtual StatusWith<ServerInfo> getServerInfo(OperationContext* txn) override;
+    virtual StatusWith<ServerInfo> getServerInfo(OperationContext* opCtx) override;
 
-    virtual StatusWith<LocksType> getLockByTS(OperationContext* txn,
+    virtual StatusWith<LocksType> getLockByTS(OperationContext* opCtx,
                                               const OID& lockSessionID) override;
 
-    virtual StatusWith<LocksType> getLockByName(OperationContext* txn, StringData name) override;
+    virtual StatusWith<LocksType> getLockByName(OperationContext* opCtx, StringData name) override;
 
-    virtual Status stopPing(OperationContext* txn, StringData processId) override;
+    virtual Status stopPing(OperationContext* opCtx, StringData processId) override;
 
     /**
      * Sets the checker method to use and the return value for grabLock to return every

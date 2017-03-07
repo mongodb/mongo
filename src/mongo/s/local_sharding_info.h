@@ -48,6 +48,6 @@ void enableLocalShardingInfo(ServiceContext* context,
 /**
  * @return true if we have any shard info for the ns
  */
-bool haveLocalShardingInfo(OperationContext* txn, const std::string& ns);
+bool haveLocalShardingInfo(OperationContext* opCtx, const std::string& ns);
 
 }  // namespace mongo

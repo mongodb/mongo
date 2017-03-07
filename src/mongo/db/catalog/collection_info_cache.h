@@ -64,7 +64,7 @@ public:
     /* get set of index keys for this namespace.  handy to quickly check if a given
        field is indexed (Note it might be a secondary component of a compound index.)
     */
-    const UpdateIndexData& getIndexKeys(OperationContext* txn) const;
+    const UpdateIndexData& getIndexKeys(OperationContext* opCtx) const;
 
     /**
      * Returns cached index usage statistics for this collection.  The map returned will contain
@@ -78,7 +78,7 @@ public:
     /**
      * Builds internal cache state based on the current state of the Collection's IndexCatalog
      */
-    void init(OperationContext* txn);
+    void init(OperationContext* opCtx);
 
     /**
      * Register a newly-created index with the cache.  Must be called whenever an index is
@@ -86,7 +86,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void addedIndex(OperationContext* txn, const IndexDescriptor* desc);
+    void addedIndex(OperationContext* opCtx, const IndexDescriptor* desc);
 
     /**
      * Deregister a newly-dropped index with the cache.  Must be called whenever an index is
@@ -94,7 +94,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void droppedIndex(OperationContext* txn, StringData indexName);
+    void droppedIndex(OperationContext* opCtx, StringData indexName);
 
     /**
      * Removes all cached query plans.
@@ -105,7 +105,7 @@ public:
      * Signal to the cache that a query operation has completed.  'indexesUsed' should list the
      * set of indexes used by the winning plan, if any.
      */
-    void notifyOfQuery(OperationContext* txn, const std::set<std::string>& indexesUsed);
+    void notifyOfQuery(OperationContext* opCtx, const std::set<std::string>& indexesUsed);
 
 private:
     Collection* _collection;  // not owned
@@ -124,14 +124,14 @@ private:
     // Tracks index usage statistics for this collection.
     CollectionIndexUsageTracker _indexUsageTracker;
 
-    void computeIndexKeys(OperationContext* txn);
-    void updatePlanCacheIndexEntries(OperationContext* txn);
+    void computeIndexKeys(OperationContext* opCtx);
+    void updatePlanCacheIndexEntries(OperationContext* opCtx);
 
     /**
      * Rebuilds cached information that is dependent on index composition. Must be called
      * when index composition changes.
      */
-    void rebuildIndexData(OperationContext* txn);
+    void rebuildIndexData(OperationContext* opCtx);
 
     bool _hasTTLIndex = false;
 };

@@ -83,7 +83,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname_unused,
                      BSONObj& cmdObj,
                      int options,
@@ -98,14 +98,14 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+            const auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 continue;
             }
             const auto s = shardStatus.getValue();
 
             auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
-                txn,
+                opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
                 "admin",
                 cmdObj,
@@ -166,9 +166,9 @@ public:
         }
 
         // Get information for config and admin dbs from the config servers.
-        auto catalogClient = grid.catalogClient(txn);
+        auto catalogClient = grid.catalogClient(opCtx);
         auto appendStatus =
-            catalogClient->appendInfoForConfigServerDatabases(txn, cmdObj, &dbListBuilder);
+            catalogClient->appendInfoForConfigServerDatabases(opCtx, cmdObj, &dbListBuilder);
         if (!appendStatus.isOK()) {
             return Command::appendCommandStatus(result, appendStatus);
         }

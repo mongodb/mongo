@@ -71,12 +71,12 @@ bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams& params) {
 // static
 const char* DeleteStage::kStageType = "DELETE";
 
-DeleteStage::DeleteStage(OperationContext* txn,
+DeleteStage::DeleteStage(OperationContext* opCtx,
                          const DeleteStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _params(params),
       _ws(ws),
       _collection(collection),

@@ -60,17 +60,17 @@ public:
     ~IndexCatalog();
 
     // must be called before used
-    Status init(OperationContext* txn);
+    Status init(OperationContext* opCtx);
 
     bool ok() const;
 
     // ---- accessors -----
 
     bool haveAnyIndexes() const;
-    int numIndexesTotal(OperationContext* txn) const;
-    int numIndexesReady(OperationContext* txn) const;
-    int numIndexesInProgress(OperationContext* txn) const {
-        return numIndexesTotal(txn) - numIndexesReady(txn);
+    int numIndexesTotal(OperationContext* opCtx) const;
+    int numIndexesReady(OperationContext* opCtx) const;
+    int numIndexesInProgress(OperationContext* opCtx) const {
+        return numIndexesTotal(opCtx) - numIndexesReady(opCtx);
     }
 
     /**
@@ -78,7 +78,7 @@ public:
      * in which case everything from this tree has to go away
      */
 
-    bool haveIdIndex(OperationContext* txn) const;
+    bool haveIdIndex(OperationContext* opCtx) const;
 
     /**
      * Returns the spec for the id index to create by default for this collection.
@@ -86,14 +86,14 @@ public:
     BSONObj getDefaultIdIndexSpec(
         ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) const;
 
-    IndexDescriptor* findIdIndex(OperationContext* txn) const;
+    IndexDescriptor* findIdIndex(OperationContext* opCtx) const;
 
     /**
      * Find index by name.  The index name uniquely identifies an index.
      *
      * @return null if cannot find
      */
-    IndexDescriptor* findIndexByName(OperationContext* txn,
+    IndexDescriptor* findIndexByName(OperationContext* opCtx,
                                      StringData name,
                                      bool includeUnfinishedIndexes = false) const;
 
@@ -108,7 +108,7 @@ public:
      * collation.
      */
     IndexDescriptor* findIndexByKeyPatternAndCollationSpec(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const BSONObj& key,
         const BSONObj& collationSpec,
         bool includeUnfinishedIndexes = false) const;
@@ -119,7 +119,7 @@ public:
      *
      * Consider using 'findIndexByName' if expecting to match one index.
      */
-    void findIndexesByKeyPattern(OperationContext* txn,
+    void findIndexesByKeyPattern(OperationContext* opCtx,
                                  const BSONObj& key,
                                  bool includeUnfinishedIndexes,
                                  std::vector<IndexDescriptor*>* matches) const;
@@ -137,11 +137,11 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* txn,
+    IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                const BSONObj& shardKey,
                                                bool requireSingleKey) const;
 
-    void findIndexByType(OperationContext* txn,
+    void findIndexByType(OperationContext* opCtx,
                          const std::string& type,
                          std::vector<IndexDescriptor*>& matches,
                          bool includeUnfinishedIndexes = false) const;
@@ -158,7 +158,7 @@ public:
      * an invalidateAll() on the cursor manager to notify other users of the IndexCatalog that
      * this descriptor is now invalid.
      */
-    const IndexDescriptor* refreshEntry(OperationContext* txn, const IndexDescriptor* oldDesc);
+    const IndexDescriptor* refreshEntry(OperationContext* opCtx, const IndexDescriptor* oldDesc);
 
     // never returns NULL
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const;
@@ -184,7 +184,7 @@ public:
         IndexCatalogEntry* catalogEntry(const IndexDescriptor* desc);
 
     private:
-        IndexIterator(OperationContext* txn,
+        IndexIterator(OperationContext* opCtx,
                       const IndexCatalog* cat,
                       bool includeUnfinishedIndexes);
 
@@ -192,7 +192,7 @@ public:
 
         bool _includeUnfinishedIndexes;
 
-        OperationContext* const _txn;
+        OperationContext* const _opCtx;
         const IndexCatalog* _catalog;
         IndexCatalogEntryContainer::const_iterator _iterator;
 
@@ -204,8 +204,8 @@ public:
         friend class IndexCatalog;
     };
 
-    IndexIterator getIndexIterator(OperationContext* txn, bool includeUnfinishedIndexes) const {
-        return IndexIterator(txn, this, includeUnfinishedIndexes);
+    IndexIterator getIndexIterator(OperationContext* opCtx, bool includeUnfinishedIndexes) const {
+        return IndexIterator(opCtx, this, includeUnfinishedIndexes);
     };
 
     // ---- index set modifiers ------
@@ -215,19 +215,20 @@ public:
      * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
      * of the created index, as it is stored in this index catalog.
      */
-    StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec);
+    StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx, BSONObj spec);
 
-    StatusWith<BSONObj> prepareSpecForCreate(OperationContext* txn, const BSONObj& original) const;
+    StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
+                                             const BSONObj& original) const;
 
-    Status dropAllIndexes(OperationContext* txn, bool includingIdIndex);
+    Status dropAllIndexes(OperationContext* opCtx, bool includingIdIndex);
 
-    Status dropIndex(OperationContext* txn, IndexDescriptor* desc);
+    Status dropIndex(OperationContext* opCtx, IndexDescriptor* desc);
 
     /**
      * will drop all incompleted indexes and return specs
      * after this, the indexes can be rebuilt
      */
-    std::vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* txn);
+    std::vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* opCtx);
 
 
     struct IndexKillCriteria {
@@ -241,7 +242,7 @@ public:
     /**
      * Returns true if the index 'idx' is multikey, and returns false otherwise.
      */
-    bool isMultikey(OperationContext* txn, const IndexDescriptor* idx);
+    bool isMultikey(OperationContext* opCtx, const IndexDescriptor* idx);
 
     /**
      * Returns the path components that cause the index 'idx' to be multikey if the index supports
@@ -252,7 +253,7 @@ public:
      * returns a vector with size equal to the number of elements in the index key pattern where
      * each element in the vector is an empty set.
      */
-    MultikeyPaths getMultikeyPaths(OperationContext* txn, const IndexDescriptor* idx);
+    MultikeyPaths getMultikeyPaths(OperationContext* opCtx, const IndexDescriptor* idx);
 
     // --- these probably become private?
 
@@ -270,7 +271,7 @@ public:
         MONGO_DISALLOW_COPYING(IndexBuildBlock);
 
     public:
-        IndexBuildBlock(OperationContext* txn, Collection* collection, const BSONObj& spec);
+        IndexBuildBlock(OperationContext* opCtx, Collection* collection, const BSONObj& spec);
 
         ~IndexBuildBlock();
 
@@ -300,7 +301,7 @@ public:
         IndexCatalogEntry* _entry;
         bool _inProgress;
 
-        OperationContext* _txn;
+        OperationContext* _opCtx;
     };
 
     // ----- data modifiers ------
@@ -311,7 +312,7 @@ public:
      *
      * This method may throw.
      */
-    Status indexRecords(OperationContext* txn,
+    Status indexRecords(OperationContext* opCtx,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* keysInsertedOut);
 
@@ -319,7 +320,7 @@ public:
      * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
      * this operation.
      */
-    void unindexRecord(OperationContext* txn,
+    void unindexRecord(OperationContext* opCtx,
                        const BSONObj& obj,
                        const RecordId& loc,
                        bool noWarn,
@@ -327,11 +328,11 @@ public:
 
     // ------- temp internal -------
 
-    std::string getAccessMethodName(OperationContext* txn, const BSONObj& keyPattern) {
-        return _getAccessMethodName(txn, keyPattern);
+    std::string getAccessMethodName(OperationContext* opCtx, const BSONObj& keyPattern) {
+        return _getAccessMethodName(opCtx, keyPattern);
     }
 
-    Status _upgradeDatabaseMinorVersionIfNeeded(OperationContext* txn,
+    Status _upgradeDatabaseMinorVersionIfNeeded(OperationContext* opCtx,
                                                 const std::string& newPluginName);
 
     // public static helpers
@@ -342,35 +343,35 @@ public:
      * Fills out 'options' in order to indicate whether to allow dups or relax
      * index constraints, as needed by replication.
      */
-    static void prepareInsertDeleteOptions(OperationContext* txn,
+    static void prepareInsertDeleteOptions(OperationContext* opCtx,
                                            const IndexDescriptor* desc,
                                            InsertDeleteOptions* options);
 
 private:
     static const BSONObj _idObj;  // { _id : 1 }
 
-    bool _shouldOverridePlugin(OperationContext* txn, const BSONObj& keyPattern) const;
+    bool _shouldOverridePlugin(OperationContext* opCtx, const BSONObj& keyPattern) const;
 
     /**
      * This differs from IndexNames::findPluginName in that returns the plugin name we *should*
      * use, not the plugin name inside of the provided key pattern.  To understand when these
      * differ, see shouldOverridePlugin.
      */
-    std::string _getAccessMethodName(OperationContext* txn, const BSONObj& keyPattern) const;
+    std::string _getAccessMethodName(OperationContext* opCtx, const BSONObj& keyPattern) const;
 
     void _checkMagic() const;
 
-    Status _indexFilteredRecords(OperationContext* txn,
+    Status _indexFilteredRecords(OperationContext* opCtx,
                                  IndexCatalogEntry* index,
                                  const std::vector<BsonRecord>& bsonRecords,
                                  int64_t* keysInsertedOut);
 
-    Status _indexRecords(OperationContext* txn,
+    Status _indexRecords(OperationContext* opCtx,
                          IndexCatalogEntry* index,
                          const std::vector<BsonRecord>& bsonRecords,
                          int64_t* keysInsertedOut);
 
-    Status _unindexRecord(OperationContext* txn,
+    Status _unindexRecord(OperationContext* opCtx,
                           IndexCatalogEntry* index,
                           const BSONObj& obj,
                           const RecordId& loc,
@@ -380,18 +381,18 @@ private:
     /**
      * this does no sanity checks
      */
-    Status _dropIndex(OperationContext* txn, IndexCatalogEntry* entry);
+    Status _dropIndex(OperationContext* opCtx, IndexCatalogEntry* entry);
 
     // just does disk hanges
     // doesn't change memory state, etc...
-    void _deleteIndexFromDisk(OperationContext* txn,
+    void _deleteIndexFromDisk(OperationContext* opCtx,
                               const std::string& indexName,
                               const std::string& indexNamespace);
 
     // descriptor ownership passes to _setupInMemoryStructures
     // initFromDisk: Avoids registering a change to undo this operation when set to true.
     //               You must set this flag if calling this function outside of a UnitOfWork.
-    IndexCatalogEntry* _setupInMemoryStructures(OperationContext* txn,
+    IndexCatalogEntry* _setupInMemoryStructures(OperationContext* opCtx,
                                                 IndexDescriptor* descriptor,
                                                 bool initFromDisk);
 
@@ -399,13 +400,13 @@ private:
     // conform to the standard for insertion.  This function adds the 'v' field if it didn't
     // exist, removes the '_id' field if it exists, applies plugin-level transformations if
     // appropriate, etc.
-    static StatusWith<BSONObj> _fixIndexSpec(OperationContext* txn,
+    static StatusWith<BSONObj> _fixIndexSpec(OperationContext* opCtx,
                                              Collection* collection,
                                              const BSONObj& spec);
 
-    Status _isSpecOk(OperationContext* txn, const BSONObj& spec) const;
+    Status _isSpecOk(OperationContext* opCtx, const BSONObj& spec) const;
 
-    Status _doesSpecConflictWithExisting(OperationContext* txn, const BSONObj& spec) const;
+    Status _doesSpecConflictWithExisting(OperationContext* opCtx, const BSONObj& spec) const;
 
     int _magic;
     Collection* const _collection;

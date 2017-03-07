@@ -70,7 +70,7 @@ public:
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
         std::string ns = "test.wt";
-        OperationContextNoop txn(newRecoveryUnit().release());
+        OperationContextNoop opCtx(newRecoveryUnit().release());
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
@@ -84,11 +84,11 @@ public:
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
-        invariantWTOK(WiredTigerIndex::Create(&txn, uri, result.getValue()));
+        invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique)
-            return stdx::make_unique<WiredTigerIndexUnique>(&txn, uri, &desc);
-        return stdx::make_unique<WiredTigerIndexStandard>(&txn, uri, &desc);
+            return stdx::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc);
+        return stdx::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

@@ -66,14 +66,14 @@ public:
     static const std::string name;
 
     using Callback = stdx::function<Status(const BSONObj& view)>;
-    virtual Status iterate(OperationContext* txn, Callback callback) {
+    virtual Status iterate(OperationContext* opCtx, Callback callback) {
         ++_iterateCount;
         return Status::OK();
     }
-    virtual void upsert(OperationContext* txn, const NamespaceString& name, const BSONObj& view) {
+    virtual void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view) {
         ++_upsertCount;
     }
-    virtual void remove(OperationContext* txn, const NamespaceString& name) {}
+    virtual void remove(OperationContext* opCtx, const NamespaceString& name) {}
     virtual const std::string& getName() const {
         return name;
     };

@@ -67,16 +67,16 @@ public:
 
     RecordStore* getRecordStore(StringData ns) const override;
 
-    IndexAccessMethod* getIndex(OperationContext* txn,
+    IndexAccessMethod* getIndex(OperationContext* opCtx,
                                 const CollectionCatalogEntry* collection,
                                 IndexCatalogEntry* index) override = 0;
 
-    Status createCollection(OperationContext* txn,
+    Status createCollection(OperationContext* opCtx,
                             StringData ns,
                             const CollectionOptions& options,
                             bool allocateDefaultSpace) override;
 
-    Status renameCollection(OperationContext* txn,
+    Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,
                             StringData toNS,
                             bool stayTemp) override;

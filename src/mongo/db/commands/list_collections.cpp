@@ -111,7 +111,7 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
  *
  * Does not add any information about the system.namespaces collection, or non-existent collections.
  */
-void _addWorkingSetMember(OperationContext* txn,
+void _addWorkingSetMember(OperationContext* opCtx,
                           const BSONObj& maybe,
                           const MatchExpression* matcher,
                           WorkingSet* ws,
@@ -147,7 +147,7 @@ BSONObj buildViewBson(const ViewDefinition& view) {
     return b.obj();
 }
 
-BSONObj buildCollectionBson(OperationContext* txn, const Collection* collection) {
+BSONObj buildCollectionBson(OperationContext* opCtx, const Collection* collection) {
 
     if (!collection) {
         return {};
@@ -162,13 +162,13 @@ BSONObj buildCollectionBson(OperationContext* txn, const Collection* collection)
     b.append("name", collectionName);
     b.append("type", "collection");
 
-    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(txn);
+    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
     b.append("options", options.toBSON());
 
     BSONObj info = BSON("readOnly" << storageGlobalParams.readOnly);
     b.append("info", info);
 
-    auto idIndex = collection->getIndexCatalog()->findIdIndex(txn);
+    auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
     if (idIndex) {
         b.append("idIndex", idIndex->infoObj());
     }
@@ -216,7 +216,7 @@ public:
 
     CmdListCollections() : Command("listCollections") {}
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
              int,
@@ -247,29 +247,29 @@ public:
             return appendCommandStatus(result, parseCursorStatus);
         }
 
-        ScopedTransaction scopedXact(txn, MODE_IS);
-        AutoGetDb autoDb(txn, dbname, MODE_S);
+        ScopedTransaction scopedXact(opCtx, MODE_IS);
+        AutoGetDb autoDb(opCtx, dbname, MODE_S);
 
         Database* db = autoDb.getDb();
 
         auto ws = make_unique<WorkingSet>();
-        auto root = make_unique<QueuedDataStage>(txn, ws.get());
+        auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
 
         if (db) {
             if (auto collNames = _getExactNameMatches(matcher.get())) {
                 for (auto&& collName : *collNames) {
                     auto nss = NamespaceString(db->name(), collName);
                     Collection* collection = db->getCollection(nss);
-                    BSONObj collBson = buildCollectionBson(txn, collection);
+                    BSONObj collBson = buildCollectionBson(opCtx, collection);
                     if (!collBson.isEmpty()) {
-                        _addWorkingSetMember(txn, collBson, matcher.get(), ws.get(), root.get());
+                        _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
                     }
                 }
             } else {
                 for (auto&& collection : *db) {
-                    BSONObj collBson = buildCollectionBson(txn, collection);
+                    BSONObj collBson = buildCollectionBson(opCtx, collection);
                     if (!collBson.isEmpty()) {
-                        _addWorkingSetMember(txn, collBson, matcher.get(), ws.get(), root.get());
+                        _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
                     }
                 }
             }
@@ -279,10 +279,10 @@ public:
                 SimpleBSONObjComparator::kInstance.evaluate(
                     filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
             if (!skipViews) {
-                db->getViewCatalog()->iterate(txn, [&](const ViewDefinition& view) {
+                db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
                     BSONObj viewBson = buildViewBson(view);
                     if (!viewBson.isEmpty()) {
-                        _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
+                        _addWorkingSetMember(opCtx, viewBson, matcher.get(), ws.get(), root.get());
                     }
                 });
             }
@@ -291,7 +291,7 @@ public:
         const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
+            opCtx, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -323,7 +323,7 @@ public:
             auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
                 {exec.release(),
                  cursorNss.ns(),
-                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
             cursorId = pinnedCursor.getCursor()->cursorid();
         }
 

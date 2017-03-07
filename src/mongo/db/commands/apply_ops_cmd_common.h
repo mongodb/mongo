@@ -39,7 +39,7 @@ class Status;
 /**
  * Returns Status::OK if the associated client is authorized to perform the command in cmdObj.
  */
-Status checkAuthForApplyOpsCommand(OperationContext* txn,
+Status checkAuthForApplyOpsCommand(OperationContext* opCtx,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj);
 

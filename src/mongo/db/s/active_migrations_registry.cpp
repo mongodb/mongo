@@ -90,7 +90,7 @@ boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkN
     return boost::none;
 }
 
-BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContext* txn) {
+BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContext* opCtx) {
     boost::optional<NamespaceString> nss;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -106,9 +106,9 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
     // desireable for reporting, and then diagnosing, migrations that are stuck.
     if (nss) {
         // Lock the collection so nothing changes while we're getting the migration report.
-        AutoGetCollection autoColl(txn, nss.get(), MODE_IS);
+        AutoGetCollection autoColl(opCtx, nss.get(), MODE_IS);
 
-        auto css = CollectionShardingState::get(txn, nss.get());
+        auto css = CollectionShardingState::get(opCtx, nss.get());
         if (css && css->getMigrationSourceManager()) {
             return css->getMigrationSourceManager()->getMigrationStatusReport();
         }
@@ -187,9 +187,9 @@ void ScopedRegisterDonateChunk::complete(Status status) {
     _completionNotification->set(status);
 }
 
-Status ScopedRegisterDonateChunk::waitForCompletion(OperationContext* txn) {
+Status ScopedRegisterDonateChunk::waitForCompletion(OperationContext* opCtx) {
     invariant(!_forUnregister);
-    return _completionNotification->get(txn);
+    return _completionNotification->get(opCtx);
 }
 
 ScopedRegisterReceiveChunk::ScopedRegisterReceiveChunk(ActiveMigrationsRegistry* registry)

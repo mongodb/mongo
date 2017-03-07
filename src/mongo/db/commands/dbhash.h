@@ -32,6 +32,6 @@ namespace mongo {
 
 class OperationContext;
 
-void logOpForDbHash(OperationContext* txn, const char* ns);
+void logOpForDbHash(OperationContext* opCtx, const char* ns);
 
 }  // namespace mongo

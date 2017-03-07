@@ -56,17 +56,18 @@ Status ShardingCatalogClientMock::startup() {
     return Status::OK();
 }
 
-void ShardingCatalogClientMock::shutDown(OperationContext* txn) {
+void ShardingCatalogClientMock::shutDown(OperationContext* opCtx) {
     if (_distLockManager) {
-        _distLockManager->shutDown(txn);
+        _distLockManager->shutDown(opCtx);
     }
 }
 
-Status ShardingCatalogClientMock::enableSharding(OperationContext* txn, const std::string& dbName) {
+Status ShardingCatalogClientMock::enableSharding(OperationContext* opCtx,
+                                                 const std::string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::shardCollection(OperationContext* txn,
+Status ShardingCatalogClientMock::shardCollection(OperationContext* opCtx,
                                                   const string& ns,
                                                   const ShardKeyPattern& fieldsAndOrder,
                                                   const BSONObj& defaultCollation,
@@ -76,51 +77,52 @@ Status ShardingCatalogClientMock::shardCollection(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<ShardDrainingStatus> ShardingCatalogClientMock::removeShard(OperationContext* txn,
+StatusWith<ShardDrainingStatus> ShardingCatalogClientMock::removeShard(OperationContext* opCtx,
                                                                        const ShardId& name) {
     return ShardDrainingStatus::COMPLETED;
 }
 
-Status ShardingCatalogClientMock::updateDatabase(OperationContext* txn,
+Status ShardingCatalogClientMock::updateDatabase(OperationContext* opCtx,
                                                  const string& dbName,
                                                  const DatabaseType& db) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabase(
-    OperationContext* txn, const string& dbName) {
+    OperationContext* opCtx, const string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::updateCollection(OperationContext* txn,
+Status ShardingCatalogClientMock::updateCollection(OperationContext* opCtx,
                                                    const string& collNs,
                                                    const CollectionType& coll) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientMock::getCollection(
-    OperationContext* txn, const string& collNs) {
+    OperationContext* opCtx, const string& collNs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getCollections(OperationContext* txn,
+Status ShardingCatalogClientMock::getCollections(OperationContext* opCtx,
                                                  const string* dbName,
                                                  vector<CollectionType>* collections,
                                                  repl::OpTime* optime) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::dropCollection(OperationContext* txn, const NamespaceString& ns) {
+Status ShardingCatalogClientMock::dropCollection(OperationContext* opCtx,
+                                                 const NamespaceString& ns) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getDatabasesForShard(OperationContext* txn,
+Status ShardingCatalogClientMock::getDatabasesForShard(OperationContext* opCtx,
                                                        const ShardId& shardName,
                                                        vector<string>* dbs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getChunks(OperationContext* txn,
+Status ShardingCatalogClientMock::getChunks(OperationContext* opCtx,
                                             const BSONObj& filter,
                                             const BSONObj& sort,
                                             boost::optional<int> limit,
@@ -130,18 +132,18 @@ Status ShardingCatalogClientMock::getChunks(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getTagsForCollection(OperationContext* txn,
+Status ShardingCatalogClientMock::getTagsForCollection(OperationContext* opCtx,
                                                        const string& collectionNs,
                                                        vector<TagsType>* tags) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::getAllShards(
-    OperationContext* txn, repl::ReadConcernLevel readConcern) {
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-bool ShardingCatalogClientMock::runUserManagementWriteCommand(OperationContext* txn,
+bool ShardingCatalogClientMock::runUserManagementWriteCommand(OperationContext* opCtx,
                                                               const string& commandName,
                                                               const string& dbname,
                                                               const BSONObj& cmdObj,
@@ -149,14 +151,14 @@ bool ShardingCatalogClientMock::runUserManagementWriteCommand(OperationContext* 
     return true;
 }
 
-bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* txn,
+bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* opCtx,
                                                              const string& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
     return true;
 }
 
-Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* txn,
+Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* opCtx,
                                                           const BSONArray& updateOps,
                                                           const BSONArray& preCondition,
                                                           const std::string& nss,
@@ -166,14 +168,14 @@ Status ShardingCatalogClientMock::applyChunkOpsDeprecated(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::logAction(OperationContext* txn,
+Status ShardingCatalogClientMock::logAction(OperationContext* opCtx,
                                             const std::string& what,
                                             const std::string& ns,
                                             const BSONObj& detail) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::logChange(OperationContext* txn,
+Status ShardingCatalogClientMock::logChange(OperationContext* opCtx,
                                             const string& what,
                                             const string& ns,
                                             const BSONObj& detail,
@@ -181,21 +183,21 @@ Status ShardingCatalogClientMock::logChange(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* txn,
+StatusWith<BSONObj> ShardingCatalogClientMock::getGlobalSettings(OperationContext* opCtx,
                                                                  StringData key) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
 StatusWith<VersionType> ShardingCatalogClientMock::getConfigVersion(
-    OperationContext* txn, repl::ReadConcernLevel readConcern) {
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-void ShardingCatalogClientMock::writeConfigServerDirect(OperationContext* txn,
+void ShardingCatalogClientMock::writeConfigServerDirect(OperationContext* opCtx,
                                                         const BatchedCommandRequest& request,
                                                         BatchedCommandResponse* response) {}
 
-Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* txn,
+Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* opCtx,
                                                        const std::string& ns,
                                                        const BSONObj& doc,
                                                        const WriteConcernOptions& writeConcern) {
@@ -203,7 +205,7 @@ Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* txn,
 }
 
 StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const std::string& ns,
     const BSONObj& query,
     const BSONObj& update,
@@ -212,14 +214,15 @@ StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* txn,
+Status ShardingCatalogClientMock::removeConfigDocuments(OperationContext* opCtx,
                                                         const std::string& ns,
                                                         const BSONObj& query,
                                                         const WriteConcernOptions& writeConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::createDatabase(OperationContext* txn, const std::string& dbName) {
+Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
+                                                 const std::string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -228,7 +231,7 @@ DistLockManager* ShardingCatalogClientMock::getDistLockManager() {
 }
 
 Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(
-    OperationContext* txn, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
+    OperationContext* opCtx, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
     return Status::OK();
 }
 

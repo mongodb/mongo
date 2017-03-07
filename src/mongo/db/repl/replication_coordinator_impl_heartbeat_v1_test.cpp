@@ -138,10 +138,10 @@ TEST_F(ReplCoordHBV1Test,
     noi = net->getNextReadyRequest();
 
     assertMemberState(MemberState::RS_STARTUP2);
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     ReplSetConfig storedConfig;
     ASSERT_OK(storedConfig.initialize(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&txn))));
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx))));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -207,10 +207,10 @@ TEST_F(ReplCoordHBV1Test,
     noi = net->getNextReadyRequest();
 
     assertMemberState(MemberState::RS_ARBITER);
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     ReplSetConfig storedConfig;
     ASSERT_OK(storedConfig.initialize(
-        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&txn))));
+        unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx))));
     ASSERT_OK(storedConfig.validate());
     ASSERT_EQUALS(3, storedConfig.getConfigVersion());
     ASSERT_EQUALS(3, storedConfig.getNumMembers());
@@ -276,9 +276,9 @@ TEST_F(ReplCoordHBV1Test,
     noi = net->getNextReadyRequest();
 
     assertMemberState(MemberState::RS_STARTUP, "2");
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
 
-    StatusWith<BSONObj> loadedConfig(getExternalState()->loadLocalConfigDocument(&txn));
+    StatusWith<BSONObj> loadedConfig(getExternalState()->loadLocalConfigDocument(&opCtx));
     ASSERT_NOT_OK(loadedConfig.getStatus()) << loadedConfig.getValue();
     exitNetwork();
 }

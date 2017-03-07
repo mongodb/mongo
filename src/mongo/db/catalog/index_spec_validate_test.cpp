@@ -790,11 +790,11 @@ TEST(IdIndexSpecValidateTest, ReturnsOKStatusIfAllFieldsAllowedForIdIndex) {
 
 TEST(IndexSpecCollationValidateTest, FillsInFullCollationSpec) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     const CollatorInterface* defaultCollator = nullptr;
 
-    auto result = validateIndexSpecCollation(txn.get(),
+    auto result = validateIndexSpecCollation(opCtx.get(),
                                              BSON("key" << BSON("field" << 1) << "name"
                                                         << "indexName"
                                                         << "ns"
@@ -840,11 +840,11 @@ TEST(IndexSpecCollationValidateTest, FillsInFullCollationSpec) {
 
 TEST(IndexSpecCollationValidateTest, RemovesCollationFieldIfSimple) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     const CollatorInterface* defaultCollator = nullptr;
 
-    auto result = validateIndexSpecCollation(txn.get(),
+    auto result = validateIndexSpecCollation(opCtx.get(),
                                              BSON("key" << BSON("field" << 1) << "name"
                                                         << "indexName"
                                                         << "ns"
@@ -869,11 +869,11 @@ TEST(IndexSpecCollationValidateTest, RemovesCollationFieldIfSimple) {
 
 TEST(IndexSpecCollationValidateTest, FillsInCollationFieldWithCollectionDefaultIfNotPresent) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     const CollatorInterfaceMock defaultCollator(CollatorInterfaceMock::MockType::kReverseString);
 
-    auto result = validateIndexSpecCollation(txn.get(),
+    auto result = validateIndexSpecCollation(opCtx.get(),
                                              BSON("key" << BSON("field" << 1) << "name"
                                                         << "indexName"
                                                         << "ns"

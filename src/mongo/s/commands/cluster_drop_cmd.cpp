@@ -72,7 +72,7 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -80,7 +80,7 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
-        auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, dbname);
+        auto scopedDbStatus = ScopedShardDatabase::getExisting(opCtx, dbname);
         if (scopedDbStatus == ErrorCodes::NamespaceNotFound) {
             return true;
         }
@@ -90,9 +90,9 @@ public:
         auto const db = scopedDbStatus.getValue().db();
 
         if (!db->isSharded(nss.ns())) {
-            _dropUnshardedCollectionFromShard(txn, db->getPrimaryId(), nss, &result);
+            _dropUnshardedCollectionFromShard(opCtx, db->getPrimaryId(), nss, &result);
         } else {
-            uassertStatusOK(Grid::get(txn)->catalogClient(txn)->dropCollection(txn, nss));
+            uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->dropCollection(opCtx, nss));
             db->markNSNotSharded(nss.ns());
         }
 
@@ -104,13 +104,13 @@ private:
      * Sends the 'drop' command for the specified collection to the specified shard. Throws
      * DBException on failure.
      */
-    static void _dropUnshardedCollectionFromShard(OperationContext* txn,
+    static void _dropUnshardedCollectionFromShard(OperationContext* opCtx,
                                                   const ShardId& shardId,
                                                   const NamespaceString& nss,
                                                   BSONObjBuilder* result) {
-        const auto shardRegistry = Grid::get(txn)->shardRegistry();
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-        const auto dropCommandBSON = [shardRegistry, txn, &shardId, &nss] {
+        const auto dropCommandBSON = [shardRegistry, opCtx, &shardId, &nss] {
             BSONObjBuilder builder;
             builder.append("drop", nss.coll());
 
@@ -121,17 +121,17 @@ private:
                 ChunkVersion::UNSHARDED().appendForCommands(&builder);
             }
 
-            if (!txn->getWriteConcern().usedDefault) {
+            if (!opCtx->getWriteConcern().usedDefault) {
                 builder.append(WriteConcernOptions::kWriteConcernField,
-                               txn->getWriteConcern().toBSON());
+                               opCtx->getWriteConcern().toBSON());
             }
 
             return builder.obj();
         }();
 
-        const auto shard = uassertStatusOK(shardRegistry->getShard(txn, shardId));
+        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
         auto cmdDropResult = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-            txn,
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             nss.db().toString(),
             dropCommandBSON,

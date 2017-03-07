@@ -89,21 +89,21 @@ public:
         return _supportsDocLocking;
     }
 
-    virtual Status closeDatabase(OperationContext* txn, StringData db);
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db);
 
-    virtual Status dropDatabase(OperationContext* txn, StringData db);
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db);
 
-    virtual int flushAllFiles(OperationContext* txn, bool sync);
+    virtual int flushAllFiles(OperationContext* opCtx, bool sync);
 
-    virtual Status beginBackup(OperationContext* txn);
+    virtual Status beginBackup(OperationContext* opCtx);
 
-    virtual void endBackup(OperationContext* txn);
+    virtual void endBackup(OperationContext* opCtx);
 
     virtual bool isDurable() const;
 
     virtual bool isEphemeral() const;
 
-    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns);
+    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns);
 
     virtual void cleanShutdown();
 

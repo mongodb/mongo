@@ -40,7 +40,9 @@ public:
     ClusterKillCursorsCmd() = default;
 
 private:
-    Status _killCursor(OperationContext* txn, const NamespaceString& nss, CursorId cursorId) final {
+    Status _killCursor(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       CursorId cursorId) final {
         return grid.getCursorManager()->killCursor(nss, cursorId);
     }
 } clusterKillCursorsCmd;

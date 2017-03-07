@@ -60,7 +60,7 @@ public:
 
 protected:
     friend class GeoHaystackSearchCommand;
-    void searchCommand(OperationContext* txn,
+    void searchCommand(OperationContext* opCtx,
                        Collection* collection,
                        const BSONObj& nearObj,
                        double maxDistance,

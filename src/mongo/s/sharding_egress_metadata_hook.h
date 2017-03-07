@@ -46,7 +46,7 @@ public:
     virtual ~ShardingEgressMetadataHook() = default;
 
     Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
-    Status writeRequestMetadata(OperationContext* txn,
+    Status writeRequestMetadata(OperationContext* opCtx,
                                 const HostAndPort& target,
                                 BSONObjBuilder* metadataBob) override;
 
@@ -57,7 +57,7 @@ public:
     // contact.
     Status readReplyMetadata(const StringData replySource, const BSONObj& metadataObj);
     Status writeRequestMetadata(bool shardedConnection,
-                                OperationContext* txn,
+                                OperationContext* opCtx,
                                 const StringData target,
                                 BSONObjBuilder* metadataBob);
 

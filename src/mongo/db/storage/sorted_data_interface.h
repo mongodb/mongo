@@ -75,18 +75,19 @@ public:
      * Implementations can assume that 'this' index outlives its bulk
      * builder.
      *
-     * @param txn the transaction under which keys are added to 'this' index
+     * @param opCtx the transaction under which keys are added to 'this' index
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      *
      * @return caller takes ownership
      */
-    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) = 0;
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
+                                                       bool dupsAllowed) = 0;
 
     /**
      * Insert an entry into the index with the specified key and RecordId.
      *
-     * @param txn the transaction under which the insert takes place
+     * @param opCtx the transaction under which the insert takes place
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      *
@@ -95,7 +96,7 @@ public:
      *         ErrorCodes::DuplicateKey if 'key' already exists in 'this' index
      *         at a RecordId other than 'loc' and duplicates were not allowed
      */
-    virtual Status insert(OperationContext* txn,
+    virtual Status insert(OperationContext* opCtx,
                           const BSONObj& key,
                           const RecordId& loc,
                           bool dupsAllowed) = 0;
@@ -103,11 +104,11 @@ public:
     /**
      * Remove the entry from the index with the specified key and RecordId.
      *
-     * @param txn the transaction under which the remove takes place
+     * @param opCtx the transaction under which the remove takes place
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      */
-    virtual void unindex(OperationContext* txn,
+    virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
                          const RecordId& loc,
                          bool dupsAllowed) = 0;
@@ -116,17 +117,19 @@ public:
      * Return ErrorCodes::DuplicateKey if 'key' already exists in 'this'
      * index at a RecordId other than 'loc', and Status::OK() otherwise.
      *
-     * @param txn the transaction under which this operation takes place
+     * @param opCtx the transaction under which this operation takes place
      *
      * TODO: Hide this by exposing an update method?
      */
-    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) = 0;
+    virtual Status dupKeyCheck(OperationContext* opCtx,
+                               const BSONObj& key,
+                               const RecordId& loc) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
      * indexed record store supports compaction-in-place.
      */
-    virtual Status compact(OperationContext* txn) {
+    virtual Status compact(OperationContext* opCtx) {
         return Status::OK();
     }
 
@@ -137,11 +140,11 @@ public:
     /**
      * TODO: expose full set of args for testing?
      */
-    virtual void fullValidate(OperationContext* txn,
+    virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const = 0;
 
-    virtual bool appendCustomStats(OperationContext* txn,
+    virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const = 0;
 
@@ -149,16 +152,16 @@ public:
     /**
      * Return the number of bytes consumed by 'this' index.
      *
-     * @param txn the transaction under which this operation takes place
+     * @param opCtx the transaction under which this operation takes place
      *
      * @see IndexAccessMethod::getSpaceUsedBytes
      */
-    virtual long long getSpaceUsedBytes(OperationContext* txn) const = 0;
+    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const = 0;
 
     /**
      * Return true if 'this' index is empty, and false otherwise.
      */
-    virtual bool isEmpty(OperationContext* txn) = 0;
+    virtual bool isEmpty(OperationContext* opCtx) = 0;
 
     /**
      * Attempt to bring the entirety of 'this' index into memory.
@@ -168,7 +171,7 @@ public:
      *
      * @return Status::OK()
      */
-    virtual Status touch(OperationContext* txn) const {
+    virtual Status touch(OperationContext* opCtx) const {
         return Status(ErrorCodes::CommandNotSupported,
                       "this storage engine does not support touch");
     }
@@ -179,9 +182,9 @@ public:
      * The default implementation should be overridden with a more
      * efficient one if at all possible.
      */
-    virtual long long numEntries(OperationContext* txn) const {
+    virtual long long numEntries(OperationContext* opCtx) const {
         long long x = -1;
-        fullValidate(txn, &x, NULL);
+        fullValidate(opCtx, &x, NULL);
         return x;
     }
 
@@ -357,7 +360,7 @@ public:
      *
      * Implementations can assume that 'this' index outlives all cursors it produces.
      */
-    virtual std::unique_ptr<Cursor> newCursor(OperationContext* txn,
+    virtual std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
                                               bool isForward = true) const = 0;
 
     /**
@@ -374,7 +377,7 @@ public:
      * Implementations should avoid obvious biases toward older, newer, larger smaller or other
      * specific classes of entries.
      */
-    virtual std::unique_ptr<Cursor> newRandomCursor(OperationContext* txn) const {
+    virtual std::unique_ptr<Cursor> newRandomCursor(OperationContext* opCtx) const {
         return {};
     }
 
@@ -382,7 +385,7 @@ public:
     // Index creation
     //
 
-    virtual Status initAsEmpty(OperationContext* txn) = 0;
+    virtual Status initAsEmpty(OperationContext* opCtx) = 0;
 };
 
 /**

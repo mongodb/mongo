@@ -101,7 +101,7 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    virtual Status explain(OperationContext* txn,
+    virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
@@ -122,7 +122,7 @@ public:
         }
 
         // Acquire the db read lock.
-        AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
+        AutoGetCollectionOrViewForRead ctx(opCtx, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -135,7 +135,7 @@ public:
 
             std::string errmsg;
             (void)Command::findCommand("aggregate")
-                ->run(txn, dbname, viewAggregation.getValue(), 0, errmsg, *out);
+                ->run(opCtx, dbname, viewAggregation.getValue(), 0, errmsg, *out);
             return Status::OK();
         }
 
@@ -143,7 +143,7 @@ public:
         // version on initial entry into count.
         RangePreserver preserver(collection);
 
-        auto statusWithPlanExecutor = getExecutorCount(txn,
+        auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
                                                        request.getValue(),
                                                        true,  // explain
@@ -158,7 +158,7 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -180,7 +180,7 @@ public:
                        "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
-        AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
+        AutoGetCollectionOrViewForRead ctx(opCtx, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -193,7 +193,7 @@ public:
 
             BSONObjBuilder aggResult;
             (void)Command::findCommand("aggregate")
-                ->run(txn, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+                ->run(opCtx, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
 
             if (ResolvedView::isResolvedViewErrorResponse(aggResult.asTempObj())) {
                 result.appendElements(aggResult.obj());
@@ -212,7 +212,7 @@ public:
         // version on initial entry into count.
         RangePreserver preserver(collection);
 
-        auto statusWithPlanExecutor = getExecutorCount(txn,
+        auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
                                                        request.getValue(),
                                                        false,  // !explain
@@ -224,9 +224,9 @@ public:
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
-        auto curOp = CurOp::get(txn);
+        auto curOp = CurOp::get(opCtx);
         {
-            stdx::lock_guard<Client> lk(*txn->getClient());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
 
@@ -238,7 +238,7 @@ public:
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);
         if (collection) {
-            collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+            collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 

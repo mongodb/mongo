@@ -81,9 +81,9 @@ DatabaseHolder& dbHolder() {
 }
 
 
-Database* DatabaseHolder::get(OperationContext* txn, StringData ns) const {
+Database* DatabaseHolder::get(OperationContext* opCtx, StringData ns) const {
     const StringData db = _todb(ns);
-    invariant(txn->lockState()->isDbLockedForMode(db, MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
     DBs::const_iterator it = _dbs.find(db);
@@ -110,9 +110,9 @@ std::set<std::string> DatabaseHolder::getNamesWithConflictingCasing(StringData n
     return _getNamesWithConflictingCasing_inlock(name);
 }
 
-Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* justCreated) {
+Database* DatabaseHolder::openDb(OperationContext* opCtx, StringData ns, bool* justCreated) {
     const StringData dbname = _todb(ns);
-    invariant(txn->lockState()->isDbLockedForMode(dbname, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_X));
 
     if (justCreated)
         *justCreated = false;  // Until proven otherwise.
@@ -148,7 +148,7 @@ Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* jus
     // different databases for the same name.
     lk.unlock();
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-    DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
+    DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(opCtx, dbname);
 
     if (!entry->exists()) {
         audit::logCreateDatabase(&cc(), dbname);
@@ -156,7 +156,7 @@ Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* jus
             *justCreated = true;
     }
 
-    auto newDb = stdx::make_unique<Database>(txn, dbname, entry);
+    auto newDb = stdx::make_unique<Database>(opCtx, dbname, entry);
 
     // Finally replace our nullptr entry with the new Database pointer.
     removeDbGuard.Dismiss();
@@ -169,8 +169,8 @@ Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* jus
     return it->second;
 }
 
-void DatabaseHolder::close(OperationContext* txn, StringData ns) {
-    invariant(txn->lockState()->isW());
+void DatabaseHolder::close(OperationContext* opCtx, StringData ns) {
+    invariant(opCtx->lockState()->isW());
 
     const StringData dbName = _todb(ns);
 
@@ -181,15 +181,15 @@ void DatabaseHolder::close(OperationContext* txn, StringData ns) {
         return;
     }
 
-    it->second->close(txn);
+    it->second->close(opCtx);
     delete it->second;
     _dbs.erase(it);
 
-    getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
+    getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(opCtx, dbName.toString());
 }
 
-bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, bool force) {
-    invariant(txn->lockState()->isW());
+bool DatabaseHolder::closeAll(OperationContext* opCtx, BSONObjBuilder& result, bool force) {
+    invariant(opCtx->lockState()->isW());
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
@@ -213,12 +213,12 @@ bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, boo
         }
 
         Database* db = _dbs[name];
-        db->close(txn);
+        db->close(opCtx);
         delete db;
 
         _dbs.erase(name);
 
-        getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(txn, name);
+        getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(opCtx, name);
 
         bb.append(name);
     }

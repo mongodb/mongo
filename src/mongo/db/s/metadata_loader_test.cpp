@@ -238,10 +238,10 @@ TEST_F(MetadataLoaderTest, NoChunksIsDropped) {
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
@@ -272,10 +272,10 @@ TEST_F(MetadataLoaderTest, CheckNumChunk) {
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
@@ -299,10 +299,10 @@ TEST_F(MetadataLoaderTest, SingleChunkCheckNumChunk) {
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
@@ -326,10 +326,10 @@ TEST_F(MetadataLoaderTest, SeveralChunksCheckNumChunks) {
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
@@ -353,10 +353,10 @@ TEST_F(MetadataLoaderTest, CollectionMetadataSetUp) {
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),

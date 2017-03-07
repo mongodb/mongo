@@ -99,7 +99,7 @@ public:
      * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
      * must called *before* the provided RecordId is about to be deleted or mutated.
      */
-    void invalidateDocument(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void invalidateDocument(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
 
     /**
      * Destroys cursors that have been inactive for too long.
@@ -151,7 +151,7 @@ public:
      *
      * If 'shouldAudit' is true, will perform audit logging.
      */
-    Status eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit);
+    Status eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
 
     /**
      * Returns true if the space of cursor ids that cursor manager is responsible for includes
@@ -172,17 +172,17 @@ public:
 
     static CursorManager* getGlobalCursorManager();
 
-    static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, const char* ids);
+    static int eraseCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
-    static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
+    static bool eraseCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
 
-    static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
+    static bool eraseCursorGlobal(OperationContext* opCtx, CursorId id);
 
     /**
      * Deletes inactive cursors from the global cursor manager and from all per-collection cursor
      * managers. Returns the number of cursors that were timed out.
      */
-    static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
+    static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, int millisSinceLastCall);
 
 private:
     friend class ClientCursorPin;

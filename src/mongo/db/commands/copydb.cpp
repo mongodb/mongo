@@ -114,7 +114,7 @@ public:
              << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -122,7 +122,7 @@ public:
                      BSONObjBuilder& result) {
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
-            maybeDisableValidation.emplace(txn);
+            maybeDisableValidation.emplace(opCtx);
 
         string fromhost = cmdObj.getStringField("fromhost");
         bool fromSelf = fromhost.empty();
@@ -171,7 +171,7 @@ public:
         string nonce = cmdObj.getStringField("nonce");
         string key = cmdObj.getStringField("key");
 
-        auto& authConn = CopyDbAuthConnection::forClient(txn->getClient());
+        auto& authConn = CopyDbAuthConnection::forClient(opCtx->getClient());
 
         if (!username.empty() && !nonce.empty() && !key.empty()) {
             uassert(13008, "must call copydbgetnonce first", authConn.get());
@@ -226,13 +226,13 @@ public:
 
         if (fromSelf) {
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
-            uassertStatusOK(cloner.copyDb(txn, todb, fromhost, cloneOptions, NULL));
+            ScopedTransaction transaction(opCtx, MODE_X);
+            Lock::GlobalWrite lk(opCtx->lockState());
+            uassertStatusOK(cloner.copyDb(opCtx, todb, fromhost, cloneOptions, NULL));
         } else {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), todb, MODE_X);
-            uassertStatusOK(cloner.copyDb(txn, todb, fromhost, cloneOptions, NULL));
+            ScopedTransaction transaction(opCtx, MODE_IX);
+            Lock::DBLock lk(opCtx->lockState(), todb, MODE_X);
+            uassertStatusOK(cloner.copyDb(opCtx, todb, fromhost, cloneOptions, NULL));
         }
 
         return true;

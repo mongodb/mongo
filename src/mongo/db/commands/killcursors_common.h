@@ -70,7 +70,7 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) final;
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -79,12 +79,12 @@ public:
 
 private:
     /**
-     * Kill the cursor with id 'cursorId' in namespace 'nss'. Use 'txn' if necessary.
+     * Kill the cursor with id 'cursorId' in namespace 'nss'. Use 'opCtx' if necessary.
      *
      * Returns Status::OK() if the cursor was killed, or ErrorCodes::CursorNotFound if there is no
      * such cursor, or ErrorCodes::OperationFailed if the cursor cannot be killed.
      */
-    virtual Status _killCursor(OperationContext* txn,
+    virtual Status _killCursor(OperationContext* opCtx,
                                const NamespaceString& nss,
                                CursorId cursorId) = 0;
 };

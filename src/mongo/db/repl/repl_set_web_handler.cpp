@@ -51,7 +51,7 @@ public:
         return str::startsWith(url, "/_replSet");
     }
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,
                         const std::string& url,
                         BSONObj params,
@@ -59,12 +59,12 @@ public:
                         int& responseCode,
                         std::vector<std::string>& headers,
                         const SockAddr& from) {
-        responseMsg = _replSet(txn);
+        responseMsg = _replSet(opCtx);
         responseCode = 200;
     }
 
     /* /_replSet show replica set status in html format */
-    std::string _replSet(OperationContext* txn) {
+    std::string _replSet(OperationContext* opCtx) {
         std::stringstream s;
         s << start("Replica Set Status " + prettyHostName());
         s << p(a("/", "back", "Home") + " | " +

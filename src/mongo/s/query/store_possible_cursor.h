@@ -57,7 +57,7 @@ class TaskExecutor;
  * BSONObj response document describing the newly-created cursor, which is suitable for returning to
  * the client.
  */
-StatusWith<BSONObj> storePossibleCursor(OperationContext* txn,
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,

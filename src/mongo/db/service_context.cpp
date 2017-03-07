@@ -315,7 +315,7 @@ void ServiceContext::killOperation(OperationContext* opCtx, ErrorCodes::Error ki
     }
 }
 
-void ServiceContext::killAllUserOperations(const OperationContext* txn,
+void ServiceContext::killAllUserOperations(const OperationContext* opCtx,
                                            ErrorCodes::Error killCode) {
     for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
         if (!client->isFromUserConnection()) {
@@ -327,7 +327,7 @@ void ServiceContext::killAllUserOperations(const OperationContext* txn,
         OperationContext* toKill = client->getOperationContext();
 
         // Don't kill ourself.
-        if (toKill && toKill->getOpID() != txn->getOpID()) {
+        if (toKill && toKill->getOpID() != opCtx->getOpID()) {
             killOperation(toKill, killCode);
         }
     }

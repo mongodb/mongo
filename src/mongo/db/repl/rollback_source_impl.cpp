@@ -68,7 +68,7 @@ BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& f
     return _getConnection()->findOne(nss.toString(), filter, NULL, QueryOption_SlaveOk).getOwned();
 }
 
-void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* txn,
+void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* opCtx,
                                                   const NamespaceString& nss) const {
     std::string errmsg;
     std::unique_ptr<DBClientConnection> tmpConn(new DBClientConnection());
@@ -82,7 +82,7 @@ void RollbackSourceImpl::copyCollectionFromRemote(OperationContext* txn,
     uassert(15909,
             str::stream() << "replSet rollback error resyncing collection " << nss.ns() << ' '
                           << errmsg,
-            cloner.copyCollection(txn, nss.ns(), BSONObj(), errmsg, true));
+            cloner.copyCollection(opCtx, nss.ns(), BSONObj(), errmsg, true));
 }
 
 StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfo(const NamespaceString& nss) const {

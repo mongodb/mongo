@@ -63,7 +63,7 @@ public:
      * The object pointed to by "request" must stay in scope for the life of the constructed
      * ParsedDelete.
      */
-    ParsedDelete(OperationContext* txn, const DeleteRequest* request);
+    ParsedDelete(OperationContext* opCtx, const DeleteRequest* request);
 
     /**
      * Parses the delete request to a canonical query. On success, the parsed delete can be
@@ -106,7 +106,7 @@ public:
 
 private:
     // Transactional context.  Not owned by us.
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // Unowned pointer to the request object that this executor will process.
     const DeleteRequest* const _request;

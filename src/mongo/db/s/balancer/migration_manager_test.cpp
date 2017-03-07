@@ -78,7 +78,7 @@ protected:
     /**
      * Returns the mock targeter for the specified shard. Useful to use like so
      *
-     *     shardTargeterMock(txn, shardId)->setFindHostReturnValue(shardHost);
+     *     shardTargeterMock(opCtx, shardId)->setFindHostReturnValue(shardHost);
      *
      * Then calls to RemoteCommandTargeterMock::findHost will return HostAndPort "shardHost" for
      * Shard "shardId".
@@ -86,7 +86,7 @@ protected:
      * Scheduling a command requires a shard host target. The command will be caught by the mock
      * network, but sending the command requires finding the shard's host.
      */
-    std::shared_ptr<RemoteCommandTargeterMock> shardTargeterMock(OperationContext* txn,
+    std::shared_ptr<RemoteCommandTargeterMock> shardTargeterMock(OperationContext* opCtx,
                                                                  ShardId shardId);
 
     /**
@@ -174,9 +174,9 @@ void MigrationManagerTest::tearDown() {
 }
 
 std::shared_ptr<RemoteCommandTargeterMock> MigrationManagerTest::shardTargeterMock(
-    OperationContext* txn, ShardId shardId) {
+    OperationContext* opCtx, ShardId shardId) {
     return RemoteCommandTargeterMock::get(
-        uassertStatusOK(shardRegistry()->getShard(txn, shardId))->getTargeter());
+        uassertStatusOK(shardRegistry()->getShard(opCtx, shardId))->getTargeter());
 }
 
 void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardId primaryShard) {
@@ -315,15 +315,15 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
     auto future = launchAsync([this, migrationRequests] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding a host to which to send the command.
         // Set up dummy hosts for the source shards.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
-            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
+            opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
             ASSERT_OK(migrationStatuses.at(migrateInfo.getName()));
@@ -378,15 +378,15 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
     auto future = launchAsync([this, migrationRequests] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding a host to which to send the command.
         // Set up dummy hosts for the source shards.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
-            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
+            opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         for (const auto& migrateInfo : migrationRequests) {
             ASSERT_OK(migrationStatuses.at(migrateInfo.getName()));
@@ -433,17 +433,17 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
     auto future = launchAsync([this, chunk1, chunk2, migrationRequests] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
         // up a dummy host for kShardHost0, and return an error for kShardHost3.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(txn.get(), kShardId2)
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId2)
             ->setFindHostReturnValue(
                 Status(ErrorCodes::ReplicaSetNotFound, "SourceShardNotFound generated error."));
 
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
-            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
+            opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         ASSERT_OK(migrationStatuses.at(chunk1.getName()));
         ASSERT_EQ(ErrorCodes::ReplicaSetNotFound, migrationStatuses.at(chunk2.getName()));
@@ -480,14 +480,14 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
     auto future = launchAsync([this, chunk1, migrationRequests] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
         // up a dummy host for kShardHost0.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
-            txn.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
+            opCtx.get(), migrationRequests, 0, kDefaultSecondaryThrottle, false);
 
         ASSERT_EQ(ErrorCodes::ChunkTooBig, migrationStatuses.at(chunk1.getName()));
     });
@@ -519,15 +519,15 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
     auto future = launchAsync([&] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
         // up a dummy host for kShardHost0.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
         ASSERT_EQ(ErrorCodes::BalancerInterrupted,
                   _migrationManager->executeManualMigration(
-                      txn.get(), {kShardId1, chunk}, 0, kDefaultSecondaryThrottle, false));
+                      opCtx.get(), {kShardId1, chunk}, 0, kDefaultSecondaryThrottle, false));
     });
 
     // Wait till the move chunk request gets sent and pretend that it is stuck by never responding
@@ -608,14 +608,14 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     auto future = launchAsync([&] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling a moveChunk command requires finding a host to which to send the command. Set
         // up a dummy host for kShardHost0.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
 
         ASSERT_OK(_migrationManager->executeManualMigration(
-            txn.get(), {kShardId1, chunk1}, 0, kDefaultSecondaryThrottle, false));
+            opCtx.get(), {kShardId1, chunk1}, 0, kDefaultSecondaryThrottle, false));
     });
 
     // Expect only one moveChunk command to be called.
@@ -663,14 +663,14 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding hosts to which to send the commands.
         // Set up dummy hosts for the source shards.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        _migrationManager->finishRecovery(txn.get(), 0, kDefaultSecondaryThrottle);
+        _migrationManager->finishRecovery(opCtx.get(), 0, kDefaultSecondaryThrottle);
     });
 
     // Expect two moveChunk commands.
@@ -765,15 +765,15 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
     auto future = launchAsync([&] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
-        auto txn = cc().makeOperationContext();
+        auto opCtx = cc().makeOperationContext();
 
         // Scheduling the moveChunk commands requires finding a host to which to send the command.
         // Set up dummy hosts for the source shards.
-        shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
-        shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
         MigrationStatuses migrationStatuses = _migrationManager->executeMigrationsForAutoBalance(
-            txn.get(),
+            opCtx.get(),
             {{kShardId1, chunk1}, {kShardId3, chunk2}},
             0,
             kDefaultSecondaryThrottle,

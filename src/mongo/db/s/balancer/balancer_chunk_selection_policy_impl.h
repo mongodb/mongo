@@ -39,15 +39,15 @@ public:
     BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats);
     ~BalancerChunkSelectionPolicyImpl();
 
-    StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* txn) override;
+    StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) override;
 
-    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* txn,
+    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
                                                      bool aggressiveBalanceHint) override;
 
     StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
-        OperationContext* txn, const ChunkType& chunk) override;
+        OperationContext* opCtx, const ChunkType& chunk) override;
 
-    Status checkMoveAllowed(OperationContext* txn,
+    Status checkMoveAllowed(OperationContext* opCtx,
                             const ChunkType& chunk,
                             const ShardId& newShardId) override;
 
@@ -57,14 +57,16 @@ private:
      * figure out whether some of them validate the tag range boundaries and need to be split.
      */
     StatusWith<SplitInfoVector> _getSplitCandidatesForCollection(
-        OperationContext* txn, const NamespaceString& nss, const ShardStatisticsVector& shardStats);
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ShardStatisticsVector& shardStats);
 
     /**
      * Synchronous method, which iterates the collection's chunks and uses the cluster statistics to
      * figure out where to place them.
      */
     StatusWith<MigrateInfoVector> _getMigrateCandidatesForCollection(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
         bool aggressiveBalanceHint);

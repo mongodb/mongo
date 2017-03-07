@@ -142,27 +142,27 @@ protected:
         executor::ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
 
-        _storageInterface.createOplogFn = [this](OperationContext* txn,
+        _storageInterface.createOplogFn = [this](OperationContext* opCtx,
                                                  const NamespaceString& nss) {
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
         _storageInterface.insertDocumentFn =
-            [this](OperationContext* txn, const NamespaceString& nss, const BSONObj& doc) {
+            [this](OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
                 ++_storageInterfaceWorkDone.documentsInsertedCount;
                 return Status::OK();
             };
         _storageInterface.insertDocumentsFn = [this](
-            OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
+            OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
             _storageInterfaceWorkDone.insertedOplogEntries = true;
             ++_storageInterfaceWorkDone.oplogEntriesInserted;
             return Status::OK();
         };
-        _storageInterface.dropCollFn = [this](OperationContext* txn, const NamespaceString& nss) {
+        _storageInterface.dropCollFn = [this](OperationContext* opCtx, const NamespaceString& nss) {
             _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns());
             return Status::OK();
         };
-        _storageInterface.dropUserDBsFn = [this](OperationContext* txn) {
+        _storageInterface.dropUserDBsFn = [this](OperationContext* opCtx) {
             _storageInterfaceWorkDone.droppedUserDBs = true;
             return Status::OK();
         };
@@ -728,9 +728,9 @@ TEST_F(DBsClonerTest, DatabaseClonerChecksAdminDbUsingStorageInterfaceAfterCopyi
     bool isAdminDbValidFnCalled = false;
     OperationContext* isAdminDbValidFnOpCtx = nullptr;
     _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled,
-                                          &isAdminDbValidFnOpCtx](OperationContext* txn) {
+                                          &isAdminDbValidFnOpCtx](OperationContext* opCtx) {
         isAdminDbValidFnCalled = true;
-        isAdminDbValidFnOpCtx = txn;
+        isAdminDbValidFnOpCtx = opCtx;
         return Status::OK();
     };
 
@@ -770,7 +770,7 @@ TEST_F(DBsClonerTest, AdminDbValidationErrorShouldAbortTheCloner) {
     Status result = getDetectableErrorStatus();
 
     bool isAdminDbValidFnCalled = false;
-    _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled](OperationContext* txn) {
+    _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled](OperationContext* opCtx) {
         isAdminDbValidFnCalled = true;
         return Status(ErrorCodes::OperationFailed, "admin db invalid");
     };

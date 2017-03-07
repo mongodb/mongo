@@ -65,7 +65,7 @@ public:
         return getGlobalServiceContext();
     }
     OperationContext* getOpCtx() {
-        return _txn.get();
+        return _opCtx.get();
     }
 
 protected:
@@ -82,12 +82,12 @@ private:
             stdx::make_unique<mongo::repl::ReplicationCoordinatorMock>(getServiceContext(),
                                                                        replSettings));
         _client = getServiceContext()->makeClient("RangeDeleterTest");
-        _txn = _client->makeOperationContext();
+        _opCtx = _client->makeOperationContext();
         deleter.startWorkers();
     }
 
     ServiceContext::UniqueClient _client;
-    ServiceContext::UniqueOperationContext _txn;
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 using ImmediateDelete = RangeDeleterTest;

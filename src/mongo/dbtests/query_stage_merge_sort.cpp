@@ -57,20 +57,20 @@ using stdx::make_unique;
 
 class QueryStageMergeSortTestBase {
 public:
-    QueryStageMergeSortTestBase() : _client(&_txn) {}
+    QueryStageMergeSortTestBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageMergeSortTestBase() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         _client.dropCollection(ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
     IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
         std::vector<IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 
@@ -83,7 +83,7 @@ public:
     }
 
     void getRecordIds(set<RecordId>* out, Collection* coll) {
-        auto cursor = coll->getCursor(&_txn);
+        auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
         }
@@ -109,7 +109,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;
@@ -120,12 +120,12 @@ private:
 class QueryStageMergeSortPrefixIndex : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -146,7 +146,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -156,17 +156,17 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -191,12 +191,12 @@ public:
 class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -217,7 +217,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -227,16 +227,16 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -261,12 +261,12 @@ public:
 class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -287,7 +287,7 @@ public:
         MergeSortStageParams msparams;
         msparams.dedup = false;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -297,16 +297,16 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -332,12 +332,12 @@ public:
 class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -359,7 +359,7 @@ public:
         // Sort by c:-1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << -1);
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -370,16 +370,16 @@ public:
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         // This is the direction along the index.
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -404,12 +404,12 @@ public:
 class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -430,7 +430,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -440,18 +440,18 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:51 (EOF)
         params.descriptor = getIndex(secondIndex, coll);
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -473,12 +473,12 @@ public:
 class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -486,7 +486,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         IndexScanParams params;
         params.bounds.isSimpleRange = true;
@@ -504,13 +504,13 @@ public:
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
             params.descriptor = getIndex(indexSpec, coll);
-            ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+            ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
         }
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -532,12 +532,12 @@ public:
 class QueryStageMergeSortInvalidation : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -545,7 +545,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        auto ms = make_unique<MergeSortStage>(&_txn, msparams, &ws, coll);
+        auto ms = make_unique<MergeSortStage>(&_opCtx, msparams, &ws, coll);
 
         IndexScanParams params;
         params.bounds.isSimpleRange = true;
@@ -565,7 +565,7 @@ public:
             BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
             addIndex(indexSpec);
             params.descriptor = getIndex(indexSpec, coll);
-            ms->addChild(new IndexScan(&_txn, params, &ws, NULL));
+            ms->addChild(new IndexScan(&_opCtx, params, &ws, NULL));
         }
 
         set<RecordId> recordIds;
@@ -596,7 +596,7 @@ public:
 
         // Invalidate recordIds[11].  Should force a fetch and return the deleted document.
         ms->saveState();
-        ms->invalidate(&_txn, *it, INVALIDATION_DELETION);
+        ms->invalidate(&_opCtx, *it, INVALIDATION_DELETION);
         ms->restoreState();
 
         // Make sure recordIds[11] was fetched for us.
@@ -648,12 +648,12 @@ public:
 class QueryStageMergeSortInvalidationMutationDedup : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -672,7 +672,7 @@ public:
         WorkingSetMember* member;
         MergeSortStageParams msparams;
         msparams.pattern = BSON("a" << 1);
-        auto ms = stdx::make_unique<MergeSortStage>(&_txn, msparams, &ws, coll);
+        auto ms = stdx::make_unique<MergeSortStage>(&_opCtx, msparams, &ws, coll);
 
         // First child scans [5, 10].
         {
@@ -684,7 +684,7 @@ public:
             params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
             params.direction = 1;
             auto fetchStage = stdx::make_unique<FetchStage>(
-                &_txn, &ws, new IndexScan(&_txn, params, &ws, nullptr), nullptr, coll);
+                &_opCtx, &ws, new IndexScan(&_opCtx, params, &ws, nullptr), nullptr, coll);
             ms->addChild(fetchStage.release());
         }
 
@@ -698,7 +698,7 @@ public:
             params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
             params.direction = 1;
             auto fetchStage = stdx::make_unique<FetchStage>(
-                &_txn, &ws, new IndexScan(&_txn, params, &ws, nullptr), nullptr, coll);
+                &_opCtx, &ws, new IndexScan(&_opCtx, params, &ws, nullptr), nullptr, coll);
             ms->addChild(fetchStage.release());
         }
 
@@ -710,7 +710,7 @@ public:
         ++it;
 
         // Doc {a: 5} gets invalidated by an update.
-        ms->invalidate(&_txn, *it, INVALIDATION_MUTATION);
+        ms->invalidate(&_opCtx, *it, INVALIDATION_MUTATION);
 
         // Invalidated doc {a: 5} should still get returned.
         member = getNextResult(&ws, ms.get());
@@ -745,12 +745,12 @@ private:
 class QueryStageMergeSortStringsWithNullCollation : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -774,7 +774,7 @@ public:
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1 << "d" << 1);
         msparams.collator = nullptr;
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -784,17 +784,17 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -818,12 +818,12 @@ public:
 class QueryStageMergeSortStringsRespectsCollation : public QueryStageMergeSortTestBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
         if (!coll) {
-            WriteUnitOfWork wuow(&_txn);
-            coll = db->createCollection(&_txn, ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            coll = db->createCollection(&_opCtx, ns());
             wuow.commit();
         }
 
@@ -848,7 +848,7 @@ public:
         msparams.pattern = BSON("c" << 1 << "d" << 1);
         CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
         msparams.collator = &collator;
-        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -858,17 +858,17 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_txn, params, ws.get(), NULL));
+        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
 
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_txn, ws.get(), ms, nullptr, coll);
+            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 

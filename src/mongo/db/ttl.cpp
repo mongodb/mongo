@@ -113,8 +113,8 @@ public:
 
 private:
     void doTTLPass() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
 
         // If part of replSet but not in a readable state (e.g. during initial sync), skip.
         if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
@@ -130,9 +130,9 @@ private:
 
         // Get all TTL indexes from every collection.
         for (const std::string& collectionNS : ttlCollections) {
-            ScopedTransaction st(&txn, MODE_IS);
+            ScopedTransaction st(&opCtx, MODE_IS);
             NamespaceString collectionNSS(collectionNS);
-            AutoGetCollection autoGetCollection(&txn, collectionNSS, MODE_IS);
+            AutoGetCollection autoGetCollection(&opCtx, collectionNSS, MODE_IS);
             Collection* coll = autoGetCollection.getCollection();
             if (!coll) {
                 // Skip since collection has been dropped.
@@ -141,9 +141,9 @@ private:
 
             CollectionCatalogEntry* collEntry = coll->getCatalogEntry();
             std::vector<std::string> indexNames;
-            collEntry->getAllIndexes(&txn, &indexNames);
+            collEntry->getAllIndexes(&opCtx, &indexNames);
             for (const std::string& name : indexNames) {
-                BSONObj spec = collEntry->getIndexSpec(&txn, name);
+                BSONObj spec = collEntry->getIndexSpec(&opCtx, name);
                 if (spec.hasField(secondsExpireField)) {
                     ttlIndexes.push_back(spec.getOwned());
                 }
@@ -152,7 +152,7 @@ private:
 
         for (const BSONObj& idx : ttlIndexes) {
             try {
-                doTTLForIndex(&txn, idx);
+                doTTLForIndex(&opCtx, idx);
             } catch (const DBException& dbex) {
                 error() << "Error processing ttl index: " << idx << " -- " << dbex.toString();
                 // Continue on to the next index.
@@ -165,7 +165,7 @@ private:
      * Remove documents from the collection using the specified TTL index after a sufficient amount
      * of time has passed according to its expiry specification.
      */
-    void doTTLForIndex(OperationContext* txn, BSONObj idx) {
+    void doTTLForIndex(OperationContext* opCtx, BSONObj idx) {
         const NamespaceString collectionNSS(idx["ns"].String());
         if (!userAllowedWriteNS(collectionNSS).isOK()) {
             error() << "namespace '" << collectionNSS
@@ -182,18 +182,18 @@ private:
 
         LOG(1) << "ns: " << collectionNSS << " key: " << key << " name: " << name;
 
-        AutoGetCollection autoGetCollection(txn, collectionNSS, MODE_IX);
+        AutoGetCollection autoGetCollection(opCtx, collectionNSS, MODE_IX);
         Collection* collection = autoGetCollection.getCollection();
         if (!collection) {
             // Collection was dropped.
             return;
         }
 
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, collectionNSS)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionNSS)) {
             return;
         }
 
-        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, name);
+        IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
         if (!desc) {
             LOG(1) << "index not found (index build in progress? index dropped?), skipping "
                    << "ttl job for: " << idx;
@@ -237,7 +237,7 @@ private:
         auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
         qr->setFilter(query);
         auto canonicalQuery = CanonicalQuery::canonicalize(
-            txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
         invariantOK(canonicalQuery.getStatus());
 
         DeleteStageParams params;
@@ -245,7 +245,7 @@ private:
         params.canonicalQuery = canonicalQuery.getValue().get();
 
         std::unique_ptr<PlanExecutor> exec =
-            InternalPlanner::deleteWithIndexScan(txn,
+            InternalPlanner::deleteWithIndexScan(opCtx,
                                                  collection,
                                                  params,
                                                  desc,

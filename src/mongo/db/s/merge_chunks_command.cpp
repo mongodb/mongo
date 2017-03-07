@@ -57,16 +57,16 @@ using std::vector;
 
 namespace {
 
-bool _checkMetadataForSuccess(OperationContext* txn,
+bool _checkMetadataForSuccess(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& minKey,
                               const BSONObj& maxKey) {
     ScopedCollectionMetadata metadataAfterMerge;
     {
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
         // Get collection metadata
-        metadataAfterMerge = CollectionShardingState::get(txn, nss.ns())->getMetadata();
+        metadataAfterMerge = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
     }
 
     ChunkType chunk;
@@ -77,7 +77,7 @@ bool _checkMetadataForSuccess(OperationContext* txn,
     return chunk.getMin().woCompare(minKey) == 0 && chunk.getMax().woCompare(maxKey) == 0;
 }
 
-Status mergeChunks(OperationContext* txn,
+Status mergeChunks(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const BSONObj& minKey,
                    const BSONObj& maxKey,
@@ -86,8 +86,8 @@ Status mergeChunks(OperationContext* txn,
     // TODO(SERVER-25086): Remove distLock acquisition from merge chunk
     const string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey
                                        << " to " << maxKey;
-    auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
-        txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+    auto scopedDistLock = grid.catalogClient(opCtx)->getDistLockManager()->lock(
+        opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
     if (!scopedDistLock.isOK()) {
         std::string errmsg = stream() << "could not acquire collection lock for " << nss.ns()
@@ -99,14 +99,14 @@ Status mergeChunks(OperationContext* txn,
         return Status(scopedDistLock.getStatus().code(), errmsg);
     }
 
-    ShardingState* shardingState = ShardingState::get(txn);
+    ShardingState* shardingState = ShardingState::get(opCtx);
 
     //
     // We now have the collection lock, refresh metadata to latest version and sanity check
     //
 
     ChunkVersion shardVersion;
-    Status refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersion);
+    Status refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &shardVersion);
 
     if (!refreshStatus.isOK()) {
         std::string errmsg = str::stream()
@@ -130,9 +130,9 @@ Status mergeChunks(OperationContext* txn,
 
     ScopedCollectionMetadata metadata;
     {
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
-        metadata = CollectionShardingState::get(txn, nss.ns())->getMetadata();
+        metadata = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
         if (!metadata || metadata->getKeyPattern().isEmpty()) {
             std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
                                           << " is not sharded";
@@ -262,8 +262,8 @@ Status mergeChunks(OperationContext* txn,
 
     auto configCmdObj =
         request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-    auto cmdResponseStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->runCommand(
-        txn,
+    auto cmdResponseStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+        opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
         configCmdObj,
@@ -275,7 +275,7 @@ Status mergeChunks(OperationContext* txn,
     //
     {
         ChunkVersion shardVersionAfterMerge;
-        refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersionAfterMerge);
+        refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &shardVersionAfterMerge);
 
         if (!refreshStatus.isOK()) {
             std::string errmsg = str::stream() << "failed to refresh metadata for merge chunk ["
@@ -301,7 +301,7 @@ Status mergeChunks(OperationContext* txn,
     auto writeConcernStatus = std::move(cmdResponseStatus.getValue().writeConcernStatus);
 
     if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
-        _checkMetadataForSuccess(txn, nss, minKey, maxKey)) {
+        _checkMetadataForSuccess(opCtx, nss, minKey, maxKey)) {
 
         LOG(1) << "mergeChunk [" << redact(minKey) << "," << redact(maxKey)
                << ") has already been committed.";
@@ -360,13 +360,13 @@ public:
     // Optional, if the merge is only valid for a particular epoch
     static BSONField<OID> epochField;
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) override {
-        uassertStatusOK(ShardingState::get(txn)->canAcceptShardedCommands());
+        uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         string ns = parseNs(dbname, cmdObj);
 
@@ -409,7 +409,7 @@ public:
             return false;
         }
 
-        auto mergeStatus = mergeChunks(txn, NamespaceString(ns), minKey, maxKey, epoch);
+        auto mergeStatus = mergeChunks(opCtx, NamespaceString(ns), minKey, maxKey, epoch);
         return appendCommandStatus(result, mergeStatus);
     }
 } mergeChunksCmd;

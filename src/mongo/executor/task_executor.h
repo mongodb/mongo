@@ -390,12 +390,12 @@ struct TaskExecutor::CallbackArgs {
     CallbackArgs(TaskExecutor* theExecutor,
                  CallbackHandle theHandle,
                  Status theStatus,
-                 OperationContext* txn = NULL);
+                 OperationContext* opCtx = NULL);
 
     TaskExecutor* executor;
     CallbackHandle myHandle;
     Status status;
-    OperationContext* txn;
+    OperationContext* opCtx;
 };
 
 /**

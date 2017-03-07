@@ -65,7 +65,7 @@ const WriteErrorDetail& WriteOp::getOpError() const {
     return *_error;
 }
 
-Status WriteOp::targetWrites(OperationContext* txn,
+Status WriteOp::targetWrites(OperationContext* opCtx,
                              const NSTargeter& targeter,
                              std::vector<TargetedWrite*>* targetedWrites) {
     bool isUpdate = _itemRef.getOpType() == BatchedCommandRequest::BatchType_Update;
@@ -77,16 +77,16 @@ Status WriteOp::targetWrites(OperationContext* txn,
     vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
 
     if (isUpdate) {
-        targetStatus = targeter.targetUpdate(txn, *_itemRef.getUpdate(), &endpoints);
+        targetStatus = targeter.targetUpdate(opCtx, *_itemRef.getUpdate(), &endpoints);
     } else if (isDelete) {
-        targetStatus = targeter.targetDelete(txn, *_itemRef.getDelete(), &endpoints);
+        targetStatus = targeter.targetDelete(opCtx, *_itemRef.getDelete(), &endpoints);
     } else {
         dassert(_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert);
 
         ShardEndpoint* endpoint = NULL;
         // TODO: Remove the index targeting stuff once there is a command for it
         if (!isIndexInsert) {
-            targetStatus = targeter.targetInsert(txn, _itemRef.getDocument(), &endpoint);
+            targetStatus = targeter.targetInsert(opCtx, _itemRef.getDocument(), &endpoint);
         } else {
             // TODO: Retry index writes with stale version?
             targetStatus = targeter.targetCollection(&endpoints);

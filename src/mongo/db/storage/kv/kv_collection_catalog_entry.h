@@ -55,25 +55,25 @@ public:
         return 64;
     };
 
-    bool setIndexIsMultikey(OperationContext* txn,
+    bool setIndexIsMultikey(OperationContext* opCtx,
                             StringData indexName,
                             const MultikeyPaths& multikeyPaths) final;
 
-    void setIndexHead(OperationContext* txn, StringData indexName, const RecordId& newHead) final;
+    void setIndexHead(OperationContext* opCtx, StringData indexName, const RecordId& newHead) final;
 
-    Status removeIndex(OperationContext* txn, StringData indexName) final;
+    Status removeIndex(OperationContext* opCtx, StringData indexName) final;
 
-    Status prepareForIndexBuild(OperationContext* txn, const IndexDescriptor* spec) final;
+    Status prepareForIndexBuild(OperationContext* opCtx, const IndexDescriptor* spec) final;
 
-    void indexBuildSuccess(OperationContext* txn, StringData indexName) final;
+    void indexBuildSuccess(OperationContext* opCtx, StringData indexName) final;
 
-    void updateTTLSetting(OperationContext* txn,
+    void updateTTLSetting(OperationContext* opCtx,
                           StringData idxName,
                           long long newExpireSeconds) final;
 
-    void updateFlags(OperationContext* txn, int newValue) final;
+    void updateFlags(OperationContext* opCtx, int newValue) final;
 
-    void updateValidator(OperationContext* txn,
+    void updateValidator(OperationContext* opCtx,
                          const BSONObj& validator,
                          StringData validationLevel,
                          StringData validationAction) final;
@@ -86,7 +86,7 @@ public:
     }
 
 protected:
-    MetaData _getMetaData(OperationContext* txn) const final;
+    MetaData _getMetaData(OperationContext* opCtx) const final;
 
 private:
     class AddIndexChange;

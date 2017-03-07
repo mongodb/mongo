@@ -79,7 +79,7 @@ public:
      * Thread-Safety:
      *   None - must be only be read and written from the thread owning "Client".
      */
-    static Status readFromMetadata(OperationContext* txn, BSONElement& elem);
+    static Status readFromMetadata(OperationContext* opCtx, BSONElement& elem);
 
     /**
      * Write the $client section to OP_Command's metadata if there is a non-empty client metadata
@@ -88,7 +88,7 @@ public:
      * Thread-Safety:
      *   None - must be only be read and written from the thread owning "Client".
      */
-    static void writeToMetadata(OperationContext* txn, BSONObjBuilder* builder);
+    static void writeToMetadata(OperationContext* opCtx, BSONObjBuilder* builder);
 
 private:
     // Optional client metadata document.

@@ -51,30 +51,30 @@ class NamespaceIndex {
     MONGO_DISALLOW_COPYING(NamespaceIndex);
 
 public:
-    NamespaceIndex(OperationContext* txn, const std::string& dir, const std::string& database);
+    NamespaceIndex(OperationContext* opCtx, const std::string& dir, const std::string& database);
     ~NamespaceIndex();
 
     /**
      * Must be called before destruction.
      */
-    void close(OperationContext* txn) {
-        LockMongoFilesExclusive lock(txn);
-        _f.close(txn);
+    void close(OperationContext* opCtx) {
+        LockMongoFilesExclusive lock(opCtx);
+        _f.close(opCtx);
     }
 
     /* returns true if the file represented by this file exists on disk */
     bool pathExists() const;
 
-    void init(OperationContext* txn);
+    void init(OperationContext* opCtx);
 
-    void add_ns(OperationContext* txn, StringData ns, const DiskLoc& loc, bool capped);
-    void add_ns(OperationContext* txn, StringData ns, const NamespaceDetails* details);
-    void add_ns(OperationContext* txn, const Namespace& ns, const NamespaceDetails* details);
+    void add_ns(OperationContext* opCtx, StringData ns, const DiskLoc& loc, bool capped);
+    void add_ns(OperationContext* opCtx, StringData ns, const NamespaceDetails* details);
+    void add_ns(OperationContext* opCtx, const Namespace& ns, const NamespaceDetails* details);
 
     NamespaceDetails* details(StringData ns) const;
     NamespaceDetails* details(const Namespace& ns) const;
 
-    void kill_ns(OperationContext* txn, StringData ns);
+    void kill_ns(OperationContext* opCtx, StringData ns);
 
     bool allocated() const {
         return _ht.get() != 0;

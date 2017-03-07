@@ -53,7 +53,7 @@ class ShardType;
 
 class ShardRegistryData {
 public:
-    ShardRegistryData(OperationContext* txn, ShardFactory* shardFactory);
+    ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory);
     ShardRegistryData() = default;
     ~ShardRegistryData() = default;
 
@@ -101,7 +101,7 @@ private:
     /**
      * Reads shards docs from the catalog client and fills in maps.
      */
-    void _init(OperationContext* txn, ShardFactory* factory);
+    void _init(OperationContext* opCtx, ShardFactory* factory);
 
     /**
      * Creates a shard based on the specified information and puts it into the lookup maps.
@@ -171,7 +171,7 @@ public:
      * reloading is required, the caller should call this method one more time if the first call
      * returned false.
      */
-    bool reload(OperationContext* txn);
+    bool reload(OperationContext* opCtx);
 
     /**
      * Takes a connection string describing either a shard or config server replica set, looks
@@ -188,7 +188,7 @@ public:
      * parameter can actually be the shard name or the HostAndPort for any
      * server in the shard.
      */
-    StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* txn, const ShardId& shardId);
+    StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx, const ShardId& shardId);
 
     /**
      * Returns a shared pointer to the shard object with the given shard id. The shardId parameter

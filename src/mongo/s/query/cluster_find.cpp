@@ -149,14 +149,14 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(const QueryReq
     return std::move(newQR);
 }
 
-StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
+StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
                                              const CanonicalQuery& query,
                                              const ReadPreferenceSetting& readPref,
                                              ChunkManager* chunkManager,
                                              std::shared_ptr<Shard> primary,
                                              std::vector<BSONObj>* results,
                                              BSONObj* viewDefinition) {
-    auto shardRegistry = Grid::get(txn)->shardRegistry();
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     // Get the set of shards on which we will run the query.
     std::vector<std::shared_ptr<Shard>> shards;
@@ -166,13 +166,13 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         invariant(chunkManager);
 
         std::set<ShardId> shardIds;
-        chunkManager->getShardIdsForQuery(txn,
+        chunkManager->getShardIdsForQuery(opCtx,
                                           query.getQueryRequest().getFilter(),
                                           query.getQueryRequest().getCollation(),
                                           &shardIds);
 
         for (auto id : shardIds) {
-            auto shardStatus = shardRegistry->getShard(txn, id);
+            auto shardStatus = shardRegistry->getShard(opCtx, id);
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
@@ -231,12 +231,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     auto ccc = ClusterClientCursorImpl::make(
-        txn, Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
     while (!FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
-        auto next = ccc->next(txn);
+        auto next = ccc->next(opCtx);
 
         if (!next.isOK()) {
             if (viewDefinition &&
@@ -289,21 +289,21 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     // Register the cursor with the cursor manager.
-    auto cursorManager = Grid::get(txn)->getCursorManager();
+    auto cursorManager = Grid::get(opCtx)->getCursorManager();
     const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
                                          : ClusterCursorManager::CursorType::NamespaceNotSharded;
     const auto cursorLifetime = query.getQueryRequest().isNoCursorTimeout()
         ? ClusterCursorManager::CursorLifetime::Immortal
         : ClusterCursorManager::CursorLifetime::Mortal;
     return cursorManager->registerCursor(
-        txn, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime);
+        opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime);
 }
 
 }  // namespace
 
 const size_t ClusterFind::kMaxStaleConfigRetries = 10;
 
-StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
+StatusWith<CursorId> ClusterFind::runQuery(OperationContext* opCtx,
                                            const CanonicalQuery& query,
                                            const ReadPreferenceSetting& readPref,
                                            std::vector<BSONObj>* results,
@@ -322,7 +322,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
-        auto scopedCMStatus = ScopedChunkManager::get(txn, query.nss());
+        auto scopedCMStatus = ScopedChunkManager::get(opCtx, query.nss());
         if (scopedCMStatus == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
@@ -333,8 +333,13 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
         const auto& scopedCM = scopedCMStatus.getValue();
 
-        auto cursorId = runQueryWithoutRetrying(
-            txn, query, readPref, scopedCM.cm().get(), scopedCM.primary(), results, viewDefinition);
+        auto cursorId = runQueryWithoutRetrying(opCtx,
+                                                query,
+                                                readPref,
+                                                scopedCM.cm().get(),
+                                                scopedCM.primary(),
+                                                results,
+                                                viewDefinition);
         if (cursorId.isOK()) {
             return cursorId;
         }
@@ -353,9 +358,9 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                << redact(status);
 
         if (status == ErrorCodes::StaleEpoch) {
-            Grid::get(txn)->catalogCache()->invalidate(query.nss().db().toString());
+            Grid::get(opCtx)->catalogCache()->invalidate(query.nss().db().toString());
         } else {
-            scopedCM.db()->getChunkManagerIfExists(txn, query.nss().ns(), true);
+            scopedCM.db()->getChunkManagerIfExists(opCtx, query.nss().ns(), true);
         }
     }
 
@@ -364,11 +369,11 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                           << " times without successfully establishing shard version."};
 }
 
-StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
+StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                                                    const GetMoreRequest& request) {
-    auto cursorManager = Grid::get(txn)->getCursorManager();
+    auto cursorManager = Grid::get(opCtx)->getCursorManager();
 
-    auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid, txn);
+    auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid, opCtx);
     if (!pinnedCursor.isOK()) {
         return pinnedCursor.getStatus();
     }
@@ -391,7 +396,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
     long long startingFrom = pinnedCursor.getValue().getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
-        auto next = pinnedCursor.getValue().next(txn);
+        auto next = pinnedCursor.getValue().next(opCtx);
         if (!next.isOK()) {
             return next.getStatus();
         }

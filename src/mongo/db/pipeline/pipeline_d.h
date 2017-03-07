@@ -97,7 +97,7 @@ private:
      * covered projection.
      */
     static StatusWith<std::unique_ptr<PlanExecutor>> prepareExecutor(
-        OperationContext* txn,
+        OperationContext* opCtx,
         Collection* collection,
         const NamespaceString& nss,
         const boost::intrusive_ptr<Pipeline>& pipeline,

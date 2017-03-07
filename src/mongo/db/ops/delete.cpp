@@ -44,7 +44,7 @@ namespace mongo {
    justOne: stop after 1 match
    god:     allow access to system namespaces, and don't yield
 */
-long long deleteObjects(OperationContext* txn,
+long long deleteObjects(OperationContext* opCtx,
                         Collection* collection,
                         StringData ns,
                         BSONObj pattern,
@@ -60,20 +60,20 @@ long long deleteObjects(OperationContext* txn,
     request.setFromMigrate(fromMigrate);
     request.setYieldPolicy(policy);
 
-    ParsedDelete parsedDelete(txn, &request);
+    ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    auto client = txn->getClient();
+    auto client = opCtx->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
 
     std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
-        getExecutorDelete(txn, &CurOp::get(txn)->debug(), collection, &parsedDelete));
+        getExecutorDelete(opCtx, &CurOp::get(opCtx)->debug(), collection, &parsedDelete));
 
     uassertStatusOK(exec->executePlan());
 
     // No-ops need to reset lastOp in the client, for write concern.
     if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-        repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+        repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx);
     }
 
     return DeleteStage::getNumDeleted(*exec);

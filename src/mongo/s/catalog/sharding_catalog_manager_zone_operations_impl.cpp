@@ -58,7 +58,7 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
  * Note: range should have the full shard key.
  * Returns ErrorCodes::RangeOverlapConflict is an overlap is detected.
  */
-Status checkForOveralappedZonedKeyRange(OperationContext* txn,
+Status checkForOveralappedZonedKeyRange(OperationContext* opCtx,
                                         Shard* configServer,
                                         const NamespaceString& ns,
                                         const ChunkRange& range,
@@ -66,7 +66,7 @@ Status checkForOveralappedZonedKeyRange(OperationContext* txn,
                                         const KeyPattern& shardKeyPattern) {
     DistributionStatus chunkDist(ns, ShardToChunksMap{});
 
-    auto tagStatus = configServer->exhaustiveFindOnConfig(txn,
+    auto tagStatus = configServer->exhaustiveFindOnConfig(opCtx,
                                                           kConfigPrimarySelector,
                                                           repl::ReadConcernLevel::kLocalReadConcern,
                                                           NamespaceString(TagsType::ConfigNS),
@@ -112,13 +112,13 @@ Status checkForOveralappedZonedKeyRange(OperationContext* txn,
  * - ErrorCodes::ShardKeyNotFound if range is not compatible (for example, not a prefix of shard
  * key) with the shard key of ns.
  */
-StatusWith<ChunkRange> includeFullShardKey(OperationContext* txn,
+StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
                                            Shard* configServer,
                                            const NamespaceString& ns,
                                            const ChunkRange& range,
                                            KeyPattern* shardKeyPatternOut) {
     auto findCollStatus =
-        configServer->exhaustiveFindOnConfig(txn,
+        configServer->exhaustiveFindOnConfig(opCtx,
                                              kConfigPrimarySelector,
                                              repl::ReadConcernLevel::kLocalReadConcern,
                                              NamespaceString(CollectionType::ConfigNS),
@@ -172,13 +172,13 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* txn,
 
 }  // namespace
 
-Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
+Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* opCtx,
                                                   const std::string& shardName,
                                                   const std::string& zoneName) {
-    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
-    auto updateStatus = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
-        txn,
+    auto updateStatus = Grid::get(opCtx)->catalogClient(opCtx)->updateConfigDocument(
+        opCtx,
         ShardType::ConfigNS,
         BSON(ShardType::name(shardName)),
         BSON("$addToSet" << BSON(ShardType::tags() << zoneName)),
@@ -197,12 +197,12 @@ Status ShardingCatalogManagerImpl::addShardToZone(OperationContext* txn,
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
+Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* opCtx,
                                                        const std::string& shardName,
                                                        const std::string& zoneName) {
-    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
-    auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     const NamespaceString shardNS(ShardType::ConfigNS);
 
     //
@@ -210,7 +210,7 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
     //
 
     auto findShardExistsStatus =
-        configShard->exhaustiveFindOnConfig(txn,
+        configShard->exhaustiveFindOnConfig(opCtx,
                                             kConfigPrimarySelector,
                                             repl::ReadConcernLevel::kLocalReadConcern,
                                             shardNS,
@@ -232,7 +232,7 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
     //
 
     auto findShardStatus =
-        configShard->exhaustiveFindOnConfig(txn,
+        configShard->exhaustiveFindOnConfig(opCtx,
                                             kConfigPrimarySelector,
                                             repl::ReadConcernLevel::kLocalReadConcern,
                                             shardNS,
@@ -265,7 +265,7 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
         }
 
         auto findChunkRangeStatus =
-            configShard->exhaustiveFindOnConfig(txn,
+            configShard->exhaustiveFindOnConfig(opCtx,
                                                 kConfigPrimarySelector,
                                                 repl::ReadConcernLevel::kLocalReadConcern,
                                                 NamespaceString(TagsType::ConfigNS),
@@ -287,8 +287,8 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
     // Perform update.
     //
 
-    auto updateStatus = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
-        txn,
+    auto updateStatus = Grid::get(opCtx)->catalogClient(opCtx)->updateConfigDocument(
+        opCtx,
         ShardType::ConfigNS,
         BSON(ShardType::name(shardName)),
         BSON("$pull" << BSON(ShardType::tags() << zoneName)),
@@ -309,17 +309,17 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
 }
 
 
-Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
+Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* opCtx,
                                                         const NamespaceString& ns,
                                                         const ChunkRange& givenRange,
                                                         const std::string& zoneName) {
-    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
-    auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     KeyPattern shardKeyPattern{BSONObj()};
     auto fullShardKeyStatus =
-        includeFullShardKey(txn, configServer.get(), ns, givenRange, &shardKeyPattern);
+        includeFullShardKey(opCtx, configServer.get(), ns, givenRange, &shardKeyPattern);
     if (!fullShardKeyStatus.isOK()) {
         return fullShardKeyStatus.getStatus();
     }
@@ -327,7 +327,7 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
     const auto& fullShardKeyRange = fullShardKeyStatus.getValue();
 
     auto zoneExistStatus =
-        configServer->exhaustiveFindOnConfig(txn,
+        configServer->exhaustiveFindOnConfig(opCtx,
                                              kConfigPrimarySelector,
                                              repl::ReadConcernLevel::kLocalReadConcern,
                                              NamespaceString(ShardType::ConfigNS),
@@ -346,7 +346,7 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
     }
 
     auto overlapStatus = checkForOveralappedZonedKeyRange(
-        txn, configServer.get(), ns, fullShardKeyRange, zoneName, shardKeyPattern);
+        opCtx, configServer.get(), ns, fullShardKeyRange, zoneName, shardKeyPattern);
     if (!overlapStatus.isOK()) {
         return overlapStatus;
     }
@@ -362,8 +362,8 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
     updateBuilder.append(TagsType::max(), fullShardKeyRange.getMax());
     updateBuilder.append(TagsType::tag(), zoneName);
 
-    auto updateStatus = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
-        txn, TagsType::ConfigNS, updateQuery, updateBuilder.obj(), true, kNoWaitWriteConcern);
+    auto updateStatus = Grid::get(opCtx)->catalogClient(opCtx)->updateConfigDocument(
+        opCtx, TagsType::ConfigNS, updateQuery, updateBuilder.obj(), true, kNoWaitWriteConcern);
 
     if (!updateStatus.isOK()) {
         return updateStatus.getStatus();
@@ -372,16 +372,16 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
     return Status::OK();
 }
 
-Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* txn,
+Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* opCtx,
                                                           const NamespaceString& ns,
                                                           const ChunkRange& range) {
-    Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
-    auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();
+    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     KeyPattern shardKeyPattern{BSONObj()};
     auto fullShardKeyStatus =
-        includeFullShardKey(txn, configServer.get(), ns, range, &shardKeyPattern);
+        includeFullShardKey(opCtx, configServer.get(), ns, range, &shardKeyPattern);
     if (!fullShardKeyStatus.isOK()) {
         return fullShardKeyStatus.getStatus();
     }
@@ -390,8 +390,8 @@ Status ShardingCatalogManagerImpl::removeKeyRangeFromZone(OperationContext* txn,
     removeBuilder.append("_id", BSON(TagsType::ns(ns.ns()) << TagsType::min(range.getMin())));
     removeBuilder.append(TagsType::max(), range.getMax());
 
-    return Grid::get(txn)->catalogClient(txn)->removeConfigDocuments(
-        txn, TagsType::ConfigNS, removeBuilder.obj(), kNoWaitWriteConcern);
+    return Grid::get(opCtx)->catalogClient(opCtx)->removeConfigDocuments(
+        opCtx, TagsType::ConfigNS, removeBuilder.obj(), kNoWaitWriteConcern);
 }
 
 }  // namespace mongo

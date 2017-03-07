@@ -62,7 +62,7 @@ public:
      *
      * Returns the database cache entry if the database exists or a failed status otherwise.
      */
-    StatusWith<std::shared_ptr<DBConfig>> getDatabase(OperationContext* txn, StringData dbName);
+    StatusWith<std::shared_ptr<DBConfig>> getDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
      * Removes the database information for the specified name from the cache, so that the

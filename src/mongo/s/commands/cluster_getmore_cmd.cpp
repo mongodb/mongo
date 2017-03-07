@@ -91,7 +91,7 @@ public:
             request.nss, request.cursorid, request.term.is_initialized());
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -106,7 +106,7 @@ public:
         }
         const GetMoreRequest& request = parseStatus.getValue();
 
-        auto response = ClusterFind::runGetMore(txn, request);
+        auto response = ClusterFind::runGetMore(opCtx, request);
         if (!response.isOK()) {
             return appendCommandStatus(result, response.getStatus());
         }

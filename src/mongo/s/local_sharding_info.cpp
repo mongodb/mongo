@@ -61,10 +61,10 @@ void enableLocalShardingInfo(ServiceContext* context, Handler handler) {
     forService(context).registerHandler(handler);
 }
 
-bool haveLocalShardingInfo(OperationContext* txn, const std::string& ns) {
-    auto handler = forService(txn->getServiceContext()).getHandler();
+bool haveLocalShardingInfo(OperationContext* opCtx, const std::string& ns) {
+    auto handler = forService(opCtx->getServiceContext()).getHandler();
     if (handler)
-        return handler(txn, ns);
+        return handler(opCtx, ns);
     return false;
 }
 

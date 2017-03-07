@@ -107,11 +107,11 @@ private:
 }
 
 
-StatusWith<CompactStats> Collection::compact(OperationContext* txn,
+StatusWith<CompactStats> Collection::compact(OperationContext* opCtx,
                                              const CompactOptions* compactOptions) {
-    dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    DisableDocumentValidation validationDisabler(txn);
+    DisableDocumentValidation validationDisabler(opCtx);
 
     if (!_recordStore->compactSupported())
         return StatusWith<CompactStats>(ErrorCodes::CommandNotSupported,
@@ -121,18 +121,18 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
 
     if (_recordStore->compactsInPlace()) {
         CompactStats stats;
-        Status status = _recordStore->compact(txn, NULL, compactOptions, &stats);
+        Status status = _recordStore->compact(opCtx, NULL, compactOptions, &stats);
         if (!status.isOK())
             return StatusWith<CompactStats>(status);
 
         // Compact all indexes (not including unfinished indexes)
-        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(txn, false));
+        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
             IndexAccessMethod* index = _indexCatalog.getIndex(descriptor);
 
             LOG(1) << "compacting index: " << descriptor->toString();
-            Status status = index->compact(txn);
+            Status status = index->compact(opCtx);
             if (!status.isOK()) {
                 error() << "failed to compact index: " << descriptor->toString();
                 return status;
@@ -142,13 +142,13 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
         return StatusWith<CompactStats>(stats);
     }
 
-    if (_indexCatalog.numIndexesInProgress(txn))
+    if (_indexCatalog.numIndexesInProgress(opCtx))
         return StatusWith<CompactStats>(ErrorCodes::BadValue,
                                         "cannot compact when indexes in progress");
 
     vector<BSONObj> indexSpecs;
     {
-        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(txn, false));
+        IndexCatalog::IndexIterator ii(_indexCatalog.getIndexIterator(opCtx, false));
         while (ii.more()) {
             IndexDescriptor* descriptor = ii.next();
 
@@ -170,14 +170,14 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
     }
 
     // Give a chance to be interrupted *before* we drop all indexes.
-    txn->checkForInterrupt();
+    opCtx->checkForInterrupt();
 
     {
         // note that the drop indexes call also invalidates all clientcursors for the namespace,
         // which is important and wanted here
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         log() << "compact dropping indexes";
-        Status status = _indexCatalog.dropAllIndexes(txn, true);
+        Status status = _indexCatalog.dropAllIndexes(opCtx, true);
         if (!status.isOK()) {
             return StatusWith<CompactStats>(status);
         }
@@ -186,7 +186,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
 
     CompactStats stats;
 
-    MultiIndexBlock indexer(txn, this);
+    MultiIndexBlock indexer(opCtx, this);
     indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 
@@ -196,7 +196,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
 
     MyCompactAdaptor adaptor(this, &indexer);
 
-    status = _recordStore->compact(txn, &adaptor, compactOptions, &stats);
+    status = _recordStore->compact(opCtx, &adaptor, compactOptions, &stats);
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
@@ -206,7 +206,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
         return StatusWith<CompactStats>(status);
 
     {
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         indexer.commit();
         wunit.commit();
     }

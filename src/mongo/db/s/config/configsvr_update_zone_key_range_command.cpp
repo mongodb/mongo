@@ -89,7 +89,7 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              BSONObj& cmdObj,
              int options,
@@ -109,11 +109,11 @@ public:
         }
 
         if (parsedRequest.isRemove()) {
-            uassertStatusOK(Grid::get(txn)->catalogManager()->removeKeyRangeFromZone(
-                txn, parsedRequest.getNS(), parsedRequest.getRange()));
+            uassertStatusOK(Grid::get(opCtx)->catalogManager()->removeKeyRangeFromZone(
+                opCtx, parsedRequest.getNS(), parsedRequest.getRange()));
         } else {
-            uassertStatusOK(Grid::get(txn)->catalogManager()->assignKeyRangeToZone(
-                txn, parsedRequest.getNS(), parsedRequest.getRange(), zoneName));
+            uassertStatusOK(Grid::get(opCtx)->catalogManager()->assignKeyRangeToZone(
+                opCtx, parsedRequest.getNS(), parsedRequest.getRange(), zoneName));
         }
 
         return true;

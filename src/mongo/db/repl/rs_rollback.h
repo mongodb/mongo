@@ -59,7 +59,7 @@ class RollbackSource;
  * This function runs a command on the sync source to detect if the sync source rolls back
  * while our rollback is in progress.
  *
- * @param txn Used to read and write from this node's databases
+ * @param opCtx Used to read and write from this node's databases
  * @param localOplog reads the oplog on this server.
  * @param rollbackSource interface for sync source:
  *            provides oplog; and
@@ -73,7 +73,7 @@ class RollbackSource;
  * fatally. All other errors should be considered recoverable regardless of whether reported as a
  * status or exception.
  */
-Status syncRollback(OperationContext* txn,
+Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     boost::optional<int> requiredRBID,

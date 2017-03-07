@@ -112,7 +112,7 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
              int options,
@@ -157,7 +157,7 @@ public:
 
         {
             // Get the size estimate for this namespace
-            AutoGetCollection autoColl(txn, nss, MODE_IS);
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
             Collection* const collection = autoColl.getCollection();
             if (!collection) {
@@ -169,7 +169,7 @@ public:
             // Therefore, any multi-key index prefixed by shard key cannot be multikey over
             // the shard key fields.
             IndexDescriptor* idx =
-                collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn, keyPattern, false);
+                collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
             if (idx == NULL) {
                 errmsg = (string) "couldn't find index over splitting key " +
                     keyPattern.clientReadable().toString();
@@ -186,8 +186,8 @@ public:
                 max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
             }
 
-            const long long recCount = collection->numRecords(txn);
-            const long long dataSize = collection->dataSize(txn);
+            const long long recCount = collection->numRecords(opCtx);
+            const long long dataSize = collection->dataSize(opCtx);
 
             //
             // 1.b Now that we have the size estimate, go over the remaining parameters and apply
@@ -260,7 +260,7 @@ public:
             long long numChunks = 0;
 
             unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(txn,
+                InternalPlanner::indexScan(opCtx,
                                            collection,
                                            idx,
                                            min,
@@ -336,7 +336,7 @@ public:
                 log() << "splitVector doing another cycle because of force, keyCount now: "
                       << keyCount;
 
-                exec = InternalPlanner::indexScan(txn,
+                exec = InternalPlanner::indexScan(opCtx,
                                                   collection,
                                                   idx,
                                                   min,

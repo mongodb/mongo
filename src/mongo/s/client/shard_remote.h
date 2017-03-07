@@ -70,7 +70,7 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
-    Status createIndexOnConfig(OperationContext* txn,
+    Status createIndexOnConfig(OperationContext* opCtx,
                                const NamespaceString& ns,
                                const BSONObj& keys,
                                bool unique) override;
@@ -80,16 +80,17 @@ private:
      * Returns the metadata that should be used when running commands against this shard with
      * the given read preference.
      */
-    BSONObj _appendMetadataForCommand(OperationContext* txn, const ReadPreferenceSetting& readPref);
+    BSONObj _appendMetadataForCommand(OperationContext* opCtx,
+                                      const ReadPreferenceSetting& readPref);
 
-    Shard::HostWithResponse _runCommand(OperationContext* txn,
+    Shard::HostWithResponse _runCommand(OperationContext* opCtx,
                                         const ReadPreferenceSetting& readPref,
                                         const std::string& dbname,
                                         Milliseconds maxTimeMSOverride,
                                         const BSONObj& cmdObj) final;
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,
         const NamespaceString& nss,

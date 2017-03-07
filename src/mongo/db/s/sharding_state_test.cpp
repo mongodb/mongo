@@ -100,7 +100,7 @@ protected:
 
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        _shardingState.setGlobalInitMethodForTest([&](OperationContext* txn,
+        _shardingState.setGlobalInitMethodForTest([&](OperationContext* opCtx,
                                                       const ConnectionString& configConnStr,
                                                       StringData distLockProcessId) {
             auto status = initializeGlobalShardingStateForMongodForTest(configConnStr);
@@ -170,7 +170,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     shardIdentity.setClusterId(OID::gen());
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status{ErrorCodes::ShutdownInProgress, "shutting down"};
         });
 
@@ -183,7 +183,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     // ShardingState is now in error state, attempting to call it again will still result in error.
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status::OK();
         });
 
@@ -213,7 +213,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
@@ -241,7 +241,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 

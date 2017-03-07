@@ -259,7 +259,7 @@ public:
      *
      * Propagates to all children, then calls doInvalidate().
      */
-    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
 
     /**
      * Retrieve a list of this stage's children. This stage keeps ownership of
@@ -356,7 +356,7 @@ protected:
     /**
      * Does the stage-specific invalidation work.
      */
-    virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {}
+    virtual void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {}
 
     ClockSource* getClock() const;
 

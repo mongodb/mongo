@@ -154,7 +154,7 @@ public:
      *   the caller should call nextEvent() to retry the request on the hosts that errored. If
      *   ready() is true, then either the error was not retriable or it has exhausted max retries.
      */
-    StatusWith<executor::TaskExecutor::EventHandle> nextEvent(OperationContext* txn);
+    StatusWith<executor::TaskExecutor::EventHandle> nextEvent(OperationContext* opCtx);
 
     /**
      * Starts shutting down this ARM. Returns a handle to an event which is signaled when this
@@ -169,7 +169,7 @@ public:
      *
      * May be called multiple times (idempotent).
      */
-    executor::TaskExecutor::EventHandle kill(OperationContext* txn);
+    executor::TaskExecutor::EventHandle kill(OperationContext* opCtx);
 
 private:
     /**
@@ -291,7 +291,7 @@ private:
      *
      * Returns success if the command to retrieve the next batch was scheduled successfully.
      */
-    Status askForNextBatch_inlock(OperationContext* txn, size_t remoteIndex);
+    Status askForNextBatch_inlock(OperationContext* opCtx, size_t remoteIndex);
 
     /**
      * Checks whether or not the remote cursors are all exhausted.
@@ -322,7 +322,7 @@ private:
      * buffered.
      */
     void handleBatchResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-                             OperationContext* txn,
+                             OperationContext* opCtx,
                              size_t remoteIndex);
 
     /**
@@ -342,7 +342,7 @@ private:
     /**
      * Schedules a killCursors command to be run on all remote hosts that have open cursors.
      */
-    void scheduleKillCursors_inlock(OperationContext* txn);
+    void scheduleKillCursors_inlock(OperationContext* opCtx);
 
     // Not owned here.
     executor::TaskExecutor* _executor;

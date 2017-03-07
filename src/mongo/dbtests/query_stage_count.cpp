@@ -54,9 +54,9 @@ const int kInterjections = kDocuments;
 class CountStageTest {
 public:
     CountStageTest()
-        : _scopedXact(&_txn, MODE_IX),
-          _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
-          _ctx(&_txn, ns()),
+        : _scopedXact(&_opCtx, MODE_IX),
+          _dbLock(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
+          _ctx(&_opCtx, ns()),
           _coll(NULL) {}
 
     virtual ~CountStageTest() {}
@@ -64,12 +64,12 @@ public:
     virtual void interject(CountStage&, int) {}
 
     virtual void setup() {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
 
-        _ctx.db()->dropCollection(&_txn, ns());
-        _coll = _ctx.db()->createCollection(&_txn, ns());
+        _ctx.db()->dropCollection(&_opCtx, ns());
+        _coll = _ctx.db()->createCollection(&_opCtx, ns());
 
-        _coll->getIndexCatalog()->createIndexOnEmptyCollection(&_txn,
+        _coll->getIndexCatalog()->createIndexOnEmptyCollection(&_opCtx,
                                                                BSON("key" << BSON("x" << 1)
                                                                           << "name"
                                                                           << "x_1"
@@ -94,7 +94,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+        unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, &ws, NULL));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -107,27 +107,27 @@ public:
     }
 
     void insert(const BSONObj& doc) {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->insertDocument(&_txn, doc, nullOpDebug, false);
+        _coll->insertDocument(&_opCtx, doc, nullOpDebug, false);
         wunit.commit();
     }
 
     void remove(const RecordId& recordId) {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->deleteDocument(&_txn, recordId, nullOpDebug);
+        _coll->deleteDocument(&_opCtx, recordId, nullOpDebug);
         wunit.commit();
     }
 
     void update(const RecordId& oldrecordId, const BSONObj& newDoc) {
-        WriteUnitOfWork wunit(&_txn);
-        BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_txn, oldrecordId).releaseToBson();
+        WriteUnitOfWork wunit(&_opCtx);
+        BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_opCtx, oldrecordId).releaseToBson();
         OplogUpdateEntryArgs args;
         args.ns = _coll->ns().ns();
-        _coll->updateDocument(&_txn,
+        _coll->updateDocument(&_opCtx,
                               oldrecordId,
-                              Snapshotted<BSONObj>(_txn.recoveryUnit()->getSnapshotId(), oldDoc),
+                              Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
                               newDoc,
                               false,
                               true,
@@ -163,7 +163,7 @@ public:
 
         const bool useRecordStoreCount = false;
         CountStageParams params(request, useRecordStoreCount);
-        CountStage countStage(&_txn, _coll, std::move(params), ws.get(), scan);
+        CountStage countStage(&_opCtx, _coll, std::move(params), ws.get(), scan);
 
         const CountStats* stats = runCount(countStage);
 
@@ -202,7 +202,7 @@ public:
     IndexScan* createIndexScan(MatchExpression* expr, WorkingSet* ws) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<IndexDescriptor*> indexes;
-        catalog->findIndexesByKeyPattern(&_txn, BSON("x" << 1), false, &indexes);
+        catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
         IndexDescriptor* descriptor = indexes[0];
 
@@ -216,7 +216,7 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new IndexScan(&_txn, params, ws, expr);
+        return new IndexScan(&_opCtx, params, ws, expr);
     }
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {
@@ -224,7 +224,7 @@ public:
         params.collection = _coll;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new CollectionScan(&_txn, params, ws, expr);
+        return new CollectionScan(&_opCtx, params, ws, expr);
     }
 
     static const char* ns() {
@@ -234,7 +234,7 @@ public:
 protected:
     vector<RecordId> _recordIds;
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     ScopedTransaction _scopedXact;
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
@@ -306,11 +306,11 @@ public:
         if (interjection == 0) {
             // At this point, our first interjection, we've counted _recordIds[0]
             // and are about to count _recordIds[1]
-            WriteUnitOfWork wunit(&_txn);
-            count_stage.invalidate(&_txn, _recordIds[interjection], INVALIDATION_DELETION);
+            WriteUnitOfWork wunit(&_opCtx);
+            count_stage.invalidate(&_opCtx, _recordIds[interjection], INVALIDATION_DELETION);
             remove(_recordIds[interjection]);
 
-            count_stage.invalidate(&_txn, _recordIds[interjection + 1], INVALIDATION_DELETION);
+            count_stage.invalidate(&_opCtx, _recordIds[interjection + 1], INVALIDATION_DELETION);
             remove(_recordIds[interjection + 1]);
             wunit.commit();
         }
@@ -331,12 +331,12 @@ public:
     // At the point which this is called we are in between the first and second record
     void interject(CountStage& count_stage, int interjection) {
         if (interjection == 0) {
-            count_stage.invalidate(&_txn, _recordIds[0], INVALIDATION_MUTATION);
-            OID id1 = _coll->docFor(&_txn, _recordIds[0]).value().getField("_id").OID();
+            count_stage.invalidate(&_opCtx, _recordIds[0], INVALIDATION_MUTATION);
+            OID id1 = _coll->docFor(&_opCtx, _recordIds[0]).value().getField("_id").OID();
             update(_recordIds[0], BSON("_id" << id1 << "x" << 100));
 
-            count_stage.invalidate(&_txn, _recordIds[1], INVALIDATION_MUTATION);
-            OID id2 = _coll->docFor(&_txn, _recordIds[1]).value().getField("_id").OID();
+            count_stage.invalidate(&_opCtx, _recordIds[1], INVALIDATION_MUTATION);
+            OID id2 = _coll->docFor(&_opCtx, _recordIds[1]).value().getField("_id").OID();
             update(_recordIds[1], BSON("_id" << id2 << "x" << 100));
         }
     }

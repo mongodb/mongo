@@ -55,63 +55,63 @@ public:
 
     ~NamespaceDetailsCollectionCatalogEntry() {}
 
-    CollectionOptions getCollectionOptions(OperationContext* txn) const final;
+    CollectionOptions getCollectionOptions(OperationContext* opCtx) const final;
 
-    int getTotalIndexCount(OperationContext* txn) const final;
+    int getTotalIndexCount(OperationContext* opCtx) const final;
 
-    int getCompletedIndexCount(OperationContext* txn) const final;
+    int getCompletedIndexCount(OperationContext* opCtx) const final;
 
     int getMaxAllowedIndexes() const final;
 
-    void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const final;
+    void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const final;
 
-    BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const final;
+    BSONObj getIndexSpec(OperationContext* opCtx, StringData idxName) const final;
 
-    bool isIndexMultikey(OperationContext* txn,
+    bool isIndexMultikey(OperationContext* opCtx,
                          StringData indexName,
                          MultikeyPaths* multikeyPaths) const final;
     bool isIndexMultikey(int idxNo) const;
 
-    bool setIndexIsMultikey(OperationContext* txn, int idxNo, bool multikey = true);
-    bool setIndexIsMultikey(OperationContext* txn,
+    bool setIndexIsMultikey(OperationContext* opCtx, int idxNo, bool multikey = true);
+    bool setIndexIsMultikey(OperationContext* opCtx,
                             StringData indexName,
                             const MultikeyPaths& multikeyPaths) final;
 
-    RecordId getIndexHead(OperationContext* txn, StringData indexName) const final;
+    RecordId getIndexHead(OperationContext* opCtx, StringData indexName) const final;
 
-    void setIndexHead(OperationContext* txn, StringData indexName, const RecordId& newHead) final;
+    void setIndexHead(OperationContext* opCtx, StringData indexName, const RecordId& newHead) final;
 
-    bool isIndexReady(OperationContext* txn, StringData indexName) const final;
+    bool isIndexReady(OperationContext* opCtx, StringData indexName) const final;
 
-    Status removeIndex(OperationContext* txn, StringData indexName) final;
+    Status removeIndex(OperationContext* opCtx, StringData indexName) final;
 
-    Status prepareForIndexBuild(OperationContext* txn, const IndexDescriptor* spec) final;
+    Status prepareForIndexBuild(OperationContext* opCtx, const IndexDescriptor* spec) final;
 
-    void indexBuildSuccess(OperationContext* txn, StringData indexName) final;
+    void indexBuildSuccess(OperationContext* opCtx, StringData indexName) final;
 
-    void updateTTLSetting(OperationContext* txn,
+    void updateTTLSetting(OperationContext* opCtx,
                           StringData idxName,
                           long long newExpireSeconds) final;
 
-    void updateFlags(OperationContext* txn, int newValue) final;
+    void updateFlags(OperationContext* opCtx, int newValue) final;
 
-    void updateValidator(OperationContext* txn,
+    void updateValidator(OperationContext* opCtx,
                          const BSONObj& validator,
                          StringData validationLevel,
                          StringData validationAction) final;
 
     // not part of interface, but available to my storage engine
 
-    int _findIndexNumber(OperationContext* txn, StringData indexName) const;
+    int _findIndexNumber(OperationContext* opCtx, StringData indexName) const;
 
     RecordId getNamespacesRecordId() {
         return _namespacesRecordId;
     }
 
     /**
-     * 'txn' is only allowed to be null when called from the constructor.
+     * 'opCtx' is only allowed to be null when called from the constructor.
      */
-    void setNamespacesRecordId(OperationContext* txn, RecordId newId);
+    void setNamespacesRecordId(OperationContext* opCtx, RecordId newId);
 
 private:
     NamespaceDetails* _details;
@@ -127,7 +127,7 @@ private:
      * Updates the entry for this namespace in '_namespacesRecordStore', updating
      * '_namespacesRecordId' if necessary.
      */
-    void _updateSystemNamespaces(OperationContext* txn, const BSONObj& update);
+    void _updateSystemNamespaces(OperationContext* opCtx, const BSONObj& update);
 
     friend class MMAPV1DatabaseCatalogEntry;
 };

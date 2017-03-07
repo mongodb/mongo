@@ -111,7 +111,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      mongo::BSONObj& cmdObj,
                      int options,
@@ -273,7 +273,7 @@ public:
         s->avail = conn;
     }
 
-    void checkVersions(OperationContext* txn, const string& ns) {
+    void checkVersions(OperationContext* opCtx, const string& ns) {
         vector<ShardId> all;
         grid.shardRegistry()->getAllShardIds(&all);
 
@@ -283,7 +283,7 @@ public:
         // Now only check top-level shard connections
         for (const ShardId& shardId : all) {
             try {
-                auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+                auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
                 if (!shardStatus.isOK()) {
                     invariant(shardStatus == ErrorCodes::ShardNotFound);
                     continue;
@@ -298,7 +298,7 @@ public:
                     s->created++;  // After, so failed creation doesn't get counted
                 }
 
-                versionManager.checkShardVersionCB(txn, s->avail, ns, false, 1);
+                versionManager.checkShardVersionCB(opCtx, s->avail, ns, false, 1);
             } catch (const DBException& ex) {
                 warning() << "problem while initially checking shard versions on"
                           << " " << shardId << causedBy(ex);
@@ -450,9 +450,9 @@ void ShardConnection::_finishInit() {
 
     if (versionManager.isVersionableCB(_conn)) {
         auto& client = cc();
-        auto txn = client.getOperationContext();
-        invariant(txn);
-        _setVersion = versionManager.checkShardVersionCB(txn, this, false, 1);
+        auto opCtx = client.getOperationContext();
+        invariant(opCtx);
+        _setVersion = versionManager.checkShardVersionCB(opCtx, this, false, 1);
     } else {
         // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)
         verify(!_manager);
@@ -486,8 +486,8 @@ void ShardConnection::kill() {
     }
 }
 
-void ShardConnection::checkMyConnectionVersions(OperationContext* txn, const string& ns) {
-    ClientConnections::threadInstance()->checkVersions(txn, ns);
+void ShardConnection::checkMyConnectionVersions(OperationContext* opCtx, const string& ns) {
+    ClientConnections::threadInstance()->checkVersions(opCtx, ns);
 }
 
 void ShardConnection::releaseMyConnections() {

@@ -87,21 +87,21 @@ Status checkAuthForWriteCommand(Client* client,
     return status;
 }
 
-bool shouldSkipOutput(OperationContext* txn) {
-    const WriteConcernOptions& writeConcern = txn->getWriteConcern();
+bool shouldSkipOutput(OperationContext* opCtx) {
+    const WriteConcernOptions& writeConcern = opCtx->getWriteConcern();
     return writeConcern.wMode.empty() && writeConcern.wNumNodes == 0 &&
         (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
          writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
 }
 
 enum class ReplyStyle { kUpdate, kNotUpdate };  // update has extra fields.
-void serializeReply(OperationContext* txn,
+void serializeReply(OperationContext* opCtx,
                     ReplyStyle replyStyle,
                     bool continueOnError,
                     size_t opsInBatch,
                     const WriteResult& result,
                     BSONObjBuilder* out) {
-    if (shouldSkipOutput(txn))
+    if (shouldSkipOutput(opCtx))
         return;
 
     long long n = 0;
@@ -170,10 +170,10 @@ void serializeReply(OperationContext* txn,
 
     {
         // Undocumented repl fields that mongos depends on.
-        auto* replCoord = repl::ReplicationCoordinator::get(txn->getServiceContext());
+        auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
         const auto replMode = replCoord->getReplicationMode();
         if (replMode != repl::ReplicationCoordinator::modeNone) {
-            const auto lastOp = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+            const auto lastOp = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             if (lastOp.getTerm() == repl::OpTime::kUninitializedTerm) {
                 out->append("opTime", lastOp.getTimestamp());
             } else {
@@ -207,22 +207,22 @@ public:
         return ReadWriteType::kWrite;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         try {
-            runImpl(txn, dbname, cmdObj, result);
+            runImpl(opCtx, dbname, cmdObj, result);
             return true;
         } catch (const DBException& ex) {
-            LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
+            LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
             throw;
         }
     }
 
-    virtual void runImpl(OperationContext* txn,
+    virtual void runImpl(OperationContext* opCtx,
                          const std::string& dbname,
                          const BSONObj& cmdObj,
                          BSONObjBuilder& result) = 0;
@@ -251,13 +251,13 @@ public:
                                         cmdObj);
     }
 
-    void runImpl(OperationContext* txn,
+    void runImpl(OperationContext* opCtx,
                  const std::string& dbname,
                  const BSONObj& cmdObj,
                  BSONObjBuilder& result) final {
         const auto batch = parseInsertCommand(dbname, cmdObj);
-        const auto reply = performInserts(txn, batch);
-        serializeReply(txn,
+        const auto reply = performInserts(opCtx, batch);
+        serializeReply(opCtx,
                        ReplyStyle::kNotUpdate,
                        batch.continueOnError,
                        batch.documents.size(),
@@ -287,17 +287,21 @@ public:
                                         cmdObj);
     }
 
-    void runImpl(OperationContext* txn,
+    void runImpl(OperationContext* opCtx,
                  const std::string& dbname,
                  const BSONObj& cmdObj,
                  BSONObjBuilder& result) final {
         const auto batch = parseUpdateCommand(dbname, cmdObj);
-        const auto reply = performUpdates(txn, batch);
-        serializeReply(
-            txn, ReplyStyle::kUpdate, batch.continueOnError, batch.updates.size(), reply, &result);
+        const auto reply = performUpdates(opCtx, batch);
+        serializeReply(opCtx,
+                       ReplyStyle::kUpdate,
+                       batch.continueOnError,
+                       batch.updates.size(),
+                       reply,
+                       &result);
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
@@ -319,16 +323,16 @@ public:
         updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
         updateRequest.setExplain();
 
-        ParsedUpdate parsedUpdate(txn, &updateRequest);
+        ParsedUpdate parsedUpdate(opCtx, &updateRequest);
         uassertStatusOK(parsedUpdate.parseRequest());
 
         // Explains of write commands are read-only, but we take write locks so that timing
         // info is more accurate.
-        ScopedTransaction scopedXact(txn, MODE_IX);
-        AutoGetCollection collection(txn, batch.ns, MODE_IX);
+        ScopedTransaction scopedXact(opCtx, MODE_IX);
+        AutoGetCollection collection(opCtx, batch.ns, MODE_IX);
 
         auto exec = uassertStatusOK(getExecutorUpdate(
-            txn, &CurOp::get(txn)->debug(), collection.getCollection(), &parsedUpdate));
+            opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedUpdate));
         Explain::explainStages(exec.get(), collection.getCollection(), verbosity, out);
         return Status::OK();
     }
@@ -355,13 +359,13 @@ public:
                                         cmdObj);
     }
 
-    void runImpl(OperationContext* txn,
+    void runImpl(OperationContext* opCtx,
                  const std::string& dbname,
                  const BSONObj& cmdObj,
                  BSONObjBuilder& result) final {
         const auto batch = parseDeleteCommand(dbname, cmdObj);
-        const auto reply = performDeletes(txn, batch);
-        serializeReply(txn,
+        const auto reply = performDeletes(opCtx, batch);
+        serializeReply(opCtx,
                        ReplyStyle::kNotUpdate,
                        batch.continueOnError,
                        batch.deletes.size(),
@@ -369,7 +373,7 @@ public:
                        &result);
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
@@ -387,17 +391,17 @@ public:
         deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
         deleteRequest.setExplain();
 
-        ParsedDelete parsedDelete(txn, &deleteRequest);
+        ParsedDelete parsedDelete(opCtx, &deleteRequest);
         uassertStatusOK(parsedDelete.parseRequest());
 
         // Explains of write commands are read-only, but we take write locks so that timing
         // info is more accurate.
-        ScopedTransaction scopedXact(txn, MODE_IX);
-        AutoGetCollection collection(txn, batch.ns, MODE_IX);
+        ScopedTransaction scopedXact(opCtx, MODE_IX);
+        AutoGetCollection collection(opCtx, batch.ns, MODE_IX);
 
         // Explain the plan tree.
         auto exec = uassertStatusOK(getExecutorDelete(
-            txn, &CurOp::get(txn)->debug(), collection.getCollection(), &parsedDelete));
+            opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedDelete));
         Explain::explainStages(exec.get(), collection.getCollection(), verbosity, out);
         return Status::OK();
     }

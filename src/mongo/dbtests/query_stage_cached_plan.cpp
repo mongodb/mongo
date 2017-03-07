@@ -63,7 +63,7 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        OldClientWriteContext ctx(&_txn, nss.ns());
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
@@ -74,38 +74,38 @@ public:
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
     }
 
     void dropCollection() {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::DBLock dbLock(_txn.lockState(), nss.db(), MODE_X);
-        Database* database = dbHolder().get(&_txn, nss.db());
+        ScopedTransaction transaction(&_opCtx, MODE_X);
+        Lock::DBLock dbLock(_opCtx.lockState(), nss.db(), MODE_X);
+        Database* database = dbHolder().get(&_opCtx, nss.db());
         if (!database) {
             return;
         }
 
-        WriteUnitOfWork wuow(&_txn);
-        database->dropCollection(&_txn, nss.ns());
+        WriteUnitOfWork wuow(&_opCtx);
+        database->dropCollection(&_opCtx, nss.ns());
         wuow.commit();
     }
 
     void insertDocument(Collection* collection, BSONObj obj) {
-        WriteUnitOfWork wuow(&_txn);
+        WriteUnitOfWork wuow(&_opCtx);
 
         const bool enforceQuota = false;
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection->insertDocument(&_txn, obj, nullOpDebug, enforceQuota));
+        ASSERT_OK(collection->insertDocument(&_opCtx, obj, nullOpDebug, enforceQuota));
         wuow.commit();
     }
 
-    OperationContext* txn() {
-        return &_txn;
+    OperationContext* opCtx() {
+        return &_opCtx;
     }
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     WorkingSet _ws;
 };
 
@@ -116,7 +116,7 @@ protected:
 class QueryStageCachedPlanFailure : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForRead ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
@@ -124,7 +124,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -136,20 +136,20 @@ public:
 
         // Get planner params.
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection, cq.get(), &plannerParams);
 
         // Queued data stage will return a failure during the cached plan trial period.
-        auto mockChild = stdx::make_unique<QueuedDataStage>(&_txn, &_ws);
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_opCtx, &_ws);
         mockChild->pushBack(PlanStage::FAILURE);
 
         // High enough so that we shouldn't trigger a replan based on works.
         const size_t decisionWorks = 50;
         CachedPlanStage cachedPlanStage(
-            &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+            &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
         PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
-                                    _txn.getServiceContext()->getFastClockSource());
+                                    _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
         // Make sure that we get 2 legit results back.
@@ -184,7 +184,7 @@ public:
 class QueryStageCachedPlanHitMaxWorks : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForRead ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
@@ -192,7 +192,7 @@ public:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -204,24 +204,24 @@ public:
 
         // Get planner params.
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection, cq.get(), &plannerParams);
 
         // Set up queued data stage to take a long time before returning EOF. Should be long
         // enough to trigger a replan.
         const size_t decisionWorks = 10;
         const size_t mockWorks =
             1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
-        auto mockChild = stdx::make_unique<QueuedDataStage>(&_txn, &_ws);
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_opCtx, &_ws);
         for (size_t i = 0; i < mockWorks; i++) {
             mockChild->pushBack(PlanStage::NEED_TIME);
         }
 
         CachedPlanStage cachedPlanStage(
-            &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+            &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
         PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
-                                    _txn.getServiceContext()->getFastClockSource());
+                                    _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
         // Make sure that we get 2 legit results back.

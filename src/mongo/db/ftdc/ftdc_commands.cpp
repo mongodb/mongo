@@ -88,7 +88,7 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
              int options,
@@ -96,7 +96,8 @@ public:
              BSONObjBuilder& result) override {
 
         result.append(
-            "data", FTDCController::get(txn->getServiceContext())->getMostRecentPeriodicDocument());
+            "data",
+            FTDCController::get(opCtx->getServiceContext())->getMostRecentPeriodicDocument());
 
         return true;
     }

@@ -88,13 +88,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto shardingState = ShardingState::get(txn);
+        auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         // Steps
@@ -128,7 +128,7 @@ public:
 
         // Step 1
 
-        Client* client = txn->getClient();
+        Client* client = opCtx->getClient();
         LastError::get(client).disable();
 
         const bool authoritative = cmdObj.getBoolField("authoritative");
@@ -156,7 +156,7 @@ public:
 
         // Validate shardName parameter.
         string shardName = cmdObj["shard"].str();
-        auto storedShardName = ShardingState::get(txn)->getShardName();
+        auto storedShardName = ShardingState::get(opCtx)->getShardName();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "received shardName " << shardName
                               << " which differs from stored shardName "
@@ -180,7 +180,7 @@ public:
             return false;
         }
 
-        ConnectionString storedConnStr = ShardingState::get(txn)->getConfigServer(txn);
+        ConnectionString storedConnStr = ShardingState::get(opCtx)->getConfigServer(opCtx);
         if (givenConnStr.getSetName() != storedConnStr.getSetName()) {
             errmsg = str::stream()
                 << "given config server set name: " << givenConnStr.getSetName()
@@ -215,10 +215,10 @@ public:
 
         {
             boost::optional<AutoGetDb> autoDb;
-            autoDb.emplace(txn, nss.db(), MODE_IS);
+            autoDb.emplace(opCtx, nss.db(), MODE_IS);
 
             // we can run on a slave up to here
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(txn,
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx,
                                                                                      nss.db())) {
                 result.append("errmsg", "not master");
                 result.append("note", "from post init in setShardVersion");
@@ -227,14 +227,14 @@ public:
 
             // Views do not require a shard version check.
             if (autoDb->getDb() && !autoDb->getDb()->getCollection(nss.ns()) &&
-                autoDb->getDb()->getViewCatalog()->lookup(txn, nss.ns())) {
+                autoDb->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
                 return true;
             }
 
             boost::optional<Lock::CollectionLock> collLock;
-            collLock.emplace(txn->lockState(), nss.ns(), MODE_IS);
+            collLock.emplace(opCtx->lockState(), nss.ns(), MODE_IS);
 
-            auto css = CollectionShardingState::get(txn, nss);
+            auto css = CollectionShardingState::get(opCtx, nss);
             const ChunkVersion collectionShardVersion =
                 (css->getMetadata() ? css->getMetadata()->getShardVersion()
                                     : ChunkVersion::UNSHARDED());
@@ -306,7 +306,7 @@ public:
                             collLock.reset();
                             autoDb.reset();
                             log() << "waiting till out of critical section";
-                            critSecSignal->waitFor(txn, Seconds(10));
+                            critSecSignal->waitFor(opCtx, Seconds(10));
                         }
                     }
 
@@ -329,7 +329,7 @@ public:
                             collLock.reset();
                             autoDb.reset();
                             log() << "waiting till out of critical section";
-                            critSecSignal->waitFor(txn, Seconds(10));
+                            critSecSignal->waitFor(opCtx, Seconds(10));
                         }
                     }
 
@@ -346,13 +346,13 @@ public:
 
         // Step 7
 
-        Status status = shardingState->onStaleShardVersion(txn, nss, requestedVersion);
+        Status status = shardingState->onStaleShardVersion(opCtx, nss, requestedVersion);
 
         {
-            AutoGetCollection autoColl(txn, nss, MODE_IS);
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
             ChunkVersion currVersion = ChunkVersion::UNSHARDED();
-            auto collMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
+            auto collMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata();
             if (collMetadata) {
                 currVersion = collMetadata->getShardVersion();
             }

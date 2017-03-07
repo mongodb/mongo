@@ -64,20 +64,20 @@ CollectionInfoCache::~CollectionInfoCache() {
     }
 }
 
-const UpdateIndexData& CollectionInfoCache::getIndexKeys(OperationContext* txn) const {
+const UpdateIndexData& CollectionInfoCache::getIndexKeys(OperationContext* opCtx) const {
     // This requires "some" lock, and MODE_IS is an expression for that, for now.
-    dassert(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
     invariant(_keysComputed);
     return _indexedPaths;
 }
 
-void CollectionInfoCache::computeIndexKeys(OperationContext* txn) {
+void CollectionInfoCache::computeIndexKeys(OperationContext* opCtx) {
     _indexedPaths.clear();
 
     bool hadTTLIndex = _hasTTLIndex;
     _hasTTLIndex = false;
 
-    IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);
+    IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(opCtx, true);
     while (i.more()) {
         IndexDescriptor* descriptor = i.next();
 
@@ -140,13 +140,13 @@ void CollectionInfoCache::computeIndexKeys(OperationContext* txn) {
     _keysComputed = true;
 }
 
-void CollectionInfoCache::notifyOfQuery(OperationContext* txn,
+void CollectionInfoCache::notifyOfQuery(OperationContext* opCtx,
                                         const std::set<std::string>& indexesUsed) {
     // Record indexes used to fulfill query.
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
         // This index should still exist, since the PlanExecutor would have been killed if the
         // index was dropped (and we would not get here).
-        dassert(NULL != _collection->getIndexCatalog()->findIndexByName(txn, *it));
+        dassert(NULL != _collection->getIndexCatalog()->findIndexByName(opCtx, *it));
 
         _indexUsageTracker.recordIndexAccess(*it);
     }
@@ -167,21 +167,21 @@ QuerySettings* CollectionInfoCache::getQuerySettings() const {
     return _querySettings.get();
 }
 
-void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* txn) {
+void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* opCtx) {
     std::vector<IndexEntry> indexEntries;
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
     const bool includeUnfinishedIndexes = true;
     IndexCatalog::IndexIterator ii =
-        _collection->getIndexCatalog()->getIndexIterator(txn, includeUnfinishedIndexes);
+        _collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         const IndexCatalogEntry* ice = ii.catalogEntry(desc);
         indexEntries.emplace_back(desc->keyPattern(),
                                   desc->getAccessMethodName(),
-                                  desc->isMultikey(txn),
-                                  ice->getMultikeyPaths(txn),
+                                  desc->isMultikey(opCtx),
+                                  ice->getMultikeyPaths(opCtx),
                                   desc->isSparse(),
                                   desc->unique(),
                                   desc->indexName(),
@@ -193,45 +193,45 @@ void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* txn) {
     _planCache->notifyOfIndexEntries(indexEntries);
 }
 
-void CollectionInfoCache::init(OperationContext* txn) {
+void CollectionInfoCache::init(OperationContext* opCtx) {
     // Requires exclusive collection lock.
-    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
 
     const bool includeUnfinishedIndexes = false;
     IndexCatalog::IndexIterator ii =
-        _collection->getIndexCatalog()->getIndexIterator(txn, includeUnfinishedIndexes);
+        _collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
     }
 
-    rebuildIndexData(txn);
+    rebuildIndexData(opCtx);
 }
 
-void CollectionInfoCache::addedIndex(OperationContext* txn, const IndexDescriptor* desc) {
+void CollectionInfoCache::addedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
     // Requires exclusive collection lock.
-    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
     invariant(desc);
 
-    rebuildIndexData(txn);
+    rebuildIndexData(opCtx);
 
     _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
 }
 
-void CollectionInfoCache::droppedIndex(OperationContext* txn, StringData indexName) {
+void CollectionInfoCache::droppedIndex(OperationContext* opCtx, StringData indexName) {
     // Requires exclusive collection lock.
-    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
 
-    rebuildIndexData(txn);
+    rebuildIndexData(opCtx);
     _indexUsageTracker.unregisterIndex(indexName);
 }
 
-void CollectionInfoCache::rebuildIndexData(OperationContext* txn) {
+void CollectionInfoCache::rebuildIndexData(OperationContext* opCtx) {
     clearQueryCache();
 
     _keysComputed = false;
-    computeIndexKeys(txn);
-    updatePlanCacheIndexEntries(txn);
+    computeIndexKeys(opCtx);
+    updatePlanCacheIndexEntries(opCtx);
 }
 
 CollectionIndexUsageMap CollectionInfoCache::getIndexUsageStats() const {

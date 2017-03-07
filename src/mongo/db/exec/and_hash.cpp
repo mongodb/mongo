@@ -412,7 +412,9 @@ PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
     }
 }
 
-void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void AndHashStage::doInvalidate(OperationContext* opCtx,
+                                const RecordId& dl,
+                                InvalidationType type) {
     // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;
@@ -424,7 +426,7 @@ void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, Inval
         if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
             WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
             if (member->hasRecordId() && member->recordId == dl) {
-                WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+                WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
                 _ws->flagForReview(_lookAheadResults[i]);
                 _lookAheadResults[i] = WorkingSet::INVALID_ID;
             }
@@ -453,7 +455,7 @@ void AndHashStage::doInvalidate(OperationContext* txn, const RecordId& dl, Inval
         _memUsage -= member->getMemUsage();
 
         // The RecordId is about to be invalidated.  Fetch it and clear the RecordId.
-        WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
 
         // Add the WSID to the to-be-reviewed list in the WS.
         _ws->flagForReview(id);

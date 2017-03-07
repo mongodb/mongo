@@ -70,7 +70,7 @@ public:
      * Returns Status::OK() if the document can be used. If there are any error or
      * conflicts along the way then those errors will be returned.
      */
-    Status populateDocumentWithQueryFields(OperationContext* txn,
+    Status populateDocumentWithQueryFields(OperationContext* opCtx,
                                            const BSONObj& query,
                                            const std::vector<FieldRef*>* immutablePaths,
                                            mutablebson::Document& doc) const;

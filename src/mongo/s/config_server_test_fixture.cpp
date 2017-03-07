@@ -174,7 +174,7 @@ std::shared_ptr<Shard> ConfigServerTestFixture::getConfigShard() const {
     return shardRegistry()->getConfigShard();
 }
 
-Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
+Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc) {
     auto insert(stdx::make_unique<BatchedInsertRequest>());
@@ -186,7 +186,7 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     auto config = getConfigShard();
     invariant(config);
 
-    auto insertResponse = config->runCommand(txn,
+    auto insertResponse = config->runCommand(opCtx,
                                              kReadPref,
                                              ns.db().toString(),
                                              request.toBSON(),
@@ -198,14 +198,14 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     return status;
 }
 
-StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* txn,
+StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* opCtx,
                                                                        const NamespaceString& ns,
                                                                        const BSONObj& filter) {
     auto config = getConfigShard();
     invariant(config);
 
     auto findStatus = config->exhaustiveFindOnConfig(
-        txn, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
+        opCtx, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -231,10 +231,10 @@ Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards
     return Status::OK();
 }
 
-StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn,
+StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opCtx,
                                                            const std::string& shardId) {
     auto doc = findOneOnConfigCollection(
-        txn, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name(shardId)));
+        opCtx, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name(shardId)));
     if (!doc.isOK()) {
         if (doc.getStatus() == ErrorCodes::NoMatchingDocument) {
             return {ErrorCodes::ShardNotFound,
@@ -258,21 +258,21 @@ Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks
     return Status::OK();
 }
 
-StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* txn,
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
                                                            const BSONObj& minKey) {
     auto doc = findOneOnConfigCollection(
-        txn, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::min() << minKey));
+        opCtx, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::min() << minKey));
     if (!doc.isOK())
         return doc.getStatus();
 
     return ChunkType::fromConfigBSON(doc.getValue());
 }
 
-StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* txn,
+StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* opCtx,
                                                                      const NamespaceString& ns) {
     auto configShard = getConfigShard();
 
-    auto response = configShard->runCommand(txn,
+    auto response = configShard->runCommand(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             ns.db().toString(),
                                             BSON("listIndexes" << ns.coll().toString()),

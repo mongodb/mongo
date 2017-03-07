@@ -157,18 +157,18 @@ std::string MozJSImplScope::getError() {
     return "";
 }
 
-void MozJSImplScope::registerOperation(OperationContext* txn) {
+void MozJSImplScope::registerOperation(OperationContext* opCtx) {
     invariant(_opCtx == nullptr);
 
     // getPooledScope may call registerOperation with a nullptr, so we have to
     // check for that here.
-    if (!txn)
+    if (!opCtx)
         return;
 
-    _opCtx = txn;
-    _opId = txn->getOpID();
+    _opCtx = opCtx;
+    _opId = opCtx->getOpID();
 
-    _engine->registerOperation(txn, this);
+    _engine->registerOperation(opCtx, this);
 }
 
 void MozJSImplScope::unregisterOperation() {
@@ -751,7 +751,7 @@ void MozJSImplScope::gc() {
     JS_RequestInterruptCallback(_runtime);
 }
 
-void MozJSImplScope::localConnectForDbEval(OperationContext* txn, const char* dbName) {
+void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
     MozJSEntry entry(this);
 
     if (_connectState == ConnectState::External)
@@ -782,7 +782,7 @@ void MozJSImplScope::localConnectForDbEval(OperationContext* txn, const char* db
     _connectState = ConnectState::Local;
     _localDBName = dbName;
 
-    loadStored(txn);
+    loadStored(opCtx);
 }
 
 void MozJSImplScope::externalSetup() {

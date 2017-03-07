@@ -39,7 +39,7 @@ namespace mongo {
 class Database;
 class OperationContext;
 
-long long deleteObjects(OperationContext* txn,
+long long deleteObjects(OperationContext* opCtx,
                         Collection* collection,
                         StringData ns,
                         BSONObj pattern,

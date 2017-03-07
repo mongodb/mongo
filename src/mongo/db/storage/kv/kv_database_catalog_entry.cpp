@@ -52,7 +52,7 @@ auto mongo::defaultDatabaseCatalogEntryFactory(const StringData name, KVStorageE
 
 namespace mongo {
 
-IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
+IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* opCtx,
                                                     const CollectionCatalogEntry* collection,
                                                     IndexCatalogEntry* index) {
     IndexDescriptor* desc = index->descriptor();
@@ -60,9 +60,9 @@ IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
     const std::string& type = desc->getAccessMethodName();
 
     std::string ident =
-        _engine->getCatalog()->getIndexIdent(txn, collection->ns().ns(), desc->indexName());
+        _engine->getCatalog()->getIndexIdent(opCtx, collection->ns().ns(), desc->indexName());
 
-    SortedDataInterface* sdi = _engine->getEngine()->getSortedDataInterface(txn, ident, desc);
+    SortedDataInterface* sdi = _engine->getEngine()->getSortedDataInterface(opCtx, ident, desc);
 
     if ("" == type)
         return new BtreeAccessMethod(index, sdi);

@@ -85,13 +85,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto shardingState = ShardingState::get(txn);
+        auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         const ShardId toShard(cmdObj["toShardName"].String());
@@ -106,7 +106,7 @@ public:
         // consistent and predictable, generally we'd refresh anyway, and to be paranoid.
         ChunkVersion currentVersion;
 
-        Status status = shardingState->refreshMetadataNow(txn, nss, &currentVersion);
+        Status status = shardingState->refreshMetadataNow(opCtx, nss, &currentVersion);
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start receiving chunk "
                                    << redact(chunkRange.toString()) << causedBy(redact(status));
@@ -118,7 +118,7 @@ public:
         const auto secondaryThrottle =
             uassertStatusOK(MigrationSecondaryThrottleOptions::createFromCommand(cmdObj));
         const auto writeConcern = uassertStatusOK(
-            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(txn, secondaryThrottle));
+            ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(opCtx, secondaryThrottle));
 
         BSONObj shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
 
@@ -199,13 +199,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        ShardingState::get(txn)->migrationDestinationManager()->report(result);
+        ShardingState::get(opCtx)->migrationDestinationManager()->report(result);
         return true;
     }
 
@@ -240,14 +240,14 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
-        auto mdm = ShardingState::get(txn)->migrationDestinationManager();
+        auto mdm = ShardingState::get(opCtx)->migrationDestinationManager();
         Status const status = mdm->startCommit(sessionId);
         mdm->report(result);
         if (!status.isOK()) {
@@ -288,13 +288,13 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto const mdm = ShardingState::get(txn)->migrationDestinationManager();
+        auto const mdm = ShardingState::get(opCtx)->migrationDestinationManager();
 
         auto migrationSessionIdStatus(MigrationSessionId::extractFromBSON(cmdObj));
 

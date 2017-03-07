@@ -260,9 +260,9 @@ public:
 class State {
 public:
     /**
-     * txn must outlive this State.
+     * opCtx must outlive this State.
      */
-    State(OperationContext* txn, const Config& c);
+    State(OperationContext* opCtx, const Config& c);
     ~State();
 
     void init();
@@ -305,7 +305,7 @@ public:
 
     void finalReduce(BSONList& values);
 
-    void finalReduce(OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
+    void finalReduce(OperationContext* opCtx, CurOp* op, ProgressMeterHolder& pm);
 
     // ------- cleanup/data positioning ----------
 
@@ -317,8 +317,8 @@ public:
     /**
        @return number objects in collection
      */
-    long long postProcessCollection(OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
-    long long postProcessCollectionNonAtomic(OperationContext* txn,
+    long long postProcessCollection(OperationContext* opCtx, CurOp* op, ProgressMeterHolder& pm);
+    long long postProcessCollectionNonAtomic(OperationContext* opCtx,
                                              CurOp* op,
                                              ProgressMeterHolder& pm,
                                              bool callerHoldsGlobalLock);
@@ -388,7 +388,7 @@ protected:
      */
     int _add(InMemory* im, const BSONObj& a);
 
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     std::unique_ptr<Scope> _scope;
     bool _onDisk;  // if the end result of this map reduce is disk or not
 

@@ -137,7 +137,7 @@ public:
     TicketServerParameter(TicketHolder* holder, const std::string& name)
         : ServerParameter(ServerParameterSet::getGlobal(), name, true, true), _holder(holder) {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b.append(name, _holder->outof());
     }
 
@@ -401,7 +401,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     return wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
 }
 
-int WiredTigerKVEngine::flushAllFiles(OperationContext* txn, bool sync) {
+int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
     if (_ephemeral) {
         return 0;
@@ -412,7 +412,7 @@ int WiredTigerKVEngine::flushAllFiles(OperationContext* txn, bool sync) {
     return 1;
 }
 
-Status WiredTigerKVEngine::beginBackup(OperationContext* txn) {
+Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
     invariant(!_backupSession);
 
     // This cursor will be freed by the backupSession being closed as the session is uncached
@@ -427,7 +427,7 @@ Status WiredTigerKVEngine::beginBackup(OperationContext* txn) {
     return Status::OK();
 }
 
-void WiredTigerKVEngine::endBackup(OperationContext* txn) {
+void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
     _backupSession.reset();
 }
 

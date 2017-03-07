@@ -67,7 +67,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -87,14 +87,14 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+            auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 continue;
             }
             const auto s = shardStatus.getValue();
 
             auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
-                txn,
+                opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 "admin",
                 BSON("fsync" << 1),

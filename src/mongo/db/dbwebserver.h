@@ -71,7 +71,7 @@ public:
         return _requiresREST;
     }
 
-    virtual void handle(OperationContext* txn,
+    virtual void handle(OperationContext* opCtx,
                         const char* rq,  // the full request
                         const std::string& url,
                         BSONObj params,
@@ -105,12 +105,12 @@ public:
                     const std::string& subheader = "");
     virtual ~WebStatusPlugin() {}
 
-    virtual void run(OperationContext* txn, std::stringstream& ss) = 0;
+    virtual void run(OperationContext* opCtx, std::stringstream& ss) = 0;
     /** called when web server stats up */
     virtual void init() = 0;
 
     static void initAll();
-    static void runAll(OperationContext* txn, std::stringstream& ss);
+    static void runAll(OperationContext* opCtx, std::stringstream& ss);
 
 private:
     std::string _name;
@@ -130,7 +130,7 @@ private:
                            std::vector<std::string>& headers,
                            const SockAddr& from);
 
-    bool _allowed(OperationContext* txn,
+    bool _allowed(OperationContext* opCtx,
                   const char* rq,
                   std::vector<std::string>& headers,
                   const SockAddr& from);

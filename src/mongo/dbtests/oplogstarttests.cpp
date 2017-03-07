@@ -45,17 +45,17 @@ static const NamespaceString nss("unittests.oplogstarttests");
 class Base {
 public:
     Base()
-        : _scopedXact(&_txn, MODE_X),
-          _lk(_txn.lockState()),
-          _context(&_txn, nss.ns()),
-          _client(&_txn) {
+        : _scopedXact(&_opCtx, MODE_X),
+          _lk(_opCtx.lockState()),
+          _context(&_opCtx, nss.ns()),
+          _client(&_opCtx) {
         Collection* c = _context.db()->getCollection(nss.ns());
         if (!c) {
-            WriteUnitOfWork wuow(&_txn);
-            c = _context.db()->createCollection(&_txn, nss.ns());
+            WriteUnitOfWork wuow(&_opCtx);
+            c = _context.db()->createCollection(&_opCtx, nss.ns());
             wuow.commit();
         }
-        ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
+        ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
     }
 
     ~Base() {
@@ -78,11 +78,11 @@ protected:
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            &_txn, std::move(qr), ExtensionsCallbackDisallowExtensions());
+            &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         _cq = std::move(statusWithCQ.getValue());
         _oplogws.reset(new WorkingSet());
-        _stage.reset(new OplogStart(&_txn, collection(), _cq->root(), _oplogws.get()));
+        _stage.reset(new OplogStart(&_opCtx, collection(), _cq->root(), _oplogws.get()));
     }
 
     void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {
@@ -100,7 +100,7 @@ protected:
 private:
     // The order of these is important in order to ensure order of destruction
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     ScopedTransaction _scopedXact;
     Lock::GlobalWrite _lk;
     OldClientContext _context;

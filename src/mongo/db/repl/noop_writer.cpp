@@ -77,8 +77,8 @@ private:
     void run(Seconds waitTime, NoopWriteFn noopWrite) {
         Client::initThread("NoopWriter");
         while (true) {
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-            OperationContext& txn = *txnPtr;
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
                 _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
@@ -86,7 +86,7 @@ private:
                 if (_inShutdown)
                     return;
             }
-            noopWrite(&txn);
+            noopWrite(&opCtx);
         }
     }
 
@@ -126,7 +126,7 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
 
     invariant(!_noopRunner);
     _noopRunner = stdx::make_unique<PeriodicNoopRunner>(
-        _writeInterval, [this](OperationContext* txn) { _writeNoop(txn); });
+        _writeInterval, [this](OperationContext* opCtx) { _writeNoop(opCtx); });
     return Status::OK();
 }
 
@@ -135,20 +135,20 @@ void NoopWriter::stopWritingPeriodicNoops() {
     _noopRunner.reset();
 }
 
-void NoopWriter::_writeNoop(OperationContext* txn) {
-    ScopedTransaction transaction(txn, MODE_IX);
+void NoopWriter::_writeNoop(OperationContext* opCtx) {
+    ScopedTransaction transaction(opCtx, MODE_IX);
     // Use GlobalLock + lockMMAPV1Flush instead of DBLock to allow return when the lock is not
     // available. It may happen when the primary steps down and a shared global lock is acquired.
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
     if (!lock.isLocked()) {
         LOG(1) << "Global lock is not available skipping noopWrite";
         return;
     }
-    txn->lockState()->lockMMAPV1Flush();
+    opCtx->lockState()->lockMMAPV1Flush();
 
-    auto replCoord = ReplicationCoordinator::get(txn);
+    auto replCoord = ReplicationCoordinator::get(opCtx);
     // Its a proxy for being a primary
-    if (!replCoord->canAcceptWritesForDatabase(txn, "admin")) {
+    if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
         LOG(1) << "Not a primary, skipping the noop write";
         return;
     }
@@ -166,11 +166,12 @@ void NoopWriter::_writeNoop(OperationContext* txn) {
                 << "Writing noop to oplog as there has been no writes to this replica set in over "
                 << _writeInterval;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork uow(txn);
-                txn->getClient()->getServiceContext()->getOpObserver()->onOpMessage(txn, kMsgObj);
+                WriteUnitOfWork uow(opCtx);
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
+                                                                                      kMsgObj);
                 uow.commit();
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeNoop", rsOplogName);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "writeNoop", rsOplogName);
         }
     }
 

@@ -55,7 +55,7 @@ public:
         h << "Returns connection-specific information such as logged-in users and their roles";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
              int,

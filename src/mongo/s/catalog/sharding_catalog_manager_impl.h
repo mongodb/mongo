@@ -52,43 +52,43 @@ public:
      */
     Status startup() override;
 
-    void shutDown(OperationContext* txn) override;
+    void shutDown(OperationContext* opCtx) override;
 
-    Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
+    Status initializeConfigDatabaseIfNeeded(OperationContext* opCtx) override;
 
     void discardCachedConfigDatabaseInitializationState() override;
 
-    Status addShardToZone(OperationContext* txn,
+    Status addShardToZone(OperationContext* opCtx,
                           const std::string& shardName,
                           const std::string& zoneName) override;
 
-    Status removeShardFromZone(OperationContext* txn,
+    Status removeShardFromZone(OperationContext* opCtx,
                                const std::string& shardName,
                                const std::string& zoneName) override;
 
-    Status assignKeyRangeToZone(OperationContext* txn,
+    Status assignKeyRangeToZone(OperationContext* opCtx,
                                 const NamespaceString& ns,
                                 const ChunkRange& range,
                                 const std::string& zoneName) override;
 
-    Status removeKeyRangeFromZone(OperationContext* txn,
+    Status removeKeyRangeFromZone(OperationContext* opCtx,
                                   const NamespaceString& ns,
                                   const ChunkRange& range) override;
 
-    Status commitChunkSplit(OperationContext* txn,
+    Status commitChunkSplit(OperationContext* opCtx,
                             const NamespaceString& ns,
                             const OID& requestEpoch,
                             const ChunkRange& range,
                             const std::vector<BSONObj>& splitPoints,
                             const std::string& shardName) override;
 
-    Status commitChunkMerge(OperationContext* txn,
+    Status commitChunkMerge(OperationContext* opCtx,
                             const NamespaceString& ns,
                             const OID& requestEpoch,
                             const std::vector<BSONObj>& chunkBoundaries,
                             const std::string& shardName) override;
 
-    StatusWith<BSONObj> commitChunkMigration(OperationContext* txn,
+    StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const ChunkType& migratedChunk,
                                              const boost::optional<ChunkType>& controlChunk,
@@ -98,15 +98,15 @@ public:
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
-    StatusWith<std::string> addShard(OperationContext* txn,
+    StatusWith<std::string> addShard(OperationContext* opCtx,
                                      const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize) override;
 
-    BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,
+    BSONObj createShardIdentityUpsertForAddShard(OperationContext* opCtx,
                                                  const std::string& shardName) override;
 
-    Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+    Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,
                                                   const std::string& version) override;
 
 private:
@@ -114,12 +114,12 @@ private:
      * Performs the necessary checks for version compatibility and creates a new config.version
      * document if the current cluster config is empty.
      */
-    Status _initConfigVersion(OperationContext* txn);
+    Status _initConfigVersion(OperationContext* opCtx);
 
     /**
      * Builds all the expected indexes on the config server.
      */
-    Status _initConfigIndexes(OperationContext* txn);
+    Status _initConfigIndexes(OperationContext* opCtx);
 
     /**
      * Used during addShard to determine if there is already an existing shard that matches the
@@ -132,7 +132,7 @@ private:
      * options, so the addShard attempt must be aborted.
      */
     StatusWith<boost::optional<ShardType>> _checkIfShardExists(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const ConnectionString& propsedShardConnectionString,
         const std::string* shardProposedName,
         long long maxSize);
@@ -153,7 +153,7 @@ private:
      * shard's name should be checked and if empty, one should be generated using some uniform
      * algorithm.
      */
-    StatusWith<ShardType> _validateHostAsShard(OperationContext* txn,
+    StatusWith<ShardType> _validateHostAsShard(OperationContext* opCtx,
                                                std::shared_ptr<RemoteCommandTargeter> targeter,
                                                const std::string* shardProposedName,
                                                const ConnectionString& connectionString);
@@ -164,13 +164,13 @@ private:
      * purposes.
      */
     StatusWith<std::vector<std::string>> _getDBNamesListFromShard(
-        OperationContext* txn, std::shared_ptr<RemoteCommandTargeter> targeter);
+        OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
      * ShardRegistry.
      */
-    StatusWith<Shard::CommandResponse> _runCommandForAddShard(OperationContext* txn,
+    StatusWith<Shard::CommandResponse> _runCommandForAddShard(OperationContext* opCtx,
                                                               RemoteCommandTargeter* targeter,
                                                               const std::string& dbName,
                                                               const BSONObj& cmdObj);

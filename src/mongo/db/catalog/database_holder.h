@@ -53,7 +53,7 @@ public:
      * Retrieves an already opened database or returns NULL. Must be called with the database
      * locked in at least IS-mode.
      */
-    Database* get(OperationContext* txn, StringData ns) const;
+    Database* get(OperationContext* opCtx, StringData ns) const;
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been
@@ -62,12 +62,12 @@ public:
      * @param justCreated Returns whether the database was newly created (true) or it already
      *          existed (false). Can be NULL if this information is not necessary.
      */
-    Database* openDb(OperationContext* txn, StringData ns, bool* justCreated = NULL);
+    Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = NULL);
 
     /**
      * Closes the specified database. Must be called with the database locked in X-mode.
      */
-    void close(OperationContext* txn, StringData ns);
+    void close(OperationContext* opCtx, StringData ns);
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
@@ -75,7 +75,7 @@ public:
      * @param result Populated with the names of the databases, which were closed.
      * @param force Force close even if something underway - use at shutdown
      */
-    bool closeAll(OperationContext* txn, BSONObjBuilder& result, bool force);
+    bool closeAll(OperationContext* opCtx, BSONObjBuilder& result, bool force);
 
     /**
      * Returns the set of existing database names that differ only in casing.

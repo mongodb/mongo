@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
+Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
                                               const ConnectionString& configCS,
                                               StringData distLockProcessId) {
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
@@ -82,7 +82,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* txn,
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     return initializeGlobalShardingState(
-        txn,
+        opCtx,
         configCS,
         distLockProcessId,
         std::move(shardFactory),

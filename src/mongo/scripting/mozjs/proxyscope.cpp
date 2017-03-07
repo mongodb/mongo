@@ -85,16 +85,16 @@ bool MozJSProxyScope::isKillPending() const {
     return _implScope->isKillPending();
 }
 
-void MozJSProxyScope::registerOperation(OperationContext* txn) {
-    run([&] { _implScope->registerOperation(txn); });
+void MozJSProxyScope::registerOperation(OperationContext* opCtx) {
+    run([&] { _implScope->registerOperation(opCtx); });
 }
 
 void MozJSProxyScope::unregisterOperation() {
     run([&] { _implScope->unregisterOperation(); });
 }
 
-void MozJSProxyScope::localConnectForDbEval(OperationContext* txn, const char* dbName) {
-    run([&] { _implScope->localConnectForDbEval(txn, dbName); });
+void MozJSProxyScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
+    run([&] { _implScope->localConnectForDbEval(opCtx, dbName); });
 }
 
 void MozJSProxyScope::externalSetup() {

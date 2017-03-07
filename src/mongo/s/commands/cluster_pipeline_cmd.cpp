@@ -72,7 +72,7 @@ public:
         return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
@@ -83,7 +83,7 @@ public:
         ClusterAggregate::Namespaces nsStruct;
         nsStruct.requestedNss = nss;
         nsStruct.executionNss = std::move(nss);
-        auto status = ClusterAggregate::runAggregate(txn, nsStruct, cmdObj, options, &result);
+        auto status = ClusterAggregate::runAggregate(opCtx, nsStruct, cmdObj, options, &result);
         appendCommandStatus(result, status);
         return status.isOK();
     }

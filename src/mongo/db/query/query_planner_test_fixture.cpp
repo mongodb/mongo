@@ -56,7 +56,7 @@ void QueryPlannerTest::setUp() {
     addIndex(BSON("_id" << 1));
 }
 
-OperationContext* QueryPlannerTest::txn() {
+OperationContext* QueryPlannerTest::opCtx() {
     return opCtx.get();
 }
 
@@ -253,7 +253,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     qr->setMax(maxObj);
     qr->setSnapshot(snapshot);
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -330,7 +330,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     qr->setMax(maxObj);
     qr->setSnapshot(snapshot);
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -349,7 +349,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
@@ -368,7 +368,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(txn(), std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx(), std::move(qr), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 

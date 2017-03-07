@@ -80,7 +80,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -109,8 +109,8 @@ public:
 
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
-        ScopedTransaction scopedXact(txn, MODE_IS);
-        AutoGetDb autoDb(txn, ns, MODE_S);
+        ScopedTransaction scopedXact(opCtx, MODE_IS);
+        AutoGetDb autoDb(opCtx, ns, MODE_S);
         Database* db = autoDb.getDb();
         if (db) {
             db->getDatabaseCatalogEntry()->getCollectionNamespaces(&colls);
@@ -152,7 +152,7 @@ public:
                 continue;
 
             bool fromCache = false;
-            string hash = _hashCollection(txn, db, fullCollectionName, &fromCache);
+            string hash = _hashCollection(opCtx, db, fullCollectionName, &fromCache);
 
             bb.append(shortCollectionName, hash);
 
@@ -174,11 +174,11 @@ public:
         return 1;
     }
 
-    void wipeCacheForCollection(OperationContext* txn, const NamespaceString& ns) {
+    void wipeCacheForCollection(OperationContext* opCtx, const NamespaceString& ns) {
         if (!_isCachable(ns))
             return;
 
-        txn->recoveryUnit()->onCommit([this, txn, ns] {
+        opCtx->recoveryUnit()->onCommit([this, opCtx, ns] {
             stdx::lock_guard<stdx::mutex> lk(_cachedHashedMutex);
             if (ns.isCommand()) {
                 // The <dbName>.$cmd namespace can represent a command that
@@ -274,9 +274,9 @@ private:
 
 }  // namespace
 
-void logOpForDbHash(OperationContext* txn, const char* ns) {
+void logOpForDbHash(OperationContext* opCtx, const char* ns) {
     NamespaceString nsString(ns);
-    dbhashCmd.wipeCacheForCollection(txn, nsString);
+    dbhashCmd.wipeCacheForCollection(opCtx, nsString);
 }
 
 }  // namespace mongo

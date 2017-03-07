@@ -77,15 +77,15 @@ public:
         help << " example: { renameCollection: foo.a, to: bar.b }";
     }
 
-    static void dropCollection(OperationContext* txn, Database* db, StringData collName) {
-        WriteUnitOfWork wunit(txn);
-        if (db->dropCollection(txn, collName).isOK()) {
+    static void dropCollection(OperationContext* opCtx, Database* db, StringData collName) {
+        WriteUnitOfWork wunit(opCtx);
+        if (db->dropCollection(opCtx, collName).isOK()) {
             // ignoring failure case
             wunit.commit();
         }
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -146,7 +146,7 @@ public:
         }
 
         return appendCommandStatus(result,
-                                   renameCollection(txn,
+                                   renameCollection(opCtx,
                                                     source,
                                                     target,
                                                     cmdObj["dropTarget"].trueValue(),

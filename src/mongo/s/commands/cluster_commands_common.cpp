@@ -51,13 +51,13 @@ using std::string;
 
 namespace {
 
-bool forceRemoteCheckShardVersionCB(OperationContext* txn, const string& ns) {
+bool forceRemoteCheckShardVersionCB(OperationContext* opCtx, const string& ns) {
     const NamespaceString nss(ns);
 
     // This will force the database catalog entry to be reloaded
-    Grid::get(txn)->catalogCache()->invalidate(nss.db());
+    Grid::get(opCtx)->catalogCache()->invalidate(nss.db());
 
-    auto scopedCMStatus = ScopedChunkManager::get(txn, nss);
+    auto scopedCMStatus = ScopedChunkManager::get(opCtx, nss);
     if (!scopedCMStatus.isOK()) {
         return false;
     }
@@ -113,7 +113,7 @@ void Future::CommandResult::init() {
     }
 }
 
-bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
+bool Future::CommandResult::join(OperationContext* opCtx, int maxRetries) {
     if (_done) {
         return _ok;
     }
@@ -155,7 +155,7 @@ bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
             }
 
             if (i >= maxRetries / 2) {
-                if (!forceRemoteCheckShardVersionCB(txn, staleNS)) {
+                if (!forceRemoteCheckShardVersionCB(opCtx, staleNS)) {
                     error() << "Future::spawnCommand (part 2) no config detected"
                             << causedBy(redact(e));
                     throw e;
@@ -169,7 +169,7 @@ bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
                           << "for lazy command " << redact(_cmd) << ", could not refresh "
                           << staleNS;
             } else {
-                versionManager.checkShardVersionCB(txn, _conn, staleNS, false, 1);
+                versionManager.checkShardVersionCB(opCtx, _conn, staleNS, false, 1);
             }
 
             LOG(i > 1 ? 0 : 1) << "retrying lazy command" << causedBy(redact(e));
@@ -242,13 +242,13 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
     return Command::appendCommandStatus(result, status);
 }
 
-std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* txn,
+std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
                                                            StringData dbName) {
     const auto dbNameStr = dbName.toString();
 
     std::vector<CollectionType> collectionsOnConfig;
-    uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getCollections(
-        txn, &dbNameStr, &collectionsOnConfig, nullptr));
+    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getCollections(
+        opCtx, &dbNameStr, &collectionsOnConfig, nullptr));
 
     std::vector<NamespaceString> collectionsToReturn;
     for (const auto& coll : collectionsOnConfig) {

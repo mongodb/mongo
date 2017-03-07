@@ -154,7 +154,7 @@ public:
          *
          * Can block.
          */
-        StatusWith<ClusterQueryResult> next(OperationContext* txn);
+        StatusWith<ClusterQueryResult> next(OperationContext* opCtx);
 
         /**
          * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
@@ -261,7 +261,7 @@ public:
      *
      * Does not block.
      */
-    StatusWith<CursorId> registerCursor(OperationContext* txn,
+    StatusWith<CursorId> registerCursor(OperationContext* opCtx,
                                         std::unique_ptr<ClusterClientCursor> cursor,
                                         const NamespaceString& nss,
                                         CursorType cursorType,
@@ -282,7 +282,7 @@ public:
      */
     StatusWith<PinnedCursor> checkOutCursor(const NamespaceString& nss,
                                             CursorId cursorId,
-                                            OperationContext* txn);
+                                            OperationContext* opCtx);
 
     /**
      * Informs the manager that the given cursor should be killed.  The cursor need not necessarily

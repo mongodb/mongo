@@ -117,7 +117,7 @@ UpdateType getUpdateExprType(const BSONObj& updateExpr) {
  *     { _id : { $lt : 30 } } => false
  *     { foo : <anything> } => false
  */
-bool isExactIdQuery(OperationContext* txn, const CanonicalQuery& query, ChunkManager* manager) {
+bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, ChunkManager* manager) {
     auto shardKey = virtualIdShardKey.extractShardKeyFromQuery(query);
     BSONElement idElt = shardKey["_id"];
 
@@ -288,8 +288,8 @@ ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss, TargeterS
     : _nss(nss), _needsTargetingRefresh(false), _stats(stats) {}
 
 
-Status ChunkManagerTargeter::init(OperationContext* txn) {
-    auto scopedCMStatus = ScopedChunkManager::getOrCreate(txn, _nss);
+Status ChunkManagerTargeter::init(OperationContext* opCtx) {
+    auto scopedCMStatus = ScopedChunkManager::getOrCreate(opCtx, _nss);
     if (!scopedCMStatus.isOK()) {
         return scopedCMStatus.getStatus();
     }
@@ -305,7 +305,7 @@ const NamespaceString& ChunkManagerTargeter::getNS() const {
     return _nss;
 }
 
-Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
+Status ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
                                           const BSONObj& doc,
                                           ShardEndpoint** endpoint) const {
     BSONObj shardKey;
@@ -349,7 +349,7 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
     return Status::OK();
 }
 
-Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
+Status ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
                                           const BatchedUpdateDocument& updateDoc,
                                           vector<ShardEndpoint*>* endpoints) const {
     //
@@ -393,7 +393,7 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
         if (updateType == UpdateType_OpStyle) {
             // Target using the query
             StatusWith<BSONObj> status =
-                _manager->getShardKeyPattern().extractShardKeyFromQuery(txn, query);
+                _manager->getShardKeyPattern().extractShardKeyFromQuery(opCtx, query);
 
             // Bad query
             if (!status.isOK())
@@ -445,7 +445,7 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     }
-    auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
+    auto cq = CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
     if (!cq.isOK()) {
         return Status(cq.getStatus().code(),
                       str::stream() << "Could not parse update query " << updateDoc.getQuery()
@@ -453,7 +453,8 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
     }
 
     // Single (non-multi) updates must target a single shard or be exact-ID.
-    if (_manager && !updateDoc.getMulti() && !isExactIdQuery(txn, *cq.getValue(), _manager.get())) {
+    if (_manager && !updateDoc.getMulti() &&
+        !isExactIdQuery(opCtx, *cq.getValue(), _manager.get())) {
         return Status(ErrorCodes::ShardKeyNotFound,
                       str::stream()
                           << "A single update on a sharded collection must contain an exact "
@@ -466,13 +467,13 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
     }
 
     if (updateType == UpdateType_OpStyle) {
-        return targetQuery(txn, query, collation, endpoints);
+        return targetQuery(opCtx, query, collation, endpoints);
     } else {
-        return targetDoc(txn, updateExpr, collation, endpoints);
+        return targetDoc(opCtx, updateExpr, collation, endpoints);
     }
 }
 
-Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
+Status ChunkManagerTargeter::targetDelete(OperationContext* opCtx,
                                           const BatchedDeleteDocument& deleteDoc,
                                           vector<ShardEndpoint*>* endpoints) const {
     BSONObj shardKey;
@@ -486,7 +487,7 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
 
         // Get the shard key
         StatusWith<BSONObj> status =
-            _manager->getShardKeyPattern().extractShardKeyFromQuery(txn, deleteDoc.getQuery());
+            _manager->getShardKeyPattern().extractShardKeyFromQuery(opCtx, deleteDoc.getQuery());
 
         // Bad query
         if (!status.isOK())
@@ -516,7 +517,7 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
     }
-    auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
+    auto cq = CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
     if (!cq.isOK()) {
         return Status(cq.getStatus().code(),
                       str::stream() << "Could not parse delete query " << deleteDoc.getQuery()
@@ -525,7 +526,7 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
 
     // Single deletes must target a single shard or be exact-ID.
     if (_manager && deleteDoc.getLimit() == 1 &&
-        !isExactIdQuery(txn, *cq.getValue(), _manager.get())) {
+        !isExactIdQuery(opCtx, *cq.getValue(), _manager.get())) {
         return Status(ErrorCodes::ShardKeyNotFound,
                       str::stream()
                           << "A single delete on a sharded collection must contain an exact "
@@ -537,19 +538,19 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
                           << _manager->getShardKeyPattern().toString());
     }
 
-    return targetQuery(txn, deleteDoc.getQuery(), collation, endpoints);
+    return targetQuery(opCtx, deleteDoc.getQuery(), collation, endpoints);
 }
 
-Status ChunkManagerTargeter::targetDoc(OperationContext* txn,
+Status ChunkManagerTargeter::targetDoc(OperationContext* opCtx,
                                        const BSONObj& doc,
                                        const BSONObj& collation,
                                        vector<ShardEndpoint*>* endpoints) const {
     // NOTE: This is weird and fragile, but it's the way our language works right now -
     // documents are either A) invalid or B) valid equality queries over themselves.
-    return targetQuery(txn, doc, collation, endpoints);
+    return targetQuery(opCtx, doc, collation, endpoints);
 }
 
-Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
+Status ChunkManagerTargeter::targetQuery(OperationContext* opCtx,
                                          const BSONObj& query,
                                          const BSONObj& collation,
                                          vector<ShardEndpoint*>* endpoints) const {
@@ -562,7 +563,7 @@ Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
     set<ShardId> shardIds;
     if (_manager) {
         try {
-            _manager->getShardIdsForQuery(txn, query, collation, &shardIds);
+            _manager->getShardIdsForQuery(opCtx, query, collation, &shardIds);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -671,7 +672,7 @@ void ChunkManagerTargeter::noteCouldNotTarget() {
     _needsTargetingRefresh = true;
 }
 
-Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasChanged) {
+Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {
     bool dummy;
     if (!wasChanged) {
         wasChanged = &dummy;
@@ -694,7 +695,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     shared_ptr<ChunkManager> lastManager = _manager;
     shared_ptr<Shard> lastPrimary = _primary;
 
-    auto scopedCMStatus = ScopedChunkManager::getOrCreate(txn, _nss);
+    auto scopedCMStatus = ScopedChunkManager::getOrCreate(opCtx, _nss);
     if (!scopedCMStatus.isOK()) {
         return scopedCMStatus.getStatus();
     }
@@ -724,7 +725,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
         // If didn't already refresh the targeting information, refresh it
         if (!alreadyRefreshed) {
             // To match previous behavior, we just need an incremental refresh here
-            return refreshNow(txn, RefreshType_RefreshChunkManager);
+            return refreshNow(opCtx, RefreshType_RefreshChunkManager);
         }
 
         *wasChanged = isMetadataDifferent(lastManager, lastPrimary, _manager, _primary);
@@ -740,10 +741,10 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
 
         if (result == CompareResult_Unknown) {
             // Our current shard versions aren't all comparable to the old versions, maybe drop
-            return refreshNow(txn, RefreshType_ReloadDatabase);
+            return refreshNow(opCtx, RefreshType_ReloadDatabase);
         } else if (result == CompareResult_LT) {
             // Our current shard versions are less than the remote versions, but no drop
-            return refreshNow(txn, RefreshType_RefreshChunkManager);
+            return refreshNow(opCtx, RefreshType_RefreshChunkManager);
         }
 
         *wasChanged = isMetadataDifferent(lastManager, lastPrimary, _manager, _primary);
@@ -755,17 +756,17 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     return Status::OK();
 }
 
-Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refreshType) {
+Status ChunkManagerTargeter::refreshNow(OperationContext* opCtx, RefreshType refreshType) {
     if (refreshType == RefreshType_ReloadDatabase) {
-        Grid::get(txn)->catalogCache()->invalidate(_nss.db().toString());
+        Grid::get(opCtx)->catalogCache()->invalidate(_nss.db().toString());
     }
 
     // Try not to spam the configs
     refreshBackoff();
 
-    ScopedChunkManager::refreshAndGet(txn, _nss);
+    ScopedChunkManager::refreshAndGet(opCtx, _nss);
 
-    auto scopedCMStatus = ScopedChunkManager::get(txn, _nss);
+    auto scopedCMStatus = ScopedChunkManager::get(opCtx, _nss);
     if (!scopedCMStatus.isOK()) {
         return scopedCMStatus.getStatus();
     }

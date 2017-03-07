@@ -56,26 +56,26 @@ public:
      *
      * Must not be called with legacy '.$cmd' commands.
      */
-    static void queryOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
+    static void queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style getMore request and sends the response back on success (or cursor not
      * found) or throws on error.
      */
-    static void getMore(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
+    static void getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style killCursors request. Doesn't send any response on success or throws on
      * error.
      */
-    static void killCursors(OperationContext* txn, DbMessage* dbm);
+    static void killCursors(OperationContext* opCtx, DbMessage* dbm);
 
     /**
      * Handles a legacy-style write operation request and updates the last error state on the client
      * with the result from the operation. Doesn't send any response back and does not throw on
      * errors.
      */
-    static void writeOp(OperationContext* txn, DbMessage* dbm);
+    static void writeOp(OperationContext* opCtx, DbMessage* dbm);
 
     /**
      * Executes a legacy-style ($cmd namespace) command. Does not throw and returns the response
@@ -84,7 +84,9 @@ public:
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static void clientCommandOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
+    static void clientCommandOp(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                DbMessage* dbm);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
@@ -94,7 +96,7 @@ public:
      * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
      * $explain modifier.
      */
-    static Status explainFind(OperationContext* txn,
+    static Status explainFind(OperationContext* opCtx,
                               const BSONObj& findCommand,
                               const QueryRequest& qr,
                               ExplainCommon::Verbosity verbosity,
@@ -117,7 +119,7 @@ public:
      * TODO: Replace these methods and all other methods of command dispatch with a more general
      * command op framework.
      */
-    static void commandOp(OperationContext* txn,
+    static void commandOp(OperationContext* opCtx,
                           const std::string& db,
                           const BSONObj& command,
                           int options,

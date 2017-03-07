@@ -56,14 +56,14 @@ namespace {
  * (2) TODO should we do this using N threads? Would be quite easy see Hackenberg paper table
  *  5 and 6. 2 threads might be a good balance.
  */
-void WRITETODATAFILES(OperationContext* txn,
+void WRITETODATAFILES(OperationContext* opCtx,
                       const JSectHeader& h,
                       const AlignedBuilder& uncompressed) {
     Timer t;
 
     LOG(4) << "WRITETODATAFILES BEGIN";
 
-    RecoveryJob::get().processSection(txn, &h, uncompressed.buf(), uncompressed.len(), NULL);
+    RecoveryJob::get().processSection(opCtx, &h, uncompressed.buf(), uncompressed.len(), NULL);
 
     const long long m = t.micros();
     stats.curr()->_writeToDataFilesMicros += m;

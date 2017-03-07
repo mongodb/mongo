@@ -51,7 +51,7 @@ class TestHook : public EgressMetadataHook {
 public:
     TestHook(string fieldName, ReadReplyArgs* arg) : _fieldName(fieldName), _arg(arg) {}
 
-    Status writeRequestMetadata(OperationContext* txn,
+    Status writeRequestMetadata(OperationContext* opCtx,
                                 const HostAndPort& requestDestination,
                                 BSONObjBuilder* metadataBob) override {
         metadataBob->append(_fieldName, requestDestination.toString());
@@ -74,7 +74,7 @@ class FixedStatusTestHook : public EgressMetadataHook {
 public:
     FixedStatusTestHook(Status status) : _toRet(status) {}
 
-    Status writeRequestMetadata(OperationContext* txn,
+    Status writeRequestMetadata(OperationContext* opCtx,
                                 const HostAndPort& requestDestination,
                                 BSONObjBuilder* metadataBob) override {
         return _toRet;

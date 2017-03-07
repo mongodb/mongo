@@ -52,15 +52,15 @@ using std::shared_ptr;
 
 class CountBase {
 public:
-    CountBase() : _client(&_txn) {}
+    CountBase() : _client(&_opCtx) {}
 
     virtual ~CountBase() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
         _client.dropCollection(ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
     void insert(const BSONObj& obj) {
@@ -93,7 +93,7 @@ public:
     IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
         Collection* collection = db->getCollection(ns());
         std::vector<IndexDescriptor*> indexes;
-        collection->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);
+        collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
     }
 
@@ -103,7 +103,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;
@@ -116,7 +116,7 @@ private:
 class QueryStageCountScanDups : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert some docs
         insert(BSON("a" << BSON_ARRAY(5 << 7)));
@@ -135,7 +135,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(2, numCounted);
@@ -148,7 +148,7 @@ public:
 class QueryStageCountScanInclusiveBounds : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert some docs
         for (int i = 0; i < 10; ++i) {
@@ -167,7 +167,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(5, numCounted);
@@ -180,7 +180,7 @@ public:
 class QueryStageCountScanExclusiveBounds : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert some docs
         for (int i = 0; i < 10; ++i) {
@@ -199,7 +199,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(3, numCounted);
@@ -212,7 +212,7 @@ public:
 class QueryStageCountScanLowerBound : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert doc, add index
         insert(BSON("a" << 2));
@@ -227,7 +227,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -240,7 +240,7 @@ public:
 class QueryStageCountScanNothingInInterval : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert documents, add index
         insert(BSON("a" << 2));
@@ -256,7 +256,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -270,7 +270,7 @@ public:
 class QueryStageCountScanNothingInIntervalFirstMatchTooHigh : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert some documents, add index
         insert(BSON("a" << 2));
@@ -286,7 +286,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -300,7 +300,7 @@ public:
 class QueryStageCountScanNoChangeDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -317,7 +317,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -353,7 +353,7 @@ public:
 class QueryStageCountScanDeleteDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -370,7 +370,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -409,7 +409,7 @@ public:
 class QueryStageCountScanInsertNewDocsDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -426,7 +426,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -468,7 +468,7 @@ public:
 class QueryStageCountScanBecomesMultiKeyDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -485,7 +485,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -523,7 +523,7 @@ public:
 class QueryStageCountScanUnusedKeys : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert docs, add index
         for (int i = 0; i < 10; ++i) {
@@ -545,7 +545,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(7, numCounted);
@@ -558,7 +558,7 @@ public:
 class QueryStageCountScanUnusedEndKey : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert docs, add index
         for (int i = 0; i < 10; ++i) {
@@ -578,7 +578,7 @@ public:
         params.endKeyInclusive = true;  // yes?
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(9, numCounted);
@@ -591,7 +591,7 @@ public:
 class QueryStageCountScanKeyBecomesUnusedDuringYield : public CountBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_opCtx, ns());
 
         // Insert documents, add index
         for (int i = 0; i < 10; ++i) {
@@ -608,7 +608,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(&_txn, params, &ws);
+        CountScan count(&_opCtx, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;

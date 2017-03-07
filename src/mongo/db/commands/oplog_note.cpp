@@ -69,7 +69,7 @@ public:
         }
         return Status::OK();
     }
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
@@ -87,11 +87,11 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        ScopedTransaction scopedXact(txn, MODE_X);
-        Lock::GlobalWrite globalWrite(txn->lockState());
+        ScopedTransaction scopedXact(opCtx, MODE_X);
+        Lock::GlobalWrite globalWrite(opCtx->lockState());
 
-        WriteUnitOfWork wuow(txn);
-        getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, dataElement.Obj());
+        WriteUnitOfWork wuow(opCtx);
+        getGlobalServiceContext()->getOpObserver()->onOpMessage(opCtx, dataElement.Obj());
         wuow.commit();
         return true;
     }

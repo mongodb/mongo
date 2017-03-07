@@ -81,12 +81,12 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
 
 }  // namespace
 
-Status verifySystemIndexes(OperationContext* txn) {
+Status verifySystemIndexes(OperationContext* opCtx) {
     const NamespaceString systemUsers = AuthorizationManager::usersCollectionNamespace;
 
     // Make sure the old unique index from v2.4 on system.users doesn't exist.
-    ScopedTransaction scopedXact(txn, MODE_IX);
-    AutoGetDb autoDb(txn, systemUsers.db(), MODE_X);
+    ScopedTransaction scopedXact(opCtx, MODE_IX);
+    AutoGetDb autoDb(opCtx, systemUsers.db(), MODE_X);
     if (!autoDb.getDb()) {
         return Status::OK();
     }
@@ -98,7 +98,7 @@ Status verifySystemIndexes(OperationContext* txn) {
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
     std::vector<IndexDescriptor*> indexes;
-    indexCatalog->findIndexesByKeyPattern(txn, v1SystemUsersKeyPattern, false, &indexes);
+    indexCatalog->findIndexesByKeyPattern(opCtx, v1SystemUsersKeyPattern, false, &indexes);
 
     if (indexCatalog && !indexes.empty()) {
         fassert(ErrorCodes::AmbiguousIndexKeyPattern, indexes.size() == 1);
@@ -111,19 +111,19 @@ Status verifySystemIndexes(OperationContext* txn) {
     return Status::OK();
 }
 
-void createSystemIndexes(OperationContext* txn, Collection* collection) {
+void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
     if (ns == AuthorizationManager::usersCollectionNamespace) {
         collection->getIndexCatalog()->createIndexOnEmptyCollection(
-            txn,
+            opCtx,
             BSON("name" << v3SystemUsersIndexName << "ns" << collection->ns().ns() << "key"
                         << v3SystemUsersKeyPattern
                         << "unique"
                         << true));
     } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
         collection->getIndexCatalog()->createIndexOnEmptyCollection(
-            txn,
+            opCtx,
             BSON("name" << v3SystemRolesIndexName << "ns" << collection->ns().ns() << "key"
                         << v3SystemRolesKeyPattern
                         << "unique"

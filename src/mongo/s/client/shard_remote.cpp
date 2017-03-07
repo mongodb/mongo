@@ -141,22 +141,22 @@ std::string ShardRemote::toString() const {
     return getId().toString() + ":" + _originalConnString.toString();
 }
 
-BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* txn,
+BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
                                                const ReadPreferenceSetting& readPref) {
     BSONObjBuilder builder;
     if (logger::globalLogDomain()->shouldLog(
             logger::LogComponent::kTracking,
             logger::LogSeverity::Debug(1))) {  // avoid performance overhead if not logging
-        if (!TrackingMetadata::get(txn).getIsLogged()) {
-            if (!TrackingMetadata::get(txn).getOperId()) {
-                TrackingMetadata::get(txn).initWithOperName("NotSet");
+        if (!TrackingMetadata::get(opCtx).getIsLogged()) {
+            if (!TrackingMetadata::get(opCtx).getOperId()) {
+                TrackingMetadata::get(opCtx).initWithOperName("NotSet");
             }
             MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
-                << TrackingMetadata::get(txn).toString();
-            TrackingMetadata::get(txn).setIsLogged(true);
+                << TrackingMetadata::get(opCtx).toString();
+            TrackingMetadata::get(opCtx).setIsLogged(true);
         }
 
-        TrackingMetadata metadata = TrackingMetadata::get(txn).constructChildMetadata();
+        TrackingMetadata metadata = TrackingMetadata::get(opCtx).constructChildMetadata();
         metadata.writeToMetadata(&builder);
     }
 
@@ -175,7 +175,7 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* txn,
     return builder.obj();
 }
 
-Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
+Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* opCtx,
                                                  const ReadPreferenceSetting& readPref,
                                                  const string& dbName,
                                                  Milliseconds maxTimeMSOverride,
@@ -185,26 +185,26 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
     if (getId() == "config") {
         readPrefWithMinOpTime.minOpTime = grid.configOpTime();
     }
-    const auto host = _targeter->findHost(txn, readPrefWithMinOpTime);
+    const auto host = _targeter->findHost(opCtx, readPrefWithMinOpTime);
     if (!host.isOK()) {
         return Shard::HostWithResponse(boost::none, host.getStatus());
     }
 
     const Milliseconds requestTimeout =
-        std::min(txn->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+        std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
 
     const RemoteCommandRequest request(
         host.getValue(),
         dbName,
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
-        _appendMetadataForCommand(txn, readPrefWithMinOpTime),
-        txn,
+        _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
+        opCtx,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 
     RemoteCommandResponse swResponse =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    TaskExecutor* executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
+    TaskExecutor* executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto callStatus = executor->scheduleRemoteCommand(
         request,
         [&swResponse](const RemoteCommandCallbackArgs& args) { swResponse = args.response; });
@@ -241,7 +241,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
 }
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
@@ -252,7 +252,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
     readPrefWithMinOpTime.minOpTime = grid.configOpTime();
 
-    const auto host = _targeter->findHost(txn, readPrefWithMinOpTime);
+    const auto host = _targeter->findHost(opCtx, readPrefWithMinOpTime);
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -313,7 +313,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     }
 
     const Milliseconds maxTimeMS =
-        std::min(txn->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
+        std::min(opCtx->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
 
     BSONObjBuilder findCmdBuilder;
 
@@ -331,12 +331,12 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         qr.asFindCommand(&findCmdBuilder);
     }
 
-    Fetcher fetcher(Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
+    Fetcher fetcher(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
                     host.getValue(),
                     nss.db().toString(),
                     findCmdBuilder.done(),
                     fetcherCallback,
-                    _appendMetadataForCommand(txn, readPrefWithMinOpTime),
+                    _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
                     maxTimeMS);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
@@ -357,7 +357,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     return response;
 }
 
-Status ShardRemote::createIndexOnConfig(OperationContext* txn,
+Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const BSONObj& keys,
                                         bool unique) {

@@ -69,20 +69,22 @@ public:
      *
      * Returns !OK if the information could not be initialized.
      */
-    Status init(OperationContext* txn);
+    Status init(OperationContext* opCtx);
 
     const NamespaceString& getNS() const;
 
     // Returns ShardKeyNotFound if document does not have a full shard key.
-    Status targetInsert(OperationContext* txn, const BSONObj& doc, ShardEndpoint** endpoint) const;
+    Status targetInsert(OperationContext* opCtx,
+                        const BSONObj& doc,
+                        ShardEndpoint** endpoint) const;
 
     // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
-    Status targetUpdate(OperationContext* txn,
+    Status targetUpdate(OperationContext* opCtx,
                         const BatchedUpdateDocument& updateDoc,
                         std::vector<ShardEndpoint*>* endpoints) const;
 
     // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
-    Status targetDelete(OperationContext* txn,
+    Status targetDelete(OperationContext* opCtx,
                         const BatchedDeleteDocument& deleteDoc,
                         std::vector<ShardEndpoint*>* endpoints) const;
 
@@ -103,7 +105,7 @@ public:
      *
      * Also see NSTargeter::refreshIfNeeded().
      */
-    Status refreshIfNeeded(OperationContext* txn, bool* wasChanged);
+    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged);
 
 private:
     // Different ways we can refresh metadata
@@ -120,7 +122,7 @@ private:
     /**
      * Performs an actual refresh from the config server.
      */
-    Status refreshNow(OperationContext* txn, RefreshType refreshType);
+    Status refreshNow(OperationContext* opCtx, RefreshType refreshType);
 
     /**
      * Returns a vector of ShardEndpoints where a document might need to be placed.
@@ -129,7 +131,7 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    Status targetDoc(OperationContext* txn,
+    Status targetDoc(OperationContext* opCtx,
                      const BSONObj& doc,
                      const BSONObj& collation,
                      std::vector<ShardEndpoint*>* endpoints) const;
@@ -141,7 +143,7 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    Status targetQuery(OperationContext* txn,
+    Status targetQuery(OperationContext* opCtx,
                        const BSONObj& query,
                        const BSONObj& collation,
                        std::vector<ShardEndpoint*>* endpoints) const;

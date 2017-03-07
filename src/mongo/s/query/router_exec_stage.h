@@ -66,13 +66,13 @@ public:
      * holding on to a subset of the returned results and need to minimize memory usage, call copy()
      * on the BSONObjs.
      */
-    virtual StatusWith<ClusterQueryResult> next(OperationContext* txn) = 0;
+    virtual StatusWith<ClusterQueryResult> next(OperationContext* opCtx) = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for
      * responses from remote hosts.
      */
-    virtual void kill(OperationContext* txn) = 0;
+    virtual void kill(OperationContext* opCtx) = 0;
 
     /**
      * Returns whether or not all the remote cursors are exhausted.

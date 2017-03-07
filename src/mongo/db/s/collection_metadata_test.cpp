@@ -76,9 +76,9 @@ protected:
         auto future = launchAsync([this] {
             ON_BLOCK_EXIT([&] { Client::destroy(); });
             Client::initThreadIfNotAlready("Test");
-            auto txn = cc().makeOperationContext();
+            auto opCtx = cc().makeOperationContext();
 
-            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+            auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -305,9 +305,9 @@ protected:
         auto future = launchAsync([this] {
             ON_BLOCK_EXIT([&] { Client::destroy(); });
             Client::initThreadIfNotAlready("Test");
-            auto txn = cc().makeOperationContext();
+            auto opCtx = cc().makeOperationContext();
 
-            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+            auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -430,9 +430,9 @@ protected:
         auto future = launchAsync([this] {
             ON_BLOCK_EXIT([&] { Client::destroy(); });
             Client::initThreadIfNotAlready("Test");
-            auto txn = cc().makeOperationContext();
+            auto opCtx = cc().makeOperationContext();
 
-            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+            auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -509,9 +509,9 @@ protected:
         auto future = launchAsync([this] {
             ON_BLOCK_EXIT([&] { Client::destroy(); });
             Client::initThreadIfNotAlready("Test");
-            auto txn = cc().makeOperationContext();
+            auto opCtx = cc().makeOperationContext();
 
-            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+            auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -633,9 +633,9 @@ protected:
         auto future = launchAsync([this] {
             ON_BLOCK_EXIT([&] { Client::destroy(); });
             Client::initThreadIfNotAlready("Test");
-            auto txn = cc().makeOperationContext();
+            auto opCtx = cc().makeOperationContext();
 
-            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
+            auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",

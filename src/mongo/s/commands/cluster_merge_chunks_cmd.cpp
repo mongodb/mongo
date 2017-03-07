@@ -99,7 +99,7 @@ public:
     static BSONField<string> configField;
 
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
              int,
@@ -107,7 +107,7 @@ public:
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
 
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
@@ -158,7 +158,7 @@ public:
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::boundsField()]);
         remoteCmdObjB.append(
             ClusterMergeChunksCommand::configField(),
-            Grid::get(txn)->shardRegistry()->getConfigServerConnectionString().toString());
+            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
                              firstChunk->getShardId().toString());
 
@@ -167,7 +167,7 @@ public:
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
         // formatting.
         const auto shardStatus =
-            Grid::get(txn)->shardRegistry()->getShard(txn, firstChunk->getShardId());
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk->getShardId());
         if (!shardStatus.isOK()) {
             return appendCommandStatus(
                 result,

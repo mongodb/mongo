@@ -55,27 +55,27 @@ class AuthzManagerExternalStateLocal : public AuthzManagerExternalState {
 public:
     virtual ~AuthzManagerExternalStateLocal() = default;
 
-    virtual Status initialize(OperationContext* txn);
+    virtual Status initialize(OperationContext* opCtx);
 
-    virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
-    virtual Status getUserDescription(OperationContext* txn,
+    virtual Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion);
+    virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserName& userName,
                                       BSONObj* result);
-    virtual Status getRoleDescription(OperationContext* txn,
+    virtual Status getRoleDescription(OperationContext* opCtx,
                                       const RoleName& roleName,
                                       PrivilegeFormat showPrivileges,
                                       BSONObj* result);
-    virtual Status getRolesDescription(OperationContext* txn,
+    virtual Status getRolesDescription(OperationContext* opCtx,
                                        const std::vector<RoleName>& roles,
                                        PrivilegeFormat showPrivileges,
                                        BSONObj* result);
-    virtual Status getRoleDescriptionsForDB(OperationContext* txn,
+    virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                             const std::string dbname,
                                             PrivilegeFormat showPrivileges,
                                             bool showBuiltinRoles,
                                             std::vector<BSONObj>* result);
 
-    bool hasAnyPrivilegeDocuments(OperationContext* txn) override;
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 
     /**
      * Finds a document matching "query" in "collectionName", and store a shared-ownership
@@ -84,7 +84,7 @@ public:
      * Returns Status::OK() on success.  If no match is found, returns
      * ErrorCodes::NoMatchingDocument.  Other errors returned as appropriate.
      */
-    virtual Status findOne(OperationContext* txn,
+    virtual Status findOne(OperationContext* opCtx,
                            const NamespaceString& collectionName,
                            const BSONObj& query,
                            BSONObj* result) = 0;
@@ -93,14 +93,17 @@ public:
      * Finds all documents matching "query" in "collectionName".  For each document returned,
      * calls the function resultProcessor on it.
      */
-    virtual Status query(OperationContext* txn,
+    virtual Status query(OperationContext* opCtx,
                          const NamespaceString& collectionName,
                          const BSONObj& query,
                          const BSONObj& projection,
                          const stdx::function<void(const BSONObj&)>& resultProcessor) = 0;
 
-    virtual void logOp(
-        OperationContext* txn, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2);
+    virtual void logOp(OperationContext* opCtx,
+                       const char* op,
+                       const char* ns,
+                       const BSONObj& o,
+                       const BSONObj* o2);
 
     /**
      * Takes a user document, and processes it with the RoleGraph, in order to recursively
@@ -127,12 +130,12 @@ private:
     /**
      * Initializes the role graph from the contents of the admin.system.roles collection.
      */
-    Status _initializeRoleGraph(OperationContext* txn);
+    Status _initializeRoleGraph(OperationContext* opCtx);
 
     /**
      * Fetches the user document for "userName" from local storage, and stores it into "result".
      */
-    Status _getUserDocument(OperationContext* txn, const UserName& userName, BSONObj* result);
+    Status _getUserDocument(OperationContext* opCtx, const UserName& userName, BSONObj* result);
 
     Status _getRoleDescription_inlock(const RoleName& roleName,
                                       PrivilegeFormat showPrivileges,

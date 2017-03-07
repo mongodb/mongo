@@ -109,27 +109,27 @@ public:
      */
     Options getOptions() const;
 
-    void startup(OperationContext* txn) override;
-    void shutdown(OperationContext* txn) override;
-    void pushEvenIfFull(OperationContext* txn, const Value& value) override;
-    void push(OperationContext* txn, const Value& value) override;
+    void startup(OperationContext* opCtx) override;
+    void shutdown(OperationContext* opCtx) override;
+    void pushEvenIfFull(OperationContext* opCtx, const Value& value) override;
+    void push(OperationContext* opCtx, const Value& value) override;
     /**
      * Pushing documents with 'pushAllNonBlocking' will not handle sentinel documents properly. If
      * pushing sentinel documents is required, use 'push' or 'pushEvenIfFull'.
      */
-    void pushAllNonBlocking(OperationContext* txn,
+    void pushAllNonBlocking(OperationContext* opCtx,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
-    void waitForSpace(OperationContext* txn, std::size_t size) override;
+    void waitForSpace(OperationContext* opCtx, std::size_t size) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
-    void clear(OperationContext* txn) override;
-    bool tryPop(OperationContext* txn, Value* value) override;
+    void clear(OperationContext* opCtx) override;
+    bool tryPop(OperationContext* opCtx, Value* value) override;
     bool waitForData(Seconds waitDuration) override;
-    bool peek(OperationContext* txn, Value* value) override;
-    boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
+    bool peek(OperationContext* opCtx, Value* value) override;
+    boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
     // ---- Testing API ----
     std::size_t getSentinelCount_forTest() const;
@@ -141,19 +141,19 @@ private:
     /*
      * Creates a temporary collection with the _nss namespace.
      */
-    void _createCollection(OperationContext* txn);
+    void _createCollection(OperationContext* opCtx);
 
     /*
      * Drops the collection with the _nss namespace.
      */
-    void _dropCollection(OperationContext* txn);
+    void _dropCollection(OperationContext* opCtx);
 
     enum class PeekMode { kExtractEmbeddedDocument, kReturnUnmodifiedDocumentFromCollection };
     /**
      * Returns the oldest oplog entry in the buffer.
      * Assumes the buffer is not empty.
      */
-    BSONObj _peek_inlock(OperationContext* txn, PeekMode peekMode);
+    BSONObj _peek_inlock(OperationContext* opCtx, PeekMode peekMode);
 
     // Storage interface used to perform storage engine level functions on the collection.
     StorageInterface* _storageInterface;
@@ -161,7 +161,7 @@ private:
     /**
      * Pops an entry off the buffer in a lock.
      */
-    bool _pop_inlock(OperationContext* txn, Value* value);
+    bool _pop_inlock(OperationContext* opCtx, Value* value);
 
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;

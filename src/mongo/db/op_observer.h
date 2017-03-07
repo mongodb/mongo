@@ -66,17 +66,17 @@ public:
     OpObserver() = default;
     virtual ~OpObserver() = default;
 
-    virtual void onCreateIndex(OperationContext* txn,
+    virtual void onCreateIndex(OperationContext* opCtx,
                                const std::string& ns,
                                BSONObj indexDoc,
                                bool fromMigrate) = 0;
-    virtual void onInserts(OperationContext* txn,
+    virtual void onInserts(OperationContext* opCtx,
                            const NamespaceString& ns,
                            std::vector<BSONObj>::const_iterator begin,
                            std::vector<BSONObj>::const_iterator end,
                            bool fromMigrate) = 0;
-    virtual void onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) = 0;
-    virtual CollectionShardingState::DeleteState aboutToDelete(OperationContext* txn,
+    virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
+    virtual CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
                                                                const NamespaceString& ns,
                                                                const BSONObj& doc) = 0;
     /**
@@ -88,33 +88,34 @@ public:
      * so should be ignored by the user as an internal maintenance operation and not a
      * real delete.
      */
-    virtual void onDelete(OperationContext* txn,
+    virtual void onDelete(OperationContext* opCtx,
                           const NamespaceString& ns,
                           CollectionShardingState::DeleteState deleteState,
                           bool fromMigrate) = 0;
-    virtual void onOpMessage(OperationContext* txn, const BSONObj& msgObj) = 0;
-    virtual void onCreateCollection(OperationContext* txn,
+    virtual void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) = 0;
+    virtual void onCreateCollection(OperationContext* opCtx,
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex) = 0;
-    virtual void onCollMod(OperationContext* txn,
+    virtual void onCollMod(OperationContext* opCtx,
                            const std::string& dbName,
                            const BSONObj& collModCmd) = 0;
-    virtual void onDropDatabase(OperationContext* txn, const std::string& dbName) = 0;
-    virtual void onDropCollection(OperationContext* txn, const NamespaceString& collectionName) = 0;
-    virtual void onDropIndex(OperationContext* txn,
+    virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
+    virtual void onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName) = 0;
+    virtual void onDropIndex(OperationContext* opCtx,
                              const std::string& dbName,
                              const BSONObj& idxDescriptor) = 0;
-    virtual void onRenameCollection(OperationContext* txn,
+    virtual void onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     bool dropTarget,
                                     bool stayTemp) = 0;
-    virtual void onApplyOps(OperationContext* txn,
+    virtual void onApplyOps(OperationContext* opCtx,
                             const std::string& dbName,
                             const BSONObj& applyOpCmd) = 0;
-    virtual void onEmptyCapped(OperationContext* txn, const NamespaceString& collectionName) = 0;
-    virtual void onConvertToCapped(OperationContext* txn,
+    virtual void onEmptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) = 0;
+    virtual void onConvertToCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
                                    double size) = 0;
 };

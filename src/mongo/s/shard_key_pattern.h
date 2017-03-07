@@ -164,7 +164,7 @@ public:
      *   { a : { b : { $eq : "hi" } } } --> returns {} because the query language treats this as
      *                                                 a : { $eq : { b : ... } }
      */
-    StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* txn,
+    StatusWith<BSONObj> extractShardKeyFromQuery(OperationContext* opCtx,
                                                  const BSONObj& basicQuery) const;
     BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
 

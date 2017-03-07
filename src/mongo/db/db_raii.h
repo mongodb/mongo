@@ -53,7 +53,7 @@ class AutoGetDb {
     MONGO_DISALLOW_COPYING(AutoGetDb);
 
 public:
-    AutoGetDb(OperationContext* txn, StringData ns, LockMode mode);
+    AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode);
 
     Database* getDb() const {
         return _db;
@@ -77,14 +77,14 @@ class AutoGetCollection {
     enum class ViewMode;
 
 public:
-    AutoGetCollection(OperationContext* txn, const NamespaceString& nss, LockMode modeAll)
-        : AutoGetCollection(txn, nss, modeAll, modeAll, ViewMode::kViewsForbidden) {}
+    AutoGetCollection(OperationContext* opCtx, const NamespaceString& nss, LockMode modeAll)
+        : AutoGetCollection(opCtx, nss, modeAll, modeAll, ViewMode::kViewsForbidden) {}
 
-    AutoGetCollection(OperationContext* txn,
+    AutoGetCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       LockMode modeDB,
                       LockMode modeColl)
-        : AutoGetCollection(txn, nss, modeDB, modeColl, ViewMode::kViewsForbidden) {}
+        : AutoGetCollection(opCtx, nss, modeDB, modeColl, ViewMode::kViewsForbidden) {}
 
     /**
      * This constructor is inteded for internal use and should not be used outside this file.
@@ -92,7 +92,7 @@ public:
      * or not it is permissible to obtain a handle on a view namespace. Use another constructor or
      * another AutoGet class instead.
      */
-    AutoGetCollection(OperationContext* txn,
+    AutoGetCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       LockMode modeDB,
                       LockMode modeColl,
@@ -132,7 +132,7 @@ class AutoGetOrCreateDb {
     MONGO_DISALLOW_COPYING(AutoGetOrCreateDb);
 
 public:
-    AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode);
+    AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, LockMode mode);
 
     Database* getDb() const {
         return _db;
@@ -166,8 +166,8 @@ class AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
 
 public:
-    AutoGetCollectionForRead(OperationContext* txn, const NamespaceString& nss)
-        : AutoGetCollectionForRead(txn, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
+    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss)
+        : AutoGetCollectionForRead(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
 
     ~AutoGetCollectionForRead();
 
@@ -183,11 +183,11 @@ private:
     void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss);
 
     const Timer _timer;
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
     const ScopedTransaction _transaction;
 
 protected:
-    AutoGetCollectionForRead(OperationContext* txn,
+    AutoGetCollectionForRead(OperationContext* opCtx,
                              const NamespaceString& nss,
                              AutoGetCollection::ViewMode viewMode);
 
@@ -207,7 +207,7 @@ class AutoGetCollectionOrViewForRead final : public AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionOrViewForRead);
 
 public:
-    AutoGetCollectionOrViewForRead(OperationContext* txn, const NamespaceString& nss);
+    AutoGetCollectionOrViewForRead(OperationContext* opCtx, const NamespaceString& nss);
 
     ViewDefinition* getView() const {
         return _view.get();
@@ -235,13 +235,16 @@ class OldClientContext {
 
 public:
     /** this is probably what you want */
-    OldClientContext(OperationContext* txn, const std::string& ns, bool doVersion = true);
+    OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion = true);
 
     /**
      * Below still calls _finishInit, but assumes database has already been acquired
      * or just created.
      */
-    OldClientContext(OperationContext* txn, const std::string& ns, Database* db, bool justCreated);
+    OldClientContext(OperationContext* opCtx,
+                     const std::string& ns,
+                     Database* db,
+                     bool justCreated);
 
     ~OldClientContext();
 
@@ -263,7 +266,7 @@ private:
     bool _doVersion;
     const std::string _ns;
     Database* _db;
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     Timer _timer;
 };
@@ -284,7 +287,7 @@ public:
     }
 
 private:
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
     const NamespaceString _nss;
 
     AutoGetOrCreateDb _autodb;

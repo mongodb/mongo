@@ -53,14 +53,14 @@ const char kShouldMigrate[] = "shouldMigrate";
 
 }  // namespace
 
-StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId) {
-    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const ShardId& shardId) {
+    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
 
     auto listDatabasesStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        txn,
+        opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
         "admin",
         BSON("listDatabases" << 1),
@@ -80,7 +80,7 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardI
     return totalSizeElem.numberLong();
 }
 
-StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
+StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
                                                         const ShardId& shardId,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
@@ -96,13 +96,13 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
         cmd.append("maxChunkObjects", *maxObjs);
     }
 
-    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
 
     auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        txn,
+        opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
         "admin",
         cmd.obj(),
@@ -127,7 +127,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
 }
 
 StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ShardId& shardId,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
@@ -176,12 +176,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     Status status{ErrorCodes::InternalError, "Uninitialized value"};
     BSONObj cmdResponse;
 
-    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         status = shardStatus.getStatus();
     } else {
         auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-            txn,
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "admin",
             cmdObj,

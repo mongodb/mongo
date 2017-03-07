@@ -55,7 +55,7 @@ using std::string;
 using std::vector;
 
 namespace {
-void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
+void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
     bool firstTime = true;
     for (std::list<std::string>::const_iterator it = nsToCheck.begin(); it != nsToCheck.end();
          ++it) {
@@ -65,9 +65,9 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
 
         // This write lock is held throughout the index building process
         // for this namespace.
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
-        OldClientContext ctx(txn, ns);
+        ScopedTransaction transaction(opCtx, MODE_IX);
+        Lock::DBLock lk(opCtx->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+        OldClientContext ctx(opCtx, ns);
 
         Collection* collection = ctx.db()->getCollection(ns);
         if (collection == NULL)
@@ -75,18 +75,18 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
 
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-        if (collection->ns().isOplog() && indexCatalog->numIndexesTotal(txn) > 0) {
+        if (collection->ns().isOplog() && indexCatalog->numIndexesTotal(opCtx) > 0) {
             warning() << ns << " had illegal indexes, removing";
-            indexCatalog->dropAllIndexes(txn, true);
+            indexCatalog->dropAllIndexes(opCtx, true);
             continue;
         }
 
 
-        MultiIndexBlock indexer(txn, collection);
+        MultiIndexBlock indexer(opCtx, collection);
 
         {
-            WriteUnitOfWork wunit(txn);
-            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(txn);
+            WriteUnitOfWork wunit(opCtx);
+            vector<BSONObj> indexesToBuild = indexCatalog->getAndClearUnfinishedIndexes(opCtx);
 
             // The indexes have now been removed from system.indexes, so the only record is
             // in-memory. If there is a journal commit between now and when insert() rewrites
@@ -122,7 +122,7 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
         try {
             uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
-            WriteUnitOfWork wunit(txn);
+            WriteUnitOfWork wunit(opCtx);
             indexer.commit();
             wunit.commit();
         } catch (const DBException& e) {
@@ -142,8 +142,8 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
 }
 }  // namespace
 
-void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
-    AuthorizationSession::get(txn->getClient())->grantInternalAuthorization();
+void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
 
     std::vector<std::string> dbNames;
 
@@ -155,13 +155,13 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
         for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
              dbName < dbNames.end();
              ++dbName) {
-            ScopedTransaction scopedXact(txn, MODE_IS);
-            AutoGetDb autoDb(txn, *dbName, MODE_S);
+            ScopedTransaction scopedXact(opCtx, MODE_IS);
+            AutoGetDb autoDb(opCtx, *dbName, MODE_S);
 
             Database* db = autoDb.getDb();
             db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
         }
-        checkNS(txn, collNames);
+        checkNS(opCtx, collNames);
     } catch (const DBException& e) {
         error() << "Index verification did not complete: " << redact(e);
         fassertFailedNoTrace(18643);

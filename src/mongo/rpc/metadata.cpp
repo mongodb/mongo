@@ -46,7 +46,7 @@ BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
+Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
     BSONElement ssmElem;
     BSONElement auditElem;
     BSONElement configSvrElem;
@@ -72,16 +72,16 @@ Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
     if (!swServerSelectionMetadata.isOK()) {
         return swServerSelectionMetadata.getStatus();
     }
-    ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
+    ServerSelectionMetadata::get(opCtx) = std::move(swServerSelectionMetadata.getValue());
 
     auto swAuditMetadata = AuditMetadata::readFromMetadata(auditElem);
     if (!swAuditMetadata.isOK()) {
         return swAuditMetadata.getStatus();
     }
-    AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
+    AuditMetadata::get(opCtx) = std::move(swAuditMetadata.getValue());
 
     const auto statusClientMetadata =
-        ClientMetadataIsMasterState::readFromMetadata(txn, clientElem);
+        ClientMetadataIsMasterState::readFromMetadata(opCtx, clientElem);
     if (!statusClientMetadata.isOK()) {
         return statusClientMetadata;
     }
@@ -90,19 +90,19 @@ Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
     if (!configServerMetadata.isOK()) {
         return configServerMetadata.getStatus();
     }
-    ConfigServerMetadata::get(txn) = std::move(configServerMetadata.getValue());
+    ConfigServerMetadata::get(opCtx) = std::move(configServerMetadata.getValue());
 
     auto trackingMetadata = TrackingMetadata::readFromMetadata(trackingElem);
     if (!trackingMetadata.isOK()) {
         return trackingMetadata.getStatus();
     }
-    TrackingMetadata::get(txn) = std::move(trackingMetadata.getValue());
+    TrackingMetadata::get(opCtx) = std::move(trackingMetadata.getValue());
 
     return Status::OK();
 }
 
-Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob) {
-    auto ssStatus = ServerSelectionMetadata::get(txn).writeToMetadata(metadataBob);
+Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) {
+    auto ssStatus = ServerSelectionMetadata::get(opCtx).writeToMetadata(metadataBob);
     if (!ssStatus.isOK()) {
         return ssStatus;
     }

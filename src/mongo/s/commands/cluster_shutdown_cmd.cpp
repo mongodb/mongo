@@ -41,7 +41,7 @@ public:
              << "either (1) ran from localhost or (2) authenticated.";
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,

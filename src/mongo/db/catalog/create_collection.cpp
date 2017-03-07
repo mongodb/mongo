@@ -40,7 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
-Status createCollection(OperationContext* txn,
+Status createCollection(OperationContext* opCtx,
                         const std::string& dbName,
                         const BSONObj& cmdObj,
                         const BSONObj& idIndex) {
@@ -73,27 +73,27 @@ Status createCollection(OperationContext* txn,
                 options.hasField("$nExtents"));
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbXLock(txn->lockState(), dbName, MODE_X);
-        OldClientContext ctx(txn, nss.ns());
-        if (txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss)) {
+        ScopedTransaction transaction(opCtx, MODE_IX);
+        Lock::DBLock dbXLock(opCtx->lockState(), dbName, MODE_X);
+        OldClientContext ctx(opCtx, nss.ns());
+        if (opCtx->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Not primary while creating collection " << nss.ns());
         }
 
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
 
         // Create collection.
         const bool createDefaultIndexes = true;
-        status = userCreateNS(txn, ctx.db(), nss.ns(), options, createDefaultIndexes, idIndex);
+        status = userCreateNS(opCtx, ctx.db(), nss.ns(), options, createDefaultIndexes, idIndex);
         if (!status.isOK()) {
             return status;
         }
 
         wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", nss.ns());
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "create", nss.ns());
     return Status::OK();
 }
 }  // namespace mongo
