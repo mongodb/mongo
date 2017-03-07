@@ -137,7 +137,7 @@ fi
 %{_bindir}/mongos
 #%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
-/etc/rc.d/init.d/mongod
+%config(noreplace) /etc/rc.d/init.d/mongod
 %config(noreplace) /etc/sysconfig/mongod
 #/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
