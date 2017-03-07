@@ -323,8 +323,10 @@ bool DBClientWithCommands::runPseudoCommand(StringData db,
 }
 
 unsigned long long DBClientWithCommands::count(
-    const string& myns, const BSONObj& query, int options, int limit, int skip) {
-    BSONObj cmd = _countCmd(myns, query, options, limit, skip);
+    const string& myns, const Query& query, int options, int limit, int skip) {
+    const BSONObj query_obj = query.isComplex() ? query.obj["query"].embeddedObject() : BSONObj();
+
+    const BSONObj cmd = _countCmd(myns, query_obj, options, limit, skip);
     BSONObj res;
     if (!runCommand(nsToDatabase(myns), cmd, res, options))
         uasserted(11010, string("count fails:") + res.toString());
@@ -334,6 +336,7 @@ unsigned long long DBClientWithCommands::count(
 BSONObj DBClientWithCommands::_countCmd(
     const string& myns, const BSONObj& query, int options, int limit, int skip) {
     NamespaceString ns(myns);
+
     BSONObjBuilder b;
     b.append("count", ns.coll());
     b.append("query", query);
