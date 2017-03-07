@@ -72,7 +72,7 @@ void* runFunc(void* ptr) {
 
     auto tl = ctx->session->getTransportLayer();
     Client::initThread("conn", ctx->session);
-    setThreadName(std::string(str::stream() << "conn" << ctx->session->id()));
+    setThreadName(str::stream() << "conn" << ctx->session->id());
 
     try {
         ctx->task(ctx->session);

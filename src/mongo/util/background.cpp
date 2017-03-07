@@ -142,7 +142,7 @@ BackgroundJob::~BackgroundJob() {}
 void BackgroundJob::jobBody() {
     const string threadName = name();
     if (!threadName.empty()) {
-        setThreadName(threadName.c_str());
+        setThreadName(threadName);
     }
 
     LOG(1) << "BackgroundJob starting: " << threadName;

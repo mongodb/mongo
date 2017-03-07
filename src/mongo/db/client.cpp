@@ -53,21 +53,21 @@ namespace mongo {
 TSP_DECLARE(ServiceContext::UniqueClient, currentClient)
 TSP_DEFINE(ServiceContext::UniqueClient, currentClient)
 
-void Client::initThreadIfNotAlready(const char* desc) {
+void Client::initThreadIfNotAlready(StringData desc) {
     if (currentClient.getMake()->get())
         return;
     initThread(desc);
 }
 
 void Client::initThreadIfNotAlready() {
-    initThreadIfNotAlready(getThreadName().c_str());
+    initThreadIfNotAlready(getThreadName());
 }
 
-void Client::initThread(const char* desc, transport::SessionHandle session) {
+void Client::initThread(StringData desc, transport::SessionHandle session) {
     initThread(desc, getGlobalServiceContext(), std::move(session));
 }
 
-void Client::initThread(const char* desc,
+void Client::initThread(StringData desc,
                         ServiceContext* service,
                         transport::SessionHandle session) {
     invariant(currentClient.getMake()->get() == nullptr);
@@ -76,10 +76,10 @@ void Client::initThread(const char* desc,
     if (session) {
         fullDesc = str::stream() << desc << session->id();
     } else {
-        fullDesc = desc;
+        fullDesc = desc.toString();
     }
 
-    setThreadName(fullDesc.c_str());
+    setThreadName(fullDesc);
 
     // Create the client obj, attach to thread
     *currentClient.get() = service->makeClient(fullDesc, std::move(session));

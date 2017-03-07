@@ -52,7 +52,7 @@
 namespace mongo {
 
 void ServiceContextMongoDTest::setUp() {
-    Client::initThread(getThreadName().c_str());
+    Client::initThread(getThreadName());
     ServiceContext* serviceContext = getServiceContext();
 
     std::array<std::uint8_t, 20> tempKey = {};

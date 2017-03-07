@@ -391,6 +391,8 @@ MongoDBDumpLocks()
 class MongoDBUniqueStack(gdb.Command):
     """Print unique stack traces of all threads in current process"""
 
+    _HEADER_FORMAT = "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid})):"
+
     def __init__(self):
         register_mongo_command(self, "mongodb-uniqstack", gdb.COMMAND_DATA)
 
@@ -411,57 +413,63 @@ class MongoDBUniqueStack(gdb.Command):
             if current_thread and current_thread.is_valid():
                 current_thread.switch()
 
+    def _get_current_thread_name(self):
+        fallback_name = '"%s"' % (gdb.selected_thread().name or '')
+        try:
+            # This goes through the pretty printer for StringData which adds "" around the name.
+            name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
+            if name == '""':
+                return fallback_name
+            return name
+        except gdb.error:
+            return fallback_name
+
     def _process_thread_stack(self, arg, stacks, thread):
         thread_info = {}  # thread dict to hold per thread data
-        thread_info['frames'] = []  # the complete backtrace per thread from gdb
-        thread_info['functions'] = []  # list of function names from frames
-
-        frame = gdb.newest_frame()
-        while frame:
-            thread_info['functions'].append(frame.name())
-            frame = frame.older()
-
-        thread_info['functions'] = tuple(thread_info['functions'])
-        if thread_info['functions'] in stacks:
-            stacks[thread_info['functions']]['tids'].append(thread.num)
-            return
-
         thread_info['pthread'] = get_thread_id()
-        (_, thread_lwpid, thread_tid) = thread.ptid
+        thread_info['gdb_thread_num'] = thread.num
+        thread_info['lwpid'] = thread.ptid[1]
+        thread_info['name'] = self._get_current_thread_name()
+
         if sys.platform.startswith("linux"):
-            header_format = "Thread {gdb_thread_num} (Thread 0x{pthread:x} (LWP {lwpid}))"
+            header_format = "Thread {gdb_thread_num}: {name} (Thread 0x{pthread:x} (LWP {lwpid}))"
         elif sys.platform.startswith("sunos"):
-            if thread_tid != 0 and thread_lwpid != 0:
-                header_format = "Thread {gdb_thread_num} (Thread {pthread} (LWP {lwpid}))"
-            elif thread_lwpid != 0:
-                header_format = "Thread {gdb_thread_num} (LWP {lwpid})"
+            (_, _, thread_tid) = thread.ptid
+            if thread_tid != 0 and thread_info['lwpid'] != 0:
+                header_format = "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid}))"
+            elif thread_info['lwpid'] != 0:
+                header_format = "Thread {gdb_thread_num}: {name} (LWP {lwpid})"
             else:
-                header_format = "Thread {gdb_thread_num} (Thread {pthread})"
+                header_format = "Thread {gdb_thread_num}: {name} (Thread {pthread})"
         else:
             raise ValueError("Unsupported platform: {}".format(sys.platform))
-        thread_info['header'] = header_format.format(gdb_thread_num=thread.num,
-                                                     pthread=thread_info['pthread'],
-                                                     lwpid=thread_lwpid)
-        try:
-            thread_info['frames'] = gdb.execute(arg, to_string=True).rstrip()
-        except gdb.error as err:
-            raise gdb.GdbError("{} {}".format(thread_info['header'], err))
-        else:
-            thread_info['tids'] = []
-            thread_info['tids'].append(thread.num)
-            stacks[thread_info['functions']] = thread_info
+        thread_info['header'] = header_format.format(**thread_info)
+
+        functions = [] # list of function names from frames
+        frame = gdb.newest_frame()
+        while frame:
+            functions.append(frame.name())
+            frame = frame.older()
+        functions = tuple(functions) # tuples are hashable, lists aren't.
+
+        unique = stacks.setdefault(functions, {'threads': []})
+        unique['threads'].append(thread_info)
+        if 'output' not in unique:
+            try:
+                unique['output'] = gdb.execute(arg, to_string=True).rstrip()
+            except gdb.error as err:
+                raise gdb.GdbError("{} {}".format(thread_info['header'], err))
 
     def _dump_unique_stacks(self, stacks):
         def first_tid(stack):
-            return stack['tids'][0]
+            return stack['threads'][0]['gdb_thread_num']
 
         for stack in sorted(stacks.values(), key=first_tid, reverse=True):
-            print(stack['header'])
-            if len(stack['tids']) > 1:
-                print("{} duplicate thread(s):".format(len(stack['tids']) - 1), end=' ')
-                print(", ".join((str(tid) for tid in stack['tids'][1:])))
-            print(stack['frames'])
-            print()  # leave extra blank line after each thread stack
+            for i, thread in enumerate(stack['threads']):
+                prefix = '' if i == 0 else 'Duplicate '
+                print(prefix + thread['header'])
+            print(stack['output'])
+            print() # leave extra blank line after each thread stack
 
 # Register command
 MongoDBUniqueStack()

@@ -47,6 +47,7 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -86,7 +87,6 @@ void setWindowsThreadName(DWORD dwThreadID, const char* threadName) {
 }
 #endif
 
-boost::thread_specific_ptr<std::string> threadName;
 AtomicInt64 nextUnnamedThreadId{1};
 
 // It is unsafe to access threadName before its dynamic initialization has completed. Use
@@ -102,20 +102,37 @@ MONGO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
     return Status::OK();
 }
 
+// TODO consider making threadName std::string and removing the size limit once we get real
+// thread_local.
+constexpr size_t kMaxThreadNameSize = 63;
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL char threadNameStorage[kMaxThreadNameSize + 1];
+
 }  // namespace
+
+namespace for_debuggers {
+// This needs external linkage to ensure that debuggers can use it.
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL StringData threadName;
+}
+using for_debuggers::threadName;
 
 void setThreadName(StringData name) {
     invariant(mongoInitializersHaveRun);
-    threadName.reset(new string(name.toString()));
+    if (name.size() > kMaxThreadNameSize) {
+        // Truncate unreasonably long thread names.
+        name = name.substr(0, kMaxThreadNameSize);
+    }
+    name.copyTo(threadNameStorage, /*null terminate=*/true);
+    threadName = StringData(threadNameStorage, name.size());
 
 #if defined(_WIN32)
     // Naming should not be expensive compared to thread creation and connection set up, but if
     // testing shows otherwise we should make this depend on DEBUG again.
-    setWindowsThreadName(GetCurrentThreadId(), threadName->c_str());
+    setWindowsThreadName(GetCurrentThreadId(), threadName.rawData());
 #elif defined(__APPLE__)
     // Maximum thread name length on OS X is MAXTHREADNAMESIZE (64 characters). This assumes
     // OS X 10.6 or later.
-    int error = pthread_setname_np(threadName->substr(0, MAXTHREADNAMESIZE - 1).c_str());
+    MONGO_STATIC_ASSERT(MAXTHREADNAMESIZE >= kMaxThreadNameSize + 1);
+    int error = pthread_setname_np(threadName.rawData());
     if (error) {
         log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
     }
@@ -126,15 +143,15 @@ void setThreadName(StringData name) {
     if (getpid() != syscall(SYS_gettid)) {
         //  Maximum thread name length supported on Linux is 16 including the null terminator.
         //  Ideally we use short and descriptive thread names that fit: this helps for log
-        //  readibility as well. Still, as the limit is so low and a few current names exceed the
+        //  readability as well. Still, as the limit is so low and a few current names exceed the
         //  limit, it's best to shorten long names.
         int error = 0;
-        if (threadName->size() > 15) {
-            std::string shortName =
-                threadName->substr(0, 7) + '.' + threadName->substr(threadName->size() - 7);
+        if (threadName.size() > 15) {
+            std::string shortName = str::stream() << threadName.substr(0, 7) << '.'
+                                                  << threadName.substr(threadName.size() - 7);
             error = pthread_setname_np(pthread_self(), shortName.c_str());
         } else {
-            error = pthread_setname_np(pthread_self(), threadName->c_str());
+            error = pthread_setname_np(pthread_self(), threadName.rawData());
         }
 
         if (error) {
@@ -144,7 +161,7 @@ void setThreadName(StringData name) {
 #endif
 }
 
-const string& getThreadName() {
+StringData getThreadName() {
     if (MONGO_unlikely(!mongoInitializersHaveRun)) {
         // 'getThreadName' has been called before dynamic initialization for this
         // translation unit has completed, so return a fallback value rather than accessing
@@ -154,11 +171,10 @@ const string& getThreadName() {
         return kFallback;
     }
 
-    std::string* s;
-    while (!(s = threadName.get())) {
-        setThreadName(std::string(str::stream() << "thread" << nextUnnamedThreadId.fetchAndAdd(1)));
+    if (threadName.empty()) {
+        setThreadName(str::stream() << "thread" << nextUnnamedThreadId.fetchAndAdd(1));
     }
-    return *s;
+    return threadName;
 }
 
 }  // namespace mongo
