@@ -19,7 +19,7 @@ import SCons
 # we are to avoid bulk loading all tools in the DefaultEnvironment.
 DefaultEnvironment(tools=[])
 
-EnsureSConsVersion( 2, 3, 0 )
+EnsureSConsVersion( 2, 3, 5 )
 
 from buildscripts import utils
 from buildscripts import moduleconfig

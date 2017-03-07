@@ -8,7 +8,7 @@ To build MongoDB, you will need:
     * Clang 3.4 (or Apple XCode 5.1.1 Clang) or newer
     * Visual Studio 2013 Update 2 or newer
 * Python 2.7
-* SCons 2.3
+* SCons 2.3.5+
 
 for the target x86, or x86-64 platform. More detailed platform instructions can be found below.
 
