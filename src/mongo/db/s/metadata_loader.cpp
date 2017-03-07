@@ -38,11 +38,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -102,38 +104,40 @@ Status MetadataLoader::makeCollectionMetadata(OperationContext* opCtx,
                                               const string& shard,
                                               const CollectionMetadata* oldMetadata,
                                               CollectionMetadata* metadata) {
-    Status initCollectionStatus = _initCollection(opCtx, catalogClient, ns, shard, metadata);
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+    bool isShardPrimary = false;
+    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(opCtx, ns)) {
+        isShardPrimary = true;
+    }
+
+    Status initCollectionStatus =
+        _initCollection(opCtx, catalogClient, ns, metadata, isShardPrimary);
     if (!initCollectionStatus.isOK()) {
         return initCollectionStatus;
     }
 
-    return _initChunks(opCtx, catalogClient, ns, shard, oldMetadata, metadata);
+    return _initChunks(opCtx, catalogClient, ns, shard, oldMetadata, metadata, isShardPrimary);
 }
+
 
 Status MetadataLoader::_initCollection(OperationContext* opCtx,
                                        ShardingCatalogClient* catalogClient,
                                        const string& ns,
-                                       const string& shard,
-                                       CollectionMetadata* metadata) {
-    // Get the config.collections entry for 'ns'.
-    auto coll = catalogClient->getCollection(opCtx, ns);
-    if (!coll.isOK()) {
-        return coll.getStatus();
+                                       CollectionMetadata* metadata,
+                                       bool isShardPrimary) {
+    StatusWith<std::pair<BSONObj, OID>> statusWithShardKeyAndEpoch =
+        shardmetadatautil::getCollectionShardKeyAndEpoch(
+            opCtx, catalogClient, NamespaceString(ns), isShardPrimary);
+    if (!statusWithShardKeyAndEpoch.isOK()) {
+        return statusWithShardKeyAndEpoch.getStatus();
     }
+    std::pair<BSONObj, OID> shardKeyAndEpoch = statusWithShardKeyAndEpoch.getValue();
 
-    // Check that the collection hasn't been dropped: passing this check does not mean the
-    // collection hasn't been dropped and recreated.
-    const auto& collInfo = coll.getValue().value;
-    if (collInfo.getDropped()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Could not load metadata because collection " << ns
-                              << " was dropped"};
-    }
-
-    metadata->_keyPattern = collInfo.getKeyPattern().toBSON();
+    metadata->_keyPattern = shardKeyAndEpoch.first;
     metadata->fillKeyPatternFields();
-    metadata->_shardVersion = ChunkVersion(0, 0, collInfo.getEpoch());
-    metadata->_collVersion = ChunkVersion(0, 0, collInfo.getEpoch());
+    metadata->_shardVersion = ChunkVersion(0, 0, shardKeyAndEpoch.second);
+    metadata->_collVersion = ChunkVersion(0, 0, shardKeyAndEpoch.second);
 
     return Status::OK();
 }
@@ -143,7 +147,8 @@ Status MetadataLoader::_initChunks(OperationContext* opCtx,
                                    const string& ns,
                                    const string& shard,
                                    const CollectionMetadata* oldMetadata,
-                                   CollectionMetadata* metadata) {
+                                   CollectionMetadata* metadata,
+                                   bool isShardPrimary) {
     const OID epoch = metadata->getCollVersion().epoch();
 
     SCMConfigDiffTracker::MaxChunkVersionMap versionMap;
@@ -193,16 +198,16 @@ Status MetadataLoader::_initChunks(OperationContext* opCtx,
                                                  &chunks,
                                                  nullptr,
                                                  repl::ReadConcernLevel::kMajorityReadConcern);
-
         if (!status.isOK()) {
             return status;
         }
 
-        // If we are the primary, or a standalone, persist new chunks locally.
-        status = _writeNewChunksIfPrimary(
-            opCtx, NamespaceString(ns), chunks, metadata->_collVersion.epoch());
-        if (!status.isOK()) {
-            return status;
+        if (isShardPrimary) {
+            status = shardmetadatautil::writeNewChunks(
+                opCtx, NamespaceString(ns), chunks, metadata->_collVersion.epoch());
+            if (!status.isOK()) {
+                return status;
+            }
         }
 
         //
@@ -248,126 +253,6 @@ Status MetadataLoader::_initChunks(OperationContext* opCtx,
                                   << metadata->_collVersion.toString()
                                   << ", this should be rare"};
         }
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-}
-
-Status MetadataLoader::_writeNewChunksIfPrimary(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const std::vector<ChunkType>& chunks,
-                                                const OID& currEpoch) {
-    NamespaceString chunkMetadataNss(ChunkType::ConfigNS + "." + nss.ns());
-
-    // Only do the write(s) if this is a primary or standalone. Otherwise, return OK.
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer ||
-        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-            opCtx, chunkMetadataNss.ns())) {
-        return Status::OK();
-    }
-
-    try {
-        DBDirectClient client(opCtx);
-
-        /**
-         * Here are examples of the operations that can happen on the config server to update
-         * the config.chunks collection. 'chunks' only includes the chunks that result from the
-         * operations, which can be read from the config server, not any that were removed, so
-         * we must delete any chunks that overlap with the new 'chunks'.
-         *
-         * CollectionVersion = 10.3
-         *
-         * moveChunk
-         * {_id: 3, max: 5, version: 10.1} --> {_id: 3, max: 5, version: 11.0}
-         *
-         * splitChunk
-         * {_id: 3, max: 9, version 10.3} --> {_id: 3, max: 5, version 10.4}
-         *                                    {_id: 5, max: 8, version 10.5}
-         *                                    {_id: 8, max: 9, version 10.6}
-         *
-         * mergeChunk
-         * {_id: 10, max: 14, version 4.3} --> {_id: 10, max: 22, version 10.4}
-         * {_id: 14, max: 19, version 7.1}
-         * {_id: 19, max: 22, version 2.0}
-         *
-         */
-        for (auto& chunk : chunks) {
-            // Check for a different epoch.
-            if (!chunk.getVersion().hasEqualEpoch(currEpoch)) {
-                // This means the collection was dropped and recreated. Drop the chunk metadata
-                // and return.
-                rpc::UniqueReply commandResponse =
-                    client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
-                                                  "drop",
-                                                  rpc::makeEmptyMetadata(),
-                                                  BSON("drop" << chunkMetadataNss.coll()));
-                Status status = getStatusFromCommandResult(commandResponse->getCommandReply());
-
-                // A NamespaceNotFound error is okay because it's possible that we find a new epoch
-                // twice in a row before ever inserting documents.
-                if (!status.isOK() && status.code() != ErrorCodes::NamespaceNotFound) {
-                    return status;
-                }
-
-                return Status{ErrorCodes::RemoteChangeDetected,
-                              str::stream() << "Invalid chunks found when reloading '"
-                                            << nss.toString()
-                                            << "'. Previous collection epoch was '"
-                                            << currEpoch.toString()
-                                            << "', but unexpectedly found a new epoch '"
-                                            << chunk.getVersion().epoch().toString()
-                                            << "'. Collection was dropped and recreated."};
-            }
-
-            // Delete any overlapping chunk ranges. Overlapping chunks will have a min value
-            // ("_id") between (chunk.min, chunk.max].
-            //
-            // query: { "_id" : {"$gte": chunk.min, "$lt": chunk.max}}
-            auto deleteDocs(stdx::make_unique<BatchedDeleteDocument>());
-            deleteDocs->setQuery(BSON(ChunkType::minShardID << BSON(
-                                          "$gte" << chunk.getMin() << "$lt" << chunk.getMax())));
-            deleteDocs->setLimit(0);
-
-            auto deleteRequest(stdx::make_unique<BatchedDeleteRequest>());
-            deleteRequest->addToDeletes(deleteDocs.release());
-
-            BatchedCommandRequest batchedDeleteRequest(deleteRequest.release());
-            batchedDeleteRequest.setNS(chunkMetadataNss);
-            const BSONObj deleteCmdObj = batchedDeleteRequest.toBSON();
-
-            rpc::UniqueReply deleteCommandResponse =
-                client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
-                                              deleteCmdObj.firstElementFieldName(),
-                                              rpc::makeEmptyMetadata(),
-                                              deleteCmdObj);
-            auto deleteStatus =
-                getStatusFromCommandResult(deleteCommandResponse->getCommandReply());
-
-            if (!deleteStatus.isOK()) {
-                return deleteStatus;
-            }
-
-            // Now the document can be expected to cleanly insert without overlap.
-            auto insert(stdx::make_unique<BatchedInsertRequest>());
-            insert->addToDocuments(chunk.toShardBSON());
-
-            BatchedCommandRequest insertRequest(insert.release());
-            insertRequest.setNS(chunkMetadataNss);
-            const BSONObj insertCmdObj = insertRequest.toBSON();
-
-            rpc::UniqueReply commandResponse =
-                client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
-                                              insertCmdObj.firstElementFieldName(),
-                                              rpc::makeEmptyMetadata(),
-                                              insertCmdObj);
-            auto insertStatus = getStatusFromCommandResult(commandResponse->getCommandReply());
-
-            if (!insertStatus.isOK()) {
-                return insertStatus;
-            }
-        }
-
-        return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

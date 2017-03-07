@@ -35,13 +35,12 @@
 
 namespace mongo {
 
-class ShardingCatalogClient;
-class ChunkType;
 class CollectionMetadata;
 class CollectionType;
 class NamespaceString;
 class OID;
 class OperationContext;
+class ShardingCatalogClient;
 
 /**
  * The MetadataLoader is responsible for interfacing with the config servers and previous
@@ -67,10 +66,11 @@ class OperationContext;
 class MetadataLoader {
 public:
     /**
-     * Fills a new metadata instance representing the chunkset of the collection 'ns'
-     * (or its entirety, if not sharded) that lives on 'shard' with data from the config server.
-     * Optionally, uses an 'oldMetadata' for the same 'ns'/'shard'; the contents of
-     * 'oldMetadata' can help reducing the amount of data read from the config servers.
+     * Fills a new metadata instance representing the chunkset of the collection 'ns' (or its
+     * entirety, if not sharded) that lives on 'shard' with data either from the config server if
+     * primary or a shard persisted copy if secondary. Optionally, uses an 'oldMetadata' for the
+     * same 'ns'/'shard'; the contents of 'oldMetadata' can help reduce the amount of data read from
+     * the config servers.
      *
      * Locking note:
      *    + Must not be called in a DBLock, since this loads over the network
@@ -95,7 +95,8 @@ public:
 private:
     /**
      * Returns OK and fills in the internal state of 'metadata' with general collection
-     * information, not including chunks.
+     * information, not including chunks. Gets the collection information from the config server if
+     * 'isShardPrimary' is true, else from a shard persisted copy.
      *
      * If information about the collection can be accessed or is invalid, returns:
      * @return NamespaceNotFound if the collection no longer exists
@@ -107,13 +108,14 @@ private:
     static Status _initCollection(OperationContext* opCtx,
                                   ShardingCatalogClient* catalogClient,
                                   const std::string& ns,
-                                  const std::string& shard,
-                                  CollectionMetadata* metadata);
+                                  CollectionMetadata* metadata,
+                                  bool isShardPrimary);
 
     /**
-     * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the
-     * collection 'ns' that sit in 'shard'. If provided, uses the contents of 'oldMetadata'
-     * as a base (see description in initCollection above).
+     * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the collection
+     * 'ns' that sit in 'shard'. If provided, uses the contents of 'oldMetadata' as a base (see
+     * description in initCollection above). If 'isShardPrimary' is true, 'chunks' is persisted on
+     * the shard so that secondaries receive the new chunks through replication.
      *
      * If information about the chunks can be accessed or is invalid, returns:
      * @return HostUnreachable if there was an error contacting the config servers
@@ -128,30 +130,8 @@ private:
                               const std::string& ns,
                               const std::string& shard,
                               const CollectionMetadata* oldMetadata,
-                              CollectionMetadata* metadata);
-
-
-    /**
-     * Takes a vector of 'chunks' and updates the config.chunks.ns collection specified by 'nss'.
-     * Any chunk documents in config.chunks.ns that overlap with a chunk in 'chunks' is removed
-     * as the new chunk document is inserted. If the epoch of any chunk in 'chunks' does not match
-     * 'currEpoch', the chunk metadata is dropped.
-     *
-     * @nss - the regular collection namespace for which chunk metadata is being updated.
-     * @chunks - a range of chunks retrieved from the config server, sorted in ascending chunk
-     * version order.
-     * @currEpoch - what this shard server knows to be the collection epoch.
-     *
-     * Returns:
-     * - OK if not primary and no writes are needed.
-     * - RemoteChangeDetected if the chunk version epoch of any chunk in 'chunks' is different than
-     * 'currEpoch'
-     * - Other errors in writes/reads to the config.chunks.ns collection fails.
-     */
-    static Status _writeNewChunksIfPrimary(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const std::vector<ChunkType>& chunks,
-                                           const OID& currEpoch);
+                              CollectionMetadata* metadata,
+                              bool isShardPrimary);
 };
 
 }  // namespace mongo

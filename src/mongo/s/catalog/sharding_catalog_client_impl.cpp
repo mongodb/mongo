@@ -854,7 +854,13 @@ StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientImpl::getColle
         return parseStatus.getStatus();
     }
 
-    return repl::OpTimeWith<CollectionType>(parseStatus.getValue(), retOpTimePair.opTime);
+    auto collType = parseStatus.getValue();
+    if (collType.getDropped()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      stream() << "collection " << collNs << " was dropped");
+    }
+
+    return repl::OpTimeWith<CollectionType>(collType, retOpTimePair.opTime);
 }
 
 Status ShardingCatalogClientImpl::getCollections(OperationContext* opCtx,

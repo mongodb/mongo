@@ -11,13 +11,23 @@ env.Library(
         'metadata_loader.cpp',
     ],
     LIBDEPS=[
+        'shard_metadata_util',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='shard_metadata_util',
+    source=[
+        'shard_metadata_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/s/common',
     ],
 )
@@ -207,6 +217,7 @@ env.CppUnitTest(
     source=[
         'collection_metadata_test.cpp',
         'metadata_loader_test.cpp',
+        'shard_metadata_util_test.cpp',
     ],
     LIBDEPS=[
         'metadata',

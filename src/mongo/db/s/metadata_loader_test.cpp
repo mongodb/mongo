@@ -42,6 +42,7 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/stdx/memory.h"
@@ -91,6 +92,51 @@ protected:
                 ASSERT_BSONOBJ_EQ(chunk.first, foundChunk.getMin());
                 ASSERT_BSONOBJ_EQ(chunk.second.getMaxKey(), foundChunk.getMax());
             }
+        } catch (const DBException& ex) {
+            ASSERT(false);
+        }
+    }
+
+    void checkCollectionsEntryExists(const NamespaceString& nss,
+                                     const CollectionMetadata& metadata,
+                                     bool hasLastConsistentCollectionVersion) {
+        try {
+            DBDirectClient client(operationContext());
+            Query query BSON(ShardCollectionType::uuid() << nss.ns());
+            query.readPref(ReadPreference::Nearest, BSONArray());
+            std::unique_ptr<DBClientCursor> cursor =
+                client.query(CollectionType::ConfigNS.c_str(), query, 1);
+            ASSERT(cursor);
+            ASSERT(cursor->more());
+            BSONObj queryResult = cursor->nextSafe();
+
+            ShardCollectionType shardCollectionEntry =
+                assertGet(ShardCollectionType::fromBSON(queryResult));
+
+            BSONObjBuilder builder;
+            builder.append(ShardCollectionType::uuid(), nss.ns());
+            builder.append(ShardCollectionType::ns(), nss.ns());
+            builder.append(ShardCollectionType::keyPattern(), metadata.getKeyPattern());
+            if (hasLastConsistentCollectionVersion) {
+                metadata.getCollVersion().appendWithFieldForCommands(
+                    &builder, ShardCollectionType::lastConsistentCollectionVersion());
+            }
+
+            ASSERT_BSONOBJ_EQ(shardCollectionEntry.toBSON(), builder.obj());
+        } catch (const DBException& ex) {
+            ASSERT(false);
+        }
+    }
+
+    void checkCollectionsEntryDoesNotExist(const NamespaceString& nss) {
+        try {
+            DBDirectClient client(operationContext());
+            Query query BSON(ShardCollectionType::uuid() << nss.ns());
+            query.readPref(ReadPreference::Nearest, BSONArray());
+            std::unique_ptr<DBClientCursor> cursor =
+                client.query(ShardCollectionType::ConfigNS.c_str(), query, 1);
+            ASSERT(cursor);
+            ASSERT(!cursor->more());
         } catch (const DBException& ex) {
             ASSERT(false);
         }
@@ -167,30 +213,43 @@ TEST_F(MetadataLoaderTest, DroppedColl) {
     collType.setEpoch(OID());
     collType.setDropped(true);
     ASSERT_OK(collType.validate());
+
+    // The config.collections entry indicates that the collection was dropped, failing the refresh.
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+        checkCollectionsEntryDoesNotExist(kNss);
     });
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
     future.timed_get(kFutureTimeout);
 }
 
 TEST_F(MetadataLoaderTest, EmptyColl) {
+    // Fail due to no config.collections entry found.
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+        checkCollectionsEntryDoesNotExist(kNss);
     });
     expectFindOnConfigSendErrorCode(ErrorCodes::NamespaceNotFound);
     future.timed_get(kFutureTimeout);
@@ -198,15 +257,22 @@ TEST_F(MetadataLoaderTest, EmptyColl) {
 
 TEST_F(MetadataLoaderTest, BadColl) {
     BSONObj badCollToSend = BSON(CollectionType::fullNs(kNss.ns()));
+
+    // Providing an invalid config.collections document should fail the refresh.
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NoSuchKey);
+        checkCollectionsEntryDoesNotExist(kNss);
     });
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{badCollToSend});
     future.timed_get(kFutureTimeout);
@@ -218,15 +284,21 @@ TEST_F(MetadataLoaderTest, BadChunk) {
     chunkInfo.setVersion(ChunkVersion(1, 0, getMaxCollVersion().epoch()));
     ASSERT(!chunkInfo.validate().isOK());
 
+    // Providing an invalid config.chunks document should fail the refresh.
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(opCtx.get(),
                                                              catalogClient(),
                                                              kNss.ns(),
                                                              kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NoSuchKey);
+        checkCollectionsEntryExists(kNss, metadata, false);
     });
 
     expectFindOnConfigSendCollectionDefault();
@@ -235,6 +307,8 @@ TEST_F(MetadataLoaderTest, BadChunk) {
 }
 
 TEST_F(MetadataLoaderTest, NoChunksIsDropped) {
+    // Finding no chunks in config.chunks indicates that the collection was dropped, even if an
+    // entry was previously found in config.collestions indicating that it wasn't dropped.
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
@@ -269,6 +343,7 @@ TEST_F(MetadataLoaderTest, CheckNumChunk) {
     chunkType.setVersion(ChunkVersion(1, 0, getMaxCollVersion().epoch()));
     ASSERT(chunkType.validate().isOK());
 
+    // Check that finding no new chunks for the shard works smoothly.
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
@@ -287,6 +362,7 @@ TEST_F(MetadataLoaderTest, CheckNumChunk) {
         ASSERT_EQUALS(0, metadata.getShardVersion().majorVersion());
 
         checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 1);
+        checkCollectionsEntryExists(kNss, metadata, true);
     });
 
     expectFindOnConfigSendCollectionDefault();
@@ -296,6 +372,7 @@ TEST_F(MetadataLoaderTest, CheckNumChunk) {
 }
 
 TEST_F(MetadataLoaderTest, SingleChunkCheckNumChunk) {
+    // Check that loading a single chunk for the shard works successfully.
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
@@ -314,6 +391,7 @@ TEST_F(MetadataLoaderTest, SingleChunkCheckNumChunk) {
         ASSERT_EQUALS(getMaxCollVersion(), metadata.getShardVersion());
 
         checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 1);
+        checkCollectionsEntryExists(kNss, metadata, true);
     });
 
     expectFindOnConfigSendCollectionDefault();
@@ -323,6 +401,7 @@ TEST_F(MetadataLoaderTest, SingleChunkCheckNumChunk) {
 }
 
 TEST_F(MetadataLoaderTest, SeveralChunksCheckNumChunks) {
+    // Check that loading several chunks for the shard works successfully.
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
@@ -341,6 +420,7 @@ TEST_F(MetadataLoaderTest, SeveralChunksCheckNumChunks) {
         ASSERT_EQUALS(getMaxCollVersion(), metadata.getShardVersion());
 
         checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 4);
+        checkCollectionsEntryExists(kNss, metadata, true);
     });
 
     expectFindOnConfigSendCollectionDefault();
@@ -350,6 +430,7 @@ TEST_F(MetadataLoaderTest, SeveralChunksCheckNumChunks) {
 }
 
 TEST_F(MetadataLoaderTest, CollectionMetadataSetUp) {
+    // Check that the CollectionMetadata is set up correctly.
     auto future = launchAsync([this] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
@@ -367,6 +448,7 @@ TEST_F(MetadataLoaderTest, CollectionMetadataSetUp) {
         ASSERT_TRUE(getMaxShardVersion().equals(metadata.getShardVersion()));
 
         checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 1);
+        checkCollectionsEntryExists(kNss, metadata, true);
     });
 
     expectFindOnConfigSendCollectionDefault();
