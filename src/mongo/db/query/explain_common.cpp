@@ -31,7 +31,7 @@
 #include "mongo/db/query/explain_common.h"
 
 #include "mongo/util/mongoutils/str.h"
-#include <string>
+
 namespace mongo {
 
 // static
@@ -59,7 +59,7 @@ Status ExplainCommon::parseCmdBSON(const BSONObj& cmdObj, ExplainCommon::Verbosi
     *verbosity = ExplainCommon::EXEC_ALL_PLANS;
     if (cmdObj.nFields() > 2) {
         return Status(ErrorCodes::BadValue, "explain allows only 2 objects: explain: {<command>}, verbosity: <excution_call>");
-    } else if (cmdObj.nFields() == 1 || cmdObj.nFields() == 0) {
+    } else if (cmdObj.nFields() == 1) {
         return Status::OK();
     } else if (!cmdObj["verbosity"].eoo()) { 
         const char* verbStr = cmdObj["verbosity"].valuestrsafe();
