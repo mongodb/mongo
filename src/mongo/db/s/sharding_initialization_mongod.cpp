@@ -92,7 +92,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
                 stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
-            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
+            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(false));
             return hookList;
         },
         [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor)

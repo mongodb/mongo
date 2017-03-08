@@ -355,13 +355,6 @@ void PipelineD::prepareCursorSource(Collection* collection,
 
     if (!sources.empty()) {
         if (sources.front()->isValidInitialSource()) {
-            if (dynamic_cast<DocumentSourceMergeCursors*>(sources.front().get())) {
-                // Enable the hooks for setting up authentication on the subsequent internal
-                // connections we are going to create. This would normally have been done
-                // when SetShardVersion was called, but since SetShardVersion is never called
-                // on secondaries, this is needed.
-                ShardedConnectionInfo::addHook();
-            }
             return;  // don't need a cursor
         }
 

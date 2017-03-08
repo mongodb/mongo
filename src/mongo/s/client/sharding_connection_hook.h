@@ -43,7 +43,7 @@ class DBClientBase;
 class ShardingConnectionHook : public DBConnectionHook {
 public:
     ShardingConnectionHook(bool shardedConnections,
-                           std::unique_ptr<rpc::ShardingEgressMetadataHook> egressHook);
+                           std::unique_ptr<rpc::EgressMetadataHook> egressHook);
 
     void onCreate(DBClientBase* conn) override;
     void onDestroy(DBClientBase* conn) override;
@@ -54,7 +54,7 @@ private:
 
     // Use the implementation of the metadata readers and writers in ShardingEgressMetadataHook,
     // since that is the hook for Network Interface ASIO and this hook is to be deprecated.
-    std::unique_ptr<rpc::ShardingEgressMetadataHook> _egressHook;
+    std::unique_ptr<rpc::EgressMetadataHook> _egressHook;
 };
 
 }  // namespace mongo

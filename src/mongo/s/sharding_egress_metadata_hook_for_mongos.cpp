@@ -41,6 +41,9 @@
 namespace mongo {
 namespace rpc {
 
+ShardingEgressMetadataHookForMongos::ShardingEgressMetadataHookForMongos(bool shardedConnection)
+    : ShardingEgressMetadataHook(shardedConnection) {}
+
 void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
                                                         StringData hostString) {
     if (!haveClient()) {
