@@ -311,12 +311,7 @@ void SyncSourceResolver::_firstOplogEntryFetcherCallback(
         return;
     }
 
-    if (!_requiredOpTime.isNull()) {
-        _scheduleRBIDRequest(candidate, earliestOpTimeSeen);
-        return;
-    }
-
-    _finishCallback(candidate);
+    _scheduleRBIDRequest(candidate, earliestOpTimeSeen);
 }
 
 void SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime earliestOpTimeSeen) {
@@ -362,12 +357,16 @@ void SyncSourceResolver::_rbidRequestCallback(
         return;
     }
 
-    // Schedule fetcher to look for '_requiredOpTime' in the remote oplog.
-    // Unittest requires that this kind of failure be handled specially.
-    auto status = _scheduleFetcher(_makeRequiredOpTimeFetcher(candidate, earliestOpTimeSeen));
-    if (!status.isOK()) {
-        _finishCallback(status);
+    if (!_requiredOpTime.isNull()) {
+        // Schedule fetcher to look for '_requiredOpTime' in the remote oplog.
+        // Unittest requires that this kind of failure be handled specially.
+        auto status = _scheduleFetcher(_makeRequiredOpTimeFetcher(candidate, earliestOpTimeSeen));
+        if (!status.isOK()) {
+            _finishCallback(status);
+        }
+        return;
     }
+    _finishCallback(candidate);
 }
 
 Status SyncSourceResolver::_compareRequiredOpTimeWithQueryResponse(

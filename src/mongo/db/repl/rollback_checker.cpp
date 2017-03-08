@@ -119,7 +119,7 @@ Status RollbackChecker::reset_sync() {
     return resetStatus;
 }
 
-int RollbackChecker::getBaseRBID_forTest() {
+int RollbackChecker::getBaseRBID() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _baseRBID;
 }

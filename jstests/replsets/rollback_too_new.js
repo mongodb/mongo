@@ -9,6 +9,8 @@
 
 (function() {
     "use strict";
+    load("jstests/replsets/rslib.js");  // For getLatestOp()
+
     // set up a set and grab things for later
     var name = "rollback_too_new";
     var replTest = new ReplSetTest({name: name, nodes: 3});
@@ -39,14 +41,28 @@
 
     replTest.stop(CID);
 
-    // do one write to master
-    // in order to trigger a rollback on C
-    assert.writeOK(master.getDB(name).foo.insert({x: 2}, options));
+    // We bump the term to make sure node 0's oplog is ahead of node 2's.
+    var term = getLatestOp(conns[0]).t;
+    try {
+        assert.commandWorked(conns[0].adminCommand({replSetStepDown: 1, force: true}));
+    } catch (e) {
+        if (!isNetworkError(e)) {
+            throw e;
+        }
+    }
+
+    // After stepping down due to the higher term, it will eventually get reelected.
+    replTest.waitForState(conns[0], ReplSetTest.State.PRIMARY);
+    // Wait for the node to increase its term.
+    assert.soon(function() {
+        return getLatestOp(conns[0]).t > term;
+    });
 
     // Node C should connect to new master as a sync source because chaining is disallowed.
     // C is ahead of master but it will still connect to it.
     clearRawMongoProgramOutput();
     replTest.restart(CID);
+
     assert.soon(function() {
         try {
             return rawMongoProgramOutput().match(

@@ -789,7 +789,7 @@ void syncFixUp(OperationContext* opCtx,
 Status _syncRollback(OperationContext* opCtx,
                      const OplogInterface& localOplog,
                      const RollbackSource& rollbackSource,
-                     boost::optional<int> requiredRBID,
+                     int requiredRBID,
                      ReplicationCoordinator* replCoord,
                      StorageInterface* storageInterface) {
     invariant(!opCtx->lockState()->isLocked());
@@ -797,11 +797,8 @@ Status _syncRollback(OperationContext* opCtx,
     FixUpInfo how;
     log() << "rollback 1";
     how.rbid = rollbackSource.getRollbackId();
-    if (requiredRBID) {
-        uassert(40362,
-                "Upstream node rolled back. Need to retry our rollback.",
-                how.rbid == *requiredRBID);
-    }
+    uassert(
+        40362, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
 
     log() << "rollback 2 FindCommonPoint";
     try {
@@ -860,7 +857,7 @@ Status _syncRollback(OperationContext* opCtx,
 Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
-                    boost::optional<int> requiredRBID,
+                    int requiredRBID,
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface) {
     invariant(opCtx);
@@ -880,7 +877,7 @@ Status syncRollback(OperationContext* opCtx,
 void rollback(OperationContext* opCtx,
               const OplogInterface& localOplog,
               const RollbackSource& rollbackSource,
-              boost::optional<int> requiredRBID,
+              int requiredRBID,
               ReplicationCoordinator* replCoord,
               StorageInterface* storageInterface,
               stdx::function<void(int)> sleepSecsFn) {
