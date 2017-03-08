@@ -980,8 +980,6 @@ pre:
     params:
       system_log: true
       script: |
-        set -o errexit
-        set -o verbose
 
         ulimit -a
         # Clear the dmesg ring buffer. The "post" phase will check dmesg for OOM messages.
@@ -992,7 +990,6 @@ pre:
         else
           echo "Could not clear the dmesg ring buffer"
         fi
-
 
 
 post:
