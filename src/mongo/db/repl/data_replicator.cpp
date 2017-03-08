@@ -682,6 +682,8 @@ void DataReplicator::_lastOplogEntryFetcherCallbackForBeginTimestamp(
                                         _opts.remoteOplogNS,
                                         config,
                                         _opts.oplogFetcherMaxFetcherRestarts,
+                                        _rollbackChecker->getBaseRBID(),
+                                        false /* requireFresherSyncSource */,
                                         _dataReplicatorExternalState.get(),
                                         stdx::bind(&DataReplicator::_enqueueDocuments,
                                                    this,

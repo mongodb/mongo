@@ -476,10 +476,17 @@ BSONObj makeRollbackCheckerResponse(int rollbackId) {
 /**
  * Generates a cursor response for a Fetcher to consume.
  */
-BSONObj makeCursorResponse(CursorId cursorId,
-                           const NamespaceString& nss,
-                           std::vector<BSONObj> docs,
-                           bool isFirstBatch = true) {
+RemoteCommandResponse makeCursorResponse(CursorId cursorId,
+                                         const NamespaceString& nss,
+                                         std::vector<BSONObj> docs,
+                                         bool isFirstBatch = true,
+                                         int rbid = 1) {
+    OpTime futureOpTime(Timestamp(1000, 1000), 1000);
+    rpc::OplogQueryMetadata oqMetadata(futureOpTime, futureOpTime, rbid, 0, 0);
+    BSONObjBuilder metadataBob;
+    ASSERT_OK(oqMetadata.writeToMetadata(&metadataBob));
+    auto metadataObj = metadataBob.obj();
+
     BSONObjBuilder bob;
     {
         BSONObjBuilder cursorBob(bob.subobjStart("cursor"));
@@ -494,7 +501,7 @@ BSONObj makeCursorResponse(CursorId cursorId,
         }
     }
     bob.append("ok", 1);
-    return bob.obj();
+    return {bob.obj(), metadataObj, Milliseconds(0)};
 }
 
 /**
@@ -2889,11 +2896,7 @@ TEST_F(DataReplicatorTest, DataReplicatorPassesThroughMultiApplierScheduleError)
         // MultiApplier next time _getNextApplierBatchCallback() runs.
         net->scheduleSuccessfulResponse(
             oplogFetcherNoi,
-            executor::RemoteCommandResponse(
-                makeCursorResponse(
-                    1LL, _options.localOplogNS, {makeOplogEntry(1), makeOplogEntry(2)}),
-                BSONObj(),
-                Milliseconds(0)));
+            makeCursorResponse(1LL, _options.localOplogNS, {makeOplogEntry(1), makeOplogEntry(2)}));
         net->runReadyNetworkOperations();
 
         // Ignore OplogFetcher's getMore request.

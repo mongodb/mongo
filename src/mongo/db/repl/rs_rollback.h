@@ -61,7 +61,7 @@ class StorageInterface;
 void rollback(OperationContext* opCtx,
               const OplogInterface& localOplog,
               const RollbackSource& rollbackSource,
-              boost::optional<int> requiredRBID,
+              int requiredRBID,
               ReplicationCoordinator* replCoord,
               StorageInterface* storageInterface,
               stdx::function<void(int)> sleepSecsFn = [](int secs) { sleepsecs(secs); });
@@ -85,6 +85,7 @@ void rollback(OperationContext* opCtx,
  * @param rollbackSource interface for sync source:
  *            provides oplog; and
  *            supports fetching documents and copying collections.
+ * @param requiredRBID Rollback ID we are required to have throughout rollback.
  * @param replCoord Used to track the rollback ID and to change the follower state
  * @param storageInterface Used to update minValid.
  *
@@ -98,7 +99,7 @@ void rollback(OperationContext* opCtx,
 Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
-                    boost::optional<int> requiredRBID,
+                    int requiredRBID,
                     ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface);
 

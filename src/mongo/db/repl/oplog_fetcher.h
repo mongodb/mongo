@@ -136,6 +136,8 @@ public:
                  NamespaceString nss,
                  ReplSetConfig config,
                  std::size_t maxFetcherRestarts,
+                 int requiredRBID,
+                 bool requireFresherSyncSource,
                  DataReplicatorExternalState* dataReplicatorExternalState,
                  EnqueueDocumentsFn enqueueDocumentsFn,
                  OnShutdownCallbackFn onShutdownCallbackFn);
@@ -255,6 +257,15 @@ private:
 
     // Maximum number of times to consecutively restart the fetcher on non-cancellation errors.
     const std::size_t _maxFetcherRestarts;
+
+    // Rollback ID that the sync source is required to have after the first batch.
+    int _requiredRBID;
+
+    // A boolean indicating whether we should error if the sync source is not ahead of our initial
+    // last fetched OpTime on the first batch. Most of the time this should be set to true,
+    // but there are certain special cases, namely during initial sync, where it's acceptable for
+    // our sync source to have no ops newer than _lastFetched.
+    bool _requireFresherSyncSource;
 
     DataReplicatorExternalState* const _dataReplicatorExternalState;
     const EnqueueDocumentsFn _enqueueDocumentsFn;

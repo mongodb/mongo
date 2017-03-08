@@ -247,7 +247,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                                     OplogInterfaceMock({operation}),
                                     RollbackSourceLocal(std::unique_ptr<OplogInterface>(
                                         new OplogInterfaceMock(kEmptyMockOperations))),
-                                    {1},
+                                    1,
                                     _coordinator,
                                     &_storageInterface),
                        UserException,
@@ -796,7 +796,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
     ASSERT_THROWS_CODE(syncRollback(_opCtx.get(),
                                     OplogInterfaceMock({dropCollectionOperation, commonOperation}),
                                     rollbackSource,
-                                    {0},
+                                    0,
                                     _coordinator,
                                     &_storageInterface),
                        DBException,

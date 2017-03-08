@@ -4,6 +4,8 @@
 // @tags: [requires_fsync]
 (function() {
     "use strict";
+    load("jstests/replsets/rslib.js");
+
     var name = "maxSyncSourceLagSecs";
     var replTest = new ReplSetTest({
         name: name,
@@ -21,8 +23,8 @@
 
     var master = replTest.getPrimary();
     var slaves = replTest.liveNodes.slaves;
-    assert.commandWorked(slaves[0].getDB("admin").runCommand({replSetSyncFrom: master.name}));
-    assert.commandWorked(slaves[1].getDB("admin").runCommand({replSetSyncFrom: master.name}));
+    syncFrom(slaves[0], master, replTest);
+    syncFrom(slaves[1], master, replTest);
     master.getDB("foo").bar.save({a: 1});
     replTest.awaitReplication();
 
@@ -31,23 +33,7 @@
     sleep(4000);
 
     jsTestLog("Setting sync target of slave 2 to slave 1");
-    assert.soon(function() {
-        // We do a write each time and have this in a try...catch block due to the fallout of
-        // SERVER-24114. If that timeout occurs, then we search for another sync source, however we
-        // will not find one unless more writes have come in. Additionally, it is possible that
-        // slaves[1] will switch to sync from slaves[0] after slaves[1] replicates a write from
-        // the primary but before slaves[0] replicates it. slaves[1] will then have to roll back
-        // which would cause a network error.
-        try {
-            slaves[1].getDB("admin").runCommand({replSetSyncFrom: slaves[0].name});
-            var res = slaves[1].getDB("admin").runCommand({"replSetGetStatus": 1});
-            master.getDB("foo").bar.insert({a: 1});
-            return res.syncingTo === slaves[0].name;
-        } catch (e) {
-            print("Exception in assert.soon, retrying: " + e);
-            return false;
-        }
-    }, "sync target not changed to other slave", 100 * 1000, 2 * 1000);
+    syncFrom(slaves[1], slaves[0], replTest);
     printjson(replTest.status());
 
     jsTestLog("Lock slave 1 and add some docs. Force sync target for slave 2 to change to primary");

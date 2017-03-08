@@ -158,8 +158,7 @@ private:
      */
     Status _enqueueDocuments(Fetcher::Documents::const_iterator begin,
                              Fetcher::Documents::const_iterator end,
-                             const OplogFetcher::DocumentsInfo& info,
-                             boost::optional<int>* requiredRBID);
+                             const OplogFetcher::DocumentsInfo& info);
 
     // restart syncing
     void start(OperationContext* opCtx);
