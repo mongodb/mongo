@@ -330,6 +330,41 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='rollback_impl',
+    source=[
+        'rollback_impl.cpp',
+    ],
+    LIBDEPS=[
+        'abstract_async_component',
+        'optime',
+        'repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        #'$BUILD_DIR/mongo/db/s/sharding', # CYCLE
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ]
+)
+
+env.CppUnitTest(
+    target='rollback_impl_test',
+    source=[
+        'rollback_impl_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_interface_mock',
+        'rollback_impl',
+        'rollback_test_fixture',
+        'task_executor_mock',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='rollback_source_impl',
     source=[
         'rollback_source_impl.cpp',
