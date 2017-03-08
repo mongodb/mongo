@@ -82,8 +82,7 @@ void threadStateChange() {
     // terrible runaway if we're not careful.
     stdx::lock_guard<stdx::mutex> lk(tcmallocCleanupLock);
 #endif
-    MallocExtension::instance()->MarkThreadIdle();
-    MallocExtension::instance()->MarkThreadBusy();
+    MallocExtension::instance()->MarkThreadTemporarilyIdle();
 }
 
 // Register threadStateChange callback
