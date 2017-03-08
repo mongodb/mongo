@@ -226,6 +226,12 @@ void TransportLayerLegacy::end(const SessionHandle& session) {
 }
 
 void TransportLayerLegacy::_closeConnection(Connection* conn) {
+    stdx::lock_guard<stdx::mutex> lk(conn->closeMutex);
+
+    if (conn->closed) {
+        return;
+    }
+
     conn->closed = true;
     conn->amp->shutdown();
     Listener::globalTicketHolder.release();

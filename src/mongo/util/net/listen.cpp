@@ -455,7 +455,9 @@ void Listener::initAndListen() {
         events[count] = ev->get();
     }
 
-    while (!inShutdown()) {
+    // The check against _finished allows us to actually stop the listener by signalling it through
+    // the _finished flag.
+    while (!inShutdown() && !_finished.load()) {
         // Turn on listening for accept-ready sockets
         for (size_t count = 0; count < _socks.size(); ++count) {
             int status = WSAEventSelect(_socks[count], events[count], FD_ACCEPT | FD_CLOSE);
