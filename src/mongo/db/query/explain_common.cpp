@@ -31,7 +31,7 @@
 #include "mongo/db/query/explain_common.h"
 
 #include "mongo/util/mongoutils/str.h"
-
+#include <string>
 namespace mongo {
 
 // static
@@ -51,12 +51,17 @@ const char* ExplainCommon::verbosityString(ExplainCommon::Verbosity verbosity) {
 
 // static
 Status ExplainCommon::parseCmdBSON(const BSONObj& cmdObj, ExplainCommon::Verbosity* verbosity) {
+
     if (Object != cmdObj.firstElement().type()) {
         return Status(ErrorCodes::BadValue, "explain command requires a nested object");
     }
 
     *verbosity = ExplainCommon::EXEC_ALL_PLANS;
-    if (!cmdObj["verbosity"].eoo()) {
+    if (cmdObj.nFields() > 2) {
+        return Status(ErrorCodes::BadValue, "explain allows only 2 objects: explain: {<command>}, verbosity: <excution_call>");
+    } else if (cmdObj.nFields() == 1 || cmdObj.nFields() == 0) {
+        return Status::OK();
+    } else if (!cmdObj["verbosity"].eoo()) { 
         const char* verbStr = cmdObj["verbosity"].valuestrsafe();
         if (mongoutils::str::equals(verbStr, "queryPlanner")) {
             *verbosity = ExplainCommon::QUERY_PLANNER;
@@ -67,9 +72,11 @@ Status ExplainCommon::parseCmdBSON(const BSONObj& cmdObj, ExplainCommon::Verbosi
                           "verbosity string must be one of "
                           "{'queryPlanner', 'executionStats', 'allPlansExecution'}");
         }
+        return Status::OK();
+    } else {
+        return Status(ErrorCodes::BadValue, "verbosity invalid command");
     }
-
-    return Status::OK();
+    
 }
 
 }  // namespace mongo
