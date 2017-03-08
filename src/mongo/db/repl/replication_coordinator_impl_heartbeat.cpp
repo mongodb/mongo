@@ -425,13 +425,9 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplSetConfig&
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
-    if (_freshnessChecker) {
-        _freshnessChecker->cancel();
-        if (_electCmdRunner) {
-            _electCmdRunner->cancel();
-        }
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
         _replExecutor.onEvent(
-            _electionFinishedEvent,
+            electionFinishedEvent,
             stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled,
                        this,
                        stdx::placeholders::_1,
@@ -574,19 +570,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     }
 
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
-    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-        if (isV1ElectionProtocol()) {
-            invariant(_voteRequester);
-            _voteRequester->cancel();
-        } else {
-            invariant(_freshnessChecker);
-            _freshnessChecker->cancel();
-            if (_electCmdRunner) {
-                _electCmdRunner->cancel();
-            }
-        }
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
         // Wait for the election to complete and the node's Role to be set to follower.
-        _replExecutor.onEvent(_electionFinishedEvent,
+        _replExecutor.onEvent(electionFinishedEvent,
                               stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
                                          this,
                                          stdx::placeholders::_1,

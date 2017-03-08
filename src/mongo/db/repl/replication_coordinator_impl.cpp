@@ -853,23 +853,13 @@ void ReplicationCoordinatorImpl::_setFollowerModeFinish(
         return;
     }
 
-    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-        // We are a candidate, which means _topCoord believes us to be in state RS_SECONDARY, and
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+        // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
-        // the old and new state were equal.  So, cancel the running election and try again to
+        // the old and new state were equal.  So, try again after the election is over to
         // finish setting the follower mode.
-        if (isV1ElectionProtocol()) {
-            invariant(_voteRequester);
-            _voteRequester->cancel();
-        } else {
-            invariant(_freshnessChecker);
-            _freshnessChecker->cancel();
-            if (_electCmdRunner) {
-                _electCmdRunner->cancel();
-            }
-        }
         _replExecutor.onEvent(
-            _electionFinishedEvent,
+            electionFinishedEvent,
             _wrapAsCallbackFn(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
                                          this,
                                          newState,
@@ -2425,19 +2415,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     invariant(_rsConfig.isInitialized());
 
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
-    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-        if (isV1ElectionProtocol()) {
-            invariant(_voteRequester);
-            _voteRequester->cancel();
-        } else {
-            invariant(_freshnessChecker);
-            _freshnessChecker->cancel();
-            if (_electCmdRunner) {
-                _electCmdRunner->cancel();
-            }
-        }
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
         // Wait for the election to complete and the node's Role to be set to follower.
-        _replExecutor.onEvent(_electionFinishedEvent,
+        _replExecutor.onEvent(electionFinishedEvent,
                               stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                                          this,
                                          stdx::placeholders::_1,
@@ -2445,7 +2425,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
                                          myIndex));
         return;
     }
-
 
     const ReplSetConfig oldConfig = _rsConfig;
     const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
@@ -3729,6 +3708,22 @@ void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
     _indexPrefetchConfig = cfg;
 }
 
+ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inTopoLock() {
+    if (_topCoord->getRole() != TopologyCoordinator::Role::candidate) {
+        return {};
+    }
+    if (isV1ElectionProtocol()) {
+        invariant(_voteRequester);
+        _voteRequester->cancel();
+    } else {
+        invariant(_freshnessChecker);
+        _freshnessChecker->cancel();
+        if (_electCmdRunner) {
+            _electCmdRunner->cancel();
+        }
+    }
+    return _electionFinishedEvent;
+}
 
 }  // namespace repl
 }  // namespace mongo

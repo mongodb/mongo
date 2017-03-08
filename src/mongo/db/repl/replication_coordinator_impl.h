@@ -1160,6 +1160,15 @@ private:
      */
     void _waitForStartUpComplete();
 
+    /**
+     * Cancels the running election, if any, and returns an event that will be signaled when the
+     * canceled election completes. If there is no running election, returns an invalid event
+     * handle.
+     *
+     * Caller must already have locked the _topoMutex.
+     */
+    ReplicationExecutor::EventHandle _cancelElectionIfNeeded_inTopoLock();
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
