@@ -133,6 +133,9 @@ public:
     // Name of the chunks collection in the config server.
     static const std::string ConfigNS;
 
+    // The shard chunks collections' common namespace prefix.
+    static const std::string ShardNSPrefix;
+
     // Field names and types in the chunks collections.
     static const BSONField<std::string> name;
     static const BSONField<BSONObj> minShardID;

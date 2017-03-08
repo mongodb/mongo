@@ -188,27 +188,12 @@ Status MetadataLoader::_initChunks(OperationContext* opCtx,
         ns, &metadata->_chunksMap, &metadata->_collVersion, &versionMap, shard);
 
     try {
-        const auto diffQuery = SCMConfigDiffTracker::createConfigDiffQuery(NamespaceString(ns),
-                                                                           metadata->_collVersion);
-        std::vector<ChunkType> chunks;
-        Status status = catalogClient->getChunks(opCtx,
-                                                 diffQuery.query,
-                                                 diffQuery.sort,
-                                                 boost::none,
-                                                 &chunks,
-                                                 nullptr,
-                                                 repl::ReadConcernLevel::kMajorityReadConcern);
-        if (!status.isOK()) {
-            return status;
+        auto statusWithChunks = shardmetadatautil::getChunks(
+            opCtx, catalogClient, NamespaceString(ns), metadata->_collVersion, isShardPrimary);
+        if (!statusWithChunks.isOK()) {
+            return statusWithChunks.getStatus();
         }
-
-        if (isShardPrimary) {
-            status = shardmetadatautil::writeNewChunks(
-                opCtx, NamespaceString(ns), chunks, metadata->_collVersion.epoch());
-            if (!status.isOK()) {
-                return status;
-            }
-        }
+        auto chunks = statusWithChunks.getValue();
 
         //
         // The diff tracker should always find at least one chunk (the highest chunk we saw

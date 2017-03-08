@@ -36,12 +36,13 @@
 namespace mongo {
 
 class BSONObj;
+struct ChunkVersion;
 class ChunkType;
 class CollectionMetadata;
-class ShardCollectionType;
 class NamespaceString;
 class OID;
 class OperationContext;
+class ShardCollectionType;
 class ShardingCatalogClient;
 template <typename T>
 class StatusWith;
@@ -56,6 +57,8 @@ namespace shardmetadatautil {
  * Gets the config.collections for 'nss' entry either remotely from the config server if
  * 'isShardPrimary' is true or locally from the shard if false. Additionally updates the shard's
  * config.collections entry with the remotely retrieved metadata if 'isShardPrimary' is true.
+ *
+ * Returns NamespaceNotFound if the collection was dropped.
  */
 StatusWith<std::pair<BSONObj, OID>> getCollectionShardKeyAndEpoch(
     OperationContext* opCtx,
@@ -74,23 +77,46 @@ StatusWith<ShardCollectionType> readShardCollectionEntry(OperationContext* opCtx
  * Only the fields specified in 'update' are modified.
  * Sets upsert to true on the update operation in case the entry does not exist locally yet.
  */
-Status updateCollectionEntry(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const BSONObj& query,
-                             const BSONObj& update);
+Status updateShardCollectionEntry(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const BSONObj& query,
+                                  const BSONObj& update);
+
+/**
+ * Gets the chunks for 'nss' that have lastmod versions equal to or higher than 'collectionVersion'.
+ * Retrieves the chunks from the config server's config.chunks collection if 'isShardPrimary is
+ * true; otherwise reads locally from the shard's chunks collection corresponding to 'nss'.
+ * Additionally updates the shard's chunks collection with the remotely retrieved chunks if
+ * 'isShardPrimary' is true.
+ *
+ * Returns NamespaceNotFound if the collection was dropped.
+ */
+StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
+                                             ShardingCatalogClient* catalogClient,
+                                             const NamespaceString& nss,
+                                             const ChunkVersion& collectionVersion,
+                                             bool isShardPrimary);
+
+/**
+ * Reads the shard server's chunks collection corresponding to 'nss' for chunks with lastmod gte
+ * 'collectionVersion'.
+ */
+StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ChunkVersion& collectionVersion);
 
 /**
  * Two threads running this function in parallel for the same collection can corrupt the collection
  * data!
  *
- * Takes a vector of 'chunks' and updates the config.chunks.ns collection specified by 'nss'.
- * Any chunk documents in config.chunks.ns that overlap with a chunk in 'chunks' is removed
- * as the new chunk document is inserted. If the epoch of any chunk in 'chunks' does not match
- * 'currEpoch', the chunk metadata is dropped and a RemoteChangeDetected error returned.
+ * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss'. Any chunk
+ * documents in config.chunks.ns that overlap with a chunk in 'chunks' is removed as the new chunk
+ * document is inserted. If the epoch of any chunk in 'chunks' does not match 'currEpoch', the chunk
+ * metadata is dropped and a RemoteChangeDetected error returned.
  *
- * @nss - the regular collection namespace for which chunk metadata is being updated.
- * @chunks - chunks retrieved from the config server, sorted in ascending chunk version order
- * @currEpoch - what this shard server expects to be the collection epoch.
+ * nss - the regular collection namespace for which chunk metadata is being updated.
+ * chunks - chunks retrieved from the config server, sorted in ascending chunk version order
+ * currEpoch - what this shard server expects to be the collection epoch.
  *
  * Returns:
  * - RemoteChangeDetected if the chunk version epoch of any chunk in 'chunks' is different than
@@ -103,12 +129,14 @@ Status writeNewChunks(OperationContext* opCtx,
                       const OID& currEpoch);
 
 /**
- * Locally on this shard, drops the config.chunks.ns corresponding to 'chunkMetadataNss' and then
- * deletes the config.collections entry for 'collectionEntryNss'.
+ * Locally on this shard, deletes the config.collections entry for 'nss', then drops
+ * the corresponding chunks collection.
+ *
+ * The order is important because the secondary observes changes to the config.collections entries.
+ * If the chunks were dropped first, the secondary would keep refreshing until it exceeded its
+ * retries, rather than returning with a useful error message.
  */
-Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx,
-                                           const NamespaceString& chunkMetadataNss,
-                                           const NamespaceString& collectionsEntryNss);
+Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace shardmetadatautil
 }  // namespace mongo

@@ -202,7 +202,7 @@ protected:
     }
 
 private:
-    ChunkVersion _maxCollVersion{1, 0, OID::gen()};
+    ChunkVersion _maxCollVersion{0, 0, OID::gen()};
     const KeyPattern _keyPattern{BSON("a" << 1)};
 };
 
@@ -212,10 +212,11 @@ TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsDocument) {
         BSON(ShardCollectionType::uuid(kNss.ns())
              << ShardCollectionType::ns(kNss.ns())
              << ShardCollectionType::keyPattern(getKeyPattern().toBSON()));
-    ASSERT_OK(shardmetadatautil::updateCollectionEntry(operationContext(),
-                                                       kNss,
-                                                       BSON(ShardCollectionType::uuid(kNss.ns())),
-                                                       shardCollectionTypeObj));
+    ASSERT_OK(
+        shardmetadatautil::updateShardCollectionEntry(operationContext(),
+                                                      kNss,
+                                                      BSON(ShardCollectionType::uuid(kNss.ns())),
+                                                      shardCollectionTypeObj));
 
     ShardCollectionType readShardCollectionType =
         assertGet(shardmetadatautil::readShardCollectionEntry(operationContext(), kNss));
@@ -225,7 +226,7 @@ TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsDocument) {
     BSONObjBuilder updateBuilder;
     getCollectionVersion().appendWithFieldForCommands(
         &updateBuilder, ShardCollectionType::lastConsistentCollectionVersion());
-    ASSERT_OK(shardmetadatautil::updateCollectionEntry(
+    ASSERT_OK(shardmetadatautil::updateShardCollectionEntry(
         operationContext(), kNss, BSON(ShardCollectionType::uuid(kNss.ns())), updateBuilder.obj()));
 
     readShardCollectionType =
@@ -243,6 +244,31 @@ TEST_F(ShardMetadataUtilTest, WriteNewChunks) {
     shardmetadatautil::writeNewChunks(
         operationContext(), kNss, chunks, getCollectionVersion().epoch());
     checkChunks(kChunkMetadataNss, chunks);
+}
+
+TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
+    setUpCollection();
+
+    std::vector<ChunkType> chunks = makeFourChunks();
+    shardmetadatautil::writeNewChunks(
+        operationContext(), kNss, chunks, getCollectionVersion().epoch());
+    checkChunks(kChunkMetadataNss, chunks);
+
+    // read all the chunks
+    std::vector<ChunkType> readChunks = assertGet(shardmetadatautil::readShardChunks(
+        operationContext(), kNss, ChunkVersion(0, 0, getCollectionVersion().epoch())));
+    for (auto chunkIt = chunks.begin(), readChunkIt = readChunks.begin();
+         chunkIt != chunks.end() && readChunkIt != readChunks.end();
+         ++chunkIt, ++readChunkIt) {
+        ASSERT_BSONOBJ_EQ(chunkIt->toShardBSON(), readChunkIt->toShardBSON());
+    }
+
+    // read only the highest version chunk
+    readChunks = assertGet(
+        shardmetadatautil::readShardChunks(operationContext(), kNss, getCollectionVersion()));
+
+    ASSERT_TRUE(readChunks.size() == 1);
+    ASSERT_BSONOBJ_EQ(chunks.back().toShardBSON(), readChunks.front().toShardBSON());
 }
 
 TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
@@ -304,8 +330,7 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
 
 TEST_F(ShardMetadataUtilTest, DropChunksAndDeleteCollectionsEntry) {
     setUpShardingMetadata();
-    ASSERT_OK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(
-        operationContext(), kChunkMetadataNss, kNss));
+    ASSERT_OK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(operationContext(), kNss));
     checkCollectionIsEmpty(NamespaceString(ShardCollectionType::ConfigNS));
     checkCollectionIsEmpty(kChunkMetadataNss);
 }
