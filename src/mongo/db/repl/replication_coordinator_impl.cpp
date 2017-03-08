@@ -2379,12 +2379,16 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         return status;
     }
 
-    const stdx::function<void(const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
-        stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
-                   this,
-                   stdx::placeholders::_1,
-                   newConfig,
-                   myIndex.getValue()));
+    auto reconfigFinished = uassertStatusOK(_replExecutor.makeEvent());
+    const auto reconfigFinishFn =
+        [ this, newConfig, myIndex = myIndex.getValue(), reconfigFinished ](
+            const ReplicationExecutor::CallbackArgs& cbData) {
+
+        if (!cbData.status.isOK()) {
+            return;
+        }
+        _finishReplSetReconfig(newConfig, myIndex, reconfigFinished);
+    };
 
     // If it's a force reconfig, the primary node may not be electable after the configuration
     // change.  In case we are that primary node, finish the reconfig under the global lock,
@@ -2402,12 +2406,15 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     fassert(18824, cbhStatus.getStatus());
 
     configStateGuard.Dismiss();
-    _replExecutor.wait(cbhStatus.getValue());
+    _replExecutor.waitForEvent(reconfigFinished);
     return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(
-    const ReplicationExecutor::CallbackArgs& cbData, const ReplSetConfig& newConfig, int myIndex) {
+    const ReplSetConfig& newConfig,
+    int myIndex,
+    const ReplicationExecutor::EventHandle& finishedEvent) {
+
     LockGuard topoLock(_topoMutex);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -2420,9 +2427,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
         _replExecutor.onEvent(electionFinishedEvent,
                               stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                                          this,
-                                         stdx::placeholders::_1,
                                          newConfig,
-                                         myIndex));
+                                         myIndex,
+                                         finishedEvent));
         return;
     }
 
@@ -2443,6 +2450,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     } else {
         _performPostMemberStateUpdateAction(action);
     }
+    _replExecutor.signalEvent(finishedEvent);
 }
 
 Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCtx,

@@ -826,9 +826,9 @@ private:
      * Finishes the work of processReplSetReconfig while holding _topoMutex, in the event of
      * a successful quorum check.
      */
-    void _finishReplSetReconfig(const ReplicationExecutor::CallbackArgs& cbData,
-                                const ReplSetConfig& newConfig,
-                                int myIndex);
+    void _finishReplSetReconfig(const ReplSetConfig& newConfig,
+                                int myIndex,
+                                const ReplicationExecutor::EventHandle& finishedEvent);
 
     /**
      * Changes _rsConfigState to newState, and notify any waiters.
