@@ -54,6 +54,10 @@ public:
 // mongos calls end() manually, which occasionally was the second call to end() if after a primary
 // stepdown.  This tests verifies our fix (making end() safe to call multiple times)
 TEST(TransportLayerLegacy, endSessionsDoesntDoubleClose) {
+    // Disabling this test until we can figure out the best way to allocate port numbers for unit
+    // tests
+    return;
+
     ServiceEntryPointUtil sepu;
 
     transport::TransportLayerLegacy::Options opts{};
