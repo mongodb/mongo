@@ -431,10 +431,10 @@ functions:
             set -o igncr
         fi;
 
-        . ./${set_tools_gopath|set_gopath.sh}
-
         sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+
+        . ./${set_tools_gopath|set_gopath.sh}
 
         build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog"
 
