@@ -50,6 +50,7 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
@@ -69,6 +70,9 @@ const char kHashFieldName[] = "h";
 const int kSleepToAllowBatchingMillis = 2;
 const int kSmallBatchLimitBytes = 40000;
 const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
+
+// Set this to true to force rollbacks to use the 3.4 implementation.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(use3dot4Rollback, bool, true);
 
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.
@@ -162,6 +166,10 @@ void BackgroundSync::shutdown(OperationContext* opCtx) {
 
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();
+    }
+
+    if (_rollback) {
+        _rollback->shutdown();
     }
 
     _inShutdown = true;
@@ -440,66 +448,7 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing) {
-        if (_replCoord->getMemberState().primary()) {
-            // TODO: Abort catchup mode early if rollback detected.
-            warning() << "Rollback situation detected in catch-up mode; catch-up mode will end.";
-            sleepsecs(1);
-            return;
-        }
-
-        // Rollback is a synchronous operation that uses the task executor and may not be
-        // executed inside the fetcher callback.
-        const int messagingPortTags = 0;
-        ConnectionPool connectionPool(messagingPortTags);
-        std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-        auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
-            if (!connection.get()) {
-                connection.reset(new ConnectionPool::ConnectionPtr(
-                    &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
-            };
-            return connection->get();
-        };
-
-        {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            lastOpTimeFetched = _lastOpTimeFetched;
-        }
-
-        log() << "Starting rollback due to " << redact(fetcherReturnStatus);
-
-        // TODO: change this to call into the Applier directly to block until the applier is
-        // drained.
-        //
-        // Wait till all buffered oplog entries have drained and been applied.
-        auto lastApplied = _replCoord->getMyLastAppliedOpTime();
-        if (lastApplied != lastOpTimeFetched) {
-            log() << "Waiting for all operations from " << lastApplied << " until "
-                  << lastOpTimeFetched << " to be applied before starting rollback.";
-            while (lastOpTimeFetched > (lastApplied = _replCoord->getMyLastAppliedOpTime())) {
-                sleepmillis(10);
-                if (getState() != ProducerState::Running) {
-                    return;
-                }
-            }
-        }
-
-        if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
-            // This log output is used in js tests so please leave it.
-            log() << "rollback - rollbackHangBeforeStart fail point "
-                     "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
-                mongo::sleepsecs(1);
-            }
-        }
-
-        OplogInterfaceLocal localOplog(opCtx, rsOplogName);
-        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-        rollback(
-            opCtx, localOplog, rollbackSource, syncSourceResp.rbid, _replCoord, storageInterface);
-
-        // Reset the producer to clear the sync source and the last optime fetched.
-        stop(true);
-        startProducerIfStopped();
+        _runRollback(opCtx, fetcherReturnStatus, source, syncSourceResp.rbid, storageInterface);
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
         warning() << "Fetcher got invalid BSON while querying oplog. Blacklisting sync source "
@@ -588,6 +537,113 @@ void BackgroundSync::consume(OperationContext* opCtx) {
         // consume(). shutdown() cleared the buffer so there is nothing for us to consume here.
         // Since our postcondition is already met, it is safe to return successfully.
     }
+}
+
+void BackgroundSync::_runRollback(OperationContext* opCtx,
+                                  const Status& fetcherReturnStatus,
+                                  const HostAndPort& source,
+                                  int requiredRBID,
+                                  StorageInterface* storageInterface) {
+    if (_replCoord->getMemberState().primary()) {
+        // TODO: Abort catchup mode early if rollback detected.
+        warning() << "Rollback situation detected in catch-up mode; catch-up mode will end.";
+        sleepsecs(1);
+        return;
+    }
+
+    // Rollback is a synchronous operation that uses the task executor and may not be
+    // executed inside the fetcher callback.
+
+    OpTime lastOpTimeFetched;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        lastOpTimeFetched = _lastOpTimeFetched;
+    }
+
+    log() << "Starting rollback due to " << redact(fetcherReturnStatus);
+
+    // TODO: change this to call into the Applier directly to block until the applier is
+    // drained.
+    //
+    // Wait till all buffered oplog entries have drained and been applied.
+    auto lastApplied = _replCoord->getMyLastAppliedOpTime();
+    if (lastApplied != lastOpTimeFetched) {
+        log() << "Waiting for all operations from " << lastApplied << " until " << lastOpTimeFetched
+              << " to be applied before starting rollback.";
+        while (lastOpTimeFetched > (lastApplied = _replCoord->getMyLastAppliedOpTime())) {
+            sleepmillis(10);
+            if (getState() != ProducerState::Running) {
+                return;
+            }
+        }
+    }
+
+    if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
+        // This log output is used in js tests so please leave it.
+        log() << "rollback - rollbackHangBeforeStart fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
+            mongo::sleepsecs(1);
+        }
+    }
+
+    OplogInterfaceLocal localOplog(opCtx, rsOplogName);
+    if (use3dot4Rollback) {
+        const int messagingPortTags = 0;
+        ConnectionPool connectionPool(messagingPortTags);
+        std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
+        auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
+            if (!connection.get()) {
+                connection.reset(new ConnectionPool::ConnectionPtr(
+                    &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
+            };
+            return connection->get();
+        };
+
+        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+        rollback(opCtx, localOplog, rollbackSource, requiredRBID, _replCoord, storageInterface);
+    } else {
+        AbstractAsyncComponent* rollback;
+        StatusWith<OpTime> onRollbackShutdownResult =
+            Status(ErrorCodes::InternalError, "Rollback failed but didn’t return an error message");
+        try {
+            auto executor = _replicationCoordinatorExternalState->getTaskExecutor();
+            auto onRollbackShutdownCallbackFn = [&onRollbackShutdownResult](
+                const StatusWith<OpTime>& lastApplied) noexcept {
+                onRollbackShutdownResult = lastApplied;
+            };
+
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            _rollback = stdx::make_unique<RollbackImpl>(executor,
+                                                        &localOplog,
+                                                        source,
+                                                        requiredRBID,
+                                                        _replCoord,
+                                                        storageInterface,
+                                                        onRollbackShutdownCallbackFn);
+            rollback = _rollback.get();
+        } catch (...) {
+            fassertFailedWithStatus(40401, exceptionToStatus());
+        }
+
+        log() << "Scheduling rollback (sync source: " << source << ")";
+        auto scheduleStatus = rollback->startup();
+        if (!scheduleStatus.isOK()) {
+            warning() << "Unable to schedule rollback: " << scheduleStatus;
+        } else {
+            rollback->join();
+            if (!onRollbackShutdownResult.isOK()) {
+                warning() << "Rollback failed with error: " << onRollbackShutdownResult.getStatus();
+            } else {
+                log() << "Rollback successful. Last applied optime: "
+                      << onRollbackShutdownResult.getValue();
+            }
+        }
+    }
+
+    // Reset the producer to clear the sync source and the last optime fetched.
+    stop(true);
+    startProducerIfStopped();
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {

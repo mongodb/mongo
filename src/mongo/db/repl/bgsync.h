@@ -37,6 +37,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -53,6 +54,7 @@ namespace repl {
 
 class ReplicationCoordinator;
 class ReplicationCoordinatorExternalState;
+class StorageInterface;
 
 class BackgroundSync {
     MONGO_DISALLOW_COPYING(BackgroundSync);
@@ -160,6 +162,15 @@ private:
                              Fetcher::Documents::const_iterator end,
                              const OplogFetcher::DocumentsInfo& info);
 
+    /**
+     * Executes a rollback.
+     */
+    void _runRollback(OperationContext* opCtx,
+                      const Status& fetcherReturnStatus,
+                      const HostAndPort& source,
+                      int requiredRBID,
+                      StorageInterface* storageInterface);
+
     // restart syncing
     void start(OperationContext* opCtx);
 
@@ -202,6 +213,11 @@ private:
 
     // Current oplog fetcher tailing the oplog on the sync source.
     std::unique_ptr<OplogFetcher> _oplogFetcher;
+
+    // Current rollback process. If this component is active, we are currently reverting local
+    // operations in the local oplog in order to bring this server to a consistent state relative
+    // to the sync source.
+    std::unique_ptr<RollbackImpl> _rollback;
 };
 
 
