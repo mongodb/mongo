@@ -326,9 +326,7 @@ public:
         bool backupOriginalFiles = e.isBoolean() && e.boolean();
 
         StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
-        bool shouldReplicateWrites = opCtx->writesAreReplicated();
-        opCtx->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, opCtx, shouldReplicateWrites);
+        repl::UnreplicatedWritesBlock uwb(opCtx);
         Status status = repairDatabase(
             opCtx, engine, dbname, preserveClonedFilesOnFailure, backupOriginalFiles);
 

@@ -214,13 +214,11 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     // Now remove the version document and re-run initializeConfigDatabaseIfNeeded().
     {
         // Mirror what happens if the config.version document is rolled back.
-        ON_BLOCK_EXIT([&] {
-            operationContext()->setReplicatedWrites(true);
-            replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
-        });
-        operationContext()->setReplicatedWrites(false);
+        ON_BLOCK_EXIT(
+            [&] { replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY); });
         replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
         auto opCtx = operationContext();
+        repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = NamespaceString(VersionType::ConfigNS);
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(opCtx, MODE_IX);

@@ -93,6 +93,9 @@ Status CollectionBulkLoaderImpl::init(Collection* coll,
             invariant(opCtx);
             invariant(coll);
             invariant(opCtx->getClient() == &cc());
+            // All writes in CollectionBulkLoaderImpl should be unreplicated.
+            // The opCtx is accessed indirectly through _secondaryIndexesBlock.
+            UnreplicatedWritesBlock uwb(opCtx);
             std::vector<BSONObj> specs(secondaryIndexSpecs);
             // This enforces the buildIndexes setting in the replica set configuration.
             _secondaryIndexesBlock->removeExistingIndexes(&specs);
@@ -124,6 +127,7 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
     return _runTaskReleaseResourcesOnFailure(
         [begin, end, &count, this](OperationContext* opCtx) -> Status {
             invariant(opCtx);
+            UnreplicatedWritesBlock uwb(opCtx);
 
             for (auto iter = begin; iter != end; ++iter) {
                 std::vector<MultiIndexBlock*> indexers;
@@ -157,6 +161,7 @@ Status CollectionBulkLoaderImpl::commit() {
             LOG(2) << "Creating indexes for ns: " << _nss.ns();
             invariant(opCtx->getClient() == &cc());
             invariant(opCtx == _opCtx);
+            UnreplicatedWritesBlock uwb(opCtx);
 
             // Commit before deleting dups, so the dups will be removed from secondary indexes when
             // deleted.

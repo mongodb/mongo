@@ -257,7 +257,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     auto status = runner->runSynchronousTask([&](OperationContext* opCtx) -> Status {
         // We are not replicating nor validating writes under this OperationContext*.
         // The OperationContext* is used for all writes to the (newly) cloned collection.
-        opCtx->setReplicatedWrites(false);
+        UnreplicatedWritesBlock uwb(opCtx);
         documentValidationDisabled(opCtx) = true;
 
         // Retry if WCE.

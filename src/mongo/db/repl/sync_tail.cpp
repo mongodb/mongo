@@ -325,7 +325,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
     auto applyOp = [&](Database* db) {
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
-        opCtx->setReplicatedWrites(false);
+        UnreplicatedWritesBlock uwb(opCtx);
         DisableDocumentValidation validationDisabler(opCtx);
 
         Status status =
@@ -481,7 +481,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             const auto txnHolder = cc().makeOperationContext();
             const auto opCtx = txnHolder.get();
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-            opCtx->setReplicatedWrites(false);
+            UnreplicatedWritesBlock uwb(opCtx);
 
             std::vector<BSONObj> docs;
             docs.reserve(end - begin);
@@ -1062,7 +1062,7 @@ void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail*) {
 Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* oplogEntryPointers,
                               SyncApplyFn syncApply) {
-    opCtx->setReplicatedWrites(false);
+    UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
 
     // allow us to get through the magic barrier
@@ -1182,7 +1182,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                                      MultiApplier::OperationPtrs* ops,
                                      SyncTail* st,
                                      AtomicUInt32* fetchCount) {
-    opCtx->setReplicatedWrites(false);
+    UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
 
     // allow us to get through the magic barrier

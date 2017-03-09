@@ -273,26 +273,28 @@ Status convertToCapped(OperationContext* opCtx,
     }
 
 
-    const bool shouldReplicateWrites = opCtx->writesAreReplicated();
-    opCtx->setReplicatedWrites(false);
-    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, opCtx, shouldReplicateWrites);
-    Status status =
-        cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
+    {
+        repl::UnreplicatedWritesBlock uwb(opCtx);
+        Status status =
+            cloneCollectionAsCapped(opCtx, db, shortSource.toString(), shortTmpName, size, true);
 
-    if (!status.isOK()) {
-        return status;
+        if (!status.isOK()) {
+            return status;
+        }
+
+        verify(db->getCollection(longTmpName));
     }
-
-    verify(db->getCollection(longTmpName));
 
     {
         WriteUnitOfWork wunit(opCtx);
-        status = db->dropCollection(opCtx, collectionName.ns());
-        opCtx->setReplicatedWrites(shouldReplicateWrites);
-        if (!status.isOK())
-            return status;
+        {
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            Status status = db->dropCollection(opCtx, collectionName.ns());
+            if (!status.isOK())
+                return status;
+        }
 
-        status = db->renameCollection(opCtx, longTmpName, collectionName.ns(), false);
+        Status status = db->renameCollection(opCtx, longTmpName, collectionName.ns(), false);
         if (!status.isOK())
             return status;
 

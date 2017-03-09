@@ -179,13 +179,11 @@ Status renameCollection(OperationContext* opCtx,
         WriteUnitOfWork wunit(opCtx);
 
         // No logOp necessary because the entire renameCollection command is one logOp.
-        bool shouldReplicateWrites = opCtx->writesAreReplicated();
-        opCtx->setReplicatedWrites(false);
+        repl::UnreplicatedWritesBlock uwb(opCtx);
         targetColl = targetDB->createCollection(opCtx,
                                                 target.ns(),
                                                 options,
                                                 false);  // _id index build with others later.
-        opCtx->setReplicatedWrites(shouldReplicateWrites);
         if (!targetColl) {
             return Status(ErrorCodes::OutOfDiskSpace, "Failed to create target collection.");
         }
@@ -232,10 +230,8 @@ Status renameCollection(OperationContext* opCtx,
 
             WriteUnitOfWork wunit(opCtx);
             // No logOp necessary because the entire renameCollection command is one logOp.
-            bool shouldReplicateWrites = opCtx->writesAreReplicated();
-            opCtx->setReplicatedWrites(false);
+            repl::UnreplicatedWritesBlock uwb(opCtx);
             Status status = targetColl->insertDocument(opCtx, obj, indexers, true);
-            opCtx->setReplicatedWrites(shouldReplicateWrites);
             if (!status.isOK())
                 return status;
             wunit.commit();
@@ -251,12 +247,12 @@ Status renameCollection(OperationContext* opCtx,
         // source collection and finalize the rename.
         WriteUnitOfWork wunit(opCtx);
 
-        bool shouldReplicateWrites = opCtx->writesAreReplicated();
-        opCtx->setReplicatedWrites(false);
-        Status status = sourceDB->dropCollection(opCtx, source.ns());
-        opCtx->setReplicatedWrites(shouldReplicateWrites);
-        if (!status.isOK())
-            return status;
+        {
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            Status status = sourceDB->dropCollection(opCtx, source.ns());
+            if (!status.isOK())
+                return status;
+        }
 
         indexer.commit();
 

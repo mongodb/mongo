@@ -187,9 +187,8 @@ protected:
                 if (0) {
                     mongo::unittest::log() << "op: " << *i << endl;
                 }
-                _opCtx.setReplicatedWrites(false);
+                repl::UnreplicatedWritesBlock uwb(&_opCtx);
                 a.applyOperation(&_opCtx, ctx.db(), *i);
-                _opCtx.setReplicatedWrites(true);
             }
         }
     }
@@ -240,9 +239,8 @@ protected:
 
         OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
-            _opCtx.setReplicatedWrites(false);
+            repl::UnreplicatedWritesBlock uwb(&_opCtx);
             coll->insertDocument(&_opCtx, o, nullOpDebug, true);
-            _opCtx.setReplicatedWrites(true);
             wunit.commit();
             return;
         }
@@ -252,9 +250,8 @@ protected:
         id.init();
         b.appendOID("_id", &id);
         b.appendElements(o);
-        _opCtx.setReplicatedWrites(false);
+        repl::UnreplicatedWritesBlock uwb(&_opCtx);
         coll->insertDocument(&_opCtx, b.obj(), nullOpDebug, true);
-        _opCtx.setReplicatedWrites(true);
         wunit.commit();
     }
     static BSONObj wid(const char* json) {

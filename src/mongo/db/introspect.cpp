@@ -189,9 +189,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     collectionOptions.cappedSize = 1024 * 1024;
 
     WriteUnitOfWork wunit(opCtx);
-    bool shouldReplicateWrites = opCtx->writesAreReplicated();
-    opCtx->setReplicatedWrites(false);
-    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, opCtx, shouldReplicateWrites);
+    repl::UnreplicatedWritesBlock uwb(opCtx);
     invariant(db->createCollection(opCtx, dbProfilingNS, collectionOptions));
     wunit.commit();
 

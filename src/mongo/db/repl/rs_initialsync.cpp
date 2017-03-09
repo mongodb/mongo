@@ -265,7 +265,7 @@ bool _initialSyncApplyOplog(OperationContext* opCtx,
 Status _initialSync(OperationContext* opCtx, BackgroundSync* bgsync) {
     log() << "initial sync pending";
 
-    opCtx->setReplicatedWrites(false);
+    UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 

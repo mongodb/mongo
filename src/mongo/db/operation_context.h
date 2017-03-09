@@ -54,6 +54,10 @@ class ServiceContext;
 class StringData;
 class WriteUnitOfWork;
 
+namespace repl {
+class UnreplicatedWritesBlock;
+}  // namespace repl
+
 /**
  * This class encompasses the state required by an operation and lives from the time a network
  * operation is dispatched until its execution is finished. Note that each "getmore" on a cursor
@@ -275,14 +279,6 @@ public:
     }
 
     /**
-     * Set whether or not operations should generate oplog entries.
-     * TODO SERVER-26965: Make this private.
-     */
-    void setReplicatedWrites(bool writesAreReplicated = true) {
-        _writesAreReplicated = writesAreReplicated;
-    }
-
-    /**
      * Returns true if operations should generate oplog entries.
      */
     bool writesAreReplicated() const {
@@ -404,7 +400,15 @@ private:
      */
     Date_t getExpirationDateForWaitForValue(Milliseconds waitFor);
 
+    /**
+     * Set whether or not operations should generate oplog entries.
+     */
+    void setReplicatedWrites(bool writesAreReplicated = true) {
+        _writesAreReplicated = writesAreReplicated;
+    }
+
     friend class WriteUnitOfWork;
+    friend class repl::UnreplicatedWritesBlock;
     Client* const _client;
     const unsigned int _opId;
 

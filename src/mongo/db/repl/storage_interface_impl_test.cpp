@@ -195,6 +195,7 @@ protected:
         setGlobalReplicationCoordinator(_coordinator);
     }
     void tearDown() override {
+        _uwb.reset(nullptr);
         _opCtx.reset(nullptr);
         ServiceContextMongoDTest::tearDown();
     }
@@ -203,7 +204,7 @@ protected:
     void createOptCtx() {
         _opCtx = cc().makeOperationContext();
         // We are not replicating nor validating these writes.
-        _opCtx->setReplicatedWrites(false);
+        _uwb = stdx::make_unique<UnreplicatedWritesBlock>(_opCtx.get());
         DisableDocumentValidation validationDisabler(_opCtx.get());
     }
 
@@ -213,6 +214,7 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+    std::unique_ptr<UnreplicatedWritesBlock> _uwb;
 
     // Owned by service context
     ReplicationCoordinator* _coordinator;

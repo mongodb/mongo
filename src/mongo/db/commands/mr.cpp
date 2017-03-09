@@ -389,9 +389,7 @@ void State::dropTempCollections() {
     if (_useIncremental && !_config.incLong.isEmpty()) {
         // We don't want to log the deletion of incLong as it isn't replicated. While
         // harmless, this would lead to a scary looking warning on the secondaries.
-        bool shouldReplicateWrites = _opCtx->writesAreReplicated();
-        _opCtx->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _opCtx, shouldReplicateWrites);
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction scopedXact(_opCtx, MODE_IX);
@@ -419,9 +417,7 @@ void State::prepTempCollection() {
     if (_useIncremental) {
         // Create the inc collection and make sure we have index on "0" key.
         // Intentionally not replicating the inc collection to secondaries.
-        bool shouldReplicateWrites = _opCtx->writesAreReplicated();
-        _opCtx->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _opCtx, shouldReplicateWrites);
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             OldClientWriteContext incCtx(_opCtx, _config.incLong.ns());
@@ -786,9 +782,7 @@ void State::_insertToInc(BSONObj& o) {
         OldClientWriteContext ctx(_opCtx, _config.incLong.ns());
         WriteUnitOfWork wuow(_opCtx);
         Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
-        bool shouldReplicateWrites = _opCtx->writesAreReplicated();
-        _opCtx->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _opCtx, shouldReplicateWrites);
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         // The documents inserted into the incremental collection are of the form
         // {"0": <key>, "1": <value>}, so we cannot call fixDocumentForInsert(o) here because the

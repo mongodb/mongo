@@ -373,7 +373,7 @@ Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationCont
             return Status::OK();
         }
 
-        opCtx->setReplicatedWrites(false);
+        UnreplicatedWritesBlock uwb(opCtx);
         Status status = repairDatabase(opCtx, engine, localDbName, false, false);
 
         // Open database before returning
@@ -660,9 +660,7 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
     }
 
     // Apply remaining ops one at at time, but don't log them because they are already logged.
-    const bool wereWritesReplicated = opCtx->writesAreReplicated();
-    ON_BLOCK_EXIT([&] { opCtx->setReplicatedWrites(wereWritesReplicated); });
-    opCtx->setReplicatedWrites(false);
+    UnreplicatedWritesBlock uwb(opCtx);
 
     while (cursor->more()) {
         auto entry = cursor->nextSafe();

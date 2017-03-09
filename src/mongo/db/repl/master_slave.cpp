@@ -731,7 +731,7 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
     // Push the CurOp stack for "opCtx" so each individual oplog entry application is separately
     // reported.
     CurOp individualOp(opCtx);
-    opCtx->setReplicatedWrites(false);
+    UnreplicatedWritesBlock uwb(opCtx);
     const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
     if (replSettings.getPretouch() &&
         !alreadyLocked /*doesn't make sense if in write lock already*/) {

@@ -338,7 +338,7 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
                     return;
                 }
                 auto opCtx = cbd.opCtx;
-                opCtx->setReplicatedWrites(false);
+                UnreplicatedWritesBlock uwb(opCtx);
                 auto&& createStatus =
                     _storageInterface->createCollection(opCtx, _destNss, _options);
                 _finishCallback(createStatus);

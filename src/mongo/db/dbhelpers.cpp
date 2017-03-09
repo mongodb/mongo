@@ -495,9 +495,7 @@ long long Helpers::removeRange(OperationContext* opCtx,
 
 void Helpers::emptyCollection(OperationContext* opCtx, const char* ns) {
     OldClientContext context(opCtx, ns);
-    bool shouldReplicateWrites = opCtx->writesAreReplicated();
-    opCtx->setReplicatedWrites(false);
-    ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, opCtx, shouldReplicateWrites);
+    repl::UnreplicatedWritesBlock uwb(opCtx);
     Collection* collection = context.db() ? context.db()->getCollection(ns) : nullptr;
     deleteObjects(opCtx, collection, ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
 }

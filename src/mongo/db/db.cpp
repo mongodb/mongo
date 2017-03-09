@@ -205,9 +205,7 @@ void logStartup(OperationContext* opCtx) {
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
-        bool shouldReplicateWrites = opCtx->writesAreReplicated();
-        opCtx->setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, opCtx, shouldReplicateWrites);
+        repl::UnreplicatedWritesBlock uwb(opCtx);
         uassertStatusOK(userCreateNS(opCtx, db, startupLogCollectionName.ns(), options));
         collection = db->getCollection(startupLogCollectionName);
     }
