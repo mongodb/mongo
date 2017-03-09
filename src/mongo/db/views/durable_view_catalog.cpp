@@ -90,8 +90,18 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
             std::string name(e.fieldName());
             valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation";
         }
-        NamespaceString viewName(viewDef["_id"].str());
-        valid &= viewName.isValid() && viewName.db() == _db->name();
+
+        const auto viewName = viewDef["_id"].str();
+        const auto collectionNameIsValid = NamespaceString::validCollectionComponent(viewName);
+        valid &= collectionNameIsValid;
+
+        // Only perform validation via NamespaceString if the collection name has been determined to
+        // be valid. If not valid then the NamespaceString constructor will uassert.
+        if (collectionNameIsValid) {
+            NamespaceString viewNss(viewName);
+            valid &= viewNss.isValid() && viewNss.db() == _db->name();
+        }
+
         valid &= NamespaceString::validCollectionName(viewDef["viewOn"].str());
 
         const bool hasPipeline = viewDef.hasField("pipeline");

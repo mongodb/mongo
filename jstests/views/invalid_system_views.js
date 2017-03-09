@@ -112,6 +112,7 @@
         {_id: "badview", pipeline: [{}]},
         {_id: "badview", pipeline: [[]]},
         {_id: 7, pipeline: []},
+        {_id: "invalid_system_views.embedded\0null", viewOn: "collection", pipeline: []}
     ];
     badViews.forEach(runTest);
 }());
