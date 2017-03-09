@@ -266,22 +266,32 @@ public:
             return false;
         }
 
-        const auto& oss = OperationShardingState::get(opCtx);
-        uassert(ErrorCodes::InvalidOptions, "collection version is missing", oss.hasShardVersion());
+        OID expectedCollectionEpoch;
+        if (cmdObj.hasField("epoch")) {
+            auto epochStatus = bsonExtractOIDField(cmdObj, "epoch", &expectedCollectionEpoch);
+            uassert(
+                ErrorCodes::InvalidOptions, "unable to parse collection epoch", epochStatus.isOK());
+        } else {
+            // Backwards compatibility with v3.4 mongos, which will send 'shardVersion' and not
+            // 'epoch'.
+            const auto& oss = OperationShardingState::get(opCtx);
+            uassert(
+                ErrorCodes::InvalidOptions, "collection version is missing", oss.hasShardVersion());
+            expectedCollectionEpoch = oss.getShardVersion(nss).epoch();
+        }
 
         // Even though the splitChunk command transmits a value in the operation's shardVersion
         // field, this value does not actually contain the shard version, but the global collection
         // version.
-        ChunkVersion expectedCollectionVersion = oss.getShardVersion(nss);
-        if (expectedCollectionVersion.epoch() != shardVersion.epoch()) {
+        if (expectedCollectionEpoch != shardVersion.epoch()) {
             std::string msg = str::stream() << "splitChunk cannot split chunk "
                                             << "[" << redact(min) << "," << redact(max) << "), "
-                                            << "collection may have been dropped. "
+                                            << "collection '" << nss.ns()
+                                            << "' may have been dropped. "
                                             << "current epoch: " << shardVersion.epoch()
-                                            << ", cmd epoch: " << expectedCollectionVersion.epoch();
+                                            << ", cmd epoch: " << expectedCollectionEpoch;
             warning() << msg;
-            throw SendStaleConfigException(
-                nss.toString(), msg, expectedCollectionVersion, shardVersion);
+            return appendCommandStatus(result, {ErrorCodes::StaleEpoch, msg});
         }
 
         ScopedCollectionMetadata collMetadata;
@@ -306,8 +316,9 @@ public:
             uassertStatusOK(collMetadata->checkChunkIsValid(chunkToMove));
         }
 
-        auto request = SplitChunkRequest(
-            nss, shardName, expectedCollectionVersion.epoch(), chunkRange, splitKeys);
+        // Commit the split to the config server.
+        auto request =
+            SplitChunkRequest(nss, shardName, expectedCollectionEpoch, chunkRange, splitKeys);
 
         auto configCmdObj =
             request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
@@ -350,15 +361,15 @@ public:
         if (commandStatus == ErrorCodes::StaleEpoch) {
             std::string msg = str::stream() << "splitChunk cannot split chunk "
                                             << "[" << redact(min) << "," << redact(max) << "), "
-                                            << "collection may have been dropped. "
+                                            << "collection '" << nss.ns()
+                                            << "' may have been dropped. "
                                             << "current epoch: " << collVersion.epoch()
-                                            << ", cmd epoch: " << expectedCollectionVersion.epoch();
+                                            << ", cmd epoch: " << expectedCollectionEpoch;
             warning() << msg;
 
-            throw SendStaleConfigException(
-                nss.toString(), msg, expectedCollectionVersion, collVersion);
-
-            return appendCommandStatus(result, commandStatus);
+            return appendCommandStatus(
+                result,
+                {commandStatus.code(), str::stream() << msg << redact(causedBy(commandStatus))});
         }
 
         //
