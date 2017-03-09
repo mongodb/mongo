@@ -235,7 +235,9 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     // codepath.
 
     if (op->_inSetup) {
-        log() << "Successfully connected to " << op->request().target.toString();
+        auto getConnectionDuration = now() - op->start();
+        log() << "Successfully connected to " << op->request().target.toString() << ", took "
+              << getConnectionDuration;
         op->_inSetup = false;
         op->finish(RemoteCommandResponse());
         return;
