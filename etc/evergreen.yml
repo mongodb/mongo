@@ -187,6 +187,7 @@ variables:
   - osx-107-ssl
   - rhel62
   - rhel70
+  - rollback-3dot4-rhel-62
   - solaris-64-bit
   - suse11
   - suse12
@@ -8987,3 +8988,112 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1604-build
+
+- name: rollback-3dot4-rhel-62
+  display_name: "~ Rollback 3.4 Enterprise RHEL 6.2"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: "\"--mongodSetParameters={use3dot4Rollback: true}\""
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-large
+  - name: auth
+  - name: auth_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_concern_linearizable_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: read_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets
+    distros:
+    - rhel62-large
+  - name: replica_sets_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_WT_ese
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth
+    distros:
+    - rhel62-large
+  - name: replica_sets_pv0
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_resync_static_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_resync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+    distros:
+    - rhel62-large
+  - name: sharding_WT
+    distros:
+    - rhel62-large
+  - name: sharding_WT_ese
+    distros:
+    - rhel62-large
+  - name: sharding_auth
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_WT
+    distros:
+    - rhel62-large
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_WT
+    distros:
+    - rhel62-large
+  - name: sharding_csrs_continuous_config_stepdown_WT
+    distros:
+    - rhel62-large
+  - name: slow1
+  - name: slow1_WT
