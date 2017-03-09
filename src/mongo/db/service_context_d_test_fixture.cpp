@@ -46,6 +46,7 @@
 #include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -82,6 +83,10 @@ void ServiceContextMongoDTest::tearDown() {
 
 ServiceContext* ServiceContextMongoDTest::getServiceContext() {
     return getGlobalServiceContext();
+}
+
+void ServiceContextMongoDTest::_doTest() {
+    MONGO_UNREACHABLE;
 }
 
 void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {

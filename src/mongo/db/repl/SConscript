@@ -300,6 +300,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='rollback_test_fixture',
+    source=[
+        'rollback_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+        'repl_settings',
+        'replmocks',
+        #'serveronly', # CYCLE
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
 env.CppUnitTest(
     target='rs_rollback_test',
     source=[
@@ -308,9 +324,8 @@ env.CppUnitTest(
     LIBDEPS=[
         'oplog_interface_local',
         'oplog_interface_mock',
-        'replmocks',
+        'rollback_test_fixture',
         'rs_rollback',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )
 
