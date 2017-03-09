@@ -203,6 +203,8 @@ error_code("NetworkInterfaceExceededTimeLimit", 202)
 error_code("ShardingStateNotInitialized", 203)
 error_code("TimeProofMismatch", 204)
 
+# Error codes 4000-8999 are reserved.
+
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)
 error_code("RecvStaleConfig", 9996)
