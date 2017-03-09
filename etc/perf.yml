@@ -427,6 +427,23 @@ tasks:
     - func: "analyze"
       vars:
         report_analysis: true
+- name: agg-query-comparison
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "agg_query_comparison"
+        includeFilter2 : "core regression"
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+        readCmd: false
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        reports_analysis: true
 
 buildvariants:
 - name: linux-wt-standalone
@@ -448,6 +465,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: aggregation
+  - name: agg-query-comparison
   - name: query
   - name: views-aggregation
   - name: views-query
@@ -470,6 +488,7 @@ buildvariants:
   - "centos6-perf"
   tasks:
   - name: aggregation
+  - name: agg-query-comparison
   - name: query
   - name: views-aggregation
   - name: views-query
