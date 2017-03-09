@@ -210,6 +210,22 @@ Status OperationContext::checkForInterruptNoAssert() {
     return Status::OK();
 }
 
+void OperationContext::sleepUntil(Date_t deadline) {
+    stdx::mutex m;
+    stdx::condition_variable cv;
+    stdx::unique_lock<stdx::mutex> lk(m);
+    invariant(stdx::cv_status::timeout ==
+              waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }));
+}
+
+void OperationContext::sleepFor(Milliseconds duration) {
+    stdx::mutex m;
+    stdx::condition_variable cv;
+    stdx::unique_lock<stdx::mutex> lk(m);
+    invariant(stdx::cv_status::timeout ==
+              waitForConditionOrInterruptFor(cv, lk, duration, [] { return false; }));
+}
+
 void OperationContext::waitForConditionOrInterrupt(stdx::condition_variable& cv,
                                                    stdx::unique_lock<stdx::mutex>& m) {
     uassertStatusOK(waitForConditionOrInterruptNoAssert(cv, m));
@@ -406,6 +422,10 @@ void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
     dassert(!_locker);
     dassert(locker);
     _locker = std::move(locker);
+}
+
+Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) {
+    return getServiceContext()->getPreciseClockSource()->now() + waitFor;
 }
 
 }  // namespace mongo

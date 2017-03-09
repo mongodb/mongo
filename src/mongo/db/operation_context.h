@@ -139,6 +139,16 @@ public:
     Status checkForInterruptNoAssert();
 
     /**
+     * Sleeps until "deadline"; throws an exception if the operation is interrupted before then.
+     */
+    void sleepUntil(Date_t deadline);
+
+    /**
+     * Sleeps for "duration" ms; throws an exception if the operation is interrupted before then.
+     */
+    void sleepFor(Milliseconds duration);
+
+    /**
      * Waits for either the condition "cv" to be signaled, this operation to be interrupted, or the
      * deadline on this operation to expire.  In the event of interruption or operation deadline
      * expiration, raises a UserException with an error code indicating the interruption type.
@@ -199,6 +209,19 @@ public:
             }
         }
         return stdx::cv_status::no_timeout;
+    }
+
+    /**
+     * Same as the predicate form of waitForConditionOrInterruptUntil, but takes a relative
+     * amount of time to wait instead of an absolute time point.
+     */
+    template <typename Pred>
+    stdx::cv_status waitForConditionOrInterruptFor(stdx::condition_variable& cv,
+                                                   stdx::unique_lock<stdx::mutex>& m,
+                                                   Milliseconds duration,
+                                                   Pred pred) {
+        return waitForConditionOrInterruptUntil(
+            cv, m, getExpirationDateForWaitForValue(duration), pred);
     }
 
     /**
@@ -374,6 +397,12 @@ private:
      * these correctly correspond.
      */
     void setDeadlineAndMaxTime(Date_t when, Microseconds maxTime);
+
+    /**
+     * Returns the timepoint that is "waitFor" ms after now according to the
+     * ServiceContext's precise clock.
+     */
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor);
 
     friend class WriteUnitOfWork;
     Client* const _client;
