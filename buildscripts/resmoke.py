@@ -6,13 +6,10 @@ Command line utility for executing MongoDB tests of all kinds.
 
 from __future__ import absolute_import
 
-import json
 import os.path
 import random
-import signal
 import sys
 import time
-import traceback
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -129,20 +126,6 @@ def find_suites_by_test(suites):
                 memberships[test] = test_membership[test]
     return memberships
 
-def _write_report_file(suites, pathname):
-    """
-    Writes the report.json file if requested.
-    """
-
-    reports = []
-    for suite in suites:
-        for group in suite.test_groups:
-            reports.extend(group.get_reports())
-
-    combined_report_dict = resmokelib.testing.report.TestReport.combine(*reports).as_dict()
-    with open(pathname, "w") as fp:
-        json.dump(combined_report_dict, fp)
-
 
 def main():
     start_time = time.time()
@@ -165,6 +148,9 @@ def main():
 
     interrupted = False
     suites = resmokelib.parser.get_suites(values, args)
+
+    # Register a signal handler so we can write the report file if the task times out.
+    resmokelib.sighandler.register(resmoke_logger, suites)
 
     # Run the suite finder after the test suite parsing is complete.
     if values.find_suites:
@@ -201,39 +187,8 @@ def main():
         if not interrupted:
             resmokelib.logging.flush.stop_thread()
 
-        if resmokelib.config.REPORT_FILE is not None:
-            _write_report_file(suites, resmokelib.config.REPORT_FILE)
+        resmokelib.reportfile.write(suites)
 
 
 if __name__ == "__main__":
-
-    def _dump_stacks(signum, frame):
-        """
-        Signal handler that will dump the stacks of all threads.
-        """
-
-        header_msg = "Dumping stacks due to SIGUSR1 signal"
-
-        sb = []
-        sb.append("=" * len(header_msg))
-        sb.append(header_msg)
-        sb.append("=" * len(header_msg))
-
-        frames = sys._current_frames()
-        sb.append("Total threads: %d" % (len(frames)))
-        sb.append("")
-
-        for thread_id in frames:
-            stack = frames[thread_id]
-            sb.append("Thread %d:" % (thread_id))
-            sb.append("".join(traceback.format_stack(stack)))
-
-        sb.append("=" * len(header_msg))
-        print "\n".join(sb)
-
-    try:
-        signal.signal(signal.SIGUSR1, _dump_stacks)
-    except AttributeError:
-        print "Cannot catch signals on Windows"
-
     main()

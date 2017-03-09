@@ -80,7 +80,9 @@ class TestGroupExecutor(object):
             num_repeats = _config.REPEAT
             while num_repeats > 0:
                 test_queue = self._make_test_queue()
-                self._test_group.record_start()
+
+                partial_reports = [job.report for job in self._jobs]
+                self._test_group.record_start(partial_reports)
 
                 # Have the Job threads destroy their fixture during the final repetition after they
                 # finish running their last test. This avoids having a large number of processes
