@@ -71,6 +71,8 @@ var doTest = function() {
     assert.eq(expectedDocs, testDB.foo.count());
 
     // Wait for the balancer to start back up
+    assert.writeOK(
+        configDB.settings.update({_id: 'balancer'}, {$set: {_waitForDelete: true}}, true));
     st.startBalancer();
 
     // Make sure we've done at least some splitting, so the balancer will work
@@ -82,11 +84,6 @@ var doTest = function() {
         print("chunk diff: " + x);
         return x < 2 && configDB.locks.findOne({_id: 'test.foo'}).state == 0;
     }, "no balance happened", 5 * 60 * 1000);
-
-    assert.soon(function() {
-        print("Waiting for migration cleanup to occur...");
-        return testDB.foo.find().itcount() == testDB.foo.count();
-    });
 
     var map = function() {
         emit(this.i, this.j);
