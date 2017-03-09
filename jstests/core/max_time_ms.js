@@ -388,6 +388,10 @@ res = t.runCommand("collMod", {usePowerOf2Sizes: true, maxTimeMS: 60 * 1000});
 assert(res.ok == 1,
        "expected collmod with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);
 
+// "createIndexes" command.
+assert.commandWorked(
+    t.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}], maxTimeMS: 60 * 1000}));
+
 //
 // Test maxTimeMS for parallelCollectionScan
 //
