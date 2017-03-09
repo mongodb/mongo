@@ -237,7 +237,7 @@ private:
     /**
      * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
      */
-    std::unique_ptr<Fetcher> _makeFetcher(OpTime lastFetchedOpTime);
+    std::unique_ptr<Fetcher> _makeFetcher(long long currentTerm, OpTime lastFetchedOpTime);
 
     /**
      * Returns whether the oplog fetcher is in shutdown.
