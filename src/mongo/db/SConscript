@@ -928,9 +928,11 @@ env.Library(
     target='logical_time',
     source=[
         'logical_time.cpp',
+        'operation_time_tracker.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'service_context',
     ],
 )
 
@@ -965,6 +967,16 @@ env.Library(
         'service_context',
         'signed_logical_time',
         'time_proof_service',
+    ],
+)
+
+env.CppUnitTest(
+    target='operation_time_tracker_test',
+    source=[
+        'operation_time_tracker_test.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
     ],
 )
 
