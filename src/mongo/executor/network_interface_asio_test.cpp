@@ -988,13 +988,15 @@ public:
     TestMetadataHook(bool* wroteRequestMetadata, bool* gotReplyMetadata)
         : _wroteRequestMetadata(wroteRequestMetadata), _gotReplyMetadata(gotReplyMetadata) {}
 
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override {
+    Status writeRequestMetadata(OperationContext* opCtx,
+                                const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override {
         metadataBob->append("foo", "bar");
         *_wroteRequestMetadata = true;
         return Status::OK();
     }
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override {
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override {
         *_gotReplyMetadata = (metadataObj["baz"].str() == "garply");
         return Status::OK();
     }

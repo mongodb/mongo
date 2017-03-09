@@ -48,9 +48,11 @@ class LogicalTimeMetadataHook : public EgressMetadataHook {
 public:
     explicit LogicalTimeMetadataHook(ServiceContext* service);
 
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
+    Status writeRequestMetadata(OperationContext* opCtx,
+                                const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override;
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
 
 private:
     ServiceContext* _service;

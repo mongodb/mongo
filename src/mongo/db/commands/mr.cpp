@@ -1746,6 +1746,8 @@ public:
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 
+        ShardedConnectionInfo::addHook();
+
         // legacy name
         const auto shardedOutputCollectionElt = cmdObj["shardedOutputCollection"];
         uassert(ErrorCodes::InvalidNamespace,

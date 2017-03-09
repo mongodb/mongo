@@ -159,10 +159,8 @@ ResponseStatus decodeRPC(Message* received,
 
         // Handle incoming reply metadata.
         if (metadataHook) {
-            auto listenStatus = callNoexcept(*metadataHook,
-                                             &rpc::EgressMetadataHook::readReplyMetadata,
-                                             source.toString(),
-                                             replyMetadata);
+            auto listenStatus = callNoexcept(
+                *metadataHook, &rpc::EgressMetadataHook::readReplyMetadata, source, replyMetadata);
             if (!listenStatus.isOK()) {
                 return {listenStatus, elapsed};
             }

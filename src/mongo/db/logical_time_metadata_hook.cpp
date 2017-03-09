@@ -41,18 +41,20 @@ namespace rpc {
 LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _service(service) {}
 
 Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
+                                                     const HostAndPort& requestDestination,
                                                      BSONObjBuilder* metadataBob) {
     LogicalTimeMetadata metadata(LogicalClock::get(_service)->getClusterTime());
     metadata.writeToMetadata(metadataBob);
     return Status::OK();
 }
 
-Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
+Status LogicalTimeMetadataHook::readReplyMetadata(const HostAndPort& replySource,
                                                   const BSONObj& metadataObj) {
     auto parseStatus = LogicalTimeMetadata::readFromMetadata(metadataObj);
     if (!parseStatus.isOK()) {
         return parseStatus.getStatus();
     }
+
     auto& signedTime = parseStatus.getValue().getSignedTime();
     return LogicalClock::get(_service)->advanceClusterTimeFromTrustedSource(signedTime);
 }

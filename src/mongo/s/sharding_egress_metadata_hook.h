@@ -43,14 +43,23 @@ namespace rpc {
 
 class ShardingEgressMetadataHook : public rpc::EgressMetadataHook {
 public:
-    /**
-     * Pass true to shardedConnection if the hook is intended for connections with shard versions.
-     */
-    ShardingEgressMetadataHook(bool shardedConnection);
     virtual ~ShardingEgressMetadataHook() = default;
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
+    Status writeRequestMetadata(OperationContext* opCtx,
+                                const HostAndPort& target,
+                                BSONObjBuilder* metadataBob) override;
+
+    // These overloaded methods exist to allow ShardingConnectionHook, which is soon to be
+    // deprecated, to use the logic in ShardingEgressMetadataHook instead of duplicating the
+    // logic. ShardingConnectionHook must provide the replySource and target as strings rather than
+    // HostAndPorts, since DBClientReplicaSet uses the hook before it decides on the actual host to
+    // contact.
+    Status readReplyMetadata(const StringData replySource, const BSONObj& metadataObj);
+    Status writeRequestMetadata(bool shardedConnection,
+                                OperationContext* opCtx,
+                                const StringData target,
+                                BSONObjBuilder* metadataBob);
 
 protected:
     /**
@@ -74,9 +83,6 @@ protected:
      * metadata in the response object from running a command.
      */
     virtual Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
-
-private:
-    bool _isShardedConnection;
 };
 
 }  // namespace rpc

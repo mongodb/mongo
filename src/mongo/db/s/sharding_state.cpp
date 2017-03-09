@@ -357,7 +357,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
                               << causedBy(_initializationStatus)};
     }
 
-    ShardedConnectionInfo::addHook(opCtx->getServiceContext());
+    ShardedConnectionInfo::addHook();
 
     try {
         Status status = _globalInit(opCtx, configSvrConnStr, generateDistLockProcessId(opCtx));

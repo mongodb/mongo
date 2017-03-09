@@ -37,7 +37,6 @@ namespace mongo {
 
 struct ChunkVersion;
 class Client;
-class ServiceContext;
 
 /**
  * There is one instance of these per each connection from mongos. Holds version state for each
@@ -64,7 +63,7 @@ public:
     void setVersion(const std::string& ns, const ChunkVersion& version);
 
     static void reset(Client* client);
-    static void addHook(ServiceContext* service);
+    static void addHook();
 
 private:
     typedef std::map<std::string, ChunkVersion> NSVersionMap;

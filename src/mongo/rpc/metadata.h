@@ -104,11 +104,11 @@ StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
 /**
  * A function type for writing request metadata. The function takes a pointer to an optional
  * OperationContext so metadata associated with a Client can be appended, a pointer to a
- * BSONObjBuilder used to construct the metadata object and returns a Status indicating if the
- * metadata was written successfully.
+ * BSONObjBuilder used to construct the metadata object and the server address of the target of the
+ * request and returns a Status indicating if the metadata was written successfully.
  */
 using RequestMetadataWriter =
-    stdx::function<Status(OperationContext* opCtx, BSONObjBuilder* metadataBuilder)>;
+    stdx::function<Status(OperationContext*, BSONObjBuilder*, StringData)>;
 
 /**
  * A function type for reading reply metadata. The function takes a a reference to a
@@ -118,8 +118,7 @@ using RequestMetadataWriter =
  *
  * TODO: would it be a layering violation if this hook took an OperationContext* ?
  */
-using ReplyMetadataReader =
-    stdx::function<Status(const BSONObj& replyMetadata, StringData sourceHost)>;
+using ReplyMetadataReader = stdx::function<Status(const BSONObj&, StringData)>;
 
 }  // namespace rpc
 }  // namespace mongo

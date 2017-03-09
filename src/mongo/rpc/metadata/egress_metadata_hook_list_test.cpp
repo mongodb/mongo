@@ -43,7 +43,7 @@ namespace {
 
 struct ReadReplyArgs {
 public:
-    StringData replySource;
+    HostAndPort replySource;
     BSONObj metadataObj;
 };
 
@@ -51,12 +51,14 @@ class TestHook : public EgressMetadataHook {
 public:
     TestHook(string fieldName, ReadReplyArgs* arg) : _fieldName(fieldName), _arg(arg) {}
 
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override {
-        metadataBob->append(_fieldName, "");
+    Status writeRequestMetadata(OperationContext* opCtx,
+                                const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override {
+        metadataBob->append(_fieldName, requestDestination.toString());
         return Status::OK();
     }
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) {
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) {
         invariant(_arg != nullptr);
         _arg->replySource = replySource;
         _arg->metadataObj = metadataObj;
@@ -72,11 +74,13 @@ class FixedStatusTestHook : public EgressMetadataHook {
 public:
     FixedStatusTestHook(Status status) : _toRet(status) {}
 
-    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override {
+    Status writeRequestMetadata(OperationContext* opCtx,
+                                const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override {
         return _toRet;
     }
 
-    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) {
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) {
         return _toRet;
     }
 
@@ -86,10 +90,11 @@ private:
 
 TEST(EgressMetadataHookListTest, EmptyHookShouldNotFail) {
     EgressMetadataHookList hookList;
-    ASSERT_OK(hookList.writeRequestMetadata(nullptr, nullptr));
+    HostAndPort emptyHost;
+    ASSERT_OK(hookList.writeRequestMetadata(nullptr, emptyHost, nullptr));
 
     BSONObj emptyObj;
-    ASSERT_OK(hookList.readReplyMetadata("", emptyObj));
+    ASSERT_OK(hookList.readReplyMetadata(emptyHost, emptyObj));
 }
 
 TEST(EgressMetadataHookListTest, SingleHook) {
@@ -99,12 +104,12 @@ TEST(EgressMetadataHookListTest, SingleHook) {
     hookList.addHook(std::move(hook1));
 
     BSONObjBuilder builder;
-    ASSERT_OK(hookList.writeRequestMetadata(nullptr, &builder));
+    ASSERT_OK(hookList.writeRequestMetadata(nullptr, HostAndPort("a:123"), &builder));
     ASSERT_BSONOBJ_EQ(BSON("h1"
-                           << ""),
+                           << "a:123"),
                       builder.obj());
 
-    string testHost("b:456");
+    HostAndPort testHost("b:456");
     BSONObj testObj(BSON("x" << 1));
     ASSERT_OK(hookList.readReplyMetadata(testHost, testObj));
     ASSERT_EQ(testHost, hook1Args.replySource);
@@ -122,14 +127,14 @@ TEST(EgressMetadataHookListTest, MultipleHooks) {
     hookList.addHook(std::move(hook2));
 
     BSONObjBuilder builder;
-    ASSERT_OK(hookList.writeRequestMetadata(nullptr, &builder));
+    ASSERT_OK(hookList.writeRequestMetadata(nullptr, HostAndPort("a:123"), &builder));
     ASSERT_BSONOBJ_EQ(BSON("foo"
-                           << ""
+                           << "a:123"
                            << "bar"
-                           << ""),
+                           << "a:123"),
                       builder.obj());
 
-    string testHost("b:456");
+    HostAndPort testHost("b:456");
     BSONObj testObj(BSON("x" << 1));
     ASSERT_OK(hookList.readReplyMetadata(testHost, testObj));
 
@@ -151,8 +156,8 @@ TEST(EgressMetadataHookListTest, SingleBadHookShouldReturnError) {
     hookList.addHook(std::move(hook2));
 
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(hookList.writeRequestMetadata(nullptr, &builder));
-    ASSERT_NOT_OK(hookList.readReplyMetadata("b:456", BSON("x" << 1)));
+    ASSERT_NOT_OK(hookList.writeRequestMetadata(nullptr, HostAndPort("a:123"), &builder));
+    ASSERT_NOT_OK(hookList.readReplyMetadata(HostAndPort("b:456"), BSON("x" << 1)));
 }
 
 }  // unnamed namespace

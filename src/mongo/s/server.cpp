@@ -207,7 +207,7 @@ static Status initializeSharding(OperationContext* opCtx) {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
                 stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
-            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(false));
+            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>());
             return hookList;
         },
         [](ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> executor) {
@@ -257,20 +257,12 @@ static ExitCode runMongosServer() {
         return EXIT_NET_ERROR;
     }
 
-    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    unshardedHookList->addHook(
-        stdx::make_unique<rpc::LogicalTimeMetadataHook>(getGlobalServiceContext()));
-    unshardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(false));
-
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
-    globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
+    globalConnPool.addHook(new ShardingConnectionHook(
+        false, stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>()));
 
-    auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    shardedHookList->addHook(
-        stdx::make_unique<rpc::LogicalTimeMetadataHook>(getGlobalServiceContext()));
-    shardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(true));
-
-    shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
+    shardConnectionPool.addHook(new ShardingConnectionHook(
+        true, stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>()));
 
     ReplicaSetMonitor::setAsynchronousConfigChangeHook(
         &ShardRegistry::replicaSetChangeConfigServerUpdateHook);

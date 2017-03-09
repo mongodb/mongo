@@ -48,8 +48,8 @@ namespace mongo {
 
 using std::string;
 
-ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections,
-                                               std::unique_ptr<rpc::EgressMetadataHook> egressHook)
+ShardingConnectionHook::ShardingConnectionHook(
+    bool shardedConnections, std::unique_ptr<rpc::ShardingEgressMetadataHook> egressHook)
     : _shardedConnections(shardedConnections), _egressHook(std::move(egressHook)) {}
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
@@ -77,9 +77,11 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
             return _egressHook->readReplyMetadata(target, metadataObj);
         });
     }
-    conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
-        return _egressHook->writeRequestMetadata(opCtx, metadataBob);
-    });
+    conn->setRequestMetadataWriter(
+        [this](OperationContext* opCtx, BSONObjBuilder* metadataBob, StringData hostStringData) {
+            return _egressHook->writeRequestMetadata(
+                _shardedConnections, opCtx, hostStringData, metadataBob);
+        });
 
 
     if (conn->type() == ConnectionString::MASTER) {

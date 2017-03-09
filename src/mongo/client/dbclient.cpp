@@ -185,8 +185,8 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     metadataBob.appendElements(metadata);
 
     if (_metadataWriter) {
-        uassertStatusOK(
-            _metadataWriter((haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
+        uassertStatusOK(_metadataWriter(
+            (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob, host));
     }
 
     auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());
@@ -223,14 +223,14 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
                           << "' ",
             requestBuilder->getProtocol() == commandReply->getProtocol());
 
-    if (_metadataReader) {
-        uassertStatusOK(_metadataReader(commandReply->getMetadata(), host));
-    }
-
     if (ErrorCodes::SendStaleConfig ==
         getStatusFromCommandResult(commandReply->getCommandReply())) {
         throw RecvStaleConfigException("stale config in runCommand",
                                        commandReply->getCommandReply());
+    }
+
+    if (_metadataReader) {
+        uassertStatusOK(_metadataReader(commandReply->getMetadata(), host));
     }
 
     return rpc::UniqueReply(std::move(replyMsg), std::move(commandReply));
