@@ -81,10 +81,8 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);
     if (cli->getRequestMetadataWriter()) {
-        uassertStatusOK(
-            cli->getRequestMetadataWriter()((haveClient() ? cc().getOperationContext() : nullptr),
-                                            &metadataBob,
-                                            cli->getServerAddress()));
+        uassertStatusOK(cli->getRequestMetadataWriter()(
+            (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
     }
 
     requestBuilder->setDatabase(database);

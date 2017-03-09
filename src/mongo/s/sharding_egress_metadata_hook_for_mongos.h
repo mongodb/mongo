@@ -34,6 +34,9 @@ namespace mongo {
 namespace rpc {
 
 class ShardingEgressMetadataHookForMongos final : public ShardingEgressMetadataHook {
+public:
+    ShardingEgressMetadataHookForMongos(bool shardedConnection);
+
 private:
     void _saveGLEStats(const BSONObj& metadata, StringData hostString) override;
 
