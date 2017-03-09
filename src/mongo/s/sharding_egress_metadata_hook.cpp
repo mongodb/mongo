@@ -50,18 +50,11 @@ namespace rpc {
 
 using std::shared_ptr;
 
-ShardingEgressMetadataHook::ShardingEgressMetadataHook(bool shardedConnection)
-    : _isShardedConnection(shardedConnection) {}
-
 Status ShardingEgressMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                         BSONObjBuilder* metadataBob) {
     try {
         audit::writeImpersonatedUsersToMetadata(opCtx, metadataBob);
-
         ClientMetadataIsMasterState::writeToMetadata(opCtx, metadataBob);
-        if (!_isShardedConnection) {
-            return Status::OK();
-        }
         rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
         return Status::OK();
     } catch (...) {

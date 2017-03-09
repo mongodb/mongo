@@ -109,13 +109,13 @@ void ShardedConnectionInfo::addHook(ServiceContext* service) {
 
     auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
-    unshardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(false));
+    unshardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
 
     globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
 
     auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
     shardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
-    shardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(true));
+    shardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
 
     shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
 

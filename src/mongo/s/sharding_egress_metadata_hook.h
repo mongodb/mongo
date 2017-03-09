@@ -41,12 +41,11 @@ class Shard;
 
 namespace rpc {
 
+/**
+ * Hooks for handling configsvr optime, client metadata and auth metadata for sharding.
+ */
 class ShardingEgressMetadataHook : public rpc::EgressMetadataHook {
 public:
-    /**
-     * Pass true to shardedConnection if the hook is intended for connections with shard versions.
-     */
-    ShardingEgressMetadataHook(bool shardedConnection);
     virtual ~ShardingEgressMetadataHook() = default;
 
     Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
@@ -74,9 +73,6 @@ protected:
      * metadata in the response object from running a command.
      */
     virtual Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj);
-
-private:
-    bool _isShardedConnection;
 };
 
 }  // namespace rpc
