@@ -1067,7 +1067,9 @@ private:
      * "isPriorityTakeover" is used to determine if the caller was a priority takeover or not and
      * log messages accordingly.
      */
-    void _startElectSelfIfEligibleV1(bool isPriorityTakeover);
+    enum StartElectionV1Reason { kElectionTimeout, kPriorityTakeover, kStepUpRequest };
+
+    void _startElectSelfIfEligibleV1(StartElectionV1Reason reason);
 
     /**
      * Resets the term of last vote to 0 to prevent any node from voting for term 0.

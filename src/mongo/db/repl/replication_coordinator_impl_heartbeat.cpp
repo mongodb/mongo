@@ -309,8 +309,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
                 log() << "Scheduling priority takeover at " << _priorityTakeoverWhen;
                 _priorityTakeoverCbh = _scheduleWorkAt(
                     _priorityTakeoverWhen,
-                    stdx::bind(
-                        &ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this, true));
+                    stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1,
+                               this,
+                               StartElectionV1Reason::kPriorityTakeover));
             }
             break;
         }
@@ -831,11 +832,14 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     invariant(when > now);
     LOG(4) << "Scheduling election timeout callback at " << when;
     _handleElectionTimeoutWhen = when;
-    _handleElectionTimeoutCbh = _scheduleWorkAt(
-        when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this, false));
+    _handleElectionTimeoutCbh =
+        _scheduleWorkAt(when,
+                        stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1,
+                                   this,
+                                   StartElectionV1Reason::kElectionTimeout));
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTakeover) {
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionV1Reason reason) {
     LockGuard topoLock(_topoMutex);
 
     if (!isV1ElectionProtocol()) {
@@ -854,25 +858,42 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         }
     }
 
-    const auto status = _topCoord->becomeCandidateIfElectable(
-        _replExecutor.now(), getMyLastAppliedOpTime(), isPriorityTakeover);
+    const auto status =
+        _topCoord->becomeCandidateIfElectable(_replExecutor.now(),
+                                              getMyLastAppliedOpTime(),
+                                              reason == StartElectionV1Reason::kPriorityTakeover);
     if (!status.isOK()) {
-        if (isPriorityTakeover) {
-            log() << "Not starting an election for a priority takeover, "
-                  << "since we are not electable due to: " << status.reason();
-        } else {
-            log() << "Not starting an election, since we are not electable due to: "
-                  << status.reason();
+        switch (reason) {
+            case StartElectionV1Reason::kElectionTimeout:
+                log() << "Not starting an election, since we are not electable due to: "
+                      << status.reason();
+                break;
+            case StartElectionV1Reason::kPriorityTakeover:
+                log() << "Not starting an election for a priority takeover, "
+                      << "since we are not electable due to: " << status.reason();
+                break;
+            case StartElectionV1Reason::kStepUpRequest:
+                log() << "Not starting an election for a replSetStepUp request, "
+                      << "since we are not electable due to: " << status.reason();
+                break;
         }
         return;
     }
-    if (isPriorityTakeover) {
-        log() << "Starting an election for a priority takeover";
-    } else {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        log() << "Starting an election, since we've seen no PRIMARY in the past "
-              << _rsConfig.getElectionTimeoutPeriod();
+
+    switch (reason) {
+        case StartElectionV1Reason::kElectionTimeout: {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            log() << "Starting an election, since we've seen no PRIMARY in the past "
+                  << _rsConfig.getElectionTimeoutPeriod();
+        } break;
+        case StartElectionV1Reason::kPriorityTakeover:
+            log() << "Starting an election for a priority takeover";
+            break;
+        case StartElectionV1Reason::kStepUpRequest:
+            log() << "Starting an election due to step up request";
+            break;
     }
+
     _startElectSelfV1();
 }
 
