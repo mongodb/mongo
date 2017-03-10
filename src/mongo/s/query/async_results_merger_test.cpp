@@ -120,7 +120,7 @@ protected:
         const auto qr =
             unittest::assertGet(QueryRequest::makeFromFindCommand(_nss, findCmd, isExplain));
 
-        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, readPref);
+        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), readPref);
         _params->sort = qr->getSort();
         _params->limit = qr->getLimit();
         _params->batchSize = getMoreBatchSize ? getMoreBatchSize : qr->getBatchSize();
@@ -142,7 +142,7 @@ protected:
      */
     void makeCursorFromExistingCursors(
         const std::vector<std::pair<HostAndPort, CursorId>>& remotes) {
-        _params = stdx::make_unique<ClusterClientCursorParams>(_nss);
+        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator());
 
         for (const auto& hostIdPair : remotes) {
             _params->remotes.emplace_back(hostIdPair.first, hostIdPair.second);

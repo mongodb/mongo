@@ -1807,7 +1807,7 @@ public:
         for (int i = 0; i < 1000; i++) {
             auto exec = makeFakePlanExecutor(opCtx.get());
             auto cursorPin = CursorManager::getGlobalCursorManager()->registerCursor(
-                {std::move(exec), NamespaceString{"test.collection"}, false, BSONObj()});
+                {std::move(exec), NamespaceString{"test.collection"}, {}, false, BSONObj()});
             ASSERT_TRUE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
         }
     }
@@ -1822,7 +1822,7 @@ public:
         for (int i = 0; i < 1000; i++) {
             auto exec = makeFakePlanExecutor(opCtx.get());
             auto cursorPin = testManager.registerCursor(
-                {std::move(exec), NamespaceString{"test.collection"}, false, BSONObj()});
+                {std::move(exec), NamespaceString{"test.collection"}, {}, false, BSONObj()});
             ASSERT_FALSE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
         }
     }
@@ -1838,7 +1838,7 @@ public:
         for (int i = 0; i < 1000; i++) {
             auto exec = makeFakePlanExecutor(opCtx.get());
             auto cursorPin = testManager.registerCursor(
-                {std::move(exec), NamespaceString{"test.collection"}, false, BSONObj()});
+                {std::move(exec), NamespaceString{"test.collection"}, {}, false, BSONObj()});
             auto cursorId = cursorPin.getCursor()->cursorid();
             if (prefix) {
                 ASSERT_EQ(*prefix, extractLeading32Bits(cursorId));

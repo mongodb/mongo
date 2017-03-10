@@ -449,7 +449,7 @@ public:
         auto exec = makeCollScanExec(coll, filterObj);
 
         // Make a client cursor from the plan executor.
-        coll->getCursorManager()->registerCursor({std::move(exec), nss, false, BSONObj()});
+        coll->getCursorManager()->registerCursor({std::move(exec), nss, {}, false, BSONObj()});
 
         // There should be one cursor before invalidation,
         // and zero cursors after invalidation.
@@ -476,7 +476,7 @@ public:
 
         // Make a client cursor from the plan executor.
         auto ccPin = collection->getCursorManager()->registerCursor(
-            {std::move(exec), nss, false, BSONObj()});
+            {std::move(exec), nss, {}, false, BSONObj()});
 
         // If the cursor is pinned, it sticks around, even after invalidation.
         ASSERT_EQUALS(1U, numCursors());
@@ -519,7 +519,7 @@ public:
 
             // Make a client cursor from the plan executor.
             collection->getCursorManager()->registerCursor(
-                {std::move(exec), nss, false, BSONObj()});
+                {std::move(exec), nss, {}, false, BSONObj()});
         }
 
         // There should be one cursor before timeout,

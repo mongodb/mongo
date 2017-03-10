@@ -152,6 +152,7 @@ public:
                 auto pinnedCursor = collection->getCursorManager()->registerCursor(
                     {std::move(exec),
                      ns,
+                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                      opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
                      cmdObj});
                 pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(

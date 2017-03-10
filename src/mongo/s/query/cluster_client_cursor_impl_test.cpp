@@ -51,7 +51,7 @@ TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
     }
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused")));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
 
@@ -74,7 +74,7 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     mockStage->queueResult(BSON("a" << 4));
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused")));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
 
     auto firstResult = cursor.next(nullptr);
     ASSERT_OK(firstResult.getStatus());
@@ -113,7 +113,7 @@ TEST(ClusterClientCursorImpl, RemotesExhausted) {
     mockStage->markRemotesExhausted();
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused")));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto firstResult = cursor.next(nullptr);
@@ -142,7 +142,7 @@ TEST(ClusterClientCursorImpl, ForwardsAwaitDataTimeout) {
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
     ClusterClientCursorImpl cursor(std::move(mockStage),
-                                   ClusterClientCursorParams(NamespaceString("unused")));
+                                   ClusterClientCursorParams(NamespaceString("unused"), {}));
     ASSERT_OK(cursor.setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
