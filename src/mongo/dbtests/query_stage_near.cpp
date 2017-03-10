@@ -33,6 +33,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+#include <vector>
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/near.h"
@@ -75,7 +78,7 @@ public:
           _pos(0) {}
 
     void addInterval(vector<BSONObj> data, double min, double max) {
-        _intervals.mutableVector().push_back(new MockInterval(data, min, max));
+        _intervals.push_back(stdx::make_unique<MockInterval>(data, min, max));
     }
 
     virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
@@ -84,9 +87,9 @@ public:
         if (_pos == static_cast<int>(_intervals.size()))
             return StatusWith<CoveredInterval*>(NULL);
 
-        const MockInterval& interval = *_intervals.vector()[_pos++];
+        const MockInterval& interval = *_intervals[_pos++];
 
-        bool lastInterval = _pos == static_cast<int>(_intervals.vector().size());
+        bool lastInterval = _pos == static_cast<int>(_intervals.size());
 
         auto queuedStage = make_unique<QueuedDataStage>(opCtx, workingSet);
 
@@ -117,7 +120,7 @@ public:
     }
 
 private:
-    OwnedPointerVector<MockInterval> _intervals;
+    std::vector<std::unique_ptr<MockInterval>> _intervals;
     int _pos;
 };
 

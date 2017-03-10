@@ -520,8 +520,7 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
 }
 
 void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
-    OwnedPointerVector<BatchedCommandRequest> commandRequestsOwned;
-    std::vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
+    std::vector<std::unique_ptr<BatchedCommandRequest>> commandRequests;
 
     msgToBatchRequests(dbm->msg(), &commandRequests);
 
@@ -533,7 +532,7 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
             clientLastError.startRequest();
         }
 
-        BatchedCommandRequest* const commandRequest = *it;
+        BatchedCommandRequest* const commandRequest = it->get();
 
         BatchedCommandResponse commandResponse;
 

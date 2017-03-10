@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -378,16 +379,17 @@ bool RangeDeleter::deleteNow(OperationContext* opCtx,
     return result;
 }
 
-void RangeDeleter::getStatsHistory(std::vector<DeleteJobStats*>* stats) const {
-    stats->clear();
-    stats->reserve(kDeleteJobsHistory);
+std::vector<std::unique_ptr<DeleteJobStats>> RangeDeleter::getStatsHistory() const {
+    std::vector<std::unique_ptr<DeleteJobStats>> stats;
+    stats.reserve(kDeleteJobsHistory);
 
     stdx::lock_guard<stdx::mutex> sl(_statsHistoryMutex);
     for (std::deque<DeleteJobStats*>::const_iterator it = _statsHistory.begin();
          it != _statsHistory.end();
          ++it) {
-        stats->push_back(new DeleteJobStats(**it));
+        stats.push_back(stdx::make_unique<DeleteJobStats>(**it));
     }
+    return stats;
 }
 
 BSONObj RangeDeleter::toBSON() const {

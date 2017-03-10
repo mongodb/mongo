@@ -314,11 +314,11 @@ const IndexCatalogEntry* IndexCatalogEntryContainer::find(const IndexDescriptor*
         return desc->_cachedEntry;
 
     for (const_iterator i = begin(); i != end(); ++i) {
-        const IndexCatalogEntry* e = *i;
+        const IndexCatalogEntry* e = i->get();
         if (e->descriptor() == desc)
             return e;
     }
-    return NULL;
+    return nullptr;
 }
 
 IndexCatalogEntry* IndexCatalogEntryContainer::find(const IndexDescriptor* desc) {
@@ -326,33 +326,31 @@ IndexCatalogEntry* IndexCatalogEntryContainer::find(const IndexDescriptor* desc)
         return desc->_cachedEntry;
 
     for (iterator i = begin(); i != end(); ++i) {
-        IndexCatalogEntry* e = *i;
+        IndexCatalogEntry* e = i->get();
         if (e->descriptor() == desc)
             return e;
     }
-    return NULL;
+    return nullptr;
 }
 
 IndexCatalogEntry* IndexCatalogEntryContainer::find(const string& name) {
     for (iterator i = begin(); i != end(); ++i) {
-        IndexCatalogEntry* e = *i;
+        IndexCatalogEntry* e = i->get();
         if (e->descriptor()->indexName() == name)
             return e;
     }
-    return NULL;
+    return nullptr;
 }
 
 IndexCatalogEntry* IndexCatalogEntryContainer::release(const IndexDescriptor* desc) {
-    for (std::vector<IndexCatalogEntry*>::iterator i = _entries.mutableVector().begin();
-         i != _entries.mutableVector().end();
-         ++i) {
-        IndexCatalogEntry* e = *i;
-        if (e->descriptor() != desc)
+    for (auto i = _entries.begin(); i != _entries.end(); ++i) {
+        if ((*i)->descriptor() != desc)
             continue;
-        _entries.mutableVector().erase(i);
+        IndexCatalogEntry* e = i->release();
+        _entries.erase(i);
         return e;
     }
-    return NULL;
+    return nullptr;
 }
 
 }  // namespace mongo

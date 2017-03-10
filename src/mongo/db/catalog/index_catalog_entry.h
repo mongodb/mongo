@@ -218,21 +218,21 @@ private:
 
 class IndexCatalogEntryContainer {
 public:
-    typedef std::vector<IndexCatalogEntry*>::const_iterator const_iterator;
-    typedef std::vector<IndexCatalogEntry*>::const_iterator iterator;
+    typedef std::vector<std::unique_ptr<IndexCatalogEntry>>::const_iterator const_iterator;
+    typedef std::vector<std::unique_ptr<IndexCatalogEntry>>::const_iterator iterator;
 
     const_iterator begin() const {
-        return _entries.vector().begin();
+        return _entries.begin();
     }
     const_iterator end() const {
-        return _entries.vector().end();
+        return _entries.end();
     }
 
     iterator begin() {
-        return _entries.vector().begin();
+        return _entries.begin();
     }
     iterator end() {
-        return _entries.vector().end();
+        return _entries.end();
     }
 
     // TODO: these have to be SUPER SUPER FAST
@@ -261,10 +261,10 @@ public:
 
     // pass ownership to EntryContainer
     void add(IndexCatalogEntry* entry) {
-        _entries.mutableVector().push_back(entry);
+        _entries.push_back(std::unique_ptr<IndexCatalogEntry>{entry});
     }
 
 private:
-    OwnedPointerVector<IndexCatalogEntry> _entries;
+    std::vector<std::unique_ptr<IndexCatalogEntry>> _entries;
 };
 }

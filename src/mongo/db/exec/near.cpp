@@ -154,8 +154,9 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
         }
 
         // CoveredInterval and its child stage are owned by _childrenIntervals
-        _childrenIntervals.push_back(intervalStatus.getValue());
-        _nextInterval = _childrenIntervals.back();
+        _childrenIntervals.push_back(
+            std::unique_ptr<NearStage::CoveredInterval>{intervalStatus.getValue()});
+        _nextInterval = _childrenIntervals.back().get();
         _specificStats.intervalStats.emplace_back();
         _nextIntervalStats = &_specificStats.intervalStats.back();
         _nextIntervalStats->minDistanceAllowed = _nextInterval->minDistance;

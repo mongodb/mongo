@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/util/log.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -253,7 +254,9 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    ASSERT_OK(QueryPlanner::plan(*cq, params, &solns.mutableVector()));
+    std::vector<QuerySolution*> solnsRaw;
+    ASSERT_OK(QueryPlanner::plan(*cq, params, &solnsRaw));
+    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
 }
 
 void QueryPlannerTest::runInvalidQuery(const BSONObj& query) {
@@ -330,7 +333,9 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
+    std::vector<QuerySolution*> solnsRaw;
+    Status s = QueryPlanner::plan(*cq, params, &solnsRaw);
+    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
     ASSERT_NOT_OK(s);
 }
 
@@ -349,7 +354,9 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
+    std::vector<QuerySolution*> solnsRaw;
+    Status s = QueryPlanner::plan(*cq, params, &solnsRaw);
+    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
     ASSERT_OK(s);
 }
 
@@ -368,7 +375,9 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    Status status = QueryPlanner::plan(*cq, params, &solns.mutableVector());
+    std::vector<QuerySolution*> solnsRaw;
+    Status status = QueryPlanner::plan(*cq, params, &solnsRaw);
+    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
     ASSERT_NOT_OK(status);
 }
 

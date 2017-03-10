@@ -212,7 +212,7 @@ protected:
     BSONObj queryObj;
     std::unique_ptr<CanonicalQuery> cq;
     QueryPlannerParams params;
-    OwnedPointerVector<QuerySolution> solns;
+    std::vector<std::unique_ptr<QuerySolution>> solns;
 };
 
 }  // namespace mongo

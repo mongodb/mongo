@@ -40,6 +40,7 @@
 #include "mongo/db/ops/path_support.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -74,44 +75,43 @@ static bool isHashedPatternEl(const BSONElement& el) {
 }
 
 /**
- * Currently the allowable shard keys are either
+ * Currently the allowable shard keys are either:
  * i) a hashed single field, e.g. { a : "hashed" }, or
  * ii) a compound list of ascending, potentially-nested field paths, e.g. { a : 1 , b.c : 1 }
  */
-static vector<FieldRef*> parseShardKeyPattern(const BSONObj& keyPattern) {
-    OwnedPointerVector<FieldRef> parsedPaths;
-    static const vector<FieldRef*> empty;
+static std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPattern) {
+    std::vector<std::unique_ptr<FieldRef>> parsedPaths;
 
     BSONObjIterator patternIt(keyPattern);
     while (patternIt.more()) {
         BSONElement patternEl = patternIt.next();
-        parsedPaths.push_back(new FieldRef(patternEl.fieldNameStringData()));
+        parsedPaths.push_back(stdx::make_unique<FieldRef>(patternEl.fieldNameStringData()));
         const FieldRef& patternPath = *parsedPaths.back();
 
         // Empty path
         if (patternPath.numParts() == 0)
-            return empty;
+            return {};
 
         // Extra "." in path?
         if (patternPath.dottedField() != patternEl.fieldNameStringData())
-            return empty;
+            return {};
 
         // Empty parts of the path, ".."?
         for (size_t i = 0; i < patternPath.numParts(); ++i) {
             if (patternPath.getPart(i).size() == 0)
-                return empty;
+                return {};
         }
 
         // Numeric and ascending (1.0), or "hashed" and single field
         if (!patternEl.isNumber()) {
             if (keyPattern.nFields() != 1 || !isHashedPatternEl(patternEl))
-                return empty;
+                return {};
         } else if (patternEl.numberInt() != 1) {
-            return empty;
+            return {};
         }
     }
 
-    return parsedPaths.release();
+    return parsedPaths;
 }
 
 ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
@@ -290,7 +290,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
     // Extract equalities from query.
     EqualityMatches equalities;
     // TODO: Build the path set initially?
-    FieldRefSet keyPatternPathSet(_keyPatternPaths.vector());
+    FieldRefSet keyPatternPathSet(transitional_tools_do_not_use::unspool_vector(_keyPatternPaths));
     // We only care about extracting the full key pattern paths - if they don't exist (or are
     // conflicting), we don't contain the shard key.
     Status eqStatus =
@@ -306,9 +306,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
 
     BSONObjBuilder keyBuilder;
     // Iterate the parsed paths to avoid re-parsing
-    for (OwnedPointerVector<FieldRef>::const_iterator it = _keyPatternPaths.begin();
-         it != _keyPatternPaths.end();
-         ++it) {
+    for (auto it = _keyPatternPaths.begin(); it != _keyPatternPaths.end(); ++it) {
         const FieldRef& patternPath = **it;
         BSONElement equalEl = findEqualityElement(equalities, patternPath);
 

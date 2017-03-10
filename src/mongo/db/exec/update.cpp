@@ -48,6 +48,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -243,7 +244,7 @@ Status storageValidChildren(const mb::ConstElement& elem, const bool deep) {
 inline Status validate(const BSONObj& original,
                        const FieldRefSet& updatedFields,
                        const mb::Document& updated,
-                       const std::vector<FieldRef*>* immutableAndSingleValueFields,
+                       const std::vector<std::unique_ptr<FieldRef>>* immutableAndSingleValueFields,
                        const ModifierInterface::Options& opts) {
     LOG(3) << "update validate options -- "
            << " updatedFields: " << updatedFields << " immutableAndSingleValueFields.size:"
@@ -267,14 +268,18 @@ inline Status validate(const BSONObj& original,
         }
 
         // Check all immutable fields
-        if (immutableAndSingleValueFields)
-            changedImmutableFields.fillFrom(*immutableAndSingleValueFields);
+        if (immutableAndSingleValueFields) {
+            changedImmutableFields.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(*immutableAndSingleValueFields));
+        }
     } else {
         // TODO: Change impl so we don't need to create a new FieldRefSet
         //       -- move all conflict logic into static function on FieldRefSet?
         FieldRefSet immutableFieldRef;
-        if (immutableAndSingleValueFields)
-            immutableFieldRef.fillFrom(*immutableAndSingleValueFields);
+        if (immutableAndSingleValueFields) {
+            immutableFieldRef.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(*immutableAndSingleValueFields));
+        }
 
         FieldRefSet::const_iterator where = updatedFields.begin();
         const FieldRefSet::const_iterator end = updatedFields.end();
@@ -435,11 +440,11 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
     return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
 };
 
-const std::vector<FieldRef*>* getImmutableFields(OperationContext* opCtx,
-                                                 const NamespaceString& ns) {
+const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContext* opCtx,
+                                                                 const NamespaceString& ns) {
     auto metadata = CollectionShardingState::get(opCtx, ns)->getMetadata();
     if (metadata) {
-        const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
+        const std::vector<std::unique_ptr<FieldRef>>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.
         return &fields;
     }
@@ -558,7 +563,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         // Verify that no immutable fields were changed and data is valid for storage.
 
         if (!(!getOpCtx()->writesAreReplicated() || request->isFromMigration())) {
-            const std::vector<FieldRef*>* immutableFields = NULL;
+            const std::vector<std::unique_ptr<FieldRef>>* immutableFields = nullptr;
             if (lifecycle)
                 immutableFields = getImmutableFields(getOpCtx(), request->getNamespaceString());
 
@@ -666,7 +671,7 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     driver->setLogOp(false);
     driver->setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
 
-    const vector<FieldRef*>* immutablePaths = NULL;
+    const std::vector<std::unique_ptr<FieldRef>>* immutablePaths = nullptr;
     if (!isInternalRequest)
         immutablePaths = getImmutableFields(opCtx, ns);
 
@@ -674,7 +679,12 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     BSONObj original;
 
     if (cq) {
-        Status status = driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc);
+        std::vector<FieldRef*> fields;
+        if (immutablePaths) {
+            fields = transitional_tools_do_not_use::unspool_vector(*immutablePaths);
+        }
+
+        Status status = driver->populateDocumentWithQueryFields(*cq, &fields, *doc);
         if (!status.isOK()) {
             return status;
         }

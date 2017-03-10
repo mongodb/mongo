@@ -234,8 +234,7 @@ private:
         if (!status.isOK())
             return status;
 
-        OwnedPointerVector<ShardEndpoint> endpointsOwned;
-        vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
+        vector<std::unique_ptr<ShardEndpoint>> endpoints;
 
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             ShardEndpoint* endpoint;
@@ -243,7 +242,7 @@ private:
                 targeter.targetInsert(opCtx, targetingBatchItem.getDocument(), &endpoint);
             if (!status.isOK())
                 return status;
-            endpoints.push_back(endpoint);
+            endpoints.push_back(std::unique_ptr<ShardEndpoint>{endpoint});
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
             Status status =
                 targeter.targetUpdate(opCtx, *targetingBatchItem.getUpdate(), &endpoints);
@@ -261,9 +260,8 @@ private:
 
         // Assemble requests
         std::vector<AsyncRequestsSender::Request> requests;
-        for (vector<ShardEndpoint*>::const_iterator it = endpoints.begin(); it != endpoints.end();
-             ++it) {
-            const ShardEndpoint* endpoint = *it;
+        for (auto it = endpoints.begin(); it != endpoints.end(); ++it) {
+            const ShardEndpoint* endpoint = it->get();
 
             auto shardStatus = shardRegistry->getShard(opCtx, endpoint->shardName);
             if (!shardStatus.isOK()) {

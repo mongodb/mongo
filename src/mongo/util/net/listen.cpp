@@ -34,6 +34,9 @@
 
 #include "mongo/util/net/listen.h"
 
+#include <memory>
+#include <vector>
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
@@ -444,15 +447,15 @@ void Listener::initAndListen() {
         _readyCondition.notify_all();
     }
 
-    OwnedPointerVector<EventHolder> eventHolders;
+    std::vector<std::unique_ptr<EventHolder>> eventHolders;
     std::unique_ptr<WSAEVENT[]> events(new WSAEVENT[_socks.size()]);
 
 
     // Populate events array with an event for each socket we are watching
     for (size_t count = 0; count < _socks.size(); ++count) {
-        EventHolder* ev(new EventHolder);
-        eventHolders.mutableVector().push_back(ev);
-        events[count] = ev->get();
+        auto ev = stdx::make_unique<EventHolder>();
+        eventHolders.push_back(std::move(ev));
+        events[count] = eventHolders.back()->get();
     }
 
     // The check against _finished allows us to actually stop the listener by signalling it through

@@ -44,6 +44,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_raii.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -349,9 +350,10 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
-                                          const BatchedUpdateDocument& updateDoc,
-                                          vector<ShardEndpoint*>* endpoints) const {
+Status ChunkManagerTargeter::targetUpdate(
+    OperationContext* opCtx,
+    const BatchedUpdateDocument& updateDoc,
+    std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
     //
     // Update targeting may use either the query or the update.  This is to support save-style
     // updates, of the form:
@@ -419,8 +421,7 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
     if (!shardKey.isEmpty()) {
         try {
             endpoints->push_back(
-                targetShardKey(shardKey, collation, (query.objsize() + updateExpr.objsize()))
-                    .release());
+                targetShardKey(shardKey, collation, (query.objsize() + updateExpr.objsize())));
             return Status::OK();
         } catch (const DBException&) {
             // This update is potentially not constrained to a single shard
@@ -473,9 +474,10 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
     }
 }
 
-Status ChunkManagerTargeter::targetDelete(OperationContext* opCtx,
-                                          const BatchedDeleteDocument& deleteDoc,
-                                          vector<ShardEndpoint*>* endpoints) const {
+Status ChunkManagerTargeter::targetDelete(
+    OperationContext* opCtx,
+    const BatchedDeleteDocument& deleteDoc,
+    std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
     BSONObj shardKey;
 
     if (_manager) {
@@ -502,7 +504,7 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* opCtx,
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
         try {
-            endpoints->push_back(targetShardKey(shardKey, collation, 0).release());
+            endpoints->push_back(targetShardKey(shardKey, collation, 0));
             return Status::OK();
         } catch (const DBException&) {
             // This delete is potentially not constrained to a single shard
@@ -541,19 +543,21 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* opCtx,
     return targetQuery(opCtx, deleteDoc.getQuery(), collation, endpoints);
 }
 
-Status ChunkManagerTargeter::targetDoc(OperationContext* opCtx,
-                                       const BSONObj& doc,
-                                       const BSONObj& collation,
-                                       vector<ShardEndpoint*>* endpoints) const {
+Status ChunkManagerTargeter::targetDoc(
+    OperationContext* opCtx,
+    const BSONObj& doc,
+    const BSONObj& collation,
+    std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
     // NOTE: This is weird and fragile, but it's the way our language works right now -
     // documents are either A) invalid or B) valid equality queries over themselves.
     return targetQuery(opCtx, doc, collation, endpoints);
 }
 
-Status ChunkManagerTargeter::targetQuery(OperationContext* opCtx,
-                                         const BSONObj& query,
-                                         const BSONObj& collation,
-                                         vector<ShardEndpoint*>* endpoints) const {
+Status ChunkManagerTargeter::targetQuery(
+    OperationContext* opCtx,
+    const BSONObj& query,
+    const BSONObj& collation,
+    std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
                       stream() << "could not target query in " << getNS().ns()
@@ -572,7 +576,7 @@ Status ChunkManagerTargeter::targetQuery(OperationContext* opCtx,
     }
 
     for (const ShardId& shardId : shardIds) {
-        endpoints->push_back(new ShardEndpoint(
+        endpoints->push_back(stdx::make_unique<ShardEndpoint>(
             shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
     }
 
@@ -594,7 +598,8 @@ std::unique_ptr<ShardEndpoint> ChunkManagerTargeter::targetShardKey(const BSONOb
                                             _manager->getVersion(chunk->getShardId()));
 }
 
-Status ChunkManagerTargeter::targetCollection(vector<ShardEndpoint*>* endpoints) const {
+Status ChunkManagerTargeter::targetCollection(
+    std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "could not target full range of " << getNS().ns()
@@ -609,14 +614,15 @@ Status ChunkManagerTargeter::targetCollection(vector<ShardEndpoint*>* endpoints)
     }
 
     for (const ShardId& shardId : shardIds) {
-        endpoints->push_back(new ShardEndpoint(
+        endpoints->push_back(stdx::make_unique<ShardEndpoint>(
             shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
     }
 
     return Status::OK();
 }
 
-Status ChunkManagerTargeter::targetAllShards(vector<ShardEndpoint*>* endpoints) const {
+Status ChunkManagerTargeter::targetAllShards(
+    std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
     if (!_primary && !_manager) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "could not target every shard with versions for "
@@ -628,7 +634,7 @@ Status ChunkManagerTargeter::targetAllShards(vector<ShardEndpoint*>* endpoints) 
     grid.shardRegistry()->getAllShardIds(&shardIds);
 
     for (const ShardId& shardId : shardIds) {
-        endpoints->push_back(new ShardEndpoint(
+        endpoints->push_back(stdx::make_unique<ShardEndpoint>(
             shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
     }
 
@@ -660,7 +666,8 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
                 previouslyNotedVersion = remoteShardVersion;
             }
         } else {
-            // Epoch changed midway while applying the batch so set the version to something unique
+            // Epoch changed midway while applying the batch so set the version to something
+            // unique
             // and non-existent to force a reload when refreshIsNeeded is called.
             previouslyNotedVersion = ChunkVersion::IGNORED();
         }
@@ -717,7 +724,8 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
         // Reset the field
         _needsTargetingRefresh = false;
 
-        // If we couldn't target, we might need to refresh if we haven't remotely refreshed the
+        // If we couldn't target, we might need to refresh if we haven't remotely refreshed
+        // the
         // metadata since we last got it from the cache.
 
         bool alreadyRefreshed = wasMetadataRefreshed(lastManager, lastPrimary, _manager, _primary);

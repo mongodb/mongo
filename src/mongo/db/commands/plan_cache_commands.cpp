@@ -416,7 +416,7 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
         BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
         reasonBob.append("score", entry->decision->scores[i]);
         BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
-        PlanStageStats* stats = entry->decision->stats.vector()[i];
+        PlanStageStats* stats = entry->decision->stats[i].get();
         if (stats) {
             Explain::statsToBSON(*stats, &statsBob);
         }

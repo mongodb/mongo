@@ -103,7 +103,7 @@ void WiredTigerRecoveryUnit::_abort() {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
-            Change* change = *it;
+            Change* change = it->get();
             LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
             change->rollback();
         }
@@ -148,7 +148,7 @@ bool WiredTigerRecoveryUnit::waitUntilDurable() {
 
 void WiredTigerRecoveryUnit::registerChange(Change* change) {
     invariant(_inUnitOfWork);
-    _changes.push_back(change);
+    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 void WiredTigerRecoveryUnit::assertInActiveTxn() const {

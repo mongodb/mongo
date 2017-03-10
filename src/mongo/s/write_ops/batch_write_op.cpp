@@ -31,6 +31,8 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -548,9 +550,9 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
 
     // Special handling for write concern errors, save for later
     if (response.isWriteConcernErrorSet()) {
-        unique_ptr<ShardWCError> wcError(
-            new ShardWCError(targetedBatch.getEndpoint(), *response.getWriteConcernError()));
-        _wcErrors.mutableVector().push_back(wcError.release());
+        auto wcError = stdx::make_unique<ShardWCError>(targetedBatch.getEndpoint(),
+                                                       *response.getWriteConcernError());
+        _wcErrors.push_back(std::move(wcError));
     }
 
     vector<WriteErrorDetail*> itemErrors;
@@ -628,10 +630,10 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             int batchIndex = targetedBatch.getWrites()[childBatchIndex]->writeOpRef.first;
 
             // Push the upserted id with the correct index into the batch upserted ids
-            BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
+            auto upsertedId = stdx::make_unique<BatchedUpsertDetail>();
             upsertedId->setIndex(batchIndex);
             upsertedId->setUpsertedID(childUpsertedId->getUpsertedID());
-            _upsertedIds.mutableVector().push_back(upsertedId);
+            _upsertedIds.push_back(std::move(upsertedId));
         }
     }
 }
@@ -761,9 +763,8 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
             error->setErrCode((*_wcErrors.begin())->error.getErrCode());
         }
 
-        for (vector<ShardWCError*>::const_iterator it = _wcErrors.begin(); it != _wcErrors.end();
-             ++it) {
-            const ShardWCError* wcError = *it;
+        for (auto it = _wcErrors.begin(); it != _wcErrors.end(); ++it) {
+            const ShardWCError* wcError = it->get();
             if (it != _wcErrors.begin())
                 msg << " :: and :: ";
             msg << wcError->error.getErrMessage() << " at " << wcError->endpoint.shardName;
@@ -778,7 +779,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     //
 
     if (_upsertedIds.size() != 0) {
-        batchResp->setUpsertDetails(_upsertedIds.vector());
+        batchResp->setUpsertDetails(transitional_tools_do_not_use::unspool_vector(_upsertedIds));
     }
 
     // Stats

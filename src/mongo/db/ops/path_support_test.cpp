@@ -29,7 +29,9 @@
 #include "mongo/db/ops/path_support.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -47,6 +49,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -659,9 +662,9 @@ public:
     ImmutablePaths() {}
 
     void addPath(const string& path) {
-        _ownedPaths.mutableVector().push_back(new FieldRef(path));
+        _ownedPaths.push_back(stdx::make_unique<FieldRef>(path));
         FieldRef const* conflictPath = NULL;
-        ASSERT(_immutablePathSet.insert(_ownedPaths.vector().back(), &conflictPath));
+        ASSERT(_immutablePathSet.insert(_ownedPaths.back().get(), &conflictPath));
     }
 
     const FieldRefSet& getPathSet() {
@@ -670,7 +673,7 @@ public:
 
 private:
     FieldRefSet _immutablePathSet;
-    OwnedPointerVector<FieldRef> _ownedPaths;
+    std::vector<std::unique_ptr<FieldRef>> _ownedPaths;
 };
 
 TEST(ExtractEqualities, IdOnlyMulti) {

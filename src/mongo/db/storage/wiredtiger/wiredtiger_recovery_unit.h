@@ -34,6 +34,9 @@
 
 #include <memory.h>
 
+#include <memory>
+#include <vector>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context.h"
@@ -134,7 +137,7 @@ private:
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
     std::unique_ptr<Timer> _timer;
 
-    typedef OwnedPointerVector<Change> Changes;
+    typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
 };
 

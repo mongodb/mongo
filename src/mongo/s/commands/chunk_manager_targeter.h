@@ -29,6 +29,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -81,16 +82,16 @@ public:
     // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
     Status targetUpdate(OperationContext* opCtx,
                         const BatchedUpdateDocument& updateDoc,
-                        std::vector<ShardEndpoint*>* endpoints) const;
+                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
     // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
     Status targetDelete(OperationContext* opCtx,
                         const BatchedDeleteDocument& deleteDoc,
-                        std::vector<ShardEndpoint*>* endpoints) const;
+                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
-    Status targetCollection(std::vector<ShardEndpoint*>* endpoints) const;
+    Status targetCollection(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
-    Status targetAllShards(std::vector<ShardEndpoint*>* endpoints) const;
+    Status targetAllShards(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
     void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo);
 
@@ -134,7 +135,7 @@ private:
     Status targetDoc(OperationContext* opCtx,
                      const BSONObj& doc,
                      const BSONObj& collation,
-                     std::vector<ShardEndpoint*>* endpoints) const;
+                     std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
@@ -146,7 +147,7 @@ private:
     Status targetQuery(OperationContext* opCtx,
                        const BSONObj& query,
                        const BSONObj& collation,
-                       std::vector<ShardEndpoint*>* endpoints) const;
+                       std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const;
 
     /**
      * Returns a ShardEndpoint for an exact shard key query.
