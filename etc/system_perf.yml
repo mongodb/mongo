@@ -268,11 +268,7 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          # Specify the test list to use. Change the testList parameter
-          # if you want to run a non-default list.
-          $DSI_PATH/bin/update_test_list.py ${testList}
-          $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          echo "Done test for ${test}-${storageEngine} with setup ${setup}!"
+          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
     - command: "json.send"
       params:
          name: "perf"
@@ -419,7 +415,6 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -442,7 +437,6 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -452,12 +446,11 @@ tasks:
   depends_on:
     - name: compile
       variant: linux-standalone
-  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
+        test: "core"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -465,8 +458,7 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
-        testList: "default"
+        test: "core"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -474,12 +466,11 @@ tasks:
   depends_on:
     - name: compile
       variant: linux-standalone
-  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun"
+        test: "core"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -487,8 +478,127 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun"
-        testList: "default"
+        test: "core"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: non_sharded_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "non_sharded"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "non_sharded"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: non_sharded_workloads_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "non_sharded"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "non_sharded"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: mongos_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "mongos"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "mongos"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: mongos_workloads_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "mongos"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "mongos"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: move_chunk_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "move_chunk"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "move_chunk"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: move_chunk_workloads_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "move_chunk"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "move_chunk"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -573,7 +683,6 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialSync"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -594,7 +703,6 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "initialSync"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -647,6 +755,8 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: non_sharded_workloads_WT
+    - name: non_sharded_workloads_MMAPv1
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -668,6 +778,8 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: non_sharded_workloads_WT
+    - name: non_sharded_workloads_MMAPv1
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -686,6 +798,10 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: mongos_workloads_WT
+    - name: mongos_workloads_MMAPv1
+    - name: move_chunk_workloads_WT
+    - name: move_chunk_workloads_MMAPv1
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
@@ -704,6 +820,10 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: secondary_performance_WT
+    - name: secondary_performance_MMAPv1
+    - name: non_sharded_workloads_WT
+    - name: non_sharded_workloads_MMAPv1
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
