@@ -13,6 +13,12 @@ In the 2.9.1 release we added statistics tracking handle list lock timing, we
 have switched that lock from a spin lock to a read-write lock, and consequently
 changed the statistics tracking lock related wait time.
 </dd>
+<dt>Forced and named checkpoint error conditions changed</dt>
+<dd>
+There are new cases where checkpoints created with an explicit name or the
+"force" configuration option can return an EBUSY error. This can happen if
+the checkpoint overlaps with other schema operations, for example table create.
+</dd>
 </dl>
 
 @section version_291 Upgrading to Version 2.9.1

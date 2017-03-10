@@ -217,6 +217,11 @@ handle_message(WT_EVENT_HANDLER *handler,
 	(void)(handler);
 	(void)(session);
 
+	/* Ignore messages about failing to create forced checkpoints. */
+	if (strstr(
+	    message, "forced or named checkpoint") != NULL)
+		return (0);
+
 	if (logfp != NULL)
 		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);
 

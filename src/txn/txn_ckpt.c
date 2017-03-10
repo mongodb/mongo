@@ -319,10 +319,12 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 			 * safely be skipped here.
 			 */
 			F_CLR(&session->txn, WT_TXN_ERROR);
-			if (force)
-				WT_RET_MSG(session, EBUSY,
+			if (force) {
+				WT_RET(__wt_msg(session,
 				    "forced or named checkpoint raced with "
-				    "a metadata update");
+				    "a metadata update"));
+				return (EBUSY);
+			}
 			__wt_verbose(session, WT_VERB_CHECKPOINT,
 			    "skipped checkpoint of %s with metadata conflict",
 			    session->dhandle->name);
