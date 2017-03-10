@@ -560,7 +560,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 int
 __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 {
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 
 	WT_ASSERT(session, WT_META_TRACKING(session));
@@ -568,10 +568,15 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 
 	/*
 	 * Get the checkpoint handle exclusive, so no one else can access it
-	 * while we are creating the new checkpoint.
+	 * while we are creating the new checkpoint.  Hold the lock until the
+	 * checkpoint completes.
 	 */
 	WT_ERR(__wt_session_get_btree(session, saved_dhandle->name,
 	    checkpoint, NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+	if ((ret = __wt_meta_track_handle_lock(session, false)) != 0) {
+		WT_TRET(__wt_session_release_btree(session));
+		goto err;
+	}
 
 	/*
 	 * Get exclusive access to the handle and then flush any pages in this
@@ -587,13 +592,9 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	 * We lock checkpoint handles that we are overwriting, so the handle
 	 * must be closed when we release it.
 	 */
-	dhandle = session->dhandle;
-	F_SET(dhandle, WT_DHANDLE_DISCARD);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
 
-	WT_ERR(__wt_meta_track_handle_lock(session, false));
-
-	/* Restore the original btree in the session. */
+	/* Restore the original data handle in the session. */
 err:	session->dhandle = saved_dhandle;
-
 	return (ret);
 }

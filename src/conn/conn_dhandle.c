@@ -400,10 +400,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 		return (ret == EBUSY ? 0 : ret);
 
 	WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
-	if (WT_META_TRACKING(session))
-		WT_TRET(__wt_meta_track_handle_lock(session, false));
-	else
-		WT_TRET(__wt_session_release_btree(session));
+	WT_TRET(__wt_session_release_btree(session));
 	return (ret);
 }
 
@@ -497,7 +494,12 @@ __wt_conn_dhandle_close_all(
 
 		session->dhandle = dhandle;
 
-		/* Lock the handle exclusively. */
+		/*
+		 * Lock the handle exclusively.  If this is part of
+		 * schema-changing operation (indicated by metadata tracking
+		 * being enabled), hold the lock for the duration of the
+		 * operation.
+		 */
 		WT_ERR(__wt_session_get_btree(session,
 		    dhandle->name, dhandle->checkpoint,
 		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
