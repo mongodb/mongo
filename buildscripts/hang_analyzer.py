@@ -307,7 +307,7 @@ class GDBDumper(object):
         source_mongo_lock = "source %s" % mongo_lock_script
         mongodb_dump_locks = "mongodb-dump-locks"
         mongodb_show_locks = "mongodb-show-locks"
-        mongodb_uniqstack = "mongodb-uniqstack bt"
+        mongodb_uniqstack = "mongodb-uniqstack mongodb-bt-if-active"
         mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
             (process_name, pid)
         mongodb_javascript_stack = "mongodb-javascript-stack"
