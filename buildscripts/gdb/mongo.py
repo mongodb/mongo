@@ -387,6 +387,25 @@ class MongoDBDumpLocks(gdb.Command):
 # Register command
 MongoDBDumpLocks()
 
+class BtIfActive(gdb.Command):
+    """Print stack trace or a short message if the current thread is idle"""
+
+    def __init__(self):
+        register_mongo_command(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
+
+    def invoke(self, arg, _from_tty):
+        try:
+            is_idle = gdb.parse_and_eval("mongo::for_debuggers::threadIsIdle")
+        except gdb.error:
+            is_idle = False # If unsure, print a stack trace.
+
+        if is_idle:
+            print("Thread is idle")
+        else:
+            gdb.execute("bt")
+
+# Register command
+BtIfActive()
 
 class MongoDBUniqueStack(gdb.Command):
     """Print unique stack traces of all threads in current process"""
