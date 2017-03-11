@@ -456,7 +456,7 @@ public:
 TEST_F(AuthorizationManagerLogOpTest, testDropDatabaseAddsRecoveryUnits) {
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("dropDatabase"
                              << "1"),
                         nullptr);
@@ -466,7 +466,7 @@ TEST_F(AuthorizationManagerLogOpTest, testDropDatabaseAddsRecoveryUnits) {
 TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("drop"
                              << "system.users"),
                         nullptr);
@@ -474,7 +474,7 @@ TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
 
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("drop"
                              << "system.roles"),
                         nullptr);
@@ -482,7 +482,7 @@ TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
 
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("drop"
                              << "system.version"),
                         nullptr);
@@ -490,7 +490,7 @@ TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
 
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("drop"
                              << "system.profile"),
                         nullptr);
@@ -500,21 +500,21 @@ TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
 TEST_F(AuthorizationManagerLogOpTest, testCreateAnyCollectionAddsNoRecoveryUnits) {
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("create"
                              << "system.users"),
                         nullptr);
 
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("create"
                              << "system.profile"),
                         nullptr);
 
     authzManager->logOp(&opCtx,
                         "c",
-                        "admin.$cmd",
+                        {"admin", "$cmd"},
                         BSON("create"
                              << "system.other"),
                         nullptr);
@@ -525,7 +525,7 @@ TEST_F(AuthorizationManagerLogOpTest, testCreateAnyCollectionAddsNoRecoveryUnits
 TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecoveryUnits) {
     authzManager->logOp(&opCtx,
                         "i",
-                        "admin.system.profile",
+                        {"admin", "system.profile"},
                         BSON("_id"
                              << "admin.user"),
                         nullptr);
@@ -533,7 +533,7 @@ TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecovery
 
     authzManager->logOp(&opCtx,
                         "i",
-                        "admin.system.users",
+                        {"admin", "system.users"},
                         BSON("_id"
                              << "admin.user"),
                         nullptr);
@@ -541,7 +541,7 @@ TEST_F(AuthorizationManagerLogOpTest, testRawInsertToRolesCollectionAddsRecovery
 
     authzManager->logOp(&opCtx,
                         "i",
-                        "admin.system.roles",
+                        {"admin", "system.roles"},
                         BSON("_id"
                              << "admin.user"),
                         nullptr);

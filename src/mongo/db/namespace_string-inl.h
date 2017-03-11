@@ -167,8 +167,8 @@ inline std::string NamespaceString::getSystemIndexesCollection() const {
     return db().toString() + ".system.indexes";
 }
 
-inline std::string NamespaceString::getCommandNS() const {
-    return db().toString() + ".$cmd";
+inline NamespaceString NamespaceString::getCommandNS() const {
+    return {db(), "$cmd"};
 }
 
 }  // namespace mongo

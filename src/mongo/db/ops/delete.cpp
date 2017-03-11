@@ -46,14 +46,13 @@ namespace mongo {
 */
 long long deleteObjects(OperationContext* opCtx,
                         Collection* collection,
-                        StringData ns,
+                        const NamespaceString& ns,
                         BSONObj pattern,
                         PlanExecutor::YieldPolicy policy,
                         bool justOne,
                         bool god,
                         bool fromMigrate) {
-    NamespaceString nsString(ns);
-    DeleteRequest request(nsString);
+    DeleteRequest request(ns);
     request.setQuery(pattern);
     request.setMulti(!justOne);
     request.setGod(god);

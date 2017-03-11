@@ -392,7 +392,7 @@ public:
             indexer.commit();
 
             for (auto&& infoObj : indexInfoObjs) {
-                std::string systemIndexes = ns.getSystemIndexesCollection();
+                NamespaceString systemIndexes{ns.getSystemIndexesCollection()};
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                     opCtx, systemIndexes, infoObj, false);
             }

@@ -122,7 +122,7 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj oldDoc = _coll->getRecordStore()->dataFor(&_opCtx, oldrecordId).releaseToBson();
         OplogUpdateEntryArgs args;
-        args.ns = _coll->ns().ns();
+        args.nss = _coll->ns();
         _coll->updateDocument(&_opCtx,
                               oldrecordId,
                               Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),

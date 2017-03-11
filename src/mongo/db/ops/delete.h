@@ -41,7 +41,7 @@ class OperationContext;
 
 long long deleteObjects(OperationContext* opCtx,
                         Collection* collection,
-                        StringData ns,
+                        const NamespaceString& ns,
                         BSONObj pattern,
                         PlanExecutor::YieldPolicy policy,
                         bool justOne,

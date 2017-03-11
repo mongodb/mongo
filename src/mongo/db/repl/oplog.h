@@ -93,7 +93,7 @@ void logOps(OperationContext* opCtx,
  */
 void logOp(OperationContext* opCtx,
            const char* opstr,
-           const char* ns,
+           const NamespaceString& ns,
            const BSONObj& obj,
            const BSONObj* o2,
            bool fromMigrate);

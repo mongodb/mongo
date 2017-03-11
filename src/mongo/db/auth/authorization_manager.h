@@ -303,7 +303,7 @@ public:
      */
     void logOp(OperationContext* opCtx,
                const char* opstr,
-               const char* ns,
+               const NamespaceString& nss,
                const BSONObj& obj,
                const BSONObj* patt);
 
@@ -326,7 +326,7 @@ private:
      * with oplog entries that have been pre-verified to actually affect authorization data.
      */
     void _invalidateRelevantCacheData(const char* op,
-                                      const char* ns,
+                                      const NamespaceString& ns,
                                       const BSONObj& o,
                                       const BSONObj* o2);
 

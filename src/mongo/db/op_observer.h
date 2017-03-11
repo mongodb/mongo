@@ -44,7 +44,7 @@ class OperationContext;
  */
 struct OplogUpdateEntryArgs {
     // Name of the collection in which document is being updated.
-    std::string ns;
+    NamespaceString nss;
 
     // Fully updated document with damages (update modifiers) applied.
     BSONObj updatedDoc;
@@ -67,7 +67,7 @@ public:
     virtual ~OpObserver() = default;
 
     virtual void onCreateIndex(OperationContext* opCtx,
-                               const std::string& ns,
+                               const NamespaceString& ns,
                                BSONObj indexDoc,
                                bool fromMigrate) = 0;
     virtual void onInserts(OperationContext* opCtx,
@@ -98,7 +98,7 @@ public:
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex) = 0;
     virtual void onCollMod(OperationContext* opCtx,
-                           const std::string& dbName,
+                           const NamespaceString& nss,
                            const BSONObj& collModCmd) = 0;
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
     virtual void onDropCollection(OperationContext* opCtx,

@@ -666,7 +666,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 OplogUpdateEntryArgs args;
-                args.ns = _collection->ns().ns();
+                args.nss = _collection->ns();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -695,7 +695,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 invariant(_collection);
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 OplogUpdateEntryArgs args;
-                args.ns = _collection->ns().ns();
+                args.nss = _collection->ns();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();

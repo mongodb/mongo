@@ -158,7 +158,7 @@ Status AuthzManagerExternalStateMock::insert(OperationContext* opCtx,
     _documents[collectionName].push_back(toInsert);
 
     if (_authzManager) {
-        _authzManager->logOp(opCtx, "i", collectionName.ns().c_str(), toInsert, NULL);
+        _authzManager->logOp(opCtx, "i", collectionName, toInsert, NULL);
     }
 
     return Status::OK();
@@ -197,7 +197,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
         BSONObj idQuery = driver.makeOplogEntryQuery(newObj, false);
 
         if (_authzManager) {
-            _authzManager->logOp(opCtx, "u", collectionName.ns().c_str(), logObj, &idQuery);
+            _authzManager->logOp(opCtx, "u", collectionName, logObj, &idQuery);
         }
 
         return Status::OK();
@@ -244,7 +244,7 @@ Status AuthzManagerExternalStateMock::remove(OperationContext* opCtx,
         ++n;
 
         if (_authzManager) {
-            _authzManager->logOp(opCtx, "d", collectionName.ns().c_str(), idQuery, NULL);
+            _authzManager->logOp(opCtx, "d", collectionName, idQuery, NULL);
         }
     }
     *numRemoved = n;

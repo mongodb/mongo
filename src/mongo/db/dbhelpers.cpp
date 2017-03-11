@@ -167,7 +167,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 
 bool Helpers::findById(OperationContext* opCtx,
                        Database* database,
-                       const char* ns,
+                       StringData ns,
                        BSONObj query,
                        BSONObj& result,
                        bool* nsFound,
@@ -493,11 +493,11 @@ long long Helpers::removeRange(OperationContext* opCtx,
     return numDeleted;
 }
 
-void Helpers::emptyCollection(OperationContext* opCtx, const char* ns) {
-    OldClientContext context(opCtx, ns);
+void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    Collection* collection = context.db() ? context.db()->getCollection(ns) : nullptr;
-    deleteObjects(opCtx, collection, ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
+    Collection* collection = context.db() ? context.db()->getCollection(nss.ns()) : nullptr;
+    deleteObjects(opCtx, collection, nss, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
 }
 
 Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {

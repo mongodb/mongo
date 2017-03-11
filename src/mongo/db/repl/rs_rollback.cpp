@@ -718,7 +718,7 @@ void syncFixUp(OperationContext* opCtx,
                         } else {
                             deleteObjects(opCtx,
                                           collection,
-                                          doc.ns,
+                                          docNss,
                                           pattern,
                                           PlanExecutor::YIELD_MANUAL,
                                           true,   // justone
@@ -729,14 +729,13 @@ void syncFixUp(OperationContext* opCtx,
                     // TODO faster...
                     updates++;
 
-                    const NamespaceString requestNs(doc.ns);
-                    UpdateRequest request(requestNs);
+                    UpdateRequest request(docNss);
 
                     request.setQuery(pattern);
                     request.setUpdates(idAndDoc.second);
                     request.setGod();
                     request.setUpsert();
-                    UpdateLifecycleImpl updateLifecycle(requestNs);
+                    UpdateLifecycleImpl updateLifecycle(docNss);
                     request.setLifecycle(&updateLifecycle);
 
                     update(opCtx, ctx.db(), request);

@@ -345,8 +345,7 @@ Status collMod(OperationContext* opCtx,
 
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
-        getGlobalServiceContext()->getOpObserver()->onCollMod(
-            opCtx, (dbName.toString() + ".$cmd").c_str(), cmdObj);
+        getGlobalServiceContext()->getOpObserver()->onCollMod(opCtx, nss, cmdObj);
     }
 
     wunit.commit();

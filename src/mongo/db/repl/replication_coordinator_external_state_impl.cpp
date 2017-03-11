@@ -427,7 +427,7 @@ OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* opCtx) {
             myRID = OID::gen();
 
             // clean out local.me
-            Helpers::emptyCollection(opCtx, meCollectionName);
+            Helpers::emptyCollection(opCtx, NamespaceString(meCollectionName));
 
             // repopulate
             BSONObjBuilder b;

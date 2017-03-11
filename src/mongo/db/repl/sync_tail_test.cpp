@@ -200,7 +200,7 @@ OplogEntry makeCommandOplogEntry(OpTime opTime,
     bob.append("h", 1LL);
     bob.append("v", 2);
     bob.append("op", "c");
-    bob.append("ns", nss.getCommandNS());
+    bob.append("ns", nss.getCommandNS().ns());
     bob.append("o", command);
     return OplogEntry(bob.obj());
 }

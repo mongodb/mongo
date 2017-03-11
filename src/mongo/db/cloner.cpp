@@ -410,7 +410,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     indexer.commit();
     if (opCtx->writesAreReplicated()) {
         const string targetSystemIndexesCollectionName = to_collection.getSystemIndexesCollection();
-        const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
+        const NamespaceString createIndexNs{targetSystemIndexesCollectionName};
         for (auto&& infoObj : indexInfoObjs) {
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                 opCtx, createIndexNs, infoObj, false);

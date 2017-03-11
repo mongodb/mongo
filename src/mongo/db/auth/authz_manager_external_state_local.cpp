@@ -445,13 +445,13 @@ public:
     AuthzManagerLogOpHandler(OperationContext* opCtx,
                              AuthzManagerExternalStateLocal* externalState,
                              const char* op,
-                             const char* ns,
+                             const NamespaceString& nss,
                              const BSONObj& o,
                              const BSONObj* o2)
         : _opCtx(opCtx),
           _externalState(externalState),
           _op(op),
-          _ns(ns),
+          _nss(nss),
           _o(o.getOwned()),
 
           _isO2Set(o2 ? true : false),
@@ -460,13 +460,13 @@ public:
     virtual void commit() {
         stdx::lock_guard<stdx::mutex> lk(_externalState->_roleGraphMutex);
         Status status = _externalState->_roleGraph.handleLogOp(
-            _opCtx, _op.c_str(), NamespaceString(_ns.c_str()), _o, _isO2Set ? &_o2 : NULL);
+            _opCtx, _op.c_str(), _nss, _o, _isO2Set ? &_o2 : NULL);
 
         if (status == ErrorCodes::OplogOperationUnsupported) {
             _externalState->_roleGraph = RoleGraph();
             _externalState->_roleGraphState = _externalState->roleGraphStateInitial;
             BSONObjBuilder oplogEntryBuilder;
-            oplogEntryBuilder << "op" << _op << "ns" << _ns << "o" << _o;
+            oplogEntryBuilder << "op" << _op << "ns" << _nss.ns() << "o" << _o;
             if (_isO2Set)
                 oplogEntryBuilder << "o2" << _o2;
             error() << "Unsupported modification to roles collection in oplog; "
@@ -494,19 +494,22 @@ private:
     OperationContext* _opCtx;
     AuthzManagerExternalStateLocal* _externalState;
     const std::string _op;
-    const std::string _ns;
+    const NamespaceString _nss;
     const BSONObj _o;
 
     const bool _isO2Set;
     const BSONObj _o2;
 };
 
-void AuthzManagerExternalStateLocal::logOp(
-    OperationContext* opCtx, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
-    if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
-        ns == AuthorizationManager::adminCommandNamespace.ns()) {
+void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
+                                           const char* op,
+                                           const NamespaceString& nss,
+                                           const BSONObj& o,
+                                           const BSONObj* o2) {
+    if (nss == AuthorizationManager::rolesCollectionNamespace ||
+        nss == AuthorizationManager::adminCommandNamespace) {
         opCtx->recoveryUnit()->registerChange(
-            new AuthzManagerLogOpHandler(opCtx, this, op, ns, o, o2));
+            new AuthzManagerLogOpHandler(opCtx, this, op, nss, o, o2));
     }
 }
 

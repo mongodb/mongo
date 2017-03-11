@@ -201,7 +201,7 @@ public:
 
     static Status validateDBName(StringData dbname);
 
-    const std::string& getSystemIndexesName() const {
+    const NamespaceString& getSystemIndexesName() const {
         return _indexesName;
     }
 
@@ -239,9 +239,9 @@ private:
 
     DatabaseCatalogEntry* _dbEntry;  // not owned here
 
-    const std::string _profileName;  // "dbname.system.profile"
-    const std::string _indexesName;  // "dbname.system.indexes"
-    const std::string _viewsName;    // "dbname.system.views"
+    const std::string _profileName;      // "dbname.system.profile"
+    const NamespaceString _indexesName;  // "dbname.system.indexes"
+    const std::string _viewsName;        // "dbname.system.views"
 
     int _profile;  // 0=off.
 

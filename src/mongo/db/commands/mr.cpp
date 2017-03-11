@@ -510,7 +510,7 @@ void State::prepTempCollection() {
                 uassertStatusOK(status);
             }
             // Log the createIndex operation.
-            string logNs = _config.tempNamespace.db() + ".system.indexes";
+            NamespaceString logNs{_config.tempNamespace.db(), "system.indexes"};
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(_opCtx, logNs, *it, false);
         }
         wuow.commit();

@@ -40,7 +40,7 @@ public:
     virtual ~OpObserverImpl() = default;
 
     void onCreateIndex(OperationContext* opCtx,
-                       const std::string& ns,
+                       const NamespaceString& ns,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
     void onInserts(OperationContext* opCtx,
@@ -62,7 +62,7 @@ public:
                             const CollectionOptions& options,
                             const BSONObj& idIndex) override;
     void onCollMod(OperationContext* opCtx,
-                   const std::string& dbName,
+                   const NamespaceString& nss,
                    const BSONObj& collModCmd) override;
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
     void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName) override;

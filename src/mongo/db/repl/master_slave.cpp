@@ -199,7 +199,7 @@ void ReplSource::ensureMe(OperationContext* opCtx) {
         Lock::DBLock dblk(opCtx, "local", MODE_X);
         WriteUnitOfWork wunit(opCtx);
         // clean out local.me
-        Helpers::emptyCollection(opCtx, "local.me");
+        Helpers::emptyCollection(opCtx, NamespaceString("local.me"));
 
         // repopulate
         BSONObjBuilder b;

@@ -148,7 +148,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
             systemViews->insertDocument(opCtx, view, &CurOp::get(opCtx)->debug(), enforceQuota));
     } else {
         OplogUpdateEntryArgs args;
-        args.ns = systemViewsNs.ns();
+        args.nss = systemViewsNs;
         args.update = view;
         args.criteria = BSON("_id" << name.ns());
         args.fromMigrate = false;

@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-void OpObserverNoop::onCreateIndex(OperationContext*, const std::string&, BSONObj, bool) {}
+void OpObserverNoop::onCreateIndex(OperationContext*, const NamespaceString&, BSONObj, bool) {}
 
 void OpObserverNoop::onInserts(OperationContext*,
                                const NamespaceString&,
@@ -60,7 +60,7 @@ void OpObserverNoop::onCreateCollection(OperationContext*,
                                         const CollectionOptions&,
                                         const BSONObj&) {}
 
-void OpObserverNoop::onCollMod(OperationContext*, const std::string&, const BSONObj&) {}
+void OpObserverNoop::onCollMod(OperationContext*, const NamespaceString&, const BSONObj&) {}
 
 void OpObserverNoop::onDropDatabase(OperationContext*, const std::string&) {}
 

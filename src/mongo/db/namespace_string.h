@@ -263,8 +263,8 @@ public:
     // @return db() + ".system.indexes"
     std::string getSystemIndexesCollection() const;
 
-    // @return db() + ".$cmd"
-    std::string getCommandNS() const;
+    // @return {db(), "$cmd"}
+    NamespaceString getCommandNS() const;
 
     /**
      * Function to escape most non-alpha characters from file names

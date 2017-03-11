@@ -121,7 +121,7 @@ bool isInRange(const BSONObj& obj,
  * TODO: Could optimize this check out if sharding on _id.
  */
 bool willOverrideLocalId(OperationContext* opCtx,
-                         const string& ns,
+                         const NamespaceString& nss,
                          BSONObj min,
                          BSONObj max,
                          BSONObj shardKeyPattern,
@@ -129,7 +129,7 @@ bool willOverrideLocalId(OperationContext* opCtx,
                          BSONObj remoteDoc,
                          BSONObj* localDoc) {
     *localDoc = BSONObj();
-    if (Helpers::findById(opCtx, db, ns.c_str(), remoteDoc, *localDoc)) {
+    if (Helpers::findById(opCtx, db, nss.ns(), remoteDoc, *localDoc)) {
         return !isInRange(*localDoc, min, max, shardKeyPattern);
     }
 
@@ -670,7 +670,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
                     BSONObj localDoc;
                     if (willOverrideLocalId(opCtx,
-                                            _nss.ns(),
+                                            _nss,
                                             min,
                                             max,
                                             shardKeyPattern,
@@ -746,7 +746,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 break;
             }
 
-            _applyMigrateOp(opCtx, _nss.ns(), min, max, shardKeyPattern, res, &lastOpApplied);
+            _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, res, &lastOpApplied);
 
             const int maxIterations = 3600 * 50;
 
@@ -837,7 +837,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             }
 
             if (res["size"].number() > 0 &&
-                _applyMigrateOp(opCtx, _nss.ns(), min, max, shardKeyPattern, res, &lastOpApplied)) {
+                _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, res, &lastOpApplied)) {
                 continue;
             }
 
@@ -879,7 +879,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 }
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
-                                                  const string& ns,
+                                                  const NamespaceString& nss,
                                                   const BSONObj& min,
                                                   const BSONObj& max,
                                                   const BSONObj& shardKeyPattern,
@@ -893,19 +893,19 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
     bool didAnything = false;
 
     if (xfer["deleted"].isABSONObj()) {
-        Lock::DBLock dlk(opCtx, nsToDatabaseSubstring(ns), MODE_IX);
-        Helpers::RemoveSaver rs("moveChunk", ns, "removedDuring");
+        Lock::DBLock dlk(opCtx, nss.db(), MODE_IX);
+        Helpers::RemoveSaver rs("moveChunk", nss.ns(), "removedDuring");
 
         BSONObjIterator i(xfer["deleted"].Obj());  // deleted documents
         while (i.more()) {
-            Lock::CollectionLock clk(opCtx->lockState(), ns, MODE_X);
-            OldClientContext ctx(opCtx, ns);
+            Lock::CollectionLock clk(opCtx->lockState(), nss.ns(), MODE_X);
+            OldClientContext ctx(opCtx, nss.ns());
 
             BSONObj id = i.next().Obj();
 
             // do not apply delete if doc does not belong to the chunk being migrated
             BSONObj fullObj;
-            if (Helpers::findById(opCtx, ctx.db(), ns.c_str(), id, fullObj)) {
+            if (Helpers::findById(opCtx, ctx.db(), nss.ns(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
                     if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
                         invariant(0);
@@ -919,8 +919,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             }
 
             deleteObjects(opCtx,
-                          ctx.db() ? ctx.db()->getCollection(ns) : nullptr,
-                          ns,
+                          ctx.db() ? ctx.db()->getCollection(nss.ns()) : nullptr,
+                          nss,
                           id,
                           PlanExecutor::YIELD_MANUAL,
                           true /* justOne */,
@@ -935,7 +935,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
     if (xfer["reload"].isABSONObj()) {  // modified documents (insert/update)
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
-            OldClientWriteContext cx(opCtx, ns);
+            OldClientWriteContext cx(opCtx, nss.ns());
 
             BSONObj updatedDoc = i.next().Obj();
 
@@ -949,7 +949,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
 
             BSONObj localDoc;
             if (willOverrideLocalId(
-                    opCtx, ns, min, max, shardKeyPattern, cx.db(), updatedDoc, &localDoc)) {
+                    opCtx, nss, min, max, shardKeyPattern, cx.db(), updatedDoc, &localDoc)) {
                 string errMsg = str::stream() << "cannot migrate chunk, local document " << localDoc
                                               << " has same _id as reloaded remote document "
                                               << updatedDoc;
@@ -961,7 +961,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             }
 
             // We are in write lock here, so sure we aren't killing
-            Helpers::upsert(opCtx, ns, updatedDoc, true);
+            Helpers::upsert(opCtx, nss.ns(), updatedDoc, true);
 
             *lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             didAnything = true;

@@ -48,7 +48,7 @@ class ReplyBuilderInterface;
 void execCommandClient(OperationContext* opCtx,
                        Command* c,
                        int queryOptions,
-                       const char* ns,
+                       StringData dbname,
                        BSONObj& cmdObj,
                        BSONObjBuilder& result);
 

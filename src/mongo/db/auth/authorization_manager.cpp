@@ -629,10 +629,10 @@ Status AuthorizationManager::initialize(OperationContext* opCtx) {
 }
 
 namespace {
-bool isAuthzNamespace(StringData ns) {
-    return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
-            ns == AuthorizationManager::usersCollectionNamespace.ns() ||
-            ns == AuthorizationManager::versionCollectionNamespace.ns());
+bool isAuthzNamespace(const NamespaceString& nss) {
+    return (nss == AuthorizationManager::rolesCollectionNamespace ||
+            nss == AuthorizationManager::usersCollectionNamespace ||
+            nss == AuthorizationManager::versionCollectionNamespace);
 }
 
 bool isAuthzCollection(StringData coll) {
@@ -641,8 +641,8 @@ bool isAuthzCollection(StringData coll) {
             coll == AuthorizationManager::versionCollectionNamespace.coll());
 }
 
-bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
-    if (ns != AuthorizationManager::adminCommandNamespace.ns())
+bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj& cmdObj) {
+    if (nss != AuthorizationManager::adminCommandNamespace)
         return false;
     const StringData cmdName(cmdObj.firstElement().fieldNameStringData());
     if (cmdName == "drop") {
@@ -661,16 +661,16 @@ bool loggedCommandOperatesOnAuthzData(const char* ns, const BSONObj& cmdObj) {
     }
 }
 
-bool appliesToAuthzData(const char* op, const char* ns, const BSONObj& o) {
+bool appliesToAuthzData(const char* op, const NamespaceString& nss, const BSONObj& o) {
     switch (*op) {
         case 'i':
         case 'u':
         case 'd':
             if (op[1] != '\0')
                 return false;  // "db" op type
-            return isAuthzNamespace(ns);
+            return isAuthzNamespace(nss);
         case 'c':
-            return loggedCommandOperatesOnAuthzData(ns, o);
+            return loggedCommandOperatesOnAuthzData(nss, o);
             break;
         case 'n':
             return false;
@@ -701,11 +701,11 @@ void AuthorizationManager::_updateCacheGeneration_inlock() {
 }
 
 void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
-                                                        const char* ns,
+                                                        const NamespaceString& ns,
                                                         const BSONObj& o,
                                                         const BSONObj* o2) {
-    if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
-        ns == AuthorizationManager::versionCollectionNamespace.ns()) {
+    if (ns == AuthorizationManager::rolesCollectionNamespace ||
+        ns == AuthorizationManager::versionCollectionNamespace) {
         invalidateUserCache();
         return;
     }
@@ -713,7 +713,7 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
     if (*op == 'i' || *op == 'd' || *op == 'u') {
         // If you got into this function isAuthzNamespace() must have returned true, and we've
         // already checked that it's not the roles or version collection.
-        invariant(ns == AuthorizationManager::usersCollectionNamespace.ns());
+        invariant(ns == AuthorizationManager::usersCollectionNamespace);
 
         StatusWith<UserName> userName = (*op == 'u')
             ? extractUserNameFromIdString((*o2)["_id"].str())
@@ -732,11 +732,14 @@ void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
     }
 }
 
-void AuthorizationManager::logOp(
-    OperationContext* opCtx, const char* op, const char* ns, const BSONObj& o, const BSONObj* o2) {
-    if (appliesToAuthzData(op, ns, o)) {
-        _externalState->logOp(opCtx, op, ns, o, o2);
-        _invalidateRelevantCacheData(op, ns, o, o2);
+void AuthorizationManager::logOp(OperationContext* opCtx,
+                                 const char* op,
+                                 const NamespaceString& nss,
+                                 const BSONObj& o,
+                                 const BSONObj* o2) {
+    if (appliesToAuthzData(op, nss, o)) {
+        _externalState->logOp(opCtx, op, nss, o, o2);
+        _invalidateRelevantCacheData(op, nss, o, o2);
     }
 }
 

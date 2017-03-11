@@ -122,10 +122,11 @@ Status _applyOps(OperationContext* opCtx,
                 continue;
 
             const std::string ns = opObj["ns"].String();
+            const NamespaceString nss{ns};
 
             // Need to check this here, or OldClientContext may fail an invariant.
-            if (*opType != 'c' && !NamespaceString(ns).isValid())
-                return {ErrorCodes::InvalidNamespace, "invalid ns: " + ns};
+            if (*opType != 'c' && !nss.isValid())
+                return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
 
             Status status(ErrorCodes::InternalError, "");
 
@@ -143,7 +144,7 @@ Status _applyOps(OperationContext* opCtx,
                 status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
                 if (!status.isOK())
                     return status;
-                logOpForDbHash(opCtx, ns.c_str());
+                logOpForDbHash(opCtx, nss);
             } else {
                 try {
                     // Run operations under a nested lock as a hack to prevent yielding.
@@ -186,7 +187,7 @@ Status _applyOps(OperationContext* opCtx,
                     return Status(ErrorCodes::UnknownError, ex.what());
                 }
                 WriteUnitOfWork wuow(opCtx);
-                logOpForDbHash(opCtx, ns.c_str());
+                logOpForDbHash(opCtx, nss);
                 wuow.commit();
             }
 
@@ -207,8 +208,6 @@ Status _applyOps(OperationContext* opCtx,
         // We want this applied atomically on slaves
         // so we re-wrap without the pre-condition for speed
 
-        std::string tempNS = str::stream() << dbName << ".$cmd";
-
         // TODO: possibly use mutable BSON to remove preCondition field
         // once it is available
         BSONObjBuilder cmdBuilder;
@@ -227,7 +226,7 @@ Status _applyOps(OperationContext* opCtx,
         auto opObserver = getGlobalServiceContext()->getOpObserver();
         invariant(opObserver);
         if (haveWrappingWUOW) {
-            opObserver->onApplyOps(opCtx, tempNS, cmdRewritten);
+            opObserver->onApplyOps(opCtx, dbName, cmdRewritten);
         } else {
             // When executing applyOps outside of a wrapping WriteUnitOfWOrk, always logOp the
             // command regardless of whether the individial ops succeeded and rely on any
@@ -236,7 +235,7 @@ Status _applyOps(OperationContext* opCtx,
             while (true) {
                 try {
                     WriteUnitOfWork wunit(opCtx);
-                    opObserver->onApplyOps(opCtx, tempNS, cmdRewritten);
+                    opObserver->onApplyOps(opCtx, dbName, cmdRewritten);
 
                     wunit.commit();
                     break;

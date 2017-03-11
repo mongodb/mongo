@@ -134,7 +134,7 @@ private:
                         const WriteConcernOptions& writeConcern);
 
     bool _applyMigrateOp(OperationContext* opCtx,
-                         const std::string& ns,
+                         const NamespaceString& ns,
                          const BSONObj& min,
                          const BSONObj& max,
                          const BSONObj& shardKeyPattern,

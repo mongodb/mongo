@@ -356,7 +356,7 @@ public:
         // foo < limit().
         BSONObj newDoc = BSON("_id" << updatedId << "foo" << limit() + 10);
         OplogUpdateEntryArgs args;
-        args.ns = coll->ns().ns();
+        args.nss = coll->ns();
         {
             WriteUnitOfWork wuow(&_opCtx);
             coll->updateDocument(&_opCtx, *it, oldDoc, newDoc, false, false, NULL, &args);
