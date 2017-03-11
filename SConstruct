@@ -2467,8 +2467,12 @@ def doConfigure(myenv):
         # Explicitly use the new gnu hash section if the linker offers it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
 
-        # Try to have the linker tell us about ODR violations. Don't use this on UBSAN (see SERVER-27229) for now.
-        if not has_option('sanitize') or not 'undefined' in get_option('sanitize'):
+        # Try to have the linker tell us about ODR violations. Don't
+        # use it when using clang with libstdc++, as libstdc++ was
+        # probably built with GCC. That combination appears to cause
+        # false positives for the ODR detector. See SERVER-28133 for
+        # additional details.
+        if not (myenv.ToolchainIs('clang') and usingLibStdCxx):
             AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would
