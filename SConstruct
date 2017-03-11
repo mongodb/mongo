@@ -9,6 +9,7 @@ import re
 import shlex
 import shutil
 import stat
+import subprocess
 import sys
 import textwrap
 import uuid
@@ -933,8 +934,7 @@ def fatal_error(env, msg, *args):
 
 def conf_error(env, msg, *args):
     print msg.format(*args)
-    print "See {0} for details".format(env['CONFIGURELOG'].abspath)
-
+    print "See {0} for details".format(env.File('$CONFIGURELOG').abspath)
     Exit(1)
 
 env.AddMethod(fatal_error, 'FatalError')
@@ -2719,12 +2719,43 @@ def doConfigure(myenv):
                 'Security',
             ])
 
+        def maybeIssueDarwinSSLAdvice(env):
+            if env.TargetOSIs('macOS'):
+                advice = textwrap.dedent(
+                    """\
+                    NOTE: Recent versions of macOS no longer ship headers for the system OpenSSL libraries.
+                    NOTE: Either build without the --ssl flag, or describe how to find OpenSSL.
+                    NOTE: Set the include path for the OpenSSL headers with the CPPPATH SCons variable.
+                    NOTE: Set the library path for OpenSSL libraries with the LIBPATH SCons variable.
+                    NOTE: If you are using HomeBrew, and have installed OpenSSL, this might look like:
+                    \tscons CPPPATH=/usr/local/opt/openssl/include LIBPATH=/usr/local/opt/openssl/lib ...
+                    NOTE: Consult the output of 'brew info openssl' for details on the correct paths."""
+                )
+                print(advice)
+                brew = env.WhereIs('brew')
+                if brew:
+                    try:
+                        # TODO: If we could programmatically extract the paths from the info output
+                        # we could give a better message here, but brew info's machine readable output
+                        # doesn't seem to include the whole 'caveats' section.
+                        message = subprocess.check_output([brew, "info", "openssl"])
+                        advice = textwrap.dedent(
+                            """\
+                            NOTE: HomeBrew installed to {0} appears to have OpenSSL installed.
+                            NOTE: Consult the output from '{0} info openssl' to determine CPPPATH and LIBPATH."""
+                        ).format(brew, message)
+
+                        print(advice)
+                    except:
+                        pass
+
         if not conf.CheckLibWithHeader(
                 sslLibName,
                 ["openssl/ssl.h"],
                 "C",
                 "SSL_version(NULL);",
                 autoadd=True):
+            maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("Couldn't find OpenSSL ssl.h header and library")
 
         if not conf.CheckLibWithHeader(
@@ -2733,6 +2764,7 @@ def doConfigure(myenv):
                 "C",
                 "SSLeay_version(0);",
                 autoadd=True):
+            maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("Couldn't find OpenSSL crypto.h header and library")
 
         def CheckLinkSSL(context):
@@ -2760,6 +2792,7 @@ def doConfigure(myenv):
         conf.AddTest("CheckLinkSSL", CheckLinkSSL)
 
         if not conf.CheckLinkSSL():
+            maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("SSL is enabled, but is unavailable")
 
         env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
