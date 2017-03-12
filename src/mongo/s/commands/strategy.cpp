@@ -54,8 +54,6 @@
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -365,11 +363,10 @@ void Strategy::clientCommandOp(OperationContext* opCtx,
 
             ShardConnection::checkMyConnectionVersions(opCtx, staleNS);
             if (loops < 4) {
-                // This throws out the entire database cache entry in response to
-                // StaleConfigException instead of just the collection which encountered it. There
-                // is no good reason for it other than the lack of lower-granularity cache
-                // invalidation.
-                Grid::get(opCtx)->catalogCache()->invalidate(NamespaceString(staleNS).db());
+                const NamespaceString nss(staleNS);
+                if (nss.isValid()) {
+                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+                }
             }
         } catch (const DBException& e) {
             OpQueryReplyBuilder reply;

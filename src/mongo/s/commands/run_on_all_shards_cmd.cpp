@@ -36,12 +36,12 @@
 #include <set>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -80,7 +80,7 @@ bool RunOnAllShardsCommand::run(OperationContext* opCtx,
     LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << redact(cmdObj);
 
     if (_implicitCreateDb) {
-        uassertStatusOK(ScopedShardDatabase::getOrCreate(opCtx, dbName));
+        uassertStatusOK(createShardDatabase(opCtx, dbName));
     }
 
     std::vector<ShardId> shardIds;

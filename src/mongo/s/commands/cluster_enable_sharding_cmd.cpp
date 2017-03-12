@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -109,7 +108,7 @@ public:
         audit::logEnableSharding(Client::getCurrent(), dbname);
 
         // Make sure to force update of any stale metadata
-        Grid::get(opCtx)->catalogCache()->invalidate(dbname);
+        Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname);
 
         return true;
     }

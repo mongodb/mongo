@@ -243,12 +243,10 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'cluster_identity_loader.cpp',
-        'config.cpp',
         'config_server_client.cpp',
         'grid.cpp',
         'shard_util.cpp',
         'sharding_egress_metadata_hook.cpp',
-        'sharding_raii.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',
@@ -265,8 +263,10 @@ env.Library(
 env.CppUnitTest(
     target='catalog_cache_test',
     source=[
-        'chunk_manager_test.cpp',
         'chunk_manager_index_bounds_test.cpp',
+        'chunk_manager_query_test.cpp',
+        'chunk_manager_refresh_test.cpp',
+        'chunk_manager_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_test_fixture',

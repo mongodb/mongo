@@ -45,10 +45,10 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/move_chunk_request.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
@@ -180,14 +180,16 @@ Status MigrationManager::executeManualMigration(
     RemoteCommandResponse remoteCommandResponse =
         _schedule(opCtx, migrateInfo, maxChunkSizeBytes, secondaryThrottle, waitForDelete)->get();
 
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, NamespaceString(migrateInfo.ns));
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            opCtx, migrateInfo.ns);
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
+    auto& routingInfo = routingInfoStatus.getValue();
 
-    auto chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
+    auto chunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
     invariant(chunk);
 
     Status commandStatus = _processRemoteCommandResponse(
@@ -310,18 +312,20 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
         auto& migrateInfos = nssAndMigrateInfos.second;
         invariant(!migrateInfos.empty());
 
-        auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, nss);
-        if (!scopedCMStatus.isOK()) {
+        auto routingInfoStatus =
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss);
+        if (!routingInfoStatus.isOK()) {
             // This shouldn't happen because the collection was intact and sharded when the previous
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
             log() << "Unable to reload chunk metadata for collection '" << nss
                   << "' during balancer recovery. Abandoning recovery."
-                  << causedBy(redact(scopedCMStatus.getStatus()));
+                  << causedBy(redact(routingInfoStatus.getStatus()));
             return;
         }
 
-        const auto& scopedCM = scopedCMStatus.getValue();
+        auto& routingInfo = routingInfoStatus.getValue();
 
         int scheduledMigrations = 0;
 
@@ -332,7 +336,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             migrateInfos.pop_front();
 
             auto chunk =
-                scopedCM.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
+                routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
             invariant(chunk);
 
             if (chunk->getShardId() != migrationInfo.from) {

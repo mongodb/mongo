@@ -5,8 +5,6 @@ selector:
     exclude_files:
     # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
     - jstests/sharding/config_version_rollback.js
-    # TODO: Enable when SERVER-22672 is complete
-    - jstests/sharding/printShardingStatus.js
     # Behavior change to addShard
     - jstests/sharding/addshard_idempotent.js
     # SERVER-27438: Preserves $comment in OP_QUERY and tests for this change.

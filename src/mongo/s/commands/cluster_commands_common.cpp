@@ -40,7 +40,6 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/version_manager.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -54,17 +53,21 @@ namespace {
 bool forceRemoteCheckShardVersionCB(OperationContext* opCtx, const string& ns) {
     const NamespaceString nss(ns);
 
-    // This will force the database catalog entry to be reloaded
-    Grid::get(opCtx)->catalogCache()->invalidate(nss.db());
-
-    auto scopedCMStatus = ScopedChunkManager::get(opCtx, nss);
-    if (!scopedCMStatus.isOK()) {
+    if (!nss.isValid()) {
         return false;
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
+    // This will force the database catalog entry to be reloaded
+    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
 
-    return scopedCM.cm() != nullptr;
+    auto routingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+    if (!routingInfoStatus.isOK()) {
+        return false;
+    }
+
+    auto& routingInfo = routingInfoStatus.getValue();
+
+    return routingInfo.cm() != nullptr;
 }
 
 }  // namespace
@@ -259,6 +262,38 @@ std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opC
     }
 
     return collectionsToReturn;
+}
+
+CachedCollectionRoutingInfo getShardedCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss) {
+    auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Collection " << nss.ns() << " is not sharded.",
+            routingInfo.cm());
+
+    return routingInfo;
+}
+
+StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName) {
+    auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
+    if (dbStatus == ErrorCodes::NamespaceNotFound) {
+        auto createDbStatus =
+            Grid::get(opCtx)->catalogClient(opCtx)->createDatabase(opCtx, dbName.toString());
+        if (createDbStatus.isOK() || createDbStatus == ErrorCodes::NamespaceExists) {
+            dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
+        } else {
+            dbStatus = createDbStatus;
+        }
+    }
+
+    if (dbStatus.isOK()) {
+        return dbStatus;
+    }
+
+    return {dbStatus.getStatus().code(),
+            str::stream() << "Database " << dbName << " not found due to "
+                          << dbStatus.getStatus().reason()};
 }
 
 }  // namespace mongo

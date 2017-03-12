@@ -93,12 +93,8 @@ public:
                       RangeMap* currMap,
                       ChunkVersion* maxVersion,
                       MaxChunkVersionMap* maxShardVersions);
-    virtual ~ConfigDiffTracker();
 
-    // Call after load for more information
-    int numValidDiffs() const {
-        return _validDiffs;
-    }
+    virtual ~ConfigDiffTracker();
 
     // Applies changes to the config data from a vector of chunks passed in. Also includes minor
     // version changes for particular major-version chunks if explicitly specified.
@@ -135,9 +131,6 @@ private:
     RangeMap* const _currMap;
     ChunkVersion* const _maxVersion;
     MaxChunkVersionMap* const _maxShardVersions;
-
-    // Store for later use
-    int _validDiffs{0};
 };
 
 }  // namespace mongo

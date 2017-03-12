@@ -53,15 +53,12 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_write.h"
-#include "mongo/s/config.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -187,19 +184,21 @@ public:
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
-        auto scopedShardedDb = uassertStatusOK(ScopedShardDatabase::getExisting(opCtx, nss.db()));
-        const auto config = scopedShardedDb.db();
+        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
 
         // Ensure sharding is allowed on the database
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding not enabled for db " << nss.db(),
-                config->isShardingEnabled());
+                dbInfo.shardingEnabled());
+
+        auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
         // Ensure that the collection is not sharded already
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding already enabled for collection " << nss.ns(),
-                !config->isSharded(nss.ns()));
+                !routingInfo.cm());
 
         // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj becomes
         // corrupt as soon as the command ends.
@@ -279,13 +278,7 @@ public:
         }
 
         // The rest of the checks require a connection to the primary db
-        const ConnectionString shardConnString = [&]() {
-            const auto shard =
-                uassertStatusOK(shardRegistry->getShard(opCtx, config->getPrimaryId()));
-            return shard->getConnString();
-        }();
-
-        ScopedDbConnection conn(shardConnString);
+        ScopedDbConnection conn(routingInfo.primary()->getConnString());
 
         // Retrieve the collection metadata in order to verify that it is legal to shard this
         // collection.
@@ -590,17 +583,21 @@ public:
                                                        initSplits,
                                                        std::set<ShardId>{}));
 
-        // Make sure the cached metadata for the collection knows that we are now sharded
-        config->getChunkManager(opCtx, nss.ns(), true /* reload */);
-
         result << "collectionsharded" << nss.ns();
+
+        // Make sure the cached metadata for the collection knows that we are now sharded
+        catalogCache->invalidateShardedCollection(nss);
 
         // Only initially move chunks when using a hashed shard key
         if (isHashedShardKey && isEmpty) {
-            // Reload the new config info.  If we created more than one initial chunk, then
-            // we need to move them around to balance.
-            auto chunkManager = config->getChunkManager(opCtx, nss.ns(), true);
-            ChunkMap chunkMap = chunkManager->getChunkMap();
+            routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Collection was successfully written as sharded but got dropped before it "
+                    "could be evenly distributed",
+                    routingInfo.cm());
+            auto chunkManager = routingInfo.cm();
+
+            const auto chunkMap = chunkManager->chunkMap();
 
             // 2. Move and commit each "big chunk" to a different shard.
             int i = 0;
@@ -646,7 +643,13 @@ public:
             }
 
             // Reload the config info, after all the migrations
-            chunkManager = config->getChunkManager(opCtx, nss.ns(), true);
+            catalogCache->invalidateShardedCollection(nss);
+            routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Collection was successfully written as sharded but got dropped before it "
+                    "could be evenly distributed",
+                    routingInfo.cm());
+            chunkManager = routingInfo.cm();
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
@@ -689,10 +692,6 @@ public:
                     subSplits.push_back(splitPoint);
                 }
             }
-
-            // Proactively refresh the chunk manager. Not really necessary, but this way it's
-            // immediately up-to-date the next time it's used.
-            config->getChunkManager(opCtx, nss.ns(), true);
         }
 
         return true;

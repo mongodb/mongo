@@ -35,8 +35,9 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -86,13 +87,10 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedDb = uassertStatusOK(ScopedShardDatabase::getExisting(opCtx, nss.db()));
-        auto config = scopedDb.db();
+        auto routingInfo = getShardedCollection(opCtx, nss);
+        const auto cm = routingInfo.cm();
 
-        auto cm = config->getChunkManagerIfExists(opCtx, nss.ns());
-        uassert(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded.", cm);
-
-        for (const auto& cmEntry : cm->getChunkMap()) {
+        for (const auto& cmEntry : cm->chunkMap()) {
             log() << redact(cmEntry.second->toString());
         }
 

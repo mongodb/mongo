@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -72,7 +71,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         shardToChunksMap[stat.shardId];
     }
 
-    for (const auto& entry : chunkMgr->getChunkMap()) {
+    for (const auto& entry : chunkMgr->chunkMap()) {
         const auto& chunkEntry = entry.second;
 
         ChunkType chunk;
@@ -299,17 +298,16 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
         return shardStatsStatus.getStatus();
     }
 
-    const auto shardStats = std::move(shardStatsStatus.getValue());
+    const auto& shardStats = shardStatsStatus.getValue();
 
-    const NamespaceString nss(chunk.getNS());
-
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                     chunk.getNS());
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
     const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
@@ -331,15 +329,14 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
 
     auto shardStats = std::move(shardStatsStatus.getValue());
 
-    const NamespaceString nss(chunk.getNS());
-
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                     chunk.getNS());
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
     const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
@@ -366,13 +363,13 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
     OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 
@@ -420,13 +417,13 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
     bool aggressiveBalanceHint) {
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 

@@ -48,7 +48,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/elapsed_tracker.h"

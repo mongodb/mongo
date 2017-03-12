@@ -47,7 +47,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk_manager.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
@@ -55,7 +55,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/store_possible_cursor.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -66,20 +65,22 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       BSONObj cmdObj,
                                       int options,
                                       BSONObjBuilder* result) {
-    auto scopedShardDbStatus =
-        ScopedShardDatabase::getExisting(opCtx, namespaces.executionNss.db());
-    if (!scopedShardDbStatus.isOK()) {
-        appendEmptyResultSet(
-            *result, scopedShardDbStatus.getStatus(), namespaces.requestedNss.ns());
-        return Status::OK();
-    }
-
     auto request = AggregationRequest::parseFromBSON(namespaces.executionNss, cmdObj);
     if (!request.isOK()) {
         return request.getStatus();
     }
 
-    const auto conf = scopedShardDbStatus.getValue().db();
+    auto const catalogCache = Grid::get(opCtx)->catalogCache();
+
+    auto executionNsRoutingInfoStatus =
+        catalogCache->getCollectionRoutingInfo(opCtx, namespaces.executionNss);
+    if (!executionNsRoutingInfoStatus.isOK()) {
+        appendEmptyResultSet(
+            *result, executionNsRoutingInfoStatus.getStatus(), namespaces.requestedNss.ns());
+        return Status::OK();
+    }
+
+    const auto& executionNsRoutingInfo = executionNsRoutingInfoStatus.getValue();
 
     // Determine the appropriate collation and 'resolve' involved namespaces to make the
     // ExpressionContext.
@@ -91,16 +92,20 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // command on an unsharded collection.
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request.getValue());
-    for (auto&& ns : liteParsedPipeline.getInvolvedNamespaces()) {
-        uassert(28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
-        resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
+    for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
+        const auto resolvedNsRoutingInfo =
+            uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+        uassert(
+            28769, str::stream() << nss.ns() << " cannot be sharded", !resolvedNsRoutingInfo.cm());
+        resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 
-    if (!conf->isSharded(namespaces.executionNss.ns())) {
-        return aggPassthrough(opCtx, namespaces, conf, cmdObj, result, options);
+    if (!executionNsRoutingInfo.cm()) {
+        return aggPassthrough(
+            opCtx, namespaces, executionNsRoutingInfo.primary()->getId(), cmdObj, result, options);
     }
 
-    auto chunkMgr = conf->getChunkManager(opCtx, namespaces.executionNss.ns());
+    const auto chunkMgr = executionNsRoutingInfo.cm();
 
     std::unique_ptr<CollatorInterface> collation;
     if (!request.getValue().getCollation().isEmpty()) {
@@ -260,9 +265,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // Run merging command on random shard, unless a stage needs the primary shard. Need to use
     // ShardConnection so that the merging mongod is sent the config servers on connection init.
     auto& prng = opCtx->getClient()->getPrng();
-    const auto& mergingShardId =
+    const auto mergingShardId =
         (needPrimaryShardMerger || internalQueryAlwaysMergeOnPrimaryShard.load())
-        ? conf->getPrimaryId()
+        ? uassertStatusOK(catalogCache->getDatabase(opCtx, namespaces.executionNss.db()))
+              .primaryId()
         : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
     const auto mergingShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, mergingShardId));
@@ -426,12 +432,12 @@ BSONObj ClusterAggregate::aggRunCommand(OperationContext* opCtx,
 
 Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const Namespaces& namespaces,
-                                        DBConfig* conf,
+                                        const ShardId& shardId,
                                         BSONObj cmdObj,
                                         BSONObjBuilder* out,
                                         int queryOptions) {
     // Temporary hack. See comment on declaration for details.
-    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, conf->getPrimaryId());
+    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
