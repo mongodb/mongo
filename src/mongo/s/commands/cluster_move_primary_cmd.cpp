@@ -49,6 +49,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -124,9 +125,9 @@ public:
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         // Flush all cached information. This can't be perfect, but it's better than nothing.
-        catalogCache->purgeDatabase(dbname);
+        catalogCache->invalidate(dbname);
 
-        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, dbname));
+        auto config = uassertStatusOK(catalogCache->getDatabase(opCtx, dbname));
 
         const auto toElt = cmdObj["to"];
         uassert(ErrorCodes::TypeMismatch,
@@ -138,7 +139,8 @@ public:
             return false;
         }
 
-        const auto fromShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbInfo.primaryId()));
+        const auto fromShard =
+            uassertStatusOK(shardRegistry->getShard(opCtx, config->getPrimaryId()));
 
         const auto toShard = [&]() {
             auto toShardStatus = shardRegistry->getShard(opCtx, to);
@@ -221,7 +223,7 @@ public:
 
         // Ensure the next attempt to retrieve the database or any of its collections will do a full
         // reload
-        catalogCache->purgeDatabase(dbname);
+        catalogCache->invalidate(dbname);
 
         const string oldPrimary = fromShard->getConnString().toString();
 

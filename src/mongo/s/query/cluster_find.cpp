@@ -52,6 +52,7 @@
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -318,34 +319,31 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* opCtx,
                               << query.getQueryRequest().getProj()};
     }
 
-    auto const catalogCache = Grid::get(opCtx)->catalogCache();
-
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
-        auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, query.nss());
-        if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
+        auto scopedCMStatus = ScopedChunkManager::get(opCtx, query.nss());
+        if (scopedCMStatus == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
             return CursorId(0);
-        } else if (!routingInfoStatus.isOK()) {
-            return routingInfoStatus.getStatus();
+        } else if (!scopedCMStatus.isOK()) {
+            return scopedCMStatus.getStatus();
         }
 
-        auto& routingInfo = routingInfoStatus.getValue();
+        const auto& scopedCM = scopedCMStatus.getValue();
 
         auto cursorId = runQueryWithoutRetrying(opCtx,
                                                 query,
                                                 readPref,
-                                                routingInfo.cm().get(),
-                                                routingInfo.primary(),
+                                                scopedCM.cm().get(),
+                                                scopedCM.primary(),
                                                 results,
                                                 viewDefinition);
         if (cursorId.isOK()) {
             return cursorId;
         }
-
-        const auto& status = cursorId.getStatus();
+        auto status = std::move(cursorId.getStatus());
 
         if (!ErrorCodes::isStaleShardingError(status.code()) &&
             status != ErrorCodes::ShardNotFound) {
@@ -359,7 +357,11 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* opCtx,
                << " on attempt " << retries << " of " << kMaxStaleConfigRetries << ": "
                << redact(status);
 
-        catalogCache->onStaleConfigError(std::move(routingInfo));
+        if (status == ErrorCodes::StaleEpoch) {
+            Grid::get(opCtx)->catalogCache()->invalidate(query.nss().db().toString());
+        } else {
+            scopedCM.db()->getChunkManagerIfExists(opCtx, query.nss().ns(), true);
+        }
     }
 
     return {ErrorCodes::StaleShardVersion,

@@ -23,5 +23,7 @@
     });
 
     // count must return error if collection name is absent
-    assert.commandFailedWithCode(db.runCommand("count"), ErrorCodes.InvalidNamespace);
+    var res = assert.commandFailed(db.runCommand("count"));
+    assert.eq(ErrorCodes.InvalidNamespace, res.code);
+
 })();

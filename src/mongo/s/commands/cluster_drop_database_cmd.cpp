@@ -40,7 +40,9 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -91,19 +93,17 @@ public:
         auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 
-        auto const catalogCache = Grid::get(opCtx)->catalogCache();
-
         // Refresh the database metadata so it kicks off a full reload
-        catalogCache->purgeDatabase(dbname);
+        Grid::get(opCtx)->catalogCache()->invalidate(dbname);
 
-        auto dbInfoStatus = catalogCache->getDatabase(opCtx, dbname);
+        auto scopedDbStatus = ScopedShardDatabase::getExisting(opCtx, dbname);
 
-        if (dbInfoStatus == ErrorCodes::NamespaceNotFound) {
+        if (scopedDbStatus == ErrorCodes::NamespaceNotFound) {
             result.append("info", "database does not exist");
             return true;
         }
 
-        uassertStatusOK(dbInfoStatus.getStatus());
+        uassertStatusOK(scopedDbStatus.getStatus());
 
         catalogClient->logChange(opCtx,
                                  "dropDatabase.start",
@@ -111,15 +111,16 @@ public:
                                  BSONObj(),
                                  ShardingCatalogClient::kMajorityWriteConcern);
 
-        auto& dbInfo = dbInfoStatus.getValue();
+        auto const db = scopedDbStatus.getValue().db();
 
         // Drop the database's collections from metadata
         for (const auto& nss : getAllShardedCollectionsForDb(opCtx, dbname)) {
             uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
+            db->markNSNotSharded(nss.ns());
         }
 
         // Drop the database from the primary shard first
-        _dropDatabaseFromShard(opCtx, dbInfo.primaryId(), dbname);
+        _dropDatabaseFromShard(opCtx, db->getPrimaryId(), dbname);
 
         // Drop the database from each of the remaining shards
         {
@@ -145,7 +146,7 @@ public:
         }
 
         // Invalidate the database so the next access will do a full reload
-        catalogCache->purgeDatabase(dbname);
+        Grid::get(opCtx)->catalogCache()->invalidate(dbname);
 
         catalogClient->logChange(
             opCtx, "dropDatabase", dbname, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);

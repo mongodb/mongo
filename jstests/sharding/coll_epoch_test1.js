@@ -21,7 +21,7 @@
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // sharded from another mongos
+    // sharded in the background
     //
 
     jsTest.log("Enabling sharding for the first time...");
@@ -44,7 +44,7 @@
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // resharded from another mongos, with a different key
+    // re-sharded in the background
     //
 
     jsTest.log("Re-enabling sharding with a different key...");
@@ -65,10 +65,24 @@
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // unsharded from another mongos
+    // unsharded and moved to a different primary
     //
 
-    jsTest.log("Re-creating unsharded collection from a sharded collection...");
+    jsTest.log(
+        "Re-creating unsharded collection from a sharded collection on different primary...");
+
+    var getOtherShard = function(shard) {
+        for (var id in shards) {
+            if (shards[id] != shard)
+                return shards[id];
+        }
+    };
+
+    var otherShard = getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary);
+    assert.commandWorked(admin.runCommand({movePrimary: coll.getDB() + "", to: otherShard}));
+    st.configRS.awaitLastOpCommitted();  // TODO: Remove after collection lifecyle project (PM-85)
+
+    jsTest.log("moved primary...");
 
     bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
@@ -82,18 +96,12 @@
     assert(coll.drop());
 
     //
-    // Test that inserts and queries go to correct shard even when the collection has been unsharded
-    // and resharded from another mongos on a different primary
+    // Test that inserts and queries go to correct shard even when the collection has been
+    // unsharded,
+    // resharded, and moved to a different primary
     //
 
     jsTest.log("Re-creating sharded collection with different primary...");
-
-    var getOtherShard = function(shard) {
-        for (var id in shards) {
-            if (shards[id] != shard)
-                return shards[id];
-        }
-    };
 
     assert.commandWorked(admin.runCommand({
         movePrimary: coll.getDB() + "",

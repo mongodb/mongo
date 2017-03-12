@@ -35,6 +35,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
@@ -58,11 +60,10 @@ class ChunkManager {
 
 public:
     ChunkManager(NamespaceString nss,
-                 KeyPattern shardKeyPattern,
+                 const OID& epoch,
+                 const ShardKeyPattern& shardKeyPattern,
                  std::unique_ptr<CollatorInterface> defaultCollator,
-                 bool unique,
-                 ChunkMap chunkMap,
-                 ChunkVersion collectionVersion);
+                 bool unique);
 
     ~ChunkManager();
 
@@ -78,7 +79,7 @@ public:
     }
 
     const ShardKeyPattern& getShardKeyPattern() const {
-        return _shardKeyPattern;
+        return _keyPattern;
     }
 
     const CollatorInterface* getDefaultCollator() const {
@@ -90,12 +91,10 @@ public:
     }
 
     ChunkVersion getVersion() const {
-        return _collectionVersion;
+        return _version;
     }
 
-    ChunkVersion getVersion(const ShardId& shardId) const;
-
-    const ChunkMap& chunkMap() const {
+    const ChunkMap& getChunkMap() const {
         return _chunkMap;
     }
 
@@ -103,9 +102,12 @@ public:
         return _chunkMap.size();
     }
 
-    const ShardVersionMap& shardVersions() const {
-        return _chunkMapViews.shardVersions;
-    }
+    // Loads existing ranges based on info in chunk manager
+    void loadExistingRanges(OperationContext* opCtx, const ChunkManager* oldManager);
+
+    //
+    // Methods to use once loaded / created
+    //
 
     /**
      * Given a shard key (or a prefix) that has been extracted from a document, returns the chunk
@@ -175,46 +177,57 @@ public:
 
     std::string toString() const;
 
-private:
-    friend class CollectionRoutingDataLoader;
+    ChunkVersion getVersion(const ShardId& shardName) const;
 
+    /**
+     * Returns the opTime of config server the last time chunks were loaded.
+     */
+    repl::OpTime getConfigOpTime() const;
+
+private:
     /**
      * Represents a range of chunk keys [getMin(), getMax()) and the id of the shard on which they
      * reside according to the metadata.
      */
-    struct ShardAndChunkRange {
-        const BSONObj& min() const {
-            return range.getMin();
+    class ShardAndChunkRange {
+    public:
+        ShardAndChunkRange(const BSONObj& min, const BSONObj& max, ShardId inShardId)
+            : _range(min, max), _shardId(std::move(inShardId)) {}
+
+        const BSONObj& getMin() const {
+            return _range.getMin();
         }
 
-        const BSONObj& max() const {
-            return range.getMax();
+        const BSONObj& getMax() const {
+            return _range.getMax();
         }
 
-        ChunkRange range;
-        ShardId shardId;
+        const ShardId& getShardId() const {
+            return _shardId;
+        }
+
+    private:
+        ChunkRange _range;
+        ShardId _shardId;
     };
 
     using ChunkRangeMap = BSONObjIndexedMap<ShardAndChunkRange>;
 
     /**
-     * Contains different transformations of the chunk map for efficient querying
+     * If load was successful, returns true and it is guaranteed that the _chunkMap and
+     * _chunkRangeMap are consistent with each other. If false is returned, it is not safe to use
+     * the chunk manager anymore.
      */
-    struct ChunkMapViews {
-        // Transformation of the chunk map containing what range of keys reside on which shard. The
-        // index is the max key of the respective range and the union of all ranges in a such
-        // constructed map must cover the complete space from [MinKey, MaxKey).
-        const ChunkRangeMap chunkRangeMap;
-
-        // Map from shard id to the maximum chunk version for that shard. If a shard contains no
-        // chunks, it won't be present in this map.
-        const ShardVersionMap shardVersions;
-    };
+    bool _load(OperationContext* opCtx,
+               ChunkMap& chunks,
+               std::set<ShardId>& shardIds,
+               ShardVersionMap* shardVersions,
+               const ChunkManager* oldManager);
 
     /**
-     * Does a single pass over the chunkMap and constructs the ChunkMapViews object.
+     * Merges consecutive chunks, which reside on the same shard into a single range.
      */
-    static ChunkMapViews _constructChunkMapViews(const OID& epoch, const ChunkMap& chunkMap);
+    static ChunkRangeMap _constructRanges(const ChunkMap& chunkMap);
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload
     // ChunkManagers.
@@ -224,7 +237,7 @@ private:
     const NamespaceString _nss;
 
     // The key pattern used to shard the collection
-    const ShardKeyPattern _shardKeyPattern;
+    const ShardKeyPattern _keyPattern;
 
     // Default collation to use for routing data queries for this collection
     const std::unique_ptr<CollatorInterface> _defaultCollator;
@@ -234,15 +247,23 @@ private:
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
-    const ChunkMap _chunkMap;
+    ChunkMap _chunkMap;
 
-    // Different transformations of the chunk map for efficient querying
-    const ChunkMapViews _chunkMapViews;
+    // Transformation of the chunk map containing what range of keys reside on which shard. The
+    // index is the max key of the respective range and the union of all ranges in a such
+    // constructed map must cover the complete space from [MinKey, MaxKey).
+    ChunkRangeMap _chunkRangeMap;
+
+    // Max known version per shard
+    ShardVersionMap _shardVersions;
 
     // Max version across all chunks
-    const ChunkVersion _collectionVersion;
+    ChunkVersion _version;
 
-    // Auto-split throttling state (state mutable by write commands)
+    // OpTime of config server the last time chunks were loaded.
+    repl::OpTime _configOpTime;
+
+    // Auto-split throttling state
     struct AutoSplitThrottle {
     public:
         AutoSplitThrottle() : _splitTickets(maxParallelSplits) {}
@@ -259,6 +280,8 @@ private:
                                                       ChunkManager*,
                                                       Chunk*,
                                                       long);
+
+    friend class TestableChunkManager;
 };
 
 }  // namespace mongo

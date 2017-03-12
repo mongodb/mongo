@@ -41,6 +41,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -79,20 +80,20 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
-        auto const catalogCache = Grid::get(opCtx)->catalogCache();
-
-        auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-        if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
+        auto scopedDbStatus = ScopedShardDatabase::getExisting(opCtx, dbname);
+        if (scopedDbStatus == ErrorCodes::NamespaceNotFound) {
             return true;
         }
 
-        auto routingInfo = uassertStatusOK(std::move(routingInfoStatus));
+        uassertStatusOK(scopedDbStatus.getStatus());
 
-        if (!routingInfo.cm()) {
-            _dropUnshardedCollectionFromShard(opCtx, routingInfo.primaryId(), nss, &result);
+        auto const db = scopedDbStatus.getValue().db();
+
+        if (!db->isSharded(nss.ns())) {
+            _dropUnshardedCollectionFromShard(opCtx, db->getPrimaryId(), nss, &result);
         } else {
             uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->dropCollection(opCtx, nss));
-            catalogCache->invalidateShardedCollection(nss);
+            db->markNSNotSharded(nss.ns());
         }
 
         return true;

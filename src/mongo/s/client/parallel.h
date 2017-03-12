@@ -117,7 +117,11 @@ private:
 
     void _finishCons();
 
-    void _markStaleNS(const NamespaceString& staleNS, const StaleConfigException& e);
+    void _markStaleNS(OperationContext* opCtx,
+                      const NamespaceString& staleNS,
+                      const StaleConfigException& e,
+                      bool& forceReload);
+    void _handleStaleNS(OperationContext* opCtx, const NamespaceString& staleNS, bool forceReload);
 
     bool _didInit;
     bool _done;

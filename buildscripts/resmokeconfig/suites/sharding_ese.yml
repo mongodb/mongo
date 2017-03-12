@@ -7,6 +7,8 @@ selector:
     roots:
     - jstests/sharding/*.js
     exclude_files:
+    # TODO: Enable when SERVER-22672 is complete
+    - jstests/sharding/printShardingStatus.js
 
 executor:
   js_test:

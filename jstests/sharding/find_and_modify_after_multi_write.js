@@ -9,6 +9,7 @@
         var st = new ShardingTest({shards: 2, mongos: 2});
 
         var testDB = st.s.getDB('test');
+        testDB.dropDatabase();
 
         assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
         st.ensurePrimaryShard('test', 'shard0000');

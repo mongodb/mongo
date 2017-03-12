@@ -37,13 +37,15 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -88,19 +90,20 @@ class SplitCollectionCmd : public Command {
 public:
     SplitCollectionCmd() : Command("split", false, "split") {}
 
-    bool slaveOk() const override {
+    virtual bool slaveOk() const {
         return true;
     }
 
-    bool adminOnly() const override {
+    virtual bool adminOnly() const {
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    void help(std::stringstream& help) const override {
+    virtual void help(std::stringstream& help) const {
         help << " example: - split the shard that contains give key\n"
              << "   { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n"
              << " example: - split the shard that contains the key with this as the middle\n"
@@ -108,9 +111,9 @@ public:
              << " NOTE: this does not move the chunks, it just creates a logical separation.";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+    virtual Status checkAuthForCommand(Client* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                 ActionType::splitChunk)) {
@@ -119,22 +122,19 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    virtual bool run(OperationContext* opCtx,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto routingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
-        const auto cm = routingInfo.cm();
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
 
         const BSONField<BSONObj> findField("find", BSONObj());
         const BSONField<BSONArray> boundsField("bounds", BSONArray());
@@ -189,6 +189,8 @@ public:
             errmsg = "cannot specify bounds and middle together";
             return false;
         }
+
+        auto const cm = scopedCM.cm();
 
         std::shared_ptr<Chunk> chunk;
 
@@ -273,7 +275,9 @@ public:
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   {splitPoint}));
 
-        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+        // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
+        // immediately up-to-date the next time it's used.
+        scopedCM.db()->getChunkManagerIfExists(opCtx, nss.ns(), true);
 
         return true;
     }

@@ -39,8 +39,6 @@
 namespace mongo {
 
 class AScopedConnection;
-class CachedCollectionRoutingInfo;
-class CachedDatabaseInfo;
 class DBClientBase;
 class DBClientCursor;
 class OperationContext;
@@ -141,18 +139,5 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
  */
 std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
                                                            StringData dbName);
-
-/**
- * Abstracts the common pattern of refreshing a collection and checking if it is sharded used across
- * multiple commands.
- */
-CachedCollectionRoutingInfo getShardedCollection(OperationContext* opCtx,
-                                                 const NamespaceString& nss);
-
-/**
- * If the specified database exists already, loads it in the cache (if not already there) and
- * returns it. Otherwise, if it does not exist, this call will implicitly create it as non-sharded.
- */
-StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName);
 
 }  // namespace mongo

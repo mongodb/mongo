@@ -39,13 +39,14 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/chunk_manager_targeter.h"
 #include "mongo/s/commands/dbclient_multi_command.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -63,6 +64,11 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setErrMessage(status.reason());
     response->setOk(false);
     dassert(response->isValid(NULL));
+}
+
+void reloadChunkManager(OperationContext* opCtx, const NamespaceString& nss) {
+    auto config = uassertStatusOK(ScopedShardDatabase::getExisting(opCtx, nss.db()));
+    config.db()->getChunkManagerIfExists(opCtx, nss.ns(), true);
 }
 
 /**
@@ -170,31 +176,30 @@ BSONObj findExtremeKeyForShard(OperationContext* opCtx,
 void splitIfNeeded(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const TargeterStats& stats) {
-    auto routingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-    if (!routingInfoStatus.isOK()) {
-        log() << "failed to get collection information for " << nss
-              << " while checking for auto-split" << causedBy(routingInfoStatus.getStatus());
+    auto scopedCMStatus = ScopedChunkManager::get(opCtx, nss);
+    if (!scopedCMStatus.isOK()) {
+        warning() << "failed to get collection information for " << nss
+                  << " while checking for auto-split" << causedBy(scopedCMStatus.getStatus());
         return;
     }
 
-    auto& routingInfo = routingInfoStatus.getValue();
+    const auto& scopedCM = scopedCMStatus.getValue();
 
-    if (!routingInfo.cm()) {
+    if (!scopedCM.cm()) {
         return;
     }
 
     for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
         std::shared_ptr<Chunk> chunk;
         try {
-            chunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(it->first);
+            chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(it->first);
         } catch (const AssertionException& ex) {
             warning() << "could not find chunk while checking for auto-split: "
                       << causedBy(redact(ex));
             return;
         }
 
-        updateChunkWriteStatsAndSplitIfNeeded(
-            opCtx, routingInfo.cm().get(), chunk.get(), it->second);
+        updateChunkWriteStatsAndSplitIfNeeded(opCtx, scopedCM.cm().get(), chunk.get(), it->second);
     }
 }
 
@@ -467,22 +472,21 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
               << (suggestedMigrateChunk ? "" : (std::string) " (migrate suggested" +
                           (shouldBalance ? ")" : ", but no migrations allowed)"));
 
-        // Reload the chunk manager after the split
-        auto routingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
-
         if (!shouldBalance || !suggestedMigrateChunk) {
+            reloadChunkManager(opCtx, nss);
             return;
         }
 
         // Top chunk optimization - try to move the top chunk out of this shard to prevent the hot
-        // spot from staying on a single shard. This is based on the assumption that succeeding
-        // inserts will fall on the top chunk.
+        // spot
+        // from staying on a single shard. This is based on the assumption that succeeding inserts
+        // will
+        // fall on the top chunk.
 
         // We need to use the latest chunk manager (after the split) in order to have the most
         // up-to-date view of the chunk we are about to move
-        auto suggestedChunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
+        auto suggestedChunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(
             suggestedMigrateChunk->getMin());
 
         ChunkType chunkToMove;
@@ -494,8 +498,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
         uassertStatusOK(configsvr_client::rebalanceChunk(opCtx, chunkToMove));
 
-        // Ensure the collection gets reloaded because of the move
-        Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+        reloadChunkManager(opCtx, nss);
     } catch (const DBException& ex) {
         chunk->randomizeBytesWritten();
 

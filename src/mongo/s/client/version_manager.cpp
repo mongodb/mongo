@@ -36,13 +36,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -257,21 +257,21 @@ bool checkShardVersion(OperationContext* opCtx,
 
     const NamespaceString nss(ns);
 
-    auto const catalogCache = Grid::get(opCtx)->catalogCache();
-
     if (authoritative) {
-        Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+        ScopedChunkManager::refreshAndGet(opCtx, nss);
     }
 
-    auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-    if (!routingInfoStatus.isOK()) {
+    auto scopedCMStatus = ScopedChunkManager::get(opCtx, nss);
+
+    if (!scopedCMStatus.isOK()) {
         return false;
     }
 
-    auto& routingInfo = routingInfoStatus.getValue();
+    const auto& scopedCM = scopedCMStatus.getValue();
 
-    const auto manager = routingInfo.cm();
-    const auto primary = routingInfo.primary();
+    auto conf = scopedCM.db();
+    const auto manager = scopedCM.cm();
+    const auto primary = scopedCM.primary();
 
     unsigned long long officialSequenceNumber = 0;
 
@@ -379,7 +379,16 @@ bool checkShardVersion(OperationContext* opCtx,
         return true;
     }
 
-    Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+    if (result["reloadConfig"].trueValue()) {
+        if (result["version"].timestampTime() == Date_t()) {
+            warning() << "reloading full configuration for " << conf->name()
+                      << ", connection state indicates significant version changes";
+
+            Grid::get(opCtx)->catalogCache()->invalidate(nss.db());
+        }
+
+        conf->getChunkManager(opCtx, nss.ns(), true);
+    }
 
     const int maxNumTries = 7;
     if (tryNumber < maxNumTries) {

@@ -40,11 +40,12 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -59,19 +60,19 @@ class MoveChunkCmd : public Command {
 public:
     MoveChunkCmd() : Command("moveChunk", false, "movechunk") {}
 
-    bool slaveOk() const override {
+    virtual bool slaveOk() const {
         return true;
     }
 
-    bool adminOnly() const override {
+    virtual bool adminOnly() const {
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
-    void help(std::stringstream& help) const override {
+    virtual void help(std::stringstream& help) const {
         help << "Example: move chunk that contains the doc {num : 7} to shard001\n"
              << "  { movechunk : 'test.foo' , find : { num : 7 } , to : 'shard0001' }\n"
              << "Example: move chunk with lower bound 0 and upper bound 10 to shard001\n"
@@ -79,9 +80,9 @@ public:
              << " , to : 'shard001' }\n";
     }
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+    virtual Status checkAuthForCommand(Client* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                 ActionType::moveChunk)) {
@@ -91,24 +92,21 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             std::string& errmsg,
-             BSONObjBuilder& result) override {
+    virtual bool run(OperationContext* opCtx,
+                     const std::string& dbname,
+                     BSONObj& cmdObj,
+                     int options,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) {
         Timer t;
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto routingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
-        const auto cm = routingInfo.cm();
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
 
         const auto toElt = cmdObj["to"];
         uassert(ErrorCodes::TypeMismatch,
@@ -146,6 +144,8 @@ public:
             errmsg = "need to specify either a find query, or both lower and upper bounds.";
             return false;
         }
+
+        auto const cm = scopedCM.cm();
 
         shared_ptr<Chunk> chunk;
 
@@ -199,7 +199,9 @@ public:
                                                     secondaryThrottle,
                                                     cmdObj["_waitForDelete"].trueValue()));
 
-        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+        // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
+        // immediately up-to-date the next time it's used.
+        scopedCM.db()->getChunkManagerIfExists(opCtx, nss.ns(), true);
 
         result.append("millis", t.millis());
         return true;
