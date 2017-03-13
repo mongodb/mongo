@@ -198,7 +198,7 @@ private:
                                                    const BSONObj* fieldsToReturn,
                                                    int queryOptions,
                                                    int batchSize);
-    int _lockType(const std::string& name);
+    int _lockType(const Query& query);
     void _checkLast();
     void _connect(const std::string& host);
 

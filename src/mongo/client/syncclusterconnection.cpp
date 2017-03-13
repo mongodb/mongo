@@ -276,9 +276,7 @@ BSONObj SyncClusterConnection::findOne(const string& ns,
                                        const BSONObj* fieldsToReturn,
                                        int queryOptions) {
     if (ns.find(".$cmd") != string::npos) {
-        string cmdName = query.obj.firstElementFieldName();
-
-        int lockType = _lockType(cmdName);
+        int lockType = _lockType(query);
 
         if (lockType > 0) {  // write $cmd
             string errmsg;
@@ -381,10 +379,10 @@ unique_ptr<DBClientCursor> SyncClusterConnection::query(const string& ns,
                                                         int batchSize) {
     _lastErrors.clear();
     if (ns.find(".$cmd") != string::npos) {
-        string cmdName = query.obj.firstElementFieldName();
-        int lockType = _lockType(cmdName);
+        int lockType = _lockType(query);
         uassert(13054,
-                (string) "write $cmd not supported in SyncClusterConnection::query for:" + cmdName,
+                str::stream() << "write $cmd not supported in SyncClusterConnection::query for: "
+                              << query.toString(),
                 lockType <= 0);
     }
 
@@ -622,7 +620,14 @@ void SyncClusterConnection::say(Message& toSend, bool isRetry, string* actualSer
     _checkLast();
 }
 
-int SyncClusterConnection::_lockType(const string& name) {
+int SyncClusterConnection::_lockType(const Query& query) {
+    string name = query.obj.firstElementFieldName();
+
+    if (name == "query") {
+        // actual command is embedded in the query object
+        name = query.obj["query"].Obj().firstElementFieldName();
+    }
+
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         map<string, int>::iterator i = _lockTypes.find(name);
