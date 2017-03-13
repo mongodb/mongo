@@ -445,14 +445,14 @@ class MongoDBUniqueStack(gdb.Command):
             raise ValueError("Unsupported platform: {}".format(sys.platform))
         thread_info['header'] = header_format.format(**thread_info)
 
-        functions = [] # list of function names from frames
+        addrs = [] # list of return addresses from frames
         frame = gdb.newest_frame()
         while frame:
-            functions.append(frame.name())
+            addrs.append(frame.pc())
             frame = frame.older()
-        functions = tuple(functions) # tuples are hashable, lists aren't.
+        addrs = tuple(addrs) # tuples are hashable, lists aren't.
 
-        unique = stacks.setdefault(functions, {'threads': []})
+        unique = stacks.setdefault(addrs, {'threads': []})
         unique['threads'].append(thread_info)
         if 'output' not in unique:
             try:
