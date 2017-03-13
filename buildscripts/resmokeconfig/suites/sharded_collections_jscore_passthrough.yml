@@ -70,6 +70,14 @@ selector:
     - jstests/core/batch_write_command_delete.js
     - jstests/core/batch_write_command_insert.js
     - jstests/core/batch_write_command_update.js
+    # TODO: Remove after fixing SERVER-28321.
+    - jstests/core/mr_undef.js
+    exclude_with_any_tags:
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
 
 executor:
   js_test:

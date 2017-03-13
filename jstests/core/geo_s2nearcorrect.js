@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // SERVER-9484
 // A geometry may have several covers, one of which is in a search ring and the other of which is
 // not.  If we see the cover that's not in the search ring, we can't mark the object as 'seen' for

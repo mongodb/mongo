@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because unsupported use of sharded collection
+// for output collection of aggregation pipeline.
+// @tags: [assumes_unsharded_collection]
+
 /**
  * Tests related to the aggregate commands behavior with writeConcern and writeConcern + explain.
  */

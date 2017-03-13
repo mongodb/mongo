@@ -1,4 +1,6 @@
-
+// Cannot implicitly shard accessed collections because the "jsMode" option to the "mapReduce"
+// command cannot be used on a sharded collection.
+// @tags: [assumes_unsharded_collection]
 
 t = db.mr2;
 t.drop();

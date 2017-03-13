@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because the "query" field in the currentOp()
+// output is reported as {"mapreduce.shardedfinish": { mapreduce: "jstests_mr_killop", ... }, ... }
+// when the "finalize" option to the "mapReduce" command is used on a sharded collection.
+// @tags: [assumes_unsharded_collection]
+
 // Test killop applied to m/r operations and child ops of m/r operations.
 
 t = db.jstests_mr_killop;

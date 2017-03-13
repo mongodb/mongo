@@ -1,3 +1,7 @@
+// Failing due to queries on a sharded collection not able to be covered when they aren't on the
+// shard key since the document needs to be fetched in order to apply the SHARDING_FILTER stage.
+// @tags: [assumes_unsharded_collection]
+
 /**
  * Test projections with dotted field paths. Also test that such projections result in covered plans
  * when appropriate.

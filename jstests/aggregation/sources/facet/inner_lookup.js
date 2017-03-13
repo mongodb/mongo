@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because unsupported use of sharded collection
+// for target collection of $lookup and $graphLookup.
+// @tags: [assumes_unsharded_collection]
+
 /**
  * Tests that using a $lookup stage inside of a $facet stage will yield the same results as using
  * the $lookup stage outside of the $facet stage.

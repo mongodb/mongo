@@ -24,6 +24,14 @@ selector:
     - jstests/aggregation/bugs/cursor_timeout.js
     - jstests/aggregation/bugs/lookup_unwind_getmore.js
     - jstests/aggregation/bugs/lookup_unwind_killcursor.js
+    # TODO: Remove after SERVER-23229 is fixed.
+    - jstests/aggregation/bugs/groupMissing.js
+    exclude_with_any_tags:
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
 
 executor:
   js_test:

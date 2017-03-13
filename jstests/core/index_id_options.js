@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // Test creation of the _id index with various options:
 // - _id indexes must have key pattern {_id: 1}.
 // - The name of an _id index gets corrected to "_id_".

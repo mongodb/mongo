@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of extra shard key index in sharded
+// collection.
+// @tags: [assumes_no_implicit_index_creation]
+
 // Test that a memory exception is triggered for in memory sorts, but not for indexed sorts.
 
 t = db.jstests_sortg;

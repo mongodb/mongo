@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 // SERVER-17011 Tests whether queries which specify sort and batch size can generate results out of
 // order due to the ntoreturn hack. The EnsureSortedStage should solve this problem.
 (function() {

@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 // Ensures that find and modify will not apply an update to a document which, due to a concurrent
 // modification, no longer matches the query predicate.
 (function() {

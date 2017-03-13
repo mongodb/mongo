@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of extra shard key index in sharded
+// collection.
+// @tags: [assumes_no_implicit_index_creation]
+
 // unique index constraint test for updates
 // case where object doesn't grow tested here
 

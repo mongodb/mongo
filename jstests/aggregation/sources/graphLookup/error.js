@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because unsupported use of sharded collection
+// for target collection of $lookup and $graphLookup.
+// @tags: [assumes_unsharded_collection]
+
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
 load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
 
