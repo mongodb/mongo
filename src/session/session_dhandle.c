@@ -270,6 +270,16 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
 		ret = __wt_conn_btree_sync_and_close(session, false, true);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD_FORCE);
+	} else if (F_ISSET(btree, WT_BTREE_BULK)) {
+		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
+		    !F_ISSET(dhandle, WT_DHANDLE_DISCARD));
+		/*
+		 * Acquire the schema lock while completing a bulk load.  This
+		 * avoids racing with a checkpoint while it gathers a set
+		 * of handles.
+		 */
+		WT_WITH_SCHEMA_LOCK(session, ret =
+		    __wt_conn_btree_sync_and_close(session, false, false));
 	} else if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
 	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));

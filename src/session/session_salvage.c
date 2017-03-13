@@ -54,6 +54,6 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_meta_ckptlist_set(
 		    session, dhandle->name, ckptbase, NULL));
 
-err:	__wt_meta_ckptlist_free(session, ckptbase);
+err:	__wt_meta_ckptlist_free(session, &ckptbase);
 	return (ret);
 }

@@ -152,11 +152,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/*
-	 * If we don't already have the schema lock, make it an error to try
-	 * to acquire it.  The problem is that we are holding an exclusive
-	 * lock on the handle, and if we attempt to acquire the schema lock
-	 * we might deadlock with a thread that has the schema lock and wants
-	 * a handle lock (specifically, checkpoint).
+	 * If we don't already have the schema lock, make it an error to try to
+	 * acquire it.  The problem is that we are holding an exclusive lock on
+	 * the handle, and if we attempt to acquire the schema lock we might
+	 * deadlock with a thread that has the schema lock and wants a handle
+	 * lock.
 	 */
 	no_schema_lock = false;
 	if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {

@@ -274,7 +274,7 @@ err:	/* Inform the underlying block manager we're done. */
 
 	/* Discard the list of checkpoints. */
 	if (ckptbase != NULL)
-		__wt_meta_ckptlist_free(session, ckptbase);
+		__wt_meta_ckptlist_free(session, &ckptbase);
 
 	/* Free allocated memory. */
 	__wt_scr_free(session, &vs->max_key);
