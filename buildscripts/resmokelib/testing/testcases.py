@@ -47,6 +47,9 @@ class TestCase(unittest.TestCase):
         if not isinstance(test_name, basestring):
             raise TypeError("test_name must be a string")
 
+        # When the TestCase is created by the TestGroupExecutor (through a call to make_test_case())
+        # logger is an instance of TestQueueLogger. When the TestCase is created by a hook
+        # implementation it is an instance of BaseLogger.
         self.logger = logger
         self.test_kind = test_kind
         self.test_name = test_name
@@ -312,7 +315,7 @@ class JSTestCase(TestCase):
                  shell_executable=None,
                  shell_options=None,
                  test_kind="JSTest"):
-        "Initializes the JSTestCase with the JS file to run."
+        """Initializes the JSTestCase with the JS file to run."""
 
         TestCase.__init__(self, logger, test_kind, js_filename)
 
@@ -425,9 +428,9 @@ class JSTestCase(TestCase):
                                                  **self.shell_options)
 
     def _run_test_in_thread(self, thread_id):
-        # Make a logger for each thread.
-        logger = logging.loggers.new_logger(self.test_kind + ':' + str(thread_id),
-                                            parent=self.logger)
+        # Make a logger for each thread. When this method gets called self.logger has been
+        # overridden with a TestLogger instance by the TestReport in the startTest() method.
+        logger = self.logger.new_test_thread_logger(self.test_kind, str(thread_id))
         shell = self._make_process(logger, thread_id)
         self._execute(shell)
 

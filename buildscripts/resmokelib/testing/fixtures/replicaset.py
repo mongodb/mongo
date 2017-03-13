@@ -273,14 +273,14 @@ class ReplicaSetFixture(interface.ReplFixture):
         """
 
         if index == 0:
-            logger_name = "%s:primary" % (self.logger.name)
+            node_name = "primary"
         elif index == self.initial_sync_node_idx:
-            logger_name = "%s:initsync" % (self.logger.name)
+            node_name = "initsync"
         else:
             suffix = str(index - 1) if self.num_nodes > 2 else ""
-            logger_name = "%s:secondary%s" % (self.logger.name, suffix)
+            node_name = "secondary%s" % suffix
 
-        return logging.loggers.new_logger(logger_name, parent=self.logger)
+        return self.logger.new_fixture_node_logger(node_name)
 
     def get_connection_string(self):
         if self.replset_name is None:

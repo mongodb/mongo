@@ -11,6 +11,7 @@ import time
 
 import bson
 import pymongo
+import pymongo.errors
 import random
 
 from . import fixtures
@@ -45,15 +46,15 @@ class CustomBehavior(object):
         """
         test_report.startTest(hook_test_case, dynamic=True)
 
-    def __init__(self, logger, fixture, description):
+    def __init__(self, hook_logger, fixture, description):
         """
         Initializes the CustomBehavior with the specified fixture.
         """
 
-        if not isinstance(logger, logging.Logger):
+        if not isinstance(hook_logger, logging.Logger):
             raise TypeError("logger must be a Logger instance")
 
-        self.logger = logger
+        self.logger = hook_logger
         self.fixture = fixture
         self.hook_test_case = None
         self.logger_name = self.__class__.__name__
@@ -95,10 +96,10 @@ class CleanEveryN(CustomBehavior):
 
     DEFAULT_N = 20
 
-    def __init__(self, logger, fixture, n=DEFAULT_N):
+    def __init__(self, hook_logger, fixture, n=DEFAULT_N):
         description = "CleanEveryN (restarts the fixture after running `n` tests)"
-        CustomBehavior.__init__(self, logger, fixture, description)
-        self.hook_test_case = testcases.TestCase(logger, "Hook", "CleanEveryN")
+        CustomBehavior.__init__(self, hook_logger, fixture, description)
+        self.hook_test_case = testcases.TestCase(hook_logger, "Hook", "CleanEveryN")
 
         # Try to isolate what test triggers the leak by restarting the fixture each time.
         if "detect_leaks=1" in os.getenv("ASAN_OPTIONS", ""):
@@ -135,9 +136,9 @@ class CleanEveryN(CustomBehavior):
 
 
 class JsCustomBehavior(CustomBehavior):
-    def __init__(self, logger, fixture, js_filename, description, shell_options=None):
-        CustomBehavior.__init__(self, logger, fixture, description)
-        self.hook_test_case = testcases.JSTestCase(logger,
+    def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
+        CustomBehavior.__init__(self, hook_logger, fixture, description)
+        self.hook_test_case = testcases.JSTestCase(hook_logger,
                                                    js_filename,
                                                    shell_options=shell_options,
                                                    test_kind="Hook")
@@ -199,10 +200,11 @@ class BackgroundInitialSync(JsCustomBehavior):
 
     DEFAULT_N = CleanEveryN.DEFAULT_N
 
-    def __init__(self, logger, fixture, use_resync=False, n=DEFAULT_N, shell_options=None):
+    def __init__(self, hook_logger, fixture, use_resync=False, n=DEFAULT_N, shell_options=None):
         description = "Background Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
-        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description, shell_options)
+        JsCustomBehavior.__init__(self, hook_logger, fixture, js_filename,
+                                  description, shell_options)
 
         self.use_resync = use_resync
         self.n = n
@@ -265,7 +267,7 @@ class BackgroundInitialSync(JsCustomBehavior):
                 if self.random_restarts < 1 and random.random() < 0.2:
                     hook_type = "resync" if self.use_resync else "initial sync"
                     self.hook_test_case.logger.info("randomly restarting " + hook_type +
-                                             " in the middle of " + hook_type)
+                                                    " in the middle of " + hook_type)
                     self.__restart_init_sync(test_report, sync_node, sync_node_conn)
                     self.random_restarts += 1
                 return
@@ -297,10 +299,10 @@ class IntermediateInitialSync(JsCustomBehavior):
 
     DEFAULT_N = CleanEveryN.DEFAULT_N
 
-    def __init__(self, logger, fixture, use_resync=False, n=DEFAULT_N):
+    def __init__(self, hook_logger, fixture, use_resync=False, n=DEFAULT_N):
         description = "Intermediate Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
-        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
+        JsCustomBehavior.__init__(self, hook_logger, fixture, js_filename, description)
 
         self.use_resync = use_resync
         self.n = n
@@ -343,17 +345,16 @@ class IntermediateInitialSync(JsCustomBehavior):
         self.hook_test_case.run_test()
 
 
-
 class ValidateCollections(JsCustomBehavior):
     """
     Runs full validation on all collections in all databases on every stand-alone
     node, primary replica-set node, or primary shard node.
     """
-    def __init__(self, logger, fixture, shell_options=None):
+    def __init__(self, hook_logger, fixture, shell_options=None):
         description = "Full collection validation"
         js_filename = os.path.join("jstests", "hooks", "run_validate_collections.js")
         JsCustomBehavior.__init__(self,
-                                  logger,
+                                  hook_logger,
                                   fixture,
                                   js_filename,
                                   description,
@@ -365,11 +366,11 @@ class CheckReplDBHash(JsCustomBehavior):
     Checks that the dbhashes of all non-local databases and non-replicated system collections
     match on the primary and secondaries.
     """
-    def __init__(self, logger, fixture, shell_options=None):
+    def __init__(self, hook_logger, fixture, shell_options=None):
         description = "Check dbhashes of all replica set or master/slave members"
         js_filename = os.path.join("jstests", "hooks", "run_check_repl_dbhash.js")
         JsCustomBehavior.__init__(self,
-                                  logger,
+                                  hook_logger,
                                   fixture,
                                   js_filename,
                                   description,
@@ -380,11 +381,11 @@ class CheckReplOplogs(JsCustomBehavior):
     """
     Checks that local.oplog.rs matches on the primary and secondaries.
     """
-    def __init__(self, logger, fixture, shell_options=None):
+    def __init__(self, hook_logger, fixture, shell_options=None):
         description = "Check oplogs of all replica set members"
         js_filename = os.path.join("jstests", "hooks", "run_check_repl_oplogs.js")
         JsCustomBehavior.__init__(self,
-                                  logger,
+                                  hook_logger,
                                   fixture,
                                   js_filename,
                                   description,
@@ -400,7 +401,7 @@ class PeriodicKillSecondaries(CustomBehavior):
 
     DEFAULT_PERIOD_SECS = 30
 
-    def __init__(self, logger, fixture, period_secs=DEFAULT_PERIOD_SECS):
+    def __init__(self, hook_logger, fixture, period_secs=DEFAULT_PERIOD_SECS):
         if not isinstance(fixture, fixtures.ReplicaSetFixture):
             raise TypeError("%s either does not support replication or does not support writing to"
                             " its oplog early"
@@ -412,7 +413,7 @@ class PeriodicKillSecondaries(CustomBehavior):
 
         description = ("PeriodicKillSecondaries (kills the secondary after running tests for a"
                        " configurable period of time)")
-        CustomBehavior.__init__(self, logger, fixture, description)
+        CustomBehavior.__init__(self, hook_logger, fixture, description)
 
         self._period_secs = period_secs
         self._start_time = None

@@ -14,7 +14,6 @@ from . import report as _report
 from . import testcases
 from .. import config as _config
 from .. import errors
-from .. import logging
 from .. import utils
 from ..utils import queue as _queue
 
@@ -32,7 +31,6 @@ class TestGroupExecutor(object):
     def __init__(self,
                  exec_logger,
                  test_group,
-                 logging_config,
                  config=None,
                  fixture=None,
                  hooks=None):
@@ -41,21 +39,13 @@ class TestGroupExecutor(object):
         """
 
         # Build a logger for executing this group of tests.
-        logger_name = "%s:%s" % (exec_logger.name, test_group.test_kind)
-        self.logger = logging.loggers.new_logger(logger_name, parent=exec_logger)
+        self.testgroup_logger = exec_logger.new_testgroup_logger(test_group.test_kind)
 
-        self.logging_config = logging_config
         self.fixture_config = fixture
         self.hooks_config = utils.default_if_none(hooks, [])
         self.test_config = utils.default_if_none(config, {})
 
         self._test_group = test_group
-
-        self._using_buildlogger = logging.config.using_buildlogger(logging_config)
-        self._build_config = None
-
-        if self._using_buildlogger:
-            self._build_config = logging.buildlogger.get_config()
 
         # Must be done after getting buildlogger configuration.
         self._jobs = [self._make_job(job_num) for job_num in xrange(_config.JOBS)]
@@ -68,7 +58,7 @@ class TestGroupExecutor(object):
         fixture are propagated.
         """
 
-        self.logger.info("Starting execution of %ss...", self._test_group.test_kind)
+        self.testgroup_logger.info("Starting execution of %ss...", self._test_group.test_kind)
 
         return_code = 0
         teardown_flag = None
@@ -102,7 +92,7 @@ class TestGroupExecutor(object):
 
                 sb = []  # String builder.
                 self._test_group.summarize_latest(sb)
-                self.logger.info("Summary: %s", "\n    ".join(sb))
+                self.testgroup_logger.info("Summary: %s", "\n    ".join(sb))
 
                 if not report.wasSuccessful():
                     return_code = 1
@@ -123,12 +113,12 @@ class TestGroupExecutor(object):
         """
         Sets up a fixture for each job.
         """
-
         for job in self._jobs:
             try:
                 job.fixture.setup()
             except:
-                self.logger.exception("Encountered an error while setting up %s.", job.fixture)
+                self.testgroup_logger.exception(
+                    "Encountered an error while setting up %s.", job.fixture)
                 return False
 
         # Once they have all been started, wait for them to become available.
@@ -136,10 +126,9 @@ class TestGroupExecutor(object):
             try:
                 job.fixture.await_ready()
             except:
-                self.logger.exception("Encountered an error while waiting for %s to be ready",
-                                      job.fixture)
+                self.testgroup_logger.exception(
+                    "Encountered an error while waiting for %s to be ready", job.fixture)
                 return False
-
         return True
 
     def _run_tests(self, test_queue, teardown_flag):
@@ -199,43 +188,19 @@ class TestGroupExecutor(object):
         Returns true if all fixtures were torn down successfully, and
         false otherwise.
         """
-
         success = True
         for job in self._jobs:
             try:
                 if not job.fixture.teardown():
-                    self.logger.warn("Teardown of %s was not successful.", job.fixture)
+                    self.testgroup_logger.warn("Teardown of %s was not successful.", job.fixture)
                     success = False
             except:
-                self.logger.exception("Encountered an error while tearing down %s.", job.fixture)
+                self.testgroup_logger.exception("Encountered an error while tearing down %s.",
+                                                job.fixture)
                 success = False
-
         return success
 
-    def _get_build_id(self, job_num):
-        """
-        Returns a unique build id for a job.
-        """
-
-        build_config = self._build_config
-
-        if self._using_buildlogger:
-            # Use a distinct "builder" for each job in order to separate their logs.
-            if build_config is not None and "builder" in build_config:
-                build_config = build_config.copy()
-                build_config["builder"] = "%s_job%d" % (build_config["builder"], job_num)
-
-            build_id = logging.buildlogger.new_build_id(build_config)
-
-            if build_config is None or build_id is None:
-                self.logger.info("Encountered an error configuring buildlogger for job #%d, falling"
-                                 " back to stderr.", job_num)
-
-            return build_id, build_config
-
-        return None, build_config
-
-    def _make_fixture(self, job_num, build_id, build_config):
+    def _make_fixture(self, job_num, job_logger):
         """
         Creates a fixture for a job.
         """
@@ -247,16 +212,11 @@ class TestGroupExecutor(object):
             fixture_config = self.fixture_config.copy()
             fixture_class = fixture_config.pop("class")
 
-        logger_name = "%s:job%d" % (fixture_class, job_num)
-        logger = logging.loggers.new_logger(logger_name, parent=logging.loggers.FIXTURE)
-        logging.config.apply_buildlogger_global_handler(logger,
-                                                        self.logging_config,
-                                                        build_id=build_id,
-                                                        build_config=build_config)
+        fixture_logger = job_logger.new_fixture_logger(fixture_class)
 
-        return fixtures.make_fixture(fixture_class, logger, job_num, **fixture_config)
+        return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
-    def _make_hooks(self, job_num, fixture):
+    def _make_hooks(self, job_num, fixture, job_logger):
         """
         Creates the custom behaviors for the job's fixture.
         """
@@ -267,10 +227,9 @@ class TestGroupExecutor(object):
             behavior_config = behavior_config.copy()
             behavior_class = behavior_config.pop("class")
 
-            logger_name = "%s:job%d" % (behavior_class, job_num)
-            logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+            hook_logger = job_logger.new_hook_logger(behavior_class, job_num)
             behavior = _hooks.make_custom_behavior(behavior_class,
-                                                   logger,
+                                                   hook_logger,
                                                    fixture,
                                                    **behavior_config)
             behaviors.append(behavior)
@@ -282,25 +241,14 @@ class TestGroupExecutor(object):
         Returns a Job instance with its own fixture, hooks, and test
         report.
         """
+        job_logger = self.testgroup_logger.new_job_logger(job_num)
 
-        build_id, build_config = self._get_build_id(job_num)
-        fixture = self._make_fixture(job_num, build_id, build_config)
-        hooks = self._make_hooks(job_num, fixture)
+        fixture = self._make_fixture(job_num, job_logger)
+        hooks = self._make_hooks(job_num, fixture, job_logger)
 
-        logger_name = "%s:job%d" % (self.logger.name, job_num)
-        logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        report = _report.TestReport(job_logger)
 
-        if build_id is not None:
-            endpoint = logging.buildlogger.APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
-            url = "%s/%s/" % (_config.BUILDLOGGER_URL.rstrip("/"), endpoint.strip("/"))
-            logger.info("Writing output of job #%d to %s.", job_num, url)
-
-        report = _report.TestReport(logger,
-                                    self.logging_config,
-                                    build_id=build_id,
-                                    build_config=build_config)
-
-        return _job.Job(logger, fixture, hooks, report)
+        return _job.Job(job_logger, fixture, hooks, report)
 
     def _make_test_queue(self):
         """
@@ -310,9 +258,7 @@ class TestGroupExecutor(object):
         that the test cases can be dispatched to multiple threads.
         """
 
-        test_kind_logger = logging.loggers.new_logger(self._test_group.test_kind,
-                                                      parent=logging.loggers.TESTS)
-
+        test_kind_logger = self.testgroup_logger.new_testqueue_logger()
         # Put all the test cases in a queue.
         queue = _queue.Queue()
         for test_name in self._test_group.tests:
