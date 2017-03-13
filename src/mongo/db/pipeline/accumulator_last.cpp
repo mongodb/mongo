@@ -49,7 +49,7 @@ void AccumulatorLast::processInternal(const Value& input, bool merging) {
     _memUsageBytes = sizeof(*this) + _last.getApproximateSize() - sizeof(Value);
 }
 
-Value AccumulatorLast::getValue(bool toBeMerged) const {
+Value AccumulatorLast::getValue(bool toBeMerged) {
     return _last;
 }
 

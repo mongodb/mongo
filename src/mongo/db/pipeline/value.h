@@ -358,6 +358,16 @@ class ImplicitValue : public Value {
 public:
     template <typename T>
     ImplicitValue(T arg) : Value(std::move(arg)) {}
+
+    /**
+     * Converts a vector of Implicit values to a single Value object.
+     */
+    static Value convertToValue(const std::vector<ImplicitValue>& vec) {
+        std::vector<Value> values;
+        for_each(
+            vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
+        return Value(values);
+    }
 };
 }
 

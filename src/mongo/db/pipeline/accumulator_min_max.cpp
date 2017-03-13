@@ -61,7 +61,7 @@ void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorMinMax::getValue(bool toBeMerged) const {
+Value AccumulatorMinMax::getValue(bool toBeMerged) {
     if (_val.missing()) {
         return Value(BSONNULL);
     }

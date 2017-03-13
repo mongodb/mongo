@@ -54,24 +54,35 @@ using std::vector;
 using std::list;
 
 /**
+ * Creates an expression given by 'expressionName' and evaluates it using
+ * 'operands' as inputs, returning the result.
+ */
+static Value evaluateExpression(const string& expressionName,
+                                const vector<ImplicitValue>& operands) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesIdGenerator idGenerator;
+    VariablesParseState vps(&idGenerator);
+    const BSONObj obj = BSON(expressionName << ImplicitValue::convertToValue(operands));
+    auto expression = Expression::parseExpression(expCtx, obj, vps);
+    Value result = expression->evaluate(Document());
+    return result;
+}
+
+/**
  * Takes the name of an expression as its first argument and a list of pairs of arguments and
  * expected results as its second argument, and asserts that for the given expression the arguments
  * evaluate to the expected results.
  */
-static void assertExpectedResults(string expression,
-                                  initializer_list<pair<vector<Value>, Value>> operations) {
+static void assertExpectedResults(
+    const string& expression,
+    initializer_list<pair<vector<ImplicitValue>, ImplicitValue>> operations) {
     for (auto&& op : operations) {
         try {
-            intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-            VariablesIdGenerator idGenerator;
-            VariablesParseState vps(&idGenerator);
-            const BSONObj obj = BSON(expression << Value(op.first));
-            auto expression = Expression::parseExpression(expCtx, obj, vps);
-            Value result = expression->evaluate(Document());
+            Value result = evaluateExpression(expression, op.first);
             ASSERT_VALUE_EQ(op.second, result);
             ASSERT_EQUALS(op.second.getType(), result.getType());
         } catch (...) {
-            log() << "failed with arguments: " << Value(op.first);
+            log() << "failed with arguments: " << ImplicitValue::convertToValue(op.first);
             throw;
         }
     }
@@ -3889,6 +3900,81 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
 }
 
 }  // namespace BuiltinRemoveVariable
+
+/* ------------------------- ExpressionMergeObjects -------------------------- */
+
+namespace ExpressionMergeObjects {
+
+TEST(ExpressionMergeObjects, MergingWithSingleObjectShouldLeaveUnchanged) {
+    assertExpectedResults("$mergeObjects", {{{}, {Document({})}}});
+
+    auto doc = Document({{"a", 1}, {"b", 1}});
+    assertExpectedResults("$mergeObjects", {{{doc}, doc}});
+}
+
+TEST(ExpressionMergeObjects, MergingDisjointObjectsShouldIncludeAllFields) {
+    auto first = Document({{"a", 1}, {"b", 1}});
+    auto second = Document({{"c", 1}});
+    assertExpectedResults("$mergeObjects",
+                          {{{first, second}, Document({{"a", 1}, {"b", 1}, {"c", 1}})}});
+}
+
+TEST(ExpressionMergeObjects, MergingIntersectingObjectsShouldOverrideInOrderReceived) {
+    auto first = Document({{"a", "oldValue"_sd}, {"b", 0}, {"c", 1}});
+    auto second = Document({{"a", "newValue"_sd}});
+    assertExpectedResults(
+        "$mergeObjects", {{{first, second}, Document({{"a", "newValue"_sd}, {"b", 0}, {"c", 1}})}});
+}
+
+TEST(ExpressionMergeObjects, MergingIntersectingEmbeddedObjectsShouldOverrideInOrderReceived) {
+    auto firstSubDoc = Document({{"a", 1}, {"b", 2}, {"c", 3}});
+    auto secondSubDoc = Document({{"a", 2}, {"b", 1}});
+    auto first = Document({{"d", 1}, {"subDoc", firstSubDoc}});
+    auto second = Document({{"subDoc", secondSubDoc}});
+    auto expected = Document({{"d", 1}, {"subDoc", secondSubDoc}});
+    assertExpectedResults("$mergeObjects", {{{first, second}, expected}});
+}
+
+TEST(ExpressionMergeObjects, MergingWithEmptyDocumentShouldIgnore) {
+    auto first = Document({{"a", 0}, {"b", 1}, {"c", 1}});
+    auto second = Document({});
+    auto expected = Document({{"a", 0}, {"b", 1}, {"c", 1}});
+    assertExpectedResults("$mergeObjects", {{{first, second}, expected}});
+}
+
+TEST(ExpressionMergeObjects, MergingSingleArgumentArrayShouldUnwindAndMerge) {
+    std::vector<Document> first = {Document({{"a", 1}}), Document({{"a", 2}})};
+    auto expected = Document({{"a", 2}});
+    assertExpectedResults("$mergeObjects", {{{first}, expected}});
+}
+
+TEST(ExpressionMergeObjects, MergingArrayWithDocumentShouldThrowException) {
+    std::vector<Document> first = {Document({{"a", 1}}), Document({{"a", 2}})};
+    auto second = Document({{"b", 2}});
+    ASSERT_THROWS_CODE(evaluateExpression("$mergeObjects", {first, second}), UserException, 40400);
+}
+
+TEST(ExpressionMergeObjects, MergingArrayContainingInvalidTypesShouldThrowException) {
+    std::vector<Value> first = {Value(Document({{"validType", 1}})), Value("invalidType"_sd)};
+    ASSERT_THROWS_CODE(evaluateExpression("$mergeObjects", {first}), UserException, 40400);
+}
+
+TEST(ExpressionMergeObjects, MergingNonObjectsShouldThrowException) {
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$mergeObjects", {"invalidArg"_sd}), UserException, 40400);
+
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$mergeObjects", {"invalidArg"_sd, Document({{"validArg", 1}})}),
+        UserException,
+        40400);
+
+    ASSERT_THROWS_CODE(evaluateExpression("$mergeObjects", {1, Document({{"validArg", 1}})}),
+                       UserException,
+                       40400);
+}
+
+}  // namespace ExpressionMergeObjects
+
 
 namespace ToLower {
 

@@ -523,6 +523,10 @@ public:
         return Document(storagePtr());
     }
 
+    size_t getApproximateSize() {
+        return peek().getApproximateSize();
+    }
+
 private:
     friend class MutableValue;  // for access to next constructor
     explicit MutableDocument(MutableValue mv) : _storageHolder(NULL), _storage(mv.getDocPtr()) {}

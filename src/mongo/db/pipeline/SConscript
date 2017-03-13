@@ -190,6 +190,7 @@ env.Library(
         'accumulator_push.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
+        'accumulator_merge_objects.cpp'
         ],
     LIBDEPS=[
         'document_value',

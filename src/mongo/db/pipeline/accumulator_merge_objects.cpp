@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011 10gen Inc.
+ * Copyright (c) 2017 10gen Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -31,62 +31,63 @@
 #include "mongo/db/pipeline/accumulator.h"
 
 #include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
-using std::vector;
 
-REGISTER_ACCUMULATOR(addToSet, AccumulatorAddToSet::create);
+/* ------------------------- AccumulatorMergeObjects ----------------------------- */
 
-const char* AccumulatorAddToSet::getOpName() const {
-    return "$addToSet";
+REGISTER_ACCUMULATOR(mergeObjects, AccumulatorMergeObjects::create);
+REGISTER_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
+
+const char* AccumulatorMergeObjects::getOpName() const {
+    return "$mergeObjects";
 }
 
-void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
-    if (!merging) {
-        if (!input.missing()) {
-            bool inserted = _set.insert(input).second;
-            if (inserted) {
-                _memUsageBytes += input.getApproximateSize();
-            }
-        }
-    } else {
-        // If we're merging, we need to take apart the arrays we
-        // receive and put their elements into the array we are collecting.
-        // If we didn't, then we'd get an array of arrays, with one array
-        // from each merge source.
-        verify(input.getType() == Array);
-
-        const vector<Value>& array = input.getArray();
-        for (size_t i = 0; i < array.size(); i++) {
-            bool inserted = _set.insert(array[i]).second;
-            if (inserted) {
-                _memUsageBytes += array[i].getApproximateSize();
-            }
-        }
-    }
-}
-
-Value AccumulatorAddToSet::getValue(bool toBeMerged) {
-    return Value(vector<Value>(_set.begin(), _set.end()));
-}
-
-AccumulatorAddToSet::AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : Accumulator(expCtx), _set(expCtx->getValueComparator().makeUnorderedValueSet()) {
-    _memUsageBytes = sizeof(*this);
-}
-
-void AccumulatorAddToSet::reset() {
-    _set = getExpressionContext()->getValueComparator().makeUnorderedValueSet();
-    _memUsageBytes = sizeof(*this);
-}
-
-intrusive_ptr<Accumulator> AccumulatorAddToSet::create(
+intrusive_ptr<Accumulator> AccumulatorMergeObjects::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new AccumulatorAddToSet(expCtx);
+    return new AccumulatorMergeObjects(expCtx);
+}
+
+AccumulatorMergeObjects::AccumulatorMergeObjects(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : Accumulator(expCtx) {
+    _memUsageBytes = sizeof(*this);
+}
+
+void AccumulatorMergeObjects::reset() {
+    _memUsageBytes = sizeof(*this);
+    _output.reset();
+}
+
+void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) {
+    if (input.nullish()) {
+        return;
+    }
+
+    uassert(40400,
+            str::stream() << "$mergeObjects requires object inputs, but input " << input.toString()
+                          << " is of type "
+                          << typeName(input.getType()),
+            (input.getType() == BSONType::Object));
+
+    FieldIterator iter = input.getDocument().fieldIterator();
+    while (iter.more()) {
+        Document::FieldPair pair = iter.next();
+        // Ignore missing values only, null and undefined are still considered.
+        if (pair.second.missing())
+            continue;
+
+        _output.setField(pair.first, pair.second);
+    }
+    _memUsageBytes = sizeof(*this) + _output.getApproximateSize();
+}
+
+Value AccumulatorMergeObjects::getValue(bool toBeMerged) {
+    return _output.freezeToValue();
 }
 
 }  // namespace mongo

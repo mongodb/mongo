@@ -344,4 +344,62 @@ TEST(Accumulators, AddToSetRespectsCollation) {
                             Value(std::vector<Value>{Value("a"_sd)})}});
 }
 
+/* ------------------------- AccumulatorMergeObjects -------------------------- */
+
+namespace AccumulatorMergeObjects {
+
+TEST(AccumulatorMergeObjects, MergingZeroObjectsShouldReturnEmptyDocument) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+
+    assertExpectedResults("$mergeObjects", expCtx, {{{}, {Value(Document({}))}}});
+}
+
+TEST(AccumulatorMergeObjects, MergingWithSingleObjectShouldLeaveUnchanged) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+
+    assertExpectedResults("$mergeObjects", expCtx, {{{}, {Value(Document({}))}}});
+
+    auto doc = Value(Document({{"a", 1}, {"b", 1}}));
+    assertExpectedResults("$mergeObjects", expCtx, {{{doc}, doc}});
+}
+
+TEST(AccumulatorMergeObjects, MergingDisjointObjectsShouldIncludeAllFields) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto first = Value(Document({{"a", 1}, {"b", 1}}));
+    auto second = Value(Document({{"c", 1}}));
+    assertExpectedResults("$mergeObjects",
+                          expCtx,
+                          {{{first, second}, Value(Document({{"a", 1}, {"b", 1}, {"c", 1}}))}});
+}
+
+TEST(AccumulatorMergeObjects, MergingIntersectingObjectsShouldOverrideInOrderReceived) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto first = Value(Document({{"a", "oldValue"_sd}, {"b", 0}, {"c", 1}}));
+    auto second = Value(Document({{"a", "newValue"_sd}}));
+    assertExpectedResults(
+        "$mergeObjects",
+        expCtx,
+        {{{first, second}, Value(Document({{"a", "newValue"_sd}, {"b", 0}, {"c", 1}}))}});
+}
+
+TEST(AccumulatorMergeObjects, MergingIntersectingEmbeddedObjectsShouldOverrideInOrderReceived) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto firstSubDoc = Document({{"a", 1}, {"b", 2}, {"c", 3}});
+    auto secondSubDoc = Document({{"a", 2}, {"b", 1}});
+    auto first = Value(Document({{"d", 1}, {"subDoc", firstSubDoc}}));
+    auto second = Value(Document({{"subDoc", secondSubDoc}}));
+    auto expected = Value(Document({{"d", 1}, {"subDoc", secondSubDoc}}));
+    assertExpectedResults("$mergeObjects", expCtx, {{{first, second}, expected}});
+}
+
+TEST(AccumulatorMergeObjects, MergingWithEmptyDocumentShouldIgnore) {
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
+    auto first = Value(Document({{"a", 0}, {"b", 1}, {"c", 1}}));
+    auto second = Value(Document({}));
+    auto expected = Value(Document({{"a", 0}, {"b", 1}, {"c", 1}}));
+    assertExpectedResults("$mergeObjects", expCtx, {{{first, second}, expected}});
+}
+
+}  // namespace AccumulatorMergeObjects
+
 }  // namespace AccumulatorTests
