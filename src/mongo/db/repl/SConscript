@@ -627,6 +627,7 @@ env.Library('read_concern_args',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
+                '$BUILD_DIR/mongo/db/logical_time',
                 'optime',
             ])
 
@@ -960,7 +961,10 @@ env.CppUnitTest(
     source=[
         'read_concern_args_test.cpp',
     ],
-    LIBDEPS=['replica_set_messages']
+    LIBDEPS=[
+        'replica_set_messages',
+        '$BUILD_DIR/mongo/db/logical_time',
+   ],
 )
 
 env.Library(target='optime',

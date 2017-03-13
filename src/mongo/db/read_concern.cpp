@@ -59,24 +59,6 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshot
 
 }  // namespace
 
-StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* opCtx,
-                                                     const BSONObj& cmdObj,
-                                                     bool supportsReadConcern) {
-    repl::ReadConcernArgs readConcernArgs;
-
-    auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
-    if (!readConcernParseStatus.isOK()) {
-        return readConcernParseStatus;
-    }
-
-    if (!supportsReadConcern && !readConcernArgs.isEmpty()) {
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << "Command does not support read concern"};
-    }
-
-    return readConcernArgs;
-}
-
 Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
@@ -95,7 +77,7 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
                 "Replica sets running protocol version 0 do not support readConcern: linearizable"};
         }
 
-        if (!readConcernArgs.getOpTime().isNull()) {
+        if (readConcernArgs.getArgsOpTime()) {
             return {ErrorCodes::FailedToParse,
                     "afterOpTime not compatible with linearizable read concern"};
         }

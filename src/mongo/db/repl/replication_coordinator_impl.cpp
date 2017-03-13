@@ -407,6 +407,10 @@ OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime_inlock() c
     return OpTime();
 }
 
+LogicalTime ReplicationCoordinatorImpl::_getCurrentCommittedLogicalTime_inlock() const {
+    return LogicalTime(_getCurrentCommittedSnapshotOpTime_inlock().getTimestamp());
+}
+
 void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
     _replExecutor.appendConnectionStats(stats);
 }
@@ -1223,8 +1227,8 @@ OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
     return _getMyLastDurableOpTime_inlock();
 }
 
-Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCtx,
-                                                          const ReadConcernArgs& settings) {
+Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
+                                                        const ReadConcernArgs& readConcern) {
     // We should never wait for replication if we are holding any locks, because this can
     // potentially block for long time while doing network activity.
     if (opCtx->lockState()->isLocked()) {
@@ -1233,7 +1237,12 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
     }
 
     const bool isMajorityReadConcern =
-        settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+
+    if (readConcern.getArgsClusterTime() && !isMajorityReadConcern) {
+        return {ErrorCodes::BadValue,
+                "only readConcern level majority is allowed when specifying afterClusterTime"};
+    }
 
     if (isMajorityReadConcern && !getSettings().isMajorityReadConcernEnabled()) {
         // This is an opt-in feature. Fail if the user didn't opt-in.
@@ -1242,9 +1251,18 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
                 "--enableMajorityReadConcern."};
     }
 
-    const auto targetOpTime = settings.getOpTime();
+    return Status::OK();
+}
 
-    if (targetOpTime.isNull()) {
+Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCtx,
+                                                          const ReadConcernArgs& readConcern) {
+    auto verifyStatus = _validateReadConcern(opCtx, readConcern);
+    if (!verifyStatus.isOK()) {
+        return verifyStatus;
+    }
+
+    // nothing to wait for
+    if (!readConcern.getArgsClusterTime() && !readConcern.getArgsOpTime()) {
         return Status::OK();
     }
 
@@ -1255,6 +1273,58 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
         return {ErrorCodes::NotAReplicaSet,
                 "node needs to be a replica set member to use read concern"};
     }
+
+    if (readConcern.getArgsClusterTime()) {
+        auto targetTime = *readConcern.getArgsClusterTime();
+
+        if (readConcern.getArgsOpTime()) {
+            auto opTimeStamp = LogicalTime(readConcern.getArgsOpTime()->getTimestamp());
+            if (opTimeStamp > targetTime) {
+                targetTime = opTimeStamp;
+            }
+        }
+        return _waitUntilClusterTimeForRead(opCtx, targetTime);
+    } else {
+        return _waitUntilOpTimeForReadDeprecated(opCtx, readConcern);
+    }
+}
+
+Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext* opCtx,
+                                                                LogicalTime clusterTime) {
+    invariant(clusterTime != LogicalTime::kUninitialized);
+
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+
+    auto currentTime = _getCurrentCommittedLogicalTime_inlock();
+    if (clusterTime > currentTime) {
+        LOG(1) << "waitUntilClusterTime: waiting for clusterTime:" << clusterTime.toString()
+               << " to be in a snapshot -- current snapshot: " << currentTime.toString();
+    }
+
+    while (clusterTime > _getCurrentCommittedLogicalTime_inlock()) {
+        if (_inShutdown) {
+            return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
+        }
+
+        LOG(3) << "waitUntilClusterTime: waiting for a new snapshot until " << opCtx->getDeadline();
+
+        auto waitStatus =
+            opCtx->waitForConditionOrInterruptNoAssert(_currentCommittedSnapshotCond, lock);
+        if (!waitStatus.isOK()) {
+            return waitStatus;
+        }
+        LOG(3) << "Got notified of new snapshot: " << _currentCommittedSnapshot->toString();
+    }
+
+    return Status::OK();
+}
+
+Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
+    OperationContext* opCtx, const ReadConcernArgs& readConcern) {
+    const bool isMajorityReadConcern =
+        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+
+    const auto targetOpTime = readConcern.getArgsOpTime().value_or(OpTime());
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 

@@ -1328,6 +1328,29 @@ MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const
     Command::registerExecCommand(execCommandHandler);
     return Status::OK();
 }
+
+/**
+ * Given the specified command and whether it supports read concern, returns an effective read
+ * concern which should be used.
+ */
+StatusWith<repl::ReadConcernArgs> _extractReadConcern(const BSONObj& cmdObj,
+                                                      bool supportsNonLocalReadConcern) {
+    repl::ReadConcernArgs readConcernArgs;
+
+    auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
+    if (!readConcernParseStatus.isOK()) {
+        return readConcernParseStatus;
+    }
+
+    if (!supportsNonLocalReadConcern &&
+        readConcernArgs.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Command does not support non local read concern"};
+    }
+
+    return readConcernArgs;
+}
+
 }  // namespace
 
 // This really belongs in commands.cpp, but we need to move it here so we can
@@ -1354,7 +1377,7 @@ bool Command::run(OperationContext* opCtx,
     const std::string db = request.getDatabase().toString();
 
     BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
-    auto readConcernArgsStatus = extractReadConcern(opCtx, cmd, supportsReadConcern());
+    auto readConcernArgsStatus = _extractReadConcern(cmd, supportsReadConcern());
 
     if (!readConcernArgsStatus.isOK()) {
         auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());

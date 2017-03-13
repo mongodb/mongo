@@ -169,7 +169,7 @@ public:
     virtual OpTime getMyLastDurableOpTime() const override;
 
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
-                                          const ReadConcernArgs& settings) override;
+                                          const ReadConcernArgs& readConcern) override;
 
     virtual OID getElectionId() override;
 
@@ -580,6 +580,16 @@ private:
      * Returns the OpTime of the current committed snapshot, if one exists.
      */
     OpTime _getCurrentCommittedSnapshotOpTime_inlock() const;
+
+    /**
+     * Returns the OpTime of the current committed snapshot converted to LogicalTime.
+     */
+    LogicalTime _getCurrentCommittedLogicalTime_inlock() const;
+
+    /**
+     *  Verifies that ReadConcernArgs match node's readConcern.
+     */
+    Status _validateReadConcern(OperationContext* opCtx, const ReadConcernArgs& readConcern);
 
     /**
      * Helper method that removes entries from _slaveInfo if they correspond to a node
@@ -1170,6 +1180,20 @@ private:
      * Caller must already have locked the _topoMutex.
      */
     ReplicationExecutor::EventHandle _cancelElectionIfNeeded_inTopoLock();
+
+    /**
+     * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
+     * It supports local readConcern, which _waitUntilClusterTimeForRead does not.
+     * TODO: remove when SERVER-28150 is done.
+     */
+    Status _waitUntilOpTimeForReadDeprecated(OperationContext* opCtx,
+                                             const ReadConcernArgs& readConcern);
+
+    /**
+     * Waits until the logicalTime of the current node is at least the 'clusterTime'.
+     * TODO: Merge with waitUntilOpTimeForRead() when SERVER-28150 is done.
+     */
+    Status _waitUntilClusterTimeForRead(OperationContext* opCtx, LogicalTime clusterTime);
 
     //
     // All member variables are labeled with one of the following codes indicating the

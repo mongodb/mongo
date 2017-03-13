@@ -41,14 +41,6 @@ class ReadConcernArgs;
 
 
 /**
- * Given the specified command and whether it supports read concern, returns an effective read
- * concern which should be used.
- */
-StatusWith<repl::ReadConcernArgs> extractReadConcern(OperationContext* opCtx,
-                                                     const BSONObj& cmdObj,
-                                                     bool supportsReadConcern);
-
-/**
  * Given the specified read concern arguments, performs checks that the read concern can actually be
  * satisfied given the current state of the server and if so calls into the replication subsystem to
  * perform the wait.
