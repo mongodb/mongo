@@ -52,6 +52,8 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
@@ -1516,6 +1518,7 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
+
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         if (!routingInfo.cm()) {
@@ -1538,51 +1541,70 @@ public:
         if (cmdObj[limitName].isNumber())
             limit = cmdObj[limitName].numberInt();
 
-        list<shared_ptr<Future::CommandResult>> futures;
+        // Construct the requests.
+        vector<AsyncRequestsSender::Request> requests;
         BSONArrayBuilder shardArray;
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-            if (!shardStatus.isOK()) {
-                invariant(shardStatus.getStatus() == ErrorCodes::ShardNotFound);
-                continue;
-            }
-
-            futures.push_back(Future::spawnCommand(
-                shardStatus.getValue()->getConnString().toString(), dbName, cmdObj, options));
+            requests.emplace_back(shardId, cmdObj);
             shardArray.append(shardId.toString());
         }
 
+        // Extract the readPreference from the command.
+        rpc::ServerSelectionMetadata ssm;
+        BSONObjBuilder unusedCmdBob;
+        BSONObjBuilder upconvertedMetadataBob;
+        uassertStatusOK(rpc::ServerSelectionMetadata::upconvert(
+            cmdObj, options, &unusedCmdBob, &upconvertedMetadataBob));
+        auto upconvertedMetadata = upconvertedMetadataBob.obj();
+        auto ssmElem = upconvertedMetadata.getField(rpc::ServerSelectionMetadata::fieldName());
+        if (!ssmElem.eoo()) {
+            ssm = uassertStatusOK(rpc::ServerSelectionMetadata::readFromMetadata(ssmElem));
+        }
+        auto readPref = ssm.getReadPreference();
+
+        // Send the requests.
+        AsyncRequestsSender ars(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            dbName,
+            requests,
+            readPref ? *readPref : ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet()));
+
+        // Receive the responses.
         multimap<double, BSONObj> results;  // TODO: maybe use merge-sort instead
         string nearStr;
         double time = 0;
         double btreelocs = 0;
         double nscanned = 0;
         double objectsLoaded = 0;
-        for (list<shared_ptr<Future::CommandResult>>::iterator i = futures.begin();
-             i != futures.end();
-             i++) {
-            shared_ptr<Future::CommandResult> res = *i;
-            if (!res->join(opCtx)) {
-                errmsg = res->result()["errmsg"].String();
-                if (res->result().hasField("code")) {
-                    result.append(res->result()["code"]);
-                }
+        while (!ars.done()) {
+            // Block until a response is available.
+            auto shardResponse = ars.next();
+
+            // Abandon processing responses on any error.
+            if (!shardResponse.swResponse.isOK()) {
+                auto errorStatus = std::move(shardResponse.swResponse.getStatus());
+                errmsg = errorStatus.reason();
+                result.append("code", errorStatus.code());
                 return false;
             }
 
-            if (res->result().hasField("near")) {
-                nearStr = res->result()["near"].String();
+            // Process a successful response.
+            auto shardResult = std::move(shardResponse.swResponse.getValue().data);
+
+            if (shardResult.hasField("near")) {
+                nearStr = shardResult["near"].String();
             }
-            time += res->result()["stats"]["time"].Number();
-            if (!res->result()["stats"]["btreelocs"].eoo()) {
-                btreelocs += res->result()["stats"]["btreelocs"].Number();
+            time += shardResult["stats"]["time"].Number();
+            if (!shardResult["stats"]["btreelocs"].eoo()) {
+                btreelocs += shardResult["stats"]["btreelocs"].Number();
             }
-            nscanned += res->result()["stats"]["nscanned"].Number();
-            if (!res->result()["stats"]["objectsLoaded"].eoo()) {
-                objectsLoaded += res->result()["stats"]["objectsLoaded"].Number();
+            nscanned += shardResult["stats"]["nscanned"].Number();
+            if (!shardResult["stats"]["objectsLoaded"].eoo()) {
+                objectsLoaded += shardResult["stats"]["objectsLoaded"].Number();
             }
 
-            BSONForEach(obj, res->result()["results"].embeddedObject()) {
+            BSONForEach(obj, shardResult["results"].embeddedObject()) {
                 results.insert(make_pair(obj["dis"].Number(), obj.embeddedObject().getOwned()));
             }
 
