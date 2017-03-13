@@ -76,7 +76,6 @@ env.Library(
         'cluster_write.cpp',
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
-        'dbclient_multi_command.cpp',
         'run_on_all_shards_cmd.cpp',
         'sharded_command_processing.cpp',
         'strategy.cpp',

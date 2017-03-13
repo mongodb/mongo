@@ -58,16 +58,10 @@ using std::string;
 using std::vector;
 
 namespace {
-/**
- * This code is mostly duplicated from DBClientWithCommands::runCommand. It may not
- * be worth de-duplicating as this codepath will eventually be removed anyway.
- */
 Message assembleCommandRequest(DBClientWithCommands* cli,
                                StringData database,
                                int legacyQueryOptions,
                                BSONObj legacyQuery) {
-    // TODO: Rewrite this to a common utility shared between this and DBClientMultiCommand.
-
     // Can be an OP_COMMAND or OP_QUERY message.
     auto requestBuilder =
         rpc::makeRequestBuilder(cli->getClientRPCProtocols(), cli->getServerRPCProtocols());
