@@ -1978,9 +1978,11 @@
         var destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
 
         // The namespace for the _id index will differ since the source and destination collections
-        // are in different databases.
+        // are in different databases. Same for UUID.
         delete sourceCollectionInfos[0].idIndex.ns;
+        delete sourceCollectionInfos[0].info.uuid;
         delete destCollectionInfos[0].idIndex.ns;
+        delete destCollectionInfos[0].info.uuid;
 
         assert.eq(sourceCollectionInfos, destCollectionInfos);
         assert.eq([{_id: "FOO"}], destDB[coll.getName()].find({_id: "foo"}).toArray());
