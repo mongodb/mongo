@@ -68,6 +68,9 @@ static Value serializeConstant(Value val) {
     return Value(DOC("$const" << val));
 }
 
+constexpr Variables::Id Variables::kRootId;
+constexpr Variables::Id Variables::kRemoveId;
+
 const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT"_sd, kRootId},
                                                                  {"REMOVE"_sd, kRemoveId}};
 
