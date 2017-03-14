@@ -7,7 +7,6 @@ Import("debugBuild")
 env = env.Clone()
 
 files = [
-    'src/base/atomicops-internals-x86.cc',
     'src/base/dynamic_annotations.c',
     'src/base/elf_mem_image.cc',
     'src/base/logging.cc',
