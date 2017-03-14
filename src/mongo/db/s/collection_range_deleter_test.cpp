@@ -72,13 +72,20 @@ void CollectionRangeDeleterTest::setUp() {
     repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
     _opCtx = getServiceContext()->makeOperationContext(&cc());
     _dbDirectClient = stdx::make_unique<DBDirectClient>(operationContext());
+
     {
+        const OID epoch = OID::gen();
+
         AutoGetCollection autoColl(operationContext(), kNamespaceString, MODE_IX);
         auto collectionShardingState =
             CollectionShardingState::get(operationContext(), kNamespaceString);
         collectionShardingState->refreshMetadata(
             operationContext(),
-            stdx::make_unique<CollectionMetadata>(kKeyPattern, ChunkVersion(1, 1, OID::gen())));
+            stdx::make_unique<CollectionMetadata>(
+                kKeyPattern,
+                ChunkVersion(1, 0, epoch),
+                ChunkVersion(0, 0, epoch),
+                SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()));
         _metadataManager = collectionShardingState->getMetadataManagerForTest();
     }
 }

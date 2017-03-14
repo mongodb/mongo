@@ -32,17 +32,177 @@
 
 #include <set>
 
+#include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager_test_fixture.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
 
+using executor::RemoteCommandRequest;
+using unittest::assertGet;
+
 using ChunkManagerLoadTest = ChunkManagerTestFixture;
+
+TEST_F(ChunkManagerLoadTest, FullLoad) {
+    const OID epoch = OID::gen();
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    auto future = launchAsync([&] {
+        auto client = serviceContext()->makeClient("Test");
+        auto opCtx = client->makeOperationContext();
+        return CatalogCache::refreshCollectionRoutingInfo(opCtx.get(), kNss, nullptr);
+    });
+
+    expectFindOnConfigSendBSONObjVector([&]() {
+        CollectionType collType;
+        collType.setNs(kNss);
+        collType.setEpoch(epoch);
+        collType.setKeyPattern(shardKeyPattern.toBSON());
+        collType.setUnique(false);
+
+        return std::vector<BSONObj>{collType.toBSON()};
+    }());
+
+    expectFindOnConfigSendBSONObjVector([&]() {
+        ChunkVersion version(1, 0, epoch);
+
+        ChunkType chunk1(kNss,
+                         {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
+                         version,
+                         {"0"});
+        version.incMinor();
+
+        ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
+        version.incMinor();
+
+        ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
+        version.incMinor();
+
+        ChunkType chunk4(kNss,
+                         {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
+                         version,
+                         {"1"});
+        version.incMinor();
+
+        return std::vector<BSONObj>{chunk1.toConfigBSON(),
+                                    chunk2.toConfigBSON(),
+                                    chunk3.toConfigBSON(),
+                                    chunk4.toConfigBSON()};
+    }());
+
+    expectFindOnConfigSendBSONObjVector([&]() {
+        ShardType shard1;
+        shard1.setName("0");
+        shard1.setHost(str::stream() << "Host0:12345");
+
+        ShardType shard2;
+        shard2.setName("1");
+        shard2.setHost(str::stream() << "Host1:12345");
+
+        return std::vector<BSONObj>{shard1.toBSON(), shard2.toBSON()};
+    }());
+
+    auto routingInfo = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(4, routingInfo->numChunks());
+}
+
+TEST_F(ChunkManagerLoadTest, CollectionNotFound) {
+    auto future = launchAsync([&] {
+        auto client = serviceContext()->makeClient("Test");
+        auto opCtx = client->makeOperationContext();
+        return CatalogCache::refreshCollectionRoutingInfo(opCtx.get(), kNss, nullptr);
+    });
+
+    // Return an empty collection
+    expectFindOnConfigSendBSONObjVector({});
+
+    ASSERT(nullptr == future.timed_get(kFutureTimeout));
+}
+
+TEST_F(ChunkManagerLoadTest, NoChunksFoundForCollection) {
+    const OID epoch = OID::gen();
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    auto future = launchAsync([&] {
+        auto client = serviceContext()->makeClient("Test");
+        auto opCtx = client->makeOperationContext();
+        return CatalogCache::refreshCollectionRoutingInfo(opCtx.get(), kNss, nullptr);
+    });
+
+    expectFindOnConfigSendBSONObjVector([&]() {
+        CollectionType collType;
+        collType.setNs(kNss);
+        collType.setEpoch(epoch);
+        collType.setKeyPattern(shardKeyPattern.toBSON());
+        collType.setUnique(false);
+
+        return std::vector<BSONObj>{collType.toBSON()};
+    }());
+
+    // Return no chunks
+    expectFindOnConfigSendBSONObjVector({});
+
+    try {
+        auto routingInfo = future.timed_get(kFutureTimeout);
+        FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
+                           << (routingInfo ? routingInfo->toString() : "nullptr"));
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.getCode());
+    }
+}
+
+TEST_F(ChunkManagerLoadTest, ChunkEpochChangeDuringIncrementalLoad) {
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    auto initialRoutingInfo(makeChunkManager(shardKeyPattern, nullptr, true, {}));
+    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+
+    auto future = launchAsync([&] {
+        auto client = serviceContext()->makeClient("Test");
+        auto opCtx = client->makeOperationContext();
+        return CatalogCache::refreshCollectionRoutingInfo(opCtx.get(), kNss, initialRoutingInfo);
+    });
+
+    expectFindOnConfigSendBSONObjVector([&]() {
+        CollectionType collType;
+        collType.setNs(kNss);
+        collType.setEpoch(initialRoutingInfo->getVersion().epoch());
+        collType.setKeyPattern(shardKeyPattern.toBSON());
+        collType.setUnique(false);
+
+        return std::vector<BSONObj>{collType.toBSON()};
+    }());
+
+    ChunkVersion version = initialRoutingInfo->getVersion();
+
+    const OID newEpoch = OID::gen();
+
+    // Return set of chunks, one of which has different epoch
+    expectFindOnConfigSendBSONObjVector([&]() {
+        version.incMajor();
+        ChunkType chunk1(
+            kNss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
+
+        ChunkType chunk2(kNss,
+                         {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
+                         ChunkVersion(1, 0, OID::gen()),
+                         {"0"});
+
+        return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
+    }());
+
+    try {
+        auto routingInfo = future.timed_get(kFutureTimeout);
+        FAIL(str::stream() << "Returning chunks with different epoch did not fail and returned "
+                           << (routingInfo ? routingInfo->toString() : "nullptr"));
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.getCode());
+    }
+}
 
 TEST_F(ChunkManagerLoadTest, IncrementalLoadAfterSplit) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
@@ -69,7 +229,15 @@ TEST_F(ChunkManagerLoadTest, IncrementalLoadAfterSplit) {
     }());
 
     // Return set of chunks, which represent a split
-    expectFindOnConfigSendBSONObjVector([&]() {
+    onFindCommand([&](const RemoteCommandRequest& request) {
+        // Ensure it is a differential query
+        const auto diffQuery =
+            assertGet(QueryRequest::makeFromFindCommand(kNss, request.cmdObj, false));
+        ASSERT_BSONOBJ_EQ(
+            BSON("ns" << kNss.ns() << "lastmod"
+                      << BSON("$gte" << Timestamp(version.majorVersion(), version.minorVersion()))),
+            diffQuery->getFilter());
+
         version.incMajor();
         ChunkType chunk1(
             kNss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
@@ -79,7 +247,7 @@ TEST_F(ChunkManagerLoadTest, IncrementalLoadAfterSplit) {
             kNss, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"0"});
 
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
-    }());
+    });
 
     auto newRoutingInfo(future.timed_get(kFutureTimeout));
     ASSERT_EQ(2, newRoutingInfo->numChunks());

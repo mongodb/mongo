@@ -160,7 +160,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
                     numRefreshAttempts < kMaxInconsistentRoutingInfoRefreshAttempts) {
                     ul.unlock();
 
-                    log() << "Metadata refresh for " << nss.ns() << " failed and will be retried"
+                    log() << "Metadata refresh for " << nss << " failed and will be retried"
                           << causedBy(redact(ex));
 
                     // Do the sleep outside of the mutex
@@ -299,7 +299,8 @@ std::shared_ptr<ChunkManager> CatalogCache::refreshCollectionRoutingInfo(
         chunkMap = existingRoutingInfo->chunkMap();
     }
 
-    log() << "Refreshing chunks based on version " << startingCollectionVersion;
+    log() << "Refreshing chunks for collection " << nss << " based on version "
+          << startingCollectionVersion;
 
     // Diff tracker should *always* find at least one chunk if collection exists
     const auto diffQuery =
@@ -325,9 +326,10 @@ std::shared_ptr<ChunkManager> CatalogCache::refreshCollectionRoutingInfo(
     const int diffsApplied = differ.calculateConfigDiff(opCtx, newChunks);
 
     if (diffsApplied < 1) {
-        log() << "Refresh took " << t.millis() << " ms and failed because the collection's "
-                                                  "sharding metadata either changed in between or "
-                                                  "became corrupted";
+        log() << "Refresh for collection " << nss << " took " << t.millis()
+              << " ms and failed because the collection's "
+                 "sharding metadata either changed in between or "
+                 "became corrupted";
 
         uasserted(ErrorCodes::ConflictingOperationInProgress,
                   "Collection sharding status changed during refresh or became corrupted");
@@ -341,7 +343,8 @@ std::shared_ptr<ChunkManager> CatalogCache::refreshCollectionRoutingInfo(
     // sequence number to detect batch writes not making progress because of chunks moving across
     // shards too frequently.
     if (collectionVersion == startingCollectionVersion) {
-        log() << "Refresh took " << t.millis() << " ms and didn't find any metadata changes";
+        log() << "Refresh for collection " << nss << " took " << t.millis()
+              << " ms and didn't find any metadata changes";
 
         return existingRoutingInfo;
     }
@@ -353,7 +356,8 @@ std::shared_ptr<ChunkManager> CatalogCache::refreshCollectionRoutingInfo(
                                               ->makeFromBSON(coll.getDefaultCollation()));
     }
 
-    log() << "Refresh took " << t.millis() << " ms and found version " << collectionVersion;
+    log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and found version "
+          << collectionVersion;
 
     return stdx::make_unique<ChunkManager>(nss,
                                            coll.getKeyPattern(),

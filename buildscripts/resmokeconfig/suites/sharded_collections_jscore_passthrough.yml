@@ -72,6 +72,10 @@ selector:
     - jstests/core/batch_write_command_update.js
     # TODO: Remove after fixing SERVER-28321.
     - jstests/core/mr_undef.js
+    # TODO: SERVER-16605
+    - jstests/core/mr1.js
+    - jstests/core/mr3.js
+    - jstests/core/mr4.js
     exclude_with_any_tags:
     # Tests tagged with the following will fail because they assume collections are not sharded.
     - assumes_no_implicit_collection_creation_after_drop

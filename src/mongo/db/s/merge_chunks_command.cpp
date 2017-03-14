@@ -133,7 +133,7 @@ Status mergeChunks(OperationContext* opCtx,
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
         metadata = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
-        if (!metadata || metadata->getKeyPattern().isEmpty()) {
+        if (!metadata) {
             std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
                                           << " is not sharded";
 

@@ -8,7 +8,6 @@ env.Library(
     target='metadata',
     source=[
         'collection_metadata.cpp',
-        'metadata_loader.cpp',
     ],
     LIBDEPS=[
         'shard_metadata_util',
@@ -221,7 +220,6 @@ env.CppUnitTest(
     target='sharding_metadata_test',
     source=[
         'collection_metadata_test.cpp',
-        'metadata_loader_test.cpp',
         'shard_metadata_util_test.cpp',
     ],
     LIBDEPS=[

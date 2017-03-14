@@ -75,17 +75,11 @@ public:
     static const BSONField<OID> lastConsistentCollectionVersionEpoch;
     static const BSONField<Date_t> lastConsistentCollectionVersion;
 
-    /**
-     * The MetadataLoader fetches CollectionType format documents from the config server and then
-     * writes them in ShardCollectionType format to the shard. This constructor facilitates the
-     * conversion from config to shard config.collections schema.
-     */
     explicit ShardCollectionType(const CollectionType& collType);
 
     /**
      * Constructs a new ShardCollectionType object from BSON retrieved from a shard server. Also
-     * does
-     * validation of the contents.
+     * does validation of the contents.
      */
     static StatusWith<ShardCollectionType> fromBSON(const BSONObj& source);
 
