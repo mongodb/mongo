@@ -100,7 +100,6 @@ void OpCounters::gotOp(int op, bool isCommand) {
             break;
         case dbKillCursors:
         case opReply:
-        case dbMsg:
             break;
         default:
             log() << "OpCounters::gotOp unknown op: " << op << endl;

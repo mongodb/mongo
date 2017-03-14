@@ -222,9 +222,8 @@ public:
     DbMessage(const Message& msg);
 
     // Indicates whether this message is expected to have a ns
-    // or in the case of dbMsg, a string in the same place as ns
     bool messageShouldHaveNs() const {
-        return (_msg.operation() >= dbMsg) & (_msg.operation() <= dbDelete);
+        return (_msg.operation() >= dbUpdate) & (_msg.operation() <= dbDelete);
     }
 
     /** the 32 bit field before the ns

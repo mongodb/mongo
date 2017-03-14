@@ -110,7 +110,7 @@ void ServiceEntryPointMongos::_sessionLoop(const transport::SessionHandle& sessi
         // connection
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "Message type " << op << " is not supported.",
-                op > dbMsg);
+                isSupportedNetworkOp(op));
 
         // Start a new LastError session. Any exceptions thrown from here onwards will be returned
         // to the caller (if the type of the message permits it).
