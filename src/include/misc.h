@@ -140,6 +140,7 @@
 
 #define	F_CLR(p, mask)		        FLD_CLR((p)->flags, mask)
 #define	F_ISSET(p, mask)	        FLD_ISSET((p)->flags, mask)
+#define	F_ISSET_ALL(p, mask)	        (FLD_MASK((p)->flags, mask) == (mask))
 #define	F_MASK(p, mask)	                FLD_MASK((p)->flags, mask)
 #define	F_SET(p, mask)		        FLD_SET((p)->flags, mask)
 

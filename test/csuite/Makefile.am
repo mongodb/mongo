@@ -4,8 +4,13 @@ LDADD = $(top_builddir)/test/utility/libtest_util.la \
     $(top_builddir)/libwiredtiger.la
 AM_LDFLAGS = -static
 
+noinst_PROGRAMS=
+
+test_scope_SOURCES = scope/main.c
+noinst_PROGRAMS += test_scope
+
 test_wt1965_col_efficiency_SOURCES = wt1965_col_efficiency/main.c
-noinst_PROGRAMS = test_wt1965_col_efficiency
+noinst_PROGRAMS += test_wt1965_col_efficiency
 
 test_wt2403_lsm_workload_SOURCES = wt2403_lsm_workload/main.c
 noinst_PROGRAMS += test_wt2403_lsm_workload

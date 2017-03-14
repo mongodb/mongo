@@ -1565,12 +1565,23 @@ __clsm_update(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDVALUE(cursor);
 	WT_ERR(__clsm_enter(clsm, false, true));
 
-	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm, &value)) == 0) {
-		WT_ERR(__clsm_deleted_encode(
-		    session, &cursor->value, &value, &buf));
-		ret = __clsm_put(session, clsm, &cursor->key, &value, true);
-	}
+	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+		WT_ERR(__clsm_lookup(clsm, &value));
+	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
+	WT_ERR(__clsm_put(session, clsm, &cursor->key, &value, true));
+
+	/*
+	 * Set the cursor to reference the internal key/value of the positioned
+	 * cursor.
+	 */
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	WT_ITEM_SET(cursor->key, clsm->current->key);
+	WT_ITEM_SET(cursor->value, clsm->current->value);
+	WT_ASSERT(session,
+	    F_MASK(clsm->current, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
+	WT_ASSERT(session,
+	    F_MASK(clsm->current, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	__wt_scr_free(session, &buf);
 	__clsm_leave(clsm);
@@ -1589,8 +1600,12 @@ __clsm_remove(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_ITEM value;
 	WT_SESSION_IMPL *session;
+	bool positioned;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
+
+	/* Check if the cursor is positioned. */
+	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
 	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
@@ -1600,9 +1615,22 @@ __clsm_remove(WT_CURSOR *cursor)
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_lookup(clsm, &value)) == 0)
 		ret = __clsm_put(
-		    session, clsm, &cursor->key, &__tombstone, true);
+		    session, clsm, &cursor->key, &__tombstone, positioned);
 
 err:	__clsm_leave(clsm);
+
+	/*
+	 * If the cursor was positioned, it stays positioned with a key but no
+	 * no value, otherwise, there's no position, key or value. This isn't
+	 * just cosmetic, without a reset, iteration on this cursor won't start
+	 * at the beginning/end of the table.
+	 */
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if (positioned)
+		F_SET(cursor, WT_CURSTD_KEY_INT);
+	else
+		WT_TRET(cursor->reset(cursor));
+
 	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }

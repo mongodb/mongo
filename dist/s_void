@@ -137,7 +137,7 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	# form of return assignment or call.
 	file_parse $f |
 	sed -e 's/return ([^)]*); }$//' \
-	    -e '/[A-Z]*_API_CALL[A-Z_]*(/d' \
+	    -e '/[_A-Z]*_API_CALL[_A-Z]*(/d' \
 	    -e '/WT_CURSOR_NEEDKEY(/d' \
 	    -e '/WT_CURSOR_NEEDVALUE(/d' \
 	    -e '/WT_ERR[A-Z_]*(/d' \
@@ -166,7 +166,7 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	file_parse $f |
 	grep 'WT_DECL_RET' |
 	sed -e '/ret =/d' \
-	    -e '/API_END_RET/d' \
+	    -e '/[_A-Z]*_API_CALL[_A-Z]*(/d' \
 	    -e '/WT_CURSOR_NEEDKEY/d' \
 	    -e '/WT_CURSOR_NEEDVALUE/d' \
 	    -e '/WT_ERR/d' \
