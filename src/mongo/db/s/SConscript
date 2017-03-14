@@ -6,7 +6,6 @@ env.Library(
     target='metadata',
     source=[
         'collection_metadata.cpp',
-        'metadata_loader.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -187,7 +186,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='sharding_metadata_test',
     source=[
-        'metadata_loader_test.cpp',
         'collection_metadata_test.cpp',
     ],
     LIBDEPS=[

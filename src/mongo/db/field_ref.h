@@ -138,11 +138,6 @@ private:
     // with allocations.
     static const size_t kReserveAhead = 4;
 
-    /**
-     * Parses 'path' into parts.
-     */
-    void _parse(StringData path);
-
     /** Converts the field part index to the variable part equivalent */
     size_t getIndex(size_t i) const {
         return i - kReserveAhead;

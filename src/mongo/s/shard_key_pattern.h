@@ -91,6 +91,8 @@ public:
 
     const KeyPattern& getKeyPattern() const;
 
+    const std::vector<FieldRef*>& getKeyPatternFields() const;
+
     const BSONObj& toBSON() const;
 
     std::string toString() const;

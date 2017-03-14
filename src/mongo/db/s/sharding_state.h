@@ -43,8 +43,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -347,13 +345,8 @@ private:
      * Refreshes collection metadata by asking the config server for the latest information and
      * returns the latest version at the time the reload was done. This call does network I/O and
      * should never be called with a lock.
-     *
-     * The metadataForDiff argument indicates that the specified metadata should be used as a base
-     * from which to only load the differences. If nullptr is passed, a full reload will be done.
      */
-    StatusWith<ChunkVersion> _refreshMetadata(OperationContext* txn,
-                                              const NamespaceString& nss,
-                                              const CollectionMetadata* metadataForDiff);
+    ChunkVersion _refreshMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
     // Initializes a TaskExecutor for cleaning up orphaned ranges
     void _initializeRangeDeleterTaskExecutor();
@@ -378,9 +371,6 @@ private:
 
     // Sets the shard name for this host (comes through setShardVersion)
     std::string _shardName;
-
-    // Protects from hitting the config server from too many threads at once
-    TicketHolder _configServerTickets;
 
     // Cache of collection metadata on this shard. It is not safe to look-up values from this map
     // without holding some form of collection lock. It is only safe to add/remove values when

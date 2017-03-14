@@ -86,7 +86,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
         metadata = CollectionShardingState::get(txn, ns.toString())->getMetadata();
     }
 
-    if (!metadata || metadata->getKeyPattern().isEmpty()) {
+    if (!metadata) {
         warning() << "skipping orphaned data cleanup for " << ns.toString()
                   << ", collection is not sharded";
 
@@ -214,15 +214,10 @@ public:
             return false;
         }
 
-        if (ns == "") {
-            errmsg = "no collection name specified";
-            return false;
-        }
-
-        if (!NamespaceString(ns).isValid()) {
-            errmsg = "invalid namespace";
-            return false;
-        }
+        const NamespaceString nss(ns);
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid namespace: " << nss.ns(),
+                nss.isValid());
 
         BSONObj startingFromKey;
         if (!FieldParser::extract(cmdObj, startingFromKeyField, &startingFromKey, &errmsg)) {
@@ -242,21 +237,12 @@ public:
             return false;
         }
 
-        ChunkVersion shardVersion;
-        Status status = shardingState->refreshMetadataNow(txn, NamespaceString(ns), &shardVersion);
-        if (!status.isOK()) {
-            if (status.code() == ErrorCodes::RemoteChangeDetected) {
-                warning() << "Shard version in transition detected while refreshing "
-                          << "metadata for " << ns << " at version " << shardVersion;
-            } else {
-                errmsg = str::stream() << "failed to refresh shard metadata: " << redact(status);
-                return false;
-            }
-        }
+        ChunkVersion unusedShardVersion;
+        uassertStatusOK(shardingState->refreshMetadataNow(txn, nss, &unusedShardVersion));
 
         BSONObj stoppedAtKey;
-        CleanupResult cleanupResult = cleanupOrphanedData(
-            txn, NamespaceString(ns), startingFromKey, writeConcern, &stoppedAtKey, &errmsg);
+        CleanupResult cleanupResult =
+            cleanupOrphanedData(txn, nss, startingFromKey, writeConcern, &stoppedAtKey, &errmsg);
 
         if (cleanupResult == CleanupResult_Error) {
             return false;

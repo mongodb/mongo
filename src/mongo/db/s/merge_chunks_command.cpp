@@ -90,10 +90,10 @@ Status mergeChunks(OperationContext* txn,
         txn, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
     if (!scopedDistLock.isOK()) {
-        std::string errmsg = stream() << "could not acquire collection lock for " << nss.ns()
-                                      << " to merge chunks in [" << redact(minKey) << ", "
-                                      << redact(maxKey) << ")"
-                                      << causedBy(scopedDistLock.getStatus());
+        const std::string errmsg = stream() << "could not acquire collection lock for " << nss.ns()
+                                            << " to merge chunks in [" << redact(minKey) << ", "
+                                            << redact(maxKey) << ")"
+                                            << causedBy(scopedDistLock.getStatus());
 
         warning() << errmsg;
         return Status(scopedDistLock.getStatus().code(), errmsg);
@@ -109,7 +109,7 @@ Status mergeChunks(OperationContext* txn,
     Status refreshStatus = shardingState->refreshMetadataNow(txn, nss, &shardVersion);
 
     if (!refreshStatus.isOK()) {
-        std::string errmsg = str::stream()
+        const std::string errmsg = str::stream()
             << "could not merge chunks, failed to refresh metadata for " << nss.ns()
             << causedBy(redact(refreshStatus));
 
@@ -118,7 +118,7 @@ Status mergeChunks(OperationContext* txn,
     }
 
     if (epoch.isSet() && shardVersion.epoch() != epoch) {
-        std::string errmsg = stream()
+        const std::string errmsg = stream()
             << "could not merge chunks, collection " << nss.ns() << " has changed"
             << " since merge was sent"
             << "(sent epoch : " << epoch.toString()
@@ -133,9 +133,9 @@ Status mergeChunks(OperationContext* txn,
         AutoGetCollection autoColl(txn, nss, MODE_IS);
 
         metadata = CollectionShardingState::get(txn, nss.ns())->getMetadata();
-        if (!metadata || metadata->getKeyPattern().isEmpty()) {
-            std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
-                                          << " is not sharded";
+        if (!metadata) {
+            const std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
+                                                << " is not sharded";
 
             warning() << errmsg;
             return Status(ErrorCodes::IllegalOperation, errmsg);
@@ -145,10 +145,11 @@ Status mergeChunks(OperationContext* txn,
     dassert(metadata->getShardVersion().equals(shardVersion));
 
     if (!metadata->isValidKey(minKey) || !metadata->isValidKey(maxKey)) {
-        std::string errmsg = stream() << "could not merge chunks, the range "
-                                      << redact(rangeToString(minKey, maxKey)) << " is not valid"
-                                      << " for collection " << nss.ns() << " with key pattern "
-                                      << metadata->getKeyPattern().toString();
+        const std::string errmsg = stream()
+            << "could not merge chunks, the range " << redact(rangeToString(minKey, maxKey))
+            << " is not valid"
+            << " for collection " << nss.ns() << " with key pattern "
+            << metadata->getKeyPattern().toString();
 
         warning() << errmsg;
         return Status(ErrorCodes::IllegalOperation, errmsg);
