@@ -267,6 +267,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='task_executor_mock',
+    source=[
+        'task_executor_mock.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+    ],
+)
+
 env.CppUnitTest(
     target='rs_rollback_test',
     source=[
@@ -1068,10 +1078,10 @@ env.CppUnitTest(
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
         'sync_source_selector_mock',
+        'task_executor_mock',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 

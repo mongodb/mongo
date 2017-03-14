@@ -49,11 +49,11 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/sync_source_selector_mock.h"
+#include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
@@ -106,43 +106,6 @@ struct CollectionCloneInfo {
     CollectionMockStats stats;
     CollectionBulkLoaderMock* loader = nullptr;
     Status status{ErrorCodes::NotYetInitialized, ""};
-};
-
-class TaskExecutorMock : public unittest::TaskExecutorProxy {
-public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
-
-    TaskExecutorMock(executor::TaskExecutor* executor, ShouldFailRequestFn shouldFailRequest)
-        : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
-
-    StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) {
-        if (shouldFailScheduleWork) {
-            return Status(ErrorCodes::OperationFailed, "failed to schedule work");
-        }
-        return getExecutor()->scheduleWork(work);
-    }
-
-    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) {
-        if (shouldFailScheduleWorkAt) {
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "failed to schedule work at " << when.toString());
-        }
-        return getExecutor()->scheduleWorkAt(when, work);
-    }
-
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
-                                                     const RemoteCommandCallbackFn& cb) override {
-        if (_shouldFailRequest(request)) {
-            return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
-        }
-        return getExecutor()->scheduleRemoteCommand(request, cb);
-    }
-
-    bool shouldFailScheduleWork = false;
-    bool shouldFailScheduleWorkAt = false;
-
-private:
-    ShouldFailRequestFn _shouldFailRequest;
 };
 
 class InitialSyncerTest : public executor::ThreadPoolExecutorTest, public SyncSourceSelector {
