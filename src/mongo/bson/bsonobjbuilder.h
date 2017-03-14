@@ -124,6 +124,17 @@ public:
         _b.reserveBytes(1);
     }
 
+    // Move constructible, but not assignable due to reference member.
+    BSONObjBuilder(BSONObjBuilder&& other)
+        : _b(&other._b == &other._buf ? _buf : other._b),
+          _buf(std::move(other._buf)),
+          _offset(std::move(other._offset)),
+          _s(std::move(other._s)),
+          _tracker(std::move(other._tracker)),
+          _doneCalled(std::move(other._doneCalled)) {
+        other.abandon();
+    }
+
     ~BSONObjBuilder() {
         // If 'done' has not already been called, and we have a reference to an owning
         // BufBuilder but do not own it ourselves, then we must call _done to write in the
