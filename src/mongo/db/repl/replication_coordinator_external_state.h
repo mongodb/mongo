@@ -85,7 +85,7 @@ public:
 
     /**
      * Starts an initial sync, and calls "finished" when done,
-     * for replica set member -- legacy impl not in DataReplicator.
+     * for replica set member.
      *
      * NOTE: Use either this (and below function) or the Master/Slave version, but not both.
      */
@@ -97,7 +97,7 @@ public:
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) = 0;
 
     /**
-     * Starts steady state sync for replica set member -- legacy impl not in DataReplicator.
+     * Starts steady state sync for replica set member.
      *
      * NOTE: Use either this or the Master/Slave version, but not both.
      */
@@ -343,7 +343,7 @@ public:
         OperationContext* opCtx) const = 0;
 
     /**
-     * Returns true if the user specified to use the data replicator for initial sync.
+     * Returns true if the user specified to use the new version for initial sync.
      */
     virtual bool shouldUseDataReplicatorInitialSync() const = 0;
 

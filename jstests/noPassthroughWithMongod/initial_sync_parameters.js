@@ -1,6 +1,6 @@
 /*
  * This test validates command line parameter parsing for initial sync. It tests that the
- * initialSyncOplogBuffer can only use a collection when using the data replicator. It then checks
+ * initialSyncOplogBuffer can only use a collection when using the initial syncer. It then checks
  * that only valid initialSyncOplogBuffer options are accepted. Finally it checks that valid
  * combinations of use3dot2InitialSync and initialSyncOplogBuffer are parsed properly.
  */

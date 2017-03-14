@@ -35,7 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/repl/data_replicator.h"
+#include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/optime.h"
@@ -1361,10 +1361,11 @@ private:
     // _lastCommittedOpTime cannot be set to an earlier OpTime.
     OpTime _firstOpTimeOfMyTerm;  // (M)
 
-    // Storage interface used by data replicator.
+    // Storage interface used by initial syncer.
     StorageInterface* _storage;  // (PS)
-    // Data Replicator used to replicate data
-    std::shared_ptr<DataReplicator> _dr;  // (I) pointer set under mutex, copied by callers.
+    // InitialSyncer used for initial sync.
+    std::shared_ptr<InitialSyncer>
+        _initialSyncer;  // (I) pointer set under mutex, copied by callers.
 
     // Hands out the next snapshot name.
     AtomicUInt64 _snapshotNameGenerator;  // (S)
