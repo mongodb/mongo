@@ -57,6 +57,29 @@ env.Library('rslog',
             ])
 
 env.Library(
+    target='abstract_async_component',
+    source=[
+        'abstract_async_component.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+    ],
+)
+
+env.CppUnitTest(
+    target='abstract_async_component_test',
+    source=[
+        'abstract_async_component_test.cpp',
+    ],
+    LIBDEPS=[
+        'abstract_async_component',
+        'task_executor_mock',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.Library(
     target='storage_interface',
     source=[
         'storage_interface.cpp',
