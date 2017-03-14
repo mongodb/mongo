@@ -103,9 +103,19 @@ public:
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
     virtual void onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName) = 0;
+    /**
+     * This function logs an oplog entry when an index is dropped. The namespace of the index,
+     * the index name, and the index info from the index descriptor are used to create a
+     * 'dropIndexes' op where the 'o' field is the name of the index and the 'o2' field is the
+     * index info. The index info can then be used to reconstruct the index on rollback.
+     *
+     * If a user specifies {dropIndexes: 'foo', index: '*'}, each index dropped will have its own
+     * oplog entry. This means it's possible to roll back half of the index drops.
+     */
     virtual void onDropIndex(OperationContext* opCtx,
-                             const std::string& dbName,
-                             const BSONObj& idxDescriptor) = 0;
+                             const NamespaceString& ns,
+                             const std::string& indexName,
+                             const BSONObj& indexInfo) = 0;
     virtual void onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,

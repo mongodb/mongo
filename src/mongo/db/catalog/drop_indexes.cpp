@@ -49,42 +49,48 @@
 namespace mongo {
 namespace {
 Status wrappedRun(OperationContext* opCtx,
-                  const StringData& dbname,
-                  const std::string& toDeleteNs,
+                  const NamespaceString& nss,
                   Database* const db,
                   const BSONObj& jsobj,
                   BSONObjBuilder* anObjBuilder) {
     if (!serverGlobalParams.quiet.load()) {
-        LOG(0) << "CMD: dropIndexes " << toDeleteNs;
+        LOG(0) << "CMD: dropIndexes " << nss;
     }
-    Collection* collection = db ? db->getCollection(toDeleteNs) : nullptr;
+    Collection* collection = db ? db->getCollection(nss) : nullptr;
 
     // If db/collection does not exist, short circuit and return.
     if (!db || !collection) {
-        if (db && db->getViewCatalog()->lookup(opCtx, toDeleteNs)) {
+        if (db && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Cannot drop indexes on view " << toDeleteNs};
+                    str::stream() << "Cannot drop indexes on view " << nss.ns()};
         }
 
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
 
-    OldClientContext ctx(opCtx, toDeleteNs);
-    BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs);
+    OldClientContext ctx(opCtx, nss.ns());
+    BackgroundOperation::assertNoBgOpInProgForNs(nss);
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
     anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(opCtx));
-
 
     BSONElement f = jsobj.getField("index");
     if (f.type() == String) {
         std::string indexToDelete = f.valuestr();
 
         if (indexToDelete == "*") {
-            Status s = indexCatalog->dropAllIndexes(opCtx, false);
+            std::map<std::string, BSONObj> droppedIndexes;
+            Status s = indexCatalog->dropAllIndexes(opCtx, false, &droppedIndexes);
             if (!s.isOK()) {
                 return s;
             }
+
+            // We log one op for every dropped index so that we can roll them back if necessary.
+            for (auto const& idx : droppedIndexes) {
+                opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+                    opCtx, nss, idx.first, idx.second);
+            }
+
             anObjBuilder->append("msg", "non-_id indexes dropped for collection");
             return Status::OK();
         }
@@ -104,6 +110,9 @@ Status wrappedRun(OperationContext* opCtx,
         if (!s.isOK()) {
             return s;
         }
+
+        opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+            opCtx, nss, desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }
@@ -136,6 +145,9 @@ Status wrappedRun(OperationContext* opCtx,
             return s;
         }
 
+        opCtx->getServiceContext()->getOpObserver()->onDropIndex(
+            opCtx, nss, desc->indexName(), desc->infoObj());
+
         return Status::OK();
     }
 
@@ -145,12 +157,11 @@ Status wrappedRun(OperationContext* opCtx,
 
 Status dropIndexes(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const BSONObj& idxDescriptor,
+                   const BSONObj& cmdObj,
                    BSONObjBuilder* result) {
-    StringData dbName = nss.db();
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(opCtx, MODE_IX);
-        AutoGetDb autoDb(opCtx, dbName, MODE_X);
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
             !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
@@ -161,17 +172,14 @@ Status dropIndexes(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        Status status = wrappedRun(opCtx, dbName, nss.ns(), autoDb.getDb(), idxDescriptor, result);
+        Status status = wrappedRun(opCtx, nss, autoDb.getDb(), cmdObj, result);
         if (!status.isOK()) {
             return status;
         }
 
-        getGlobalServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, dbName.toString() + ".$cmd", idxDescriptor);
-
         wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropIndexes", dbName);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropIndexes", nss.db());
     return Status::OK();
 }
 

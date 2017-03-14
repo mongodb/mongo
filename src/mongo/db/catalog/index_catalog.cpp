@@ -814,7 +814,9 @@ BSONObj IndexCatalog::getDefaultIdIndexSpec(
     return b.obj();
 }
 
-Status IndexCatalog::dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) {
+Status IndexCatalog::dropAllIndexes(OperationContext* opCtx,
+                                    bool includingIdIndex,
+                                    std::map<std::string, BSONObj>* droppedIndexes) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));
 
     BackgroundOperation::assertNoBgOpInProgForNs(_collection->ns().ns());
@@ -854,6 +856,10 @@ Status IndexCatalog::dropAllIndexes(OperationContext* opCtx, bool includingIdInd
         IndexCatalogEntry* entry = _entries.find(desc);
         invariant(entry);
         _dropIndex(opCtx, entry);
+
+        if (droppedIndexes != nullptr) {
+            droppedIndexes->emplace(desc->indexName(), desc->infoObj());
+        }
     }
 
     // verify state is sane post cleaning

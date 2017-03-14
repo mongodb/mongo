@@ -255,12 +255,15 @@ void OpObserverImpl::onDropCollection(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onDropIndex(OperationContext* opCtx,
-                                 const std::string& dbName,
-                                 const BSONObj& idxDescriptor) {
-    repl::logOp(opCtx, "c", dbName.c_str(), idxDescriptor, nullptr, false);
+                                 const NamespaceString& ns,
+                                 const std::string& indexName,
+                                 const BSONObj& indexInfo) {
+    BSONObj cmdObj = BSON("dropIndexes" << ns.coll() << "index" << indexName);
+    auto commandNS = ns.getCommandNS();
+    repl::logOp(opCtx, "c", commandNS.c_str(), cmdObj, &indexInfo, false);
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName.c_str(), idxDescriptor, nullptr);
-    logOpForDbHash(opCtx, dbName.c_str());
+    getGlobalAuthorizationManager()->logOp(opCtx, "c", commandNS.c_str(), cmdObj, &indexInfo);
+    logOpForDbHash(opCtx, commandNS.c_str());
 }
 
 void OpObserverImpl::onRenameCollection(OperationContext* opCtx,

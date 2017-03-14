@@ -67,8 +67,9 @@ public:
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
     void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName) override;
     void onDropIndex(OperationContext* opCtx,
-                     const std::string& dbName,
-                     const BSONObj& idxDescriptor) override;
+                     const NamespaceString& ns,
+                     const std::string& indexName,
+                     const BSONObj& indexInfo) override;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,

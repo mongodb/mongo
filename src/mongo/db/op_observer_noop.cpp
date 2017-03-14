@@ -66,7 +66,10 @@ void OpObserverNoop::onDropDatabase(OperationContext*, const std::string&) {}
 
 void OpObserverNoop::onDropCollection(OperationContext*, const NamespaceString&) {}
 
-void OpObserverNoop::onDropIndex(OperationContext*, const std::string&, const BSONObj&) {}
+void OpObserverNoop::onDropIndex(OperationContext*,
+                                 const NamespaceString&,
+                                 const std::string&,
+                                 const BSONObj&) {}
 
 void OpObserverNoop::onRenameCollection(
     OperationContext*, const NamespaceString&, const NamespaceString&, bool, bool) {}

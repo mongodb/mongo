@@ -220,7 +220,14 @@ public:
     StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
                                              const BSONObj& original) const;
 
-    Status dropAllIndexes(OperationContext* opCtx, bool includingIdIndex);
+    /**
+     * Drops all indexes in the index catalog, optionally dropping the id index depending on the
+     * 'includingIdIndex' parameter value. If the 'droppedIndexes' parameter is not null,
+     * it is filled with the names and index info of the dropped indexes.
+     */
+    Status dropAllIndexes(OperationContext* opCtx,
+                          bool includingIdIndex,
+                          std::map<std::string, BSONObj>* droppedIndexes = nullptr);
 
     Status dropIndex(OperationContext* opCtx, IndexDescriptor* desc);
 

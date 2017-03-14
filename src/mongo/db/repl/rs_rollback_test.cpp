@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
@@ -612,6 +613,144 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
     ASSERT_EQUALS(
         1, countLogLinesContaining("Missing collection namespace in system.indexes operation,"));
     ASSERT_FALSE(rollbackSource.called);
+}
+
+TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
+    createOplog(_opCtx.get());
+    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    {
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        auto indexCatalog = collection->getIndexCatalog();
+        ASSERT(indexCatalog);
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
+    }
+
+    auto indexSpec = BSON("ns"
+                          << "test.t"
+                          << "key"
+                          << BSON("a" << 1)
+                          << "name"
+                          << "a_1"
+                          << "v"
+                          << static_cast<int>(kIndexVersion));
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    auto dropIndexOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) << "h" << 1LL << "op"
+                                 << "c"
+                                 << "ns"
+                                 << "test.$cmd"
+                                 << "o"
+                                 << BSON("dropIndexes"
+                                         << "t"
+                                         << "index"
+                                         << "a_1")
+                                 << "o2"
+                                 << indexSpec),
+                       RecordId(2));
+    class RollbackSourceLocal : public RollbackSourceMock {
+    public:
+        RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
+            : RollbackSourceMock(std::move(oplog)), called(false) {}
+        void copyCollectionFromRemote(OperationContext* opCtx,
+                                      const NamespaceString& nss) const override {
+            called = true;
+        }
+        mutable bool called;
+
+    private:
+        BSONObj _documentAtSource;
+    };
+    RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+        commonOperation,
+    })));
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock({dropIndexOperation, commonOperation}),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           &_storageInterface));
+    ASSERT(rollbackSource.called);
+}
+
+TEST_F(RSRollbackTest, RollbackDropIndexCommandWithMultipleIndexes) {
+    createOplog(_opCtx.get());
+    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    {
+        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        auto indexCatalog = collection->getIndexCatalog();
+        ASSERT(indexCatalog);
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
+    }
+
+    auto indexSpec1 = BSON("ns"
+                           << "test.t"
+                           << "key"
+                           << BSON("a" << 1)
+                           << "name"
+                           << "a_1"
+                           << "v"
+                           << static_cast<int>(kIndexVersion));
+    auto indexSpec2 = BSON("ns"
+                           << "test.t"
+                           << "key"
+                           << BSON("b" << 1)
+                           << "name"
+                           << "b_1"
+                           << "v"
+                           << static_cast<int>(kIndexVersion));
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    auto dropIndexOperation1 =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) << "h" << 1LL << "op"
+                                 << "c"
+                                 << "ns"
+                                 << "test.$cmd"
+                                 << "o"
+                                 << BSON("dropIndexes"
+                                         << "t"
+                                         << "index"
+                                         << "a_1")
+                                 << "o2"
+                                 << indexSpec1),
+                       RecordId(2));
+    auto dropIndexOperation2 =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) << "h" << 1LL << "op"
+                                 << "c"
+                                 << "ns"
+                                 << "test.$cmd"
+                                 << "o"
+                                 << BSON("dropIndexes"
+                                         << "t"
+                                         << "index"
+                                         << "b_1")
+                                 << "o2"
+                                 << indexSpec2),
+                       RecordId(3));
+    class RollbackSourceLocal : public RollbackSourceMock {
+    public:
+        RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
+            : RollbackSourceMock(std::move(oplog)), called(false) {}
+        void copyCollectionFromRemote(OperationContext* opCtx,
+                                      const NamespaceString& nss) const override {
+            called = true;
+        }
+        mutable bool called;
+
+    private:
+        BSONObj _documentAtSource;
+    };
+    RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+        commonOperation,
+    })));
+    ASSERT_OK(syncRollback(
+        _opCtx.get(),
+        OplogInterfaceMock({dropIndexOperation2, dropIndexOperation1, commonOperation}),
+        rollbackSource,
+        {},
+        _coordinator,
+        &_storageInterface));
+    ASSERT(rollbackSource.called);
 }
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
