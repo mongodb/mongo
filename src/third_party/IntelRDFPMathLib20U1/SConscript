@@ -1,5 +1,7 @@
 # -*- mode: python -*-
 
+import sys
+
 Import("env")
 Import("has_option")
 Import("debugBuild")
@@ -339,3 +341,42 @@ env.Library(
     source=source_files,
     LIBS=libs,
 )
+
+readtest = env.Program(
+    target='intel_decimal128_readtest',
+    source=[
+        'TESTS/readtest.c',
+    ],
+    LIBDEPS=[
+        'intel_decimal128',
+    ],
+    LIBS=libs,
+)
+
+readtest_input = env.Install(
+    '.',
+    source=['TESTS/readtest.in'],
+)
+
+readtest_dict = {
+    '@readtest_python_interpreter@' : sys.executable,
+    '@readtest_program@' : readtest[0].name,
+    '@readtest_input@' : readtest_input[0].name,
+}
+
+readtest_wrapper = env.Substfile(
+    'intel_decimal128_readtest_wrapper.py.in',
+    SUBST_DICT=readtest_dict,
+)
+env.Depends(readtest_wrapper, [readtest, readtest_input])
+
+if env.TargetOSIs('windows'):
+    readtest_wrapper_bat = env.Substfile(
+        'intel_decimal128_readtest_wrapper.bat.in',
+        SUBST_DICT=readtest_dict,
+    )
+    env.Depends(readtest_wrapper_bat, readtest_wrapper)
+    env.RegisterUnitTest(readtest_wrapper_bat[0])
+else:
+    env.AddPostAction(readtest_wrapper[0], Chmod(readtest_wrapper[0], 'oug+x'))
+    env.RegisterUnitTest(readtest_wrapper[0])

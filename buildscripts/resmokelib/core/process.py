@@ -99,8 +99,9 @@ class Process(object):
         and environment.
         """
 
-        # Ensure that executable files on Windows have a ".exe" extension.
-        if sys.platform == "win32" and os.path.splitext(args[0])[1] != ".exe":
+        # Ensure that executable files that don't already have an
+        # extension on Windows have a ".exe" extension.
+        if sys.platform == "win32" and not os.path.splitext(args[0])[1]:
             args[0] += ".exe"
 
         self.logger = logger

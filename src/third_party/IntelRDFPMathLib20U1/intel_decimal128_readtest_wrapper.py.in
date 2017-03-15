@@ -1,0 +1,19 @@
+#!@readtest_python_interpreter@
+"""
+Wrapper python script to launch the readtest_program program as interpolated
+by scons with the standard input set to the test file readtest_input, also as
+interpolated by scons.
+"""
+
+import os
+import subprocess
+
+rp = os.path.realpath(__file__)
+dn = os.path.dirname(rp)
+
+readtest_program = os.path.join(dn, '@readtest_program@')
+readtest_input = os.path.join(dn, '@readtest_input@')
+
+with open(readtest_input, 'r') as readtest_input_stream:
+    result = subprocess.call([readtest_program], stdin=readtest_input_stream)
+    exit(result)
