@@ -85,6 +85,9 @@ AggregationRequest ResolvedView::asExpandedViewAggregation(
 
     expandedRequest.setHint(request.getHint());
     expandedRequest.setComment(request.getComment());
+    expandedRequest.setMaxTimeMS(request.getMaxTimeMS());
+    expandedRequest.setReadConcern(request.getReadConcern());
+    expandedRequest.setUnwrappedReadPref(request.getUnwrappedReadPref());
     expandedRequest.setBypassDocumentValidation(request.shouldBypassDocumentValidation());
     expandedRequest.setAllowDiskUse(request.shouldAllowDiskUse());
     expandedRequest.setCollation(request.getCollation());

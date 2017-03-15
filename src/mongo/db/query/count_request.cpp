@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/count_request.h"
 
+#include "mongo/db/query/query_request.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -42,7 +43,9 @@ const char kSkipField[] = "skip";
 const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
 const char kExplainField[] = "explain";
-
+const char kCommentField[] = "comment";
+const char kMaxTimeMSField[] = "maxTimeMS";
+const char kReadConcernField[] = "readConcern";
 }  // namespace
 
 CountRequest::CountRequest(NamespaceString nss, BSONObj query)
@@ -54,31 +57,6 @@ void CountRequest::setHint(BSONObj hint) {
 
 void CountRequest::setCollation(BSONObj collation) {
     _collation = collation.getOwned();
-}
-
-BSONObj CountRequest::toBSON() const {
-    BSONObjBuilder builder;
-
-    builder.append(kCmdName, _nss.ns());
-    builder.append(kQueryField, _query);
-
-    if (_limit) {
-        builder.append(kLimitField, _limit.get());
-    }
-
-    if (_skip) {
-        builder.append(kSkipField, _skip.get());
-    }
-
-    if (_hint) {
-        builder.append(kHintField, _hint.get());
-    }
-
-    if (_collation) {
-        builder.append(kCollationField, _collation.get());
-    }
-
-    return builder.obj();
 }
 
 StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
@@ -121,8 +99,17 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
         return Status(ErrorCodes::BadValue, "skip value is not a valid number");
     }
 
+    // maxTimeMS
+    if (cmdObj[kMaxTimeMSField].ok()) {
+        auto maxTimeMS = QueryRequest::parseMaxTimeMS(cmdObj[kMaxTimeMSField]);
+        if (!maxTimeMS.isOK()) {
+            return maxTimeMS.getStatus();
+        }
+        request.setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
+    }
+
     // Hint
-    if (Object == cmdObj[kHintField].type()) {
+    if (BSONType::Object == cmdObj[kHintField].type()) {
         request.setHint(cmdObj[kHintField].Obj());
     } else if (String == cmdObj[kHintField].type()) {
         const std::string hint = cmdObj.getStringField(kHintField);
@@ -130,11 +117,33 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
     }
 
     // Collation
-    if (Object == cmdObj[kCollationField].type()) {
+    if (BSONType::Object == cmdObj[kCollationField].type()) {
         request.setCollation(cmdObj[kCollationField].Obj());
     } else if (cmdObj[kCollationField].ok()) {
         return Status(ErrorCodes::BadValue, "collation value is not a document");
     }
+
+    // readConcern
+    if (BSONType::Object == cmdObj[kReadConcernField].type()) {
+        request.setReadConcern(cmdObj[kReadConcernField].Obj());
+    } else if (cmdObj[kReadConcernField].ok()) {
+        return Status(ErrorCodes::BadValue, "readConcern value is not a document");
+    }
+
+    // unwrappedReadPref
+    if (BSONType::Object == cmdObj[QueryRequest::kUnwrappedReadPrefField].type()) {
+        request.setUnwrappedReadPref(cmdObj[QueryRequest::kUnwrappedReadPrefField].Obj());
+    } else if (cmdObj[QueryRequest::kUnwrappedReadPrefField].ok()) {
+        return Status(ErrorCodes::BadValue, "readPreference value is not a document");
+    }
+
+    // Comment
+    if (BSONType::String == cmdObj[kCommentField].type()) {
+        request.setComment(cmdObj[kCommentField].valueStringData());
+    } else if (cmdObj[kCommentField].ok()) {
+        return Status(ErrorCodes::BadValue, "comment value is not a string");
+    }
+
 
     // Explain
     request.setExplain(isExplain);
@@ -177,6 +186,22 @@ StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
 
     if (_hint) {
         aggregationBuilder.append(kHintField, *_hint);
+    }
+
+    if (!_comment.empty()) {
+        aggregationBuilder.append(kCommentField, _comment);
+    }
+
+    if (_maxTimeMS > 0) {
+        aggregationBuilder.append(kMaxTimeMSField, _maxTimeMS);
+    }
+
+    if (!_readConcern.isEmpty()) {
+        aggregationBuilder.append(kReadConcernField, _readConcern);
+    }
+
+    if (!_unwrappedReadPref.isEmpty()) {
+        aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, _unwrappedReadPref);
     }
 
     // The 'cursor' option is always specified so that aggregation uses the cursor interface.

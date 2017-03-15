@@ -60,12 +60,6 @@
 namespace mongo {
 
 namespace {
-// These fields are not part of the AggregationRequest since they are not handled by the aggregation
-// subsystem, so we serialize them separately.
-const std::initializer_list<StringData> kFieldsToPropagateToShards = {
-    "$queryOptions", "readConcern", QueryRequest::cmdOptionMaxTimeMS,
-};
-
 // Given a document representing an aggregation command such as
 //
 //   {aggregate: "myCollection", pipeline: [], ...},
@@ -73,23 +67,13 @@ const std::initializer_list<StringData> kFieldsToPropagateToShards = {
 // produces the corresponding explain command:
 //
 //   {explain: {aggregate: "myCollection", pipline: [], ...}, verbosity: ...}
-//
-// The 'cmdObj' is the original user request, which may contain fields to propagate to the shards
-// that are not handled by the aggregation subsystem itself (e.g. maxTimeMS).
-Document wrapAggAsExplain(Document aggregateCommand,
-                          ExplainOptions::Verbosity verbosity,
-                          const BSONObj& cmdObj) {
+Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity verbosity) {
     MutableDocument explainCommandBuilder;
     explainCommandBuilder["explain"] = Value(aggregateCommand);
 
     // Add explain command options.
     for (auto&& explainOption : ExplainOptions::toBSON(verbosity)) {
         explainCommandBuilder[explainOption.fieldNameStringData()] = Value(explainOption);
-    }
-
-    // Propagate options not specific to agg to the shards.
-    for (auto&& field : kFieldsToPropagateToShards) {
-        explainCommandBuilder[field] = Value(cmdObj[field]);
     }
 
     return explainCommandBuilder.freeze();
@@ -208,13 +192,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (mergeCtx->explain) {
-        commandBuilder.reset(wrapAggAsExplain(commandBuilder.freeze(), *mergeCtx->explain, cmdObj));
-    } else {
-        // Add things like $queryOptions which must be sent to the shards but are not part of the
-        // agg request.
-        for (auto&& field : kFieldsToPropagateToShards) {
-            commandBuilder[field] = Value(cmdObj[field]);
-        }
+        commandBuilder.reset(wrapAggAsExplain(commandBuilder.freeze(), *mergeCtx->explain));
     }
 
     BSONObj shardedCommand = commandBuilder.freeze().toBson();
@@ -276,10 +254,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     MutableDocument mergeCmd(request.serializeToCommandObj());
     mergeCmd["pipeline"] = Value(pipeline.getValue()->serialize());
     mergeCmd["cursor"] = Value(cmdObj["cursor"]);
-
-    if (cmdObj.hasField("$queryOptions")) {
-        mergeCmd["$queryOptions"] = Value(cmdObj["$queryOptions"]);
-    }
 
     if (cmdObj.hasField(QueryRequest::cmdOptionMaxTimeMS)) {
         mergeCmd[QueryRequest::cmdOptionMaxTimeMS] =
@@ -493,7 +467,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     // the shards.
     if (aggRequest.getExplain()) {
         auto explainCmdObj =
-            wrapAggAsExplain(aggRequest.serializeToCommandObj(), *aggRequest.getExplain(), cmdObj);
+            wrapAggAsExplain(aggRequest.serializeToCommandObj(), *aggRequest.getExplain());
         cmdObj = explainCmdObj.toBson();
     }
 

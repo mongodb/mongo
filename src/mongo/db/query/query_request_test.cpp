@@ -473,6 +473,7 @@ TEST(QueryRequestTest, ParseFromCommandAllNonOptionFields) {
         "projection: {c: 1},"
         "hint: {d: 1},"
         "readConcern: {e: 1},"
+        "$queryOptions: {$readPreference: 'secondary'},"
         "collation: {f: 1},"
         "limit: 3,"
         "skip: 5,"
@@ -494,6 +495,9 @@ TEST(QueryRequestTest, ParseFromCommandAllNonOptionFields) {
     ASSERT_EQUALS(0, expectedHint.woCompare(qr->getHint()));
     BSONObj expectedReadConcern = BSON("e" << 1);
     ASSERT_EQUALS(0, expectedReadConcern.woCompare(qr->getReadConcern()));
+    BSONObj expectedUnwrappedReadPref = BSON("$readPreference"
+                                             << "secondary");
+    ASSERT_EQUALS(0, expectedUnwrappedReadPref.woCompare(qr->getUnwrappedReadPref()));
     BSONObj expectedCollation = BSON("f" << 1);
     ASSERT_EQUALS(0, expectedCollation.woCompare(qr->getCollation()));
     ASSERT_EQUALS(3, *qr->getLimit());
@@ -589,6 +593,7 @@ TEST(QueryRequestTest, ParseFromCommandSkipWrongType) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+
 TEST(QueryRequestTest, ParseFromCommandLimitWrongType) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
@@ -618,6 +623,17 @@ TEST(QueryRequestTest, ParseFromCommandCommentWrongType) {
         "{find: 'testns',"
         "filter:  {a: 1},"
         "comment: 1}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_NOT_OK(result.getStatus());
+}
+
+TEST(QueryRequestTest, ParseFromCommandUnwrappedReadPrefWrongType) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "filter:  {a: 1},"
+        "$queryOptions: 1}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);

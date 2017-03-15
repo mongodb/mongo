@@ -140,6 +140,18 @@ public:
         return _explainMode;
     }
 
+    unsigned int getMaxTimeMS() const {
+        return _maxTimeMS;
+    }
+
+    const BSONObj& getReadConcern() const {
+        return _readConcern;
+    }
+
+    const BSONObj& getUnwrappedReadPref() const {
+        return _unwrappedReadPref;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -180,6 +192,18 @@ public:
         _bypassDocumentValidation = shouldBypassDocumentValidation;
     }
 
+    void setMaxTimeMS(unsigned int maxTimeMS) {
+        _maxTimeMS = maxTimeMS;
+    }
+
+    void setReadConcern(BSONObj readConcern) {
+        _readConcern = readConcern.getOwned();
+    }
+
+    void setUnwrappedReadPref(BSONObj unwrappedReadPref) {
+        _unwrappedReadPref = unwrappedReadPref.getOwned();
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -203,11 +227,21 @@ private:
     // The comment parameter attached to this aggregation.
     std::string _comment;
 
+    BSONObj _readConcern;
+
+    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
+    // This object will be empty when no readPreference is specified or if the request does not
+    // originate from mongos.
+    BSONObj _unwrappedReadPref;
+
     // The explain mode to use, or boost::none if this is not a request for an aggregation explain.
     boost::optional<ExplainOptions::Verbosity> _explainMode;
 
     bool _allowDiskUse = false;
     bool _fromRouter = false;
     bool _bypassDocumentValidation = false;
+
+    // A user-specified maxTimeMS limit, or a value of '0' if not specified.
+    unsigned int _maxTimeMS = 0;
 };
 }  // namespace mongo

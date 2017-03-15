@@ -168,6 +168,14 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(Namespace
             }
 
             qr->_readConcern = el.Obj().getOwned();
+        } else if (str::equals(fieldName, QueryRequest::kUnwrappedReadPrefField.c_str())) {
+            // Read preference parsing is handled elsewhere, but we store a copy here.
+            Status status = checkFieldType(el, Object);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            qr->setUnwrappedReadPref(el.Obj());
         } else if (str::equals(fieldName, kCollationField)) {
             // Collation parsing is handled elsewhere, but we store a copy here.
             Status status = checkFieldType(el, Object);
@@ -1062,6 +1070,12 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     }
     if (!_comment.empty()) {
         aggregationBuilder.append("comment", _comment);
+    }
+    if (!_readConcern.isEmpty()) {
+        aggregationBuilder.append("readConcern", _readConcern);
+    }
+    if (!_unwrappedReadPref.isEmpty()) {
+        aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, _unwrappedReadPref);
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
 }
