@@ -66,6 +66,11 @@ protected:
         return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime));
     }
 
+    const unsigned currentWallClockSecs() {
+        return durationCount<Seconds>(
+            _serviceContext->getFastClockSource()->now().toDurationSinceEpoch());
+    }
+
 private:
     TimeProofService* _timeProofService;
     std::unique_ptr<ServiceContextNoop> _serviceContext;
@@ -116,6 +121,31 @@ TEST_F(LogicalClockTestBase, advanceClusterTime) {
     ASSERT_OK(getClock()->advanceClusterTimeFromTrustedSource(l1));
     auto l2(getClock()->getClusterTime());
     ASSERT_TRUE(l1.getTime() == l2.getTime());
+}
+
+// Verify rate limiter rejects logical times whose seconds values are too far ahead.
+TEST_F(LogicalClockTestBase, RateLimiterRejectsLogicalTimesTooFarAhead) {
+    Timestamp tooFarAheadTimestamp(
+        currentWallClockSecs() +
+            durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) +
+            10,  // Add 10 seconds to ensure limit is exceeded.
+        1);
+    SignedLogicalTime l1 = makeSignedLogicalTime(LogicalTime(tooFarAheadTimestamp));
+
+    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(l1));
+    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter,
+              getClock()->advanceClusterTimeFromTrustedSource(l1));
+}
+
+// Verify cluster time can be initialized to a very old time.
+TEST_F(LogicalClockTestBase, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
+    Timestamp veryOldTimestamp(
+        currentWallClockSecs() -
+        (durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) * 5));
+    auto veryOldTime = LogicalTime(veryOldTimestamp);
+    getClock()->initClusterTimeFromTrustedSource(veryOldTime);
+
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == veryOldTime);
 }
 
 }  // unnamed namespace

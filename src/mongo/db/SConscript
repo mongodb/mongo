@@ -1002,6 +1002,7 @@ env.Library(
         'logical_clock.cpp',
     ],
     LIBDEPS=[
+        'server_parameters',
         'service_context',
         'signed_logical_time',
         'time_proof_service',

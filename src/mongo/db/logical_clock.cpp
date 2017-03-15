@@ -34,11 +34,38 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+constexpr Seconds LogicalClock::kMaxAcceptableLogicalClockDrift;
+
+server_parameter_storage_type<long long, ServerParameterType::kStartupOnly>::value_type
+    maxAcceptableLogicalClockDrift(LogicalClock::kMaxAcceptableLogicalClockDrift.count());
+
+class MaxAcceptableLogicalClockDrift
+    : public ExportedServerParameter<long long, ServerParameterType::kStartupOnly> {
+public:
+    MaxAcceptableLogicalClockDrift()
+        : ExportedServerParameter<long long, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "maxAcceptableLogicalClockDrift",
+              &maxAcceptableLogicalClockDrift) {}
+
+    Status validate(const long long& potentialNewValue) {
+        if (potentialNewValue < 0) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "maxAcceptableLogicalClockDrift cannot be negative, but "
+                                           "attempted to set to: "
+                                        << potentialNewValue);
+        }
+
+        return Status::OK();
+    }
+} maxAcceptableLogicalClockDriftParameter;
 
 namespace {
 const auto getLogicalClock = ServiceContext::declareDecoration<std::unique_ptr<LogicalClock>>();
@@ -83,8 +110,7 @@ Status LogicalClock::advanceClusterTime(const SignedLogicalTime& newTime) {
         return res;
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _advanceClusterTime_inlock(newTime);
+    return advanceClusterTimeFromTrustedSource(newTime);
 }
 
 Status LogicalClock::_advanceClusterTime_inlock(SignedLogicalTime newTime) {
@@ -97,6 +123,11 @@ Status LogicalClock::_advanceClusterTime_inlock(SignedLogicalTime newTime) {
 
 Status LogicalClock::advanceClusterTimeFromTrustedSource(SignedLogicalTime newTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    auto rateLimitStatus = _passesRateLimiter_inlock(newTime.getTime());
+    if (!rateLimitStatus.isOK()) {
+        return rateLimitStatus;
+    }
+
     return _advanceClusterTime_inlock(std::move(newTime));
 }
 
@@ -140,7 +171,27 @@ LogicalTime LogicalClock::reserveTicks(uint64_t ticks) {
 
 void LogicalClock::initClusterTimeFromTrustedSource(LogicalTime newTime) {
     invariant(_clusterTime.getTime() == LogicalTime::kUninitialized);
+    // Rate limit checks are skipped here so a server with no activity for longer than
+    // maxAcceptableLogicalClockDrift seconds can still have its cluster time initialized.
     _clusterTime = _makeSignedLogicalTime(newTime);
+}
+
+Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
+    const unsigned wallClockSecs =
+        durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
+    auto maxAcceptableDrift = static_cast<const unsigned>(maxAcceptableLogicalClockDrift);
+    auto newTimeSecs = newTime.asTimestamp().getSecs();
+
+    // Both values are unsigned, so compare them first to avoid wrap-around.
+    if ((newTimeSecs > wallClockSecs) && (newTimeSecs - wallClockSecs) > maxAcceptableDrift) {
+        return Status(ErrorCodes::ClusterTimeFailsRateLimiter,
+                      str::stream() << "New cluster time, " << newTimeSecs
+                                    << ", is too far from this node's wall clock time, "
+                                    << wallClockSecs
+                                    << ".");
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

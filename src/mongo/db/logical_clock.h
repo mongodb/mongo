@@ -50,6 +50,9 @@ public:
     static LogicalClock* get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalClock> logicalClock);
 
+    static constexpr Seconds kMaxAcceptableLogicalClockDrift =
+        Seconds(365 * 24 * 60 * 60);  // 1 year
+
     /**
      *  Creates an instance of LogicalClock. The TimeProofService must already be fully initialized.
      */
@@ -99,6 +102,12 @@ private:
     SignedLogicalTime _makeSignedLogicalTime(LogicalTime);
 
     Status _advanceClusterTime_inlock(SignedLogicalTime newTime);
+
+    /**
+     * Rate limiter for advancing logical time. Rejects newTime if its seconds value is more than
+     * kMaxAcceptableLogicalClockDrift seconds ahead of this node's wall clock.
+     */
+    Status _passesRateLimiter_inlock(LogicalTime newTime);
 
     ServiceContext* const _service;
     std::unique_ptr<TimeProofService> _timeProofService;
