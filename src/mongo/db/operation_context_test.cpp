@@ -513,21 +513,6 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
     ASSERT_FALSE(waiterResult.get());
 }
 
-TEST_F(ThreadedOperationDeadlineTests, SleepForExpires) {
-    auto opCtx = client->makeOperationContext();
-    WaitTestState state;
-    const auto startDate = mockClock->now();
-    auto waiterResult = startWaiterWithSleepForAndMaxTime(
-        opCtx.get(), &state, Seconds{10}, startDate + Seconds{60});  // maxTime
-    ASSERT(stdx::future_status::ready !=
-           waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
-    mockClock->advance(Seconds{9});
-    ASSERT(stdx::future_status::ready !=
-           waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
-    mockClock->advance(Seconds{2});
-    ASSERT_FALSE(waiterResult.get());
-}
-
 }  // namespace
 
 }  // namespace mongo
