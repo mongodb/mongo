@@ -251,13 +251,13 @@ TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
 
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
     auto notification = manager.addRangeToClean(cr1);
-    auto opCtx = cc().makeOperationContext().get();
+    auto opCtx = cc().makeOperationContext();
     // Once the new range deleter is set up, this might fail if the range deleter
     // deleted cr1 before we got here...
-    ASSERT_FALSE(notification->waitFor(opCtx, Milliseconds(0)));
+    ASSERT_FALSE(notification->waitFor(opCtx.get(), Milliseconds(0)));
 
     manager.removeRangeToClean(cr1);
-    ASSERT_TRUE(notification->waitFor(opCtx, Milliseconds(0)));
+    ASSERT_TRUE(notification->waitFor(opCtx.get(), Milliseconds(0)));
     ASSERT_OK(notification->get());
 }
 
