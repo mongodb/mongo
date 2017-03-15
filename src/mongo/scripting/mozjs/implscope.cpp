@@ -50,6 +50,10 @@
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 using namespace mongoutils;
 
 namespace mongo {
@@ -96,7 +100,9 @@ bool closeToMaxMemory() {
 }
 }  // namespace
 
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope;
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope::ASANHandles* kCurrentASANHandles =
+    nullptr;
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope = nullptr;
 
 struct MozJSImplScope::MozJSEntry {
     MozJSEntry(MozJSImplScope* scope)
@@ -245,11 +251,42 @@ void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
           << " total: " << mongo::sm::get_total_bytes() << " limit: " << mongo::sm::get_max_bytes();
 }
 
-MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
-    // While we're initializing the runtime/scope, calling MozJSImplScope::getThreadScope() should
-    // return a nullptr.
-    kCurrentScope = nullptr;
+#if __has_feature(address_sanitizer)
 
+MozJSImplScope::ASANHandles::ASANHandles() {
+    kCurrentASANHandles = this;
+}
+
+MozJSImplScope::ASANHandles::~ASANHandles() {
+    invariant(_handles.empty());
+    invariant(kCurrentASANHandles == this);
+    kCurrentASANHandles = nullptr;
+}
+
+void MozJSImplScope::ASANHandles::addPointer(void* ptr) {
+    bool inserted;
+    std::tie(std::ignore, inserted) = _handles.insert(ptr);
+    invariant(inserted);
+}
+
+void MozJSImplScope::ASANHandles::removePointer(void* ptr) {
+    invariant(_handles.erase(ptr));
+}
+
+#else
+
+MozJSImplScope::ASANHandles::ASANHandles() {}
+
+MozJSImplScope::ASANHandles::~ASANHandles() {}
+
+void MozJSImplScope::ASANHandles::addPointer(void* ptr) {}
+
+void MozJSImplScope::ASANHandles::removePointer(void* ptr) {}
+
+#endif
+
+
+MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
     /**
      * The maximum amount of memory to be given out per thread to mozilla. We
      * manage this by trapping all calls to malloc, free, etc. and keeping track of
@@ -365,7 +402,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _pendingGC(false),
       _connectState(ConnectState::Not),
       _status(Status::OK()),
-      _quickExit(false),
       _generation(0),
       _hasOutOfMemoryException(false),
       _binDataProto(_context),
@@ -405,6 +441,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
     JS_SetInterruptCallback(_runtime, _interruptCallback);
     JS_SetGCCallback(_runtime, _gcCallback, this);
     JS_SetContextPrivate(_context, this);
+    JS_SetRuntimePrivate(_runtime, this);
     JSAutoRequest ar(_context);
 
     JS_SetErrorReporter(_runtime, _reportError);
@@ -435,6 +472,8 @@ MozJSImplScope::~MozJSImplScope() {
     }
 
     unregisterOperation();
+
+    kCurrentScope = nullptr;
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {
@@ -853,9 +892,6 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     if (success)
         return false;
 
-    if (_quickExit)
-        return false;
-
     if (_status.isOK()) {
         JS::RootedValue excn(_context);
         if (JS_GetPendingException(_context, &excn) && excn.isObject()) {
@@ -904,17 +940,8 @@ MozJSImplScope* MozJSImplScope::getThreadScope() {
     return kCurrentScope;
 }
 
-void MozJSImplScope::setQuickExit(int exitCode) {
-    _quickExit = true;
-    _exitCode = exitCode;
-}
-
-bool MozJSImplScope::getQuickExit(int* exitCode) {
-    if (_quickExit) {
-        *exitCode = _exitCode;
-    }
-
-    return _quickExit;
+auto MozJSImplScope::ASANHandles::getThreadASANHandles() -> ASANHandles* {
+    return kCurrentASANHandles;
 }
 
 void MozJSImplScope::setOOM() {

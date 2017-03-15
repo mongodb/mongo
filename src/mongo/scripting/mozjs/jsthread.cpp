@@ -239,7 +239,7 @@ void JSThreadInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     if (!config)
         return;
 
-    delete config;
+    getScope(fop)->trackedDelete(config);
 }
 
 void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
@@ -247,7 +247,7 @@ void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
 
     JS::RootedObject obj(cx);
     scope->getProto<JSThreadInfo>().newObject(&obj);
-    JSThreadConfig* config = new JSThreadConfig(cx, args);
+    JSThreadConfig* config = scope->trackedNew<JSThreadConfig>(cx, args);
     JS_SetPrivate(obj, config);
 
     ObjectWrapper(cx, args.thisv()).setObject(InternedString::_JSThreadConfig, obj);

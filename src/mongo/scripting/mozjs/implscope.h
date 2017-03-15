@@ -61,6 +61,7 @@
 #include "mongo/scripting/mozjs/regexp.h"
 #include "mongo/scripting/mozjs/timestamp.h"
 #include "mongo/scripting/mozjs/uri.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 namespace mozjs {
@@ -297,9 +298,6 @@ public:
         return _uriProto;
     }
 
-    void setQuickExit(int exitCode);
-    bool getQuickExit(int* exitCode);
-
     static const char* const kExecResult;
     static const char* const kInvokeResult;
 
@@ -315,6 +313,33 @@ public:
     JS::HandleId getInternedStringId(InternedString name) {
         return _internedStrings.getInternedString(name);
     }
+
+    std::string buildStackString();
+
+    template <typename T, typename... Args>
+    T* trackedNew(Args&&... args) {
+        T* t = new T(std::forward<Args>(args)...);
+        _asanHandles.addPointer(t);
+        return t;
+    }
+
+    template <typename T>
+    void trackedDelete(T* t) {
+        _asanHandles.removePointer(t);
+        delete (t);
+    }
+
+    struct ASANHandles {
+        ASANHandles();
+        ~ASANHandles();
+
+        void addPointer(void* ptr);
+        void removePointer(void* ptr);
+
+        stdx::unordered_set<void*> _handles;
+
+        static ASANHandles* getThreadASANHandles();
+    };
 
 private:
     void _MozJSCreateFunction(const char* raw,
@@ -361,6 +386,7 @@ private:
 
     void setCompileOptions(JS::CompileOptions* co);
 
+    ASANHandles _asanHandles;
     MozJSScriptEngine* _engine;
     MozRuntime _mr;
     JSRuntime* _runtime;
@@ -377,8 +403,6 @@ private:
     std::atomic<bool> _pendingGC;
     ConnectState _connectState;
     Status _status;
-    int _exitCode;
-    bool _quickExit;
     std::string _parentStack;
     std::size_t _generation;
     bool _hasOutOfMemoryException;
@@ -414,6 +438,10 @@ private:
 
 inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(JS_GetContextPrivate(cx));
+}
+
+inline MozJSImplScope* getScope(JSFreeOp* fop) {
+    return static_cast<MozJSImplScope*>(JS_GetRuntimePrivate(fop->runtime()));
 }
 
 }  // namespace mozjs

@@ -161,7 +161,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
         case mongo::NumberLong: {
             JS::RootedObject thisv(_context);
             scope->getProto<NumberLongInfo>().newObject(&thisv);
-            JS_SetPrivate(thisv, new int64_t(elem.numberLong()));
+            JS_SetPrivate(thisv, scope->trackedNew<int64_t>(elem.numberLong()));
             _value.setObjectOrNull(thisv);
             return;
         }

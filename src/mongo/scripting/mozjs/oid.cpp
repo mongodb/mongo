@@ -53,7 +53,7 @@ void OIDInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto oid = static_cast<OID*>(JS_GetPrivate(obj));
 
     if (oid) {
-        delete oid;
+        getScope(fop)->trackedDelete(oid);
     }
 }
 
@@ -94,10 +94,9 @@ void OIDInfo::construct(JSContext* cx, JS::CallArgs args) {
 void OIDInfo::make(JSContext* cx, const OID& oid, JS::MutableHandleValue out) {
     auto scope = getScope(cx);
 
-    auto oidHolder = stdx::make_unique<OID>(oid);
     JS::RootedObject thisv(cx);
     scope->getProto<OIDInfo>().newObject(&thisv);
-    JS_SetPrivate(thisv, oidHolder.release());
+    JS_SetPrivate(thisv, scope->trackedNew<OID>(oid));
 
     out.setObjectOrNull(thisv);
 }

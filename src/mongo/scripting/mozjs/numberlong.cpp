@@ -59,7 +59,7 @@ void NumberLongInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto numLong = static_cast<int64_t*>(JS_GetPrivate(obj));
 
     if (numLong)
-        delete numLong;
+        getScope(fop)->trackedDelete(numLong);
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
@@ -190,7 +190,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
         numLong = (top << 32) + bot;
     }
 
-    JS_SetPrivate(thisv, new int64_t(numLong));
+    JS_SetPrivate(thisv, scope->trackedNew<int64_t>(numLong));
 
     args.rval().setObjectOrNull(thisv);
 }

@@ -353,12 +353,6 @@ void MozJSProxyScope::implThread(void* arg) {
             proxy->_status = exceptionToStatus();
         }
 
-        int exitCode;
-        if (proxy->_implScope && proxy->_implScope->getQuickExit(&exitCode)) {
-            scope.reset();
-            quickExit(exitCode);
-        }
-
         proxy->_state = State::ImplResponse;
 
         proxy->_condvar.notify_one();
