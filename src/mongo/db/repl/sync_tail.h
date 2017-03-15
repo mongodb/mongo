@@ -191,9 +191,9 @@ public:
     static int replWriterThreadCount;
 
 protected:
-    // Cap the batches using the limit on journal commits.
-    // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
-    static const unsigned int replBatchLimitBytes = dur::UncommittedBytesLimit;
+    // Cap the batches to 50 MB for 32-bit systems and 100 MB for 64-bit systems.
+    static const unsigned int replBatchLimitBytes =
+        (sizeof(void*) == 4) ? 50 * 1024 * 1024 : 100 * 1024 * 1024;
     static const unsigned int replBatchLimitOperations = 5000;
 
     // Apply a batch of operations, using multiple threads.
