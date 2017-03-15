@@ -101,10 +101,6 @@ LegacyRequestBuilder& LegacyRequestBuilder::addInputDoc(BSONObj inputDoc) {
     return *this;
 }
 
-RequestBuilderInterface::State LegacyRequestBuilder::getState() const {
-    return _state;
-}
-
 Protocol LegacyRequestBuilder::getProtocol() const {
     return rpc::Protocol::kOpQuery;
 }

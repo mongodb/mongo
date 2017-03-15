@@ -70,8 +70,6 @@ public:
 
     CommandRequestBuilder& addInputDoc(BSONObj inputDoc) final;
 
-    State getState() const final;
-
     Protocol getProtocol() const final;
 
     /**

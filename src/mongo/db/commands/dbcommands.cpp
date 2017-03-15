@@ -1570,7 +1570,7 @@ bool Command::run(OperationContext* opCtx,
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
-    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
+    BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
     auto readConcernArgsStatus = _extractReadConcern(cmd, supportsReadConcern());
 
     if (!readConcernArgsStatus.isOK()) {
@@ -1712,8 +1712,6 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         uassertStatusOK(rpc::readRequestMetadata(opCtx, request.getMetadata()));
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
-
         std::string dbname = request.getDatabase().toString();
         unique_ptr<MaintenanceModeSetter> mmSetter;
 
@@ -1854,8 +1852,6 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
         retval = command->run(opCtx, request, replyBuilder);
-
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
 
         if (!retval) {
             command->_commandsFailed.increment();

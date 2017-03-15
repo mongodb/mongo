@@ -54,8 +54,6 @@ public:
     LegacyRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
     LegacyRequestBuilder& addInputDoc(BSONObj inputDoc) final;
 
-    State getState() const final;
-
     Protocol getProtocol() const final;
 
     Message done() final;

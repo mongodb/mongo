@@ -58,14 +58,12 @@ public:
 
 
     CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
-    BufBuilder& getInPlaceReplyBuilder(std::size_t) final;
+    BSONObjBuilder getInPlaceReplyBuilder(std::size_t) final;
 
     CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
 
     Status addOutputDocs(DocumentRange outputDocs) final;
     Status addOutputDoc(const BSONObj& outputDoc) final;
-
-    State getState() const final;
 
     Protocol getProtocol() const final;
 
@@ -79,6 +77,8 @@ public:
     Message done() final;
 
 private:
+    enum class State { kMetadata, kCommandReply, kOutputDocs, kDone };
+
     // Default values are all empty.
     BufBuilder _builder{};
     Message _message;

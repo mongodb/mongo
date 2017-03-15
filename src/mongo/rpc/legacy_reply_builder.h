@@ -53,14 +53,12 @@ public:
     LegacyReplyBuilder& setCommandReply(Status nonOKStatus, const BSONObj& extraErrorInfo) final;
     LegacyReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
 
-    BufBuilder& getInPlaceReplyBuilder(std::size_t) final;
+    BSONObjBuilder getInPlaceReplyBuilder(std::size_t) final;
 
     LegacyReplyBuilder& setMetadata(const BSONObj& metadata) final;
 
     Status addOutputDocs(DocumentRange outputDocs) final;
     Status addOutputDoc(const BSONObj& outputDoc) final;
-
-    State getState() const final;
 
     void reset() final;
 
@@ -69,6 +67,8 @@ public:
     Protocol getProtocol() const final;
 
 private:
+    enum class State { kMetadata, kCommandReply, kOutputDocs, kDone };
+
     BufBuilder _builder{};
     Message _message;
     State _state{State::kCommandReply};

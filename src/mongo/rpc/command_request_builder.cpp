@@ -88,10 +88,6 @@ CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
     return *this;
 }
 
-RequestBuilderInterface::State CommandRequestBuilder::getState() const {
-    return _state;
-}
-
 Protocol CommandRequestBuilder::getProtocol() const {
     return rpc::Protocol::kOpCommandV1;
 }

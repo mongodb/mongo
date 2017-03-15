@@ -53,14 +53,14 @@ CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& comm
     return *this;
 }
 
-BufBuilder& CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+BSONObjBuilder CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
     invariant(_state == State::kCommandReply);
     // Eagerly allocate reserveBytes bytes.
     _builder.reserveBytes(reserveBytes);
     // Claim our reservation immediately so we can actually write data to it.
     _builder.claimReservedBytes(reserveBytes);
     _state = State::kMetadata;
-    return _builder;
+    return BSONObjBuilder(_builder);
 }
 
 CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
@@ -83,10 +83,6 @@ Status CommandReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
     invariant(_state == State::kOutputDocs);
     outputDoc.appendSelfToBufBuilder(_builder);
     return Status::OK();
-}
-
-ReplyBuilderInterface::State CommandReplyBuilder::getState() const {
-    return _state;
 }
 
 Protocol CommandReplyBuilder::getProtocol() const {

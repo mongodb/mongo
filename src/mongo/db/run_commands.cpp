@@ -44,8 +44,6 @@ void runCommands(OperationContext* opCtx,
                  const rpc::RequestInterface& request,
                  rpc::ReplyBuilderInterface* replyBuilder) {
     try {
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
-
         Command* c = nullptr;
         // In the absence of a Command object, no redaction is possible. Therefore
         // to avoid displaying potentially sensitive information in the logs,

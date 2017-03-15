@@ -92,12 +92,6 @@ public:
     virtual RequestBuilderInterface& addInputDoc(BSONObj inputDoc) = 0;
 
     /**
-     * Get the state of the builder. This method is intended to enable debug or invariant
-     * checks that the builder is in the correct state.
-     */
-    virtual State getState() const = 0;
-
-    /**
      * Gets the protocol used to serialize this request. This should only be used for asserts,
      * and not for runtime behavior changes, which should be handled with polymorphism.
      */
