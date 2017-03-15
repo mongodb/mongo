@@ -91,7 +91,7 @@ void NativeFunctionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto holder = static_cast<NativeHolder*>(JS_GetPrivate(obj));
 
     if (holder)
-        delete holder;
+        getScope(fop)->trackedDelete(holder);
 }
 
 void NativeFunctionInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
@@ -112,7 +112,7 @@ void NativeFunctionInfo::make(JSContext* cx,
 
     scope->getProto<NativeFunctionInfo>().newObject(obj);
 
-    JS_SetPrivate(obj, new NativeHolder(function, data));
+    JS_SetPrivate(obj, scope->trackedNew<NativeHolder>(function, data));
 }
 
 }  // namespace mozjs

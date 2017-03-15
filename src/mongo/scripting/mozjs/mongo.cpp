@@ -47,6 +47,7 @@
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 namespace mozjs {
@@ -101,22 +102,26 @@ DBClientBase* getConnection(JS::CallArgs& args) {
     return ret;
 }
 
-void setCursor(JS::HandleObject target,
+void setCursor(MozJSImplScope* scope,
+               JS::HandleObject target,
                std::unique_ptr<DBClientCursor> cursor,
                JS::CallArgs& args) {
     auto client =
         static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
 
     // Copy the client shared pointer to up the refcount
-    JS_SetPrivate(target, new CursorInfo::CursorHolder(std::move(cursor), *client));
+    JS_SetPrivate(target, scope->trackedNew<CursorInfo::CursorHolder>(std::move(cursor), *client));
 }
 
-void setCursorHandle(JS::HandleObject target, long long cursorId, JS::CallArgs& args) {
+void setCursorHandle(MozJSImplScope* scope,
+                     JS::HandleObject target,
+                     long long cursorId,
+                     JS::CallArgs& args) {
     auto client =
         static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
 
     // Copy the client shared pointer to up the refcount.
-    JS_SetPrivate(target, new CursorHandleInfo::CursorTracker(cursorId, *client));
+    JS_SetPrivate(target, scope->trackedNew<CursorHandleInfo::CursorTracker>(cursorId, *client));
 }
 
 void setHiddenMongo(JSContext* cx,
@@ -143,9 +148,9 @@ void setHiddenMongo(JSContext* cx,
         } else {
             scope->getProto<MongoExternalInfo>().newObject(&newMongo);
         }
-        JS_SetPrivate(
-            newMongo,
-            new std::shared_ptr<DBClientBase>(connSharedPtr, static_cast<DBClientBase*>(resPtr)));
+        JS_SetPrivate(newMongo,
+                      scope->trackedNew<std::shared_ptr<DBClientBase>>(
+                          connSharedPtr, static_cast<DBClientBase*>(resPtr)));
 
         ObjectWrapper from(cx, args.thisv());
         ObjectWrapper to(cx, newMongo);
@@ -168,7 +173,7 @@ void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
     auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(obj));
 
     if (conn) {
-        delete conn;
+        getScope(fop)->trackedDelete(conn);
     }
 }
 
@@ -295,7 +300,7 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject c(cx);
     scope->getProto<CursorInfo>().newObject(&c);
 
-    setCursor(c, std::move(cursor), args);
+    setCursor(scope, c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
 }
@@ -503,7 +508,7 @@ void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) 
     JS::RootedObject c(cx);
     scope->getProto<CursorInfo>().newObject(&c);
 
-    setCursor(c, std::move(cursor), args);
+    setCursor(scope, c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
 }
@@ -523,7 +528,7 @@ void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs 
     JS::RootedObject c(cx);
     scope->getProto<CursorHandleInfo>().newObject(&c);
 
-    setCursorHandle(c, cursorId, args);
+    setCursorHandle(scope, c, cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }
@@ -684,7 +689,7 @@ void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<MongoLocalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
+    JS_SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
 
     o.setBoolean(InternedString::slaveOk, false);
     o.setString(InternedString::host, "EMBEDDED");
@@ -717,7 +722,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<MongoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
+    JS_SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
 
     o.setBoolean(InternedString::slaveOk, false);
     o.setString(InternedString::host, cs.toString());
@@ -754,11 +759,7 @@ void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) 
 }
 
 void MongoExternalInfo::Functions::quit::call(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->setQuickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
-
-    uasserted(ErrorCodes::JSUncatchableError, "Calling Quit");
+    quickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
 }
 
 void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallArgs args) {
