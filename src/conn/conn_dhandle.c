@@ -38,6 +38,14 @@ __wt_conn_dhandle_alloc(
 	WT_DECL_RET;
 	uint64_t bucket;
 
+	/*
+	 * Ensure no one beat us to creating the handle now that we hold the
+	 * write lock.
+	 */
+	if ((ret =
+	     __wt_conn_dhandle_find(session, uri, checkpoint)) != WT_NOTFOUND)
+		return (ret);
+
 	WT_RET(__wt_calloc_one(session, &dhandle));
 
 	__wt_rwlock_init(session, &dhandle->rwlock);
