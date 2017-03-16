@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import gdb.printing
 import os
+import re
 import sys
 
 try:
@@ -27,6 +28,27 @@ def get_process_name():
     # The return from gdb.objfiles() could include the file extension of the debug symbols.
     main_binary_name = gdb.objfiles()[0].filename
     return os.path.splitext(os.path.basename(main_binary_name))[0]
+
+
+def get_thread_id():
+    """Returns the thread_id of the current GDB thread"""
+    # GDB thread example:
+    #  RHEL
+    #   [Current thread is 1 (Thread 0x7f072426cca0 (LWP 12867))]
+    thread_info = gdb.execute("thread", from_tty=False, to_string=True)
+
+    if sys.platform.startswith("linux"):
+        match = re.search(r"Thread (?P<pthread_id>0x[0-9a-f]+)", thread_info)
+        if match:
+            return int(match.group("pthread_id"), 16)
+    elif sys.platform.startswith("sunos"):
+        match = re.search(r"Thread (?P<pthread_id>[0-9]+)", thread_info)
+        if match:
+            return int(match.group("pthread_id"), 10)
+        lwpid = gdb.selected_thread().ptid[1]
+        if lwpid != 0:
+            return lwpid
+    raise ValueError("Failed to find thread id in {}".format(thread_info))
 
 
 ###################################################################################################
@@ -336,35 +358,34 @@ class DumpGlobalServiceContext(gdb.Command):
 DumpGlobalServiceContext()
 
 
-class MongoDBAnalyze(gdb.Command):
-    """Analyze MongoDB process"""
+class MongoDBDumpLocks(gdb.Command):
+    """Dump locks in mongod process"""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-analyze", gdb.COMMAND_STATUS)
+        register_mongo_command(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
         print("Running Hang Analyzer Supplement")
 
         main_binary_name = get_process_name()
-        if main_binary_name.endswith('mongod'):
-            self.analyze_mongod()
+        if main_binary_name == 'mongod':
+            self.dump_mongod_locks()
         else:
-            print("No process specific analysis done for: %s" % (main_binary_name))
+            print("Not invoking mongod lock dump for: %s" % (main_binary_name))
 
-    def analyze_mongod(self):
+    def dump_mongod_locks(self):
         """GDB in-process python supplement"""
 
         try:
-
             # Call into mongod, and dump the state of lock manager
             # Note that output will go to mongod's standard output, not the debugger output window
             gdb.execute("call ('mongo::(anonymous namespace)::globalLockManager').dump()",
                         from_tty=False, to_string=False)
         except gdb.error as gdberr:
-            print("Ignoring error '%s'" % str(gdberr))
+            print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 
 # Register command
-MongoDBAnalyze()
+MongoDBDumpLocks()
 
 
 class MongoDBUniqueStack(gdb.Command):
@@ -394,7 +415,7 @@ class MongoDBUniqueStack(gdb.Command):
         thread_info = {}  # thread dict to hold per thread data
         thread_info['frames'] = []  # the complete backtrace per thread from gdb
         thread_info['functions'] = []  # list of function names from frames
-        thread_info['pthread'] = hex(int(gdb.parse_and_eval("(uint64_t)pthread_self()")))
+        thread_info['pthread'] = hex(get_thread_id())
 
         frame = gdb.newest_frame()
         while frame:
@@ -480,7 +501,7 @@ class MongoDBHelp(gdb.Command):
     """Dump list of mongodb commands"""
 
     def __init__(self):
-        gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_DATA)
+        gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_SUPPORT)
 
     def invoke(self, arg, _from_tty):
         print("Command - Description")
