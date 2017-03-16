@@ -60,11 +60,6 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
-void ReplicationCoordinatorExternalStateMock::runOnInitialSyncThread(
-    stdx::function<void(OperationContext* opCtx)> run) {
-    log() << "not running initial sync during test.";
-}
-
 void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& settings) {
     _threadsStarted = true;
 }
@@ -72,8 +67,6 @@ void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& s
 bool ReplicationCoordinatorExternalStateMock::isInitialSyncFlagSet(OperationContext*) {
     return false;
 }
-
-void ReplicationCoordinatorExternalStateMock::startInitialSync(OnInitialSyncFinishedFn) {}
 
 void ReplicationCoordinatorExternalStateMock::startSteadyStateReplication(OperationContext*,
                                                                           ReplicationCoordinator*) {
@@ -284,10 +277,6 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitia
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeSteadyStateOplogBuffer(
     OperationContext* opCtx) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
-}
-
-bool ReplicationCoordinatorExternalStateMock::shouldUseDataReplicatorInitialSync() const {
-    return true;
 }
 
 std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRestarts() const {

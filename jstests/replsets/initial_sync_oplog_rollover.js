@@ -11,14 +11,6 @@
     "use strict";
     load("jstests/libs/check_log.js");
 
-    // If the parameter is already set, don't run this test.
-    var parameters = db.adminCommand({getCmdLineOpts: 1}).parsed.setParameter;
-    if (parameters.use3dot2InitialSync || parameters.initialSyncOplogBuffer) {
-        jsTest.log("Skipping initial_sync_oplog_rollover.js because use3dot2InitialSync or " +
-                   "initialSyncOplogBuffer was already provided.");
-        return;
-    }
-
     var name = 'initial_sync_oplog_rollover';
     var replSet = new ReplSetTest({
         name: name,
@@ -40,8 +32,7 @@
     var firstOplogEntry = getFirstOplogEntry(primary);
 
     // Add a secondary node but make it hang before copying databases.
-    var secondary = replSet.add(
-        {setParameter: {use3dot2InitialSync: false, initialSyncOplogBuffer: "collection"}});
+    var secondary = replSet.add();
     secondary.setSlaveOk();
 
     assert.commandWorked(secondary.getDB('admin').runCommand(

@@ -46,7 +46,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -105,10 +104,7 @@ public:
 
         auto replCoord = ReplicationCoordinator::get(getGlobalServiceContext());
 
-        if (cmdObj.hasElement("forceInitialSyncFailure")) {
-            replSetForceInitialSyncFailure = (unsigned)cmdObj["forceInitialSyncFailure"].Number();
-            return true;
-        } else if (cmdObj.hasElement("waitForMemberState")) {
+        if (cmdObj.hasElement("waitForMemberState")) {
             long long stateVal;
             auto status = bsonExtractIntegerField(cmdObj, "waitForMemberState", &stateVal);
             if (!status.isOK()) {

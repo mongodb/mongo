@@ -443,7 +443,6 @@ void ReplSource::forceResync(OperationContext* opCtx, const char* requester) {
                       getGlobalReplicationCoordinator()->getMyRID())) {
             msgassertedNoTrace(14051, "unable to connect to resync");
         }
-        /* todo use getDatabaseNames() method here */
         bool ok = oplogReader.conn()->runCommand(
             "admin", BSON("listDatabases" << 1), info, QueryOption_SlaveOk);
         massert(10385, "Unable to get database list", ok);

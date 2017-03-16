@@ -711,13 +711,6 @@ public:
     }
 
     /**
-       get a list of all the current databases
-       uses the { listDatabases : 1 } command.
-       throws on error
-     */
-    std::list<std::string> getDatabaseNames();
-
-    /**
      * { name : "<short collection name>",
      *   options : { }
      * }

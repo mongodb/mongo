@@ -925,7 +925,6 @@ env.Library(
         "range_deleter_d",
         "repair_database",
         "repl/bgsync",
-        "repl/initial_sync_common",
         "repl/oplog_buffer_collection",
         "repl/oplog_buffer_blocking_queue",
         "repl/oplog_buffer_proxy",

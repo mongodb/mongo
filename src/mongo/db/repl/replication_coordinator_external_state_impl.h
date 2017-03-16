@@ -64,11 +64,9 @@ public:
                                             StorageInterface* storageInterface);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
-    virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
     virtual void stopDataReplication(OperationContext* opCtx) override;
-    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* opCtx)> run) override;
 
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
@@ -116,7 +114,6 @@ public:
         OperationContext* opCtx) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* opCtx) const override;
-    virtual bool shouldUseDataReplicatorInitialSync() const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
 
     // Methods from JournalListener.
@@ -186,12 +183,6 @@ private:
     long long _nextThreadId = 0;
 
     std::unique_ptr<SnapshotThread> _snapshotThread;
-
-    // Initial sync stuff
-    StartInitialSyncFn _startInitialSyncIfNeededFn;
-    StartSteadyReplicationFn _startSteadReplicationFn;
-    OldThreadPool _initialSyncThreadPool;
-    TaskRunner _initialSyncRunner;
 
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;

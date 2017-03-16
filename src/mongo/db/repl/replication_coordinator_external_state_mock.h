@@ -57,11 +57,9 @@ public:
     ReplicationCoordinatorExternalStateMock();
     virtual ~ReplicationCoordinatorExternalStateMock();
     virtual void startThreads(const ReplSettings& settings) override;
-    virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
     virtual void stopDataReplication(OperationContext* opCtx) override;
-    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* opCtx)> run) override;
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
     virtual void startMasterSlave(OperationContext*);
@@ -108,7 +106,6 @@ public:
         OperationContext* opCtx) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* opCtx) const override;
-    virtual bool shouldUseDataReplicatorInitialSync() const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
 
     /**

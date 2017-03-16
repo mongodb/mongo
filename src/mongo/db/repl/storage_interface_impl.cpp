@@ -41,6 +41,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
@@ -61,7 +63,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
@@ -601,7 +602,59 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     AutoGetDb autoDB(opCtx, "admin", MODE_X);
-    return checkAdminDatabase(opCtx, autoDB.getDb());
+    auto adminDb = autoDB.getDb();
+    if (!adminDb) {
+        return Status::OK();
+    }
+
+    Collection* const usersCollection =
+        adminDb->getCollection(AuthorizationManager::usersCollectionNamespace);
+    const bool hasUsers =
+        usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
+    Collection* const adminVersionCollection =
+        adminDb->getCollection(AuthorizationManager::versionCollectionNamespace);
+    BSONObj authSchemaVersionDocument;
+    if (!adminVersionCollection ||
+        !Helpers::findOne(opCtx,
+                          adminVersionCollection,
+                          AuthorizationManager::versionDocumentQuery,
+                          authSchemaVersionDocument)) {
+        if (!hasUsers) {
+            // It's OK to have no auth version document if there are no user documents.
+            return Status::OK();
+        }
+        std::string msg = str::stream()
+            << "During initial sync, found documents in "
+            << AuthorizationManager::usersCollectionNamespace.ns()
+            << " but could not find an auth schema version document in "
+            << AuthorizationManager::versionCollectionNamespace.ns() << ".  "
+            << "This indicates that the primary of this replica set was not successfully "
+               "upgraded to schema version "
+            << AuthorizationManager::schemaVersion26Final
+            << ", which is the minimum supported schema version in this version of MongoDB";
+        return {ErrorCodes::AuthSchemaIncompatible, msg};
+    }
+    long long foundSchemaVersion;
+    Status status = bsonExtractIntegerField(authSchemaVersionDocument,
+                                            AuthorizationManager::schemaVersionFieldName,
+                                            &foundSchemaVersion);
+    if (!status.isOK()) {
+        std::string msg = str::stream()
+            << "During initial sync, found malformed auth schema version document: "
+            << status.toString() << "; document: " << authSchemaVersionDocument;
+        return {ErrorCodes::AuthSchemaIncompatible, msg};
+    }
+    if ((foundSchemaVersion != AuthorizationManager::schemaVersion26Final) &&
+        (foundSchemaVersion != AuthorizationManager::schemaVersion28SCRAM)) {
+        std::string msg = str::stream()
+            << "During initial sync, found auth schema version " << foundSchemaVersion
+            << ", but this version of MongoDB only supports schema versions "
+            << AuthorizationManager::schemaVersion26Final << " and "
+            << AuthorizationManager::schemaVersion28SCRAM;
+        return {ErrorCodes::AuthSchemaIncompatible, msg};
+    }
+
+    return Status::OK();
 }
 
 }  // namespace repl

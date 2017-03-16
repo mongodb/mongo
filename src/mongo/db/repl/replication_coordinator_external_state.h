@@ -60,9 +60,6 @@ class ReplSettings;
 class ReplicationCoordinator;
 class ReplicationExecutor;
 
-using OnInitialSyncFinishedFn = stdx::function<void(OperationContext* opCtx)>;
-using StartInitialSyncFn = stdx::function<void(OnInitialSyncFinishedFn callback)>;
-using StartSteadyReplicationFn = stdx::function<void()>;
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
  * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
@@ -84,14 +81,6 @@ public:
     virtual void startThreads(const ReplSettings& settings) = 0;
 
     /**
-     * Starts an initial sync, and calls "finished" when done,
-     * for replica set member.
-     *
-     * NOTE: Use either this (and below function) or the Master/Slave version, but not both.
-     */
-    virtual void startInitialSync(OnInitialSyncFinishedFn finished) = 0;
-
-    /**
      * Returns true if an incomplete initial sync is detected.
      */
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) = 0;
@@ -103,8 +92,6 @@ public:
      */
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) = 0;
-
-    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* opCtx)> run) = 0;
 
     /**
      * Stops the data replication threads = bgsync, applier, reporter.
@@ -341,11 +328,6 @@ public:
      */
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* opCtx) const = 0;
-
-    /**
-     * Returns true if the user specified to use the new version for initial sync.
-     */
-    virtual bool shouldUseDataReplicatorInitialSync() const = 0;
 
     /**
      * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog

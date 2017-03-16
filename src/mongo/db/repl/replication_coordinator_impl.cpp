@@ -592,83 +592,69 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
     }
 
     // Do initial sync.
-    if (_externalState->shouldUseDataReplicatorInitialSync()) {
-        if (!_externalState->getTaskExecutor()) {
-            log() << "not running initial sync during test.";
+    if (!_externalState->getTaskExecutor()) {
+        log() << "not running initial sync during test.";
+        return;
+    }
+
+    auto onCompletion = [this, startCompleted](const StatusWith<OpTimeWithHash>& status) {
+        {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (status == ErrorCodes::CallbackCanceled) {
+                log() << "Initial Sync has been cancelled: " << status.getStatus();
+                return;
+            } else if (!status.isOK()) {
+                if (_inShutdown) {
+                    log() << "Initial Sync failed during shutdown due to " << status.getStatus();
+                    return;
+                } else {
+                    error() << "Initial sync failed, shutting down now. Restart the server "
+                               "to attempt a new initial sync.";
+                    fassertFailedWithStatusNoTrace(40088, status.getStatus());
+                }
+            }
+
+            const auto lastApplied = status.getValue();
+            _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
+        }
+
+        // Clear maint. mode.
+        while (getMaintenanceMode()) {
+            setMaintenanceMode(false);
+        }
+
+        if (startCompleted) {
+            startCompleted();
+        }
+        // Repair local db (to compact it).
+        auto opCtx = cc().makeOperationContext();
+        uassertStatusOK(_externalState->runRepairOnLocalDB(opCtx.get()));
+        _externalState->startSteadyStateReplication(opCtx.get(), this);
+    };
+
+    std::shared_ptr<InitialSyncer> initialSyncerCopy;
+    try {
+        {
+            // Must take the lock to set _initialSyncer, but not call it.
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            initialSyncerCopy = std::make_shared<InitialSyncer>(
+                createInitialSyncerOptions(this, _externalState.get()),
+                stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
+                                                                          _externalState.get()),
+                _storage,
+                onCompletion);
+            _initialSyncer = initialSyncerCopy;
+        }
+        // InitialSyncer::startup() must be called outside lock because it uses features (eg.
+        // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
+        uassertStatusOK(initialSyncerCopy->startup(opCtx, numInitialSyncAttempts.load()));
+    } catch (...) {
+        auto status = exceptionToStatus();
+        log() << "Initial Sync failed to start: " << status;
+        if (ErrorCodes::CallbackCanceled == status || ErrorCodes::isShutdownError(status.code())) {
             return;
         }
-
-        auto onCompletion = [this, startCompleted](const StatusWith<OpTimeWithHash>& status) {
-            {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
-                if (status == ErrorCodes::CallbackCanceled) {
-                    log() << "Initial Sync has been cancelled: " << status.getStatus();
-                    return;
-                } else if (!status.isOK()) {
-                    if (_inShutdown) {
-                        log() << "Initial Sync failed during shutdown due to "
-                              << status.getStatus();
-                        return;
-                    } else {
-                        error() << "Initial sync failed, shutting down now. Restart the server "
-                                   "to attempt a new initial sync.";
-                        fassertFailedWithStatusNoTrace(40088, status.getStatus());
-                    }
-                }
-
-                const auto lastApplied = status.getValue();
-                _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
-            }
-
-            // Clear maint. mode.
-            while (getMaintenanceMode()) {
-                setMaintenanceMode(false);
-            }
-
-            if (startCompleted) {
-                startCompleted();
-            }
-            // Repair local db (to compact it).
-            auto opCtx = cc().makeOperationContext();
-            uassertStatusOK(_externalState->runRepairOnLocalDB(opCtx.get()));
-            _externalState->startSteadyStateReplication(opCtx.get(), this);
-        };
-
-        std::shared_ptr<InitialSyncer> initialSyncerCopy;
-        try {
-            {
-                // Must take the lock to set _initialSyncer, but not call it.
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
-                initialSyncerCopy = std::make_shared<InitialSyncer>(
-                    createInitialSyncerOptions(this, _externalState.get()),
-                    stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
-                                                                              _externalState.get()),
-                    _storage,
-                    onCompletion);
-                _initialSyncer = initialSyncerCopy;
-            }
-            // InitialSyncer::startup() must be called outside lock because it uses features (eg.
-            // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
-            uassertStatusOK(initialSyncerCopy->startup(opCtx, numInitialSyncAttempts.load()));
-        } catch (...) {
-            auto status = exceptionToStatus();
-            log() << "Initial Sync failed to start: " << status;
-            if (ErrorCodes::CallbackCanceled == status ||
-                ErrorCodes::isShutdownError(status.code())) {
-                return;
-            }
-            fassertFailedWithStatusNoTrace(40354, status);
-        }
-    } else {
-        _externalState->startInitialSync([this, startCompleted](OperationContext* opCtx) {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (!_inShutdown) {
-                if (startCompleted) {
-                    startCompleted();
-                }
-                _externalState->startSteadyStateReplication(opCtx, this);
-            }
-        });
+        fassertFailedWithStatusNoTrace(40354, status);
     }
 }
 

@@ -13,12 +13,6 @@
     "use strict";
     load("jstests/libs/check_log.js");
 
-    var parameters = TestData.setParameters;
-    if (parameters && parameters.indexOf("use3dot2InitialSync=true") != -1) {
-        jsTest.log("Skipping this test because use3dot2InitialSync was provided.");
-        return;
-    }
-
     var name = 'initial_sync_applier_error';
     var replSet = new ReplSetTest({
         name: name,

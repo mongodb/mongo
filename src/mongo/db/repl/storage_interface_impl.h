@@ -121,6 +121,9 @@ public:
                                                      BoundInclusion boundInclusion,
                                                      std::size_t limit) override;
 
+    /**
+     * Checks that the "admin" database contains a supported version of the auth data schema.
+     */
     Status isAdminDbValid(OperationContext* opCtx) override;
 
 private:

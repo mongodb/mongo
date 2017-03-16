@@ -37,6 +37,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
@@ -61,7 +62,6 @@
 #include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -120,8 +120,6 @@ const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
 // repl::SnapshotThread introduces.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(use3dot2InitialSync, bool, false);
-
 // Set this to specify whether to use a collection to buffer the oplog on the destination server
 // during initial sync to prevent rolling over the oplog.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
@@ -164,12 +162,6 @@ MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
         return Status(ErrorCodes::BadValue,
                       "unsupported initial sync oplog buffer option: " + initialSyncOplogBuffer);
     }
-    if (use3dot2InitialSync && (initialSyncOplogBuffer == kCollectionOplogBufferName)) {
-        return Status(ErrorCodes::BadValue,
-                      "cannot use collection oplog buffer without --setParameter "
-                      "use3dot2InitialSync=false");
-    }
-
     return Status::OK();
 }
 
@@ -189,43 +181,13 @@ std::unique_ptr<ThreadPool> makeThreadPool() {
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
     ServiceContext* service, StorageInterface* storageInterface)
-    : _service(service),
-      _storageInterface(storageInterface),
-      _initialSyncThreadPool(OldThreadPool::DoNotStartThreadsTag(), 1, "initial sync-"),
-      _initialSyncRunner(&_initialSyncThreadPool) {
+    : _service(service), _storageInterface(storageInterface) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
 bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationContext* opCtx) {
     return _storageInterface->getInitialSyncFlag(opCtx);
-}
-
-void ReplicationCoordinatorExternalStateImpl::startInitialSync(OnInitialSyncFinishedFn finished) {
-    _initialSyncRunner.schedule([finished, this](OperationContext* opCtx, const Status& status) {
-        if (status == ErrorCodes::CallbackCanceled) {
-            return TaskRunner::NextAction::kDisposeOperationContext;
-        }
-        // Do initial sync.
-        syncDoInitialSync(opCtx, this);
-        finished(opCtx);
-        return TaskRunner::NextAction::kDisposeOperationContext;
-    });
-}
-
-void ReplicationCoordinatorExternalStateImpl::runOnInitialSyncThread(
-    stdx::function<void(OperationContext* opCtx)> run) {
-    _initialSyncRunner.cancel();
-    _initialSyncRunner.join();
-    _initialSyncRunner.schedule([run, this](OperationContext* opCtx, const Status& status) {
-        if (status == ErrorCodes::CallbackCanceled) {
-            return TaskRunner::NextAction::kDisposeOperationContext;
-        }
-        invariant(opCtx);
-        invariant(opCtx->getClient());
-        run(opCtx);
-        return TaskRunner::NextAction::kDisposeOperationContext;
-    });
 }
 
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
@@ -284,9 +246,6 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
         oldBgSync->join(opCtx);
     }
 
-    _initialSyncRunner.cancel();
-    _initialSyncRunner.join();
-
     lock->lock();
     _stoppingDataReplication = false;
     _dataReplicationStopped.notify_all();
@@ -314,7 +273,6 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
     _taskExecutor->startup();
 
-    _initialSyncThreadPool.startThreads();
     _writerPool = SyncTail::makeWriterPool();
 
     _storageInterface->startup();
@@ -924,10 +882,6 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitia
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer(
     OperationContext* opCtx) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
-}
-
-bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync() const {
-    return !use3dot2InitialSync;
 }
 
 std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
