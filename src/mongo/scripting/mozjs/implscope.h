@@ -316,6 +316,8 @@ public:
         return _internedStrings.getInternedString(name);
     }
 
+    std::string buildStackString();
+
 private:
     void _MozJSCreateFunction(const char* raw,
                               ScriptingFunction functionNumber,

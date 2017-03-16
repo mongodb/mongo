@@ -96,7 +96,7 @@ bool closeToMaxMemory() {
 }
 }  // namespace
 
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope;
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope = nullptr;
 
 struct MozJSImplScope::MozJSEntry {
     MozJSEntry(MozJSImplScope* scope)
@@ -936,6 +936,21 @@ void MozJSImplScope::advanceGeneration() {
 
 const std::string& MozJSImplScope::getParentStack() const {
     return _parentStack;
+}
+
+std::string MozJSImplScope::buildStackString() {
+    JS::RootedObject stack(_context);
+
+    if (!JS::CaptureCurrentStack(_context, &stack)) {
+        return {};
+    }
+
+    JS::RootedString out(_context);
+    if (JS::BuildStackString(_context, stack, &out)) {
+        return JSStringWrapper(_context, out.get()).toString();
+    } else {
+        return {};
+    }
 }
 
 }  // namespace mozjs

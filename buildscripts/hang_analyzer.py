@@ -329,13 +329,16 @@ class GDBDumper(object):
             bt_command,
             dump_command,
             "mongodb-analyze",
+            "mongodb-javascript-stack",  # The mongodb-javascript-stack command executes code in
+                                         # order to dump JavaScript backtraces and should therefore
+                                         # should be one of the last analysis commands.
             "set confirm off",
             "quit",
             ]
 
         call([dbg, "--quiet", "--nx"] +
-            list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
-            logger)
+             list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
+             logger)
 
         root_logger.info("Done analyzing %s process with PID %d" % (process_name, pid))
 
