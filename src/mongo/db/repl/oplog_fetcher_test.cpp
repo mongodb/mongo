@@ -346,7 +346,7 @@ TEST_F(OplogFetcherTest, StartupWhenActiveReturnsIllegalOperation) {
     ASSERT_TRUE(oplogFetcher.isActive());
     auto status = oplogFetcher.startup();
     getExecutor().shutdown();
-    ASSERT_EQUALS(ErrorCodes::InternalError, status);
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     ASSERT_STRING_CONTAINS(status.reason(), "oplog fetcher already started");
 }
 

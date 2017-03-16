@@ -740,6 +740,7 @@ env.Library(
         'oplog_fetcher.cpp',
     ],
     LIBDEPS=[
+        'abstract_async_component',
         'repl_coordinator_interface',
         'replica_set_messages',
         '$BUILD_DIR/mongo/base',

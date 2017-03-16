@@ -333,7 +333,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            DataReplicatorExternalState* dataReplicatorExternalState,
                            EnqueueDocumentsFn enqueueDocumentsFn,
                            OnShutdownCallbackFn onShutdownCallbackFn)
-    : _executor(executor),
+    : AbstractAsyncComponent(executor, "oplog fetcher"),
       _source(source),
       _nss(nss),
       _metadataObject(uassertStatusOK(makeMetadataObject(config.getProtocolVersion() == 1LL))),
@@ -367,62 +367,21 @@ std::string OplogFetcher::toString() const {
                          << " fetcher: " << _fetcher->getDiagnosticString();
 }
 
-bool OplogFetcher::isActive() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isActive_inlock();
+Status OplogFetcher::_doStartup_inlock() noexcept {
+    return _scheduleFetcher_inlock();
 }
 
-bool OplogFetcher::_isActive_inlock() const {
-    return State::kRunning == _state || State::kShuttingDown == _state;
+void OplogFetcher::_doShutdown_inlock() noexcept {
+    _fetcher->shutdown();
 }
 
-Status OplogFetcher::startup() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    switch (_state) {
-        case State::kPreStart:
-            _state = State::kRunning;
-            break;
-        case State::kRunning:
-            return Status(ErrorCodes::InternalError, "oplog fetcher already started");
-        case State::kShuttingDown:
-            return Status(ErrorCodes::ShutdownInProgress, "oplog fetcher shutting down");
-        case State::kComplete:
-            return Status(ErrorCodes::ShutdownInProgress, "oplog fetcher completed");
-    }
-
-    auto status = _scheduleFetcher_inlock();
-    if (!status.isOK()) {
-        _state = State::kComplete;
-    }
-    return status;
+stdx::mutex* OplogFetcher::_getMutex() noexcept {
+    return &_mutex;
 }
 
 Status OplogFetcher::_scheduleFetcher_inlock() {
     readersCreatedStats.increment();
     return _fetcher->schedule();
-}
-
-void OplogFetcher::shutdown() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    switch (_state) {
-        case State::kPreStart:
-            // Transition directly from PreStart to Complete if not started yet.
-            _state = State::kComplete;
-            return;
-        case State::kRunning:
-            _state = State::kShuttingDown;
-            break;
-        case State::kShuttingDown:
-        case State::kComplete:
-            // Nothing to do if we are already in ShuttingDown or Complete state.
-            return;
-    }
-    _fetcher->shutdown();
-}
-
-void OplogFetcher::join() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _condition.wait(lock, [this]() { return !_isActive_inlock(); });
 }
 
 OpTimeWithHash OplogFetcher::getLastOpTimeWithHashFetched() const {
@@ -441,11 +400,6 @@ BSONObj OplogFetcher::getMetadataObject_forTest() const {
 
 Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
     return _awaitDataTimeout;
-}
-
-OplogFetcher::State OplogFetcher::getState_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _state;
 }
 
 void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
@@ -664,9 +618,7 @@ void OplogFetcher::_finishCallback(Status status, OpTimeWithHash opTimeWithHash)
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(State::kComplete != _state);
-    _state = State::kComplete;
-    _condition.notify_all();
+    _transitionToComplete_inlock();
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
     // The function object will be destroyed outside the lock since the temporary variable
@@ -678,36 +630,13 @@ void OplogFetcher::_finishCallback(Status status, OpTimeWithHash opTimeWithHash)
 std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(long long currentTerm,
                                                     OpTime lastFetchedOpTime) {
     return stdx::make_unique<Fetcher>(
-        _executor,
+        _getExecutor(),
         _source,
         _nss.db().toString(),
         makeFindCommandObject(_nss, currentTerm, lastFetchedOpTime),
         stdx::bind(&OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
         _metadataObject,
         kOplogQueryNetworkTimeout);
-}
-
-bool OplogFetcher::_isShuttingDown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isShuttingDown_inlock();
-}
-
-bool OplogFetcher::_isShuttingDown_inlock() const {
-    return State::kShuttingDown == _state;
-}
-
-std::ostream& operator<<(std::ostream& os, const OplogFetcher::State& state) {
-    switch (state) {
-        case OplogFetcher::State::kPreStart:
-            return os << "PreStart";
-        case OplogFetcher::State::kRunning:
-            return os << "Running";
-        case OplogFetcher::State::kShuttingDown:
-            return os << "ShuttingDown";
-        case OplogFetcher::State::kComplete:
-            return os << "Complete";
-    }
-    MONGO_UNREACHABLE;
 }
 
 }  // namespace repl
