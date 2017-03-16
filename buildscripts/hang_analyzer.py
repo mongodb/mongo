@@ -301,8 +301,12 @@ class GDBDumper(object):
         root_logger.info("dir %s" % script_dir)
         gdb_dir = os.path.join(script_dir, "gdb")
         printers_script = os.path.join(gdb_dir, "mongo.py")
+        mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
 
         bt_command = "mongodb-uniqstack bt"
+        mongodb_show_locks = "mongodb-show-locks"
+        mongodb_deadlock = "mongodb-waitsfor-graph debugger_deadlock_%s_%d.gv" % \
+            (process_name, pid)
         if sys.platform.startswith("sunos"):
             '''
             On Solaris, currently calling mongo-uniqstack leads to an error:
@@ -318,20 +322,29 @@ class GDBDumper(object):
             When the function is done executing, GDB will silently stop.
             '''
             bt_command = "thread apply all bt"
+            mongodb_show_locks = ""
+            mongodb_deadlock = ""
 
         cmds = [
-            "set pagination off",
+            "set interactive-mode off",
+            "set print thread-events off",  # Python calls to gdb.parse_and_eval may cause threads
+                                            # to start and finish. This suppresses those messages
+                                            # from appearing in the return output.
+            "file %s" % process_name,  # Solaris must load the process to read the symbols.
             "attach %d" % pid,
             "info sharedlibrary",
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
-            "source " + printers_script,
+            "source %s" % printers_script,
+            "source %s" % mongo_lock_script,
             bt_command,
             dump_command,
-            "mongodb-analyze",
+            "mongodb-dump-locks",
+            mongodb_show_locks,
+            mongodb_deadlock,
             "mongodb-javascript-stack",  # The mongodb-javascript-stack command executes code in
                                          # order to dump JavaScript backtraces and should therefore
-                                         # should be one of the last analysis commands.
+                                         # be one of the last analysis commands.
             "set confirm off",
             "quit",
             ]
