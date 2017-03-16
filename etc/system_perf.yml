@@ -820,8 +820,6 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
-    - name: secondary_performance_WT
-    - name: secondary_performance_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
 
