@@ -688,20 +688,29 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 	if (chunk != NULL &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    chunk->switch_txn == WT_TXN_NONE) {
-		clsm->primary_chunk = chunk;
 		primary = clsm->chunks[clsm->nchunks - 1]->cursor;
+		btree = ((WT_CURSOR_BTREE *)primary)->btree;
+
 		/*
-		 * Disable eviction for the in-memory chunk.  Also clear the
-		 * bulk load flag here, otherwise eviction will be enabled by
-		 * the first update.
+		 * If the primary is not yet set as the primary, do that now.
+		 * Note that eviction was configured off when the underlying
+		 * object was created, which is what we want, leave it alone.
+		 *
+		 * We don't have to worry about races here: every thread that
+		 * modifies the tree will have to come through here, at worse
+		 * we set the flag repeatedly.  We don't use a WT_BTREE handle
+		 * flag, however, we could race doing the read-modify-write of
+		 * the flags field.
+		 *
+		 * If something caused the chunk to be closed and reopened
+		 * since it was created, we can no longer use it as a primary
+		 * chunk and we need to force a switch. We detect the tree was
+		 * created when it was opened by checking the "original" flag.
 		 */
-		btree = ((WT_CURSOR_BTREE *)(primary))->btree;
-		if (btree->bulk_load_ok) {
-			btree->bulk_load_ok = false;
-			WT_WITH_BTREE(session, btree,
-			    ret = __wt_btree_lsm_switch_primary(session, true));
-			WT_ERR(ret);
-		}
+		if (!btree->lsm_primary && btree->original)
+			btree->lsm_primary = true;
+		if (btree->lsm_primary)
+			clsm->primary_chunk = chunk;
 	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;

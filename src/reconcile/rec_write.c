@@ -3583,11 +3583,12 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	uint64_t recno;
 
 	btree = S2BT(session);
+
 	/*
 	 * Bulk-load is only permitted on newly created files, not any empty
 	 * file -- see the checkpoint code for a discussion.
 	 */
-	if (!btree->bulk_load_ok)
+	if (!btree->original)
 		WT_RET_MSG(session, EINVAL,
 		    "bulk-load is only possible for newly created trees");
 

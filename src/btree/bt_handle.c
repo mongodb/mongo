@@ -188,7 +188,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	 * Special operations don't enable eviction. (The underlying commands
 	 * may turn on eviction, but it's their decision.)
 	 */
-	if (btree->bulk_load_ok ||
+	if (btree->original ||
 	    F_ISSET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_REBALANCE |
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		WT_ERR(__wt_evict_file_exclusive_on(session));
@@ -562,7 +562,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 	 * tree.
 	 */
 	if (creation)
-		btree->bulk_load_ok = 1;
+		btree->original = 1;
 
 	/*
 	 * A note about empty trees: the initial tree is a single root page.

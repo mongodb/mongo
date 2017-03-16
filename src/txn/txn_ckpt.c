@@ -1420,7 +1420,7 @@ __checkpoint_tree(
 	 * delete a physical checkpoint, and that will end in tears.
 	 */
 	if (is_checkpoint)
-		if (btree->bulk_load_ok) {
+		if (btree->original) {
 			fake_ckpt = true;
 			goto fake;
 		}

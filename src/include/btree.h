@@ -118,10 +118,12 @@ struct __wt_btree {
 
 	uint64_t last_recno;		/* Column-store last record number */
 
-	WT_REF root;			/* Root page reference */
-	bool modified;			/* If the tree ever modified */
-	uint8_t bulk_load_ok;		/* Bulk-load is a possibility
+	WT_REF	root;			/* Root page reference */
+	bool	modified;		/* If the tree ever modified */
+	uint8_t	original;		/* Newly created: bulk-load possible
 					   (want a bool but needs atomic cas) */
+
+	bool lsm_primary;		/* Handle is/was the LSM primary */
 
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
@@ -160,7 +162,6 @@ struct __wt_btree {
 #define	WT_BTREE_IGNORE_CACHE	0x000400 /* Cache-resident object */
 #define	WT_BTREE_IN_MEMORY	0x000800 /* Cache-resident object */
 #define	WT_BTREE_LOOKASIDE	0x001000 /* Look-aside table */
-#define	WT_BTREE_LSM_PRIMARY	0x002000 /* Handle is current LSM primary */
 #define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
 #define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
 #define	WT_BTREE_NO_RECONCILE	0x010000 /* Allow splits, even with no evict */
