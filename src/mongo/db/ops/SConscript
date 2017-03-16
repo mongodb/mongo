@@ -278,21 +278,20 @@ env.Library(
         "write_ops_exec.cpp",
     ],
     LIBDEPS=[
+        'update_driver',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/db/service_context',
-        'update_driver',
-        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
         '$BUILD_DIR/mongo/db/introspect',
         '$BUILD_DIR/mongo/db/curop_metrics',
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
     ],
     LIBDEPS_TAGS=[
         # TODO(ADAM, 2017-01-10): See `CYCLE` tags above.
-        # The only undefined symbol is `mongo::Command::run` from `dcommands`.
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )

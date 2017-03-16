@@ -164,6 +164,11 @@ env.Library(
         'apply_ops_cmd_common',
         'core',
         'killcursors_common',
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

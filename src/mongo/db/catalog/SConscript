@@ -80,6 +80,7 @@ env.Library(
     ],
     LIBDEPS=[
         'collection_options',
+        'index_key_validate',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
@@ -92,15 +93,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/background',
-        #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
-        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
-        #'$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
-        #'$BUILD_DIR/mongo/db/views/views_mongod', # CYCLE
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
-        #'$BUILD_DIR/mongo/db/clientcursor', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/clientcursor',
+        '$BUILD_DIR/mongo/db/commands/dcommands',
+        '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/s/balancer',
     ],
 )

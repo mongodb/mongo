@@ -438,6 +438,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/net/miniwebserver",
         "mongodandmongos",
         'repl/repl_coordinator_global',
+        'repl/serveronly',
     ],
 )
 
@@ -565,9 +566,13 @@ env.Library(
         'db_raii.cpp',
     ],
     LIBDEPS=[
-        'catalog/catalog',
         'stats/top',
         'views/views',
+        #'catalog/catalog', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -608,6 +613,11 @@ env.Library(
         'db_raii',
         'index/index_access_methods',
         'ops/write_ops',
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -658,8 +668,12 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/background_job",
-        "catalog/catalog",
         "query/query",
+        #"catalog/catalog", # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -670,10 +684,14 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "catalog/catalog",
         "dbdirectclient",
         "ops/write_ops",
         "repl/isself",
+        #"catalog/catalog", # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -696,9 +714,13 @@ env.Library(
         "index_rebuilder.cpp",
     ],
     LIBDEPS=[
-        "catalog/catalog",
         "db_raii",
         "index/index_access_methods",
+        #"catalog/catalog", # CYCYLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -708,8 +730,12 @@ env.Library(
         "introspect.cpp",
     ],
     LIBDEPS=[
-        "catalog/catalog",
         "db_raii",
+        #"catalog/catalog", # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -732,10 +758,14 @@ env.Library(
         "range_deleter_service.cpp",
     ],
     LIBDEPS=[
-        "catalog/catalog",
         "dbhelpers",
         "db_raii",
         "range_deleter",
+        #"catalog/catalog", # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -763,8 +793,12 @@ env.Library(
     ],
     LIBDEPS=[
         "background",
-        "catalog/catalog",
         "catalog/index_key_validate",
+        #"catalog/catalog", # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -807,6 +841,11 @@ env.Library(
         "ops/write_ops_parsers",
         "run_commands",
         "storage/storage_options",
+        #"catalog/catalog", # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
