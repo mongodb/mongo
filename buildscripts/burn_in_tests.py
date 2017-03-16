@@ -202,6 +202,11 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
         revs_to_check = callo(["git", "rev-list", base_commit,
                                "--max-count=200", "--skip=1"]).splitlines()
         last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
+        if last_activated is None:
+            # When the current commit is the first time 'buildvariant' has run, there won't be a
+            # commit among 'revs_to_check' that's been activated in Evergreen. We handle this by
+            # only considering tests changed in the current commit.
+            last_activated = "HEAD"
         print "Comparing current branch against", last_activated
         revisions = callo(["git", "rev-list", base_commit + "..." + last_activated]).splitlines()
         base_commit = last_activated
