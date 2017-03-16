@@ -737,7 +737,6 @@ Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
 void PlanCache::clear() {
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     _cache.clear();
-    _writeOperations.store(0);
 }
 
 PlanCacheKey PlanCache::computeKey(const CanonicalQuery& cq) const {
