@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import gdb.printing
+import os
 import sys
 
 try:
@@ -19,6 +20,13 @@ except ImportError as e:
 def get_unique_ptr(obj):
     """Read the value of a libstdc++ std::unique_ptr"""
     return obj["_M_t"]['_M_head_impl']
+
+
+def get_process_name():
+    """Return the main binary we are attached to."""
+    # The return from gdb.objfiles() could include the file extension of the debug symbols.
+    main_binary_name = gdb.objfiles()[0].filename
+    return os.path.splitext(os.path.basename(main_binary_name))[0]
 
 
 ###################################################################################################
@@ -336,12 +344,8 @@ class MongoDBAnalyze(gdb.Command):
 
     def invoke(self, arg, _from_tty):
         print("Running Hang Analyzer Supplement")
-        if len(gdb.objfiles()) == 0:
-            print("Skipping, not attached to an inferior")
-            return
 
-        main_binary_name = gdb.objfiles()[0].filename
-
+        main_binary_name = get_process_name()
         if main_binary_name.endswith('mongod'):
             self.analyze_mongod()
         else:
@@ -372,7 +376,7 @@ class MongoDBUniqueStack(gdb.Command):
     def invoke(self, arg, _from_tty):
         stacks = {}
         if not arg:
-            arg = 'bt' # default to 'bt'
+            arg = 'bt'  # default to 'bt'
 
         current_thread = gdb.selected_thread()
         try:
@@ -387,9 +391,9 @@ class MongoDBUniqueStack(gdb.Command):
                 current_thread.switch()
 
     def _process_thread_stack(self, arg, stacks, thread):
-        thread_info = {} # thread dict to hold per thread data
-        thread_info['frames'] = [] # the complete backtrace per thread from gdb
-        thread_info['functions'] = [] # list of function names from frames
+        thread_info = {}  # thread dict to hold per thread data
+        thread_info['frames'] = []  # the complete backtrace per thread from gdb
+        thread_info['functions'] = []  # list of function names from frames
         thread_info['pthread'] = hex(int(gdb.parse_and_eval("(uint64_t)pthread_self()")))
 
         frame = gdb.newest_frame()
@@ -422,10 +426,54 @@ class MongoDBUniqueStack(gdb.Command):
                 print("{} duplicate thread(s):".format(len(stack['tids']) - 1), end=' ')
                 print(", ".join((str(tid) for tid in stack['tids'][1:])))
             print(stack['frames'])
-            print() # leave extra blank line after each thread stack
+            print()  # leave extra blank line after each thread stack
 
 # Register command
 MongoDBUniqueStack()
+
+
+class MongoDBJavaScriptStack(gdb.Command):
+    """Print the JavaScript stack from a MongoDB process"""
+
+    def __init__(self):
+        register_mongo_command(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
+
+    def invoke(self, arg, _from_tty):
+        print("Running Print JavaScript Stack Supplement")
+
+        main_binary_name = get_process_name()
+        if main_binary_name.endswith('mongod') or main_binary_name.endswith('mongo'):
+            self.javascript_stack()
+        else:
+            print("No JavaScript stack print done for: %s" % (main_binary_name))
+
+    def javascript_stack(self):
+        """GDB in-process python supplement"""
+
+        for thread in gdb.selected_inferior().threads():
+            try:
+                if not thread.is_valid():
+                    print("Ignoring invalid thread %d in javascript_stack" % thread.num)
+                    continue
+                thread.switch()
+            except gdb.error as err:
+                print("Ignoring GDB error '%s' in javascript_stack" % str(err))
+                continue
+
+            try:
+                if gdb.parse_and_eval(
+                        'mongo::mozjs::kCurrentScope && mongo::mozjs::kCurrentScope->_inOp'):
+                    gdb.execute('thread', from_tty=False, to_string=False)
+                    gdb.execute('printf "%s\n", ' +
+                                'mongo::mozjs::kCurrentScope->buildStackString().c_str()',
+                                from_tty=False, to_string=False)
+            except gdb.error as err:
+                print("Ignoring GDB error '%s' in javascript_stack" % str(err))
+                continue
+
+
+# Register command
+MongoDBJavaScriptStack()
 
 
 class MongoDBHelp(gdb.Command):

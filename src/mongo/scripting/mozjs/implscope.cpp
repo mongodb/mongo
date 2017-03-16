@@ -965,5 +965,20 @@ const std::string& MozJSImplScope::getParentStack() const {
     return _parentStack;
 }
 
+std::string MozJSImplScope::buildStackString() {
+    JS::RootedObject stack(_context);
+
+    if (!JS::CaptureCurrentStack(_context, &stack)) {
+        return {};
+    }
+
+    JS::RootedString out(_context);
+    if (JS::BuildStackString(_context, stack, &out)) {
+        return JSStringWrapper(_context, out.get()).toString();
+    } else {
+        return {};
+    }
+}
+
 }  // namespace mozjs
 }  // namespace mongo
