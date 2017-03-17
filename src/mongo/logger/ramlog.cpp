@@ -50,8 +50,7 @@ RM* _named = NULL;
 }  // namespace
 
 RamLog::RamLog(const std::string& name) : _name(name), _totalLinesWritten(0), _lastWrite(0) {
-    h = 0;
-    n = 0;
+    clear();
     for (int i = 0; i < N; i++)
         lines[i][C - 1] = 0;
 }
@@ -82,6 +81,16 @@ void RamLog::write(const std::string& str) {
         n++;
     else
         h = (h + 1) % N;
+}
+
+void RamLog::clear() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _totalLinesWritten = 0;
+    _lastWrite = 0;
+    h = 0;
+    n = 0;
+    for (int i = 0; i < N; i++)
+        lines[i][0] = 0;
 }
 
 time_t RamLog::LineIterator::lastWrite() {

@@ -104,6 +104,7 @@
         cleanupOrphaned: {
             skip: "Tested in views/views_sharded.js",
         },
+        clearLog: {skip: isUnrelated},
         clone: {skip: "Tested in replsets/cloneDb.js"},
         cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
         cloneCollectionAsCapped: {
