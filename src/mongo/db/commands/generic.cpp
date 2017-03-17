@@ -32,6 +32,7 @@
 
 #include <time.h>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/auth/action_set.h"
@@ -449,6 +450,61 @@ public:
     }
 
 } getLogCmd;
+
+class ClearLogCmd : public Command {
+public:
+    ClearLogCmd() : Command("clearLog") {}
+
+    virtual bool slaveOk() const {
+        return true;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+    virtual bool adminOnly() const {
+        return true;
+    }
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
+        // No access control needed since this command is a testing-only command that must be
+        // enabled at the command line.
+        return Status::OK();
+    }
+    virtual void help(stringstream& help) const {
+        help << "{ clearLog : 'global' }";
+    }
+
+    virtual bool run(OperationContext* opCtx,
+                     const string& dbname,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result) {
+        std::string logName;
+        Status status = bsonExtractStringField(cmdObj, "clearLog", &logName);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
+
+        if (logName != "global") {
+            return appendCommandStatus(
+                result, Status(ErrorCodes::InvalidOptions, "Only the 'global' log can be cleared"));
+        }
+        RamLog* ramlog = RamLog::getIfExists(logName);
+        invariant(ramlog);
+        ramlog->clear();
+        return true;
+    }
+};
+
+MONGO_INITIALIZER(RegisterClearLogCmd)(InitializerContext* context) {
+    if (Command::testCommandsEnabled) {
+        // Leaked intentionally: a Command registers itself when constructed.
+        new ClearLogCmd();
+    }
+    return Status::OK();
+}
 
 class CmdGetCmdLineOpts : Command {
 public:

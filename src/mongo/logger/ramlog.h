@@ -93,6 +93,11 @@ public:
      */
     void write(const std::string& str);
 
+    /**
+     * Empties out the RamLog.
+     */
+    void clear();
+
 
     /**
      * Writes an HTML representation of the log to "s".
