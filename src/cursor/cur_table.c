@@ -1015,11 +1015,15 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (*cursorp != NULL) {
-			if (*cursorp != cursor)
-				WT_TRET(__wt_cursor_close(*cursorp));
+			/*
+			 * When a dump cursor is opened, then *cursorp, not
+			 * cursor, is the dump cursor. Close the dump cursor,
+			 * and the table cursor will be closed as its child.
+			 */
+			cursor = *cursorp;
 			*cursorp = NULL;
 		}
-		WT_TRET(__curtable_close(cursor));
+		WT_TRET(cursor->close(cursor));
 	}
 
 	__wt_scr_free(session, &tmp);
