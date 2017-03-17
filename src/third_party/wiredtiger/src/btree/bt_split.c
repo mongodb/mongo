@@ -187,7 +187,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
 		exclusive = true;
 
 	if (exclusive) {
-		__wt_free(session, p);
+		__wt_overwrite_and_free_len(session, p, s);
 		return (0);
 	}
 
@@ -640,12 +640,12 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	/* Start making real changes to the tree, errors are fatal. */
 	complete = WT_ERR_PANIC;
 
-	/* Get a generation for this split, mark the root page. */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-	root->pg_intl_split_gen = split_gen;
-
-	/* Prepare the WT_REFs for the move. */
-	__split_ref_prepare(session, alloc_index, split_gen, false);
+	/*
+	 * Prepare the WT_REFs for the move: this requires a stable split
+	 * generation to block splits in newly created pages, so get one.
+	 */
+	WT_ENTER_PAGE_INDEX(session);
+	__split_ref_prepare(session, alloc_index, session->split_gen, false);
 
 	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
@@ -654,6 +654,16 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(root) == pindex);
 	WT_INTL_INDEX_SET(root, alloc_index);
 	alloc_index = NULL;
+
+	WT_LEAVE_PAGE_INDEX(session);
+
+	/*
+	 * Get a generation for this split, mark the root page.  This must be
+	 * after the new index is swapped into place in order to know that no
+	 * readers are looking at the old index.
+	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	root->pg_intl_split_gen = split_gen;
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
@@ -825,10 +835,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	/* Start making real changes to the tree, errors are fatal. */
 	complete = WT_ERR_PANIC;
 
-	/* Get a generation for this split, mark the parent page. */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-	parent->pg_intl_split_gen = split_gen;
-
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which
 	 * makes the split visible to threads descending the tree.
@@ -836,6 +842,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
+
+	/*
+	 * Get a generation for this split, mark the page.  This must be after
+	 * the new index is swapped into place in order to know that no readers
+	 * are looking at the old index.
+	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	parent->pg_intl_split_gen = split_gen;
 
 	/*
 	 * If discarding the page's original WT_REF field, reset it to split.
@@ -1154,23 +1168,34 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	/* Start making real changes to the tree, errors are fatal. */
 	complete = WT_ERR_PANIC;
 
-	/* Get a generation for this split, mark the page. */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-	page->pg_intl_split_gen = split_gen;
-
-	/* Prepare the WT_REFs for the move. */
-	__split_ref_prepare(session, alloc_index, split_gen, true);
+	/*
+	 * Prepare the WT_REFs for the move: this requires a stable split
+	 * generation to block splits in newly created pages, so get one.
+	 */
+	WT_ENTER_PAGE_INDEX(session);
+	__split_ref_prepare(session, alloc_index, session->split_gen, true);
 
 	/* Split into the parent. */
-	WT_ERR(__split_parent(session, page_ref, alloc_index->index,
-	    alloc_index->entries, parent_incr, false, false));
+	if ((ret = __split_parent(session, page_ref, alloc_index->index,
+	    alloc_index->entries, parent_incr, false, false)) == 0) {
+		/*
+		 * Confirm the page's index hasn't moved, then update it, which
+		 * makes the split visible to threads descending the tree.
+		 */
+		WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
+		WT_INTL_INDEX_SET(page, replace_index);
+	}
+
+	WT_LEAVE_PAGE_INDEX(session);
+	WT_ERR(ret);
 
 	/*
-	 * Confirm the page's index hasn't moved, then update it, which makes
-	 * the split visible to threads descending the tree.
+	 * Get a generation for this split, mark the parent page.  This must be
+	 * after the new index is swapped into place in order to know that no
+	 * readers are looking at the old index.
 	 */
-	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
-	WT_INTL_INDEX_SET(page, replace_index);
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	page->pg_intl_split_gen = split_gen;
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
