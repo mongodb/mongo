@@ -226,6 +226,9 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccrt) {
         // time we retrieved a cache entry for it. Doing nothing in this case will cause the
         // next call to getCollectionRoutingInfo to return an unsharded collection.
         return;
+    } else if (itColl->second.needsRefresh) {
+        // Refresh has been scheduled for the collection already
+        return;
     } else if (itColl->second.routingInfo->getVersion() == ccrt._cm->getVersion()) {
         // If the versions match, the last version of the routing information that we used is no
         // longer valid, so trigger a refresh.
