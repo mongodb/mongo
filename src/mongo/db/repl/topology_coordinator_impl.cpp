@@ -172,7 +172,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
     // if we have a target we've requested to sync from, use it
     if (_forceSyncSourceIndex != -1) {
         invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
-        _syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
+        _syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getInternalHostAndPort();
         _forceSyncSourceIndex = -1;
         log() << "choosing sync source candidate by request: " << _syncSource;
         std::string msg(str::stream() << "syncing from: " << _syncSource.toString()
@@ -202,7 +202,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
         } else if (_memberIsBlacklisted(*_currentPrimaryMember(), now)) {
             LOG(1) << "Cannot select a sync source because chaining is not allowed and primary "
                       "member is blacklisted: "
-                   << _currentPrimaryMember()->getHostAndPort();
+                   << _currentPrimaryMember()->getInternalHostAndPort();
             _syncSource = HostAndPort();
             return _syncSource;
         } else if (_currentPrimaryIndex == _selfIndex) {
@@ -211,7 +211,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             _syncSource = HostAndPort();
             return _syncSource;
         } else {
-            _syncSource = _currentPrimaryMember()->getHostAndPort();
+            _syncSource = _currentPrimaryMember()->getInternalHostAndPort();
             log() << "chaining not allowed, choosing primary as sync source candidate: "
                   << _syncSource;
             std::string msg(str::stream() << "syncing from primary: " << _syncSource.toString());
@@ -265,13 +265,13 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             // Candidate must be up to be considered.
             if (!it->up()) {
                 LOG(2) << "Cannot select sync source because it is not up: "
-                       << itMemberConfig.getHostAndPort();
+                       << itMemberConfig.getInternalHostAndPort();
                 continue;
             }
             // Candidate must be PRIMARY or SECONDARY state to be considered.
             if (!it->getState().readable()) {
                 LOG(2) << "Cannot select sync source because it is not readable: "
-                       << itMemberConfig.getHostAndPort();
+                       << itMemberConfig.getInternalHostAndPort();
                 continue;
             }
 
@@ -280,19 +280,19 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 // Candidate must be a voter if we are a voter.
                 if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
                     LOG(2) << "Cannot select sync source because we are a voter and it is not: "
-                           << itMemberConfig.getHostAndPort();
+                           << itMemberConfig.getInternalHostAndPort();
                     continue;
                 }
                 // Candidates must not be hidden.
                 if (itMemberConfig.isHidden()) {
                     LOG(2) << "Cannot select sync source because it is hidden: "
-                           << itMemberConfig.getHostAndPort();
+                           << itMemberConfig.getInternalHostAndPort();
                     continue;
                 }
                 // Candidates cannot be excessively behind.
                 if (it->getAppliedOpTime() < oldestSyncOpTime) {
                     LOG(2) << "Cannot select sync source because it is too far behind."
-                           << "Latest optime of sync candidate " << itMemberConfig.getHostAndPort()
+                           << "Latest optime of sync candidate " << itMemberConfig.getInternalHostAndPort()
                            << ": " << it->getAppliedOpTime()
                            << ", oldest acceptable optime: " << oldestSyncOpTime;
                     continue;
@@ -300,7 +300,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 // Candidate must not have a configured delay larger than ours.
                 if (_selfConfig().getSlaveDelay() < itMemberConfig.getSlaveDelay()) {
                     LOG(2) << "Cannot select sync source with larger slaveDelay than ours: "
-                           << itMemberConfig.getHostAndPort();
+                           << itMemberConfig.getInternalHostAndPort();
                     continue;
                 }
             }
@@ -308,7 +308,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             if (_selfConfig().shouldBuildIndexes()) {
                 if (!itMemberConfig.shouldBuildIndexes()) {
                     LOG(2) << "Cannot select sync source with shouldBuildIndex differences: "
-                           << itMemberConfig.getHostAndPort();
+                           << itMemberConfig.getInternalHostAndPort();
                     continue;
                 }
             }
@@ -317,23 +317,23 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 LOG(1) << "Cannot select sync source equal to or behind our last fetched optime. "
                        << "My last fetched oplog optime: " << lastOpTimeFetched.toBSON()
                        << ", latest oplog optime of sync candidate "
-                       << itMemberConfig.getHostAndPort() << ": "
+                       << itMemberConfig.getInternalHostAndPort() << ": "
                        << it->getAppliedOpTime().toBSON();
                 continue;
             }
             // Candidate cannot be more latent than anything we've already considered.
             if ((closestIndex != -1) &&
-                (_getPing(itMemberConfig.getHostAndPort()) >
-                 _getPing(_rsConfig.getMemberAt(closestIndex).getHostAndPort()))) {
+                (_getPing(itMemberConfig.getInternalHostAndPort()) >
+                 _getPing(_rsConfig.getMemberAt(closestIndex).getInternalHostAndPort()))) {
                 LOG(2) << "Cannot select sync source with higher latency than the best candidate: "
-                       << itMemberConfig.getHostAndPort();
+                       << itMemberConfig.getInternalHostAndPort();
 
                 continue;
             }
             // Candidate cannot be blacklisted.
             if (_memberIsBlacklisted(itMemberConfig, now)) {
                 LOG(1) << "Cannot select sync source which is blacklisted: "
-                       << itMemberConfig.getHostAndPort();
+                       << itMemberConfig.getInternalHostAndPort();
 
                 continue;
             }
@@ -356,7 +356,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
         _syncSource = HostAndPort();
         return _syncSource;
     }
-    _syncSource = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
+    _syncSource = _rsConfig.getMemberAt(closestIndex).getInternalHostAndPort();
     log() << "sync source candidate: " << _syncSource;
     std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
     setMyHeartbeatMessage(now, msg);
@@ -366,6 +366,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
 bool TopologyCoordinatorImpl::_memberIsBlacklisted(const MemberConfig& memberConfig,
                                                    Date_t now) const {
     std::map<HostAndPort, Date_t>::const_iterator blacklisted =
+        _syncSourceBlacklist.find(memberConfig.getInternalHostAndPort()) ||
         _syncSourceBlacklist.find(memberConfig.getHostAndPort());
     if (blacklisted != _syncSourceBlacklist.end()) {
         if (blacklisted->second > now) {
