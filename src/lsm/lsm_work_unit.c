@@ -230,7 +230,7 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (__wt_atomic_cas32(&chunk->bloom_busy, 0, 1)) {
 			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 				ret = __lsm_bloom_create(
-				    session, lsm_tree, chunk, (u_int)i);
+				    session, lsm_tree, chunk, i);
 				/*
 				 * Record if we were successful so that we can
 				 * later push a merge work unit.
@@ -662,7 +662,8 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			if (drop_ret == EBUSY) {
 				++skipped;
 				continue;
-			} else if (drop_ret != ENOENT)
+			}
+			if (drop_ret != ENOENT)
 				WT_ERR(drop_ret);
 
 			flush_metadata = true;
@@ -673,7 +674,8 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			if (drop_ret == EBUSY) {
 				++skipped;
 				continue;
-			} else if (drop_ret != ENOENT)
+			}
+			if (drop_ret != ENOENT)
 				WT_ERR(drop_ret);
 			flush_metadata = true;
 		}

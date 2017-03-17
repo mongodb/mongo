@@ -369,6 +369,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	size_t addr_size;
 	uint32_t previous_state;
 	const uint8_t *addr;
+	bool timer;
 
 	btree = S2BT(session);
 	page = NULL;
@@ -408,10 +409,11 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * There's an address, read or map the backing disk page and build an
 	 * in-memory version of the page.
 	 */
-	if (!F_ISSET(session, WT_SESSION_INTERNAL))
+	timer = !F_ISSET(session, WT_SESSION_INTERNAL);
+	if (timer)
 		__wt_epoch(session, &start);
 	WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
-	if (!F_ISSET(session, WT_SESSION_INTERNAL)) {
+	if (timer) {
 		__wt_epoch(session, &stop);
 		WT_STAT_CONN_INCR(session, cache_read_app_count);
 		WT_STAT_CONN_INCRV(session, cache_read_app_time,

@@ -422,7 +422,6 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		__wt_sleep(0, stepdown_us / 10);
 		__wt_epoch(session, &stop);
 		current_us = WT_TIMEDIFF_US(stop, last);
-		total_ms = WT_TIMEDIFF_MS(stop, start);
 		bytes_written_total =
 		    cache->bytes_written - bytes_written_start;
 

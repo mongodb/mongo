@@ -19,7 +19,7 @@
 	__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n)
 
 #define	API_CALL(s, h, n, dh, config, cfg) do {				\
-	const char *cfg[] =						\
+	const char *(cfg)[] =						\
 	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, dh);					\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
@@ -62,15 +62,16 @@
 	if (__autotxn) {						\
 		if (F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT))		\
 			F_CLR(&(s)->txn, WT_TXN_AUTOCOMMIT);		\
-		else if (ret == 0 && !F_ISSET(&(s)->txn, WT_TXN_ERROR))	\
-			ret = __wt_txn_commit((s), NULL);		\
+		else if ((ret) == 0 &&					\
+		    !F_ISSET(&(s)->txn, WT_TXN_ERROR))			\
+			(ret) = __wt_txn_commit((s), NULL);		\
 		else {							\
 			if (retry)					\
 				WT_TRET(__wt_session_copy_values(s));	\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
-			if ((ret == 0 || ret == WT_ROLLBACK) &&		\
+			if (((ret) == 0 || (ret) == WT_ROLLBACK) &&	\
 			    (retry)) {					\
-				ret = 0;				\
+				(ret) = 0;				\
 				continue;				\
 			}						\
 			WT_TRET(__wt_session_reset_cursors(s, false));	\

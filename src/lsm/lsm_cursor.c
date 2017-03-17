@@ -10,10 +10,10 @@
 
 #define	WT_FORALL_CURSORS(clsm, c, i)					\
 	for ((i) = (clsm)->nchunks; (i) > 0;)				\
-		if (((c) = (clsm)->chunks[--i]->cursor) != NULL)
+		if (((c) = (clsm)->chunks[--(i)]->cursor) != NULL)
 
 #define	WT_LSM_CURCMP(s, lsm_tree, c1, c2, cmp)				\
-	__wt_compare(s, (lsm_tree)->collator, &(c1)->key, &(c2)->key, &cmp)
+	__wt_compare(s, (lsm_tree)->collator, &(c1)->key, &(c2)->key, &(cmp))
 
 static int __clsm_lookup(WT_CURSOR_LSM *, WT_ITEM *);
 static int __clsm_open_cursors(WT_CURSOR_LSM *, bool, u_int, uint32_t);
@@ -1223,7 +1223,8 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 				WT_LSM_TREE_STAT_INCR(
 				    session, clsm->lsm_tree->bloom_miss);
 				continue;
-			} else if (ret == 0)
+			}
+			if (ret == 0)
 				WT_LSM_TREE_STAT_INCR(
 				    session, clsm->lsm_tree->bloom_hit);
 			WT_ERR(ret);
@@ -1328,7 +1329,8 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND) {
 			ret = 0;
 			continue;
-		} else if (ret != 0)
+		}
+		if (ret != 0)
 			goto err;
 
 		/* Do we have an exact match? */
@@ -1348,7 +1350,8 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			if ((ret = c->next(c)) == WT_NOTFOUND) {
 				ret = 0;
 				continue;
-			} else if (ret != 0)
+			}
+			if (ret != 0)
 				goto err;
 		}
 

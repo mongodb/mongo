@@ -78,6 +78,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
 	uint64_t oldest_id, saved_pinned_id;
 	uint32_t flags;
+	bool timer;
 
 	conn = S2C(session);
 	btree = S2BT(session);
@@ -88,7 +89,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
-	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+	timer = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT);
+	if (timer)
 		__wt_epoch(session, &start);
 
 	switch (syncop) {
@@ -242,7 +244,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		break;
 	}
 
-	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
+	if (timer) {
 		__wt_epoch(session, &end);
 		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote: %" PRIu64

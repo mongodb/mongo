@@ -1108,11 +1108,7 @@ retry:	WT_RET(__wt_btcur_search(start));
 	WT_ASSERT(session,
 	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
-	/*
-	 * Reset ret each time through so that we don't loop forever in
-	 * the cursor equals case.
-	 */
-	for (ret = 0;;) {
+	for (;;) {
 		if ((ret = rmfunc(session, start, 1)) != 0)
 			break;
 
@@ -1176,11 +1172,7 @@ retry:	WT_RET(__wt_btcur_search(start));
 	WT_ASSERT(session,
 	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
-	/*
-	 * Reset ret each time through so that we don't loop forever in
-	 * the cursor equals case.
-	 */
-	for (ret = 0;;) {
+	for (;;) {
 		value = (const uint8_t *)start->iface.value.data;
 		if (*value != 0 &&
 		    (ret = rmfunc(session, start, 1)) != 0)

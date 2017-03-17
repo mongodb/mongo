@@ -87,7 +87,7 @@ struct __wt_session_impl {
 	void	  *meta_track_sub;	/* Child transaction / save point */
 	size_t	   meta_track_alloc;	/* Currently allocated */
 	int	   meta_track_nest;	/* Nesting level of meta transaction */
-#define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
+#define	WT_META_TRACKING(session)	((session)->meta_track_next != NULL)
 
 	/*
 	 * Each session keeps a cache of table handles. The set of handles

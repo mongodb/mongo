@@ -67,7 +67,7 @@
 
 #define	WT_TIMECMP(t1, t2)						\
 	((t1).tv_sec < (t2).tv_sec ? -1 :				\
-	     (t1).tv_sec == (t2.tv_sec) ?				\
+	     (t1).tv_sec == (t2).tv_sec ?				\
 	     (t1).tv_nsec < (t2).tv_nsec ? -1 :				\
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 

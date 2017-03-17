@@ -163,7 +163,6 @@ static void
 __curstat_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_UNUSED(cursor);
-	return;
 }
 
 /*

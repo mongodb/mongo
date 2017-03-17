@@ -80,8 +80,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 		if (no_overwrite)
 			flags |= LOAD_JSON_NO_OVERWRITE;
 		return (util_load_json(session, filename, flags));
-	} else
-		return (load_dump(session));
+	}
+	return (load_dump(session));
 }
 
 /*

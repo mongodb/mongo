@@ -93,7 +93,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	    "%s op %" PRIu32 " to file %" PRIu32 " at LSN %" PRIu32	\
 	    "/%" PRIu32,						\
 	    cursor == NULL ? "Skipping" : "Applying",			\
-	    optype, fileid, lsnp->l.file, lsnp->l.offset);		\
+	    optype, fileid, (lsnp)->l.file, (lsnp)->l.offset);		\
 	if (cursor == NULL)						\
 		break
 

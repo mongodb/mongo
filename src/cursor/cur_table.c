@@ -14,8 +14,8 @@ static int __curtable_update(WT_CURSOR *cursor);
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
 	u_int __i;							\
-	for (__i = 0, __cp = ctable->cg_cursors;			\
-	    __i < WT_COLGROUPS(ctable->table);				\
+	for (__i = 0, __cp = (ctable)->cg_cursors;			\
+	    __i < WT_COLGROUPS((ctable)->table);			\
 	    __i++, __cp++)						\
 		WT_TRET((*__cp)->f(*__cp));				\
 } while (0)
