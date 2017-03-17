@@ -12,10 +12,13 @@ function stopServerReplication(conn) {
         });
         return;
     }
+
+    // Clear ramlog so checkLog can't find log messages from previous times this fail point was
+    // enabled.
+    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
     var errMsg = 'Failed to enable stopReplProducer failpoint.';
     assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}),
-        errMsg);
+        conn.adminCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}), errMsg);
 
     // Wait until the fail point is actually hit.
     checkLog.contains(conn, 'bgsync - stopReplProducer fail point enabled');
