@@ -304,6 +304,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
     if (aggRequest) {
+        qr->setExplain(static_cast<bool>(aggRequest->getExplain()));
         qr->setHint(aggRequest->getHint());
     }
 
