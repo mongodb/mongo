@@ -157,14 +157,14 @@ struct __wt_btree {
 	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
-#define	WT_BTREE_BULK		0x000100 /* Bulk-load handle */
-#define	WT_BTREE_CLOSED		0x000200 /* Handle closed */
-#define	WT_BTREE_IGNORE_CACHE	0x000400 /* Cache-resident object */
-#define	WT_BTREE_IN_MEMORY	0x000800 /* Cache-resident object */
-#define	WT_BTREE_LOOKASIDE	0x001000 /* Look-aside table */
+#define	WT_BTREE_ALLOW_SPLITS	0x000100 /* Allow splits, even with no evict */
+#define	WT_BTREE_BULK		0x000200 /* Bulk-load handle */
+#define	WT_BTREE_CLOSED		0x000400 /* Handle closed */
+#define	WT_BTREE_IGNORE_CACHE	0x000800 /* Cache-resident object */
+#define	WT_BTREE_IN_MEMORY	0x001000 /* Cache-resident object */
+#define	WT_BTREE_LOOKASIDE	0x002000 /* Look-aside table */
 #define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
 #define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
-#define	WT_BTREE_NO_RECONCILE	0x010000 /* Allow splits, even with no evict */
 #define	WT_BTREE_REBALANCE	0x020000 /* Handle is for rebalance */
 #define	WT_BTREE_SALVAGE	0x040000 /* Handle is for salvage */
 #define	WT_BTREE_SKIP_CKPT	0x080000 /* Handle skipped checkpoint */

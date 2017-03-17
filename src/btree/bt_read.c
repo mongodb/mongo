@@ -592,8 +592,9 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 */
 			if (LF_ISSET(WT_READ_NO_EVICT) ||
 			    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
+			    btree->lsm_primary ||
 			    (btree->evict_disabled > 0 &&
-			     !F_ISSET(btree, WT_BTREE_NO_RECONCILE)))
+			    !F_ISSET(btree, WT_BTREE_ALLOW_SPLITS)))
 				goto skip_evict;
 
 			/*

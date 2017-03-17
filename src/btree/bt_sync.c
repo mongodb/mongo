@@ -188,9 +188,9 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * to grow significantly larger than the configured maximum
 		 * size.
 		 */
-		F_SET(btree, WT_BTREE_NO_RECONCILE);
+		F_SET(btree, WT_BTREE_ALLOW_SPLITS);
 		ret = __wt_evict_file_exclusive_on(session);
-		F_CLR(btree, WT_BTREE_NO_RECONCILE);
+		F_CLR(btree, WT_BTREE_ALLOW_SPLITS);
 		WT_ERR(ret);
 		__wt_evict_file_exclusive_off(session);
 
