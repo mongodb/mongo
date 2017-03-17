@@ -302,7 +302,7 @@ class WiredTigerTestCase(unittest.TestCase):
         # In case the open starts additional threads, flush first to
         # avoid confusion.
         sys.stdout.flush()
-        conn_param = 'create,error_prefix="%s: ",%s' % (self.shortid(), config)
+        conn_param = 'create,error_prefix="%s",%s' % (self.shortid(), config)
         try:
             conn = self.wiredtiger_open(home, conn_param)
         except wiredtiger.WiredTigerError as e:
