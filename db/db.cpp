@@ -547,6 +547,9 @@ int main(int argc, char* argv[]) {
 #if defined(_WIN32)
     po::options_description windows_scm_options("Windows Service Control Manager options");
 #endif
+#if defined(MONGO_SSL)
+    po::options_description ssl_options("SSL options");
+#endif
     po::options_description replication_options("Replication options");
     po::options_description ms_options("Master/slave options");
     po::options_description rs_options("Replica set options");
@@ -596,6 +599,14 @@ int main(int argc, char* argv[]) {
     CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
 #endif
 
+#if defined(MONGO_SSL)
+    ssl_options.add_options()
+    ("sslOnNormalPorts", "Enable SSL on the defined/default ports")
+    ("sslPEMKeyFile", "Specify the path to the PEM formatted SSL certificate/key file")
+    ("sslPEMKeyPassword", "Enable SSL on the defined/default ports")
+	;
+#endif
+
     replication_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
     ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
@@ -642,6 +653,9 @@ int main(int argc, char* argv[]) {
     visible_options.add(general_options);
 #if defined(_WIN32)
     visible_options.add(windows_scm_options);
+#endif
+#ifdef MONGO_SSL
+    visible_options.add(ssl_options);
 #endif
     visible_options.add(replication_options);
     visible_options.add(ms_options);

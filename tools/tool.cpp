@@ -54,7 +54,7 @@ namespace mongo {
             ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
             ("ipv6", "enable IPv6 support (disabled by default)")
 #ifdef MONGO_SSL
-            ("ssl", "use all for connections")
+            ("ssl", "use SSL for all connections")
 #endif
 
             ("username,u",po::value<string>(), "username" )

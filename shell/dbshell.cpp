@@ -511,7 +511,7 @@ int _main(int argc, char* argv[]) {
     ("verbose", "increase verbosity")
     ("ipv6", "enable IPv6 support (disabled by default)")
 #ifdef MONGO_SSL
-    ("ssl", "use all for connections")
+    ("ssl", "use SSL for all connections")
 #endif
     ;
 
