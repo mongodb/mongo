@@ -45,25 +45,17 @@ CollectionMetadata::CollectionMetadata(const BSONObj& keyPattern,
                                        ChunkVersion collectionVersion,
                                        ChunkVersion shardVersion,
                                        RangeMap shardChunksMap)
-    : _keyPattern(keyPattern.getOwned()),
+    : _shardKeyPattern(keyPattern),
       _collVersion(collectionVersion),
       _shardVersion(shardVersion),
       _chunksMap(std::move(shardChunksMap)),
       _pendingMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()),
       _rangesMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()) {
 
-    invariant(!_keyPattern.isEmpty());
+    invariant(_shardKeyPattern.isValid());
     invariant(_collVersion.epoch() == _shardVersion.epoch());
     invariant(_collVersion.isSet());
     invariant(_collVersion >= _shardVersion);
-
-    // Parse the shard keys into the states 'keys' and 'keySet' members.
-    for (const auto& current : _keyPattern) {
-        auto newFieldRef(stdx::make_unique<FieldRef>());
-        newFieldRef->parse(current.fieldNameStringData());
-
-        _keyFields.emplace_back(std::move(newFieldRef));
-    }
 
     if (_chunksMap.empty()) {
         invariant(!_shardVersion.isSet());
@@ -111,7 +103,7 @@ std::unique_ptr<CollectionMetadata> CollectionMetadata::cloneMinusPending(
     invariant(rangeMapContains(_pendingMap, chunk.getMin(), chunk.getMax()));
 
     auto metadata(stdx::make_unique<CollectionMetadata>(
-        _keyPattern, getCollVersion(), getShardVersion(), getChunks()));
+        _shardKeyPattern.toBSON(), getCollVersion(), getShardVersion(), getChunks()));
     metadata->_pendingMap = _pendingMap;
 
     metadata->_pendingMap.erase(chunk.getMin());
@@ -124,7 +116,7 @@ std::unique_ptr<CollectionMetadata> CollectionMetadata::clonePlusPending(
     invariant(!rangeMapOverlaps(_chunksMap, chunk.getMin(), chunk.getMax()));
 
     auto metadata(stdx::make_unique<CollectionMetadata>(
-        _keyPattern, getCollVersion(), getShardVersion(), getChunks()));
+        _shardKeyPattern.toBSON(), getCollVersion(), getShardVersion(), getChunks()));
     metadata->_pendingMap = _pendingMap;
 
     // If there are any pending chunks on the interval to be added this is ok, since pending chunks
@@ -249,7 +241,7 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) {
 void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
     _collVersion.addToBSON(bb, "collVersion");
     _shardVersion.addToBSON(bb, "shardVersion");
-    bb.append("keyPattern", _keyPattern);
+    bb.append("keyPattern", _shardKeyPattern.toBSON());
 }
 
 void CollectionMetadata::toBSONChunks(BSONArrayBuilder& bb) const {
@@ -331,7 +323,7 @@ bool CollectionMetadata::getNextOrphanRange(const BSONObj& origLookupKey, KeyRan
         // bounds of the surrounding ranges in both maps.
         //
 
-        range->keyPattern = _keyPattern;
+        range->keyPattern = _shardKeyPattern.toBSON();
         range->minKey = getMinKey();
         range->maxKey = maxKey;
 
@@ -361,29 +353,15 @@ bool CollectionMetadata::getNextOrphanRange(const BSONObj& origLookupKey, KeyRan
 }
 
 BSONObj CollectionMetadata::getMinKey() const {
-    BSONObjIterator it(_keyPattern);
-    BSONObjBuilder minKeyB;
-    while (it.more())
-        minKeyB << it.next().fieldName() << MINKEY;
-    return minKeyB.obj();
+    return _shardKeyPattern.getKeyPattern().globalMin();
 }
 
 BSONObj CollectionMetadata::getMaxKey() const {
-    BSONObjIterator it(_keyPattern);
-    BSONObjBuilder maxKeyB;
-    while (it.more())
-        maxKeyB << it.next().fieldName() << MAXKEY;
-    return maxKeyB.obj();
+    return _shardKeyPattern.getKeyPattern().globalMax();
 }
 
 bool CollectionMetadata::isValidKey(const BSONObj& key) const {
-    BSONObjIterator it(_keyPattern);
-    while (it.more()) {
-        BSONElement next = it.next();
-        if (!key.hasField(next.fieldName()))
-            return false;
-    }
-    return key.nFields() == _keyPattern.nFields();
+    return _shardKeyPattern.isShardKey(key);
 }
 
 }  // namespace mongo

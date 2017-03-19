@@ -28,10 +28,9 @@
 
 #pragma once
 
-#include "mongo/db/field_ref_set.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -148,11 +147,11 @@ public:
     }
 
     const BSONObj& getKeyPattern() const {
-        return _keyPattern;
+        return _shardKeyPattern.toBSON();
     }
 
     const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {
-        return _keyFields;
+        return _shardKeyPattern.getKeyPatternFields();
     }
 
     BSONObj getMinKey() const;
@@ -185,7 +184,7 @@ public:
 
 private:
     // Shard key pattern for the collection
-    BSONObj _keyPattern;
+    ShardKeyPattern _shardKeyPattern;
 
     // a version for this collection that identifies the collection incarnation (ie, a
     // dropped and recreated collection with the same name would have a different version)
@@ -193,9 +192,6 @@ private:
 
     // highest ChunkVersion for which this metadata's information is accurate
     ChunkVersion _shardVersion;
-
-    // A vector owning the FieldRefs parsed from the shard-key pattern of field names.
-    std::vector<std::unique_ptr<FieldRef>> _keyFields;
 
     // Map of chunks tracked by this shard
     RangeMap _chunksMap;

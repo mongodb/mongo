@@ -31,7 +31,6 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
@@ -93,6 +92,8 @@ public:
     bool isHashedPattern() const;
 
     const KeyPattern& getKeyPattern() const;
+
+    const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const;
 
     const BSONObj& toBSON() const;
 
