@@ -179,8 +179,6 @@ TEST_F(ChunkManagerLoadTest, ChunkEpochChangeDuringIncrementalLoad) {
 
     ChunkVersion version = initialRoutingInfo->getVersion();
 
-    const OID newEpoch = OID::gen();
-
     // Return set of chunks, one of which has different epoch
     expectFindOnConfigSendBSONObjVector([&]() {
         version.incMajor();
