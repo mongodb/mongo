@@ -191,11 +191,11 @@ class TestReport(unittest.TestResult):
             test_info.status = "error"
             test_info.return_code = 2
 
-            # Recompute number of success, failures, and errors.
-            self.num_succeeded = len(self.get_successful())
-            self.num_failed = len(self.get_failed())
-            self.num_errored = len(self.get_errored())
-            self.num_interrupted = len(self.get_interrupted())
+        # Recompute number of success, failures, and errors.
+        self.num_succeeded = len(self.get_successful())
+        self.num_failed = len(self.get_failed())
+        self.num_errored = len(self.get_errored())
+        self.num_interrupted = len(self.get_interrupted())
 
     def addFailure(self, test, err):
         """
@@ -225,11 +225,11 @@ class TestReport(unittest.TestResult):
             test_info.status = "fail"
             test_info.return_code = return_code
 
-            # Recompute number of success, failures, and errors.
-            self.num_succeeded = len(self.get_successful())
-            self.num_failed = len(self.get_failed())
-            self.num_errored = len(self.get_errored())
-            self.num_interrupted = len(self.get_interrupted())
+        # Recompute number of success, failures, and errors.
+        self.num_succeeded = len(self.get_successful())
+        self.num_failed = len(self.get_failed())
+        self.num_errored = len(self.get_errored())
+        self.num_interrupted = len(self.get_interrupted())
 
     def addSuccess(self, test):
         """
