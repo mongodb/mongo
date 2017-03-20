@@ -831,7 +831,7 @@ void DataReplicator::_lastOplogEntryFetcherCallbackForStopTimestamp(
         const auto& documents = result.getValue().documents;
         invariant(!documents.empty());
         const auto& oplogSeedDoc = documents.front();
-        LOG(1) << "inserting oplog seed document: " << oplogSeedDoc;
+        LOG(2) << "Inserting oplog seed document: " << oplogSeedDoc;
 
         auto txn = makeOpCtx();
         // StorageInterface::insertDocument() has to be called outside the lock because we may
@@ -1009,7 +1009,7 @@ void DataReplicator::_lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments
     auto&& optimeWithHash = optimeWithHashStatus.getValue();
 
     const auto newOplogEnd = optimeWithHash.opTime.getTimestamp();
-    LOG(1) << "Pushing back minValid from " << _initialSyncState->stopTimestamp << " to "
+    LOG(2) << "Pushing back minValid from " << _initialSyncState->stopTimestamp << " to "
            << newOplogEnd;
     _initialSyncState->stopTimestamp = newOplogEnd;
 
