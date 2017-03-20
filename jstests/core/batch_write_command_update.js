@@ -111,7 +111,7 @@ result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(1, coll.count({}));
 
-var fields = ['ok', 'operationTime'];
+var fields = ['ok'];
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //
