@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/field_path.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -61,8 +62,12 @@ FieldPath::FieldPath(std::string inputPath)
 
     _fieldPathDotPosition.push_back(_fieldPath.size());
 
-    // Validate fields.
-    for (size_t i = 0; i < getPathLength(); ++i) {
+    // Validate the path length and the fields.
+    const auto pathLength = getPathLength();
+    uassert(ErrorCodes::Overflow,
+            "FieldPath is too long",
+            pathLength <= BSONDepth::getMaxAllowableDepth());
+    for (size_t i = 0; i < pathLength; ++i) {
         uassertValidFieldName(getFieldName(i));
     }
 }

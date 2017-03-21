@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -242,5 +243,36 @@ TEST_F(ProjectStageTest, ExclusionProjectionReportsExcludedPathsWithIdExclusion)
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
 }
 
+/**
+ * Creates BSON for a DocumentSourceProject that represents projecting a new computed field nested
+ * 'depth' levels deep.
+ */
+BSONObj makeProjectForNestedDocument(size_t depth) {
+    ASSERT_GTE(depth, 2U);
+    StringBuilder builder;
+    builder << "a";
+    for (size_t i = 0; i < depth - 1; ++i) {
+        builder << ".a";
+    }
+    return BSON(builder.str() << BSON("$literal" << 1));
+}
+
+TEST_F(ProjectStageTest, CanAddNestedDocumentExactlyAtDepthLimit) {
+    auto project = DocumentSourceProject::create(
+        makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"_id", 1}});
+    project->setSource(mock.get());
+
+    auto next = project->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+}
+
+TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
+    ASSERT_THROWS_CODE(
+        DocumentSourceProject::create(
+            makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth() + 1), getExpCtx()),
+        UserException,
+        ErrorCodes::Overflow);
+}
 }  // namespace
 }  // namespace mongo
