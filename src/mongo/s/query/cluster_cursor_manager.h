@@ -163,6 +163,12 @@ public:
         bool isTailable() const;
 
         /**
+         * Returns the set of authenticated users when this cursor was created. Cannot be called
+         * after returnCursor() is called.  A cursor must be owned.
+         */
+        UserNameIterator getAuthenticatedUsers() const;
+
+        /**
          * Transfers ownership of the underlying cursor back to the manager.  A cursor must be
          * owned, and a cursor will no longer be owned after this method completes.
          *

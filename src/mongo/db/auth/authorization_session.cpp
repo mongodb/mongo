@@ -49,6 +49,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -850,6 +851,27 @@ bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient) {
             opIt.next();
         }
         it.next();
+    }
+
+    return false;
+}
+
+bool AuthorizationSession::isCoauthorizedWith(UserNameIterator userNameIter) {
+    if (!getAuthorizationManager().isAuthEnabled()) {
+        return true;
+    }
+    if (!userNameIter.more() && !getAuthenticatedUserNames().more()) {
+        return true;
+    }
+
+    for (; userNameIter.more(); userNameIter.next()) {
+        for (UserNameIterator thisUserNameIter = getAuthenticatedUserNames();
+             thisUserNameIter.more();
+             thisUserNameIter.next()) {
+            if (*userNameIter == *thisUserNameIter) {
+                return true;
+            }
+        }
     }
 
     return false;

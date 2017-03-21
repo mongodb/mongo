@@ -82,6 +82,7 @@ ClientCursor::ClientCursor(ClientCursorParams&& params,
                            CursorId cursorId)
     : _cursorid(cursorId),
       _nss(std::move(params.nss)),
+      _authenticatedUsers(std::move(params.authenticatedUsers)),
       _isReadCommitted(params.isReadCommitted),
       _cursorManager(cursorManager),
       _originatingCommand(params.originatingCommandObj),
