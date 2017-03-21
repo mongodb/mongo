@@ -231,53 +231,6 @@ stdx::cv_status OperationContext::waitForConditionOrInterruptUntil(
     return uassertStatusOK(waitForConditionOrInterruptNoAssertUntil(cv, m, deadline));
 }
 
-static NOINLINE_DECL stdx::cv_status cvWaitUntilWithClockSource(ClockSource* clockSource,
-                                                                stdx::condition_variable& cv,
-                                                                stdx::unique_lock<stdx::mutex>& m,
-                                                                Date_t deadline) {
-    if (deadline <= clockSource->now()) {
-        return stdx::cv_status::timeout;
-    }
-
-    struct AlarmInfo {
-        stdx::mutex controlMutex;
-        stdx::mutex* waitMutex;
-        stdx::condition_variable* waitCV;
-        stdx::cv_status cvWaitResult = stdx::cv_status::no_timeout;
-    };
-    auto alarmInfo = std::make_shared<AlarmInfo>();
-    alarmInfo->waitCV = &cv;
-    alarmInfo->waitMutex = m.mutex();
-    const auto waiterThreadId = stdx::this_thread::get_id();
-    bool invokedAlarmInline = false;
-    invariantOK(clockSource->setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
-        stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
-        alarmInfo->cvWaitResult = stdx::cv_status::timeout;
-        if (!alarmInfo->waitMutex) {
-            return;
-        }
-        if (stdx::this_thread::get_id() == waiterThreadId) {
-            // In NetworkInterfaceMock, setAlarm may invoke its callback immediately if the deadline
-            // has expired, so we detect that case and avoid self-deadlock by returning early, here.
-            // It is safe to set invokedAlarmInline without synchronization in this case, because it
-            // is exactly the case where the same thread is writing and consulting the value.
-            invokedAlarmInline = true;
-            return;
-        }
-        stdx::lock_guard<stdx::mutex> waitLk(*alarmInfo->waitMutex);
-        alarmInfo->waitCV->notify_all();
-    }));
-    if (!invokedAlarmInline) {
-        cv.wait(m);
-    }
-    m.unlock();
-    stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
-    m.lock();
-    alarmInfo->waitMutex = nullptr;
-    alarmInfo->waitCV = nullptr;
-    return alarmInfo->cvWaitResult;
-}
-
 // Theory of operation for waitForConditionOrInterruptNoAssertUntil and markKilled:
 //
 // An operation indicates to potential killers that it is waiting on a condition variable by setting
@@ -330,14 +283,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
             cv.wait(m);
             return stdx::cv_status::no_timeout;
         }
-        const auto clockSource = getServiceContext()->getPreciseClockSource();
-        if (clockSource->tracksSystemClock()) {
-            return cv.wait_until(m, deadline.toSystemTimePoint());
-        }
-
-        // The following cases only occur during testing, when the precise clock source is
-        // virtualized and does not track the system clock.
-        return cvWaitUntilWithClockSource(clockSource, cv, m, deadline);
+        return getServiceContext()->getPreciseClockSource()->waitForConditionUntil(cv, m, deadline);
     }();
 
     // Continue waiting on cv until no other thread is attempting to kill this one.
