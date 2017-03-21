@@ -221,9 +221,9 @@ function runTest(s) {
     // that replication can keep up even on slow machines.
     s.stopBalancer();
     s._rs[0].test.awaitReplication();
-    assert.eq(51200, primary.getDB("test")[outcol].count(), "Wrong count");
+    assert.eq(51200, primary.getDB("test")[outcol].find().itcount(), "Wrong count");
     for (var i = 0; i < secondaries.length; ++i) {
-        assert.eq(51200, secondaries[i].getDB("test")[outcol].count(), "Wrong count");
+        assert.eq(51200, secondaries[i].getDB("test")[outcol].find().itcount(), "Wrong count");
     }
 }
 
