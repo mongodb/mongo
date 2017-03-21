@@ -8,11 +8,11 @@ env.Library(
     target='collection_options',
     source=[
         'collection_options.cpp',
-        'collection_uuid.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/util/uuid',
     ],
 )
 
