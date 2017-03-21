@@ -84,6 +84,28 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='uuid',
+    source=[
+        'uuid.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+    ],
+)
+
+env.CppUnitTest(
+    target='uuid_test',
+    source=[
+        'uuid_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'uuid',
+    ],
+)
+
+env.Library(
     target='summation',
     source=[
         'summation.cpp',
