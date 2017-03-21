@@ -303,27 +303,23 @@ class GDBDumper(object):
         printers_script = os.path.join(gdb_dir, "mongo.py")
         mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
 
-        bt_command = "mongodb-uniqstack bt"
+        source_mongo_lock = "source %s" % mongo_lock_script
+        mongodb_dump_locks = "mongodb-dump-locks"
         mongodb_show_locks = "mongodb-show-locks"
-        mongodb_deadlock = "mongodb-waitsfor-graph debugger_deadlock_%s_%d.gv" % \
+        mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
             (process_name, pid)
+        mongodb_javascript_stack = "mongodb-javascript-stack"
+        # The following MongoDB python extensions do not run on Solaris.
         if sys.platform.startswith("sunos"):
-            '''
-            On Solaris, currently calling mongo-uniqstack leads to an error:
+            source_mongo_lock = ""
+            # SERVER-28234 - GDB frame information not available on Solaris for a templatized
+            # function
+            mongodb_dump_locks = ""
 
-            Thread 198 received signal SIGSEGV, Segmentation fault.
-            0x0000000000000000 in ?? ()
-            Python Exception <class 'gdb.error'> The program being debugged was signaled while in a
-            function called from GDB.
-            GDB remains in the frame where the signal was received.
-            To change this behavior use "set unwindonsignal on".
-            Evaluation of the expression containing the function
-            (at 0x0x0) will be abandoned.
-            When the function is done executing, GDB will silently stop.
-            '''
-            bt_command = "thread apply all bt"
+            # SERVER-28373 - GDB thread-local variables not available on Solaris
             mongodb_show_locks = ""
-            mongodb_deadlock = ""
+            mongodb_waitsfor_graph = ""
+            mongodb_javascript_stack = ""
 
         cmds = [
             "set interactive-mode off",
@@ -336,15 +332,15 @@ class GDBDumper(object):
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
             "source %s" % printers_script,
-            "source %s" % mongo_lock_script,
-            bt_command,
+            source_mongo_lock,
+            "mongodb-uniqstack bt",
             dump_command,
-            "mongodb-dump-locks",
+            mongodb_dump_locks,
             mongodb_show_locks,
-            mongodb_deadlock,
-            "mongodb-javascript-stack",  # The mongodb-javascript-stack command executes code in
-                                         # order to dump JavaScript backtraces and should therefore
-                                         # be one of the last analysis commands.
+            mongodb_waitsfor_graph,
+            mongodb_javascript_stack,  # The mongodb-javascript-stack command executes code in
+                                       # order to dump JavaScript backtraces and should therefore
+                                       # be one of the last analysis commands.
             "set confirm off",
             "quit",
             ]

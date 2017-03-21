@@ -65,6 +65,9 @@ class Graph(object):
     def __init__(self):
         self.nodes = {}
 
+    def is_empty(self):
+        return not bool(self.nodes)
+
     def add_node(self, node):
         if not self.find_node(node):
             self.nodes[node.key()] = {'node': node, 'next_nodes': []}
@@ -115,6 +118,9 @@ class Graph(object):
 
     def to_graph(self):
         sb = []
+        sb.append('# Legend:')
+        sb.append('#    Thread 1 -> Lock 1 indicates Thread 1 is waiting on Lock 1')
+        sb.append('#    Lock 2 -> Thread 2 indicates Lock 2 is held by Thread 2')
         sb.append('digraph "mongod+lock-status" {')
         for node_key in self.nodes:
             for next_node_key in self.nodes[node_key]['next_nodes']:
@@ -253,16 +259,12 @@ def get_threads_info(graph=None):
 
 
 class MongoDBShowLocks(gdb.Command):
-    """Show MongoDB locks"""
+    """Show MongoDB locks & pthread mutexes"""
     def __init__(self):
         register_mongo_command(self, "mongodb-show-locks", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
-        main_binary_name = get_process_name()
-        if main_binary_name.endswith('mongod') or main_binary_name.endswith('mongo'):
-            self.mongodb_show_locks()
-        else:
-            print("No show MongoDB locks done for: %s" % (main_binary_name))
+        self.mongodb_show_locks()
 
     def mongodb_show_locks(self):
         """GDB in-process python supplement"""
@@ -276,16 +278,12 @@ MongoDBShowLocks()
 
 
 class MongoDBWaitsForGraph(gdb.Command):
-    """Create MongoDB WaitsFor graph [graph_file]"""
+    """Create MongoDB WaitsFor lock graph [graph_file]"""
     def __init__(self):
         register_mongo_command(self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
-        main_binary_name = get_process_name()
-        if main_binary_name.endswith('mongod') or main_binary_name.endswith('mongo'):
-            self.mongodb_waitsfor_graph(arg)
-        else:
-            print("No create MongoDB WaitsFor graph done for: %s" % (main_binary_name))
+        self.mongodb_waitsfor_graph(arg)
 
     def mongodb_waitsfor_graph(self, file=None):
         """GDB in-process python supplement"""
@@ -295,6 +293,9 @@ class MongoDBWaitsForGraph(gdb.Command):
             thread_dict = get_threads_info(graph=graph)
             get_locks(graph=graph, thread_dict=thread_dict, show=False)
             graph.remove_nodes_without_edge()
+            if graph.is_empty():
+                print("Not generating the digraph, since the lock graph is empty")
+                return
             if file:
                 print("Saving digraph to %s" % file)
                 with open(file, 'w') as f:
