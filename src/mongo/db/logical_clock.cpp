@@ -140,35 +140,48 @@ Status LogicalClock::signAndAdvanceClusterTime(LogicalTime newTime) {
     return _advanceClusterTime_inlock(std::move(newSignedTime));
 }
 
-LogicalTime LogicalClock::reserveTicks(uint64_t ticks) {
+LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
 
-    invariant(ticks > 0);
+    invariant(nTicks > 0 && nTicks < (1U << 31));
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
+    LogicalTime clusterTime = _clusterTime.getTime();
+    LogicalTime nextClusterTime;
+
     const unsigned wallClockSecs =
         durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
-    unsigned currentSecs = _clusterTime.getTime().asTimestamp().getSecs();
-    LogicalTime clusterTimestamp = _clusterTime.getTime();
+    unsigned clusterTimeSecs = clusterTime.asTimestamp().getSecs();
 
-    if (MONGO_unlikely(currentSecs < wallClockSecs)) {
-        clusterTimestamp = LogicalTime(Timestamp(wallClockSecs, 1));
-    } else {
-        clusterTimestamp.addTicks(1);
+    // Synchronize clusterTime with wall clock time, if clusterTime was behind in seconds.
+    if (clusterTimeSecs < wallClockSecs) {
+        clusterTime = LogicalTime(Timestamp(wallClockSecs, 0));
     }
-    auto currentTime = clusterTimestamp;
-    clusterTimestamp.addTicks(ticks - 1);
+    // If reserving 'nTicks' would force the cluster timestamp's increment field to exceed (2^31-1),
+    // overflow by moving to the next second. We use the signed integer maximum as an overflow point
+    // in order to preserve compatibility with potentially signed or unsigned integral Timestamp
+    // increment types. It is also unlikely to apply more than 2^31 oplog entries in the span of one
+    // second.
+    else if (clusterTime.asTimestamp().getInc() >= ((1U << 31) - nTicks)) {
 
-    // Fail if time is not moving forward for 2**31 ticks
-    if (MONGO_unlikely(clusterTimestamp.asTimestamp().getSecs() > wallClockSecs) &&
-        clusterTimestamp.asTimestamp().getInc() >= 1U << 31) {
-        mongo::severe() << "clock skew detected, prev: " << wallClockSecs
-                        << " now: " << clusterTimestamp.asTimestamp().getSecs();
-        fassertFailed(17449);
+        log() << "Exceeded maximum allowable increment value within one second. Moving clusterTime "
+                 "forward to the next second.";
+
+        // Move time forward to the next second
+        clusterTime = LogicalTime(Timestamp(clusterTime.asTimestamp().getSecs() + 1, 0));
     }
 
-    _clusterTime = _makeSignedLogicalTime(clusterTimestamp);
-    return currentTime;
+    // Save the next cluster time.
+    clusterTime.addTicks(1);
+    nextClusterTime = clusterTime;
+
+    // Add the rest of the requested ticks if needed.
+    if (nTicks > 1) {
+        clusterTime.addTicks(nTicks - 1);
+    }
+
+    _clusterTime = _makeSignedLogicalTime(clusterTime);
+    return nextClusterTime;
 }
 
 void LogicalClock::initClusterTimeFromTrustedSource(LogicalTime newTime) {

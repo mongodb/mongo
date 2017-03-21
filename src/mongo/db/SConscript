@@ -1009,6 +1009,7 @@ env.Library(
         'service_context',
         'signed_logical_time',
         'time_proof_service',
+        '$BUILD_DIR/mongo/util/clock_source_mock'
     ],
 )
 

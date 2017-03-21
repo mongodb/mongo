@@ -50,8 +50,6 @@ rt.stop(true);
 m = rt.start(true, null, true);
 assert.eq(op.ts.i, lastop().ts.i);
 
-assert.throws(function() {
-    am().save({});  // triggers fassert because ofclock skew
-});
+am().save({});
 
-assert.neq(0, rt.stop(true));  // fasserted
+assert.eq(0, rt.stop(true));

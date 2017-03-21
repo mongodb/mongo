@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/db/logical_clock.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
@@ -35,6 +37,8 @@
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -49,6 +53,8 @@ protected:
         auto pTps = stdx::make_unique<TimeProofService>();
         _timeProofService = pTps.get();
         _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps));
+        _serviceContext->setFastClockSource(
+                stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
     }
 
     void tearDown() {
@@ -58,6 +64,14 @@ protected:
 
     LogicalClock* getClock() {
         return _clock.get();
+    }
+
+    void setMockClockSourceTime(Date_t time) {
+        _mockClockSource->reset(time);
+    }
+
+    Date_t getMockClockSourceTime() {
+        return _mockClockSource->now();
     }
 
     SignedLogicalTime makeSignedLogicalTime(LogicalTime logicalTime) {
@@ -73,6 +87,8 @@ protected:
 private:
     TimeProofService* _timeProofService;
     std::unique_ptr<ServiceContextNoop> _serviceContext;
+
+    std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
     std::unique_ptr<LogicalClock> _clock;
 };
 
@@ -89,9 +105,15 @@ TEST_F(LogicalClockTestBase, roundtrip) {
 
 // Verify the reserve ticks functionality.
 TEST_F(LogicalClockTestBase, reserveTicks) {
+    // Set clock to a non-zero time, so we can verify wall clock synchronization.
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
+
     auto t1 = getClock()->reserveTicks(1);
     auto t2(getClock()->getClusterTime());
     ASSERT_TRUE(t1 == t2.getTime());
+
+    // Make sure we synchronized with the wall clock.
+    ASSERT_TRUE(t2.getTime().asTimestamp().getSecs() == 10);
 
     auto t3 = getClock()->reserveTicks(1);
     t1.addTicks(1);
@@ -104,6 +126,12 @@ TEST_F(LogicalClockTestBase, reserveTicks) {
     t3 = getClock()->reserveTicks(1);
     t1.addTicks(100);
     ASSERT_TRUE(t3 == t1);
+
+    // Ensure overflow to a new second.
+    auto initTimeSecs = getClock()->getClusterTime().getTime().asTimestamp().getSecs();
+    getClock()->reserveTicks((1U << 31) - 1);
+    auto newTimeSecs = getClock()->getClusterTime().getTime().asTimestamp().getSecs();
+    ASSERT_TRUE(newTimeSecs == initTimeSecs + 1);
 }
 
 // Verify the advanceClusterTime functionality.

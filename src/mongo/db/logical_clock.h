@@ -84,8 +84,9 @@ public:
     SignedLogicalTime getClusterTime();
 
     /**
-     * Returns the next  clusterTime value and provides the guarantee that the next reserveTicks
-     * call will return the value at least nTicks ticks in the future from the current clusterTime.
+     * Returns the next clusterTime value and provides a guarantee that any future call to
+     * reserveTicks() will return a value at least 'nTicks' ticks in the future from the current
+     * clusterTime.
      */
     LogicalTime reserveTicks(uint64_t nTicks);
 
