@@ -144,7 +144,7 @@ assert.hasFields = function(result, arr, msg) {
     }
 
     if (count != arr.length) {
-        doassert("None of values from " + tojson(arr) + " was in " + tojson(o) + " : " + msg);
+        doassert("None of values from " + tojson(arr) + " was in " + tojson(result) + " : " + msg);
     }
 };
 

@@ -32,6 +32,17 @@ env.Library(
 )
 
 env.Library(
+    target='sharding_task_executor',
+    source=[
+        'sharding_task_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+    ],
+)
+
+env.Library(
     target='migration_types',
     source=[
         'migration_session_id.cpp',
@@ -95,6 +106,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         'metadata',
         'migration_types',
+        'sharding_task_executor',
         'type_shard_identity',
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE

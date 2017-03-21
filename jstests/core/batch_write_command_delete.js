@@ -227,7 +227,8 @@ result = coll.runCommand(request);
 assert.commandWorked(result);
 assert.eq(1, coll.count());
 
-assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
+// the error path does not go to the shard and hence there is no operationTime.
+assert.hasFields(result, ["ok"], 'fields in result do not match: ' + tojson(fields));
 
 //
 // When limit is not 0 and 1

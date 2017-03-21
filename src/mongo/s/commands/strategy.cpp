@@ -46,6 +46,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
@@ -81,6 +82,8 @@ using std::string;
 using std::stringstream;
 
 namespace {
+
+const std::string kOperationTime = "operationTime";
 
 void runAgainstRegistered(OperationContext* opCtx,
                           const char* ns,
@@ -167,6 +170,11 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
     rpc::LogicalTimeMetadata logicalTimeMetadata(LogicalClock::get(opCtx)->getClusterTime());
     logicalTimeMetadata.writeToMetadata(responseBuilder);
+    auto tracker = OperationTimeTracker::get(opCtx);
+    if (tracker) {
+        auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
+        responseBuilder->append(kOperationTime, operationTime.asTimestamp());
+    }
 }
 
 MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const) {
