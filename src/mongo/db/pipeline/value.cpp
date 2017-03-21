@@ -37,6 +37,7 @@
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
@@ -367,11 +368,9 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val)
                                              val._storage.getCodeWScope()->scope);
 
         case Array: {
-            const vector<Value>& array = val.getArray();
-            const size_t n = array.size();
             BSONArrayBuilder arrayBuilder(builder.subarrayStart());
-            for (size_t i = 0; i < n; i++) {
-                array[i].addToBsonArray(&arrayBuilder);
+            for (auto&& value : val.getArray()) {
+                value.addToBsonArray(&arrayBuilder);
             }
             arrayBuilder.doneFast();
             return builder.builder();
@@ -380,13 +379,54 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val)
     verify(false);
 }
 
-void Value::addToBsonObj(BSONObjBuilder* pBuilder, StringData fieldName) const {
-    *pBuilder << fieldName << *this;
+void Value::addToBsonObj(BSONObjBuilder* builder,
+                         StringData fieldName,
+                         size_t recursionLevel) const {
+    uassert(ErrorCodes::Overflow,
+            str::stream() << "cannot convert document to BSON because it exceeds the limit of "
+                          << BSONDepth::getMaxAllowableDepth()
+                          << " levels of nesting",
+            recursionLevel <= BSONDepth::getMaxAllowableDepth());
+
+    if (getType() == BSONType::Object) {
+        BSONObjBuilder subobjBuilder(builder->subobjStart(fieldName));
+        getDocument().toBson(&subobjBuilder, recursionLevel + 1);
+        subobjBuilder.doneFast();
+    } else if (getType() == BSONType::Array) {
+        BSONArrayBuilder subarrBuilder(builder->subarrayStart(fieldName));
+        for (auto&& value : getArray()) {
+            value.addToBsonArray(&subarrBuilder, recursionLevel + 1);
+        }
+        subarrBuilder.doneFast();
+    } else {
+        *builder << fieldName << *this;
+    }
 }
 
-void Value::addToBsonArray(BSONArrayBuilder* pBuilder) const {
-    if (!missing()) {  // don't want to increment builder's counter
-        *pBuilder << *this;
+void Value::addToBsonArray(BSONArrayBuilder* builder, size_t recursionLevel) const {
+    uassert(ErrorCodes::Overflow,
+            str::stream() << "cannot convert document to BSON because it exceeds the limit of "
+                          << BSONDepth::getMaxAllowableDepth()
+                          << " levels of nesting",
+            recursionLevel <= BSONDepth::getMaxAllowableDepth());
+
+    // If this Value is empty, do nothing to avoid incrementing the builder's counter.
+    if (missing()) {
+        return;
+    }
+
+    if (getType() == BSONType::Object) {
+        BSONObjBuilder subobjBuilder(builder->subobjStart());
+        getDocument().toBson(&subobjBuilder, recursionLevel + 1);
+        subobjBuilder.doneFast();
+    } else if (getType() == BSONType::Array) {
+        BSONArrayBuilder subarrBuilder(builder->subarrayStart());
+        for (auto&& value : getArray()) {
+            value.addToBsonArray(&subarrBuilder, recursionLevel + 1);
+        }
+        subarrBuilder.doneFast();
+    } else {
+        *builder << *this;
     }
 }
 

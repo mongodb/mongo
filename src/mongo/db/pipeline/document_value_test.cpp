@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_comparator.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
@@ -110,6 +111,40 @@ TEST(DocumentConstruction, FromEmptyDocumentClone) {
     // Prior to SERVER-26462, cloning an empty document would cause a segmentation fault.
     Document documentClone = document.clone();
     ASSERT_DOCUMENT_EQ(document, documentClone);
+}
+
+/**
+ * Appends to 'builder' an object nested 'depth' levels deep.
+ */
+void appendNestedObject(size_t depth, BSONObjBuilder* builder) {
+    if (depth == 1U) {
+        builder->append("a", 1);
+    } else {
+        BSONObjBuilder subobj(builder->subobjStart("a"));
+        appendNestedObject(depth - 1, &subobj);
+        subobj.doneFast();
+    }
+}
+
+TEST(DocumentSerialization, CanSerializeDocumentExactlyAtDepthLimit) {
+    BSONObjBuilder builder;
+    appendNestedObject(BSONDepth::getMaxAllowableDepth(), &builder);
+    BSONObj originalBSONObj = builder.obj();
+
+    Document doc(originalBSONObj);
+    BSONObjBuilder serializationResult;
+    doc.toBson(&serializationResult);
+    ASSERT_BSONOBJ_EQ(originalBSONObj, serializationResult.obj());
+}
+
+TEST(DocumentSerialization, CannotSerializeDocumentThatExceedsDepthLimit) {
+    BSONObjBuilder builder;
+    appendNestedObject(BSONDepth::getMaxAllowableDepth() + 1, &builder);
+
+    Document doc(builder.obj());
+    BSONObjBuilder throwaway;
+    ASSERT_THROWS_CODE(doc.toBson(&throwaway), UserException, ErrorCodes::Overflow);
+    throwaway.abandon();
 }
 
 /** Add Document fields. */

@@ -32,6 +32,7 @@
 
 #include <boost/functional/hash.hpp>
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/mongoutils/str.h"
@@ -246,9 +247,15 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Document& d
     return builder.builder();
 }
 
-void Document::toBson(BSONObjBuilder* pBuilder) const {
+void Document::toBson(BSONObjBuilder* builder, size_t recursionLevel) const {
+    uassert(ErrorCodes::Overflow,
+            str::stream() << "cannot convert document to BSON because it exceeds the limit of "
+                          << BSONDepth::getMaxAllowableDepth()
+                          << " levels of nesting",
+            recursionLevel <= BSONDepth::getMaxAllowableDepth());
+
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-        *pBuilder << it->nameSD() << it->val;
+        it->val.addToBsonObj(builder, it->nameSD(), recursionLevel);
     }
 }
 
