@@ -53,6 +53,16 @@ public:
     }
 
 protected:
+    void waitForIdleDetection() {
+        auto start = _csMock->now();
+        while (_btcs->peekNowForTest() != Date_t()) {
+            // If the bg thread doesn't notice idleness within a minute, something is wrong.
+            ASSERT_LT(_csMock->now() - start, Minutes(1));
+            _csMock->advance(Milliseconds(1));
+            sleepFor(Milliseconds(1));
+        }
+    }
+
     std::unique_ptr<BackgroundThreadClockSource> _btcs;
     ClockSourceMock* _csMock;
 };
@@ -69,8 +79,8 @@ TEST_F(BTCSTest, TimeKeeping) {
     setUpClocks(Milliseconds(1));
     ASSERT_EQUALS(_btcs->now(), _csMock->now());
 
-    _csMock->advance(Milliseconds(100));
-    sleepFor(Seconds(1));  // give the _btcs opportunity to read the new time
+    waitForIdleDetection();
+
     ASSERT_EQUALS(_btcs->now(), _csMock->now());
 }
 
@@ -81,69 +91,70 @@ TEST_F(BTCSTest, GetPrecision) {
 
 TEST_F(BTCSTest, StartsPaused) {
     setUpClocks(Milliseconds(1));
-    ASSERT_EQUALS(_btcs->peekNowForTest(), 0);
+    ASSERT_EQUALS(_btcs->peekNowForTest(), Date_t());
 }
 
 TEST_F(BTCSTest, PausesAfterRead) {
-    setUpClocks(Milliseconds(100));
+    const auto kGranularity = Milliseconds(5);
+    setUpClocks(kGranularity);
 
     // Wake it up.
-    auto now = _btcs->now().toMillisSinceEpoch();
-    ASSERT_NE(now, 0);
+    const auto now = _btcs->now();
+    ASSERT_NE(now, Date_t());
     ASSERT_EQ(_btcs->peekNowForTest(), now);
-    _csMock->advance(Milliseconds(100));
-    ASSERT_EQ(_btcs->now().toMillisSinceEpoch(), now);
+    _csMock->advance(kGranularity - Milliseconds(1));
+    ASSERT_EQ(_btcs->now(), now);
 
-    sleepFor(Seconds(1));  // give the _btcs opportunity to detect idleness.
-    ASSERT_EQ(_btcs->peekNowForTest(), 0);
+    waitForIdleDetection();  // Only returns when the thread is paused.
 }
 
 TEST_F(BTCSTest, DoesntPauseWhenInUse) {
-    setUpClocks(Milliseconds(100));
+    const auto kGranularity = Milliseconds(5);
+    setUpClocks(kGranularity);
 
-    auto lastTime = _btcs->now().toMillisSinceEpoch();
-    ASSERT_NE(lastTime, 0);
-    ASSERT_EQ(lastTime, _btcs->now().toMillisSinceEpoch());  // Mark the timer as still in use.
-    auto ticks = 0;                                          // Count of when times change.
+    auto lastTime = _btcs->now();
+    ASSERT_NE(lastTime, Date_t());
+    ASSERT_EQ(lastTime, _btcs->now());  // Mark the timer as still in use.
+    auto ticks = 0;                     // Count of when times change.
     while (ticks < 10) {
         if (_btcs->peekNowForTest() == lastTime) {
             _csMock->advance(Milliseconds(1));
-            ASSERT_LT(_csMock->now().toMillisSinceEpoch() - lastTime, 1000);
+            ASSERT_LT(_csMock->now() - lastTime, Minutes(1));
             sleepFor(Milliseconds(1));
             continue;
         }
         ticks++;
 
-        ASSERT_NE(_btcs->peekNowForTest(), 0);
-        lastTime = _btcs->now().toMillisSinceEpoch();
-        ASSERT_NE(lastTime, 0);
+        ASSERT_NE(_btcs->peekNowForTest(), Date_t());
+        lastTime = _btcs->now();
+        ASSERT_NE(lastTime, Date_t());
         ASSERT_EQ(lastTime, _btcs->peekNowForTest());
     }
 }
 
 TEST_F(BTCSTest, WakesAfterPause) {
-    setUpClocks(Milliseconds(10));
+    const auto kGranularity = Milliseconds(5);
+    setUpClocks(kGranularity);
 
     // Wake it up.
-    auto now = _btcs->now().toMillisSinceEpoch();
-    ASSERT_NE(now, 0);
+    const auto now = _btcs->now();
+    ASSERT_NE(now, Date_t());
     ASSERT_EQ(_btcs->peekNowForTest(), now);
-    _csMock->advance(Milliseconds(10));
-    ASSERT_EQ(_btcs->now().toMillisSinceEpoch(), now);
+    _csMock->advance(kGranularity - Milliseconds(1));
+    ASSERT_EQ(_btcs->now(), now);
 
-    sleepFor(Seconds(1));  // give the _btcs opportunity to detect idleness.
-    ASSERT_EQ(_btcs->peekNowForTest(), 0);
+    waitForIdleDetection();
 
     // Wake it up again and ensure it ticks at least once.
-    auto lastTime = _btcs->now().toMillisSinceEpoch();
-    ASSERT_NE(lastTime, 0);
-    ASSERT_EQ(lastTime, _btcs->now().toMillisSinceEpoch());  // Mark the timer as still in use.
+    const auto lastTime = _btcs->now();
+    ASSERT_NE(lastTime, Date_t());
+    ASSERT_EQ(lastTime, _btcs->now());  // Mark the timer as still in use.
     while (_btcs->peekNowForTest() == lastTime) {
         _csMock->advance(Milliseconds(1));
-        ASSERT_LT(_csMock->now().toMillisSinceEpoch() - lastTime, 1000);
+        ASSERT_LT(_csMock->now() - lastTime, Minutes(1));
         sleepFor(Milliseconds(1));
     }
-    ASSERT_NE(_btcs->peekNowForTest(), 0);
+    ASSERT_NE(_btcs->peekNowForTest(), Date_t());
 }
 
 }  // namespace

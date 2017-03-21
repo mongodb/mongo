@@ -47,6 +47,7 @@ BackgroundThreadClockSource::BackgroundThreadClockSource(std::unique_ptr<ClockSo
                                                          Milliseconds granularity)
     : _clockSource(std::move(clockSource)), _granularity(granularity) {
     _startTimerThread();
+    _tracksSystemClock = _clockSource->tracksSystemClock();
 }
 
 BackgroundThreadClockSource::~BackgroundThreadClockSource() {
@@ -61,6 +62,10 @@ BackgroundThreadClockSource::~BackgroundThreadClockSource() {
 
 Milliseconds BackgroundThreadClockSource::getPrecision() {
     return _granularity;
+}
+
+Status BackgroundThreadClockSource::setAlarm(Date_t when, stdx::function<void()> action) {
+    return _clockSource->setAlarm(when, action);
 }
 
 Date_t BackgroundThreadClockSource::now() {
@@ -115,8 +120,10 @@ void BackgroundThreadClockSource::_startTimerThread() {
                 _condition.wait(lock, [this] { return _inShutdown || _current.load() != 0; });
             }
 
-            _condition.wait_for(
-                lock, _granularity.toSystemDuration(), [this] { return _inShutdown; });
+            const auto sleepUntil = Date_t::fromMillisSinceEpoch(_current.load()) + _granularity;
+            MONGO_IDLE_THREAD_BLOCK;
+            _clockSource->waitForConditionUntil(
+                _condition, lock, sleepUntil, [this] { return _inShutdown; });
         }
     });
 
