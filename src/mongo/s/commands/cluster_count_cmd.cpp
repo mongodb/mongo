@@ -197,17 +197,15 @@ public:
                 total += shardCount;
             } else {
                 shardSubTotal.doneFast();
-                errmsg = "failed on : " + shardName.toString();
-                result.append("cause", resultBSON);
 
-                // Add "code" to the top-level response, if the failure of the sharded command
-                // can be accounted to a single error
-                int code = getUniqueCodeFromCommandResults(countResult);
-                if (code != 0) {
-                    result.append("code", code);
-                }
-
-                return false;
+                // Add error context so that you can see on which shard failed as well as details
+                // about that error.
+                auto shardError = getStatusFromCommandResult(resultBSON);
+                auto errorWithContext =
+                    Status(shardError.code(),
+                           str::stream() << "failed on: " << shardName.toString()
+                                         << causedBy(shardError.reason()));
+                return appendCommandStatus(result, errorWithContext);
             }
         }
 
