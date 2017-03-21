@@ -43,6 +43,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
@@ -73,6 +74,7 @@
 #endif
 
 namespace mongo {
+
 namespace {
 
 const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
@@ -89,6 +91,16 @@ SSLParams sslGlobalParams;
 const SSLParams& getSSLGlobalParams() {
     return sslGlobalParams;
 }
+
+/**
+ * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
+ * if the sslMode is set to preferSSL, we will log connections that are not using SSL.
+ * If true, such log messages will be suppressed.
+ */
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly>
+    disableNonSSLConnectionLoggingParameter(ServerParameterSet::getGlobal(),
+                                            "disableNonSSLConnectionLogging",
+                                            &sslGlobalParams.disableNonSSLConnectionLogging);
 
 #ifdef MONGO_CONFIG_SSL
 // Old copies of OpenSSL will not have constants to disable protocols they don't support.
