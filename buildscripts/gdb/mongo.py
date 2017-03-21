@@ -365,7 +365,7 @@ class MongoDBDumpLocks(gdb.Command):
         register_mongo_command(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
-        print("Running Hang Analyzer Supplement")
+        print("Running Hang Analyzer Supplement - MongoDBDumpLocks")
 
         main_binary_name = get_process_name()
         if main_binary_name == 'mongod':
@@ -415,7 +415,6 @@ class MongoDBUniqueStack(gdb.Command):
         thread_info = {}  # thread dict to hold per thread data
         thread_info['frames'] = []  # the complete backtrace per thread from gdb
         thread_info['functions'] = []  # list of function names from frames
-        thread_info['pthread'] = hex(get_thread_id())
 
         frame = gdb.newest_frame()
         while frame:
@@ -425,17 +424,32 @@ class MongoDBUniqueStack(gdb.Command):
         thread_info['functions'] = tuple(thread_info['functions'])
         if thread_info['functions'] in stacks:
             stacks[thread_info['functions']]['tids'].append(thread.num)
-        else:
-            thread_info['header'] = "Thread {} (Thread {} (LWP {})):".format(
-                thread.num, thread_info['pthread'], thread.ptid[1])
-            try:
-                thread_info['frames'] = gdb.execute(arg, to_string=True).rstrip()
-            except gdb.error as err:
-                raise gdb.GdbError("{} {}".format(thread_info['header'], err))
+            return
+
+        thread_info['pthread'] = get_thread_id()
+        (_, thread_lwpid, thread_tid) = thread.ptid
+        if sys.platform.startswith("linux"):
+            header_format = "Thread {gdb_thread_num} (Thread 0x{pthread:x} (LWP {lwpid}))"
+        elif sys.platform.startswith("sunos"):
+            if thread_tid != 0 and thread_lwpid != 0:
+                header_format = "Thread {gdb_thread_num} (Thread {pthread} (LWP {lwpid}))"
+            elif thread_lwpid != 0:
+                header_format = "Thread {gdb_thread_num} (LWP {lwpid})"
             else:
-                thread_info['tids'] = []
-                thread_info['tids'].append(thread.num)
-                stacks[thread_info['functions']] = thread_info
+                header_format = "Thread {gdb_thread_num} (Thread {pthread})"
+        else:
+            raise ValueError("Unsupported platform: {}".format(sys.platform))
+        thread_info['header'] = header_format.format(gdb_thread_num=thread.num,
+                                                     pthread=thread_info['pthread'],
+                                                     lwpid=thread_lwpid)
+        try:
+            thread_info['frames'] = gdb.execute(arg, to_string=True).rstrip()
+        except gdb.error as err:
+            raise gdb.GdbError("{} {}".format(thread_info['header'], err))
+        else:
+            thread_info['tids'] = []
+            thread_info['tids'].append(thread.num)
+            stacks[thread_info['functions']] = thread_info
 
     def _dump_unique_stacks(self, stacks):
         def first_tid(stack):
