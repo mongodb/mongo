@@ -232,18 +232,6 @@ public:
             }
         }
 
-        // A user can only call getMore on their own cursor. If there were multiple users
-        // authenticated when the cursor was created, then at least one of them must be
-        // authenticated in order to run getMore on the cursor.
-        if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isCoauthorizedWith(cursor->getAuthenticatedUsers())) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::Unauthorized,
-                       str::stream() << "cursor id " << request.cursorid
-                                     << " was not created by the authenticated user"));
-        }
-
         if (request.nss != cursor->nss()) {
             return appendCommandStatus(
                 result,

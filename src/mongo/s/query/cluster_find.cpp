@@ -39,7 +39,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
@@ -180,10 +179,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
         }
     }
 
-    ClusterClientCursorParams params(
-        query.nss(),
-        AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-        readPref);
+    ClusterClientCursorParams params(query.nss(), readPref);
     params.limit = query.getQueryRequest().getLimit();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
     params.skip = query.getQueryRequest().getSkip();
@@ -383,16 +379,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // If the fail point is enabled, busy wait until it is disabled.
     while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
-    }
-
-    // A user can only call getMore on their own cursor. If there were multiple users authenticated
-    // when the cursor was created, then at least one of them must be authenticated in order to run
-    // getMore on the cursor.
-    if (!AuthorizationSession::get(opCtx->getClient())
-             ->isCoauthorizedWith(pinnedCursor.getValue().getAuthenticatedUsers())) {
-        return {ErrorCodes::Unauthorized,
-                str::stream() << "cursor id " << request.cursorid
-                              << " was not created by the authenticated user"};
     }
 
     if (request.awaitDataTimeout) {

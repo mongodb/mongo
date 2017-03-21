@@ -120,11 +120,6 @@ bool ClusterCursorManager::PinnedCursor::isTailable() const {
     return _cursor->isTailable();
 }
 
-UserNameIterator ClusterCursorManager::PinnedCursor::getAuthenticatedUsers() const {
-    invariant(_cursor);
-    return _cursor->getAuthenticatedUsers();
-}
-
 void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
     invariant(_cursor);
     // Note that unpinning a cursor transfers ownership of the underlying ClusterClientCursor object

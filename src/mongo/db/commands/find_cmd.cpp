@@ -401,7 +401,6 @@ public:
             ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
                 {std::move(exec),
                  nss,
-                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                  opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
                  cmdObj});
             cursorId = pinnedCursor.getCursor()->cursorid();

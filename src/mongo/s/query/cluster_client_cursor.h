@@ -30,7 +30,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/util/time_support.h"
@@ -79,11 +78,6 @@ public:
      * Returns whether or not this cursor is tailing a capped collection on a shard.
      */
     virtual bool isTailable() const = 0;
-
-    /**
-     * Returns the set of authenticated users when this cursor was created.
-     */
-    virtual UserNameIterator getAuthenticatedUsers() const = 0;
 
     /**
      * Returns the view definition associated with this cursor, if any.

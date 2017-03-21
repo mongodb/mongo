@@ -271,11 +271,6 @@ public:
     // The existence of 'opClient' must be guaranteed through locks taken by the caller.
     bool isCoauthorizedWithClient(Client* opClient);
 
-    // Returns true if the session and 'userNameIter' share an authenticated user, or if both have
-    // no authenticated users. Impersonated users are not considered as 'authenticated' for the
-    // purpose of this check.
-    bool isCoauthorizedWith(UserNameIterator userNameIter);
-
     // Tells whether impersonation is active or not.  This state is set when
     // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
     // called.

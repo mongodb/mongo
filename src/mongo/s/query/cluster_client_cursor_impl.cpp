@@ -99,11 +99,6 @@ bool ClusterClientCursorImpl::isTailable() const {
     return _params.isTailable;
 }
 
-UserNameIterator ClusterClientCursorImpl::getAuthenticatedUsers() const {
-    return makeUserNameIterator(_params.authenticatedUsers.begin(),
-                                _params.authenticatedUsers.end());
-}
-
 boost::optional<BSONObj> ClusterClientCursorImpl::viewDefinition() const {
     return _params.viewDefinition;
 }

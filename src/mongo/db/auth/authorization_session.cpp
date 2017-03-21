@@ -855,24 +855,6 @@ bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient) {
     return false;
 }
 
-bool AuthorizationSession::isCoauthorizedWith(UserNameIterator userNameIter) {
-    if (!userNameIter.more() && !getAuthenticatedUserNames().more()) {
-        return true;
-    }
-
-    while (userNameIter.more()) {
-        for (UserNameIterator thisUserNameIter = getAuthenticatedUserNames();
-             thisUserNameIter.more();
-             thisUserNameIter.next()) {
-            if (userNameIter.next() == *thisUserNameIter) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 UserNameIterator AuthorizationSession::getImpersonatedUserNames() {
     return makeUserNameIterator(_impersonatedUserNames.begin(), _impersonatedUserNames.end());
 }

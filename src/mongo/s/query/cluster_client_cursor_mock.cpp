@@ -77,14 +77,6 @@ bool ClusterClientCursorMock::isTailable() const {
     return false;
 }
 
-namespace {
-const std::vector<UserName> emptyAuthenticatedUsers{};
-}  // namespace
-
-UserNameIterator ClusterClientCursorMock::getAuthenticatedUsers() const {
-    return makeUserNameIterator(emptyAuthenticatedUsers.begin(), emptyAuthenticatedUsers.end());
-}
-
 boost::optional<BSONObj> ClusterClientCursorMock::viewDefinition() const {
     return boost::none;
 }
