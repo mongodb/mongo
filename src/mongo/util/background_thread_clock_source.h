@@ -56,12 +56,15 @@ public:
     ~BackgroundThreadClockSource() override;
     Milliseconds getPrecision() override;
     Date_t now() override;
+    Status setAlarm(Date_t when, stdx::function<void()> action) override;
 
     /**
      * Doesn't count as a call to now() for determining whether this ClockSource is idle.
+     *
+     * Unlike now(), returns Date_t() if the thread is currently paused.
      */
-    int64_t peekNowForTest() const {
-        return _current.load();
+    Date_t peekNowForTest() const {
+        return Date_t::fromMillisSinceEpoch(_current.load());
     }
 
 private:
