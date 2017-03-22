@@ -1393,7 +1393,12 @@ public:
 
         LOG(1) << "mr ns: " << config.nss;
 
-        uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
+        uassert(16149, "cannot run mapReduce without the js engine", getGlobalScriptEngine());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "cannot run mapReduce on the system collection '"
+                              << config.nss.ns()
+                              << "'",
+                !config.nss.isSystem());
 
         // Prevent sharding state from changing during the MR.
         unique_ptr<RangePreserver> rangePreserver;
