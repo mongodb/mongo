@@ -365,6 +365,7 @@
             "5": "5".repeat(100),
             "6": "6".repeat(100),
         };
+
         var truncatedQueryString = "{ find: \"currentop_query\", filter: { " +
             "1: \"1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111\", " +
             "2: \"2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222\", " +
@@ -374,10 +375,66 @@
 
         confirmCurrentOpContents({
             test: function() {
-                assert.eq(db.currentop_query.find(TestData.queryFilter).itcount(), 0);
+                assert.eq(db.currentop_query.find(TestData.queryFilter)
+                              .comment("currentop_query")
+                              .itcount(),
+                          0);
             },
             planSummary: "COLLSCAN",
-            currentOpFilter: {"query": truncatedQueryString}
+            currentOpFilter:
+                {"query.$truncated": truncatedQueryString, "query.comment": "currentop_query"}
+        });
+
+        // Verify that an originatingCommand truncated by currentOp appears as { $truncated:
+        // <string>, comment: <string> }.
+        cmdRes = testDB.runCommand({
+            find: "currentop_query",
+            filter: TestData.queryFilter,
+            comment: "currentop_query",
+            batchSize: 0
+        });
+        assert.commandWorked(cmdRes);
+
+        TestData.commandResult = cmdRes;
+
+        filter = {
+            "query.getMore": TestData.commandResult.cursor.id,
+            "originatingCommand.$truncated": truncatedQueryString,
+            "originatingCommand.comment": "currentop_query"
+        };
+
+        confirmCurrentOpContents({
+            test: function() {
+                var cursor = new DBCommandCursor(db.getMongo(), TestData.commandResult, 5);
+                assert.eq(cursor.itcount(), 0);
+            },
+            planSummary: "COLLSCAN",
+            currentOpFilter: filter
+        });
+
+        delete TestData.commandResult;
+
+        // Verify that an aggregation truncated by currentOp appears as { $truncated: <string>,
+        // comment: <string> } when a comment parameter is present.
+        truncatedQueryString = "{ aggregate: \"currentop_query\", pipeline: [ { $match: { 1: " +
+            "\"111111111111111111111111111111111111111111111111111111111111111111111111111111" +
+            "1111111111111111111111\", 2: \"2222222222222222222222222222222222222222222222222" +
+            "222222222222222222222222222222222222222222222222222\", 3: \"33333333333333333333" +
+            "33333333333333333333333333333333333333333333333333333333333333333333333333333333" +
+            "\", 4: \"44444444444444444444444444444444444444444444444444444444444444444444444" +
+            "44444444444444444444444444444\", 5: \"555555555555555555555...";
+
+        confirmCurrentOpContents({
+            test: function() {
+                assert.eq(
+                    db.currentop_query
+                        .aggregate([{$match: TestData.queryFilter}], {comment: "currentop_query"})
+                        .itcount(),
+                    0);
+            },
+            planSummary: "COLLSCAN",
+            currentOpFilter:
+                {"query.$truncated": truncatedQueryString, "query.comment": "currentop_query"}
         });
 
         delete TestData.queryFilter;

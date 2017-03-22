@@ -86,4 +86,19 @@
     assert.eq(1, coll.aggregate([{$match: {a: 3, b: 3}}], {hint: {_id: 1}}).itcount());
     profileObj = getLatestProfilerEntry(testDB);
     assert.eq(profileObj.command.hint, {_id: 1}, tojson(profileObj));
+
+    //
+    // Confirm that aggregations are truncated in the profiler as { $truncated: <string>, comment:
+    // <string> } when a comment parameter is provided.
+    //
+    let matchPredicate = {};
+
+    for (let i = 0; i < 501; i++) {
+        matchPredicate[i] = "a".repeat(150);
+    }
+
+    assert.eq(coll.aggregate([{$match: matchPredicate}], {comment: "profile_agg"}).itcount(), 0);
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq((typeof profileObj.command.$truncated), "string", tojson(profileObj));
+    assert.eq(profileObj.command.comment, "profile_agg", tojson(profileObj));
 })();

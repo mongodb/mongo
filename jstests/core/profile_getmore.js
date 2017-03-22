@@ -121,4 +121,26 @@
     assert.eq(profileObj.docsExamined, 20, tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
     assert.eq(profileObj.originatingCommand.hint, {a: 1}, tojson(profileObj));
+
+    //
+    // Confirm that originatingCommand is truncated in the profiler as { $truncated: <string>,
+    // comment: <string> }
+    //
+    let docToInsert = {};
+
+    for (i = 0; i < 501; i++) {
+        docToInsert[i] = "a".repeat(150);
+    }
+
+    coll.drop();
+    for (i = 0; i < 4; i++) {
+        assert.writeOK(coll.insert(docToInsert));
+    }
+
+    cursor = coll.find(docToInsert).comment("profile_getmore").batchSize(2);
+    assert.eq(cursor.itcount(), 4);  // Consume result set and trigger getMore.
+
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq((typeof profileObj.originatingCommand.$truncated), "string", tojson(profileObj));
+    assert.eq(profileObj.originatingCommand.comment, "profile_getmore", tojson(profileObj));
 })();

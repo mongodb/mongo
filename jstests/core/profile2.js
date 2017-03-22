@@ -22,9 +22,9 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('query'));
-assert.eq('string', typeof(result.query));
+assert.eq('string', typeof(result.query.$truncated));
 // String value is truncated.
-assert(result.query.match(/filter: { a: "a+\.\.\." } }$/));
+assert(result.query.$truncated.match(/filter: { a: "a+\.\.\." } }$/));
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
@@ -38,8 +38,8 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('query'));
-assert.eq('string', typeof(result.query));
-assert(result.query.match(/^{ a: "a+\.\.\." }$/));  // String value is truncated.
+assert.eq('string', typeof(result.query.$truncated));
+assert(result.query.$truncated.match(/^{ a: "a+\.\.\." }$/));  // String value is truncated.
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
@@ -53,8 +53,8 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('updateobj'));
-assert.eq('string', typeof(result.updateobj));
-assert(result.updateobj.match(/^{ a: "a+\.\.\." }$/));  // String value is truncated.
+assert.eq('string', typeof(result.updateobj.$truncated));
+assert(result.updateobj.$truncated.match(/^{ a: "a+\.\.\." }$/));  // String value is truncated.
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
@@ -72,8 +72,8 @@ var result = results[0];
 assert(result.hasOwnProperty('ns'));
 assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('query'));
-assert.eq('string', typeof(result.query));
+assert.eq('string', typeof(result.query.$truncated));
 // Query object itself is truncated.
-assert(result.query.match(/filter: { a0: 1\.0, a1: .*\.\.\.$/));
+assert(result.query.$truncated.match(/filter: { a0: 1\.0, a1: .*\.\.\.$/));
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
