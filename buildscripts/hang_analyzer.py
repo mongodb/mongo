@@ -73,6 +73,7 @@ def find_program(prog, paths):
 def get_process_logger(debugger_output, pid, process_name):
     """Returns the process logger from options specified."""
     process_logger = logging.Logger("process", level=logging.DEBUG)
+    process_logger.mongo_process_filename = None
 
     if 'stdout' in debugger_output:
         handler = logging.StreamHandler(sys.stdout)
@@ -80,9 +81,9 @@ def get_process_logger(debugger_output, pid, process_name):
         process_logger.addHandler(handler)
 
     if 'file' in debugger_output:
-        handler = logging.FileHandler(
-            filename="debugger_%s_%d.log" % (os.path.splitext(process_name)[0], pid),
-            mode="w")
+        filename = "debugger_%s_%d.log" % (os.path.splitext(process_name)[0], pid)
+        process_logger.mongo_process_filename = filename
+        handler = logging.FileHandler(filename=filename, mode="w")
         handler.setFormatter(logging.Formatter(fmt="%(message)s"))
         process_logger.addHandler(handler)
 
@@ -329,6 +330,21 @@ class GDBDumper(object):
             mongodb_waitsfor_graph = ""
             mongodb_javascript_stack = ""
 
+        if not logger.mongo_process_filename:
+            raw_stacks_commands = []
+        else:
+            base, ext = os.path.splitext(logger.mongo_process_filename)
+            raw_stacks_filename = base + '_raw_stacks' + ext
+            raw_stacks_commands = [
+                    'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
+                    # This sends output to log file rather than stdout until we turn logging off.
+                    'set logging redirect on',
+                    'set logging file ' + raw_stacks_filename,
+                    'set logging on',
+                    'thread apply all bt',
+                    'set logging off',
+                    ]
+
         cmds = [
             "set interactive-mode off",
             "set print thread-events off",  # Python calls to gdb.parse_and_eval may cause threads
@@ -339,6 +355,7 @@ class GDBDumper(object):
             "info sharedlibrary",
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
+            ] + raw_stacks_commands + [
             stack_bt,
             "source %s" % printers_script,
             source_mongo_lock,
