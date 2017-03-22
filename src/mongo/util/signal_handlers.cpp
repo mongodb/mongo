@@ -171,7 +171,7 @@ void signalProcessingThread(LogFileStatus rotate) {
     while (true) {
         int actualSignal = 0;
         int status = [&] {
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             return sigwait(&asyncSignals, &actualSignal);
         }();
         fassert(16781, status == 0);

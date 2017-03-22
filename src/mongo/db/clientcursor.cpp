@@ -280,7 +280,7 @@ public:
                 cursorStatsTimedOut.increment(
                     CursorManager::timeoutCursorsGlobal(&opCtx, t.millisReset()));
             }
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             sleepsecs(clientCursorMonitorFrequencySecs.load());
         }
     }

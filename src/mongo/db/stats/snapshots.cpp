@@ -114,7 +114,7 @@ void StatsSnapshotThread::run() {
             log() << "ERROR in SnapshotThread: " << redact(e.what()) << endl;
         }
 
-        IdleThreadBlock markIdle;
+        MONGO_IDLE_THREAD_BLOCK;
         sleepsecs(4);
     }
 }

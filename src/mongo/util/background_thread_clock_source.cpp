@@ -116,12 +116,12 @@ void BackgroundThreadClockSource::_startTimerThread() {
             } else {
                 // Stop running if nothing has read the time since we last updated the time.
                 _current.store(0);
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 _condition.wait(lock, [this] { return _inShutdown || _current.load() != 0; });
             }
 
             const auto sleepUntil = Date_t::fromMillisSinceEpoch(_current.load()) + _granularity;
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             _clockSource->waitForConditionUntil(
                 _condition, lock, sleepUntil, [this] { return _inShutdown; });
         }

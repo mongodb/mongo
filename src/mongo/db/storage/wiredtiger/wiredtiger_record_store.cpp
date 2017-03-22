@@ -181,7 +181,7 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
     // Wait until kill() is called or there are too many oplog stones.
     stdx::unique_lock<stdx::mutex> lock(_oplogReclaimMutex);
     while (!_isDead && !hasExcessStones()) {
-        IdleThreadBlock markIdle;
+        MONGO_IDLE_THREAD_BLOCK;
         _oplogReclaimCv.wait(lock);
     }
 }
@@ -1711,7 +1711,7 @@ void WiredTigerRecordStore::_oplogJournalThreadLoop(WiredTigerSessionCache* sess
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(_uncommittedRecordIdsMutex);
         {
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             _opsWaitingForJournalCV.wait(
                 lk, [&] { return _shuttingDown || !_opsWaitingForJournal.empty(); });
         }

@@ -311,7 +311,7 @@ void PeriodicTaskRunner::run() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (!_shutdownRequested) {
         {
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             if (stdx::cv_status::timeout != _cond.wait_for(lock, waitTime.toSystemDuration()))
                 continue;
         }

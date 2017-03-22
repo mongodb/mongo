@@ -147,7 +147,7 @@ void UserCacheInvalidator::run() {
             lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
         Date_t now = Date_t::now();
         while (now < sleepUntil) {
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             invalidationIntervalChangedCondition.wait_until(lock, sleepUntil.toSystemTimePoint());
             sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
             now = Date_t::now();

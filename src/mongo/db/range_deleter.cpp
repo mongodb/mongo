@@ -427,7 +427,7 @@ void RangeDeleter::doWork() {
             stdx::unique_lock<stdx::mutex> sl(_queueMutex);
             while (_taskQueue.empty()) {
                 {
-                    IdleThreadBlock markIdle;
+                    MONGO_IDLE_THREAD_BLOCK;
                     _taskQueueNotEmptyCV.wait_for(
                         sl, Milliseconds(kNotEmptyTimeoutMillis).toSystemDuration());
                 }

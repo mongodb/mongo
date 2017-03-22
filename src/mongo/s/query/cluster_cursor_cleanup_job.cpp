@@ -72,7 +72,7 @@ void ClusterCursorCleanupJob::run() {
                                                 Milliseconds(cursorTimeoutMillis.load()));
         manager->incrementCursorsTimedOut(manager->reapZombieCursors());
 
-        IdleThreadBlock markIdle;
+        MONGO_IDLE_THREAD_BLOCK;
         sleepsecs(clientCursorMonitorFrequencySecs.load());
     }
 }

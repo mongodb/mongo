@@ -115,7 +115,7 @@ void ServiceEntryPointMongod::_sessionLoop(const transport::SessionHandle& sessi
         if (!inExhaust) {
             inMessage.reset();
             auto status = [&] {
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 return session->sourceMessage(&inMessage).wait();
             }();
 

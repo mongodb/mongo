@@ -296,7 +296,7 @@ void Listener::initAndListen() {
         maxSelectTime.tv_sec = 0;
         maxSelectTime.tv_usec = 250000;
         const int ret = [&] {
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             return select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
         }();
 

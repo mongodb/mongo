@@ -215,7 +215,7 @@ void JournalWriter::_journalWriterThread() {
     try {
         while (true) {
             Buffer* const buffer = [&] {
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 return _journalQueue.blockingPop();
             }();
 

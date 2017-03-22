@@ -357,7 +357,7 @@ static ExitCode runMongosServer() {
 #endif
 
     // Block until shutdown.
-    IdleThreadBlock markIdle;
+    MONGO_IDLE_THREAD_BLOCK;
     return waitForShutdown();
 }
 

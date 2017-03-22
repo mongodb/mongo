@@ -1214,7 +1214,7 @@ void SnapshotThread::run() {
                     break;
                 }
 
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 newTimestampNotifier.wait(lock);
             }
         }

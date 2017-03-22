@@ -452,7 +452,7 @@ void Balancer::_endRound(OperationContext* opCtx, Seconds waitTimeout) {
         _condVar.notify_all();
     }
 
-    IdleThreadBlock markIdle;
+    MONGO_IDLE_THREAD_BLOCK;
     _sleepFor(opCtx, waitTimeout);
 }
 
