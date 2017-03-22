@@ -914,15 +914,6 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForStartUp will return a status indicating what is wrong
     // with the new config.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")))));
-
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
@@ -936,63 +927,15 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(ErrorCodes::BadValue,
-                  validateConfigForStartUp(
-                      &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext())
-                      .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        validateConfigForStartUp(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+            .getStatus());
 }
 
-TEST(ValidateConfigForStartUp, OldAndNewConfigIncompatible) {
-    // The new config is not compatible with the old config due to a member changing _ids. This
-    // tests that validateConfigForStartUp will return a status indicating the incompatiblilty
-    // between the old and new config.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
-
-
-    ReplSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version"
-                                        << 2
-                                        << "members"
-                                        << BSON_ARRAY(BSON("_id" << 2 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
-
-    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
-    presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                  validateConfigForStartUp(
-                      &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext())
-                      .getStatus());
-}
-
-TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
-    // The new config is compatible with the old config. This tests that
-    // validateConfigForStartUp will return a Status::OK() indicating the validity of this
-    // config change.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h3")))));
-
-
+TEST(ValidateConfigForStartUp, NewConfigValid) {
+    // The new config is valid. This tests that validateConfigForStartUp will return a
+    // Status::OK() indicating the validity of this configuration.
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
@@ -1008,24 +951,15 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(validateConfigForStartUp(
-                  &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext())
-                  .getStatus());
+    ASSERT_OK(
+        validateConfigForStartUp(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+            .getStatus());
 }
 
 TEST(ValidateConfigForStartUp, NewConfigWriteConcernNotSatisfiable) {
     // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
     // created anymore, but we allow any which exist to pass and the database to start up to
     // maintain backwards compatibility.
-    ReplSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version"
-                                        << 1
-                                        << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h2")))));
-
     ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
@@ -1039,9 +973,9 @@ TEST(ValidateConfigForStartUp, NewConfigWriteConcernNotSatisfiable) {
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
-    ASSERT_OK(validateConfigForStartUp(
-                  &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext())
-                  .getStatus());
+    ASSERT_OK(
+        validateConfigForStartUp(&presentOnceExternalState, newConfig, getGlobalServiceContext())
+            .getStatus());
 }
 
 TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {

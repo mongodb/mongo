@@ -256,18 +256,11 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
 }  // namespace
 
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
-                                         const ReplSetConfig& oldConfig,
                                          const ReplSetConfig& newConfig,
                                          ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
         return StatusWith<int>(status);
-    }
-    if (oldConfig.isInitialized()) {
-        status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
-        if (!status.isOK()) {
-            return StatusWith<int>(status);
-        }
     }
     return findSelfInConfig(externalState, newConfig, ctx);
 }

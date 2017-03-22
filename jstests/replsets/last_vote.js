@@ -103,7 +103,10 @@
 
     jsTestLog("Restarting node 0 in replica set mode");
     node0 = rst.restart(0);  // Restart in replSet mode again.
-    assertCurrentTerm(node0, term);
+    assert.soonNoExcept(function() {
+        assertCurrentTerm(node0, term);
+        return true;
+    });
 
     jsTestLog("Manually sending node 0 a dryRun replSetRequestVotes command, " +
               "expecting failure in old term");
