@@ -121,6 +121,12 @@ public:
                                                      BoundInclusion boundInclusion,
                                                      std::size_t limit) override;
 
+    StatusWith<StorageInterface::CollectionSize> getCollectionSize(
+        OperationContext* opCtx, const NamespaceString& nss) override;
+
+    StatusWith<StorageInterface::CollectionCount> getCollectionCount(
+        OperationContext* opCtx, const NamespaceString& nss) override;
+
     /**
      * Checks that the "admin" database contains a supported version of the auth data schema.
      */

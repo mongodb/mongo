@@ -600,6 +600,38 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
                                   FindDeleteMode::kDelete);
 }
 
+StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollectionSize(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+    if (!autoColl.getDb()) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Database [" << nss.db().toString() << "] not found."};
+    }
+    Collection* collection = autoColl.getCollection();
+    if (!collection) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection [" << nss.toString() << "] not found."};
+    }
+
+    return collection->dataSize(opCtx);
+}
+
+StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectionCount(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+    if (!autoColl.getDb()) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Database [" << nss.db().toString() << "] not found."};
+    }
+    Collection* collection = autoColl.getCollection();
+    if (!collection) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection [" << nss.toString() << "] not found."};
+    }
+
+    return collection->numRecords(opCtx);
+}
+
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     AutoGetDb autoDB(opCtx, "admin", MODE_X);
     auto adminDb = autoDB.getDb();

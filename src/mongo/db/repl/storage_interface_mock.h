@@ -202,6 +202,16 @@ public:
             opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
     }
 
+    StatusWith<StorageInterface::CollectionSize> getCollectionSize(
+        OperationContext* opCtx, const NamespaceString& nss) override {
+        return 0;
+    }
+
+    StatusWith<StorageInterface::CollectionCount> getCollectionCount(
+        OperationContext* opCtx, const NamespaceString& nss) override {
+        return 0;
+    }
+
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };
