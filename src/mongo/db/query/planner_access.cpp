@@ -1218,7 +1218,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedDataAccess(const CanonicalQue
         } else if (Indexability::arrayUsesIndexOnChildren(root)) {
             QuerySolutionNode* solution = NULL;
 
-            invariant(MatchExpression::ELEM_MATCH_OBJECT);
+            invariant(root->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
             // The child is an AND.
             invariant(1 == root->numChildren());
             solution = buildIndexedDataAccess(query, root->getChild(0), true, indices, params);
