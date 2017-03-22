@@ -55,15 +55,6 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target=[
-        'clonable_ptr_test',
-    ],
-    source=[
-        'clonable_ptr_test.cpp',
-    ],
-)
-
 env.Library(
     target=[
         'secure_allocator'
