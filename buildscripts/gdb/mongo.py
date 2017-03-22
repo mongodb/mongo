@@ -395,12 +395,12 @@ class BtIfActive(gdb.Command):
 
     def invoke(self, arg, _from_tty):
         try:
-            is_idle = gdb.parse_and_eval("mongo::for_debuggers::threadIsIdle")
+            idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
         except gdb.error:
-            is_idle = False # If unsure, print a stack trace.
+            idle_location = None # If unsure, print a stack trace.
 
-        if is_idle:
-            print("Thread is idle")
+        if idle_location:
+            print("Thread is idle at " + idle_location.string())
         else:
             gdb.execute("bt")
 

@@ -34,17 +34,17 @@
 namespace mongo {
 namespace for_debuggers {
 // This needs external linkage to ensure that debuggers can use it.
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL bool threadIsIdle = false;
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL const char* idleThreadLocation = nullptr;
 }
-using for_debuggers::threadIsIdle;
+using for_debuggers::idleThreadLocation;
 
-void IdleThreadBlock::beginIdleThreadBlock() {
-    invariant(!threadIsIdle);
-    threadIsIdle = true;
+void IdleThreadBlock::beginIdleThreadBlock(const char* location) {
+    invariant(!idleThreadLocation);
+    idleThreadLocation = location;
 }
 
 void IdleThreadBlock::endIdleThreadBlock() {
-    invariant(threadIsIdle);
-    threadIsIdle = false;
+    invariant(idleThreadLocation);
+    idleThreadLocation = nullptr;
 }
 }

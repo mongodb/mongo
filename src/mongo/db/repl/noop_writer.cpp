@@ -82,7 +82,7 @@ private:
             OperationContext& txn = *txnPtr;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
 
                 if (_inShutdown)

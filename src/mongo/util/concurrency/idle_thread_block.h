@@ -27,12 +27,14 @@
 
 #pragma once
 
+#include <boost/preprocessor/stringize.hpp>
+
 #include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
 /**
- * Marks a thread as idle while in scope.
+ * Marks a thread as idle while in scope. Prefer to use the macro below.
  *
  * Our debugger scripts can hide idle threads when dumping all stacks. You should mark threads as
  * idle when printing the stack would just be unhelpful noise. IdleThreadBlocks are not allowed to
@@ -43,8 +45,8 @@ class IdleThreadBlock {
     MONGO_DISALLOW_COPYING(IdleThreadBlock);
 
 public:
-    IdleThreadBlock() {
-        beginIdleThreadBlock();
+    IdleThreadBlock(const char* location) {
+        beginIdleThreadBlock(location);
     }
     ~IdleThreadBlock() {
         endIdleThreadBlock();
@@ -52,8 +54,13 @@ public:
 
     // These should not be called by mongo C++ code. They are only public to allow exposing this
     // functionality to a C api.
-    static void beginIdleThreadBlock();
+    static void beginIdleThreadBlock(const char* location);
     static void endIdleThreadBlock();
 };
+
+/**
+ * Marks a thread idle for the rest of the current scope and passes file:line as the location.
+ */
+#define MONGO_IDLE_THREAD_BLOCK IdleThreadBlock markIdle(__FILE__ ":" BOOST_PP_STRINGIZE(__LINE__))
 
 }  // namespace mongo

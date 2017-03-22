@@ -186,7 +186,7 @@ void NetworkInterfaceASIO::waitForWork() {
     stdx::unique_lock<stdx::mutex> lk(_executorMutex);
     // TODO: This can be restructured with a lambda.
     while (!_isExecutorRunnable) {
-        IdleThreadBlock markIdle;
+        MONGO_IDLE_THREAD_BLOCK;
         _isExecutorRunnableCondition.wait(lk);
     }
     _isExecutorRunnable = false;
@@ -200,7 +200,7 @@ void NetworkInterfaceASIO::waitForWorkUntil(Date_t when) {
         if (waitTime <= Milliseconds(0)) {
             break;
         }
-        IdleThreadBlock markIdle;
+        MONGO_IDLE_THREAD_BLOCK;
         _isExecutorRunnableCondition.wait_for(lk, waitTime.toSystemDuration());
     }
     _isExecutorRunnable = false;

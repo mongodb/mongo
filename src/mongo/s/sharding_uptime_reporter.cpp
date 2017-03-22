@@ -110,7 +110,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
                 }
             }
 
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             sleepFor(kUptimeReportInterval);
         }
     });

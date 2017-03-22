@@ -376,7 +376,7 @@ void FileAllocator::run(FileAllocator* fa) {
         {
             stdx::unique_lock<stdx::mutex> lk(fa->_pendingMutex);
             if (fa->_pending.size() == 0) {
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 fa->_pendingUpdated.wait(lk);
             }
         }

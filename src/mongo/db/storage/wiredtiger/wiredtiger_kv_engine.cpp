@@ -114,7 +114,7 @@ public:
                 ms = 100;
             }
 
-            IdleThreadBlock markIdle;
+            MONGO_IDLE_THREAD_BLOCK;
             sleepmillis(ms);
         }
         LOG(1) << "stopping " << name() << " thread";

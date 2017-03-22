@@ -73,7 +73,7 @@ void BackgroundThreadClockSource::_startTimerThread() {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (!_shutdownTimer) {
             {
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 if (_condition.wait_for(lock, _granularity.toSystemDuration()) !=
                     stdx::cv_status::timeout) {
                     continue;

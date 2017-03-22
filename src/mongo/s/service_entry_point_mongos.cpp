@@ -87,7 +87,7 @@ void ServiceEntryPointMongos::_sessionLoop(const transport::SessionHandle& sessi
         // Source a Message from the client
         {
             auto status = [&] {
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 return session->sourceMessage(&message).wait();
             }();
 

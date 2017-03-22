@@ -89,7 +89,7 @@ public:
 
         while (!inShutdown()) {
             {
-                IdleThreadBlock markIdle;
+                MONGO_IDLE_THREAD_BLOCK;
                 sleepsecs(ttlMonitorSleepSecs);
             }
 
