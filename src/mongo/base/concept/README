@@ -1,0 +1,5 @@
+This directory contains a number of C++ headers which describe concepts for
+C++ types used by and with the Mongo library.  These headers do not describe
+instantiable types, but instead are used to concisely describe models of C++
+type concepts.  When C++ grows a proper `Concepts` feature, these files can be
+converted to proper concepts.
