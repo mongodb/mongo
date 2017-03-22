@@ -380,20 +380,18 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
-        auto executor = _replicationCoordinatorExternalState->getTaskExecutor();
-        auto config = _replCoord->getConfig();
         auto onOplogFetcherShutdownCallbackFn =
             [&fetcherReturnStatus](const Status& status, const OpTimeWithHash& lastFetched) {
                 fetcherReturnStatus = status;
             };
-
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _oplogFetcher = stdx::make_unique<OplogFetcher>(
-            executor,
+        // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
+        // replication coordinator.
+        auto oplogFetcherPtr = stdx::make_unique<OplogFetcher>(
+            _replicationCoordinatorExternalState->getTaskExecutor(),
             OpTimeWithHash(lastHashFetched, lastOpTimeFetched),
             source,
             NamespaceString(rsOplogName),
-            config,
+            _replCoord->getConfig(),
             _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
             syncSourceResp.rbid,
             true /* requireFresherSyncSource */,
@@ -404,6 +402,8 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
                        stdx::placeholders::_2,
                        stdx::placeholders::_3),
             onOplogFetcherShutdownCallbackFn);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _oplogFetcher = std::move(oplogFetcherPtr);
         oplogFetcher = _oplogFetcher.get();
     } catch (const mongo::DBException& ex) {
         fassertFailedWithStatus(34440, exceptionToStatus());
