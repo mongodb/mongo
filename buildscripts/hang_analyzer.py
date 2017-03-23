@@ -303,12 +303,20 @@ class GDBDumper(object):
         printers_script = os.path.join(gdb_dir, "mongo.py")
         mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
 
+        stack_bt = ""
         source_mongo_lock = "source %s" % mongo_lock_script
         mongodb_dump_locks = "mongodb-dump-locks"
         mongodb_show_locks = "mongodb-show-locks"
+        mongodb_uniqstack = "mongodb-uniqstack bt"
         mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
             (process_name, pid)
         mongodb_javascript_stack = "mongodb-javascript-stack"
+
+        # SERVER-28415 - GDB on ARM can run out of virtual memory after Python modules are loaded
+        if platform.processor() == "aarch64":
+            stack_bt = "thread apply all bt"
+            mongodb_uniqstack = ""
+
         # The following MongoDB python extensions do not run on Solaris.
         if sys.platform.startswith("sunos"):
             source_mongo_lock = ""
@@ -331,9 +339,10 @@ class GDBDumper(object):
             "info sharedlibrary",
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
+            stack_bt,
             "source %s" % printers_script,
             source_mongo_lock,
-            "mongodb-uniqstack bt",
+            mongodb_uniqstack,
             dump_command,
             mongodb_dump_locks,
             mongodb_show_locks,
