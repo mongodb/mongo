@@ -1061,6 +1061,14 @@ IsCacheableSetPropCall(JSContext* cx, JSObject* obj, JSObject* holder, Shape* sh
 
     JSFunction* func = &shape->setterObject()->as<JSFunction>();
 
+    if (IsWindow(obj)) {
+        if (!func->isNative())
+            return false;
+
+        if (!func->jitInfo() || func->jitInfo()->needsOuterizedThisObject())
+            return false;
+    }
+
     if (func->isNative()) {
         *isScripted = false;
         return true;
@@ -6398,6 +6406,12 @@ ICCallStubCompiler::guardFunApply(MacroAssembler& masm, AllocatableGeneralRegist
                           Address(BaselineFrameReg, BaselineFrame::reverseOffsetOfFlags()),
                           Imm32(BaselineFrame::HAS_ARGS_OBJ),
                           failure);
+
+        // Limit the length to something reasonable.
+        masm.branch32(Assembler::Above,
+                      Address(BaselineFrameReg, BaselineFrame::offsetOfNumActualArgs()),
+                      Imm32(ICCall_ScriptedApplyArray::MAX_ARGS_ARRAY_LENGTH),
+                      failure);
     } else {
         MOZ_ASSERT(applyThing == FunApply_Array);
 

@@ -314,11 +314,16 @@ CanEnterBaselineJIT(JSContext* cx, HandleScript script, InterpreterFrame* osrFra
     if (script->nslots() > BaselineScript::MAX_JSSCRIPT_SLOTS)
         return Method_CantCompile;
 
-    if (!cx->compartment()->ensureJitCompartmentExists(cx))
-        return Method_Error;
-
     if (script->hasBaselineScript())
         return Method_Compiled;
+
+    // Check this before calling ensureJitCompartmentExists, so we're less
+    // likely to report OOM in JSRuntime::createJitRuntime.
+    if (!CanLikelyAllocateMoreExecutableMemory())
+        return Method_Skipped;
+
+    if (!cx->compartment()->ensureJitCompartmentExists(cx))
+        return Method_Error;
 
     // Check script warm-up counter.
     if (script->incWarmUpCounter() <= JitOptions.baselineWarmUpThreshold)

@@ -2310,9 +2310,7 @@ LIRGenerator::visitInterruptCheck(MInterruptCheck* ins)
     // is complicated because there could be another AutoWritableJitCode on the
     // stack.
     LInstructionHelper<0, 0, 0>* lir;
-    if (GetJitContext()->runtime->canUseSignalHandlers() &&
-        !ExecutableAllocator::nonWritableJitCode)
-    {
+    if (GetJitContext()->runtime->canUseSignalHandlers()) {
         lir = new(alloc()) LInterruptCheckImplicit();
     } else {
         lir = new(alloc()) LInterruptCheck();

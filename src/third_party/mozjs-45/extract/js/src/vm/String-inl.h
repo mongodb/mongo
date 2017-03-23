@@ -13,6 +13,7 @@
 #include "mozilla/Range.h"
 
 #include "jscntxt.h"
+#include "jscompartment.h"
 
 #include "gc/Allocator.h"
 #include "gc/Marking.h"
@@ -220,7 +221,11 @@ JSFlatString::new_(js::ExclusiveContext* cx, const CharT* chars, size_t length)
     if (!validateLength(cx, length))
         return nullptr;
 
-    JSFlatString* str = static_cast<JSFlatString*>(js::Allocate<JSString, allowGC>(cx));
+    JSFlatString* str;
+    if (cx->compartment()->isAtomsCompartment())
+        str = js::Allocate<js::NormalAtom, allowGC>(cx);
+    else
+        str = static_cast<JSFlatString*>(js::Allocate<JSString, allowGC>(cx));
     if (!str)
         return nullptr;
 
@@ -247,6 +252,9 @@ template <js::AllowGC allowGC>
 MOZ_ALWAYS_INLINE JSThinInlineString*
 JSThinInlineString::new_(js::ExclusiveContext* cx)
 {
+    if (cx->compartment()->isAtomsCompartment())
+        return (JSThinInlineString*)(js::Allocate<js::NormalAtom, allowGC>(cx));
+
     return static_cast<JSThinInlineString*>(js::Allocate<JSString, allowGC>(cx));
 }
 
@@ -254,6 +262,9 @@ template <js::AllowGC allowGC>
 MOZ_ALWAYS_INLINE JSFatInlineString*
 JSFatInlineString::new_(js::ExclusiveContext* cx)
 {
+    if (cx->compartment()->isAtomsCompartment())
+        return (JSFatInlineString*)(js::Allocate<js::FatInlineAtom, allowGC>(cx));
+
     return js::Allocate<JSFatInlineString, allowGC>(cx);
 }
 
@@ -351,6 +362,7 @@ JSString::finalize(js::FreeOp* fop)
 {
     /* FatInline strings are in a different arena. */
     MOZ_ASSERT(getAllocKind() != js::gc::AllocKind::FAT_INLINE_STRING);
+    MOZ_ASSERT(getAllocKind() != js::gc::AllocKind::FAT_INLINE_ATOM);
 
     if (isFlat())
         asFlat().finalize(fop);
@@ -362,6 +374,7 @@ inline void
 JSFlatString::finalize(js::FreeOp* fop)
 {
     MOZ_ASSERT(getAllocKind() != js::gc::AllocKind::FAT_INLINE_STRING);
+    MOZ_ASSERT(getAllocKind() != js::gc::AllocKind::FAT_INLINE_ATOM);
 
     if (!isInline())
         fop->free_(nonInlineCharsRaw());
@@ -381,6 +394,8 @@ JSAtom::finalize(js::FreeOp* fop)
 {
     MOZ_ASSERT(JSString::isAtom());
     MOZ_ASSERT(JSString::isFlat());
+    MOZ_ASSERT(getAllocKind() == js::gc::AllocKind::ATOM ||
+               getAllocKind() == js::gc::AllocKind::FAT_INLINE_ATOM);
 
     if (!isInline())
         fop->free_(nonInlineCharsRaw());

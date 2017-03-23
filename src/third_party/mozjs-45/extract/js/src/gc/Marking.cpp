@@ -171,6 +171,17 @@ template <> bool ThingIsPermanentAtomOrWellKnownSymbol<JS::Symbol>(JS::Symbol* s
     return sym->isWellKnownSymbol();
 }
 
+template <typename T>
+static inline bool
+IsOwnedByOtherRuntime(JSRuntime* rt, T thing)
+{
+    bool other = thing->runtimeFromAnyThread() != rt;
+    MOZ_ASSERT_IF(other,
+                  ThingIsPermanentAtomOrWellKnownSymbol(thing) ||
+                  thing->zoneFromAnyThread()->isSelfHostingZone());
+    return other;
+}
+
 template<typename T>
 void
 js::CheckTracedThing(JSTracer* trc, T* thing)
@@ -188,10 +199,10 @@ js::CheckTracedThing(JSTracer* trc, T* thing)
     MOZ_ASSERT_IF(!IsMovingTracer(trc) && !trc->isTenuringTracer(), !IsForwarded(thing));
 
     /*
-     * Permanent atoms are not associated with this runtime, but will be
-     * ignored during marking.
+     * Permanent atoms and things in the self-hosting zone are not associated
+     * with this runtime, but will be ignored during marking.
      */
-    if (ThingIsPermanentAtomOrWellKnownSymbol(thing))
+    if (IsOwnedByOtherRuntime(trc->runtime(), thing))
         return;
 
     Zone* zone = thing->zoneFromAnyThread();
@@ -675,16 +686,24 @@ GCMarker::markImplicitEdges(T* thing)
 
 template <typename T>
 static inline bool
-MustSkipMarking(T thing)
+MustSkipMarking(GCMarker* gcmarker, T thing)
 {
+    // Don't trace things that are owned by another runtime.
+    if (IsOwnedByOtherRuntime(gcmarker->runtime(), thing))
+        return true;
+
     // Don't mark things outside a zone if we are in a per-zone GC.
     return !thing->zone()->isGCMarking();
 }
 
 template <>
 bool
-MustSkipMarking<JSObject*>(JSObject* obj)
+MustSkipMarking<JSObject*>(GCMarker* gcmarker, JSObject* obj)
 {
+    // Don't trace things that are owned by another runtime.
+    if (IsOwnedByOtherRuntime(gcmarker->runtime(), obj))
+        return true;
+
     // We may mark a Nursery thing outside the context of the
     // MinorCollectionTracer because of a pre-barrier. The pre-barrier is not
     // needed in this case because we perform a minor collection before each
@@ -698,34 +717,12 @@ MustSkipMarking<JSObject*>(JSObject* obj)
     return !TenuredCell::fromPointer(obj)->zone()->isGCMarking();
 }
 
-template <>
-bool
-MustSkipMarking<JSString*>(JSString* str)
-{
-    // Don't mark permanent atoms, as they may be associated with another
-    // runtime. Note that traverse() also checks this, but we need to not
-    // run the isGCMarking test from off-main-thread, so have to check it here
-    // too.
-    return str->isPermanentAtom() ||
-           !str->zone()->isGCMarking();
-}
-
-template <>
-bool
-MustSkipMarking<JS::Symbol*>(JS::Symbol* sym)
-{
-    // As for JSString, don't touch a globally owned well-known symbol from
-    // off-main-thread.
-    return sym->isWellKnownSymbol() ||
-           !sym->zone()->isGCMarking();
-}
-
 template <typename T>
 void
 DoMarking(GCMarker* gcmarker, T* thing)
 {
     // Do per-type marking precondition checks.
-    if (MustSkipMarking(thing))
+    if (MustSkipMarking(gcmarker, thing))
         return;
 
     CheckTracedThing(gcmarker, thing);
@@ -752,13 +749,13 @@ void
 NoteWeakEdge(GCMarker* gcmarker, T** thingp)
 {
     // Do per-type marking precondition checks.
-    if (MustSkipMarking(*thingp))
+    if (MustSkipMarking(gcmarker, *thingp))
         return;
 
     CheckTracedThing(gcmarker, *thingp);
 
     // If the target is already marked, there's no need to store the edge.
-    if (IsMarkedUnbarriered(thingp))
+    if (IsMarkedUnbarriered(gcmarker->runtime(), thingp))
         return;
 
     gcmarker->noteWeakEdge(thingp);
@@ -2329,17 +2326,22 @@ IsMarkedInternalCommon(T* thingp)
 
 template <typename T>
 static bool
-IsMarkedInternal(T** thingp)
+IsMarkedInternal(JSRuntime* rt, T** thingp)
 {
+    if (IsOwnedByOtherRuntime(rt, *thingp))
+        return true;
+
     return IsMarkedInternalCommon(thingp);
 }
 
 template <>
 /* static */ bool
-IsMarkedInternal(JSObject** thingp)
+IsMarkedInternal(JSRuntime* rt, JSObject** thingp)
 {
+    if (IsOwnedByOtherRuntime(rt, *thingp))
+        return true;
+
     if (IsInsideNursery(*thingp)) {
-        JSRuntime* rt = (*thingp)->runtimeFromAnyThread();
         MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
         return rt->gc.nursery.getForwardedPointer(thingp);
     }
@@ -2348,18 +2350,18 @@ IsMarkedInternal(JSObject** thingp)
 
 template <typename S>
 struct IsMarkedFunctor : public IdentityDefaultAdaptor<S> {
-    template <typename T> S operator()(T* t, bool* rv) {
-        *rv = IsMarkedInternal(&t);
+    template <typename T> S operator()(T* t, JSRuntime* rt, bool* rv) {
+        *rv = IsMarkedInternal(rt, &t);
         return js::gc::RewrapTaggedPointer<S, T*>::wrap(t);
     }
 };
 
 template <typename T>
 static bool
-IsMarkedInternal(T* thingp)
+IsMarkedInternal(JSRuntime* rt, T* thingp)
 {
     bool rv = true;
-    *thingp = DispatchTyped(IsMarkedFunctor<T>(), *thingp, &rv);
+    *thingp = DispatchTyped(IsMarkedFunctor<T>(), *thingp, rt, &rv);
     return rv;
 }
 
@@ -2427,16 +2429,16 @@ namespace gc {
 
 template <typename T>
 bool
-IsMarkedUnbarriered(T* thingp)
+IsMarkedUnbarriered(JSRuntime* rt, T* thingp)
 {
-    return IsMarkedInternal(ConvertToBase(thingp));
+    return IsMarkedInternal(rt, ConvertToBase(thingp));
 }
 
 template <typename T>
 bool
-IsMarked(WriteBarrieredBase<T>* thingp)
+IsMarked(JSRuntime* rt, WriteBarrieredBase<T>* thingp)
 {
-    return IsMarkedInternal(ConvertToBase(thingp->unsafeUnbarrieredForTracing()));
+    return IsMarkedInternal(rt, ConvertToBase(thingp->unsafeUnbarrieredForTracing()));
 }
 
 template <typename T>
@@ -2469,8 +2471,8 @@ EdgeNeedsSweep(JS::Heap<T>* thingp)
 
 // Instantiate a copy of the Tracing templates for each derived type.
 #define INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS(type) \
-    template bool IsMarkedUnbarriered<type>(type*); \
-    template bool IsMarked<type>(WriteBarrieredBase<type>*); \
+    template bool IsMarkedUnbarriered<type>(JSRuntime*, type*);                \
+    template bool IsMarked<type>(JSRuntime*, WriteBarrieredBase<type>*); \
     template bool IsAboutToBeFinalizedUnbarriered<type>(type*); \
     template bool IsAboutToBeFinalized<type>(WriteBarrieredBase<type>*); \
     template bool IsAboutToBeFinalized<type>(ReadBarrieredBase<type>*); \
