@@ -103,6 +103,8 @@ template <> struct MapTypeToFinalizeKind<ObjectGroup>       { static const Alloc
 template <> struct MapTypeToFinalizeKind<JSFatInlineString> { static const AllocKind kind = AllocKind::FAT_INLINE_STRING; };
 template <> struct MapTypeToFinalizeKind<JSString>          { static const AllocKind kind = AllocKind::STRING; };
 template <> struct MapTypeToFinalizeKind<JSExternalString>  { static const AllocKind kind = AllocKind::EXTERNAL_STRING; };
+template <> struct MapTypeToFinalizeKind<js::FatInlineAtom> { static const AllocKind kind = AllocKind::FAT_INLINE_ATOM; };
+template <> struct MapTypeToFinalizeKind<js::NormalAtom>    { static const AllocKind kind = AllocKind::ATOM; };
 template <> struct MapTypeToFinalizeKind<JS::Symbol>        { static const AllocKind kind = AllocKind::SYMBOL; };
 template <> struct MapTypeToFinalizeKind<jit::JitCode>      { static const AllocKind kind = AllocKind::JITCODE; };
 
@@ -140,6 +142,8 @@ IsNurseryAllocable(AllocKind kind)
         false,     /* AllocKind::FAT_INLINE_STRING */
         false,     /* AllocKind::STRING */
         false,     /* AllocKind::EXTERNAL_STRING */
+        false,     /* AllocKind::FAT_INLINE_ATOM */
+        false,     /* AllocKind::ATOM */
         false,     /* AllocKind::SYMBOL */
         false,     /* AllocKind::JITCODE */
     };
@@ -175,6 +179,8 @@ IsBackgroundFinalized(AllocKind kind)
         true,      /* AllocKind::FAT_INLINE_STRING */
         true,      /* AllocKind::STRING */
         false,     /* AllocKind::EXTERNAL_STRING */
+        true,      /* AllocKind::FAT_INLINE_ATOM */
+        true,      /* AllocKind::ATOM */
         true,      /* AllocKind::SYMBOL */
         false,     /* AllocKind::JITCODE */
     };

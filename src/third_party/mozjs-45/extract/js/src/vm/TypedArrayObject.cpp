@@ -1032,6 +1032,11 @@ DataViewObject*
 DataViewObject::create(JSContext* cx, uint32_t byteOffset, uint32_t byteLength,
                        Handle<ArrayBufferObject*> arrayBuffer, JSObject* protoArg)
 {
+    if (arrayBuffer->isNeutered()) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TYPED_ARRAY_DETACHED);
+        return nullptr;
+    }
+
     MOZ_ASSERT(byteOffset <= INT32_MAX);
     MOZ_ASSERT(byteLength <= INT32_MAX);
     MOZ_ASSERT(byteOffset + byteLength < UINT32_MAX);
@@ -2264,36 +2269,50 @@ js::DefineTypedArrayElement(JSContext* cx, HandleObject obj, uint64_t index,
 {
     MOZ_ASSERT(IsAnyTypedArray(obj));
 
-    // These are all substeps of 3.c.
-    // Steps i-vi.
+    // These are all substeps of 3.b.
+
+    // Steps i-iii are handled by the caller.
+
+    // Steps iv-v.
     // We (wrongly) ignore out of range defines with a value.
-    if (index >= AnyTypedArrayLength(obj))
+    uint32_t length = AnyTypedArrayLength(obj);
+    if (index >= length)
         return result.succeed();
 
-    // Step vii.
+    // Step vi.
     if (desc.isAccessorDescriptor())
         return result.fail(JSMSG_CANT_REDEFINE_PROP);
 
-    // Step viii.
+    // Step vii.
     if (desc.hasConfigurable() && desc.configurable())
         return result.fail(JSMSG_CANT_REDEFINE_PROP);
 
-    // Step ix.
+    // Step viii.
     if (desc.hasEnumerable() && !desc.enumerable())
         return result.fail(JSMSG_CANT_REDEFINE_PROP);
 
-    // Step x.
+    // Step ix.
     if (desc.hasWritable() && !desc.writable())
         return result.fail(JSMSG_CANT_REDEFINE_PROP);
 
-    // Step xi.
+    // Step x.
     if (desc.hasValue()) {
-        double d;
-        if (!ToNumber(cx, desc.value(), &d))
+        // The following step numbers refer to 9.4.5.9
+        // IntegerIndexedElementSet.
+
+        // Steps 1-2 are enforced by the caller.
+
+        // Step 3.
+        double numValue;
+        if (!ToNumber(cx, desc.value(), &numValue))
             return false;
 
-        if (obj->is<TypedArrayObject>())
-            TypedArrayObject::setElement(obj->as<TypedArrayObject>(), index, d);
+        // Steps 4-5, 8-9.
+        if (AnyTypedArrayIsDetached(obj))
+            return result.fail(JSMSG_TYPED_ARRAY_DETACHED);
+
+        // Steps 10-16.
+        TypedArrayObject::setElement(obj->as<TypedArrayObject>(), index, numValue);
     }
 
     // Step xii.

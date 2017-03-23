@@ -156,12 +156,13 @@ inline
 AtomHasher::Lookup::Lookup(const JSAtom* atom)
   : isLatin1(atom->hasLatin1Chars()), length(atom->length()), atom(atom)
 {
+    hash = atom->hash();
     if (isLatin1) {
         latin1Chars = atom->latin1Chars(nogc);
-        hash = mozilla::HashString(latin1Chars, length);
+        MOZ_ASSERT(mozilla::HashString(latin1Chars, length) == hash);
     } else {
         twoByteChars = atom->twoByteChars(nogc);
-        hash = mozilla::HashString(twoByteChars, length);
+        MOZ_ASSERT(mozilla::HashString(twoByteChars, length) == hash);
     }
 }
 
@@ -171,7 +172,7 @@ AtomHasher::match(const AtomStateEntry& entry, const Lookup& lookup)
     JSAtom* key = entry.asPtr();
     if (lookup.atom)
         return lookup.atom == key;
-    if (key->length() != lookup.length)
+    if (key->length() != lookup.length || key->hash() != lookup.hash)
         return false;
 
     if (key->hasLatin1Chars()) {

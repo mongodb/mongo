@@ -311,6 +311,7 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
         return false;
 
     atomsCompartment->setIsSystem(true);
+    atomsCompartment->setIsAtomsCompartment();
 
     atomsZone.forget();
     this->atomsCompartment_ = atomsCompartment.forget();
@@ -743,6 +744,32 @@ JSRuntime::triggerActivityCallback(bool active)
     AutoSuppressGC suppress(this);
 
     activityCallback(activityCallbackArg, active);
+}
+
+mozilla::non_crypto::XorShift128PlusRNG&
+JSRuntime::randomKeyGenerator()
+{
+    MOZ_ASSERT(CurrentThreadCanAccessRuntime(this));
+    if (randomKeyGenerator_.isNothing()) {
+        mozilla::Array<uint64_t, 2> seed;
+        GenerateXorShift128PlusSeed(seed);
+        randomKeyGenerator_.emplace(seed[0], seed[1]);
+    }
+    return randomKeyGenerator_.ref();
+}
+
+mozilla::HashCodeScrambler
+JSRuntime::randomHashCodeScrambler()
+{
+    auto& rng = randomKeyGenerator();
+    return mozilla::HashCodeScrambler(rng.next(), rng.next());
+}
+
+mozilla::non_crypto::XorShift128PlusRNG
+JSRuntime::forkRandomKeyGenerator()
+{
+    auto& rng = randomKeyGenerator();
+    return mozilla::non_crypto::XorShift128PlusRNG(rng.next(), rng.next());
 }
 
 void
