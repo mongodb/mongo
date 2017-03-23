@@ -69,7 +69,17 @@ NativeIterator::mark(JSTracer* trc)
         TraceManuallyBarrieredEdge(trc, &iterObj_, "iterObj");
 }
 
-typedef HashSet<jsid, JsidHasher> IdSet;
+struct IdHashPolicy {
+    typedef jsid Lookup;
+    static HashNumber hash(jsid id) {
+        return JSID_BITS(id);
+    }
+    static bool match(jsid id1, jsid id2) {
+        return id1 == id2;
+    }
+};
+
+typedef HashSet<jsid, IdHashPolicy> IdSet;
 
 static inline bool
 NewKeyValuePair(JSContext* cx, jsid id, const Value& val, MutableHandleValue rval)

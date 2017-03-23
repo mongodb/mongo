@@ -16,11 +16,10 @@
 
 #include "gc/Barrier.h"
 #include "gc/Marking.h"
+
 #include "js/GCHashTable.h"
 #include "js/RootingAPI.h"
 #include "js/TypeDecls.h"
-#include "js/Utility.h"
-#include "vm/String.h"
 
 namespace JS {
 
@@ -28,31 +27,25 @@ class Symbol : public js::gc::TenuredCell
 {
   private:
     SymbolCode code_;
-
-    // Each Symbol gets its own hash code so that we don't have to use
-    // addresses as hash codes (a security hazard).
-    js::HashNumber hash_;
-
     JSAtom* description_;
 
     // The minimum allocation size is sizeof(JSString): 16 bytes on 32-bit
-    // architectures and 24 bytes on 64-bit.  A size_t of padding makes Symbol
+    // architectures and 24 bytes on 64-bit.  8 bytes of padding makes Symbol
     // the minimum size on both.
-    size_t unused_;
+    uint64_t unused2_;
 
-    Symbol(SymbolCode code, js::HashNumber hash, JSAtom* desc)
-        : code_(code), hash_(hash), description_(desc)
+    Symbol(SymbolCode code, JSAtom* desc)
+        : code_(code), description_(desc)
     {
-        // Silence warnings about unused_ being... unused.
-        (void)unused_;
+        // Silence warnings about unused2 being... unused.
+        (void)unused2_;
     }
 
     Symbol(const Symbol&) = delete;
     void operator=(const Symbol&) = delete;
 
     static Symbol*
-    newInternal(js::ExclusiveContext* cx, SymbolCode code, js::HashNumber hash,
-                JSAtom* description);
+    newInternal(js::ExclusiveContext* cx, SymbolCode code, JSAtom* description);
 
   public:
     static Symbol* new_(js::ExclusiveContext* cx, SymbolCode code, JSString* description);
@@ -60,7 +53,6 @@ class Symbol : public js::gc::TenuredCell
 
     JSAtom* description() const { return description_; }
     SymbolCode code() const { return code_; }
-    js::HashNumber hash() const { return hash_; }
 
     bool isWellKnownSymbol() const { return uint32_t(code_) < WellKnownSymbolLimit; }
 
@@ -96,7 +88,7 @@ struct HashSymbolsByDescription
     typedef JSAtom* Lookup;
 
     static HashNumber hash(Lookup l) {
-        return HashNumber(l->hash());
+        return HashNumber(reinterpret_cast<uintptr_t>(l));
     }
     static bool match(Key sym, Lookup l) {
         return sym->description() == l;

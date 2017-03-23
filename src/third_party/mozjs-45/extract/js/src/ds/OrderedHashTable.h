@@ -29,15 +29,12 @@
  *
  * See the comment about "Hash policy" in HashTable.h for general features that
  * hash policy classes must provide. Hash policies for OrderedHashMaps and Sets
- * differ in that the hash() method takes an extra argument:
- *     static js::HashNumber hash(Lookup, const HashCodeScrambler&);
- * They must additionally provide a distinguished "empty" key value and the
+ * must additionally provide a distinguished "empty" key value and the
  * following static member functions:
  *     bool isEmpty(const Key&);
  *     void makeEmpty(Key*);
  */
 
-#include "mozilla/HashFunctions.h"
 #include "mozilla/Move.h"
 
 using mozilla::Forward;
@@ -81,11 +78,10 @@ class OrderedHashTable
     uint32_t hashShift;         // multiplicative hash shift
     Range* ranges;              // list of all live Ranges on this table
     AllocPolicy alloc;
-    mozilla::HashCodeScrambler hcs;  // don't reveal pointer hash codes
 
   public:
-    OrderedHashTable(AllocPolicy& ap, mozilla::HashCodeScrambler hcs)
-        : hashTable(nullptr), data(nullptr), dataLength(0), ranges(nullptr), alloc(ap), hcs(hcs) {}
+    explicit OrderedHashTable(AllocPolicy& ap)
+        : hashTable(nullptr), data(nullptr), dataLength(0), ranges(nullptr), alloc(ap) {}
 
     bool init() {
         MOZ_ASSERT(!hashTable, "init must be called at most once");
@@ -434,8 +430,8 @@ class OrderedHashTable
         void rekeyFront(const Key& k) {
             MOZ_ASSERT(valid());
             Data& entry = ht.data[i];
-            HashNumber oldHash = ht.prepareHash(Ops::getKey(entry.element)) >> ht.hashShift;
-            HashNumber newHash = ht.prepareHash(k) >> ht.hashShift;
+            HashNumber oldHash = prepareHash(Ops::getKey(entry.element)) >> ht.hashShift;
+            HashNumber newHash = prepareHash(k) >> ht.hashShift;
             Ops::setKey(entry.element, k);
             if (newHash != oldHash) {
                 // Remove this entry from its old hash chain. (If this crashes
@@ -531,12 +527,10 @@ class OrderedHashTable
      */
     static double minDataFill() { return 0.25; }
 
-  public:
-    HashNumber prepareHash(const Lookup& l) const {
-        return ScrambleHashCode(Ops::hash(l, hcs));
+    static HashNumber prepareHash(const Lookup& l) {
+        return ScrambleHashCode(Ops::hash(l));
     }
 
-  private:
     /* The size of hashTable, in elements. Always a power of two. */
     uint32_t hashBuckets() const {
         return 1 << (HashNumberSizeBits - hashShift);
@@ -707,7 +701,7 @@ class OrderedHashMap
   public:
     typedef typename Impl::Range Range;
 
-    OrderedHashMap(AllocPolicy ap, mozilla::HashCodeScrambler hcs) : impl(ap, hcs) {}
+    explicit OrderedHashMap(AllocPolicy ap = AllocPolicy()) : impl(ap) {}
     bool init()                                     { return impl.init(); }
     uint32_t count() const                          { return impl.count(); }
     bool has(const Key& key) const                  { return impl.has(key); }
@@ -718,8 +712,6 @@ class OrderedHashMap
     bool put(const Key& key, V&& value)             { return impl.put(Entry(key, Forward<V>(value))); }
     bool remove(const Key& key, bool* foundp)       { return impl.remove(key, foundp); }
     bool clear()                                    { return impl.clear(); }
-
-    HashNumber hash(const Key& key) const { return impl.prepareHash(key); }
 
     void rekeyOneEntry(const Key& current, const Key& newKey) {
         const Entry* e = get(current);
@@ -746,7 +738,7 @@ class OrderedHashSet
   public:
     typedef typename Impl::Range Range;
 
-    explicit OrderedHashSet(AllocPolicy ap, mozilla::HashCodeScrambler hcs) : impl(ap, hcs) {}
+    explicit OrderedHashSet(AllocPolicy ap = AllocPolicy()) : impl(ap) {}
     bool init()                                     { return impl.init(); }
     uint32_t count() const                          { return impl.count(); }
     bool has(const T& value) const                  { return impl.has(value); }
@@ -754,8 +746,6 @@ class OrderedHashSet
     bool put(const T& value)                        { return impl.put(value); }
     bool remove(const T& value, bool* foundp)       { return impl.remove(value, foundp); }
     bool clear()                                    { return impl.clear(); }
-
-    HashNumber hash(const T& value) const { return impl.prepareHash(value); }
 
     void rekeyOneEntry(const T& current, const T& newKey) {
         return impl.rekeyOneEntry(current, newKey, newKey);

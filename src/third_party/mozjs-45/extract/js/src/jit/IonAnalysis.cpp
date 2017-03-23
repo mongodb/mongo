@@ -3673,9 +3673,6 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, JSFunction* fun,
     TempAllocator temp(&alloc);
     JitContext jctx(cx, &temp);
 
-    if (!jit::CanLikelyAllocateMoreExecutableMemory())
-        return true;
-
     if (!cx->compartment()->ensureJitCompartmentExists(cx))
         return false;
 
@@ -3904,9 +3901,6 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
     LifoAlloc alloc(TempAllocator::PreferredLifoChunkSize);
     TempAllocator temp(&alloc);
     JitContext jctx(cx, &temp);
-
-    if (!jit::CanLikelyAllocateMoreExecutableMemory())
-        return true;
 
     if (!cx->compartment()->ensureJitCompartmentExists(cx))
         return false;

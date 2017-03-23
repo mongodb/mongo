@@ -756,7 +756,7 @@ JitcodeGlobalTable::setAllEntriesAsExpired(JSRuntime* rt)
 struct Unconditionally
 {
     template <typename T>
-    static bool ShouldMark(JSRuntime* rt, T* thingp) { return true; }
+    static bool ShouldMark(T* thingp) { return true; }
 };
 
 void
@@ -775,13 +775,13 @@ JitcodeGlobalTable::markUnconditionally(JSTracer* trc)
 struct IfUnmarked
 {
     template <typename T>
-    static bool ShouldMark(JSRuntime* rt, T* thingp) { return !IsMarkedUnbarriered(rt, thingp); }
+    static bool ShouldMark(T* thingp) { return !IsMarkedUnbarriered(thingp); }
 };
 
 template <>
-bool IfUnmarked::ShouldMark<TypeSet::Type>(JSRuntime* rt, TypeSet::Type* type)
+bool IfUnmarked::ShouldMark<TypeSet::Type>(TypeSet::Type* type)
 {
-    return !TypeSet::IsTypeMarked(rt, type);
+    return !TypeSet::IsTypeMarked(type);
 }
 
 bool
@@ -832,7 +832,7 @@ JitcodeGlobalTable::markIteratively(JSTracer* trc)
         // mapping, alive as well.
         if (!entry->isSampled(gen, lapCount)) {
             entry->setAsExpired();
-            if (!entry->baseEntry().isJitcodeMarkedFromAnyThread(trc->runtime()))
+            if (!entry->baseEntry().isJitcodeMarkedFromAnyThread())
                 continue;
         }
 
@@ -868,7 +868,7 @@ template <class ShouldMarkProvider>
 bool
 JitcodeGlobalEntry::BaseEntry::markJitcode(JSTracer* trc)
 {
-    if (ShouldMarkProvider::ShouldMark(trc->runtime(), &jitcode_)) {
+    if (ShouldMarkProvider::ShouldMark(&jitcode_)) {
         TraceManuallyBarrieredEdge(trc, &jitcode_, "jitcodglobaltable-baseentry-jitcode");
         return true;
     }
@@ -876,9 +876,9 @@ JitcodeGlobalEntry::BaseEntry::markJitcode(JSTracer* trc)
 }
 
 bool
-JitcodeGlobalEntry::BaseEntry::isJitcodeMarkedFromAnyThread(JSRuntime* rt)
+JitcodeGlobalEntry::BaseEntry::isJitcodeMarkedFromAnyThread()
 {
-    return IsMarkedUnbarriered(rt, &jitcode_) ||
+    return IsMarkedUnbarriered(&jitcode_) ||
            jitcode_->arenaHeader()->allocatedDuringIncremental;
 }
 
@@ -892,7 +892,7 @@ template <class ShouldMarkProvider>
 bool
 JitcodeGlobalEntry::BaselineEntry::mark(JSTracer* trc)
 {
-    if (ShouldMarkProvider::ShouldMark(trc->runtime(), &script_)) {
+    if (ShouldMarkProvider::ShouldMark(&script_)) {
         TraceManuallyBarrieredEdge(trc, &script_, "jitcodeglobaltable-baselineentry-script");
         return true;
     }
@@ -906,9 +906,9 @@ JitcodeGlobalEntry::BaselineEntry::sweepChildren()
 }
 
 bool
-JitcodeGlobalEntry::BaselineEntry::isMarkedFromAnyThread(JSRuntime* rt)
+JitcodeGlobalEntry::BaselineEntry::isMarkedFromAnyThread()
 {
-    return IsMarkedUnbarriered(rt, &script_) ||
+    return IsMarkedUnbarriered(&script_) ||
            script_->arenaHeader()->allocatedDuringIncremental;
 }
 
@@ -918,9 +918,8 @@ JitcodeGlobalEntry::IonEntry::mark(JSTracer* trc)
 {
     bool markedAny = false;
 
-    JSRuntime* rt = trc->runtime();
     for (unsigned i = 0; i < numScripts(); i++) {
-        if (ShouldMarkProvider::ShouldMark(rt, &sizedScriptList()->pairs[i].script)) {
+        if (ShouldMarkProvider::ShouldMark(&sizedScriptList()->pairs[i].script)) {
             TraceManuallyBarrieredEdge(trc, &sizedScriptList()->pairs[i].script,
                                        "jitcodeglobaltable-ionentry-script");
             markedAny = true;
@@ -933,15 +932,15 @@ JitcodeGlobalEntry::IonEntry::mark(JSTracer* trc)
     for (IonTrackedTypeWithAddendum* iter = optsAllTypes_->begin();
          iter != optsAllTypes_->end(); iter++)
     {
-        if (ShouldMarkProvider::ShouldMark(rt, &iter->type)) {
+        if (ShouldMarkProvider::ShouldMark(&iter->type)) {
             TypeSet::MarkTypeUnbarriered(trc, &iter->type, "jitcodeglobaltable-ionentry-type");
             markedAny = true;
         }
-        if (iter->hasAllocationSite() && ShouldMarkProvider::ShouldMark(rt, &iter->script)) {
+        if (iter->hasAllocationSite() && ShouldMarkProvider::ShouldMark(&iter->script)) {
             TraceManuallyBarrieredEdge(trc, &iter->script,
                                        "jitcodeglobaltable-ionentry-type-addendum-script");
             markedAny = true;
-        } else if (iter->hasConstructor() && ShouldMarkProvider::ShouldMark(rt, &iter->constructor)) {
+        } else if (iter->hasConstructor() && ShouldMarkProvider::ShouldMark(&iter->constructor)) {
             TraceManuallyBarrieredEdge(trc, &iter->constructor,
                                        "jitcodeglobaltable-ionentry-type-addendum-constructor");
             markedAny = true;
@@ -974,10 +973,10 @@ JitcodeGlobalEntry::IonEntry::sweepChildren()
 }
 
 bool
-JitcodeGlobalEntry::IonEntry::isMarkedFromAnyThread(JSRuntime* rt)
+JitcodeGlobalEntry::IonEntry::isMarkedFromAnyThread()
 {
     for (unsigned i = 0; i < numScripts(); i++) {
-        if (!IsMarkedUnbarriered(rt, &sizedScriptList()->pairs[i].script) &&
+        if (!IsMarkedUnbarriered(&sizedScriptList()->pairs[i].script) &&
             !sizedScriptList()->pairs[i].script->arenaHeader()->allocatedDuringIncremental)
         {
             return false;
@@ -990,7 +989,7 @@ JitcodeGlobalEntry::IonEntry::isMarkedFromAnyThread(JSRuntime* rt)
     for (IonTrackedTypeWithAddendum* iter = optsAllTypes_->begin();
          iter != optsAllTypes_->end(); iter++)
     {
-        if (!TypeSet::IsTypeMarked(rt, &iter->type) &&
+        if (!TypeSet::IsTypeMarked(&iter->type) &&
             !TypeSet::IsTypeAllocatedDuringIncremental(iter->type))
         {
             return false;

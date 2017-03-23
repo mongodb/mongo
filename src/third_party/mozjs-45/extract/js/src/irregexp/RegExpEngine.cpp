@@ -32,7 +32,6 @@
 
 #include "irregexp/NativeRegExpMacroAssembler.h"
 #include "irregexp/RegExpMacroAssembler.h"
-#include "jit/ExecutableAllocator.h"
 #include "jit/JitCommon.h"
 
 using namespace js;
@@ -1731,11 +1730,7 @@ irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData*
     Maybe<InterpretedRegExpMacroAssembler> interpreted_assembler;
 
     RegExpMacroAssembler* assembler;
-    if (IsNativeRegExpEnabled(cx) &&
-        !force_bytecode &&
-        jit::CanLikelyAllocateMoreExecutableMemory() &&
-        shared->getSource()->length() < 32 * 1024)
-    {
+    if (IsNativeRegExpEnabled(cx) && !force_bytecode) {
         NativeRegExpMacroAssembler::Mode mode =
             is_ascii ? NativeRegExpMacroAssembler::ASCII
                      : NativeRegExpMacroAssembler::CHAR16;

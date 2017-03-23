@@ -29,9 +29,7 @@ class HashableValue : public JS::Traceable
   public:
     struct Hasher {
         typedef HashableValue Lookup;
-        static HashNumber hash(const Lookup& v, const mozilla::HashCodeScrambler& hcs) {
-            return v.hash(hcs);
-        }
+        static HashNumber hash(const Lookup& v) { return v.hash(); }
         static bool match(const HashableValue& k, const Lookup& l) { return k == l; }
         static bool isEmpty(const HashableValue& v) { return v.value.isMagic(JS_HASH_KEY_EMPTY); }
         static void makeEmpty(HashableValue* vp) { vp->value = MagicValue(JS_HASH_KEY_EMPTY); }
@@ -40,7 +38,7 @@ class HashableValue : public JS::Traceable
     HashableValue() : value(UndefinedValue()) {}
 
     bool setValue(JSContext* cx, HandleValue v);
-    HashNumber hash(const mozilla::HashCodeScrambler& hcs) const;
+    HashNumber hash() const;
     bool operator==(const HashableValue& other) const;
     HashableValue mark(JSTracer* trc) const;
     Value get() const { return value.get(); }

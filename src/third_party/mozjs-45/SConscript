@@ -91,7 +91,6 @@ env.Prepend(CPPPATH=[
 sources = [
     "extract/js/src/builtin/RegExp.cpp",
     "extract/js/src/frontend/Parser.cpp",
-    "extract/js/src/jit/ProcessExecutableMemory.cpp",
     "extract/js/src/jsarray.cpp",
     "extract/js/src/jsatom.cpp",
     "extract/js/src/jsmath.cpp",
@@ -112,6 +111,13 @@ if env['TARGET_ARCH'] == 'x86_64' and not env.TargetOSIs('solaris'):
 if env.TargetOSIs('windows'):
     env.Prepend(CPPDEFINES=[
         ("_CRT_RAND_S", "1")
+    ])
+    sources.extend([
+        "extract/js/src/jit/ExecutableAllocatorWin.cpp",
+    ])
+else:
+    sources.extend([
+        "extract/js/src/jit/ExecutableAllocatorPosix.cpp",
     ])
 
 sources.extend(Glob('platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/build/*.cpp")),

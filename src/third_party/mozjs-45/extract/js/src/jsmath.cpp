@@ -747,8 +747,8 @@ js::math_pow(JSContext* cx, unsigned argc, Value* vp)
     return math_pow_handle(cx, args.get(0), args.get(1), args.rval());
 }
 
-uint64_t
-js::GenerateRandomSeed()
+static uint64_t
+GenerateSeed()
 {
     uint64_t seed = 0;
 
@@ -763,7 +763,7 @@ js::GenerateRandomSeed()
         close(fd);
     }
 #else
-# error "Platform needs to implement GenerateRandomSeed()"
+# error "Platform needs to implement GenerateSeed()"
 #endif
 
     // Also mix in PRMJ_Now() in case we couldn't read random bits from the OS.
@@ -775,8 +775,8 @@ js::GenerateXorShift128PlusSeed(mozilla::Array<uint64_t, 2>& seed)
 {
     // XorShift128PlusRNG must be initialized with a non-zero seed.
     do {
-        seed[0] = GenerateRandomSeed();
-        seed[1] = GenerateRandomSeed();
+        seed[0] = GenerateSeed();
+        seed[1] = GenerateSeed();
     } while (seed[0] == 0 && seed[1] == 0);
 }
 

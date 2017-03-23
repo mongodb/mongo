@@ -106,8 +106,6 @@ enum class AllocKind {
     FAT_INLINE_STRING,
     STRING,
     EXTERNAL_STRING,
-    FAT_INLINE_ATOM,
-    ATOM,
     SYMBOL,
     JITCODE,
     LIMIT,
@@ -199,8 +197,6 @@ MapAllocToTraceKind(AllocKind kind)
         JS::TraceKind::String,       /* AllocKind::FAT_INLINE_STRING */
         JS::TraceKind::String,       /* AllocKind::STRING */
         JS::TraceKind::String,       /* AllocKind::EXTERNAL_STRING */
-        JS::TraceKind::String,       /* AllocKind::FAT_INLINE_ATOM */
-        JS::TraceKind::String,       /* AllocKind::ATOM */
         JS::TraceKind::Symbol,       /* AllocKind::SYMBOL */
         JS::TraceKind::JitCode,      /* AllocKind::JITCODE */
     };

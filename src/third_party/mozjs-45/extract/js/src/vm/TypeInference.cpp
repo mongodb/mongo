@@ -749,16 +749,16 @@ TypeSet::readBarrier(const TypeSet* types)
 }
 
 /* static */ bool
-TypeSet::IsTypeMarked(JSRuntime* rt, TypeSet::Type* v)
+TypeSet::IsTypeMarked(TypeSet::Type* v)
 {
     bool rv;
     if (v->isSingletonUnchecked()) {
         JSObject* obj = v->singletonNoBarrier();
-        rv = IsMarkedUnbarriered(rt, &obj);
+        rv = IsMarkedUnbarriered(&obj);
         *v = TypeSet::ObjectType(obj);
     } else if (v->isGroupUnchecked()) {
         ObjectGroup* group = v->groupNoBarrier();
-        rv = IsMarkedUnbarriered(rt, &group);
+        rv = IsMarkedUnbarriered(&group);
         *v = TypeSet::ObjectType(group);
     } else {
         rv = true;
@@ -4192,10 +4192,6 @@ ObjectGroup::sweep(AutoClearTypeInferenceStateOnOOM* oom)
 
         if (unboxedLayout().newScript())
             unboxedLayout().newScript()->sweep();
-
-        // Discard constructor code to avoid holding onto ExecutablePools.
-        if (zone()->isGCCompacting())
-            unboxedLayout().setConstructorCode(nullptr);
     }
 
     if (maybePreliminaryObjects())

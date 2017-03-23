@@ -142,9 +142,7 @@ namespace gc {
 
 struct WeakKeyTableHashPolicy {
     typedef JS::GCCellPtr Lookup;
-    static HashNumber hash(const Lookup& v, const mozilla::HashCodeScrambler&) {
-        return mozilla::HashGeneric(v.asCell());
-    }
+    static HashNumber hash(const Lookup& v) { return mozilla::HashGeneric(v.asCell()); }
     static bool match(const JS::GCCellPtr& k, const Lookup& l) { return k == l; }
     static bool isEmpty(const JS::GCCellPtr& v) { return !v; }
     static void makeEmpty(JS::GCCellPtr* vp) { *vp = nullptr; }
@@ -370,19 +368,13 @@ PushArena(GCMarker* gcmarker, ArenaHeader* aheader);
 
 /*** Liveness ***/
 
-// Report whether a thing has been marked.  Things which are in zones that are
-// not currently being collected or are owned by another runtime are always
-// reported as being marked.
 template <typename T>
 bool
-IsMarkedUnbarriered(JSRuntime* rt, T* thingp);
+IsMarkedUnbarriered(T* thingp);
 
-// Report whether a thing has been marked.  Things which are in zones that are
-// not currently being collected or are owned by another runtime are always
-// reported as being marked.
 template <typename T>
 bool
-IsMarked(JSRuntime* rt, WriteBarrieredBase<T>* thingp);
+IsMarked(WriteBarrieredBase<T>* thingp);
 
 template <typename T>
 bool

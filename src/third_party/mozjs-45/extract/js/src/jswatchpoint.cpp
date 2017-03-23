@@ -11,7 +11,6 @@
 #include "jsfriendapi.h"
 
 #include "gc/Marking.h"
-#include "vm/Shape.h"
 
 #include "jsgcinlines.h"
 
@@ -154,7 +153,7 @@ WatchpointMap::markIteratively(JSTracer* trc)
         JSObject* priorKeyObj = entry.key().object;
         jsid priorKeyId(entry.key().id.get());
         bool objectIsLive =
-            IsMarked(trc->runtime(), const_cast<PreBarrieredObject*>(&entry.key().object));
+            IsMarked(const_cast<PreBarrieredObject*>(&entry.key().object));
         if (objectIsLive || entry.value().held) {
             if (!objectIsLive) {
                 TraceEdge(trc, const_cast<PreBarrieredObject*>(&entry.key().object),
@@ -167,7 +166,7 @@ WatchpointMap::markIteratively(JSTracer* trc)
                        JSID_IS_SYMBOL(priorKeyId));
             TraceEdge(trc, const_cast<PreBarrieredId*>(&entry.key().id), "WatchKey::id");
 
-            if (entry.value().closure && !IsMarked(trc->runtime(), &entry.value().closure)) {
+            if (entry.value().closure && !IsMarked(&entry.value().closure)) {
                 TraceEdge(trc, &entry.value().closure, "Watchpoint::closure");
                 marked = true;
             }
