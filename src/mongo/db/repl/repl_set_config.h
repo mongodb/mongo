@@ -59,6 +59,7 @@ public:
 
     static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
+    static const Milliseconds kInfiniteCatchUpTimeout;
 
     static const Milliseconds kDefaultElectionTimeoutPeriod;
     static const Milliseconds kDefaultHeartbeatInterval;

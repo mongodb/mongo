@@ -284,6 +284,8 @@ public:
         return _service;
     }
 
+    virtual Status abortCatchupIfNeeded() override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     ServiceContext* const _service;

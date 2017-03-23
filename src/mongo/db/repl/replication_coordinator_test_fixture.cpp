@@ -323,6 +323,10 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
             ReplSetHeartbeatResponse hbResp;
             hbResp.setSetName(rsConfig.getReplSetName());
             hbResp.setState(MemberState::RS_SECONDARY);
+            // The smallest valid optime in PV1.
+            OpTime opTime(Timestamp(), 0);
+            hbResp.setAppliedOpTime(opTime);
+            hbResp.setDurableOpTime(opTime);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
         } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
@@ -488,32 +492,30 @@ void ReplCoordTest::disableSnapshots() {
     _externalState->setAreSnapshotsEnabled(false);
 }
 
-void ReplCoordTest::simulateCatchUpTimeout() {
+void ReplCoordTest::simulateCatchUpAbort() {
     NetworkInterfaceMock* net = getNet();
-    auto catchUpTimeoutWhen = net->now() + getReplCoord()->getConfig().getCatchUpTimeoutPeriod();
+    auto heartbeatTimeoutWhen =
+        net->now() + getReplCoord()->getConfig().getHeartbeatTimeoutPeriodMillis();
     bool hasRequest = false;
     net->enterNetwork();
-    if (net->now() < catchUpTimeoutWhen) {
-        net->runUntil(catchUpTimeoutWhen);
+    if (net->now() < heartbeatTimeoutWhen) {
+        net->runUntil(heartbeatTimeoutWhen);
     }
     hasRequest = net->hasReadyRequests();
-    net->exitNetwork();
-
     while (hasRequest) {
-        net->enterNetwork();
         auto noi = net->getNextReadyRequest();
         auto request = noi->getRequest();
         // Black hole heartbeat requests caused by time advance.
         log() << "Black holing request to " << request.target.toString() << " : " << request.cmdObj;
         net->blackHole(noi);
-        if (net->now() < catchUpTimeoutWhen) {
-            net->runUntil(catchUpTimeoutWhen);
+        if (net->now() < heartbeatTimeoutWhen) {
+            net->runUntil(heartbeatTimeoutWhen);
         } else {
             net->runReadyNetworkOperations();
         }
         hasRequest = net->hasReadyRequests();
-        net->exitNetwork();
     }
+    net->exitNetwork();
 }
 
 }  // namespace repl
