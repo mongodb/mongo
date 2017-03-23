@@ -220,6 +220,13 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
                     repl::ReplicationCoordinator::get(opCtx->getServiceContext())
                         ->canAcceptWritesFor(opCtx, nss));
 
+            // If the "admin.system.version" collection has not been created yet, explicitly create
+            // it to hold the v=2 index.
+            if (!autoDB.getDb()->getCollection(nss)) {
+                uassertStatusOK(
+                    repl::StorageInterface::get(opCtx)->createCollection(opCtx, nss, {}));
+            }
+
             IndexBuilder builder(k32IncompatibleIndexSpec, false);
             auto status = builder.buildInForeground(opCtx, autoDB.getDb());
             uassertStatusOK(status);
@@ -303,6 +310,12 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
         {
             AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
+
+            // We reached this point because the only database that exists on the server is "local"
+            // and we have just created an empty "admin" database.
+            // Therefore, it is safe to create the "admin.system.version" collection.
+            invariant(autoDB.justCreated());
+            uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
 
             IndexBuilder builder(k32IncompatibleIndexSpec, false);
             auto status = builder.buildInForeground(opCtx, autoDB.getDb());
