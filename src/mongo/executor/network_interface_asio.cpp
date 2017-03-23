@@ -392,5 +392,9 @@ bool NetworkInterfaceASIO::onNetworkThread() {
                        [id](const stdx::thread& thread) { return id == thread.get_id(); });
 }
 
+void NetworkInterfaceASIO::dropConnections(const HostAndPort& hostAndPort) {
+    _connectionPool.dropConnections(hostAndPort);
+}
+
 }  // namespace executor
 }  // namespace mongo

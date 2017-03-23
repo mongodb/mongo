@@ -104,6 +104,8 @@ public:
 
     virtual bool onNetworkThread();
 
+    void dropConnections(const HostAndPort&) override {}
+
 
     ////////////////////////////////////////////////////////////////////////////////
     //

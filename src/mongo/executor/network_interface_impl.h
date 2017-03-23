@@ -96,6 +96,7 @@ public:
     void cancelAllCommands() override {}
     void setAlarm(Date_t when, const stdx::function<void()>& action) override;
     bool onNetworkThread() override;
+    void dropConnections(const HostAndPort& hostAndPort) override {}
 
 private:
     /**

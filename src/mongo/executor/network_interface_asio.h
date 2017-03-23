@@ -121,6 +121,8 @@ public:
 
     bool inShutdown() const;
 
+    void dropConnections(const HostAndPort& hostAndPort) override;
+
 private:
     using ResponseStatus = TaskExecutor::ResponseStatus;
     using NetworkInterface::RemoteCommandCompletionFn;
