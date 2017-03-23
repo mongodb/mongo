@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Tests distinct with geospatial field values.
 // 1. Test distinct with geo values for 'key' (SERVER-2135)
 // 2. Test distinct with geo predicates for 'query' (SERVER-13769)

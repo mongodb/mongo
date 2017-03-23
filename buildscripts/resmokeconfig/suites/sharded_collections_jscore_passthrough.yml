@@ -66,10 +66,18 @@ selector:
     - jstests/core/ns_length.js
     - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
     - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+    # TODO: Remove after fixing SERVER-28321.
+    - jstests/core/mr_undef.js
     # TODO: SERVER-16605
     - jstests/core/mr1.js
     - jstests/core/mr3.js
     - jstests/core/mr4.js
+    exclude_with_any_tags:
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
 
 executor:
   js_test:

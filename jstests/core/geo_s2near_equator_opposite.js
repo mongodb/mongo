@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Tests geo near with 2 points diametrically opposite to each other
 // on the equator
 // First reported in SERVER-11830 as a regression in 2.5

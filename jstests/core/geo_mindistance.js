@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 /* Test $minDistance option for $near and $nearSphere queries, and geoNear
  * command. SERVER-9395.
 */

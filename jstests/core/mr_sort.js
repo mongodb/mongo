@@ -1,3 +1,6 @@
+// Cannot implicitly shard accessed collections because the "limit" option to the "mapReduce"
+// command cannot be used on a sharded collection.
+// @tags: [assumes_unsharded_collection]
 
 t = db.mr_sort;
 t.drop();

@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // Test that:
 // 1. Text indexes properly validate the index spec used to create them.
 // 2. Text indexes properly enforce a schema on the language_override field.

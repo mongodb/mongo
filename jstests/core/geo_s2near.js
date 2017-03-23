@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Test 2dsphere near search, called via find and geoNear.
 t = db.geo_s2near;
 t.drop();

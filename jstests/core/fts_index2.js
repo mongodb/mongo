@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because renameCollection command not supported
+// on sharded collections.
+// @tags: [assumes_unsharded_collection]
+
 // Test that collections with text indexes can be renamed.  SERVER-14027.
 
 var coll1 = db.fts_index2;

@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 // Test modifier operations on numerically equivalent string field names.  SERVER-4776
 
 t = db.jstests_updatek;

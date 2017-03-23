@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because unsupported use of sharded collection
+// for output collection of aggregation pipeline.
+// @tags: [assumes_unsharded_collection]
+
 // server-3253 Unsharded support for $out
 load('jstests/aggregation/extras/utils.js');
 

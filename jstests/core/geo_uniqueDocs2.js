@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Additional checks for geo uniqueDocs and includeLocs SERVER-3139.
 // SERVER-12120 uniqueDocs is deprecated.
 // Server always returns results with implied uniqueDocs=true

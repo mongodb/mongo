@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Test that we correct return results for compound 2d and 2dsphere indices in
 // both the multikey and non-multikey cases.
 
