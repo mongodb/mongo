@@ -1,6 +1,3 @@
-// Cannot implicitly shard accessed collections because of unsupported group operator on sharded
-// collection.
-// @tags: [assumes_unsharded_collection]
 
 t = db.eval2;
 t.drop();

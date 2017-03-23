@@ -1,12 +1,9 @@
 // test short-circuiting of $and and $or in
 // $project stages to a $const boolean
 //
-// Cannot implicitly shard accessed collections because the explain output from a mongod when run
-// against a sharded collection is wrapped in a "shards" object with keys for each shard.
-//
 // This test makes assumptions about how the explain output will be formatted, so cannot be
 // transformed to be put inside a $facet stage.
-// @tags: [do_not_wrap_aggregations_in_facets,assumes_unsharded_collection]
+// @tags: [do_not_wrap_aggregations_in_facets]
 
 var t = db.jstests_aggregation_server6192;
 t.drop();

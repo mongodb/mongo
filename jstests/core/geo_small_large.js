@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
-// command.
-// @tags: [assumes_unsharded_collection]
-
 // SERVER-2386, general geo-indexing using very large and very small bounds
 
 load("jstests/libs/geo_near_random.js");

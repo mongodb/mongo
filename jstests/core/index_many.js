@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because renameCollection command not supported
-// on sharded collections.
-// @tags: [assumes_unsharded_collection]
-
 /* test using lots of indexes on one collection */
 
 t = db.many;

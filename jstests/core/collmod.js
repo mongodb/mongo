@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
-
 // Basic js tests for the collMod command.
 // Test setting the usePowerOf2Sizes flag, and modifying TTL indexes.
 

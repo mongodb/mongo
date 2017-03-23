@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
-
 // Basic functional tests for the listCollections command.
 //
 // Note that storage engines are allowed to advertise internal collections to the user (in

@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
-// command.
-// @tags: [assumes_unsharded_collection]
-
 // Test that updates with geo queries which match
 // the same document multiple times only apply
 // the update once

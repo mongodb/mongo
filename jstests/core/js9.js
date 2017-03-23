@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because unsupported use of sharded collection
-// from db.eval.
-// @tags: [assumes_unsharded_collection]
-
 c = db.jstests_js9;
 c.drop();
 

@@ -1,7 +1,3 @@
-// Cannot implicitly shard accessed collections because of unsupported group operator on sharded
-// collection.
-// @tags: [assumes_unsharded_collection]
-
 (function() {
     'use strict';
     var t = db.group_owned;
