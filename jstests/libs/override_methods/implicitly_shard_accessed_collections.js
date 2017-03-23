@@ -5,9 +5,8 @@
  * The DB.prototype.getCollection() function is called whenever an undefined property is accessed
  * on the db object.
  *
- * The DBCollection.prototype.drop() function will re-shard any non-blacklisted collection that is
- * dropped in a sharded cluster. Tests can bypass this behavior by using
- * DB.prototype.runCommand({drop: ...}).
+ * DBCollection.prototype.drop() function will re-shard any non-blacklisted collection that is
+ * dropped in a sharded cluster.
  */
 
 (function() {
