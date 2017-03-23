@@ -161,6 +161,11 @@ public:
      */
     virtual bool onNetworkThread() = 0;
 
+    /**
+     * Drops all connections to the given host in the connection pool.
+     */
+    virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
+
 protected:
     NetworkInterface();
 };

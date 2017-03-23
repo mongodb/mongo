@@ -518,5 +518,9 @@ void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateA
     }
 }
 
+void ThreadPoolTaskExecutor::dropConnections(const HostAndPort& hostAndPort) {
+    _net->dropConnections(hostAndPort);
+}
+
 }  // namespace executor
 }  // namespace mongo
