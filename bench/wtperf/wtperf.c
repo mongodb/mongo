@@ -1655,6 +1655,9 @@ close_reopen(WTPERF *wtperf)
 
 	opts = wtperf->opts;
 
+	if (opts->in_memory)
+		return (0);
+
 	if (!opts->readonly && !opts->reopen_connection)
 		return (0);
 	/*
@@ -2568,7 +2571,8 @@ main(int argc, char *argv[])
 	/* Concatenate non-default configuration strings. */
 	if ((opts->verbose > 1 && strlen(debug_cconfig) != 0) ||
 	     user_cconfig != NULL || opts->session_count_idle > 0 ||
-	     wtperf->compress_ext != NULL || wtperf->async_config != NULL) {
+	     wtperf->compress_ext != NULL || wtperf->async_config != NULL ||
+	     opts->in_memory) {
 		req_len = 20;
 		req_len += wtperf->async_config != NULL ?
 		    strlen(wtperf->async_config) : 0;
@@ -2583,6 +2587,7 @@ main(int argc, char *argv[])
 			    opts->session_count_idle +
 			    wtperf->workers_cnt + opts->populate_threads + 10);
 		}
+		req_len += opts->in_memory ? strlen("in_memory=true") : 0;
 		req_len += user_cconfig != NULL ? strlen(user_cconfig) : 0;
 		req_len += debug_cconfig != NULL ? strlen(debug_cconfig) : 0;
 		cc_buf = dmalloc(req_len);
@@ -2601,6 +2606,12 @@ main(int argc, char *argv[])
 			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
 			    append_comma, wtperf->compress_ext);
+			append_comma = ",";
+		}
+		if (opts->in_memory) {
+			pos += (size_t)snprintf(
+			    cc_buf + pos, req_len - pos, "%s%s",
+			    append_comma, "in_memory=true");
 			append_comma = ",";
 		}
 		if (sess_cfg != NULL && strlen(sess_cfg) != 0) {
