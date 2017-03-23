@@ -225,8 +225,10 @@ MEMALIGN
 MERCHANTABILITY
 METADATA
 MONGODB
+MOVEFILE
 MRXB
 MRXBOPC
+MSDN
 MSVC
 MULTI
 MULTIBLOCK
@@ -240,8 +242,7 @@ Metadata
 Mewhort
 Mitzenmacher
 MongoDB
-MoveFile
-MoveFileW
+MoveFileExW
 Multi
 MultiByteToWideChar
 Multithreaded
