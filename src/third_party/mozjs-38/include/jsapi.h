@@ -275,10 +275,6 @@ class AutoHashMapRooter : protected AutoGCRooter
         return map.sizeOfIncludingThis(mallocSizeOf);
     }
 
-    uint32_t generation() const {
-        return map.generation();
-    }
-
     /************************************************** Shorthand operations */
 
     bool has(const Lookup& l) const {
@@ -388,10 +384,6 @@ class AutoHashSetRooter : protected AutoGCRooter
     }
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
         return set.sizeOfIncludingThis(mallocSizeOf);
-    }
-
-    uint32_t generation() const {
-        return set.generation();
     }
 
     /************************************************** Shorthand operations */

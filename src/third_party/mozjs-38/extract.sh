@@ -182,6 +182,7 @@ cp extract/mfbt/MemoryReporting.h include/mozilla
 cp extract/mfbt/Move.h include/mozilla
 cp extract/mfbt/NullPtr.h include/mozilla
 cp extract/mfbt/NumericLimits.h include/mozilla
+cp extract/mfbt/Opaque.h include/mozilla
 cp extract/mfbt/Pair.h include/mozilla
 cp extract/mfbt/PodOperations.h include/mozilla
 cp extract/mfbt/Poison.h include/mozilla

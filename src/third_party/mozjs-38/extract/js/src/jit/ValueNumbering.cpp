@@ -438,6 +438,7 @@ ValueNumberer::fixupOSROnlyLoop(MBasicBlock* block, MBasicBlock* backedge)
     graph_.insertBlockBefore(block, fake);
     fake->setImmediateDominator(fake);
     fake->addNumDominated(1);
+    fake->setDomIndex(fake->id());
 
     // Create zero-input phis to use as inputs for any phis in |block|.
     // Again, this is a little odd, but it's the least-odd thing we can do

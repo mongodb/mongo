@@ -1579,8 +1579,9 @@ CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group, HandleObj
         if (!res)
             return nullptr;
 
-        if (newKind != SingletonObject)
-            newScript->registerNewObject(res);
+        // Make sure group->newScript is still there.
+        if (newKind != SingletonObject && group->newScript())
+            group->newScript()->registerNewObject(res);
 
         return res;
     }

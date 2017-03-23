@@ -571,6 +571,9 @@ class AutoClearTypeInferenceStateOnOOM
     void setOOM() {
         oom = true;
     }
+    bool hadOOM() const {
+        return oom;
+    }
 };
 
 /* Superclass common to stack and heap type sets. */

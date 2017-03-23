@@ -387,8 +387,10 @@ NativeObject::getChildPropertyOnDictionary(ExclusiveContext* cx, HandleNativeObj
         if (!shape)
             return nullptr;
         if (childRoot->hasSlot() && childRoot->slot() >= obj->lastProperty()->base()->slotSpan()) {
-            if (!obj->setSlotSpan(cx, childRoot->slot() + 1))
+            if (!obj->setSlotSpan(cx, childRoot->slot() + 1)) {
+                new (shape) Shape(obj->lastProperty()->base()->unowned(), 0);
                 return nullptr;
+            }
         }
         shape->initDictionaryShape(*childRoot, obj->numFixedSlots(), &obj->shape_);
     }
