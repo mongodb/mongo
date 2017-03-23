@@ -127,22 +127,9 @@ Status IndexBuilder::_build(OperationContext* txn,
     const NamespaceString ns(_index["ns"].String());
 
     Collection* c = db->getCollection(ns.ns());
-    if (!c) {
-        while (true) {
-            try {
-                WriteUnitOfWork wunit(txn);
-                c = db->getOrCreateCollection(txn, ns.ns());
-                verify(c);
-                wunit.commit();
-                break;
-            } catch (const WriteConflictException& wce) {
-                LOG(2) << "WriteConflictException while creating collection in IndexBuilder"
-                       << ", retrying.";
-                txn->recoveryUnit()->abandonSnapshot();
-                continue;
-            }
-        }
-    }
+
+    // Collections should not be implicitly created by the index builder.
+    fassert(40409, c);
 
     {
         stdx::lock_guard<Client> lk(*txn->getClient());
