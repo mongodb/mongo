@@ -8,8 +8,11 @@
     const map = printjson;
     const reduce = printjson;
 
+    // Drops the collections if they exist so that we can create them anew. The view is dropped with
+    // runCommand rather than the shell helper to avoid implicitly re-sharding it during the
+    // sharded_collections_jscore_passthrough test suite.
     mrDB.foo.drop();
-    mrDB.view.drop();
+    mrDB.runCommand({drop: "view"});
 
     assert.writeOK(mrDB.foo.insert({x: 1}));
     assert.commandWorked(mrDB.foo.createIndex({x: 1}));
