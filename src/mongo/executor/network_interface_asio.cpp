@@ -530,5 +530,9 @@ void NetworkInterfaceASIO::_failWithInfo_inlock(const char* file,
     fassertFailedWithStatus(34429, status);
 }
 
+void NetworkInterfaceASIO::dropConnections(const HostAndPort& hostAndPort) {
+    _connectionPool.dropConnections(hostAndPort);
+}
+
 }  // namespace executor
 }  // namespace mongo

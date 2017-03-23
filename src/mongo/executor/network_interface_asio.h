@@ -137,6 +137,8 @@ public:
 
     bool onNetworkThread() override;
 
+    void dropConnections(const HostAndPort& hostAndPort) override;
+
 private:
     using ResponseStatus = TaskExecutor::ResponseStatus;
     using NetworkInterface::RemoteCommandCompletionFn;
