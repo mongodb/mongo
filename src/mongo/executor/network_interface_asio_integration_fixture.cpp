@@ -119,6 +119,7 @@ void NetworkInterfaceASIOIntegrationFixture::assertCommandOK(StringData db,
     auto res = runCommandSync(request);
     ASSERT_OK(res.status);
     ASSERT_OK(getStatusFromCommandResult(res.data));
+    ASSERT(!res.data["writeErrors"]);
 }
 
 void NetworkInterfaceASIOIntegrationFixture::assertCommandFailsOnClient(
@@ -138,5 +139,21 @@ void NetworkInterfaceASIOIntegrationFixture::assertCommandFailsOnServer(
     auto serverStatus = getStatusFromCommandResult(res.data);
     ASSERT_EQ(reason, serverStatus);
 }
+
+void NetworkInterfaceASIOIntegrationFixture::assertWriteError(StringData db,
+                                                              const BSONObj& cmd,
+                                                              ErrorCodes::Error reason,
+                                                              Milliseconds timeoutMillis) {
+    RemoteCommandRequest request{
+        fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
+    auto res = runCommandSync(request);
+    ASSERT_OK(res.status);
+    ASSERT_OK(getStatusFromCommandResult(res.data));
+    ASSERT(res.data["writeErrors"]);
+    auto firstWriteError = res.data["writeErrors"].embeddedObject().firstElement().embeddedObject();
+    Status writeErrorStatus(ErrorCodes::fromInt(firstWriteError.getIntField("code")),
+                            firstWriteError.getStringField("errmsg"));
+    ASSERT_EQ(reason, writeErrorStatus);
 }
-}
+}  // namespace executor
+}  // namespace mongo

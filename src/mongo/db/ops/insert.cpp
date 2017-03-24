@@ -27,8 +27,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/insert.h"
+
+#include <vector>
+
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -40,6 +45,38 @@ using std::string;
 
 using namespace mongoutils;
 
+namespace {
+/**
+ * Validates the nesting depth of 'obj', returning a non-OK status if it exceeds the limit.
+ */
+Status validateDepth(const BSONObj& obj) {
+    std::vector<BSONObjIterator> frames;
+    frames.reserve(16);
+    frames.emplace_back(obj);
+
+    while (!frames.empty()) {
+        const auto elem = frames.back().next();
+        if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
+            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage())) {
+                // We're exactly at the limit, so descending to the next level would exceed
+                // the maximum depth.
+                return {ErrorCodes::Overflow,
+                        str::stream() << "cannot insert document because it exceeds "
+                                      << BSONDepth::getMaxDepthForUserStorage()
+                                      << " levels of nesting"};
+            }
+            frames.emplace_back(elem.embeddedObject());
+        }
+
+        if (!frames.back().more()) {
+            frames.pop_back();
+        }
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
 StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc) {
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
@@ -48,6 +85,11 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
                                                  << doc.objsize()
                                                  << ", max size: "
                                                  << BSONObjMaxUserSize);
+
+    auto depthStatus = validateDepth(doc);
+    if (!depthStatus.isOK()) {
+        return depthStatus;
+    }
 
     bool firstElementIsId = false;
     bool hasTimestampToFix = false;

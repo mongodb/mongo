@@ -40,4 +40,9 @@ std::int32_t BSONDepth::maxAllowableDepth = BSONDepth::kDefaultMaxAllowableDepth
 std::uint32_t BSONDepth::getMaxAllowableDepth() {
     return static_cast<std::uint32_t>(BSONDepth::maxAllowableDepth);
 }
+
+std::uint32_t BSONDepth::getMaxDepthForUserStorage() {
+    return static_cast<std::uint32_t>(BSONDepth::maxAllowableDepth -
+                                      BSONDepth::kExtraSystemDepthLevels);
+}
 }  // namespace mongo

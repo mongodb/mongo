@@ -25,9 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
-
 
 #include "mongo/unittest/unittest.h"
 
@@ -78,10 +76,14 @@ public:
                                     ErrorCodes::Error reason,
                                     Milliseconds timeoutMillis = Minutes(5));
 
+    void assertWriteError(StringData db,
+                          const BSONObj& cmd,
+                          ErrorCodes::Error reason,
+                          Milliseconds timeoutMillis = Minutes(5));
+
 private:
     std::unique_ptr<NetworkInterfaceASIO> _net;
     PseudoRandom* _rng = nullptr;
 };
-
 }  // namespace executor
 }  // namespace mongo

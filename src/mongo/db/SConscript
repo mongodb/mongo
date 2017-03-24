@@ -1144,3 +1144,16 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+asioEnv = env.Clone()
+asioEnv.InjectThirdPartyIncludePaths('asio')
+
+asioEnv.CppIntegrationTest(
+    target='nesting_depth_test',
+    source=[
+        'nesting_depth_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/network_interface_asio_fixture',
+    ],
+)
