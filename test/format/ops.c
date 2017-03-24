@@ -660,33 +660,6 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 #endif
 		/* Perform the operation. */
 		switch (op) {
-		case REMOVE:
-			switch (g.type) {
-			case ROW:
-				ret =
-				    row_remove(cursor, key, keyno, positioned);
-				break;
-			case FIX:
-			case VAR:
-				ret =
-				    col_remove(cursor, key, keyno, positioned);
-				break;
-			}
-			if (ret == 0) {
-				++tinfo->remove;
-				/*
-				 * Don't set positioned: it's unchanged from the
-				 * previous state, but not necessarily set.
-				 */
-				if (SNAP_TRACK)
-					snap_track(snap++, keyno, NULL, NULL);
-			} else {
-				positioned = false;
-				if (ret == WT_ROLLBACK && intxn)
-					goto deadlock;
-				testutil_assert(ret == WT_NOTFOUND);
-			}
-			break;
 		case INSERT:
 			switch (g.type) {
 			case ROW:
@@ -718,7 +691,48 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 			} else {
 				if (ret == WT_ROLLBACK && intxn)
 					goto deadlock;
-				testutil_assert(ret == 0);
+				testutil_assert(ret == 0 || ret == WT_ROLLBACK);
+			}
+			break;
+		case READ:
+			++tinfo->search;
+			ret = read_row(cursor, key, value, keyno);
+			if (ret == 0) {
+				positioned = true;
+				if (SNAP_TRACK)
+					snap_track(snap++, keyno, NULL, value);
+			} else {
+				positioned = false;
+				if (ret == WT_ROLLBACK && intxn)
+					goto deadlock;
+				testutil_assert(ret == WT_NOTFOUND);
+			}
+			break;
+		case REMOVE:
+			switch (g.type) {
+			case ROW:
+				ret =
+				    row_remove(cursor, key, keyno, positioned);
+				break;
+			case FIX:
+			case VAR:
+				ret =
+				    col_remove(cursor, key, keyno, positioned);
+				break;
+			}
+			if (ret == 0) {
+				++tinfo->remove;
+				/*
+				 * Don't set positioned: it's unchanged from the
+				 * previous state, but not necessarily set.
+				 */
+				if (SNAP_TRACK)
+					snap_track(snap++, keyno, NULL, NULL);
+			} else {
+				positioned = false;
+				if (ret == WT_ROLLBACK && intxn)
+					goto deadlock;
+				testutil_assert(ret == WT_NOTFOUND);
 			}
 			break;
 		case UPDATE:
@@ -745,21 +759,7 @@ update_instead_of_insert:
 				positioned = false;
 				if (ret == WT_ROLLBACK && intxn)
 					goto deadlock;
-				testutil_assert(ret == 0);
-			}
-			break;
-		case READ:
-			++tinfo->search;
-			ret = read_row(cursor, key, value, keyno);
-			if (ret == 0) {
-				positioned = true;
-				if (SNAP_TRACK)
-					snap_track(snap++, keyno, NULL, value);
-			} else {
-				positioned = false;
-				if (ret == WT_ROLLBACK && intxn)
-					goto deadlock;
-				testutil_assert(ret == WT_NOTFOUND);
+				testutil_assert(ret == 0 || ret == WT_ROLLBACK);
 			}
 			break;
 		}
