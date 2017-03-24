@@ -756,6 +756,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                   << op,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
+            // Check if collection exists.
+            auto indexCollection = db->getCollection(indexNss);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Failed to create index due to missing collection: "
+                                  << op.toString(),
+                    indexCollection);
+
             opCounters->gotInsert();
 
             if (!indexSpec["v"]) {
