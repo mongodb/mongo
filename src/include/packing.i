@@ -198,7 +198,7 @@ next:	if (pack->cur == pack->end)
 		return (0);
 	default:
 		WT_RET_MSG(pack->session, EINVAL,
-		   "Invalid type '%c' found in format '%.*s'",
+		    "Invalid type '%c' found in format '%.*s'",
 		    pv->type, (int)(pack->end - pack->orig), pack->orig);
 	}
 

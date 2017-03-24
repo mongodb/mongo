@@ -1206,10 +1206,15 @@ __wt_session_range_truncate(WT_SESSION_IMPL *session,
 
 done:
 err:	/*
-	 * Close any locally-opened start cursor.
+	 * Close any locally-opened start cursor. Reset application cursors,
+	 * they've possibly moved and the application cannot use them.
 	 */
 	if (local_start)
 		WT_TRET(start->close(start));
+	else
+		WT_TRET(start->reset(start));
+	if (stop != NULL)
+		WT_TRET(stop->reset(stop));
 	return (ret);
 }
 

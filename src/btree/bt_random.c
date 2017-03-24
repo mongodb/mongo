@@ -292,14 +292,16 @@ int
 __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	wt_off_t size;
 	uint64_t n, skip;
 
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
+	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/*
 	 * Only supports row-store: applications can trivially select a random
@@ -312,6 +314,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_CONN_INCR(session, cursor_next);
 	WT_STAT_DATA_INCR(session, cursor_next);
 
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * Under some conditions we end up using the underlying cursor.next to
@@ -320,7 +324,6 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	 */
 	__wt_cursor_key_order_reset(cbt);
 #endif
-
 	/*
 	 * If we don't have a current position in the tree, or if retrieving
 	 * random values without sampling, pick a roughly random leaf page in

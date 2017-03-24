@@ -1480,6 +1480,10 @@ struct __wt_session {
 	 * contains.
 	 * @snippet ex_all.c Truncate a range
 	 *
+	 * Any specified cursors end with no position, and subsequent calls to
+	 * the WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
+	 * beginning (end) of the table.
+	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to truncate
 	 * @param start optional cursor marking the first record discarded;

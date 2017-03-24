@@ -987,7 +987,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	if (conn->evict_tune_num_points >= conn->evict_tune_datapts_needed) {
 		if ((conn->evict_tune_workers_best ==
 		    conn->evict_threads.current_threads) &&
-		   (conn->evict_threads.current_threads <
+		    (conn->evict_threads.current_threads <
 		    conn->evict_threads_max)) {
 			/*
 			 * Keep adding workers. We will check again
@@ -996,7 +996,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			conn->evict_tune_datapts_needed +=
 			    WT_MIN(EVICT_TUNE_DATAPT_MIN,
 			    (conn->evict_threads_max
-			    - conn->evict_threads.current_threads)/
+			    - conn->evict_threads.current_threads) /
 			    EVICT_TUNE_BATCH);
 		} else {
 			/*

@@ -63,39 +63,42 @@ config_setup(void)
 	config_in_memory();
 
 	/*
-	 * Choose a data source type and a file type: they're interrelated (LSM
-	 * trees are only compatible with row-store) and other items depend on
-	 * them.
+	 * Choose a file format and a data source: they're interrelated (LSM is
+	 * only compatible with row-store) and other items depend on them.
 	 */
+	if (!config_is_perm("file_type")) {
+		if (config_is_perm("data_source") && DATASOURCE("lsm"))
+			config_single("file_type=row", 0);
+		else
+			switch (mmrand(NULL, 1, 10)) {
+			case 1:					/* 10% */
+				config_single("file_type=fix", 0);
+				break;
+			case 2: case 3: case 4:			/* 30% */
+				config_single("file_type=var", 0);
+				break;				/* 60% */
+			case 5: case 6: case 7: case 8: case 9: case 10:
+				config_single("file_type=row", 0);
+				break;
+			}
+	}
+	config_map_file_type(g.c_file_type, &g.type);
+
 	if (!config_is_perm("data_source"))
 		switch (mmrand(NULL, 1, 3)) {
 		case 1:
 			config_single("data_source=file", 0);
 			break;
 		case 2:
-			if (!g.c_in_memory) {
-				config_single("data_source=lsm", 0);
-				break;
-			}
-			/* FALLTHROUGH */
-		case 3:
 			config_single("data_source=table", 0);
 			break;
-		}
-
-	if (!config_is_perm("file_type"))
-		switch (DATASOURCE("lsm") ? 5 : mmrand(NULL, 1, 10)) {
-		case 1:
-			config_single("file_type=fix", 0);
-			break;
-		case 2: case 3: case 4:
-			config_single("file_type=var", 0);
-			break;
-		case 5: case 6: case 7: case 8: case 9: case 10:
-			config_single("file_type=row", 0);
+		case 3:
+			if (g.c_in_memory || g.type != ROW)
+				config_single("data_source=table", 0);
+			else
+				config_single("data_source=lsm", 0);
 			break;
 		}
-	config_map_file_type(g.c_file_type, &g.type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still

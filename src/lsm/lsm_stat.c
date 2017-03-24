@@ -29,8 +29,8 @@ __curstat_lsm_init(
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
-	   WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
-	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
+	    "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = false;
 	WT_RET(__wt_lsm_tree_get(session, uri, false, &lsm_tree));

@@ -306,7 +306,7 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ASSERT(session, !F_ISSET(&session->txn, WT_TXN_ERROR));
 		WT_RET(__wt_metadata_cursor(session, &meta_cursor));
 		meta_cursor->set_key(meta_cursor, session->dhandle->name);
-		ret = __wt_curfile_update_check(meta_cursor);
+		ret = __wt_curfile_insert_check(meta_cursor);
 		if (ret == WT_ROLLBACK) {
 			metadata_race = true;
 			ret = 0;

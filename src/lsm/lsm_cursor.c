@@ -178,20 +178,12 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 
 	if (reset) {
 		WT_ASSERT(session, !F_ISSET(&clsm->iface,
-		   WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT));
+		    WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT));
 		WT_RET(__clsm_reset_cursors(clsm, NULL));
 	}
 
 	for (;;) {
-		/*
-		 * If the cursor looks up-to-date, check if the cache is full.
-		 * In case this call blocks, the check will be repeated before
-		 * proceeding.
-		 */
-		if (clsm->dsk_gen != lsm_tree->dsk_gen &&
-		    lsm_tree->nchunks != 0)
-			goto open;
-
+		/* Check if the cursor looks up-to-date. */
 		if (clsm->dsk_gen != lsm_tree->dsk_gen &&
 		    lsm_tree->nchunks != 0)
 			goto open;
@@ -666,7 +658,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 */
 		if (i != nchunks - 1)
 			clsm->chunks[i]->cursor->insert =
-			    __wt_curfile_update_check;
+			    __wt_curfile_insert_check;
 
 		if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
@@ -852,8 +844,8 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
 
-	WT_CURSOR_NEEDKEY(a);
-	WT_CURSOR_NEEDKEY(b);
+	WT_CURSOR_CHECKKEY(a);
+	WT_CURSOR_CHECKKEY(b);
 
 	WT_ERR(__wt_compare(
 	    session, alsm->lsm_tree->collator, &a->key, &b->key, cmpp));
@@ -1529,7 +1521,7 @@ __clsm_insert(WT_CURSOR *cursor)
 	clsm = (WT_CURSOR_LSM *)cursor;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	WT_ERR(__clsm_enter(clsm, false, true));
 
@@ -1573,7 +1565,7 @@ __clsm_update(WT_CURSOR *cursor)
 	clsm = (WT_CURSOR_LSM *)cursor;
 
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	WT_ERR(__clsm_enter(clsm, false, true));
 
@@ -1620,16 +1612,14 @@ __clsm_remove(WT_CURSOR *cursor)
 	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
 	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);
 	WT_ERR(__clsm_enter(clsm, false, true));
 
-	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm, &value)) == 0)
-		ret = __clsm_put(
-		    session, clsm, &cursor->key, &__tombstone, positioned);
-
-err:	__clsm_leave(clsm);
+	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+		WT_ERR(__clsm_lookup(clsm, &value));
+	WT_ERR(__clsm_put(
+	    session, clsm, &cursor->key, &__tombstone, positioned));
 
 	/*
 	 * If the cursor was positioned, it stays positioned with a key but no
@@ -1643,6 +1633,7 @@ err:	__clsm_leave(clsm);
 	else
 		WT_TRET(cursor->reset(cursor));
 
+err:	__clsm_leave(clsm);
 	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }

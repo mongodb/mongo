@@ -210,7 +210,7 @@ __compact_checkpoint(WT_SESSION_IMPL *session)
 	 * work we need to have done is done in the underlying block manager.
 	 */
 	const char *checkpoint_cfg[] = {
-	   WT_CONFIG_BASE(session, WT_SESSION_checkpoint), "force=1", NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_checkpoint), "force=1", NULL };
 
 	/* Checkpoints take a lot of time, check if we've run out. */
 	WT_RET(__wt_session_compact_check_timeout(session));

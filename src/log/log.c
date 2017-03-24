@@ -783,8 +783,8 @@ __log_openfile(WT_SESSION_IMPL *session,
 		__wt_log_desc_byteswap(desc);
 		if (desc->log_magic != WT_LOG_MAGIC)
 			WT_PANIC_RET(session, WT_ERROR,
-			   "log file %s corrupted: Bad magic number %" PRIu32,
-			   (*fhp)->name, desc->log_magic);
+			    "log file %s corrupted: Bad magic number %" PRIu32,
+			    (*fhp)->name, desc->log_magic);
 		if (desc->majorv > WT_LOG_MAJOR_VERSION ||
 		    (desc->majorv == WT_LOG_MAJOR_VERSION &&
 		    desc->minorv > WT_LOG_MINOR_VERSION))
