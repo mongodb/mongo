@@ -2608,8 +2608,8 @@ main(int argc, char *argv[])
 			append_comma = ",";
 		}
 		if (opts->in_memory) {
-			pos += (size_t)snprintf(
-			    cc_buf + pos, req_len - pos, "%s%s",
+			testutil_check(__wt_snprintf_len_incr(
+			    cc_buf + pos, req_len - pos, &pos, "%s%s",
 			    append_comma, "in_memory=true");
 			append_comma = ",";
 		}
