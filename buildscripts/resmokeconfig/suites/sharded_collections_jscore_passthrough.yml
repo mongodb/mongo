@@ -66,7 +66,8 @@ selector:
     - jstests/core/ns_length.js
     - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
     - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-    # TODO: Remove after fixing SERVER-28321.
+    # TODO: Remove after fixing SERVER-14324. mapReduce behaves unpredictably when the out
+    # collection is sharded on anything other than {_id: 1}.
     - jstests/core/mr_undef.js
     # TODO: SERVER-16605
     - jstests/core/mr1.js
