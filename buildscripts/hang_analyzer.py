@@ -27,6 +27,12 @@ import tempfile
 import time
 from distutils import spawn
 from optparse import OptionParser
+_is_windows = (sys.platform == "win32")
+
+if _is_windows:
+    import win32event
+    import win32api
+
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -477,7 +483,7 @@ def get_hang_analyzers():
         dbg = GDBDumper()
         jstack = JstackDumper()
         ps = SolarisProcessList()
-    elif os.name == 'nt' or (os.name == "posix" and sys.platform == "cygwin"):
+    elif _is_windows or sys.platform == "cygwin":
         dbg = WindowsDumper()
         jstack = JstackWindowsDumper()
         ps = WindowsProcessList()
@@ -499,6 +505,33 @@ def check_dump_quota(quota, ext):
         size_sum += os.path.getsize(file_name)
 
     return (size_sum <= quota)
+
+
+def signal_event_object(logger, pid):
+    """Signal the Windows event object"""
+
+    # Use unique event_name created.
+    event_name = "Global\\Mongo_Python_" + str(pid)
+
+    try:
+        desired_access = win32event.EVENT_MODIFY_STATE
+        inherit_handle = False
+        task_timeout_handle = win32event.OpenEvent(desired_access,
+                                                   inherit_handle,
+                                                   event_name)
+    except win32event.error as err:
+        logger.info("Exception from win32event.OpenEvent with error: %s" % err)
+        return
+
+    try:
+        win32event.SetEvent(task_timeout_handle)
+    except win32event.error as err:
+        logger.info("Exception from win32event.SetEvent with error: %s" % err)
+    finally:
+        win32api.CloseHandle(task_timeout_handle)
+
+    logger.info("Waiting for process to report")
+    time.sleep(5)
 
 
 def signal_process(logger, pid, signalnum):
@@ -530,8 +563,13 @@ def main():
     root_logger.info("OS: %s" % platform.platform())
 
     try:
-        distro = platform.linux_distribution()
-        root_logger.info("Linux Distribution: %s" % str(distro))
+        if _is_windows or sys.platform == "cygwin":
+            distro = platform.win32_ver()
+            root_logger.info("Windows Distribution: %s" % str(distro))
+        else:
+            distro = platform.linux_distribution()
+            root_logger.info("Linux Distribution: %s" % str(distro))
+
     except AttributeError:
         root_logger.warning("Cannot determine Linux distro since Python is too old")
 
@@ -651,13 +689,23 @@ def main():
     # TerminateProcess.
     # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn in go_processes]:
-        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" % (process_name, pid))
+        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" %
+            (process_name, pid))
         signal_process(root_logger, pid, signal.SIGABRT)
 
     # Dump python processes after signalling them.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
-        root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" % (process_name, pid))
-        signal_process(root_logger, pid, signal.SIGUSR1)
+        # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
+        # a signal handler to wait for the signal since it supports POSIX signals.
+        if _is_windows:
+            root_logger.info("Calling SetEvent to signal python process %s with PID %d" %
+                (process_name, pid))
+            signal_event_object(root_logger, pid)
+        else:
+            root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" %
+                (process_name, pid))
+            signal_process(root_logger, pid, signal.SIGUSR1)
+
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         dbg.dump_info(
             root_logger,
