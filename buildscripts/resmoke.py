@@ -134,7 +134,8 @@ def main():
     interrupted = False
     suites = resmokelib.parser.get_suites(values, args)
 
-    # Register a signal handler so we can write the report file if the task times out.
+    # Register a signal handler or Windows event object so we can write the report file if the task
+    # times out.
     resmokelib.sighandler.register(resmoke_logger, suites)
 
     try:

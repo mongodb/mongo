@@ -24,6 +24,12 @@ import threading
 import time
 from distutils import spawn
 from optparse import OptionParser
+_is_windows = (sys.platform == "win32")
+
+if _is_windows:
+    import win32event
+    import win32api
+
 
 if sys.platform == "win32":
     import win32process
@@ -365,7 +371,7 @@ def get_hang_analyzers():
     elif sys.platform.startswith("sunos"):
         dbg = GDBDumper()
         ps = SolarisProcessList()
-    elif os.name == 'nt' or (os.name == "posix" and sys.platform == "cygwin"):
+    elif _is_windows or sys.platform == "cygwin":
         dbg = WindowsDumper()
         ps = WindowsProcessList()
     elif sys.platform == "darwin":
@@ -383,10 +389,37 @@ def is_interesting_process(p):
     return False
 
 
-def signal_process(pid):
-    """Signal python process with SIGUSR1, N/A on Windows"""
+def signal_event_object(pid):
+    """Signal the Windows event object"""
+
+    # Use unique event_name created.
+    event_name = "Global\\Mongo_Python_" + str(pid)
+
     try:
-        os.kill(pid, signal.SIGUSR1)
+        desired_access = win32event.EVENT_MODIFY_STATE
+        inherit_handle = False
+        task_timeout_handle = win32event.OpenEvent(desired_access,
+                                                   inherit_handle,
+                                                   event_name)
+    except win32event.error as err:
+        print "Exception from win32event.OpenEvent with error: " + str(err)
+        return
+
+    try:
+        win32event.SetEvent(task_timeout_handle)
+    except win32event.error as err:
+        print "Exception from win32event.SetEvent with error: " + str(err)
+    finally:
+        win32api.CloseHandle(task_timeout_handle)
+
+    print "Waiting for process to report"
+    time.sleep(5)
+
+
+def signal_process(pid, signalnum):
+    """Signal process with signal, N/A on Windows"""
+    try:
+        os.kill(pid, signalnum)
 
         print "Waiting for python process to report"
         time.sleep(5)
@@ -417,8 +450,13 @@ def main():
     print "OS: " + platform.platform()
 
     try:
-        distro = platform.linux_distribution()
-        print "Linux Distribution: " + str(distro)
+        if _is_windows or sys.platform == "cygwin":
+            distro = platform.win32_ver()
+            print "Windows Distribution: " + str(distro)
+        else:
+            distro = platform.linux_distribution()
+            print "Linux Distribution: " + str(distro)
+
     except AttributeError:
         print "Cannot determine Linux distro since Python is too old"
 
@@ -463,14 +501,23 @@ def main():
             dbg.dump_info(process[0], process[1], sys.stdout)
 
         for process in [a for a in processes if a[1].startswith("python")]:
-            signal_process(process[0])
+            # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
+            # a signal handler to wait for the signal since it supports POSIX signals.
+            if _is_windows:
+                sys.stdout.write("Calling SetEvent to signal python process %s with PID %d\n" %
+                    (process[1], process[0]))
+                signal_event_object(process[0])
+            else:
+                sys.stdout.write("Sending signal SIGUSR1 to python process %s with PID %d\n" %
+                    (process[1], process[0]))
+                signal_process(process[0], signal.SIGUSR1)
 
             dbg.dump_info(process[0], process[1], sys.stdout)
 
     # Suspend the timer so we can exit cleanly
     timer.cancel()
 
-    sys.stdout.write("Done analyzing processes for hangs\n")
+    sys.stdout.write("Done analyzing all processes for hangs\n")
 
 if __name__ == "__main__":
     main()
