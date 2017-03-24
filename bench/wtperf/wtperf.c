@@ -2610,7 +2610,7 @@ main(int argc, char *argv[])
 		if (opts->in_memory) {
 			testutil_check(__wt_snprintf_len_incr(
 			    cc_buf + pos, req_len - pos, &pos, "%s%s",
-			    append_comma, "in_memory=true");
+			    append_comma, "in_memory=true"));
 			append_comma = ",";
 		}
 		if (sess_cfg != NULL && strlen(sess_cfg) != 0) {
