@@ -325,24 +325,21 @@ __curfile_remove(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_remove(cbt), ret);
+	WT_ERR(__wt_btcur_remove(cbt));
 
 	/*
-	 * After a successful remove, copy the key: the value is not available.
+	 * Remove with a search-key is fire-and-forget, no position and no key.
+	 * Remove starting from a position maintains the position and a key.
+	 * We don't know which it was at this layer, so can only assert the key
+	 * is not set at all, or internal. There's never a value.
 	 */
-	if (ret == 0) {
-		if (F_ISSET(cursor, WT_CURSTD_KEY_INT) &&
-		    !WT_DATA_IN_ITEM(&(cursor)->key)) {
-			WT_ERR(__wt_buf_set(session, &cursor->key,
-			    cursor->key.data, cursor->key.size));
-			F_CLR(cursor, WT_CURSTD_KEY_INT);
-			F_SET(cursor, WT_CURSTD_KEY_EXT);
-		}
-		F_CLR(cursor, WT_CURSTD_VALUE_SET);
-	}
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == 0 ||
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
+	WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);

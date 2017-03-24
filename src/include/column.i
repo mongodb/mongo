@@ -108,7 +108,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 	/* Fast path the check for values at the end of the skiplist. */
 	if (recno > WT_INSERT_RECNO(ret_ins))
 		return (NULL);
-	else if (recno == WT_INSERT_RECNO(ret_ins))
+	if (recno == WT_INSERT_RECNO(ret_ins))
 		return (ret_ins);
 
 	/*
@@ -127,7 +127,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 
 		if (cmp == 0)			/* Exact match: return */
 			return (*insp);
-		else if (cmp > 0)		/* Keep going at this level */
+		if (cmp > 0)			/* Keep going at this level */
 			insp = &(*insp)->next[i];
 		else {				/* Drop down a level */
 			--i;

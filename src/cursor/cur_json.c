@@ -23,20 +23,20 @@ static int __json_pack_size(WT_SESSION_IMPL *, const char *, WT_CONFIG_ITEM *,
     bool, const char *, size_t *);
 
 #define	WT_PACK_JSON_GET(session, pv, jstr) do {			\
-	switch (pv.type) {						\
+	switch ((pv).type) {						\
 	case 'x':							\
 		break;							\
 	case 's':							\
 	case 'S':							\
-		WT_RET(json_string_arg(session, &jstr, &pv.u.item));	\
-		pv.type = pv.type == 's' ? 'j' : 'J';			\
+		WT_RET(json_string_arg(session, &(jstr), &(pv).u.item));\
+		(pv).type = (pv).type == 's' ? 'j' : 'J';		\
 		break;							\
 	case 'b':							\
 	case 'h':							\
 	case 'i':							\
 	case 'l':							\
 	case 'q':							\
-		WT_RET(json_int_arg(session, &jstr, &pv.u.i));		\
+		WT_RET(json_int_arg(session, &(jstr), &(pv).u.i));	\
 		break;							\
 	case 'B':							\
 	case 'H':							\
@@ -46,11 +46,11 @@ static int __json_pack_size(WT_SESSION_IMPL *, const char *, WT_CONFIG_ITEM *,
 	case 'r':							\
 	case 'R':							\
 	case 't':							\
-		WT_RET(json_uint_arg(session, &jstr, &pv.u.u));		\
+		WT_RET(json_uint_arg(session, &(jstr), &(pv).u.u));	\
 		break;							\
 	case 'u':							\
-		WT_RET(json_string_arg(session, &jstr, &pv.u.item));	\
-		pv.type = 'K';						\
+		WT_RET(json_string_arg(session, &(jstr), &(pv).u.item));\
+		(pv).type = 'K';					\
 		break;							\
 	/* User format strings have already been validated. */		\
 	WT_ILLEGAL_VALUE(session);					\
@@ -304,7 +304,6 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		__wt_free(session, json->value_buf);
 		__wt_free(session, json);
 	}
-	return;
 }
 
 /*
@@ -323,33 +322,32 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
 			if (bufsz >= 1)
 				*buf = ch;
 			return (1);
-		} else {
-			abbrev = '\0';
-			switch (ch) {
-			case '\\':
-			case '"':
-				abbrev = ch;
-				break;
-			case '\f':
-				abbrev = 'f';
-				break;
-			case '\n':
-				abbrev = 'n';
-				break;
-			case '\r':
-				abbrev = 'r';
-				break;
-			case '\t':
-				abbrev = 't';
-				break;
+		}
+		abbrev = '\0';
+		switch (ch) {
+		case '\\':
+		case '"':
+			abbrev = ch;
+			break;
+		case '\f':
+			abbrev = 'f';
+			break;
+		case '\n':
+			abbrev = 'n';
+			break;
+		case '\r':
+			abbrev = 'r';
+			break;
+		case '\t':
+			abbrev = 't';
+			break;
+		}
+		if (abbrev != '\0') {
+			if (bufsz >= 2) {
+				*buf++ = '\\';
+				*buf = abbrev;
 			}
-			if (abbrev != '\0') {
-				if (bufsz >= 2) {
-					*buf++ = '\\';
-					*buf = abbrev;
-				}
-				return (2);
-			}
+			return (2);
 		}
 	}
 	if (bufsz >= 6) {
@@ -421,16 +419,16 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
 #define	MATCH_KEYWORD(session, in, result, keyword, matchval) 	do {	\
 	size_t _kwlen = strlen(keyword);				\
 	if (strncmp(in, keyword, _kwlen) == 0 &&			\
-	    !__wt_isalnum((u_char)in[_kwlen])) {			\
-		in += _kwlen;						\
-		result = matchval;					\
+	    !__wt_isalnum((u_char)(in)[_kwlen])) {			\
+		(in) += _kwlen;						\
+		(result) = matchval;					\
 	} else {							\
-		const char *_bad = in;					\
-		while (__wt_isalnum((u_char)*in))			\
-			in++;						\
+		const char *_bad = (in);				\
+		while (__wt_isalnum((u_char)*(in)))			\
+			(in)++;						\
 		WT_RET_MSG(session, EINVAL,				\
 		    "unknown keyword \"%.*s\" in JSON",			\
-		    (int)(in - _bad), _bad);				\
+		    (int)((in) - _bad), _bad);				\
 	}								\
 } while (0)
 
@@ -692,12 +690,13 @@ json_uint_arg(WT_SESSION_IMPL *session, const char **jstr, uint64_t *up)
 
 #define	JSON_EXPECT_TOKEN_GET(session, jstr, tokval, start, sz) do {	\
     int __tok;								\
-    WT_RET(__wt_json_token((WT_SESSION *)session, jstr, &__tok, &start, &sz));\
-    if (__tok != tokval)						\
+    WT_RET(__wt_json_token(						\
+	(WT_SESSION *)(session), jstr, &__tok, &(start), &(sz)));	\
+    if (__tok != (tokval))						\
 	    WT_RET_MSG(session, EINVAL,					\
 		"expected JSON %s, got %s",				\
 		__wt_json_tokname(tokval), __wt_json_tokname(__tok));	\
-    jstr = start + sz;							\
+    (jstr) = (start) + (sz);						\
 } while (0)
 
 #define	JSON_EXPECT_TOKEN(session, jstr, tokval) do {			\

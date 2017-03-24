@@ -1395,7 +1395,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
  */
 #define	WT_CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
-		hazard = false;						\
+		(hazard) = false;					\
 		WT_TRET(						\
 		    __wt_page_release(session, ref, WT_READ_NO_EVICT));	\
 	}								\
@@ -1737,7 +1737,7 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 	 * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
 	 * the copy in-line.
 	 */
-	for (p = (uint8_t *)r->first_free,
+	for (p = r->first_free,
 	    t = (uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
 		*p++ = *t++;
 
@@ -2889,7 +2889,7 @@ no_slots:
 		len = WT_PTRDIFF(
 		    r->first_free, (uint8_t *)dsk + dsk_dst->mem_size);
 		dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
-		(void)memmove(dsk_start, (uint8_t *)r->first_free - len, len);
+		(void)memmove(dsk_start, r->first_free - len, len);
 
 		r->entries -= r->raw_entries[result_slots - 1];
 		r->first_free = dsk_start + len;
@@ -3583,11 +3583,12 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	uint64_t recno;
 
 	btree = S2BT(session);
+
 	/*
 	 * Bulk-load is only permitted on newly created files, not any empty
 	 * file -- see the checkpoint code for a discussion.
 	 */
-	if (!btree->bulk_load_ok)
+	if (!btree->original)
 		WT_RET_MSG(session, EINVAL,
 		    "bulk-load is only possible for newly created trees");
 
@@ -3604,16 +3605,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	r = cbulk->reconcile;
 	r->is_bulk_load = true;
 
-	recno = WT_RECNO_OOB;		/* -Werror=maybe-uninitialized */
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-	case BTREE_COL_VAR:
-		recno = 1;
-		break;
-	case BTREE_ROW:
-		recno = WT_RECNO_OOB;
-		break;
-	}
+	recno = btree->type == BTREE_ROW ? WT_RECNO_OOB : 1;
 
 	return (__rec_split_init(
 	    session, r, cbulk->leaf, recno, btree->maxleafpage));

@@ -107,10 +107,11 @@ struct __wt_table {
  *	Acquire a lock if available, perform an operation, drop the lock.
  */
 #define	WT_WITH_LOCK_NOWAIT(session, ret, lock, flag, op) do {		\
-	ret = 0;							\
+	(ret) = 0;							\
 	if (F_ISSET(session, (flag))) {					\
 		op;							\
-	} else if ((ret = __wt_spin_trylock_track(session, lock)) == 0) {\
+	} else if (((ret) =						\
+	    __wt_spin_trylock_track(session, lock)) == 0) {		\
 		F_SET(session, (flag));					\
 		op;							\
 		F_CLR(session, (flag));					\
@@ -248,7 +249,7 @@ struct __wt_table {
 	    WT_SESSION_LOCKED_HANDLE_LIST));				\
 	if (F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE)) {		\
 		op;							\
-	} else if ((ret = __wt_try_writelock(session,			\
+	} else if (((ret) = __wt_try_writelock(session,			\
 	    &S2C(session)->table_lock)) == 0) {				\
 		F_SET(session, WT_SESSION_LOCKED_TABLE_WRITE);		\
 		op;							\

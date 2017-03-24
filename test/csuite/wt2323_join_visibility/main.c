@@ -92,10 +92,11 @@ main(int argc, char *argv[])
 	TEST_OPTS *opts, _opts;
 	const char *tablename;
 
+	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+		return (EXIT_SUCCESS);
+
 	opts = &_opts;
 	sharedopts = &_sharedopts;
-	if (testutil_disable_long_tests())
-		return (0);
 	memset(opts, 0, sizeof(*opts));
 	memset(sharedopts, 0, sizeof(*sharedopts));
 

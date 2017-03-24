@@ -133,10 +133,10 @@ extern void __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE
 extern void __wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_btree_close(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern int __wt_btree_discard(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, bool is_recno) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
-extern void __wt_btree_evictable(WT_SESSION_IMPL *session, bool on) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
@@ -161,6 +161,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #endif
  ) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_bt_rebalance(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern int __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern bool __wt_split_obsolete(WT_SESSION_IMPL *session, uint64_t split_gen) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
@@ -462,7 +463,7 @@ extern int __wt_meta_checkpoint_last_name( WT_SESSION_IMPL *session, const char 
 extern int __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_meta_ckptlist_get( WT_SESSION_IMPL *session, const char *fname, WT_CKPT **ckptbasep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_meta_ckptlist_set(WT_SESSION_IMPL *session, const char *fname, WT_CKPT *ckptbase, WT_LSN *ckptlsn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
-extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT *ckptbase) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT **ckptbasep) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_ext_metadata_insert(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *key, const char *value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_ext_metadata_remove( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *key) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));

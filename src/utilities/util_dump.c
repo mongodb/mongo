@@ -504,16 +504,17 @@ dump_prefix(WT_SESSION *session, bool hex, bool json)
 
 	(void)wiredtiger_version(&vmajor, &vminor, &vpatch);
 
+	if (json && printf(
+	    "    \"%s\" : \"%d (%d.%d.%d)\",\n",
+	    DUMP_JSON_VERSION_MARKER, DUMP_JSON_CURRENT_VERSION,
+	    vmajor, vminor, vpatch) < 0)
+		return (util_err(session, EIO, NULL));
+
 	if (!json && (printf(
 	    "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n",
 	    vmajor, vminor, vpatch) < 0 ||
 	    printf("Format=%s\n", hex ? "hex" : "print") < 0 ||
 	    printf("Header\n") < 0))
-		return (util_err(session, EIO, NULL));
-	else if (json && printf(
-	    "    \"%s\" : \"%d (%d.%d.%d)\",\n",
-	    DUMP_JSON_VERSION_MARKER, DUMP_JSON_CURRENT_VERSION,
-	    vmajor, vminor, vpatch) < 0)
 		return (util_err(session, EIO, NULL));
 
 	return (0);

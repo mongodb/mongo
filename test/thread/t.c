@@ -37,7 +37,6 @@ int multiple_files;				/* File per thread */
 int session_per_op;				/* New session per operation */
 
 static char home[512];				/* Program working dir */
-static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
@@ -59,10 +58,7 @@ main(int argc, char *argv[])
 	int ch, cnt, runs;
 	char *config_open, *working_dir;
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	config_open = NULL;
 	working_dir = NULL;

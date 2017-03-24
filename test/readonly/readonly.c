@@ -39,7 +39,6 @@ static char home_rd[HOME_SIZE + sizeof(HOME_RD_SUFFIX)];
 #define	HOME_RD2_SUFFIX	".RDNOLOCK"	/* Read-only dir no lock file */
 static char home_rd2[HOME_SIZE + sizeof(HOME_RD2_SUFFIX)];
 
-static const char *progname;		/* Program name */
 static const char *saved_argv0;		/* Program command */
 static const char * const uri = "table:main";
 
@@ -172,10 +171,8 @@ main(int argc, char *argv[])
 	char cmd[512];
 	uint8_t buf[MAX_VAL];
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
+
 	/*
 	 * Needed unaltered for system command later.
 	 */

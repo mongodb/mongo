@@ -316,6 +316,6 @@ __wt_spin_trylock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 		stats = (int64_t **)S2C(session)->stats;
 		stats[session->stat_bucket][t->stat_count_off]++;
 		return (0);
-	} else
-		return (__wt_spin_trylock(session, t));
+	}
+	return (__wt_spin_trylock(session, t));
 }

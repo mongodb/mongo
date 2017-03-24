@@ -634,11 +634,11 @@ __wt_block_off_free(
 	 */
 	if ((ret = __wt_block_off_remove_overlap(
 	    session, block, &block->live.alloc, offset, size)) == 0)
-		ret = __block_merge(session, block,
-		    &block->live.avail, offset, (wt_off_t)size);
+		ret = __block_merge(
+		    session, block, &block->live.avail, offset, size);
 	else if (ret == WT_NOTFOUND)
-		ret = __block_merge(session, block,
-		    &block->live.discard, offset, (wt_off_t)size);
+		ret = __block_merge(
+		    session, block, &block->live.discard, offset, size);
 	return (ret);
 }
 
@@ -1247,7 +1247,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_PAGE_HEADER *dsk;
-	size_t entries, size;
+	uint32_t entries;
+	size_t size;
 	uint8_t *p;
 
 	WT_RET(__block_extlist_dump(session, block, el, "write"));

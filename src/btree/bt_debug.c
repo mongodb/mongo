@@ -34,7 +34,7 @@ static const					/* Output separator */
 
 static int __debug_cell(WT_DBG *, const WT_PAGE_HEADER *, WT_CELL_UNPACK *);
 static int __debug_cell_data(
-	WT_DBG *, WT_PAGE *, int type, const char *, WT_CELL_UNPACK *);
+	WT_DBG *, WT_PAGE *, int, const char *, WT_CELL_UNPACK *);
 static int __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, bool);
 static int __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int __debug_dsk_cell(WT_DBG *, const WT_PAGE_HEADER *);

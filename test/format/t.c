@@ -49,14 +49,7 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
-#ifdef _WIN32
-	g.progname = "t_format.exe";
-#else
-	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		g.progname = argv[0];
-	else
-		++g.progname;
-#endif
+	(void)testutil_set_progname(argv);
 
 #if 0
 	/* Configure the GNU malloc for debugging. */
@@ -74,7 +67,7 @@ main(int argc, char *argv[])
 	home = NULL;
 	onerun = 0;
 	while ((ch = __wt_getopt(
-	    g.progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
+	    progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			onerun = 1;
@@ -179,7 +172,7 @@ main(int argc, char *argv[])
 	testutil_check(pthread_rwlock_init(&g.checkpoint_lock, NULL));
 	testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
 
-	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
+	printf("%s: process %" PRIdMAX "\n", progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
 		startup();			/* Start a run */
 
@@ -344,7 +337,7 @@ usage(void)
 	    "usage: %s [-1Llqr] [-C wiredtiger-config]\n    "
 	    "[-c config-file] [-H mount] [-h home] "
 	    "[name=value ...]\n",
-	    g.progname);
+	    progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"

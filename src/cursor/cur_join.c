@@ -270,7 +270,7 @@ again:
 			iter->positioned = true;
 			return (ret);
 		}
-		else if (ret == WT_NOTFOUND) {
+		if (ret == WT_NOTFOUND) {
 			WT_RET(__curjoin_iter_close_all(iter->child));
 			entry->subjoin->iter = NULL;
 			iter->child = NULL;
@@ -518,8 +518,7 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	}
 	if (disjunction && end == endmax)
 		return (WT_NOTFOUND);
-	else
-		return (0);
+	return (0);
 }
 
 typedef struct {

@@ -72,7 +72,7 @@
  * and the session ID is a small, monotonically increasing number.
  */
 #define	WT_STATS_SLOT_ID(session)					\
-	((session)->id) % WT_COUNTER_SLOTS
+	(((session)->id) % WT_COUNTER_SLOTS)
 
 /*
  * Statistic structures are arrays of int64_t's. We have functions to read/write
