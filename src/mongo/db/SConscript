@@ -538,7 +538,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         'audit',
-        'auth/authorization_manager_global',
+        'auth/authcore',
         'commands/server_status_core',
         'commands/test_commands_enabled',
         'service_context',

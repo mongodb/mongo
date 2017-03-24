@@ -111,7 +111,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
 }
 
 void QuorumChecker::processResponse(const RemoteCommandRequest& request,
-                                    const ResponseStatus& response) {
+                                    const executor::RemoteCommandResponse& response) {
     _tabulateHeartbeatResponse(request, response);
     if (hasReceivedSufficientResponses()) {
         _onQuorumCheckComplete();
@@ -177,7 +177,7 @@ void QuorumChecker::_onQuorumCheckComplete() {
 }
 
 void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& request,
-                                               const ResponseStatus& response) {
+                                               const executor::RemoteCommandResponse& response) {
     ++_numResponses;
     if (!response.isOK()) {
         warning() << "Failed to complete heartbeat request to " << request.target << "; "
@@ -279,7 +279,7 @@ bool QuorumChecker::hasReceivedSufficientResponses() const {
     return true;
 }
 
-Status checkQuorumGeneral(ReplicationExecutor* executor,
+Status checkQuorumGeneral(executor::TaskExecutor* executor,
                           const ReplSetConfig& rsConfig,
                           const int myIndex) {
     QuorumChecker checker(&rsConfig, myIndex);
@@ -292,14 +292,14 @@ Status checkQuorumGeneral(ReplicationExecutor* executor,
     return checker.getFinalStatus();
 }
 
-Status checkQuorumForInitiate(ReplicationExecutor* executor,
+Status checkQuorumForInitiate(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
                               const int myIndex) {
     invariant(rsConfig.getConfigVersion() == 1);
     return checkQuorumGeneral(executor, rsConfig, myIndex);
 }
 
-Status checkQuorumForReconfig(ReplicationExecutor* executor,
+Status checkQuorumForReconfig(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
                               const int myIndex) {
     invariant(rsConfig.getConfigVersion() > 1);

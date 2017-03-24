@@ -177,7 +177,6 @@ env.Library(
     LIBDEPS=[
         'clientdriver',
         '$BUILD_DIR/mongo/db/auth/authcommon',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
     ]
 )
 

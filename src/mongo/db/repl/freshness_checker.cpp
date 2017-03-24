@@ -47,6 +47,7 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 FreshnessChecker::Algorithm::Algorithm(Timestamp lastOpTimeApplied,
                                        const ReplSetConfig& rsConfig,
@@ -122,7 +123,7 @@ bool FreshnessChecker::Algorithm::_isVotingMember(const HostAndPort hap) const {
 }
 
 void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& request,
-                                                  const ResponseStatus& response) {
+                                                  const RemoteCommandResponse& response) {
     ++_responsesProcessed;
     bool votingMember = _isVotingMember(request.target);
 
@@ -209,8 +210,8 @@ long long FreshnessChecker::getOriginalConfigVersion() const {
 FreshnessChecker::FreshnessChecker() : _isCanceled(false) {}
 FreshnessChecker::~FreshnessChecker() {}
 
-StatusWith<ReplicationExecutor::EventHandle> FreshnessChecker::start(
-    ReplicationExecutor* executor,
+StatusWith<executor::TaskExecutor::EventHandle> FreshnessChecker::start(
+    executor::TaskExecutor* executor,
     const Timestamp& lastOpTimeApplied,
     const ReplSetConfig& currentConfig,
     int selfIndex,
