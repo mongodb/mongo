@@ -20,7 +20,8 @@ import SCons
 # we are to avoid bulk loading all tools in the DefaultEnvironment.
 DefaultEnvironment(tools=[])
 
-EnsureSConsVersion( 2, 3, 5 )
+EnsurePythonVersion(2, 7)
+EnsureSConsVersion(2, 5)
 
 from buildscripts import utils
 from buildscripts import moduleconfig
@@ -587,11 +588,11 @@ def variable_arch_converter(val):
 def decide_platform_tools():
     if is_running_os('windows'):
         # we only support MS toolchain on windows
-        return ['msvc', 'mslink', 'mslib', 'masm', 'install']
+        return ['msvc', 'mslink', 'mslib', 'masm']
     elif is_running_os('linux', 'solaris'):
-        return ['gcc', 'g++', 'gnulink', 'ar', 'gas', 'install']
+        return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
     elif is_running_os('darwin'):
-        return ['gcc', 'g++', 'applelink', 'ar', 'as', 'install']
+        return ['gcc', 'g++', 'applelink', 'ar', 'as']
     else:
         return ["default"]
 
