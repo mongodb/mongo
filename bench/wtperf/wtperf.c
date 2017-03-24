@@ -32,9 +32,6 @@
 #define	DEFAULT_HOME		"WT_TEST"
 #define	DEFAULT_MONITOR_DIR	"WT_TEST"
 
-static const char * const debug_cconfig = "";
-static const char * const debug_tconfig = "";
-
 static void	*checkpoint_worker(void *);
 static int	 drop_all_tables(WTPERF *);
 static int	 execute_populate(WTPERF *);
@@ -2569,8 +2566,7 @@ main(int argc, char *argv[])
 	__wt_stream_set_line_buffer(stdout);
 
 	/* Concatenate non-default configuration strings. */
-	if ((opts->verbose > 1 && strlen(debug_cconfig) != 0) ||
-	     user_cconfig != NULL || opts->session_count_idle > 0 ||
+	if (user_cconfig != NULL || opts->session_count_idle > 0 ||
 	     wtperf->compress_ext != NULL || wtperf->async_config != NULL ||
 	     opts->in_memory) {
 		req_len = 20;
@@ -2589,7 +2585,6 @@ main(int argc, char *argv[])
 		}
 		req_len += opts->in_memory ? strlen("in_memory=true") : 0;
 		req_len += user_cconfig != NULL ? strlen(user_cconfig) : 0;
-		req_len += debug_cconfig != NULL ? strlen(debug_cconfig) : 0;
 		cc_buf = dmalloc(req_len);
 
 		pos = 0;
@@ -2626,23 +2621,18 @@ main(int argc, char *argv[])
 			    append_comma, user_cconfig);
 			append_comma = ",";
 		}
-		if (opts->verbose > 1 && strlen(debug_cconfig) != 0)
-			pos += (size_t)snprintf(
-			    cc_buf + pos, req_len - pos, "%s%s",
-			    append_comma, debug_cconfig);
 
 		if (strlen(cc_buf) != 0 && (ret =
 		    config_opt_name_value(wtperf, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if ((opts->verbose > 1 && strlen(debug_tconfig) != 0) || opts->index ||
+	if (opts->index ||
 	    user_tconfig != NULL || wtperf->compress_table != NULL) {
 		req_len = 20;
 		req_len += wtperf->compress_table != NULL ?
 		    strlen(wtperf->compress_table) : 0;
 		req_len += opts->index ? strlen(INDEX_COL_NAMES) : 0;
 		req_len += user_tconfig != NULL ? strlen(user_tconfig) : 0;
-		req_len += debug_tconfig != NULL ? strlen(debug_tconfig) : 0;
 		tc_buf = dmalloc(req_len);
 
 		pos = 0;
@@ -2666,10 +2656,6 @@ main(int argc, char *argv[])
 			    append_comma, user_tconfig);
 			append_comma = ",";
 		}
-		if (opts->verbose > 1 && strlen(debug_tconfig) != 0)
-			pos += (size_t)snprintf(
-			    tc_buf + pos, req_len - pos, "%s%s",
-			    append_comma, debug_tconfig);
 
 		if (strlen(tc_buf) != 0 && (ret =
 		    config_opt_name_value(wtperf, "table_config", tc_buf)) != 0)
