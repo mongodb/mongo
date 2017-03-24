@@ -50,6 +50,49 @@ namespace executor {
 
 class AsyncStreamInterface;
 
+/**
+ * A factory that produces mock streams to allow for testing of NetworkInterfaceASIO.
+ *
+ * The streams produced by this factory simulate a flow of Events (ConnectEvent,
+ * ReadEvent, WriteEvent). The streams created by this factory will automatically
+ * pause themselves at each Event, and the caller must unblock them by destroying
+ * the Event object to continue.
+ *
+ * Example use of this factory:
+ *
+ *     AsyncMockStreamFactory factory();
+ *
+ *     // NIA will then call makeStream(...) to create new streams from the
+ *     // factory, or the caller can do this manually.
+ *
+ *     // Wait for the desired stream to exist
+ *     auto stream = streamFactory.blockUntilStreamExists(host);
+ *
+ *     // If we do not care to inspect after a certain event, we can skip it:
+ *     ConnectEvent{stream}.skip();
+ *
+ *     // To examine the stream at an Event, instantiate the event object.
+ *     // When the Event object goes out of scope the stream will unblock.
+ *     {
+ *         WriteEvent write{stream};
+ *
+ *         // Inspect what NIA wrote to this stream:
+ *         auto messageData = stream->popWrite();
+ *         ...
+ *     }
+ *
+ *     // The Event object will keep the stream blocked as long as it exists.
+ *     // Use this window to perform operations on the stream or inspect it.
+ *     {
+ *         ReadEvent read{stream};
+ *
+ *         // Simulate data sent to this stream over the network
+ *         stream->pushRead( ... );
+ *
+ *         // Or, simulate a networking error
+ *         stream->setError( error_code );
+ *     }
+ */
 class AsyncMockStreamFactory final : public AsyncStreamFactoryInterface {
 public:
     AsyncMockStreamFactory() = default;
@@ -57,6 +100,22 @@ public:
     std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service::strand* strand,
                                                      const HostAndPort& host) override;
 
+    /**
+     * A mock stream class for testing the egress networking layer.
+     *
+     * At the core of this class is an idea of deferring actions and allowing inspection
+     * of state of the stream before those actions happen.
+     *
+     * This class operates on the assumption that two threads are in use: a networking
+     * thread used by NIA to issue IO calls on the MockStream, and a test thread to
+     * wait on those calls and react.
+     *
+     * When the test thread creates an Event object, the constructor sends it to wait
+     * on a condition variable. When NIA issues an IO call on the stream, the MockStream
+     * load the proper handler into a placeholder, and then calls notify() on the
+     * condition variable. At that point the stream is paused and the test thread
+     * may operate on it.
+     */
     class MockStream final : public AsyncStreamInterface {
     public:
         MockStream(asio::io_service::strand* strand,
