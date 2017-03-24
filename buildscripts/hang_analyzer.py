@@ -608,6 +608,10 @@ def main():
 
     all_processes = ps.dump_processes(root_logger)
 
+    # Canonicalize the process names to lowercase to handle cases where the name of the Python
+    # process is /System/Library/.../Python on OS X and -p python is specified to hang_analyzer.py.
+    all_processes = [(pid, process_name.lower()) for (pid, process_name) in all_processes]
+
     # Find all running interesting processes:
     #   If a list of process_ids is supplied, match on that.
     #   Otherwise, do a substring match on interesting_processes.
