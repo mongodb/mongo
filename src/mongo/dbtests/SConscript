@@ -66,6 +66,7 @@ dbtest = env.Program(
         'index_access_method_test.cpp',
         'indexcatalogtests.cpp',
         'indexupdatetests.cpp',
+        'insert_test.cpp',
         'jsobjtests.cpp',
         'jsontests.cpp',
         'jstests.cpp',

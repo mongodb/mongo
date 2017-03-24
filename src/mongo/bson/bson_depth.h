@@ -44,13 +44,26 @@ struct BSONDepth {
     // The maximum allowable value for the BSON depth parameter.
     static constexpr std::int32_t kBSONDepthParameterCeiling = 1000;
 
+    // The number of extra levels of nesting above the storage depth limit that the server will
+    // tolerate.
+    static constexpr std::uint32_t kExtraSystemDepthLevels = 20;
+
     // The depth of BSON accepted by the server. Configurable via the 'maxBSONDepth' server
     // parameter.
     static std::int32_t maxAllowableDepth;
 
     /**
-     * Returns the maximum allowable BSON depth as an unsigned integer.
+     * Returns the maximum allowable BSON depth as an unsigned integer. Note that this is a hard
+     * limit -- any BSON document that exceeds this limit should be considered invalid.
      */
     static std::uint32_t getMaxAllowableDepth();
+
+    /**
+     * Returns the BSON nesting depth limit for stored objects. User documents that exceed this
+     * depth are not valid for storage. This limit is slightly lower than the hard limit in
+     * getMaxAllowableDepth(), since we may generate things like oplog entries from these documents
+     * that contain extra levels of nesting.
+     */
+    static std::uint32_t getMaxDepthForUserStorage();
 };
 }  // namespace mongo
