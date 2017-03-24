@@ -1378,8 +1378,8 @@ __wt_block_extlist_init(WT_SESSION_IMPL *session,
 	size = (name == NULL ? 0 : strlen(name)) +
 	    strlen(".") + (extname == NULL ? 0 : strlen(extname) + 1);
 	WT_RET(__wt_calloc_def(session, size, &el->name));
-	(void)snprintf(el->name, size, "%s.%s",
-	    name == NULL ? "" : name, extname == NULL ? "" : extname);
+	WT_RET(__wt_snprintf(el->name, size, "%s.%s",
+	    name == NULL ? "" : name, extname == NULL ? "" : extname));
 
 	el->offset = WT_BLOCK_INVALID_OFFSET;
 	el->track_size = track_size;

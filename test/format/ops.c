@@ -530,8 +530,9 @@ ops(void *arg)
 			    pthread_rwlock_trywrlock(&g.backup_lock) == EBUSY)
 				ckpt_config = NULL;
 			else {
-				(void)snprintf(ckpt_name, sizeof(ckpt_name),
-				    "name=thread-%d", tinfo->id);
+				testutil_check(__wt_snprintf(
+				    ckpt_name, sizeof(ckpt_name),
+				    "name=thread-%d", tinfo->id));
 				ckpt_config = ckpt_name;
 			}
 
@@ -557,8 +558,9 @@ ops(void *arg)
 				strcpy(ckpt_name,
 				    "checkpoint=WiredTigerCheckpoint");
 			else
-				(void)snprintf(ckpt_name, sizeof(ckpt_name),
-				    "checkpoint=thread-%d", tinfo->id);
+				testutil_check(__wt_snprintf(
+				    ckpt_name, sizeof(ckpt_name),
+				    "checkpoint=thread-%d", tinfo->id));
 			ckpt_available = true;
 
 skip_checkpoint:	/* Pick the next checkpoint operation. */

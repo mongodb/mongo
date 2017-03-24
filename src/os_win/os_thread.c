@@ -58,10 +58,10 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
  * __wt_thread_id --
  *	Fill in a printable version of the process and thread IDs.
  */
-void
+int
 __wt_thread_id(char *buf, size_t buflen)
 {
-	(void)snprintf(buf, buflen,
+	return (__wt_snprintf(buf, buflen,
 	    "%" PRIu64 ":%" PRIu64,
-	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId);
+	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId));
 }

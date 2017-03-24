@@ -288,8 +288,8 @@ latency_print_single(WTPERF *wtperf, TRACK *total, const char *name)
 	uint64_t cumops;
 	char path[1024];
 
-	snprintf(path, sizeof(path),
-	    "%s/latency.%s", wtperf->monitor_dir, name);
+	testutil_check(__wt_snprintf(path, sizeof(path),
+	    "%s/latency.%s", wtperf->monitor_dir, name));
 	if ((fp = fopen(path, "w")) == NULL) {
 		lprintf(wtperf, errno, 0, "%s", path);
 		return;

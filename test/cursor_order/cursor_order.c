@@ -181,19 +181,15 @@ wt_connect(SHARED_CONFIG *cfg, char *config_open)
 	};
 	int ret;
 	char config[512];
-	size_t print_count;
 
 	testutil_clean_work_dir(home);
 	testutil_make_work_dir(home);
 
-	print_count = (size_t)snprintf(config, sizeof(config),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,statistics=(all),error_prefix=\"%s\",%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
-	    config_open == NULL ? "" : config_open);
-
-	if (print_count >= sizeof(config))
-		testutil_die(EINVAL, "Config string too long");
+	    config_open == NULL ? "" : config_open));
 
 	if ((ret = wiredtiger_open(
 	    home, &event_handler, config, &cfg->conn)) != 0)

@@ -104,8 +104,8 @@ __pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
 	WT_CONFIG_ITEM ignore;
 
 	if (pn->genname) {
-		(void)snprintf(pn->buf, sizeof(pn->buf),
-		    (pn->iskey ? "key%d" : "value%d"), pn->count);
+		WT_RET(__wt_snprintf(pn->buf, sizeof(pn->buf),
+		    (pn->iskey ? "key%d" : "value%d"), pn->count));
 		WT_CLEAR(*name);
 		name->str = pn->buf;
 		name->len = strlen(pn->buf);

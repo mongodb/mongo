@@ -185,7 +185,7 @@ __curjoin_iter_set_entry(WT_CURSOR_JOIN_ITER *iter, u_int entry_pos)
 
 		size = strlen(to_dup->internal_uri) + 3;
 		WT_ERR(__wt_calloc(session, size, 1, &uri));
-		snprintf(uri, size, "%s()", to_dup->internal_uri);
+		WT_ERR(__wt_snprintf(uri, size, "%s()", to_dup->internal_uri));
 		if ((c = iter->cursor) == NULL || !WT_STREQ(c->uri, uri)) {
 			iter->cursor = NULL;
 			if (c != NULL)
@@ -929,7 +929,7 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	if ((proj = cjoin->projection) != NULL) {
 		size = strlen(urimain) + strlen(proj) + 1;
 		WT_ERR(__wt_calloc(session, size, 1, &mainbuf));
-		snprintf(mainbuf, size, "%s%s", urimain, proj);
+		WT_ERR(__wt_snprintf(mainbuf, size, "%s%s", urimain, proj));
 		urimain = mainbuf;
 	}
 	WT_ERR(__wt_open_cursor(session, urimain, (WT_CURSOR *)cjoin, config,
@@ -1148,8 +1148,8 @@ __curjoin_open_main(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 
 	newsize = strlen(cjoin->table->name) + idx->colconf.len + 1;
 	WT_ERR(__wt_calloc(session, 1, newsize, &main_uri));
-	snprintf(main_uri, newsize, "%s%.*s",
-	    cjoin->table->name, (int)idx->colconf.len, idx->colconf.str);
+	WT_ERR(__wt_snprintf(main_uri, newsize, "%s%.*s",
+	    cjoin->table->name, (int)idx->colconf.len, idx->colconf.str));
 	WT_ERR(__wt_open_cursor(session, main_uri,
 	    (WT_CURSOR *)cjoin, raw_cfg, &entry->main));
 	if (idx->extractor == NULL) {
@@ -1162,7 +1162,8 @@ __curjoin_open_main(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		 */
 		len = strlen(entry->main->value_format) + 3;
 		WT_ERR(__wt_calloc(session, len, 1, &newformat));
-		snprintf(newformat, len, "%s0x", entry->main->value_format);
+		WT_ERR(__wt_snprintf(
+		    newformat, len, "%s0x", entry->main->value_format));
 		__wt_free(session, entry->main->value_format);
 		entry->main->value_format = newformat;
 	}
@@ -1531,8 +1532,8 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			len = strlen(cindex->iface.key_format) + 3;
 			WT_RET(__wt_calloc(session, len, 1,
 			    &entry->repack_format));
-			snprintf(entry->repack_format, len, "%s0x",
-			    cindex->iface.key_format);
+			WT_RET(__wt_snprintf(entry->repack_format,
+			    len, "%s0x", cindex->iface.key_format));
 		}
 	}
 	return (0);

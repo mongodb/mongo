@@ -601,7 +601,8 @@ __create_table(WT_SESSION_IMPL *session,
 		if (ncolgroups == 0) {
 			cgsize = strlen("colgroup:") + strlen(tablename) + 1;
 			WT_ERR(__wt_calloc_def(session, cgsize, &cgname));
-			snprintf(cgname, cgsize, "colgroup:%s", tablename);
+			WT_ERR(__wt_snprintf(
+			    cgname, cgsize, "colgroup:%s", tablename));
 			WT_ERR(__create_colgroup(
 			    session, cgname, exclusive, config));
 		}

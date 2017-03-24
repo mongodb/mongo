@@ -96,7 +96,7 @@ compare_backups(int i)
 	if (i == 0)
 		(void)strncpy(msg, "MAIN", sizeof(msg));
 	else
-		snprintf(msg, sizeof(msg), "%d", i);
+		(void)snprintf(msg, sizeof(msg), "%d", i);
 	printf(
 	    "Iteration %s: Tables %s.%d and %s.%d %s\n",
 	    msg, full_out, i, incr_out, i, ret == 0 ? "identical" : "differ");
@@ -131,8 +131,8 @@ setup_directories(void)
 		 * For incremental backups we need 0-N.  The 0 incremental
 		 * directory will compare with the original at the end.
 		 */
-		snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir %s.%d",
-		    home_incr, i, home_incr, i);
+		(void)snprintf(buf, sizeof(buf),
+		    "rm -rf %s.%d && mkdir %s.%d", home_incr, i, home_incr, i);
 		if ((ret = system(buf)) != 0) {
 			fprintf(stderr, "%s: failed ret %d\n", buf, ret);
 			return (ret);
@@ -142,8 +142,8 @@ setup_directories(void)
 		/*
 		 * For full backups we need 1-N.
 		 */
-		snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir %s.%d",
-		    home_full, i, home_full, i);
+		(void)snprintf(buf, sizeof(buf),
+		    "rm -rf %s.%d && mkdir %s.%d", home_full, i, home_full, i);
 		if ((ret = system(buf)) != 0) {
 			fprintf(stderr, "%s: failed ret %d\n", buf, ret);
 			return (ret);
@@ -164,8 +164,8 @@ add_work(WT_SESSION *session, int iter)
 	 * Perform some operations with individual auto-commit transactions.
 	 */
 	for (i = 0; i < MAX_KEYS; i++) {
-		snprintf(k, sizeof(k), "key.%d.%d", iter, i);
-		snprintf(v, sizeof(v), "value.%d.%d", iter, i);
+		(void)snprintf(k, sizeof(k), "key.%d.%d", iter, i);
+		(void)snprintf(v, sizeof(v), "value.%d.%d", iter, i);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
@@ -187,7 +187,7 @@ take_full_backup(WT_SESSION *session, int i)
 	 * directories.  Otherwise only into the appropriate full directory.
 	 */
 	if (i != 0) {
-		snprintf(h, sizeof(h), "%s.%d", home_full, i);
+		(void)snprintf(h, sizeof(h), "%s.%d", home_full, i);
 		hdir = h;
 	} else
 		hdir = home_incr;
@@ -200,14 +200,15 @@ take_full_backup(WT_SESSION *session, int i)
 			 * Take a full backup into each incremental directory.
 			 */
 			for (j = 0; j < MAX_ITERATIONS; j++) {
-				snprintf(h, sizeof(h), "%s.%d", home_incr, j);
+				(void)snprintf(h, sizeof(h),
+				    "%s.%d", home_incr, j);
 				(void)snprintf(buf, sizeof(buf),
 				    "cp %s/%s %s/%s",
 				    home, filename, h, filename);
 				ret = system(buf);
 			}
 		else {
-			snprintf(h, sizeof(h), "%s.%d", home_full, i);
+			(void)snprintf(h, sizeof(h), "%s.%d", home_full, i);
 			(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
 			    home, filename, hdir, filename);
 			ret = system(buf);
@@ -237,12 +238,12 @@ take_incr_backup(WT_SESSION *session, int i)
 		 * Copy into the 0 incremental directory and then each of the
 		 * incremental directories for this iteration and later.
 		 */
-		snprintf(h, sizeof(h), "%s.0", home_incr);
+		(void)snprintf(h, sizeof(h), "%s.0", home_incr);
 		(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
 		    home, filename, h, filename);
 		ret = system(buf);
 		for (j = i; j < MAX_ITERATIONS; j++) {
-			snprintf(h, sizeof(h), "%s.%d", home_incr, j);
+			(void)snprintf(h, sizeof(h), "%s.%d", home_incr, j);
 			(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
 			    home, filename, h, filename);
 			ret = system(buf);
@@ -270,7 +271,8 @@ main(void)
 	int i, ret;
 	char cmd_buf[256];
 
-	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir %s", home, home);
+	(void)snprintf(cmd_buf, sizeof(cmd_buf),
+	    "rm -rf %s && mkdir %s", home, home);
 	if ((ret = system(cmd_buf)) != 0) {
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (EXIT_FAILURE);

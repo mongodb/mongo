@@ -199,11 +199,11 @@ wt_connect(const char *config_open)
 
 	testutil_make_work_dir(g.home);
 
-	snprintf(config, sizeof(config),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,statistics=(fast),error_prefix=\"%s\",cache_size=1GB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
-	    config_open == NULL ? "" : config_open);
+	    config_open == NULL ? "" : config_open));
 
 	if ((ret = wiredtiger_open(
 	    g.home, &event_handler, config, &g.conn)) != 0)

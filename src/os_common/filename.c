@@ -43,8 +43,8 @@ __wt_nfilename(
 	else {
 		len = strlen(S2C(session)->home) + 1 + namelen + 1;
 		WT_RET(__wt_calloc(session, 1, len, &buf));
-		snprintf(buf, len, "%s%s%.*s", S2C(session)->home,
-		    __wt_path_separator(), (int)namelen, name);
+		WT_RET(__wt_snprintf(buf, len, "%s%s%.*s", S2C(session)->home,
+		    __wt_path_separator(), (int)namelen, name));
 		*path = buf;
 	}
 

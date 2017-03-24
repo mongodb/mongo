@@ -267,9 +267,11 @@ enable_failures(uint64_t allow_writes, uint64_t allow_reads)
 	char value[100];
 
 	testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
-	snprintf(value, sizeof(value), "%" PRIu64, allow_writes);
+	testutil_check(__wt_snprintf(
+	    value, sizeof(value), "%" PRIu64, allow_writes));
 	testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
-	snprintf(value, sizeof(value), "%" PRIu64, allow_reads);
+	testutil_check(__wt_snprintf(
+	    value, sizeof(value), "%" PRIu64, allow_reads));
 	testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
 }
 
@@ -325,10 +327,11 @@ run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
 	subtest_args[narg++] = (char *)"-v";	/* subtest is always verbose */
 	subtest_args[narg++] = (char *)"-p";
 	subtest_args[narg++] = (char *)"-o";
-	snprintf(sarg, sizeof(sarg), "%" PRIu64, nops);
+	testutil_check(__wt_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops));
 	subtest_args[narg++] = sarg;		/* number of operations */
 	subtest_args[narg++] = (char *)"-n";
-	snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords);
+	testutil_check(__wt_snprintf(
+	    rarg, sizeof(rarg), "%" PRIu64, opts->nrecords));
 	subtest_args[narg++] = rarg;		/* number of records */
 	subtest_args[narg++] = NULL;
 	testutil_assert(narg <= MAX_ARGS);
@@ -463,15 +466,17 @@ subtest_main(int argc, char *argv[], bool close_test)
 	testutil_make_work_dir(opts->home);
 
 	/* Redirect stderr, stdout. */
-	sprintf(filename, "%s/%s", opts->home, STDERR_FILE);
+	testutil_check(__wt_snprintf(
+	    filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
 	testutil_assert(freopen(filename, "a", stderr) != NULL);
-	sprintf(filename, "%s/%s", opts->home, STDOUT_FILE);
+	testutil_check(__wt_snprintf(
+	    filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
 	testutil_assert(freopen(filename, "a", stdout) != NULL);
-	snprintf(config, sizeof(config),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,cache_size=250M,log=(enabled),"
 	    "transaction_sync=(enabled,method=none),extensions=("
 	    WT_FAIL_FS_LIB
-	    "=(early_load,config={environment=true,verbose=true})]");
+	    "=(early_load,config={environment=true,verbose=true})]"));
 
 	testutil_check(wiredtiger_open(opts->home, NULL, config, &opts->conn));
 	testutil_check(

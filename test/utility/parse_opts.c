@@ -115,13 +115,15 @@ testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 	if (opts->home == NULL) {
 		len = strlen("WT_TEST.")  + strlen(opts->progname) + 10;
 		opts->home = dmalloc(len);
-		snprintf(opts->home, len, "WT_TEST.%s", opts->progname);
+		testutil_check(__wt_snprintf(
+		    opts->home, len, "WT_TEST.%s", opts->progname));
 	}
 
 	/* Setup the default URI string */
 	len = strlen("table:") + strlen(opts->progname) + 10;
 	opts->uri = dmalloc(len);
-	snprintf(opts->uri, len, "table:%s", opts->progname);
+	testutil_check(__wt_snprintf(
+	    opts->uri, len, "table:%s", opts->progname));
 
 	return (0);
 }

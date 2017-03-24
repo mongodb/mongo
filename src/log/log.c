@@ -2246,8 +2246,10 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 		return (0);
 
 	va_copy(ap_copy, ap);
-	len = (size_t)vsnprintf(NULL, 0, fmt, ap_copy) + 1;
+	len = 1;
+	ret = __wt_vsnprintf_len_incr(NULL, 0, &len, fmt, ap_copy);
 	va_end(ap_copy);
+	WT_RET(ret);
 
 	WT_RET(
 	    __wt_logrec_alloc(session, sizeof(WT_LOG_RECORD) + len, &logrec));
@@ -2264,7 +2266,8 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	    rec_fmt, rectype));
 	logrec->size += (uint32_t)header_size;
 
-	(void)vsnprintf((char *)logrec->data + logrec->size, len, fmt, ap);
+	WT_ERR(__wt_vsnprintf(
+	    (char *)logrec->data + logrec->size, len, fmt, ap));
 
 	__wt_verbose(session, WT_VERB_LOG,
 	    "log_printf: %s", (char *)logrec->data + logrec->size);

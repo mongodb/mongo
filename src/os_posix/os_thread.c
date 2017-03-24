@@ -45,7 +45,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
  * __wt_thread_id --
  *	Fill in a printable version of the process and thread IDs.
  */
-void
+int
 __wt_thread_id(char *buf, size_t buflen)
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
@@ -57,10 +57,10 @@ __wt_thread_id(char *buf, size_t buflen)
 	 */
 	self = pthread_self();
 #ifdef __sun
-	(void)snprintf(buf, buflen,
-	    "%" PRIuMAX ":%u", (uintmax_t)getpid(), self);
+	return (__wt_snprintf(buf, buflen,
+	    "%" PRIuMAX ":%u", (uintmax_t)getpid(), self));
 #else
-	(void)snprintf(buf, buflen,
-	    "%" PRIuMAX ":%p", (uintmax_t)getpid(), (void *)self);
+	return (__wt_snprintf(buf, buflen,
+	    "%" PRIuMAX ":%p", (uintmax_t)getpid(), (void *)self));
 #endif
 }
