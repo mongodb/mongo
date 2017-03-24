@@ -65,9 +65,11 @@
     DBCollection.prototype.drop = function() {
         var dropResult = originalDBCollectionDrop.apply(this, arguments);
 
-        // Attempt to enable sharding on database and collection if not already done.
-        shardCollection(this);
-
+        // TODO: Disable sharding collection on OSX until SERVER-28418 is fixed.
+        if (this.getDB().serverBuildInfo().buildEnvironment.target_os !== "macOS") {
+            // Attempt to enable sharding on database and collection if not already done.
+            shardCollection(this);
+        }
         return dropResult;
     };
 }());
