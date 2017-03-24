@@ -1250,10 +1250,10 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 	WT_ERR(WT_NOTFOUND);
 
 done:
-err:	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if (ret == 0) {
-		clsm->current = c;
+err:	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		F_SET(cursor, WT_CURSTD_KEY_INT);
+		clsm->current = c;
 		if (value == &cursor->value)
 			F_SET(cursor, WT_CURSTD_VALUE_INT);
 	} else if (c != NULL)

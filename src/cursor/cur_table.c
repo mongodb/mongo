@@ -625,12 +625,24 @@ __curtable_remove(WT_CURSOR *cursor)
 	/* Find the old record so it can be removed from indices */
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
+		if (ret == WT_NOTFOUND)
+			goto notfound;
 		WT_ERR(ret);
 		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), false));
 	}
 
 	APPLY_CG(ctable, remove);
+	if (ret == WT_NOTFOUND)
+		goto notfound;
 	WT_ERR(ret);
+
+notfound:
+	/*
+	 * If the cursor is configured to overwrite and the record is not found,
+	 * that is exactly what we want.
+	 */
+	if (ret == WT_NOTFOUND && F_ISSET(primary, WT_CURSTD_OVERWRITE))
+		ret = 0;
 
 	/*
 	 * If the cursor was positioned, it stays positioned with a key but no
