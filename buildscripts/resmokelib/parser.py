@@ -24,9 +24,7 @@ DEST_TO_CONFIG = {
     "dbpath_prefix": "dbpathPrefix",
     "dbtest_executable": "dbtest",
     "dry_run": "dryRun",
-    "exclude_with_all_tags": "excludeWithAllTags",
     "exclude_with_any_tags": "excludeWithAnyTags",
-    "include_with_all_tags": "includeWithAllTags",
     "include_with_any_tags": "includeWithAnyTags",
     "jobs": "jobs",
     "mongo_executable": "mongo",
@@ -98,11 +96,6 @@ def parse_command_line():
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
                       help="The path to the dbtest executable for resmoke to use.")
 
-    parser.add_option("--excludeWithAllTags", action="append", dest="exclude_with_all_tags",
-                      metavar="TAG1,TAG2",
-                      help=("Comma separated list of tags. Any jstest that contains all of the"
-                            " specified tags will be excluded from any suites that are run."))
-
     parser.add_option("--excludeWithAnyTags", action="append", dest="exclude_with_any_tags",
                       metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. Any jstest that contains any of the"
@@ -110,11 +103,6 @@ def parse_command_line():
 
     parser.add_option("-f", "--findSuites", action="store_true", dest="find_suites",
                       help="List the names of the suites that will execute the specified tests.")
-
-    parser.add_option("--includeWithAllTags", action="append", dest="include_with_all_tags",
-                      metavar="TAG1,TAG2",
-                      help=("Comma separated list of tags. For the jstest portion of the suite(s),"
-                            " only tests which have all of the specified tags will be run."))
 
     parser.add_option("--includeWithAnyTags", action="append", dest="include_with_any_tags",
                       metavar="TAG1,TAG2",
@@ -246,10 +234,8 @@ def update_config_vars(values):
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
-    _config.EXCLUDE_WITH_ALL_TAGS = config.pop("excludeWithAllTags")
     _config.EXCLUDE_WITH_ANY_TAGS = config.pop("excludeWithAnyTags")
     _config.FAIL_FAST = not config.pop("continueOnFailure")
-    _config.INCLUDE_WITH_ALL_TAGS = config.pop("includeWithAllTags")
     _config.INCLUDE_WITH_ANY_TAGS = config.pop("includeWithAnyTags")
     _config.JOBS = config.pop("jobs")
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo"))
