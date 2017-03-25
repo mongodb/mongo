@@ -86,18 +86,11 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
-# If set, then any jstests that have all of the specified tags will be excluded from the suite(s).
-EXCLUDE_WITH_ALL_TAGS = None
-
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
 
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
-
-# If set, then only jstests that have all of the specified tags will be run during the jstest
-# portion of the suite(s).
-INCLUDE_WITH_ALL_TAGS = None
 
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).
