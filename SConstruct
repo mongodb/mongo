@@ -435,7 +435,6 @@ add_option('osx-version-min',
 )
 
 win_version_min_choices = {
-    'vista'   : ('0600', '0000'),
     'win7'    : ('0601', '0000'),
     'ws08r2'  : ('0601', '0000'),
     'win8'    : ('0602', '0000'),

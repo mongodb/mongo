@@ -46,11 +46,11 @@
 #if !defined(_WIN32_WINNT)
 // Can't use symbolic versions here, since we may not have seen sdkddkver.h yet.
 #if defined(_WIN64)
-// 64-bit builds default to Windows Server 2003 support.
-#define _WIN32_WINNT 0x0502
+// 64-bit builds default to Windows 7/Windows Server 2008 R2 support.
+#define _WIN32_WINNT 0x0601
 #else
-// 32-bit builds default to Windows XP support.
-#define _WIN32_WINNT 0x0501
+// 32-bit builds default to Windows 7/Windows Server 2008 R2 support.
+#define _WIN32_WINNT 0x0601
 #endif
 #endif
 
@@ -59,11 +59,11 @@
 #if !defined(NTDDI_VERSION)
 // Can't use symbolic versions here, since we may not have seen sdkddkver.h yet.
 #if defined(_WIN64)
-// 64-bit builds default to Windows Server 2003 SP 2 support.
-#define NTDDI_VERSION 0x05020200
+// 64-bit builds default to Windows 7/Windows Server 2008 R2 support.
+#define NTDDI_VERSION 0x06010000
 #else
-// 32-bit builds default to Windows XP SP 3 support.
-#define NTDDI_VERSION 0x05010300
+// 32-bit builds default to Windows 7/Windows Server 2008 R2 support.
+#define NTDDI_VERSION 0x06010000
 #endif
 #endif
 
@@ -114,6 +114,6 @@
 #error "MongoDB requires Windows SDK 8.1 or higher to build"
 #endif
 
-#if !defined(NTDDI_VISTA) || NTDDI_VERSION < NTDDI_VISTA
-#error "MongoDB does not support Windows versions older than Windows Vista"
+#if !defined(NTDDI_WIN7) || NTDDI_VERSION < NTDDI_WIN7
+#error "MongoDB does not support Windows versions older than Windows 7/Windows Server 2008 R2."
 #endif

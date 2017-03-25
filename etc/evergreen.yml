@@ -4821,242 +4821,6 @@ buildvariants:
 #         Windows buildvariants           #
 ###########################################
 
-- name: windows-64
-  display_name: Windows Vista
-  run_on:
-  - windows-64-vs2015-small
-  batchtime: 1440 # 1 day
-  expansions:
-    platform_decompress: unzip
-    exe: ".exe"
-    push_path: win32
-    push_bucket: downloads.mongodb.org
-    push_name: win32
-    push_arch: x86_64
-    msi_target: msi
-    content_type: application/zip
-    compile_flags: --release -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
-    python: python
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    ext: zip
-    use_scons_cache: true
-  tasks:
-  - name: compile
-    distros:
-    - windows-64-vs2015-large
-  - name: compile_all
-    distros:
-    - windows-64-vs2015-large
-  - name: aggregation
-  - name: aggregation_WT
-  - name: auth
-  - name: auth_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: disk_WT
-  - name: durability
-  - name: failpoints
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_decimal
-  - name: jsCore_decimal_WT
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_WT
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_replication_WT
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_concurrent_sharded_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: replica_sets
-  - name: replica_sets_WT
-  - name: replica_sets_jscore_passthrough
-  - name: replica_sets_jscore_passthrough_WT
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
-  - name: sharding
-  - name: sharding_WT
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: tool
-  - name: tool_WT
-  - name: push
-    distros:
-    - rhel70-small
-
-- name: windows-64-2k8
-  display_name: Windows 2008R2
-  run_on:
-  - windows-64-vs2015-small
-  batchtime: 1440 # 1 day
-  expansions:
-    platform_decompress: unzip
-    exe: ".exe"
-    push_path: win32
-    push_bucket: downloads.mongodb.org
-    push_name: win32
-    push_arch: x86_64-2008plus
-    multiversion_platform_arch: "windows/x86_64-2008plus"
-    msi_target: msi
-    content_type: application/zip
-    compile_flags: --release --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
-    python: python
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    ext: zip
-    use_scons_cache: true
-  tasks:
-  - name: compile
-    distros:
-    - windows-64-vs2015-large
-  - name: compile_all
-    distros:
-    - windows-64-vs2015-large
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_read_concern_majority_passthrough_WT
-  - name: aggregation_sharded_collections_passthrough_WT
-  - name: auth
-  - name: auth_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: disk_WT
-  - name: durability
-  - name: failpoints
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_compression
-  - name: jsCore_decimal
-  - name: jsCore_decimal_WT
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_WT
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_replication_WT
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_concurrent_sharded_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: mongosTest
-  - name: multiversion
-  - name: multiversion_auth
-  - name: multiversion_WT
-  - name: multiversion_multistorage_engine
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: read_concern_linearizable_passthrough
-  - name: read_concern_linearizable_passthrough_WT
-  - name: read_concern_majority_passthrough_WT
-  - name: replica_sets
-  - name: replica_sets_WT
-  - name: replica_sets_compression
-  - name: replica_sets_jscore_passthrough
-  - name: replica_sets_jscore_passthrough_WT
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
-  - name: sharding
-  - name: sharding_WT
-  - name: sharding_compression
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: tool
-  - name: tool_WT
-  - name: push
-    distros:
-    - rhel70-small
-
 - name: windows-64-2k8-debug
   display_name: "! Windows 2008R2 DEBUG"
   run_on:
@@ -5205,8 +4969,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
 
-- name: enterprise-windows-64
-  display_name: "* Enterprise Windows"
+- name: enterprise-windows-64-2k8
+  display_name: "* Enterprise Windows 2008R2"
   modules:
   - enterprise
   run_on:
@@ -5275,8 +5039,8 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: enterprise-windows-64-inmem
-  display_name: Enterprise Windows (inMemory)
+- name: enterprise-windows-64-2k8-inmem
+  display_name: Enterprise Windows 2008R2 (inMemory)
   modules:
   - enterprise
   run_on:
@@ -5368,18 +5132,39 @@ buildvariants:
     - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_WT
+  - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
   - name: disk_WT
   - name: durability
   - name: failpoints
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jstestfuzz
@@ -5394,49 +5179,53 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: replica_sets
-  - name: replica_sets_WT
-  - name: replica_sets_jscore_passthrough
-  - name: replica_sets_jscore_passthrough_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
-  - name: sharding
-  - name: sharding_WT
-  - name: slow1
-  - name: slow1_WT
+  - name: mmap
+  - name: mongosTest
+  - name: multiversion
+  - name: multiversion_WT
+  - name: multiversion_auth
+  - name: multiversion_multistorage_engine
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: replica_sets
+  - name: replica_sets_WT
+  - name: replica_sets_compression
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_WT
   - name: serial_run
   - name: serial_run_WT
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+  - name: sharding_WT
+  - name: sharding_compression
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: tool
-  - name: tool_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: slow1
+  - name: slow1_WT
   - name: ssl
   - name: sslSpecial
+  - name: tool
+  - name: tool_WT
   - name: push
     distros:
     - rhel70-small
@@ -5473,111 +5262,8 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-- name: osx-107
-  display_name: OS X 10.7
-  run_on:
-  - osx-1010
-  batchtime: 1440 # 1 day
-  expansions:
-    push_path: osx
-    push_bucket: downloads.mongodb.org
-    push_name: osx
-    push_arch: x86_64
-    compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
-    python: python2.7
-    num_jobs_available: 1
-    build_mongoreplay: true
-  tasks:
-  - name: compile
-  - name: compile_all
-  - name: aggregation
-  - name: aggregation_WT
-  - name: auth
-  - name: auth_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: disk_WT
-  - name: durability
-  - name: failpoints
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: httpinterface
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_compression
-  - name: jsCore_decimal
-  - name: jsCore_decimal_WT
-  - name: jstestfuzz
-  - name: jstestfuzz_WT
-  - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_WT
-  - name: jstestfuzz_concurrent_replication
-  - name: jstestfuzz_concurrent_replication_WT
-  - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_concurrent_sharded_WT
-  - name: jstestfuzz_replication
-  - name: jstestfuzz_replication_WT
-  - name: jstestfuzz_sharded
-  - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: replica_sets
-  - name: replica_sets_WT
-  - name: replica_sets_compression
-  - name: replica_sets_jscore_passthrough
-  - name: replica_sets_jscore_passthrough_WT
-  - name: master_slave
-  - name: master_slave_WT
-  - name: master_slave_jscore_passthrough
-  - name: master_slave_jscore_passthrough_WT
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: tool
-  - name: tool_WT
-  - name: push
-    distros:
-    - rhel70-small
-
-- name: osx-107-ssl
-  display_name: SSL OS X 10.7
+- name: osx-1010-ssl
+  display_name: SSL OS X 10.10
   run_on:
   - osx-1010
   batchtime: 1440 # 1 day
@@ -5600,6 +5286,16 @@ buildvariants:
   - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
@@ -5608,20 +5304,18 @@ buildvariants:
   - name: failpoints
   - name: gle_auth
   - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_WT
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: httpinterface
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
+  - name: jsCore_compression
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: jstestfuzz
@@ -5636,42 +5330,40 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
-  - name: mmap
-  - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: read_concern_majority_passthrough_WT
-  - name: replica_sets
-  - name: replica_sets_WT
-  - name: replica_sets_jscore_passthrough
-  - name: replica_sets_jscore_passthrough_WT
-  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
-  - name: slow1
-  - name: slow1_WT
+  - name: mmap
+  - name: mongosTest
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: read_concern_majority_passthrough_WT
+  - name: replica_sets
+  - name: replica_sets_WT
+  - name: replica_sets_compression
+  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: serial_run
   - name: serial_run_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: slow1
+  - name: slow1_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -5680,8 +5372,8 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: osx-107-debug
-  display_name: "* OS X 10.7 DEBUG"
+- name: osx-1010-debug
+  display_name: "* OS X 10.10 DEBUG"
   run_on:
   - osx-1010
   expansions:
@@ -5721,8 +5413,8 @@ buildvariants:
   - name: tool
   - name: tool_WT
 
-- name: enterprise-osx-107
-  display_name: Enterprise OS X 10.7
+- name: enterprise-osx-1010
+  display_name: Enterprise OS X 10.10
   modules:
   - enterprise
   run_on:

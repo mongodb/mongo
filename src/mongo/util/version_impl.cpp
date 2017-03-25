@@ -83,8 +83,6 @@ public:
 #if defined(_WIN32)
 #if (NTDDI_VERSION >= NTDDI_WIN7)
         return "Windows 7/Windows Server 2008 R2";
-#elif (NTDDI_VERSION >= NTDDI_VISTA)
-        return "Windows Vista/Windows Server 2008";
 #else
 #error This targeted Windows version is not supported
 #endif  // NTDDI_VERSION
