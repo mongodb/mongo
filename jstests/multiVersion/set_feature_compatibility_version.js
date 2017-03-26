@@ -208,7 +208,10 @@
     replSetConfig = rst.getReplSetConfig();
     replSetConfig.members[1].priority = 0;
     replSetConfig.members[1].votes = 0;
-    rst.initiate(replSetConfig, 'replSetInitiate', false);
+
+    // TODO(SERVER-14017): remove this in favor of using initiate() everywhere.
+    rst.initiateWithAnyNodeAsPrimary(replSetConfig);
+    rst.awaitSecondaryNodes();
 
     primaryAdminDB = rst.getPrimary().getDB("admin");
     res = assert.commandWorked(
