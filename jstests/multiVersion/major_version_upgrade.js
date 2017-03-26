@@ -102,7 +102,10 @@
 
     // Start up and initiate the replica set.
     rst.startSet();
-    rst.initiate();
+
+    // ReplSetTest.stepUp() requires replSetGetConfig, which is not available in 2.6, so we
+    // use initiateWithAnyNodeAsPrimary() instead.
+    rst.initiateWithAnyNodeAsPrimary();
 
     // Iterate from earliest to latest versions specified in the versions list, and follow the steps
     // outlined at the top of this test file.

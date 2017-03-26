@@ -231,7 +231,8 @@ print('--- replica set test ---');
 var rst = new ReplSetTest({
     name: 'testset',
     nodes: 2,
-    nodeOptions: {'auth': null, 'httpinterface': null, 'keyFile': keyfile}
+    nodeOptions: {'auth': null, 'httpinterface': null},
+    keyFile: keyfile
 });
 
 rst.startSet();
