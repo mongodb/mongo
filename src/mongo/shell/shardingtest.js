@@ -1153,7 +1153,10 @@ var ShardingTest = function(params) {
             this._rs[i] =
                 {setName: setName, test: rs, nodes: rs.startSet(rsDefaults), url: rs.getURL()};
 
-            rs.initiate();
+            // ReplSetTest.initiate() requires all nodes to be to be authorized to run
+            // replSetGetStatus.
+            // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
+            rs.initiateWithAnyNodeAsPrimary();
 
             this["rs" + i] = rs;
             this._rsObjects[i] = rs;
@@ -1301,7 +1304,10 @@ var ShardingTest = function(params) {
     var config = this.configRS.getReplSetConfig();
     config.configsvr = true;
     config.settings = config.settings || {};
-    this.configRS.initiate(config);
+
+    // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
+    // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
+    this.configRS.initiateWithAnyNodeAsPrimary(config);
 
     // Wait for master to be elected before starting mongos
     var csrsPrimary = this.configRS.getPrimary();
