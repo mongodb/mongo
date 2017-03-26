@@ -190,7 +190,6 @@ var Cluster = function(options) {
 
     this.setup = function setup() {
         var verbosityLevel = 0;
-        const REPL_SET_INITIATE_TIMEOUT_MS = 5 * 60 * 1000;
 
         if (initialized) {
             throw new Error('cluster has already been initialized');
@@ -217,11 +216,7 @@ var Cluster = function(options) {
                     oplogSize: 1024,
                     verbose: verbosityLevel
                 };
-                shardConfig.rsOptions = {
-                    // Specify a longer timeout for replSetInitiate, to ensure that
-                    // slow hardware has sufficient time for file pre-allocation.
-                    initiateTimeout: REPL_SET_INITIATE_TIMEOUT_MS,
-                };
+                shardConfig.rsOptions = {};
             }
 
             st = new ShardingTest(shardConfig);
@@ -272,10 +267,7 @@ var Cluster = function(options) {
             var rst = new ReplSetTest(replSetConfig);
             rst.startSet();
 
-            // Send the replSetInitiate command and wait for initialization, with an increased
-            // timeout. This should provide sufficient time for slow hardware, where files may need
-            // to be pre-allocated.
-            rst.initiate(null, null, REPL_SET_INITIATE_TIMEOUT_MS);
+            rst.initiate();
             rst.awaitSecondaryNodes();
 
             conn = rst.getPrimary();
