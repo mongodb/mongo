@@ -16,7 +16,10 @@ function runInitialSyncTest() {
         {name: "jstests_initsync1_x509", nodes: {node0: x509_options1, node1: x509_options2}});
 
     var conns = replTest.startSet();
-    replTest.initiate();
+
+    // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
+    // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
+    replTest.initiateWithAnyNodeAsPrimary();
 
     var master = replTest.getPrimary();
     var foo = master.getDB("foo");

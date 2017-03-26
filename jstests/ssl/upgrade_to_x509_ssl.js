@@ -30,7 +30,10 @@ opts = {
 var NUM_NODES = 3;
 var rst = new ReplSetTest({name: 'sslSet', nodes: NUM_NODES, nodeOptions: opts});
 rst.startSet();
-rst.initiate();
+
+// ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
+// TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
+rst.initiateWithAnyNodeAsPrimary();
 
 // Connect to master and do some basic operations
 var rstConn1 = rst.getPrimary();
