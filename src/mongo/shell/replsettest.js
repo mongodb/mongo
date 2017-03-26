@@ -790,7 +790,12 @@ var ReplSetTest = function(opts) {
      */
     this.initiateWithNodeZeroAsPrimary = function(cfg, initCmd) {
         this.initiateWithAnyNodeAsPrimary(cfg, initCmd);
-        this.stepUp(this.nodes[0]);
+
+        // stepUp() calls awaitReplication() which requires all nodes to be authorized to run
+        // replSetGetStatus.
+        asCluster(this.nodes, function() {
+            self.stepUp(self.nodes[0]);
+        });
     };
 
     /**
@@ -809,6 +814,7 @@ var ReplSetTest = function(opts) {
      */
     this.stepUp = function(node) {
         this.awaitSecondaryNodes();
+        this.awaitReplication();
         this.awaitNodesAgreeOnPrimary();
         if (this.getPrimary() === node) {
             return;
@@ -829,6 +835,7 @@ var ReplSetTest = function(opts) {
                     print("Caught exception while stepping down node '" + tojson(node.host) +
                           "': " + tojson(ex));
                 }
+                this.awaitReplication();
                 this.awaitNodesAgreeOnPrimary();
             }
 
