@@ -21,6 +21,7 @@ selector:
     # New feature in v3.6 mongos and mongod.
     - jstests/sharding/logical_time_api.js
     - jstests/sharding/operation_time_api.js
+    - jstests/sharding/auth_drop_user_while_logged_in.js
     # New feature in v3.6 mongo shell.
     - jstests/sharding/causal_consistency_shell_support.js
 
