@@ -437,8 +437,10 @@ dump_table_parts_config(WT_SESSION *session, WT_CURSOR *cursor,
 	len = strlen(entry) + strlen(name) + 1;
 	if ((uriprefix = malloc(len)) == NULL)
 		return (util_err(session, errno, NULL));
-	if ((ret = __wt_snprintf(uriprefix, len, "%s%s", entry, name)) != 0)
+	if ((ret = __wt_snprintf(uriprefix, len, "%s%s", entry, name)) != 0) {
+		free(uriprefix);
 		return (util_err(session, ret, NULL));
+	}
 
 	/*
 	 * Search the file looking for column group and index key/value pairs:

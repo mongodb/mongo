@@ -153,13 +153,15 @@ json_kvraw_append(WT_SESSION *session,
 		needsize = strlen(ins->kvraw) + len + 2;
 		if ((tmp = malloc(needsize)) == NULL)
 			return (util_err(session, errno, NULL));
-		if ((ret = __wt_snprintf(
-		    tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str)) != 0)
-			return (util_err(session, ret, NULL));
+		WT_ERR(__wt_snprintf(
+		    tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str));
 		free(ins->kvraw);
 		ins->kvraw = tmp;
 	}
 	return (0);
+
+err:	free(tmp);
+	return (util_err(session, ret, NULL));
 }
 
 /*

@@ -326,12 +326,12 @@ util_uri(WT_SESSION *session, const char *s, const char *type)
 	 * the default type for the operation.
 	 */
 	if (strchr(s, ':') != NULL)
-		ret = __wt_snprintf(name, len, "%s", s);
+		WT_ERR(__wt_snprintf(name, len, "%s", s));
 	else
-		ret = __wt_snprintf(name, len, "%s:%s", type, s);
-	if (ret != 0) {
-		(void)util_err(session, ret, NULL);
-		return (NULL);
-	}
+		WT_ERR(__wt_snprintf(name, len, "%s:%s", type, s));
 	return (name);
+
+err:	free(name);
+	(void)util_err(session, ret, NULL);
+	return (NULL);
 }

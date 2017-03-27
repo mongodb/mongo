@@ -2623,7 +2623,6 @@ main(int argc, char *argv[])
 			testutil_check(__wt_snprintf_len_incr(
 			    cc_buf + pos, req_len - pos, &pos, "%s%s",
 			    append_comma, user_cconfig));
-			append_comma = ",";
 		}
 
 		if (strlen(cc_buf) != 0 && (ret =
@@ -2658,7 +2657,6 @@ main(int argc, char *argv[])
 			testutil_check(__wt_snprintf_len_incr(
 			    tc_buf + pos, req_len - pos, &pos, "%s%s",
 			    append_comma, user_tconfig));
-			append_comma = ",";
 		}
 
 		if (strlen(tc_buf) != 0 && (ret =
