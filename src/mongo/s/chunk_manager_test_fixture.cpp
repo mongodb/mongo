@@ -40,14 +40,15 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-const NamespaceString ChunkManagerTestFixture::kNss("TestDB", "TestColl");
 
 void ChunkManagerTestFixture::setUp() {
     ShardingCatalogTestFixture::setUp();
@@ -57,16 +58,39 @@ void ChunkManagerTestFixture::setUp() {
     CollatorFactoryInterface::set(serviceContext(), stdx::make_unique<CollatorFactoryMock>());
 }
 
+executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
+ChunkManagerTestFixture::scheduleRoutingInfoRefresh(const NamespaceString& nss) {
+    return launchAsync([this, nss] {
+        auto client = serviceContext()->makeClient("Test");
+        auto opCtx = client->makeOperationContext();
+        auto const catalogCache = Grid::get(serviceContext())->catalogCache();
+        catalogCache->invalidateShardedCollection(nss.ns());
+
+        return boost::make_optional(
+            uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx.get(), nss)));
+    });
+}
+
 std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
+    const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     const std::vector<BSONObj>& splitPoints) {
     ChunkVersion version(1, 0, OID::gen());
 
+    const BSONObj databaseBSON = [&]() {
+        DatabaseType db;
+        db.setName(nss.db().toString());
+        db.setPrimary({"0"});
+        db.setSharded(true);
+
+        return db.toBSON();
+    }();
+
     const BSONObj collectionBSON = [&]() {
         CollectionType coll;
-        coll.setNs(kNss);
+        coll.setNs(nss);
         coll.setEpoch(version.epoch());
         coll.setKeyPattern(shardKeyPattern.getKeyPattern());
         coll.setUnique(unique);
@@ -78,7 +102,7 @@ std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
         return coll.toBSON();
     }();
 
-    std::vector<BSONObj> shards;
+    std::vector<ShardType> shards;
     std::vector<BSONObj> initialChunks;
 
     auto splitPointsIncludingEnds(splitPoints);
@@ -91,10 +115,8 @@ std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
         shard.setName(str::stream() << (i - 1));
         shard.setHost(str::stream() << "Host" << (i - 1) << ":12345");
 
-        shards.push_back(shard.toBSON());
-
         ChunkType chunk(
-            kNss,
+            nss,
             {shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i - 1],
                                                               false),
              shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
@@ -102,21 +124,25 @@ std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
             shard.getName());
 
         initialChunks.push_back(chunk.toConfigBSON());
+        shards.push_back(std::move(shard));
 
         version.incMajor();
     }
 
-    auto future = launchAsync([&] {
-        auto client = serviceContext()->makeClient("Test");
-        auto opCtx = client->makeOperationContext();
-        return CatalogCache::refreshCollectionRoutingInfo(opCtx.get(), kNss, nullptr);
-    });
+    setupShards(shards);
 
+    auto future = scheduleRoutingInfoRefresh(nss);
+
+    expectFindOnConfigSendBSONObjVector({databaseBSON});
+    expectFindOnConfigSendBSONObjVector({collectionBSON});
     expectFindOnConfigSendBSONObjVector({collectionBSON});
     expectFindOnConfigSendBSONObjVector(initialChunks);
-    expectFindOnConfigSendBSONObjVector(shards);
 
-    return future.timed_get(kFutureTimeout);
+    auto routingInfo = future.timed_get(kFutureTimeout);
+    ASSERT(routingInfo->cm());
+    ASSERT(!routingInfo->primary());
+
+    return routingInfo->cm();
 }
 
 }  // namespace mongo

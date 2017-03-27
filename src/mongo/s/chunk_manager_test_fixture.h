@@ -37,6 +37,7 @@
 namespace mongo {
 
 class BSONObj;
+class CachedCollectionRoutingInfo;
 class ChunkManager;
 class CollatorInterface;
 class ShardKeyPattern;
@@ -46,17 +47,27 @@ protected:
     void setUp() override;
 
     /**
-     * Returns a chunk manager with chunks at the specified split points. Each individual chunk is
-     * placed on a separate shard with shard id being a single number ranging from "0" to the number
-     * of chunks.
+     * Returns a chunk manager for the specified namespace with chunks at the specified split
+     * points. Each individual chunk is placed on a separate shard with shard id being a single
+     * number ranging from "0" to the number of chunks.
      */
     std::shared_ptr<ChunkManager> makeChunkManager(
+        const NamespaceString& nss,
         const ShardKeyPattern& shardKeyPattern,
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         const std::vector<BSONObj>& splitPoints);
 
-    static const NamespaceString kNss;
+    /**
+     * Invalidates the catalog cache for 'kNss' and schedules a thread to invoke the blocking 'get'
+     * call, returning a future which can be obtained to get the specified routing information.
+     *
+     * NOTE: The returned value is always set. The reason to use optional is a deficiency of
+     * std::future with the MSVC STL library, which requires the templated type to be default
+     * constructible.
+     */
+    executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
+    scheduleRoutingInfoRefresh(const NamespaceString& nss);
 };
 
 }  // namespace mongo

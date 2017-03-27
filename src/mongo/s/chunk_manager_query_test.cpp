@@ -39,6 +39,8 @@
 namespace mongo {
 namespace {
 
+const NamespaceString kNss("TestDB", "TestColl");
+
 class ChunkManagerQueryTest : public ChunkManagerTestFixture {
 protected:
     void runQueryTest(const BSONObj& shardKey,
@@ -50,7 +52,7 @@ protected:
                       const std::set<ShardId> expectedShardIds) {
         const ShardKeyPattern shardKeyPattern(shardKey);
         auto chunkManager =
-            makeChunkManager(shardKeyPattern, std::move(defaultCollator), false, splitPoints);
+            makeChunkManager(kNss, shardKeyPattern, std::move(defaultCollator), false, splitPoints);
 
         std::set<ShardId> shardIds;
         chunkManager->getShardIdsForQuery(operationContext(), query, queryCollation, &shardIds);

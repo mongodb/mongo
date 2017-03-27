@@ -88,6 +88,126 @@ public:
     }
 };
 
+/**
+ * Blocking method, which refreshes the routing information for the specified collection. If
+ * 'existingRoutingInfo' has been specified uses this as a basis to perform an 'incremental'
+ * refresh, which only fetches the chunks which changed. Otherwise does a full refresh, fetching all
+ * the chunks for the collection.
+ *
+ * Returns the refreshed routing information if the collection is still sharded or nullptr if it is
+ * not. If refresh fails for any reason, throws a DBException.
+ *
+ * With the exception of ConflictingOperationInProgress, error codes thrown from this method are
+ * final in that there is nothing that can be done to remedy them other than pass the error to the
+ * user.
+ *
+ * ConflictingOperationInProgress indicates that the chunk metadata was found to be inconsistent.
+ * Since this may be transient, due to the collection being dropped or recreated, the caller must
+ * retry the reload up to some configurable number of attempts.
+ */
+std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::shared_ptr<ChunkManager> existingRoutingInfo) {
+    Timer t;
+
+    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+
+    // Decide whether to do a full or partial load based on the state of the collection
+    auto collStatus = catalogClient->getCollection(opCtx, nss.ns());
+    if (collStatus == ErrorCodes::NamespaceNotFound) {
+        return nullptr;
+    }
+
+    const auto coll = uassertStatusOK(std::move(collStatus)).value;
+    if (coll.getDropped()) {
+        return nullptr;
+    }
+
+    ChunkVersion startingCollectionVersion;
+    ChunkMap chunkMap =
+        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>();
+
+    if (!existingRoutingInfo) {
+        // If we don't have a basis chunk manager, do a full refresh
+        startingCollectionVersion = ChunkVersion(0, 0, coll.getEpoch());
+    } else if (existingRoutingInfo->getVersion().epoch() != coll.getEpoch()) {
+        // If the collection's epoch has changed, do a full refresh
+        startingCollectionVersion = ChunkVersion(0, 0, coll.getEpoch());
+    } else {
+        // Otherwise do a partial refresh
+        startingCollectionVersion = existingRoutingInfo->getVersion();
+        chunkMap = existingRoutingInfo->chunkMap();
+    }
+
+    log() << "Refreshing chunks for collection " << nss << " based on version "
+          << startingCollectionVersion;
+
+    // Diff tracker should *always* find at least one chunk if collection exists
+    const auto diffQuery =
+        CMConfigDiffTracker::createConfigDiffQuery(nss, startingCollectionVersion);
+
+    // Query the chunks which have changed
+    std::vector<ChunkType> newChunks;
+    repl::OpTime opTime;
+    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getChunks(
+        opCtx,
+        diffQuery.query,
+        diffQuery.sort,
+        boost::none,
+        &newChunks,
+        &opTime,
+        repl::ReadConcernLevel::kMajorityReadConcern));
+
+    ChunkVersion collectionVersion = startingCollectionVersion;
+
+    ShardVersionMap unusedShardVersions;
+    CMConfigDiffTracker differ(nss, &chunkMap, &collectionVersion, &unusedShardVersions);
+
+    const int diffsApplied = differ.calculateConfigDiff(opCtx, newChunks);
+
+    if (diffsApplied < 1) {
+        log() << "Refresh for collection " << nss << " took " << t.millis()
+              << " ms and failed because the collection's "
+                 "sharding metadata either changed in between or "
+                 "became corrupted";
+
+        uasserted(ErrorCodes::ConflictingOperationInProgress,
+                  "Collection sharding status changed during refresh or became corrupted");
+    }
+
+    // If at least one diff was applied, the metadata is correct, but it might not have changed so
+    // in this case there is no need to recreate the chunk manager.
+    //
+    // NOTE: In addition to the above statement, it is also important that we return the same chunk
+    // manager object, because the write commands' code relies on changes of the chunk manager's
+    // sequence number to detect batch writes not making progress because of chunks moving across
+    // shards too frequently.
+    if (collectionVersion == startingCollectionVersion) {
+        log() << "Refresh for collection " << nss << " took " << t.millis()
+              << " ms and didn't find any metadata changes";
+
+        return existingRoutingInfo;
+    }
+
+    std::unique_ptr<CollatorInterface> defaultCollator;
+    if (!coll.getDefaultCollation().isEmpty()) {
+        // The collation should have been validated upon collection creation
+        defaultCollator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(coll.getDefaultCollation()));
+    }
+
+    log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and found version "
+          << collectionVersion;
+
+    return stdx::make_unique<ChunkManager>(nss,
+                                           coll.getKeyPattern(),
+                                           std::move(defaultCollator),
+                                           coll.getUnique(),
+                                           std::move(chunkMap),
+                                           collectionVersion);
+}
+
 }  // namespace
 
 CatalogCache::CatalogCache() = default;
@@ -265,109 +385,6 @@ void CatalogCache::purgeDatabase(StringData dbName) {
 void CatalogCache::purgeAllDatabases() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _databases.clear();
-}
-
-std::shared_ptr<ChunkManager> CatalogCache::refreshCollectionRoutingInfo(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    std::shared_ptr<ChunkManager> existingRoutingInfo) {
-    Timer t;
-
-    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
-
-    // Decide whether to do a full or partial load based on the state of the collection
-    auto collStatus = catalogClient->getCollection(opCtx, nss.ns());
-    if (collStatus == ErrorCodes::NamespaceNotFound) {
-        return nullptr;
-    }
-
-    const auto coll = uassertStatusOK(std::move(collStatus)).value;
-    if (coll.getDropped()) {
-        return nullptr;
-    }
-
-    ChunkVersion startingCollectionVersion;
-    ChunkMap chunkMap =
-        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>();
-
-    if (!existingRoutingInfo) {
-        // If we don't have a basis chunk manager, do a full refresh
-        startingCollectionVersion = ChunkVersion(0, 0, coll.getEpoch());
-    } else if (existingRoutingInfo->getVersion().epoch() != coll.getEpoch()) {
-        // If the collection's epoch has changed, do a full refresh
-        startingCollectionVersion = ChunkVersion(0, 0, coll.getEpoch());
-    } else {
-        // Otherwise do a partial refresh
-        startingCollectionVersion = existingRoutingInfo->getVersion();
-        chunkMap = existingRoutingInfo->chunkMap();
-    }
-
-    log() << "Refreshing chunks for collection " << nss << " based on version "
-          << startingCollectionVersion;
-
-    // Diff tracker should *always* find at least one chunk if collection exists
-    const auto diffQuery =
-        CMConfigDiffTracker::createConfigDiffQuery(nss, startingCollectionVersion);
-
-    // Query the chunks which have changed
-    std::vector<ChunkType> newChunks;
-    repl::OpTime opTime;
-    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getChunks(
-        opCtx,
-        diffQuery.query,
-        diffQuery.sort,
-        boost::none,
-        &newChunks,
-        &opTime,
-        repl::ReadConcernLevel::kMajorityReadConcern));
-
-    ChunkVersion collectionVersion = startingCollectionVersion;
-
-    ShardVersionMap unusedShardVersions;
-    CMConfigDiffTracker differ(nss, &chunkMap, &collectionVersion, &unusedShardVersions);
-
-    const int diffsApplied = differ.calculateConfigDiff(opCtx, newChunks);
-
-    if (diffsApplied < 1) {
-        log() << "Refresh for collection " << nss << " took " << t.millis()
-              << " ms and failed because the collection's "
-                 "sharding metadata either changed in between or "
-                 "became corrupted";
-
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  "Collection sharding status changed during refresh or became corrupted");
-    }
-
-    // If at least one diff was applied, the metadata is correct, but it might not have changed so
-    // in this case there is no need to recreate the chunk manager.
-    //
-    // NOTE: In addition to the above statement, it is also important that we return the same chunk
-    // manager object, because the write commands' code relies on changes of the chunk manager's
-    // sequence number to detect batch writes not making progress because of chunks moving across
-    // shards too frequently.
-    if (collectionVersion == startingCollectionVersion) {
-        log() << "Refresh for collection " << nss << " took " << t.millis()
-              << " ms and didn't find any metadata changes";
-
-        return existingRoutingInfo;
-    }
-
-    std::unique_ptr<CollatorInterface> defaultCollator;
-    if (!coll.getDefaultCollation().isEmpty()) {
-        // The collation should have been validated upon collection creation
-        defaultCollator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(coll.getDefaultCollation()));
-    }
-
-    log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and found version "
-          << collectionVersion;
-
-    return stdx::make_unique<ChunkManager>(nss,
-                                           coll.getKeyPattern(),
-                                           std::move(defaultCollator),
-                                           coll.getUnique(),
-                                           std::move(chunkMap),
-                                           collectionVersion);
 }
 
 std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase_inlock(

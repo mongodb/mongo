@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -111,30 +111,6 @@ public:
      * Blocking method, which removes all databases (including their collections) from the cache.
      */
     void purgeAllDatabases();
-
-    /**
-     * Blocking method, which refreshes the routing information for the specified collection. If
-     * 'existingRoutingInfo' has been specified uses this as a basis to perform an 'incremental'
-     * refresh, which only fetches the chunks which changed. Otherwise does a full refresh, fetching
-     * all the chunks for the collection.
-     *
-     * Returns the refreshed routing information if the collection is still sharded or nullptr if it
-     * is not. If refresh fails for any reason, throws a DBException.
-     *
-     * With the exception of ConflictingOperationInProgress, error codes thrown from this method are
-     * final in that there is nothing that can be done to remedy them other than pass the error to
-     * the user.
-     *
-     * ConflictingOperationInProgress indicates that the chunk metadata was found to be
-     * inconsistent. Since this may be transient, due to the collection being dropped or recreated,
-     * the caller must retry the reload up to some configurable number of attempts.
-     *
-     * NOTE: Should never be called directly and is exposed as public for testing purposes only.
-     */
-    static std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        std::shared_ptr<ChunkManager> existingRoutingInfo);
 
 private:
     // Make the cache entries friends so they can access the private classes below
