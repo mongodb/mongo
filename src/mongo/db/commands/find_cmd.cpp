@@ -41,17 +41,17 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -243,37 +243,34 @@ public:
 
         ShardingState* const shardingState = ShardingState::get(txn);
 
-        if (OperationShardVersion::get(txn).hasShardVersion() && shardingState->enabled()) {
-            ChunkVersion receivedVersion = OperationShardVersion::get(txn).getShardVersion(nss);
-            ChunkVersion latestVersion;
-            // Wait for migration completion to get the correct chunk version.
+        // Parse, canonicalize, plan, transcribe, and get a plan executor.
+        boost::optional<AutoGetCollectionForRead> optionalCtx;
+        try {
+            optionalCtx.emplace(txn, nss);
+        } catch (const StaleConfigException& sce) {
+            // Wait for migration completion to get the correct chunk version
             const int maxTimeoutSec = 30;
             int timeoutSec = cq->getParsed().getMaxTimeMS() / 1000;
             if (!timeoutSec || timeoutSec > maxTimeoutSec) {
                 timeoutSec = maxTimeoutSec;
             }
 
-            if (!shardingState->waitTillNotInCriticalSection(timeoutSec)) {
-                uasserted(ErrorCodes::LockTimeout, "Timeout while waiting for migration commit");
+            if (shardingState->waitTillNotInCriticalSection(maxTimeoutSec)) {
+                ChunkVersion unused;
+                shardingState->refreshMetadataIfNeeded(
+                    txn, nss.ns(), sce.getVersionReceived(), &unused);
             }
-
-            // If the received version is newer than the version cached in 'shardingState', then we
-            // have to refresh 'shardingState' from the config servers. We do this before acquiring
-            // locks so that we don't hold locks while waiting on the network.
-            uassertStatusOK(shardingState->refreshMetadataIfNeeded(
-                txn, nss.ns(), receivedVersion, &latestVersion));
+            throw;
         }
 
-        // Acquire locks.
-        AutoGetCollectionForRead ctx(txn, nss);
+        const auto& ctx = *optionalCtx;
         Collection* collection = ctx.getCollection();
 
         const int dbProfilingLevel =
             ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
 
-        // It is possible that the sharding version will change during yield while we are
-        // retrieving a plan executor. If this happens we will throw an error and mongos will
-        // retry.
+        // It is possible that the sharding version will change during yield while we are retrieving
+        // a plan executor. If this happens we will throw an error and mongos will retry.
         const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
         // Get the execution plan for the query.

@@ -42,7 +42,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/stale_exception.h"
@@ -525,12 +525,37 @@ std::string runQuery(OperationContext* txn,
     LOG(5) << "Running query:\n" << cq->toString();
     LOG(2) << "Running query: " << cq->toStringShort();
 
+    ShardingState* const shardingState = ShardingState::get(txn);
+
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionForRead ctx(txn, nss);
+    boost::optional<AutoGetCollectionForRead> optionalCtx;
+    try {
+        optionalCtx.emplace(txn, nss);
+    } catch (const StaleConfigException& sce) {
+        // Wait for migration completion to get the correct chunk version
+        const int maxTimeoutSec = 30;
+        int timeoutSec = cq->getParsed().getMaxTimeMS() / 1000;
+        if (!timeoutSec || timeoutSec > maxTimeoutSec) {
+            timeoutSec = maxTimeoutSec;
+        }
+
+        if (shardingState->waitTillNotInCriticalSection(maxTimeoutSec)) {
+            ChunkVersion unused;
+            shardingState->refreshMetadataIfNeeded(
+                txn, nss.ns(), sce.getVersionReceived(), &unused);
+        }
+        throw;
+    }
+
+    const auto& ctx = *optionalCtx;
     Collection* collection = ctx.getCollection();
 
     const int dbProfilingLevel =
         ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
+
+    // It is possible that the sharding version will change during yield while we are retrieving a
+    // plan executor. If this happens we will throw an error and mongos will retry.
+    const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
     // We have a parsed query. Time to get the execution plan for it.
     std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
@@ -567,11 +592,6 @@ std::string runQuery(OperationContext* txn,
         result.setData(qr.view2ptr(), true);
         return "";
     }
-
-    ShardingState* const shardingState = ShardingState::get(txn);
-
-    // We freak out later if this changes before we're done with the query.
-    const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
     // Handle query option $maxTimeMS (not used with commands).
     curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);

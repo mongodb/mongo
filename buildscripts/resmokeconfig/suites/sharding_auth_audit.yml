@@ -24,6 +24,7 @@ selector:
     - jstests/sharding/migration_with_source_deletes.js                 # SERVER-21713
     - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
     - jstests/sharding/donor_shard_abort_and_start_new_migration.js     # SERVER-21713
+    - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
 
 executor:
   js_test:
