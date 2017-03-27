@@ -172,6 +172,9 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
         mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
         test_data["setParametersMongos"] = _format_test_data_set_parameters(mongos_set_parameters)
 
+    if "eval_prepend" in kwargs:
+        eval_sb.append(str(kwargs.pop("eval_prepend")))
+
     for var_name in global_vars:
         _format_shell_vars(eval_sb, var_name, global_vars[var_name])
 
