@@ -41,6 +41,7 @@ DEST_TO_CONFIG = {
     "shell_read_mode": "shellReadMode",
     "shell_write_mode": "shellWriteMode",
     "shuffle": "shuffle",
+    "stagger_jobs": "staggerJobs",
     "storage_engine": "storageEngine",
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
     "task_id": "taskId",
@@ -182,6 +183,11 @@ def parse_command_line():
     parser.add_option("--shuffle", action="store_true", dest="shuffle",
                       help="Randomize the order in which tests are executed.")
 
+    parser.add_option("--staggerJobs", type="choice", action="store", dest="stagger_jobs",
+                      choices=("on", "off"), metavar="ON|OFF",
+                      help=("Enable or disable the stagger of launching resmoke jobs."
+                            " Defaults to %default."))
+
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
@@ -206,7 +212,8 @@ def parse_command_line():
                         dry_run="off",
                         find_suites=False,
                         list_suites=False,
-                        prealloc_journal="off")
+                        prealloc_journal="off",
+                        stagger_jobs="off")
 
     return parser.parse_args()
 
@@ -252,6 +259,7 @@ def update_config_vars(values):
     _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
     _config.SHUFFLE = config.pop("shuffle")
+    _config.STAGGER_JOBS = config.pop("staggerJobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storageEngine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
     _config.TASK_ID = config.pop("taskId")

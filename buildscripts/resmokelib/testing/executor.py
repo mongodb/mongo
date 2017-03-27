@@ -167,7 +167,8 @@ class TestGroupExecutor(object):
                 threads.append(t)
                 # SERVER-24729 Need to stagger when jobs start to reduce I/O load if there
                 # are many of them.  Both the 5 and the 10 are arbitrary.
-                if len(threads) >= 5:
+                # Currently only enabled on Evergreen.
+                if _config.STAGGER_JOBS and len(threads) >= 5:
                     time.sleep(10)
 
             joined = False

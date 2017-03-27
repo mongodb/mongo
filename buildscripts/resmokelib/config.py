@@ -55,6 +55,7 @@ DEFAULTS = {
     "shellReadMode": None,
     "shellWriteMode": None,
     "shuffle": False,
+    "staggerJobs": None,
     "storageEngine": None,
     "storageEngineCacheSizeGB": None,
     "taskId": None,
@@ -144,6 +145,9 @@ SHELL_WRITE_MODE = None
 # If true, then the order the tests run in is randomized. Otherwise the tests will run in
 # alphabetical (case-insensitive) order.
 SHUFFLE = None
+
+# If true, the launching of jobs is staggered in resmoke.py.
+STAGGER_JOBS = None 
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.
