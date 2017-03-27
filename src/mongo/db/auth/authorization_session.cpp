@@ -104,7 +104,7 @@ void AuthorizationSession::startRequest(OperationContext* opCtx) {
 Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
                                                  const UserName& userName) {
     User* user;
-    Status status = getAuthorizationManager().acquireUser(opCtx, userName, &user);
+    Status status = getAuthorizationManager().acquireUserForInitialAuth(opCtx, userName, &user);
     if (!status.isOK()) {
         return status;
     }
@@ -753,7 +753,9 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
             UserName name = user->getName();
             User* updatedUser;
 
-            Status status = authMan.acquireUser(opCtx, name, &updatedUser);
+            Status status =
+                authMan.acquireUserToRefreshSessionCache(opCtx, name, user->getID(), &updatedUser);
+
             switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.

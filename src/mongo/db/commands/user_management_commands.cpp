@@ -39,6 +39,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/config.h"
@@ -141,7 +142,7 @@ Status getCurrentUserRoles(OperationContext* opCtx,
                            unordered_set<RoleName>* roles) {
     User* user;
     authzManager->invalidateUserByName(userName);  // Need to make sure cache entry is up to date
-    Status status = authzManager->acquireUser(opCtx, userName, &user);
+    Status status = authzManager->acquireUserForInitialAuth(opCtx, userName, &user);
     if (!status.isOK()) {
         return status;
     }
@@ -668,6 +669,7 @@ public:
         userObjBuilder.append(
             "_id", str::stream() << args.userName.getDB() << "." << args.userName.getUser());
         userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, args.userName.getUser());
+        userObjBuilder.append(AuthorizationManager::USER_ID_FIELD_NAME, OID::gen());
         userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, args.userName.getDB());
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1197,7 +1199,8 @@ public:
                     BSONObjBuilder userWithoutCredentials(usersArrayBuilder.subobjStart());
                     for (BSONObjIterator it(userDetails); it.more();) {
                         BSONElement e = it.next();
-                        if (e.fieldNameStringData() != "credentials")
+                        if (e.fieldNameStringData() != "credentials" &&
+                            e.fieldNameStringData() != AuthorizationManager::USER_ID_FIELD_NAME)
                             userWithoutCredentials.append(e);
                     }
                     userWithoutCredentials.doneFast();
@@ -1224,16 +1227,17 @@ public:
             // Order results by user field then db field, matching how UserNames are ordered
             queryBuilder.append("orderby", BSON("user" << 1 << "db" << 1));
 
-            BSONObj projection;
+            BSONObjBuilder projection;
             if (!args.showCredentials) {
-                projection = BSON("credentials" << 0);
+                projection.append(AuthorizationManager::USER_ID_FIELD_NAME, 0);
+                projection.append("credentials", 0);
             }
             const stdx::function<void(const BSONObj&)> function = stdx::bind(
                 appendBSONObjToBSONArrayBuilder, &usersArrayBuilder, stdx::placeholders::_1);
             queryAuthzDocument(opCtx,
                                AuthorizationManager::usersCollectionNamespace,
                                queryBuilder.done(),
-                               projection,
+                               projection.done(),
                                function);
         }
         result.append("users", usersArrayBuilder.arr());

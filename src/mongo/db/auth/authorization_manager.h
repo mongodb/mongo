@@ -31,6 +31,8 @@
 #include <memory>
 #include <string>
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
@@ -82,6 +84,7 @@ public:
     ~AuthorizationManager();
 
     static const std::string USER_NAME_FIELD_NAME;
+    static const std::string USER_ID_FIELD_NAME;
     static const std::string USER_DB_FIELD_NAME;
     static const std::string ROLE_NAME_FIELD_NAME;
     static const std::string ROLE_DB_FIELD_NAME;
@@ -250,16 +253,41 @@ public:
                                     std::vector<BSONObj>* result);
 
     /**
-     *  Returns the User object for the given userName in the out parameter "acquiredUser".
-     *  If the user cache already has a user object for this user, it increments the refcount
-     *  on that object and gives out a pointer to it.  If no user object for this user name
-     *  exists yet in the cache, reads the user's privilege document from disk, builds up
-     *  a User object, sets the refcount to 1, and gives that out.  The returned user may
-     *  be invalid by the time the caller gets access to it.
-     *  The AuthorizationManager retains ownership of the returned User object.
-     *  On non-OK Status return values, acquiredUser will not be modified.
+     * Returns the User object for the given userName in the out parameter "acquiredUser".
+     *
+     * This method should be used only when initially authenticating a user, in contexts when
+     * the caller does not yet have an id for this user. When the caller already has access
+     * to a user document, acquireUserToRefreshSessionCache should be used instead.
+     *
+     * If no user object for this user name exists yet in the cache, read the user's privilege
+     * document from disk, build up a User object, sets the refcount to 1, and give that out.
+     *
+     * The returned user may be invalid by the time the caller gets access to it.
+     * The AuthorizationManager retains ownership of the returned User object.
+     * On non-OK Status return values, acquiredUser will not be modified.
      */
-    Status acquireUser(OperationContext* opCtx, const UserName& userName, User** acquiredUser);
+    Status acquireUserForInitialAuth(OperationContext* opCtx,
+                                     const UserName& userName,
+                                     User** acquiredUser);
+    /**
+     * Returns the User object for the given userName in the out parameter "acquiredUser".
+     *
+     * This method must be called with a user id (the unset optional, boost::none, will be
+     * understood as a distinct id for a pre-3.6 user). The acquired user must match
+     * both the given name and given id, or this method will return an error. This method
+     * should be used when the caller is refresing a user document they already have.
+     *
+     * If no user object for this user name exists yet in the cache, read the user's privilege
+     * document from disk, build up a User object, sets the refcount to 1, and give that out.
+     *
+     * The returned user may be invalid by the time the caller gets access to it.
+     * The AuthorizationManager retains ownership of the returned User object.
+     * On non-OK Status return values, acquiredUser will not be modified.
+     */
+    Status acquireUserToRefreshSessionCache(OperationContext* opCtx,
+                                            const UserName& userName,
+                                            boost::optional<OID> id,
+                                            User** acquiredUser);
 
     /**
      * Decrements the refcount of the given User object.  If the refcount has gone to zero,
@@ -372,8 +400,8 @@ private:
     /**
      * Cached value of the authorization schema version.
      *
-     * May be set by acquireUser() and getAuthorizationVersion().  Invalidated by
-     * invalidateUserCache().
+     * May be set by acquireUserForInitialAuth(), acquireUserToRefreshSessionCache(),
+     * and getAuthorizationVersion().  Invalidated by invalidateUserCache().
      *
      * Reads and writes guarded by CacheGuard.
      */

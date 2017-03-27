@@ -85,6 +85,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, MONGO_NO_PREREQU
 }
 
 const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
+const std::string AuthorizationManager::USER_ID_FIELD_NAME = "userId";
 const std::string AuthorizationManager::USER_DB_FIELD_NAME = "db";
 const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";
 const std::string AuthorizationManager::ROLE_DB_FIELD_NAME = "db";
@@ -384,6 +385,7 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
                                                                   const BSONObj& privDoc) {
     V2UserDocumentParser parser;
     std::string userName = parser.extractUserNameFromUserDocument(privDoc);
+
     if (userName != user->getName().getUser()) {
         return Status(ErrorCodes::BadValue,
                       mongoutils::str::stream() << "User name from privilege document \""
@@ -393,6 +395,8 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
                                                 << "\"",
                       0);
     }
+
+    user->setID(parser.extractUserIDFromUserDocument(privDoc));
 
     Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
     if (!status.isOK()) {
@@ -444,9 +448,36 @@ Status AuthorizationManager::getRoleDescriptionsForDB(OperationContext* opCtx,
         opCtx, dbname, privileges, showBuiltinRoles, result);
 }
 
-Status AuthorizationManager::acquireUser(OperationContext* opCtx,
-                                         const UserName& userName,
-                                         User** acquiredUser) {
+Status AuthorizationManager::acquireUserToRefreshSessionCache(OperationContext* opCtx,
+                                                              const UserName& userName,
+                                                              boost::optional<OID> id,
+                                                              User** acquiredUser) {
+    // Funnel down to acquireUserForInitialAuth, and then do the id checking.
+    auto status = acquireUserForInitialAuth(opCtx, userName, acquiredUser);
+    if (!status.isOK()) {
+        // If we got a non-ok status, no acquiredUser should be set, so we can simply
+        // return without doing an id check.
+        return status;
+    }
+
+    // Verify that the returned user matches the id that we were passed.
+    if (id != (*acquiredUser)->getID()) {
+        // If the generations don't match, then fail.
+        releaseUser(*acquiredUser);
+        *acquiredUser = nullptr;
+        return Status(ErrorCodes::UserNotFound,
+                      mongoutils::str::stream() << "User id from privilege document \""
+                                                << userName.toString()
+                                                << "\" doesn't match provided user id",
+                      0);
+    }
+
+    return status;
+}
+
+Status AuthorizationManager::acquireUserForInitialAuth(OperationContext* opCtx,
+                                                       const UserName& userName,
+                                                       User** acquiredUser) {
     if (userName == internalSecurity.user->getName()) {
         *acquiredUser = internalSecurity.user;
         return Status::OK();
@@ -513,6 +544,7 @@ Status AuthorizationManager::acquireUser(OperationContext* opCtx,
 
         authzVersion = schemaVersionInvalid;
     }
+
     if (!status.isOK())
         return status;
 

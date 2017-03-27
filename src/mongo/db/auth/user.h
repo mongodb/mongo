@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_name.h"
@@ -86,6 +87,11 @@ public:
     const UserName& getName() const;
 
     /**
+     * Returns the user's id.
+     */
+    const boost::optional<OID>& getID() const;
+
+    /**
      * Returns an iterator over the names of the user's direct roles
      */
     RoleNameIterator getRoles() const;
@@ -136,6 +142,11 @@ public:
     User* clone() const;
 
     // Mutators below.  Mutation functions should *only* be called by the AuthorizationManager
+
+    /**
+     * Set the id for this user.
+     */
+    void setID(boost::optional<OID> id);
 
     /**
      * Sets this user's authentication credentials.
@@ -205,6 +216,12 @@ public:
 
 private:
     UserName _name;
+
+    // An id for this user. We use this to identify different "generations" of the same username
+    // (ie a user "Lily" is dropped and then added). This field is optional to facilitate the
+    // upgrade path from 3.4 to 3.6. When comparing User documents' generations, we consider
+    // an unset _id field to be a distinct value that will fail to compare to any other id value.
+    boost::optional<OID> _id;
 
     // Maps resource name to privilege on that resource
     ResourcePrivilegeMap _privileges;

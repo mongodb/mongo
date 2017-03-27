@@ -263,7 +263,8 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* opCtx,
     }
 
     User* userObj;
-    Status status = getGlobalAuthorizationManager()->acquireUser(opCtx, user, &userObj);
+    Status status =
+        getGlobalAuthorizationManager()->acquireUserForInitialAuth(opCtx, user, &userObj);
     if (!status.isOK()) {
         // Failure to find the privilege document indicates no-such-user, a fact that we do not
         // wish to reveal to the client.  So, we return AuthenticationFailed rather than passing
