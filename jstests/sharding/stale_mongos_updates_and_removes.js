@@ -16,7 +16,6 @@
 // (used for testing *multi* removes to a *specific* shard key).
 var resetCollection = function() {
     assert(staleMongos.getCollection(collNS).drop());
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
     assert.commandWorked(staleMongos.adminCommand({shardCollection: collNS, key: {x: 1}}));
     for (var i = 0; i < numShardKeys; i++) {
         assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
@@ -183,6 +182,8 @@ var splitPoint = numShardKeys / 2;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {x: 1}}));
+
+st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 var freshMongos = st.s0;
 var staleMongos = st.s1;
