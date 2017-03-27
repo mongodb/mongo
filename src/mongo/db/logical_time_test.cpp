@@ -107,15 +107,19 @@ TEST(LogicalTime, toUnsignedArray) {
 
 TEST(SignedLogicalTime, roundtrip) {
     Timestamp tX(1);
+
     std::array<std::uint8_t, 20> tempKey = {};
     TimeProofService::Key key(std::move(tempKey));
     TimeProofService tps(std::move(key));
     auto time = LogicalTime(tX);
     auto proof = tps.getProof(time);
 
-    SignedLogicalTime signedTime(time, proof);
+    long long keyId = 1;
+
+    SignedLogicalTime signedTime(time, proof, keyId);
     ASSERT_TRUE(time == signedTime.getTime());
     ASSERT_TRUE(proof == signedTime.getProof());
+    ASSERT_TRUE(keyId == signedTime.getKeyId());
 }
 
 }  // unnamed namespace

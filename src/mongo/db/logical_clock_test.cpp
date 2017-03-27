@@ -63,7 +63,7 @@ protected:
     }
 
     SignedLogicalTime makeSignedLogicalTime(LogicalTime logicalTime) {
-        return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime));
+        return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime), 0);
     }
 
     const unsigned currentWallClockSecs() {

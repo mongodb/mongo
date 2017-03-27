@@ -93,7 +93,9 @@ SignedLogicalTime LogicalClock::getClusterTime() {
 }
 
 SignedLogicalTime LogicalClock::_makeSignedLogicalTime(LogicalTime logicalTime) {
-    return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime));
+    // TODO: SERVER-28436 Implement KeysCollectionManager
+    // Replace dummy keyId with real id from key manager.
+    return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime), 0);
 }
 
 Status LogicalClock::advanceClusterTime(const SignedLogicalTime& newTime) {
