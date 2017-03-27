@@ -1599,7 +1599,9 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	bool force;
 
 	/* Should not be called with a checkpoint handle. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
@@ -1608,8 +1610,10 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) ||
 	    F_ISSET(session, WT_SESSION_LOCKED_METADATA));
 
+	WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
+	force = cval.val != 0;
 	WT_SAVE_DHANDLE(session, ret = __checkpoint_lock_dirty_tree(
-	    session, true, false, true, cfg));
+	    session, true, force, true, cfg));
 	WT_RET(ret);
 	if (F_ISSET(S2BT(session), WT_BTREE_SKIP_CKPT))
 		return (0);
