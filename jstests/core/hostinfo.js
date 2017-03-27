@@ -31,3 +31,13 @@ if (hostinfo.os.type != "") {
     assert.neq(hostinfo.system.cpuArch, "" || null, "Missing CPU Architecture");
     assert.neq(hostinfo.system.numaEnabled, "" || null, "Missing NUMA flag");
 }
+
+var buildInfo = assert.commandWorked(db.runCommand({buildInfo: 1}));
+if (buildInfo.buildEnvironment && buildInfo.buildEnvironment.target_arch) {
+    var targetArch = buildInfo.buildEnvironment.target_arch;
+    if (targetArch == "i386")
+        assert.eq(hostinfo.system.cpuAddrSize, 32);
+    else
+        assert.eq(hostinfo.system.cpuAddrSize, 64);
+    assert.eq(hostinfo.system.cpuAddrSize, buildInfo.bits);
+}
