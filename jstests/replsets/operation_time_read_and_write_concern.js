@@ -3,12 +3,11 @@
  * the read/write commmand that produced it.
  */
 (function() {
+    "use strict";
+
     load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
     load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries,
                                                  // restartReplicationOnSecondaries
-
-    "use strict";
-
     var name = "operation_time_read_and_write_concern";
 
     var replTest =

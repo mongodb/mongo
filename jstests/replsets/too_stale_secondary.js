@@ -29,9 +29,9 @@
  */
 
 (function() {
-    load('jstests/replsets/rslib.js');
-
     "use strict";
+
+    load('jstests/replsets/rslib.js');
 
     function getFirstOplogEntry(conn) {
         return conn.getDB('local').oplog.rs.find().sort({ts: 1}).limit(1)[0];
