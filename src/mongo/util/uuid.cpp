@@ -50,8 +50,6 @@ std::regex uuidRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 
 }  // namespace
 
-const int UUID::kNumBytes = 16;
-
 StatusWith<UUID> UUID::parse(BSONElement from) {
     try {
         return UUID{from.uuid()};
@@ -111,9 +109,13 @@ UUID UUID::gen() {
     return UUID{randomBytes};
 }
 
+void UUID::appendToBuilder(BSONObjBuilder* builder, StringData name) const {
+    builder->appendBinData(name, sizeof(UUIDStorage), BinDataType::newUUID, &_uuid);
+}
+
 BSONObj UUID::toBSON() const {
     BSONObjBuilder builder;
-    builder.appendBinData("uuid", sizeof(UUIDStorage), BinDataType::newUUID, &_uuid);
+    appendToBuilder(&builder, "uuid");
     return builder.obj();
 }
 

@@ -44,13 +44,15 @@ namespace mongo {
  * a secure random number generator.
  */
 class UUID {
+    using UUIDStorage = std::array<unsigned char, 16>;
+
 public:
     UUID() = delete;
 
     /**
      * The number of bytes contained in a UUID.
      */
-    static const int kNumBytes;
+    static constexpr int kNumBytes = sizeof(UUIDStorage);
 
     /**
      * Generate a new random v4 UUID per RFC 4122.
@@ -73,6 +75,11 @@ public:
      * Returns whether this string represents a valid UUID.
      */
     static bool isUUIDString(const std::string& s);
+
+    /**
+     * Append to builder as BinData(4, "...") element with the given name.
+     */
+    void appendToBuilder(BSONObjBuilder* builder, StringData name) const;
 
     /**
      * Return a BSON object of the form { uuid: BinData(4, "...") }.
@@ -109,7 +116,6 @@ public:
     };
 
 private:
-    using UUIDStorage = std::array<unsigned char, 16>;
     UUID(const UUIDStorage& uuid) : _uuid(uuid) {}
 
     UUIDStorage _uuid;  // UUID in network byte order
