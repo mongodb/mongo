@@ -107,7 +107,7 @@ variables:
   - enterprise-osx-107
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-coverage
-  - enterprise-rhel-67-s390x  
+  - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-72-s390x
@@ -424,7 +424,7 @@ functions:
           # Set the shell process (and its children processes) to dump ELF headers (bit 4),
           # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
           echo 0x13 > /proc/self/coredump_filter
-        
+
           if [ -f /sbin/sysctl ]; then
             # Check that the core pattern is set explicitly on our distro image instead
             # of being the OS's default value. This ensures that coredump names are consistent
@@ -5706,8 +5706,7 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -5860,8 +5859,6 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
-  - name: rlp
-  - name: rlp_WT
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
@@ -6642,7 +6639,7 @@ buildvariants:
   - name: unittests
   - name: views_WT
   - name: views_rs_WT
-  - name: push      
+  - name: push
     distros:
     - rhel62-small
 
