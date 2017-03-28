@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
@@ -121,9 +122,16 @@ private:
      * Cache entry describing a collection.
      */
     struct CollectionRoutingInfoEntry {
-        std::shared_ptr<ChunkManager> routingInfo;
-
+        // Specifies whether this cache entry needs a refresh (in which case routingInfo should not
+        // be relied on) or it doesn't, in which case there should be a non-null routingInfo.
         bool needsRefresh{true};
+
+        // Contains a notification to be waited on for the refresh to complete (only available if
+        // needsRefresh is true)
+        std::shared_ptr<Notification<Status>> refreshCompletionNotification;
+
+        // Contains the cached routing information (only available if needsRefresh is false)
+        std::shared_ptr<ChunkManager> routingInfo;
     };
 
     /**
@@ -143,8 +151,19 @@ private:
      * Ensures that the specified database is in the cache, loading it if necessary. If the database
      * was not in cache, all the sharded collections will be in the 'needsRefresh' state.
      */
-    std::shared_ptr<DatabaseInfoEntry> _getDatabase_inlock(OperationContext* opCtx,
-                                                           StringData dbName);
+    std::shared_ptr<DatabaseInfoEntry> _getDatabase(OperationContext* opCtx, StringData dbName);
+
+    /**
+     * Non-blocking call which schedules an asynchronous refresh for the specified namespace. The
+     * namespace must be in the 'needRefresh' state.
+     */
+    void _scheduleCollectionRefresh_inlock(std::shared_ptr<DatabaseInfoEntry> dbEntry,
+                                           std::shared_ptr<ChunkManager> existingRoutingInfo,
+                                           const NamespaceString& nss,
+                                           int refreshAttempt);
+
+    // Interface from which chunks will be retrieved
+    const std::unique_ptr<CatalogCacheLoader> _cacheLoader;
 
     // Mutex to serialize access to the structures below
     stdx::mutex _mutex;
