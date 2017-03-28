@@ -587,11 +587,11 @@ def variable_arch_converter(val):
 def decide_platform_tools():
     if is_running_os('windows'):
         # we only support MS toolchain on windows
-        return ['msvc', 'mslink', 'mslib', 'masm']
+        return ['msvc', 'mslink', 'mslib', 'masm', 'install']
     elif is_running_os('linux', 'solaris'):
-        return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
+        return ['gcc', 'g++', 'gnulink', 'ar', 'gas', 'install']
     elif is_running_os('darwin'):
-        return ['gcc', 'g++', 'applelink', 'ar', 'as']
+        return ['gcc', 'g++', 'applelink', 'ar', 'as', 'install']
     else:
         return ["default"]
 
