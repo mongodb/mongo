@@ -134,18 +134,18 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
 
     // create new collection
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        const auto fromOptions =
-            fromCollection->getCatalogEntry()->getCollectionOptions(opCtx).toBSON();
-        OldClientContext ctx(opCtx, toNs);
-        BSONObjBuilder spec;
-        spec.appendBool("capped", true);
-        spec.append("size", size);
+        auto options = fromCollection->getCatalogEntry()->getCollectionOptions(opCtx);
+        // The capped collection will get its own new unique id, as the conversion isn't reversible,
+        // so it can't be rolled back.
+        options.uuid.reset();
+        options.capped = true;
+        options.cappedSize = size;
         if (temp)
-            spec.appendBool("temp", true);
-        spec.appendElementsUnique(fromOptions);
+            options.temp = true;
+        OldClientContext ctx(opCtx, toNs);
 
         WriteUnitOfWork wunit(opCtx);
-        Status status = userCreateNS(opCtx, ctx.db(), toNs, spec.done());
+        Status status = userCreateNS(opCtx, ctx.db(), toNs, options.toBSON());
         if (!status.isOK())
             return status;
         wunit.commit();
