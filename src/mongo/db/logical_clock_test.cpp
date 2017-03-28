@@ -46,9 +46,7 @@ class LogicalClockTestBase : public unittest::Test {
 protected:
     void setUp() {
         _serviceContext = stdx::make_unique<ServiceContextNoop>();
-        std::array<std::uint8_t, 20> tempKey = {};
-        TimeProofService::Key key(std::move(tempKey));
-        auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
+        auto pTps = stdx::make_unique<TimeProofService>();
         _timeProofService = pTps.get();
         _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps));
     }
@@ -63,7 +61,8 @@ protected:
     }
 
     SignedLogicalTime makeSignedLogicalTime(LogicalTime logicalTime) {
-        return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime), 0);
+        TimeProofService::Key key = {};
+        return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime, key), 0);
     }
 
     const unsigned currentWallClockSecs() {
@@ -79,17 +78,11 @@ private:
 
 // Check that the initial time does not change during logicalClock creation.
 TEST_F(LogicalClockTestBase, roundtrip) {
-    // Create different logicalClock instance to validate that the initial time is preserved.
-    ServiceContextNoop serviceContext;
     Timestamp tX(1);
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
     auto time = LogicalTime(tX);
 
-    LogicalClock logicalClock(&serviceContext, std::move(pTps));
-    logicalClock.initClusterTimeFromTrustedSource(time);
-    auto storedTime(logicalClock.getClusterTime());
+    getClock()->initClusterTimeFromTrustedSource(time);
+    auto storedTime(getClock()->getClusterTime());
 
     ASSERT_TRUE(storedTime.getTime() == time);
 }

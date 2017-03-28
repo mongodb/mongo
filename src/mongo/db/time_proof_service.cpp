@@ -48,14 +48,17 @@ TimeProofService::Key TimeProofService::generateRandomKey() {
                                                  SHA1Block::kHashLength));
 }
 
-TimeProofService::TimeProof TimeProofService::getProof(const LogicalTime& time) const {
+TimeProofService::TimeProof TimeProofService::getProof(const LogicalTime& time,
+                                                       const Key& key) const {
     auto unsignedTimeArray = time.toUnsignedArray();
     return SHA1Block::computeHmac(
-        _key.data(), _key.size(), unsignedTimeArray.data(), unsignedTimeArray.size());
+        key.data(), key.size(), unsignedTimeArray.data(), unsignedTimeArray.size());
 }
 
-Status TimeProofService::checkProof(const LogicalTime& time, const TimeProof& proof) const {
-    auto myProof = getProof(time);
+Status TimeProofService::checkProof(const LogicalTime& time,
+                                    const TimeProof& proof,
+                                    const Key& key) const {
+    auto myProof = getProof(time, key);
     if (myProof != proof) {
         return Status(ErrorCodes::TimeProofMismatch, "Proof does not match the logical time");
     }

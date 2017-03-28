@@ -107,12 +107,10 @@ TEST(LogicalTime, toUnsignedArray) {
 
 TEST(SignedLogicalTime, roundtrip) {
     Timestamp tX(1);
-
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    TimeProofService tps(std::move(key));
+    TimeProofService tps;
+    TimeProofService::Key key = {};
     auto time = LogicalTime(tX);
-    auto proof = tps.getProof(time);
+    auto proof = tps.getProof(time, key);
 
     long long keyId = 1;
 

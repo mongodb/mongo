@@ -115,6 +115,14 @@ private:
     // the mutex protects _clusterTime
     stdx::mutex _mutex;
     SignedLogicalTime _clusterTime;
+
+    /**
+     * Temporary key only used for unit tests.
+     *
+     * TODO: SERVER-28436 Implement KeysCollectionManager
+     * Remove _tempKey and its uses from logical clock, and pass actual key from key manager.
+     */
+    TimeProofService::Key _tempKey = {};
 };
 
 }  // namespace mongo
