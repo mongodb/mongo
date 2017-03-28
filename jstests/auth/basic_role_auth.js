@@ -157,32 +157,27 @@ var testOps = function(db, allowedActions) {
         var dbName = db.getName();
         var db2 = newConn.getDB(dbName);
 
-        if (db2 == 'admin') {
+        if (db2.getName() == 'admin') {
             assert.eq(1, db2.auth('aro', AUTH_INFO.admin.aro.pwd));
         } else {
             assert.eq(1, db2.auth('ro', AUTH_INFO.test.ro.pwd));
         }
 
-        var cursor = db2.kill_cursor.find().batchSize(2);
+        // Create cursor from db2.
+        var cmdRes = db2.runCommand({find: db2.kill_cursor.getName(), batchSize: 2});
+        assert.commandWorked(cmdRes);
+        var cursorId = cmdRes.cursor.id;
+        assert(!bsonBinaryEqual({cursorId: cursorId}, {cursorId: NumberLong(0)}),
+               "find command didn't return a cursor: " + tojson(cmdRes));
 
-        db.killCursor(cursor.id());
-        // Send a synchronous message to make sure that kill cursor was processed
-        // before proceeding.
-        db.runCommand({whatsmyuri: 1});
-
-        checkErr(!allowedActions.hasOwnProperty('killCursor'), function() {
-            while (cursor.hasNext()) {
-                var next = cursor.next();
-
-                // This is a failure in mongos case. Standalone case will fail
-                // when next() was called.
-                if (next.code == 16336) {
-                    // could not find cursor in cache for id
-                    throw next.$err;
-                }
-            }
+        checkErr(allowedActions.hasOwnProperty('killCursor'), function() {
+            // Issue killCursor command from db.
+            cmdRes = db.runCommand({killCursors: db2.kill_cursor.getName(), cursors: [cursorId]});
+            assert.commandWorked(cmdRes);
+            assert(bsonBinaryEqual({cursorId: cmdRes.cursorsKilled}, {cursorId: [cursorId]}),
+                   "unauthorized to kill cursor: " + tojson(cmdRes));
         });
-    });  // TODO: enable test after SERVER-5813 is fixed.
+    })();
 
     var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
     // Note: fsyncUnlock is not supported in mongos.
@@ -192,7 +187,7 @@ var testOps = function(db, allowedActions) {
             var errorCodeUnauthorized = 13;
 
             if (res.code == errorCodeUnauthorized) {
-                throw Error("unauthorized unauthorized fsyncUnlock");
+                throw Error("unauthorized fsyncUnlock");
             }
         });
     }

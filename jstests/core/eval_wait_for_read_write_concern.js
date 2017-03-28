@@ -13,4 +13,4 @@
         writeConcern: {w: 'majority', wtimeout: 30000}
     };
     db.runCommand({'eval': 'db.runCommand(' + tojson(insertCommand) + ')'});
-});
+})();

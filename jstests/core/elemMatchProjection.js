@@ -96,7 +96,6 @@ assert.throws(function() {
 }, [], "throw on invalid sorted projection (field mismatch)");
 
 assert.throws(function() {
-    x;
     t.find({group: 3, 'x.a': 2}, {'x.$': 1, group: 0}).sort({x: 1}).toArray();
 }, [], "throw on invalid projection combination (include and exclude)");
 

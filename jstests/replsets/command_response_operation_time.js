@@ -4,9 +4,9 @@
  * and local reads and writes return the last applied optime's timestamp.
  */
 (function() {
-    load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
-
     "use strict";
+
+    load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
     function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
         assert.eq(0,
