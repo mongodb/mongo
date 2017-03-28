@@ -820,8 +820,8 @@ functions:
       silent: true
       script: |
         process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
-        # Exclude Evergreen agent processes
-        process_exclude_list="(main)"
+        # Exclude Evergreen agent processes and other system daemons
+        process_exclude_list="(main|tuned)"
 
         if [ "Windows_NT" = "$OS" ]; then
           # Get the list of Windows tasks (tasklist list format):
@@ -840,18 +840,10 @@ functions:
           # - The first column has the process ID
           # - The second column (and beyond) has task name
 
-          # There are 2 "styles" of pgrep, figure out which one works
-          pgrep_list_full=$(pgrep -f --list-full ".*" 2>&1 > /dev/null)
-          if [ -z "$pgrep_list_full" ]; then
-            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
-          else
-            pgrep_list=$(pgrep -f -l "$process_kill_list")
-          fi
-
           # There are 2 "styles" of grep, figure out which one works
           grep=grep
-          grep_extended=$(echo "a" | $grep -E "(a)" 2>&1 > /dev/null)
-          if [ ! -z "$grep_extended" ]; then
+          echo "a" | $grep -qE "(a)" > /dev/null 2>&1
+          if [ $? -ne 0 ]; then
             # Extended grep on Solaris is in the following location
             grep=/usr/xpg4/bin/grep
             if [ ! -f $grep ]; then
@@ -860,9 +852,20 @@ functions:
             fi
           fi
 
+          # There are 2 "styles" of pgrep, figure out which one works.
+          # Due to https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1501916
+          # we cannot rely on the return status ($?) to detect if the option is supported.
+          pgrep -f --list-full ".*" 2>&1 | $grep -qE "(illegal|invalid|unrecognized) option"
+          if [ $? -ne 0 ]; then
+            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
+          else
+            pgrep_list=$(pgrep -f -l "$process_kill_list")
+          fi
+
           # Since a process name might have a CR or LF in it, we need to delete any lines from
           # pgrep which do not start with space(s) and 1 digit and trim any leading spaces.
-          processes=$(echo "$pgrep_list" | $grep -i -v -E "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
+          processes=$(echo "$pgrep_list" | $grep -ivE "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
+
           # Kill the Unix process ID with signal KILL (9)
           kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; kill -9 $pid; }
         fi
