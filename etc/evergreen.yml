@@ -100,7 +100,9 @@ variables:
   jepsen_read_concern: ""
   jepsen_read_with_find_and_modify: ""
   jepsen_storage_engine: ""
-  jepsen_time_limit: --time-limit 300
+  # Empirically, we've had greater success in reproducing the issues found in MongoDB versions
+  # 3.4.0-rc3 and 3.4.0-rc4 when running Jepsen with at least --time-limit=600.
+  jepsen_time_limit: --time-limit 1200
   jepsen_write_concern: ""
 
 # Template for running Jepsen tests
@@ -584,9 +586,27 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          git clone git@github.com:10gen/jepsen.git
-          cd jepsen/jepsen
-          git checkout mongodb-master-linearizable-2
+
+          # Build libfaketime. A version of libfaketime at least as new as v0.9.6-9-g75896bd is
+          # required to use the FAKETIME_NO_CACHE and FAKETIME_TIMESTAMP_FILE environment variables.
+          git clone git@github.com:wolfcw/libfaketime.git
+          cd libfaketime
+          git checkout 3c0ce9c8859ed136a154b61da396deece94844e0
+          make PREFIX=$(pwd)/build/ LIBDIRNAME='.' install
+
+          # Add libfaketime to mongo-binaries.tgz so it gets uploaded to each of the LXC containers.
+          # The build/ prefix of the shared object will get removed when Jepsen extracts the tarball
+          # into the /opt/mongodb/ directory.
+          gzip --stdout --decompress ../mongo-binaries.tgz > mongo-binaries.tar
+          tar --append --file=mongo-binaries.tar build/libfaketime.so.1
+          gzip --stdout mongo-binaries.tar > ../mongo-binaries.tgz
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          git clone --branch=jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
+          cd jepsen-mongodb
           branch=$(git symbolic-ref --short HEAD)
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
@@ -640,11 +660,24 @@ functions:
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
-        working_dir: src/jepsen/mongodb
+        working_dir: src/jepsen-mongodb
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern} 2>&1 | tee jepsen_${task_name}_${execution}.log
+          lein run test --test register                                   \
+                        --tarball "file:///root/mongo-binaries.tgz"       \
+                        --ssh-private-key ~/.ssh/id_rsa_lxc               \
+                        --clock-skew faketime                             \
+                        --libfaketime-path /opt/mongodb/libfaketime.so.1  \
+                        ${jepsen_key_time_limit}                          \
+                        ${jepsen_protocol_version}                        \
+                        ${jepsen_read_concern}                            \
+                        ${jepsen_read_with_find_and_modify}               \
+                        ${jepsen_storage_engine}                          \
+                        ${jepsen_time_limit}                              \
+                        ${jepsen_write_concern}                           \
+                        2>&1                                              \
+          | tee jepsen_${task_name}_${execution}.log
           end_time=$(date +%s)
           elapsed_secs=$((end_time-start_time))
           # Since we cannot use PIPESTATUS to get the exit code from the "lein run ..." pipe in dash shell,
@@ -671,7 +704,7 @@ functions:
           exit $exit_code
     - command: shell.exec
       params:
-        working_dir: src/jepsen/mongodb
+        working_dir: src/jepsen-mongodb
         script: |
           set -o verbose
           # Jepsen system failure if file exists.
@@ -1075,7 +1108,7 @@ post:
   - command: archive.targz_pack
     params:
       target: "src/jepsen-results.tgz"
-      source_dir: "src/jepsen/mongodb/store"
+      source_dir: "src/jepsen-mongodb/store"
       include:
         - "./**"
   - command: s3.put
@@ -1389,6 +1422,9 @@ tasks:
       hang_analyzer_processes: "java"
       jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine mmapv1
+      # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
+      # out of memory issues and task timeouts during the analysis phase.
+      jepsen_time_limit: --time-limit 300
 
 - <<: *run_jepsen_template
   name: jepsen_linearizableRead_WT
