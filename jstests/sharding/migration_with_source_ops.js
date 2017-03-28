@@ -29,11 +29,9 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var st = new ShardingTest({shards: 2, mongos: 1});
     st.stopBalancer();
 
-    var mongos = st.s0, admin = mongos.getDB('admin'),
-        shards = mongos.getCollection('config.shards').find().toArray(), dbName = "testDB",
-        ns = dbName + ".foo", coll = mongos.getCollection(ns), donor = st.shard0,
-        recipient = st.shard1, donorColl = donor.getCollection(ns),
-        recipientColl = recipient.getCollection(ns);
+    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns = dbName + ".foo",
+        coll = mongos.getCollection(ns), donor = st.shard0, recipient = st.shard1,
+        donorColl = donor.getCollection(ns), recipientColl = recipient.getCollection(ns);
 
     /**
      * Exable sharding, and split collection into two chunks.
@@ -44,7 +42,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Recipient:
     jsTest.log('Enabling sharding of the collection and pre-splitting into two chunks....');
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, shards[0]._id);
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: ns, key: {a: 1}}));
     assert.commandWorked(admin.runCommand({split: ns, middle: {a: 20}}));
 
@@ -84,7 +82,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Recipient:    [20, 40)
     jsTest.log('Starting migration, pause after cloning...');
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), shards[1]._id);
+        staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), st.shard1.shardName);
 
     /**
      * Wait for recipient to finish cloning step.

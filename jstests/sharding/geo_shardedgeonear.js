@@ -2,16 +2,13 @@
 
 var coll = 'points';
 
-function test(db, sharded, indexType) {
+function test(st, db, sharded, indexType) {
     printjson(db);
     db[coll].drop();
 
     if (sharded) {
-        var shards = [];
+        var shards = [st.shard0, st.shard1, st.shard2];
         var config = shardedDB.getSiblingDB("config");
-        config.shards.find().forEach(function(shard) {
-            shards.push(shard._id);
-        });
 
         shardedDB.adminCommand({shardCollection: shardedDB[coll].getFullName(), key: {rand: 1}});
         for (var i = 1; i < 10; i++) {
@@ -20,7 +17,7 @@ function test(db, sharded, indexType) {
             shardedDB.adminCommand({
                 moveChunk: shardedDB[coll].getFullName(),
                 find: {rand: i / 10},
-                to: shards[i % shards.length]
+                to: shards[i % shards.length].shardName
             });
         }
 
@@ -50,5 +47,5 @@ var shardedDB = sharded.getDB('test');
 sharded.ensurePrimaryShard('test', 'shard0001');
 printjson(shardedDB);
 
-test(shardedDB, true, '2dsphere');
+test(sharded, shardedDB, true, '2dsphere');
 sharded.stop();

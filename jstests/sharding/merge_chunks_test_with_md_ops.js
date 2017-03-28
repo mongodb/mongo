@@ -7,11 +7,10 @@
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
     var coll = mongos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+    st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
     st.printShardingStatus();
@@ -30,7 +29,7 @@
     jsTest.log("Moving to another shard...");
 
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: shards[1]._id}));
+        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
     // Split and merge the chunk repeatedly
     jsTest.log("Splitting and merging repeatedly (again)...");
@@ -46,7 +45,7 @@
     jsTest.log("Moving to original shard...");
 
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: shards[0]._id}));
+        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard0.shardName}));
 
     st.printShardingStatus();
 

@@ -6,7 +6,6 @@
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
-    var shards = mongos.getDB("config").shards.find().toArray();
 
     //
     // Set up multiple collections to target with regex shard keys on two shards
@@ -19,7 +18,7 @@
     var collHashed = mongos.getCollection("foo.barHashed");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
-    st.ensurePrimaryShard(coll.getDB().toString(), shards[0]._id);
+    st.ensurePrimaryShard(coll.getDB().toString(), st.shard0.shardName);
 
     //
     // Split the collection so that "abcde-0" and "abcde-1" go on different shards when possible
@@ -30,7 +29,7 @@
     assert.commandWorked(admin.runCommand({
         moveChunk: collSharded.toString(),
         find: {a: 0},
-        to: shards[1]._id,
+        to: st.shard1.shardName,
         _waitForDelete: true
     }));
 
@@ -41,7 +40,7 @@
     assert.commandWorked(admin.runCommand({
         moveChunk: collCompound.toString(),
         find: {a: 0, b: 0},
-        to: shards[1]._id,
+        to: st.shard1.shardName,
         _waitForDelete: true
     }));
 
@@ -52,7 +51,7 @@
     assert.commandWorked(admin.runCommand({
         moveChunk: collNested.toString(),
         find: {a: {b: 0}},
-        to: shards[1]._id,
+        to: st.shard1.shardName,
         _waitForDelete: true
     }));
 

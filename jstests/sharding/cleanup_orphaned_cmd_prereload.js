@@ -6,11 +6,10 @@ var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
-var shards = mongos.getCollection("config.shards").find().toArray();
 var coll = mongos.getCollection("foo.bar");
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
+printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
 assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
 
 jsTest.log("Moving some chunks to shard1...");
@@ -20,11 +19,13 @@ assert(admin.runCommand({split: coll + "", middle: {_id: 1}}).ok);
 
 assert(
     admin
-        .runCommand({moveChunk: coll + "", find: {_id: 0}, to: shards[1]._id, _waitForDelete: true})
+        .runCommand(
+            {moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true})
         .ok);
 assert(
     admin
-        .runCommand({moveChunk: coll + "", find: {_id: 1}, to: shards[1]._id, _waitForDelete: true})
+        .runCommand(
+            {moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true})
         .ok);
 
 var metadata =
@@ -43,7 +44,8 @@ assert(!st.shard1.getDB("admin")
 
 jsTest.log("Moving some chunks back to shard0 after empty...");
 
-admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: shards[1]._id, _waitForDelete: true});
+admin.runCommand(
+    {moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName, _waitForDelete: true});
 
 var metadata =
     st.shard0.getDB("admin").runCommand({getShardVersion: coll + "", fullMetadata: true}).metadata;
@@ -56,7 +58,8 @@ assert.eq(metadata.pending.length, 0);
 
 assert(
     admin
-        .runCommand({moveChunk: coll + "", find: {_id: 1}, to: shards[0]._id, _waitForDelete: true})
+        .runCommand(
+            {moveChunk: coll + "", find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true})
         .ok);
 
 var metadata =

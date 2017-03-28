@@ -10,7 +10,6 @@ var st = new ShardingTest({shards: 1});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
-var shards = mongos.getCollection("config.shards").find().toArray();
 var coll = mongos.getCollection("foo.bar");
 
 //
@@ -18,7 +17,7 @@ var coll = mongos.getCollection("foo.bar");
 // Tests with _id : 1 shard key
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
+printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
 assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
 st.printShardingStatus();
 
