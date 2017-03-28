@@ -1163,6 +1163,45 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='rollback_fix_up_info',
+    source=[
+        'rollback_fix_up_info.cpp',
+        'rollback_fix_up_info_descriptions.cpp',
+    ],
+    LIBDEPS=[
+        'storage_interface',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
+
+env.CppUnitTest(
+    target='rollback_fix_up_info_test',
+    source=[
+        'rollback_fix_up_info_test.cpp',
+    ],
+    LIBDEPS=[
+        'replmocks',
+        'rollback_fix_up_info',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target='rollback_fix_up_info_descriptions_test',
+    source=[
+        'rollback_fix_up_info_descriptions_test.cpp',
+    ],
+    LIBDEPS=[
+        'rollback_fix_up_info',
+    ],
+)
+
+env.Library(
     target='roll_back_local_operations',
     source=[
         'roll_back_local_operations.cpp',
