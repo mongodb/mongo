@@ -54,7 +54,16 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'index_key_validate',
-    ]
+    ],
+)
+
+env.Library(
+    target='index_catalog_entry',
+    source=[
+        "index_catalog_entry.cpp",
+    ],
+    LIBDEPS=[
+    ],
 )
 
 env.Library(
@@ -74,12 +83,13 @@ env.Library(
         "drop_database.cpp",
         "drop_indexes.cpp",
         "index_catalog.cpp",
-        "index_catalog_entry.cpp",
+        "index_catalog_entry_impl.cpp",
         "index_create.cpp",
         "rename_collection.cpp",
     ],
     LIBDEPS=[
         'collection_options',
+        'index_catalog_entry',
         'index_key_validate',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
