@@ -67,7 +67,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
-#include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -90,14 +89,6 @@ StorageInterfaceImpl::StorageInterfaceImpl()
 
 StorageInterfaceImpl::StorageInterfaceImpl(const NamespaceString& minValidNss)
     : _minValidNss(minValidNss) {}
-
-StorageInterfaceImpl::~StorageInterfaceImpl() {
-    DESTRUCTOR_GUARD(shutdown(););
-}
-
-void StorageInterfaceImpl::startup() {}
-
-void StorageInterfaceImpl::shutdown() {}
 
 NamespaceString StorageInterfaceImpl::getMinValidNss() const {
     return _minValidNss;

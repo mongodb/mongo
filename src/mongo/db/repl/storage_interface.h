@@ -98,9 +98,6 @@ public:
     StorageInterface() = default;
     virtual ~StorageInterface() = default;
 
-    virtual void startup() = 0;
-    virtual void shutdown() = 0;
-
     // MinValid and Initial Sync Flag.
     /**
      * Returns true if initial sync was started but has not not completed.

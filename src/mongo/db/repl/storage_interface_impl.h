@@ -52,10 +52,6 @@ public:
 
     StorageInterfaceImpl();
     explicit StorageInterfaceImpl(const NamespaceString& minValidNss);
-    virtual ~StorageInterfaceImpl();
-
-    void startup() override;
-    void shutdown() override;
 
     /**
      * Returns namespace of collection containing the minvalid boundaries and initial sync flag.

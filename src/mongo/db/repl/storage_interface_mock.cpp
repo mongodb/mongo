@@ -38,8 +38,7 @@
 
 namespace mongo {
 namespace repl {
-void StorageInterfaceMock::startup() {}
-void StorageInterfaceMock::shutdown() {}
+
 bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
     return _initialSyncFlag;

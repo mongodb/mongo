@@ -122,9 +122,6 @@ public:
 
     StorageInterfaceMock() = default;
 
-    void startup() override;
-    void shutdown() override;
-
     bool getInitialSyncFlag(OperationContext* opCtx) const override;
     void setInitialSyncFlag(OperationContext* opCtx) override;
     void clearInitialSyncFlag(OperationContext* opCtx) override;

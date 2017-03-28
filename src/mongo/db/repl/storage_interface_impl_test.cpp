@@ -473,7 +473,6 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocFailesIfCollection
 TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionWithIDIndexCommits) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
-    storage.startup();
     NamespaceString nss("foo.bar");
     CollectionOptions opts;
     std::vector<BSONObj> indexes;
@@ -500,7 +499,6 @@ void _testDestroyUncommitedCollectionBulkLoader(
     std::vector<BSONObj> secondaryIndexes,
     stdx::function<void(std::unique_ptr<CollectionBulkLoader> loader)> destroyLoaderFn) {
     StorageInterfaceImpl storage;
-    storage.startup();
     NamespaceString nss("foo.bar");
     CollectionOptions opts;
     auto loaderStatus =
@@ -572,7 +570,6 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
 TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionThatAlreadyExistsFails) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
-    storage.startup();
     NamespaceString nss("test.system.indexes");
     createCollection(opCtx, nss);
 
@@ -705,7 +702,6 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
        FindDocumentsReturnsIndexOptionsConflictIfIndexIsAPartialIndex) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
-    storage.startup();
     auto nss = makeNamespace(_agent);
     std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
                                              << "x_1"

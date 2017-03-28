@@ -275,8 +275,6 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
 
     _writerPool = SyncTail::makeWriterPool();
 
-    _storageInterface->startup();
-
     _startedThreads = true;
 }
 
@@ -309,7 +307,6 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
         log() << "Stopping replication storage threads";
         _taskExecutor->shutdown();
         _taskExecutor->join();
-        _storageInterface->shutdown();
     }
 }
 
