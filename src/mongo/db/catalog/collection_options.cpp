@@ -31,9 +31,14 @@
 #include "mongo/db/catalog/collection_options.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+bool enableCollectionUUIDs = false;
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableCollectionUUIDsParameter(
+    ServerParameterSet::getGlobal(), "enableCollectionUUIDs", &enableCollectionUUIDs);
 
 // static
 bool CollectionOptions::validMaxCappedDocs(long long* max) {
@@ -126,11 +131,11 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
         StringData fieldName = e.fieldName();
 
         if (fieldName == "uuid" && kind == parseForStorage) {
-            try {
-                uuid.emplace(e);
-            } catch (const UserException& ex) {
-                return ex.toStatus();
+            auto res = CollectionUUID::parse(e);
+            if (!res.isOK()) {
+                return res.getStatus();
             }
+            uuid = res.getValue();
         } else if (fieldName == "capped") {
             capped = e.trueValue();
         } else if (fieldName == "size") {

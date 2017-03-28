@@ -243,8 +243,8 @@ public:
     /**
      * Dereferencing the ScopedCollectionMetadata will dereference the internal CollectionMetadata.
      */
-    CollectionMetadata* operator->();
-    CollectionMetadata* getMetadata();
+    CollectionMetadata* operator->() const;
+    CollectionMetadata* getMetadata() const;
 
     /**
      * True if the ScopedCollectionMetadata stores a metadata (is not empty)

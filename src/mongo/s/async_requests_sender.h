@@ -47,9 +47,8 @@
 namespace mongo {
 
 /**
- * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel and
- * automatically retrying on retriable errors according to a RetryPolicy. Work on remote nodes is
- * accomplished by scheduling remote work in a TaskExecutor's event loop.
+ * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel.
+ * Work on remote nodes is accomplished by scheduling remote work in a TaskExecutor's event loop.
  *
  * Typical usage is:
  *
@@ -60,8 +59,8 @@ namespace mongo {
  * AsyncRequestsSender ars(opCtx, executor, db, requests, readPrefSetting);
  *
  * while (!ars.done()) {
- *     // Schedule a round of retries if needed and wait for next response or error
- *     auto response = ars.next(opCtx);
+ *     // Schedule a round of retries if needed and wait for next response or error.
+ *     auto response = ars.next();
  *
  *     if (!response.swResponse.isOK()) {
  *         // If partial results are tolerable, process the error as needed and continue.
@@ -130,7 +129,7 @@ public:
 
     /**
      * Ensures pending network I/O for any outstanding requests has been canceled and waits for
-     * outstanding requests to complete.
+     * outstanding callbacks to complete.
      */
     ~AsyncRequestsSender();
 
@@ -142,10 +141,12 @@ public:
     /**
      * Returns the next available response or error.
      *
-     * If neither kill() nor stopRetrying() have been called, schedules retries for any remotes that
-     * have had a retriable error and have not exhausted their retries.
+     * If the operation is interrupted, the status of some responses may be CallbackCanceled.
      *
-     * Invalid to call if done() is true.
+     * If neither cancelPendingRequests() nor stopRetrying() have been called, schedules retries for
+     * any remotes that have had a retriable error and have not exhausted their retries.
+     *
+     * Note: Must only be called from one thread at a time, and invalid to call if done() is true.
      */
     Response next();
 
@@ -155,15 +156,7 @@ public:
      * Use this if you no longer care about getting success responses, but need to do cleanup based
      * on responses for requests that have already been dispatched.
      */
-    void interrupt();
-
-    /**
-     * Cancels all outstanding requests.
-     *
-     * Use this if you no longer care about getting success responses, and don't need to process
-     * responses for requests that have already been dispatched.
-     */
-    void kill();
+    void stopRetrying();
 
 private:
     /**
@@ -210,6 +203,11 @@ private:
     };
 
     /**
+     * Cancels all outstanding requests on the TaskExecutor and sets the _stopRetrying flag.
+     */
+    void _cancelPendingRequests();
+
+    /**
      * Replaces _notification with a new notification.
      *
      * If _stopRetrying is false, schedules retries for remotes that have had a retriable error.
@@ -251,10 +249,6 @@ private:
     void _handleResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
                          size_t remoteIndex);
 
-    // Used internally to determine if the ARS should attempt to retry any requests. Is set to true
-    // when stopRetrying() or kill() is called.
-    bool _stopRetrying = false;
-
     // Not owned here.
     OperationContext* _opCtx;
 
@@ -271,19 +265,25 @@ private:
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;
 
-    // Must be acquired before accessing any data members.
+    // Used to determine whether to check for interrupt when waiting for a remote to be ready.
+    // Set to false if we are interrupted, so that we can still wait for callbacks to complete.
+    // This is only accessed by the thread in next().
+    bool _checkForInterrupt = true;
+
+    // Must be acquired before accessing the below data members.
     // Must also be held when calling any of the '_inlock()' helper functions.
     stdx::mutex _mutex;
 
     // Data tracking the state of our communication with each of the remote nodes.
     std::vector<RemoteData> _remotes;
 
-    // A notification that gets signaled when a remote has a retriable error or the last outstanding
-    // response is received.
+    // A notification that gets signaled when a remote is ready for processing (i.e., we failed to
+    // schedule a request to it or received a response from it).
     boost::optional<Notification<void>> _notification;
 
-    // Set to true when kill() is called so that it is only executed once.
-    bool _killed = false;
+    // Used to determine if the ARS should attempt to retry any requests. Is set to true when
+    // stopRetrying() or cancelPendingRequests() is called.
+    bool _stopRetrying = false;
 };
 
 }  // namespace mongo

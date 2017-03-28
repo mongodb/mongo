@@ -42,6 +42,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/ticket.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
@@ -113,7 +114,10 @@ void ServiceEntryPointMongod::_sessionLoop(const transport::SessionHandle& sessi
         // 1. Source a Message from the client (unless we are exhausting)
         if (!inExhaust) {
             inMessage.reset();
-            auto status = session->sourceMessage(&inMessage).wait();
+            auto status = [&] {
+                MONGO_IDLE_THREAD_BLOCK;
+                return session->sourceMessage(&inMessage).wait();
+            }();
 
             if (ErrorCodes::isInterruption(status.code()) ||
                 ErrorCodes::isNetworkError(status.code())) {

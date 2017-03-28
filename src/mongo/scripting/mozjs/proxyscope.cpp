@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/quick_exit.h"
 
@@ -340,9 +341,12 @@ void MozJSProxyScope::implThread(void* arg) {
 
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
-        proxy->_condvar.wait(lk, [proxy] {
-            return proxy->_state == State::ProxyRequest || proxy->_state == State::Shutdown;
-        });
+        {
+            MONGO_IDLE_THREAD_BLOCK;
+            proxy->_condvar.wait(lk, [proxy] {
+                return proxy->_state == State::ProxyRequest || proxy->_state == State::Shutdown;
+            });
+        }
 
         if (proxy->_state == State::Shutdown)
             break;

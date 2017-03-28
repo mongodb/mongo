@@ -45,7 +45,8 @@ namespace mongo {
 /**
  * A clock source that uses a periodic timer to build a low-resolution, fast-to-read clock.
  * Essentially uses a background thread that repeatedly sleeps for X amount of milliseconds
- * and wakes up to store the current time.
+ * and wakes up to store the current time. If nothing reads the time for a whole granularity, the
+ * thread will sleep until it is needed again.
  */
 class BackgroundThreadClockSource final : public ClockSource {
     MONGO_DISALLOW_COPYING(BackgroundThreadClockSource);
@@ -55,19 +56,32 @@ public:
     ~BackgroundThreadClockSource() override;
     Milliseconds getPrecision() override;
     Date_t now() override;
+    Status setAlarm(Date_t when, stdx::function<void()> action) override;
+
+    /**
+     * Doesn't count as a call to now() for determining whether this ClockSource is idle.
+     *
+     * Unlike now(), returns Date_t() if the thread is currently paused.
+     */
+    Date_t peekNowForTest() const {
+        return Date_t::fromMillisSinceEpoch(_current.load());
+    }
 
 private:
+    Date_t _slowNow();
     void _startTimerThread();
-    void _updateCurrent();
+    int64_t _updateCurrent_inlock();
 
     const std::unique_ptr<ClockSource> _clockSource;
-    AtomicInt64 _current;
+    AtomicInt64 _current{0};           // 0 if _timer is paused due to idleness.
+    AtomicBool _timerWillPause{true};  // If true when _timer wakes up, it will pause.
 
     const Milliseconds _granularity;
 
     stdx::mutex _mutex;
     stdx::condition_variable _condition;
-    bool _shutdownTimer;
+    bool _inShutdown = false;
+    bool _started = false;
     stdx::thread _timer;
 };
 

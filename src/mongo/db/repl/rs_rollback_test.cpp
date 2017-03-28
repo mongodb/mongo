@@ -30,12 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include <list>
+#include <initializer_list>
 #include <utility>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
@@ -49,14 +47,10 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/rollback_source.h"
+#include "mongo/db/repl/rollback_test_fixture.h"
 #include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -70,28 +64,6 @@ using namespace mongo::repl::rollback_internal;
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 const OplogInterfaceMock::Operations kEmptyMockOperations;
-
-ReplSettings createReplSettings() {
-    ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setReplSetString("mySet/node1:12345");
-    return settings;
-}
-
-class ReplicationCoordinatorRollbackMock : public ReplicationCoordinatorMock {
-public:
-    ReplicationCoordinatorRollbackMock(ServiceContext* service)
-        : ReplicationCoordinatorMock(service, createReplSettings()) {}
-    void resetLastOpTimesFromOplog(OperationContext* opCtx) override {}
-    bool setFollowerMode(const MemberState& newState) override {
-        if (newState == _failSetFollowerModeOnThisMemberState) {
-            return false;
-        }
-        return ReplicationCoordinatorMock::setFollowerMode(newState);
-    }
-    MemberState _failSetFollowerModeOnThisMemberState = MemberState::RS_UNKNOWN;
-};
-
 
 class RollbackSourceMock : public RollbackSource {
 public:
@@ -137,38 +109,18 @@ StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString&
     return BSON("name" << nss.ns() << "options" << BSONObj());
 }
 
-class RSRollbackTest : public ServiceContextMongoDTest {
-protected:
-    ServiceContext::UniqueOperationContext _opCtx;
-
-    // Owned by service context
-    ReplicationCoordinatorRollbackMock* _coordinator;
-
-    repl::StorageInterfaceMock _storageInterface;
-
+class RSRollbackTest : public RollbackTest {
 private:
     void setUp() override;
     void tearDown() override;
 };
 
 void RSRollbackTest::setUp() {
-    ServiceContextMongoDTest::setUp();
-    _opCtx = cc().makeOperationContext();
-    _coordinator = new ReplicationCoordinatorRollbackMock(_opCtx->getServiceContext());
-
-    auto serviceContext = getServiceContext();
-    ReplicationCoordinator::set(serviceContext,
-                                std::unique_ptr<ReplicationCoordinator>(_coordinator));
-
-    setOplogCollectionName();
-    _storageInterface.setAppliedThrough(_opCtx.get(), OpTime{});
-    _storageInterface.setMinValid(_opCtx.get(), OpTime{});
+    RollbackTest::setUp();
 }
 
 void RSRollbackTest::tearDown() {
-    _opCtx.reset();
-    ServiceContextMongoDTest::tearDown();
-    setGlobalReplicationCoordinator(nullptr);
+    RollbackTest::tearDown();
 }
 
 OplogInterfaceMock::Operation makeNoopOplogEntryAndRecordId(Seconds seconds) {

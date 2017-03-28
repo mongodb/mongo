@@ -763,5 +763,161 @@ TEST_F(AuthorizationSessionTest,
     BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
     ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
 }
+
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithEmptyUserSet) {
+    std::vector<UserName> userSet;
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsNotCoauthorizedWithNonemptyUserSet) {
+    std::vector<UserName> userSet;
+    userSet.emplace_back("spencer", "test");
+    ASSERT_FALSE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest,
+       UnauthorizedSessionIsCoauthorizedWithNonemptyUserSetWhenAuthIsDisabled) {
+    authzManager->setAuthEnabled(false);
+    std::vector<UserName> userSet;
+    userSet.emplace_back("spencer", "test");
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUserSet) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    std::vector<UserName> userSet;
+    ASSERT_FALSE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest,
+       AuthorizedSessionIsCoauthorizedWithEmptyUserSetWhenAuthIsDisabled) {
+    authzManager->setAuthEnabled(false);
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    std::vector<UserName> userSet;
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersectingUserSet) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "test")));
+    std::vector<UserName> userSet;
+    userSet.emplace_back("admin", "test");
+    userSet.emplace_back("tess", "test");
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNonintersectingUserSet) {
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "test")));
+    std::vector<UserName> userSet;
+    userSet.emplace_back("tess", "test");
+    ASSERT_FALSE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
+
+TEST_F(AuthorizationSessionTest,
+       AuthorizedSessionIsCoauthorizedWithNonintersectingUserSetWhenAuthIsDisabled) {
+    authzManager->setAuthEnabled(false);
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(managerState->insertPrivilegeDocument(&_opCtx,
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials"
+                                                         << BSON("MONGODB-CR"
+                                                                 << "a")
+                                                         << "roles"
+                                                         << BSONArray()),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("spencer", "test")));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(&_opCtx, UserName("admin", "test")));
+    std::vector<UserName> userSet;
+    userSet.emplace_back("tess", "test");
+    ASSERT_TRUE(
+        authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
+}
 }  // namespace
 }  // namespace mongo

@@ -8,7 +8,6 @@ env.Library(
     target='metadata',
     source=[
         'collection_metadata.cpp',
-        'metadata_loader.cpp',
     ],
     LIBDEPS=[
         'shard_metadata_util',
@@ -29,6 +28,17 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/s/common',
+    ],
+)
+
+env.Library(
+    target='sharding_task_executor',
+    source=[
+        'sharding_task_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
     ],
 )
 
@@ -88,7 +98,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/internal_plans',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/is_mongos',
@@ -96,6 +105,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         'metadata',
         'migration_types',
+        'sharding_task_executor',
         'type_shard_identity',
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE
@@ -221,7 +231,6 @@ env.CppUnitTest(
     target='sharding_metadata_test',
     source=[
         'collection_metadata_test.cpp',
-        'metadata_loader_test.cpp',
         'shard_metadata_util_test.cpp',
     ],
     LIBDEPS=[

@@ -2382,6 +2382,10 @@ bool TopologyCoordinatorImpl::stepDownIfPending() {
     return true;
 }
 
+bool TopologyCoordinatorImpl::isStepDownPending() const {
+    return _stepDownPending;
+}
+
 void TopologyCoordinatorImpl::_stepDownSelfAndReplaceWith(int newPrimary) {
     invariant(_role == Role::leader);
     invariant(_selfIndex != -1);

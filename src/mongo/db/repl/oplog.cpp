@@ -88,6 +88,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
@@ -756,6 +757,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                   << op,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
+            // Check if collection exists.
+            auto indexCollection = db->getCollection(indexNss);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Failed to create index due to missing collection: "
+                                  << op.toString(),
+                    indexCollection);
+
             opCounters->gotInsert();
 
             if (!indexSpec["v"]) {
@@ -1206,6 +1214,7 @@ void SnapshotThread::run() {
                     break;
                 }
 
+                MONGO_IDLE_THREAD_BLOCK;
                 newTimestampNotifier.wait(lock);
             }
         }

@@ -128,8 +128,8 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
 ElectCmdRunner::ElectCmdRunner() : _isCanceled(false) {}
 ElectCmdRunner::~ElectCmdRunner() {}
 
-StatusWith<ReplicationExecutor::EventHandle> ElectCmdRunner::start(
-    ReplicationExecutor* executor,
+StatusWith<executor::TaskExecutor::EventHandle> ElectCmdRunner::start(
+    executor::TaskExecutor* executor,
     const ReplSetConfig& currentConfig,
     int selfIndex,
     const std::vector<HostAndPort>& targets) {

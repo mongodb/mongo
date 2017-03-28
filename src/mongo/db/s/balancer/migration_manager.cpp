@@ -520,7 +520,7 @@ void MigrationManager::_schedule_inlock(OperationContext* opCtx,
         executor->scheduleRemoteCommand(
             remoteRequest,
             [this, itMigration](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-                Client::initThread(getThreadName().c_str());
+                Client::initThread(getThreadName());
                 ON_BLOCK_EXIT([&] { Client::destroy(); });
                 auto opCtx = cc().makeOperationContext();
 

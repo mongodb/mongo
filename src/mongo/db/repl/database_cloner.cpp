@@ -353,12 +353,12 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         if (infoElement.isABSONObj()) {
             BSONElement uuidElement = infoElement[kUUIDFieldName];
             if (!uuidElement.eoo()) {
-                try {
-                    options.uuid.emplace(uuidElement);
-                } catch (const UserException& ex) {
-                    _finishCallback_inlock(lk, ex.toStatus());
+                auto res = CollectionUUID::parse(uuidElement);
+                if (!res.isOK()) {
+                    _finishCallback_inlock(lk, res.getStatus());
                     return;
                 }
+                options.uuid = res.getValue();
             }
         }
         // TODO(SERVER-27994): Ensure UUID present when FCV >= "3.6".

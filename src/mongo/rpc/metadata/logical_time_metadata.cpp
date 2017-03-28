@@ -40,6 +40,8 @@ namespace {
 
 const char kClusterTimeFieldName[] = "clusterTime";
 const char kSignatureFieldName[] = "signature";
+const char kSignatureHashFieldName[] = "hash";
+const char kSignatureKeyIdFieldName[] = "keyId";
 
 }  // unnamed namespace
 
@@ -64,30 +66,49 @@ StatusWith<LogicalTimeMetadata> LogicalTimeMetadata::readFromMetadata(
         return status;
     }
 
-    // Extract BinData type signature and construct a SHA1Block instance from it.
     BSONElement signatureElem;
-    status = bsonExtractTypedField(obj, kSignatureFieldName, BinData, &signatureElem);
+    status = bsonExtractTypedField(obj, kSignatureFieldName, Object, &signatureElem);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    const auto& signatureObj = signatureElem.Obj();
+
+    // Extract BinData type signature hash and construct a SHA1Block instance from it.
+    BSONElement hashElem;
+    status = bsonExtractTypedField(signatureObj, kSignatureHashFieldName, BinData, &hashElem);
     if (!status.isOK()) {
         return status;
     }
 
     int hashLength = 0;
-    auto rawBinSignature = signatureElem.binData(hashLength);
-    BSONBinData proofBinData(rawBinSignature, hashLength, signatureElem.binDataType());
+    auto rawBinSignature = hashElem.binData(hashLength);
+    BSONBinData proofBinData(rawBinSignature, hashLength, hashElem.binDataType());
     auto proofStatus = SHA1Block::fromBinData(proofBinData);
 
     if (!proofStatus.isOK()) {
         return proofStatus.getStatus();
     }
 
+    long long keyId;
+    status = bsonExtractIntegerField(signatureObj, kSignatureKeyIdFieldName, &keyId);
+    if (!status.isOK()) {
+        return status;
+    }
+
     return LogicalTimeMetadata(
-        SignedLogicalTime(LogicalTime(ts), std::move(proofStatus.getValue())));
+        SignedLogicalTime(LogicalTime(ts), std::move(proofStatus.getValue()), keyId));
 }
 
 void LogicalTimeMetadata::writeToMetadata(BSONObjBuilder* metadataBuilder) const {
     BSONObjBuilder subObjBuilder(metadataBuilder->subobjStart(fieldName()));
     _clusterTime.getTime().asTimestamp().append(subObjBuilder.bb(), kClusterTimeFieldName);
-    _clusterTime.getProof().appendAsBinData(subObjBuilder, kSignatureFieldName);
+
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart(kSignatureFieldName));
+    _clusterTime.getProof().appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);
+    signatureObjBuilder.append(kSignatureKeyIdFieldName, _clusterTime.getKeyId());
+    signatureObjBuilder.doneFast();
+
     subObjBuilder.doneFast();
 }
 

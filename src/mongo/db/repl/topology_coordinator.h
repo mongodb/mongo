@@ -427,6 +427,11 @@ public:
     virtual bool stepDownIfPending() = 0;
 
     /**
+     * Returns true if a stepdown request is pending on acquisition of the global lock.
+     */
+    virtual bool isStepDownPending() const = 0;
+
+    /**
      * Considers whether or not this node should stand for election, and returns true
      * if the node has transitioned to candidate role as a result of the call.
      */

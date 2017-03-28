@@ -138,6 +138,10 @@ public:
                     break;
                 }
 
+                uassert(ErrorCodes::IllegalOperation,
+                        str::stream() << "Unsupported network op " << request.operation(),
+                        isSupportedNetworkOp(request.operation()));
+
                 if (request.operation() == dbCompressed) {
                     auto swm = compressorManager.decompressMessage(request);
                     if (!swm.isOK()) {
@@ -214,10 +218,10 @@ public:
                 }
 
                 // Send the message we received from '_mp' to 'dest'. 'dest' returns a response for
-                // OP_QUERY, OP_MSG, OP_GET_MORE, and OP_COMMAND messages that we respond back to
+                // OP_QUERY, OP_GET_MORE, and OP_COMMAND messages that we respond back to
                 // '_mp' with.
-                if (request.operation() == dbQuery || request.operation() == dbMsg ||
-                    request.operation() == dbGetMore || request.operation() == dbCommand) {
+                if (request.operation() == dbQuery || request.operation() == dbGetMore ||
+                    request.operation() == dbCommand) {
                     // Forward the message to 'dest' and receive its reply in 'response'.
                     response.reset();
                     dest.port().call(request, response);

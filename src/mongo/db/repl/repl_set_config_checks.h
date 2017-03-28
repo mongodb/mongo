@@ -45,12 +45,8 @@ class ReplSetConfig;
  *
  * Returns the index of the current node's member configuration in "newConfig",
  * on success, and an indicative error on failure.
- *
- * If "oldConfig" is valid, this method only succeds if "newConfig" is a legal
- * successor configuration.
  */
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
-                                         const ReplSetConfig& oldConfig,
                                          const ReplSetConfig& newConfig,
                                          ServiceContext* ctx);
 

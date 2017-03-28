@@ -228,7 +228,10 @@ public:
 
     bool requiresIdIndex() const;
 
-    Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const;
+    Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const {
+        return Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(),
+                                    _recordStore->dataFor(opCtx, loc).releaseToBson());
+    }
 
     /**
      * @param out - contents set to the right docs if exists, or nothing.

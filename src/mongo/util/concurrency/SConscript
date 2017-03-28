@@ -57,13 +57,3 @@ env.CppUnitTest(
         '$BUILD_DIR/third_party/shim_boost',
     ],
 )
-
-env.Library(
-    target='task',
-    source=[
-        'task.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/background_job',
-    ],
-)

@@ -298,7 +298,7 @@ private:
     IndexCatalogEntry* _cachedEntry;
 
     friend class IndexCatalog;
-    friend class IndexCatalogEntry;
+    friend class IndexCatalogEntryImpl;
     friend class IndexCatalogEntryContainer;
 };
 

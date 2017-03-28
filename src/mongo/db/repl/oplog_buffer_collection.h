@@ -53,6 +53,8 @@ public:
     struct Options {
         // If equal to 0, the cache size will be set to 1.
         std::size_t peekCacheSize = 0;
+        bool dropCollectionAtStartup = true;
+        bool dropCollectionAtShutdown = true;
         Options() {}
     };
 
@@ -162,6 +164,12 @@ private:
      * Pops an entry off the buffer in a lock.
      */
     bool _pop_inlock(OperationContext* opCtx, Value* value);
+
+    /**
+     * Returns the last document pushed onto the collection. This does not remove the `_id` field
+     * of the document. If the collection is empty, this returns boost::none.
+     */
+    boost::optional<Value> _lastDocumentPushed_inlock(OperationContext* opCtx) const;
 
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;

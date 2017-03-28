@@ -107,6 +107,7 @@ baseSource=[
     'util/allocator.cpp',
     'util/assert_util.cpp',
     'util/base64.cpp',
+    'util/concurrency/idle_thread_block.cpp',
     'util/concurrency/thread_name.cpp',
     'util/duration.cpp',
     'util/exception_filter_win32.cpp',

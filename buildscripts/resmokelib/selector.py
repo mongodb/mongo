@@ -103,10 +103,8 @@ def filter_dbtests(binary=None, include_suites=None):
 
 def filter_jstests(roots,
                    include_files=None,
-                   include_with_all_tags=None,
                    include_with_any_tags=None,
                    exclude_files=None,
-                   exclude_with_all_tags=None,
                    exclude_with_any_tags=None):
     """
     Filters out what jstests to run.
@@ -117,9 +115,7 @@ def filter_jstests(roots,
     # Command line options are merged with YAML options.
     tags = {
         # The constructor for an empty set does not accept "None".
-        "exclude_with_all_tags": set(utils.default_if_none(exclude_with_all_tags, [])),
         "exclude_with_any_tags": set(utils.default_if_none(exclude_with_any_tags, [])),
-        "include_with_all_tags": set(utils.default_if_none(include_with_all_tags, [])),
         "include_with_any_tags": set(utils.default_if_none(include_with_any_tags, [])),
     }
 
@@ -128,9 +124,7 @@ def filter_jstests(roots,
             raise TypeError("%s must be a YAML list of strings" % (name))
 
     cmd_line_lists = (
-        ("exclude_with_all_tags", config.EXCLUDE_WITH_ALL_TAGS),
         ("exclude_with_any_tags", config.EXCLUDE_WITH_ANY_TAGS),
-        ("include_with_all_tags", config.INCLUDE_WITH_ALL_TAGS),
         ("include_with_any_tags", config.INCLUDE_WITH_ANY_TAGS),
     )
 
@@ -167,11 +161,7 @@ def filter_jstests(roots,
 
     for filename in jstests_set:
         file_tags = set(jscomment.get_tags(filename))
-        if tags["include_with_all_tags"] and tags["include_with_all_tags"] - file_tags:
-            excluded.add(filename)
         if tags["include_with_any_tags"] and not tags["include_with_any_tags"] & file_tags:
-            excluded.add(filename)
-        if tags["exclude_with_all_tags"] and not tags["exclude_with_all_tags"] - file_tags:
             excluded.add(filename)
         if tags["exclude_with_any_tags"] and tags["exclude_with_any_tags"] & file_tags:
             excluded.add(filename)

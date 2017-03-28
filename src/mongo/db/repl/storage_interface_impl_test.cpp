@@ -1501,4 +1501,83 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                       .getStatus());
 }
 
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       GetCollectionCountReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.getCollectionCount(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       GetCollectionCountReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.getCollectionCount(opCtx, wrongColl).getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, GetCollectionCountReturnsZeroOnEmptyCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto count = unittest::assertGet(storage.getCollectionCount(opCtx, nss));
+    ASSERT_EQUALS(0UL, count);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, GetCollectionCountReturnsCollectionCount) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    auto count = unittest::assertGet(storage.getCollectionCount(opCtx, nss));
+    ASSERT_EQUALS(3UL, count);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       GetCollectionSizeReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.getCollectionSize(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       GetCollectionSizeReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.getCollectionSize(opCtx, wrongColl).getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, GetCollectionSizeReturnsZeroOnEmptyCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto size = unittest::assertGet(storage.getCollectionSize(opCtx, nss));
+    ASSERT_EQUALS(0UL, size);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, GetCollectionSizeReturnsCollectionSize) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    auto size = unittest::assertGet(storage.getCollectionSize(opCtx, nss));
+    ASSERT_NOT_EQUALS(0UL, size);
+}
+
 }  // namespace

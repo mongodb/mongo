@@ -48,7 +48,9 @@ TEST(LogicalTimeMetadataTest, Roundtrip) {
     proof[19] = 6;
     proof[0] = 12;
 
-    SignedLogicalTime signedTs(LogicalTime(ts), proof);
+    long long keyId = 1;
+
+    SignedLogicalTime signedTs(LogicalTime(ts), proof, keyId);
 
     LogicalTimeMetadata origMetadata(signedTs);
     BSONObjBuilder builder;
@@ -62,15 +64,21 @@ TEST(LogicalTimeMetadataTest, Roundtrip) {
     const auto& parsedTs = parsedMetadata.getSignedTime();
     ASSERT_EQ(ts.asTimestamp(), parsedTs.getTime().asTimestamp());
     ASSERT_TRUE(SHA1Block(proof) == parsedTs.getProof());
+    ASSERT_TRUE(keyId == parsedTs.getKeyId());
 }
 
 TEST(LogicalTimeMetadataTest, MissingClusterTimeShouldFailToParse) {
     std::array<uint8_t, 20> proof;
     proof.fill(0);
 
+    long long keyId = 1;
+
     BSONObjBuilder builder;
     BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
-    subObjBuilder.append("signature", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
+    signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
+    signatureObjBuilder.append("keyId", keyId);
+    signatureObjBuilder.doneFast();
     subObjBuilder.doneFast();
 
     auto serializedObj = builder.done();
@@ -78,12 +86,49 @@ TEST(LogicalTimeMetadataTest, MissingClusterTimeShouldFailToParse) {
     ASSERT_EQ(ErrorCodes::NoSuchKey, status);
 }
 
-TEST(LogicalTimeMetadataTest, MissingProofShouldFailToParse) {
+TEST(LogicalTimeMetadataTest, MissingSignatureShouldFailToParse) {
     const auto ts = Timestamp(100, 200);
 
     BSONObjBuilder builder;
     BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
     ts.append(subObjBuilder.bb(), "clusterTime");
+    subObjBuilder.doneFast();
+
+    auto serializedObj = builder.done();
+    auto status = LogicalTimeMetadata::readFromMetadata(serializedObj).getStatus();
+    ASSERT_EQ(ErrorCodes::NoSuchKey, status);
+}
+
+TEST(LogicalTimeMetadataTest, MissingHashShouldFailToParse) {
+    const auto ts = Timestamp(100, 200);
+
+    long long keyId = 1;
+
+    BSONObjBuilder builder;
+    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    ts.append(subObjBuilder.bb(), "clusterTime");
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
+    signatureObjBuilder.append("keyId", keyId);
+    signatureObjBuilder.doneFast();
+    subObjBuilder.doneFast();
+
+    auto serializedObj = builder.done();
+    auto status = LogicalTimeMetadata::readFromMetadata(serializedObj).getStatus();
+    ASSERT_EQ(ErrorCodes::NoSuchKey, status);
+}
+
+TEST(LogicalTimeMetadataTest, MissingKeyIdShouldFailToParse) {
+    const auto ts = Timestamp(100, 200);
+
+    std::array<uint8_t, 20> proof;
+    proof.fill(0);
+
+    BSONObjBuilder builder;
+    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    ts.append(subObjBuilder.bb(), "clusterTime");
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
+    signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
+    signatureObjBuilder.doneFast();
     subObjBuilder.doneFast();
 
     auto serializedObj = builder.done();
@@ -97,10 +142,15 @@ TEST(LogicalTimeMetadataTest, ProofWithWrongLengthShouldFailToParse) {
     std::array<uint8_t, 10> proof;
     proof.fill(0);
 
+    long long keyId = 1;
+
     BSONObjBuilder builder;
     BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
     ts.append(subObjBuilder.bb(), "clusterTime");
-    subObjBuilder.append("signature", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
+    signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
+    signatureObjBuilder.append("keyId", keyId);
+    signatureObjBuilder.doneFast();
     subObjBuilder.doneFast();
 
     auto serializedObj = builder.done();

@@ -32,8 +32,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/freshness_scanner.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -48,16 +48,11 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using unittest::assertGet;
 
-class FreshnessScannerTest : public mongo::unittest::Test {
+class FreshnessScannerTest : public executor::ThreadPoolExecutorTest {
 public:
-    NetworkInterfaceMock* getNet() {
-        return _net;
-    }
-    ReplicationExecutor* getExecutor() {
-        return _executor.get();
-    }
-
     virtual void setUp() {
+        executor::ThreadPoolExecutorTest::setUp();
+        launchExecutorThread();
         ASSERT_OK(_config.initialize(BSON("_id"
                                           << "rs0"
                                           << "version"
@@ -82,17 +77,6 @@ public:
                                                                       << "priority"
                                                                       << 0)))));
         ASSERT_OK(_config.validate());
-
-        auto net = stdx::make_unique<NetworkInterfaceMock>();
-        _net = net.get();
-        _executor = stdx::make_unique<ReplicationExecutor>(std::move(net), 1 /* prng seed */);
-        _executorThread =
-            stdx::make_unique<stdx::thread>(stdx::bind(&ReplicationExecutor::run, _executor.get()));
-    }
-
-    virtual void tearDown() {
-        _executor->shutdown();
-        _executorThread->join();
     }
 
 protected:
@@ -104,42 +88,36 @@ protected:
                                     Milliseconds(0));
     }
 
-    ResponseStatus makeResponseStatus(BSONObj response) {
-        return ResponseStatus(
+    RemoteCommandResponse makeRemoteCommandResponse(BSONObj response) {
+        return RemoteCommandResponse(
             NetworkInterfaceMock::Response(response, BSONObj(), Milliseconds(10)));
     }
 
-    ResponseStatus badResponseStatus() {
-        return ResponseStatus(ErrorCodes::NodeNotFound, "not on my watch");
+    RemoteCommandResponse badRemoteCommandResponse() {
+        return RemoteCommandResponse(ErrorCodes::NodeNotFound, "not on my watch");
     }
 
-    ResponseStatus goodResponseStatus(Timestamp timestamp, long long term) {
+    RemoteCommandResponse goodRemoteCommandResponse(Timestamp timestamp, long long term) {
         // OpTime part of replSetGetStatus.
         BSONObj response =
             BSON("optimes" << BSON("appliedOpTime" << OpTime(timestamp, term).toBSON()));
-        return makeResponseStatus(response);
+        return makeRemoteCommandResponse(response);
     }
 
     ReplSetConfig _config;
-
-private:
-    // owned by _executor
-    NetworkInterfaceMock* _net;
-    std::unique_ptr<ReplicationExecutor> _executor;
-    std::unique_ptr<stdx::thread> _executorThread;
 };
 
 TEST_F(FreshnessScannerTest, ImmediateGoodResponse) {
     FreshnessScanner::Algorithm algo(_config, 0, Milliseconds(2000));
 
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host1"), goodResponseStatus(Timestamp(1, 100), 1));
+    algo.processResponse(requestFrom("host1"), goodRemoteCommandResponse(Timestamp(1, 100), 1));
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host2"), goodResponseStatus(Timestamp(1, 200), 1));
+    algo.processResponse(requestFrom("host2"), goodRemoteCommandResponse(Timestamp(1, 200), 1));
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host3"), goodResponseStatus(Timestamp(1, 400), 1));
+    algo.processResponse(requestFrom("host3"), goodRemoteCommandResponse(Timestamp(1, 400), 1));
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host4"), goodResponseStatus(Timestamp(1, 300), 1));
+    algo.processResponse(requestFrom("host4"), goodRemoteCommandResponse(Timestamp(1, 300), 1));
     ASSERT_TRUE(algo.hasReceivedSufficientResponses());
     ASSERT_EQUALS((size_t)4, algo.getResult().size());
     ASSERT_EQUALS(3, algo.getResult().front().index);
@@ -153,18 +131,18 @@ TEST_F(FreshnessScannerTest, ImmediateBadResponse) {
 
     // Cannot access host 1 and host 2.
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host1"), badResponseStatus());
+    algo.processResponse(requestFrom("host1"), badRemoteCommandResponse());
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host2"), badResponseStatus());
+    algo.processResponse(requestFrom("host2"), badRemoteCommandResponse());
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
 
     // host 3 is in an old version, which doesn't include OpTimes in the response.
-    algo.processResponse(requestFrom("host3"), makeResponseStatus(BSONObj()));
+    algo.processResponse(requestFrom("host3"), makeRemoteCommandResponse(BSONObj()));
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
 
     // Responses from host 4 in PV0 are considered as bad responses.
     auto response4 = BSON("optimes" << BSON("appliedOpTime" << Timestamp(1, 300)));
-    algo.processResponse(requestFrom("host4"), makeResponseStatus(response4));
+    algo.processResponse(requestFrom("host4"), makeRemoteCommandResponse(response4));
     ASSERT_TRUE(algo.hasReceivedSufficientResponses());
     ASSERT_EQUALS((size_t)0, algo.getResult().size());
 }
@@ -172,7 +150,7 @@ TEST_F(FreshnessScannerTest, ImmediateBadResponse) {
 TEST_F(FreshnessScannerTest, AllResponsesTimeout) {
     Milliseconds timeout(2000);
     FreshnessScanner scanner;
-    scanner.start(getExecutor(), _config, 0, timeout);
+    scanner.start(&getExecutor(), _config, 0, timeout);
 
     auto net = getNet();
     net->enterNetwork();
@@ -191,7 +169,7 @@ TEST_F(FreshnessScannerTest, AllResponsesTimeout) {
 TEST_F(FreshnessScannerTest, BadResponsesAndTimeout) {
     Milliseconds timeout(2000);
     FreshnessScanner scanner;
-    scanner.start(getExecutor(), _config, 0, timeout);
+    scanner.start(&getExecutor(), _config, 0, timeout);
 
     auto net = getNet();
     net->enterNetwork();
@@ -201,11 +179,11 @@ TEST_F(FreshnessScannerTest, BadResponsesAndTimeout) {
     ASSERT(net->hasReadyRequests());
     auto noi = net->getNextReadyRequest();
     HostAndPort successfulHost = noi->getRequest().target;
-    net->scheduleResponse(noi, later, goodResponseStatus(Timestamp(1, 100), 1));
+    net->scheduleResponse(noi, later, goodRemoteCommandResponse(Timestamp(1, 100), 1));
 
     // host 2 has a bad connection.
     ASSERT(net->hasReadyRequests());
-    net->scheduleResponse(net->getNextReadyRequest(), later, badResponseStatus());
+    net->scheduleResponse(net->getNextReadyRequest(), later, badRemoteCommandResponse());
 
     // host 3 and 4 time out.
     ASSERT(net->hasReadyRequests());

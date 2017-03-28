@@ -257,8 +257,6 @@ RangeMap MetadataManager::getCopyOfReceivingChunks() {
 }
 
 void MetadataManager::_setActiveMetadata_inlock(std::unique_ptr<CollectionMetadata> newMetadata) {
-    invariant(!newMetadata || newMetadata->isValid());
-
     if (_activeMetadataTracker->usageCounter > 0) {
         _metadataInUse.push_front(std::move(_activeMetadataTracker));
     }
@@ -300,11 +298,11 @@ ScopedCollectionMetadata::~ScopedCollectionMetadata() {
     _decrementUsageCounter();
 }
 
-CollectionMetadata* ScopedCollectionMetadata::operator->() {
+CollectionMetadata* ScopedCollectionMetadata::operator->() const {
     return _tracker->metadata.get();
 }
 
-CollectionMetadata* ScopedCollectionMetadata::getMetadata() {
+CollectionMetadata* ScopedCollectionMetadata::getMetadata() const {
     return _tracker->metadata.get();
 }
 

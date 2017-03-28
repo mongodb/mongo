@@ -44,8 +44,8 @@ public:
 
     SignedLogicalTime() = default;
 
-    explicit SignedLogicalTime(LogicalTime time, TimeProof proof)
-        : _time(std::move(time)), _proof(std::move(proof)) {}
+    explicit SignedLogicalTime(LogicalTime time, TimeProof proof, long long keyId)
+        : _time(std::move(time)), _proof(std::move(proof)), _keyId(keyId) {}
 
     LogicalTime getTime() const {
         return _time;
@@ -55,11 +55,18 @@ public:
         return _proof;
     }
 
+    long long getKeyId() const {
+        return _keyId;
+    }
+
     std::string toString() const;
+
+    static const SignedLogicalTime kUninitialized;
 
 private:
     LogicalTime _time;
     TimeProof _proof;
+    long long _keyId{0};
 };
 
 }  // namespace mongo

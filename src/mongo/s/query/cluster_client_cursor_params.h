@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard.h"
@@ -91,20 +92,26 @@ struct ClusterClientCursorParams {
     };
 
     /**
-     * Constructor used for cases where initial shard host targeting is necessary (i.e., we don't
+     * Read preference must be provided if initial shard host targeting is necessary (i.e., we don't
      * know yet the remote cursor id).
      */
-    ClusterClientCursorParams(NamespaceString nss, ReadPreferenceSetting readPref)
-        : nsString(std::move(nss)), readPreference(std::move(readPref)) {}
-
-    /**
-     * Constructor used for cases, where the remote cursor ids are already known and no resolution
-     * or retargeting needs to happen.
-     */
-    ClusterClientCursorParams(NamespaceString nss) : nsString(std::move(nss)) {}
+    ClusterClientCursorParams(NamespaceString nss,
+                              UserNameIterator authenticatedUsersIter,
+                              boost::optional<ReadPreferenceSetting> readPref = boost::none)
+        : nsString(std::move(nss)) {
+        while (authenticatedUsersIter.more()) {
+            authenticatedUsers.emplace_back(authenticatedUsersIter.next());
+        }
+        if (readPref) {
+            readPreference = std::move(readPref.get());
+        }
+    }
 
     // Namespace against which to query.
     NamespaceString nsString;
+
+    // The set of authenticated users when this cursor was created.
+    std::vector<UserName> authenticatedUsers;
 
     // Per-remote node data.
     std::vector<Remote> remotes;

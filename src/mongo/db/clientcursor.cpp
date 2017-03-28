@@ -50,6 +50,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
 namespace mongo {
@@ -82,6 +83,7 @@ ClientCursor::ClientCursor(ClientCursorParams&& params,
                            CursorId cursorId)
     : _cursorid(cursorId),
       _nss(std::move(params.nss)),
+      _authenticatedUsers(std::move(params.authenticatedUsers)),
       _isReadCommitted(params.isReadCommitted),
       _cursorManager(cursorManager),
       _originatingCommand(params.originatingCommandObj),
@@ -278,6 +280,7 @@ public:
                 cursorStatsTimedOut.increment(
                     CursorManager::timeoutCursorsGlobal(&opCtx, t.millisReset()));
             }
+            MONGO_IDLE_THREAD_BLOCK;
             sleepsecs(clientCursorMonitorFrequencySecs.load());
         }
     }

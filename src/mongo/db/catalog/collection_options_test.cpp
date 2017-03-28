@@ -317,7 +317,7 @@ TEST(CollectionOptions, WriteConcernWhitelistedOptionIgnored) {
 
 TEST(CollectionOptions, ParseUUID) {
     CollectionOptions options;
-    CollectionUUID uuid = CollectionUUID::generateSecureRandomUUID();
+    CollectionUUID uuid = CollectionUUID::gen();
 
     // Check required parse failures
     ASSERT_FALSE(options.uuid);

@@ -352,15 +352,31 @@ var BackupRestoreTest = function(options) {
         stopMongoProgramByPid(fsmPid);
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
+        jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +
+                  ' to become SECONDARY');
         rst.waitForState(hiddenNode, ReplSetTest.State.SECONDARY);
 
         // Wait for secondaries to finish catching up before shutting down.
+        jsTestLog(
+            'Hidden node ' + hiddenHost +
+            ' is now SECONDARY. Waiting for CRUD and FSM operations to be applied on all nodes.');
+        rst.awaitReplication();
+
+        jsTestLog('CRUD and FSM operations successfully applied on all nodes. ' +
+                  'Waiting for all nodes to agree on the primary.');
         rst.awaitNodesAgreeOnPrimary();
+
+        jsTestLog('All nodes agree on the primary. Getting current primary.');
         primary = rst.getPrimary();
-        assert.writeOK(primary.getDB("test").foo.insert(
-            {}, {writeConcern: {w: rst.nodes.length, wtimeout: 10 * 60 * 1000}}));
+
+        jsTestLog('Inserting single document into primary ' + primary.host +
+                  ' with writeConcern w:' + rst.nodes.length);
+        var writeResult = assert.writeOK(primary.getDB("test").foo.insert(
+            {}, {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
         // Stop set.
+        jsTestLog('Insert operation successful: ' + tojson(writeResult) +
+                  '. Stopping replica set.');
         rst.stopSet();
 
         // Cleanup the files from the test

@@ -264,6 +264,20 @@ public:
                                                              const BSONObj& startKey,
                                                              BoundInclusion boundInclusion,
                                                              std::size_t limit) = 0;
+
+    using CollectionSize = uint64_t;
+    using CollectionCount = uint64_t;
+
+    /**
+     * Returns the sum of the sizes of documents in the collection in bytes.
+     */
+    virtual StatusWith<CollectionSize> getCollectionSize(OperationContext* opCtx,
+                                                         const NamespaceString& nss) = 0;
+    /**
+     * Returns the number of documents in the collection.
+     */
+    virtual StatusWith<CollectionCount> getCollectionCount(OperationContext* opCtx,
+                                                           const NamespaceString& nss) = 0;
 };
 
 }  // namespace repl

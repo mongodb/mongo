@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,65 +26,35 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/db/client.h"
-#include "mongo/db/json.h"
-#include "mongo/db/repl/noop_writer.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/functional.h"
 
+namespace mongo {
+namespace repl {
 
-namespace {
+/**
+ * This class represents the interface BackgroundSync and ReplicationCoordinatorExternalState use to
+ * interact with the rollback subsystem.
+ */
+class Rollback {
+    MONGO_DISALLOW_COPYING(Rollback);
 
-using namespace mongo;
-using namespace mongo::repl;
-
-using unittest::log;
-
-class NoopWriterTest : public ReplicationExecutorTest {
 public:
-    NoopWriter* getNoopWriter() {
-        return _noopWriter.get();
-    }
+    /**
+     * Callback function to report results of rollback. On success, the last optime applied will be
+     * passed in.
+     */
+    using OnCompletionFn =
+        stdx::function<void(const StatusWith<OpTime>& lastOpTimeApplied) noexcept>;
 
-protected:
-    void setUp() override {
-        setupNoopWriter(Seconds(1));
-    }
+    Rollback() = default;
 
-    void tearDown() override {}
-
-private:
-    void startNoopWriter(OpTime opTime) {
-        invariant(_noopWriter);
-        _noopWriter->start(opTime);
-    }
-
-    void stopNoopWriter() {
-        invariant(_noopWriter);
-        _noopWriter->stop();
-    }
-
-    void setupNoopWriter(Seconds waitTime) {
-        invariant(!_noopWriter);
-        _noopWriter = stdx::make_unique<NoopWriter>(waitTime);
-    }
-
-    OpTime _getLastOpTime() {
-        return _lastOpTime;
-    }
-
-    std::unique_ptr<NoopWriter> _noopWriter;
-    OpTime _lastOpTime;
+    virtual ~Rollback() = default;
 };
-// TODO: SERVER-25679
-TEST_F(NoopWriterTest, CreateDestroy) {
-    NoopWriter* writer = getNoopWriter();
-    ASSERT(writer != nullptr);
-}
-}
+
+}  // namespace repl
+}  // namespace mongo

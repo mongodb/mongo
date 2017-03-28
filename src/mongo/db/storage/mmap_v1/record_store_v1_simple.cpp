@@ -453,7 +453,8 @@ Status SimpleRecordStoreV1::compact(OperationContext* opCtx,
         _details->setLastExtentSize(opCtx, 0);
 
         // create a new extent so new records go there
-        increaseStorageSize(opCtx, _details->lastExtentSize(opCtx), true);
+        const bool enforceQuota = false;
+        increaseStorageSize(opCtx, _details->lastExtentSize(opCtx), enforceQuota);
         wunit.commit();
     }
 

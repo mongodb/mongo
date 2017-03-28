@@ -147,6 +147,42 @@ LogicalTime _getClientOperationTime(OperationContext* opCtx) {
     }
     return operationTime;
 }
+
+/**
+ * Returns the proper operationTime for a command. To construct the operationTime for replica set
+ * members, it uses the last optime in the oplog for writes, last committed optime for majority
+ * reads, and the last applied optime for every other read. An uninitialized logical time is
+ * returned for non replica set members.
+ *
+ * TODO: SERVER-28419 Do not compute operationTime if replica set does not propagate clusterTime.
+ */
+LogicalTime _computeOperationTime(OperationContext* opCtx,
+                                  LogicalTime startOperationTime,
+                                  repl::ReadConcernLevel level) {
+    repl::ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    const bool isReplSet =
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+
+    if (!isReplSet) {
+        return LogicalTime();
+    }
+
+    auto operationTime = _getClientOperationTime(opCtx);
+    invariant(operationTime >= startOperationTime);
+
+    // If the last operationTime has not changed, consider this command a read, and, for replica set
+    // members, construct the operationTime with the proper optime for its read concern level.
+    if (operationTime == startOperationTime) {
+        if (level == repl::ReadConcernLevel::kMajorityReadConcern) {
+            operationTime = LogicalTime(replCoord->getLastCommittedOpTime().getTimestamp());
+        } else {
+            operationTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+        }
+    }
+
+    return operationTime;
+}
 }  // namespace
 
 
@@ -1469,17 +1505,14 @@ bool Command::run(OperationContext* opCtx,
 
     appendCommandStatus(inPlaceReplyBob, result, errmsg);
 
-    auto finishOperationTime = _getClientOperationTime(opCtx);
-    auto operationTime = finishOperationTime;
-    invariant(finishOperationTime >= startOperationTime);
+    auto operationTime = _computeOperationTime(
+        opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel());
 
-    // this command did not write, so return current clusterTime.
-    if (finishOperationTime == startOperationTime) {
-        // TODO: SERVER-27786 to return the clusterTime of the read.
-        operationTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
+    // An uninitialized operation time means the cluster time is not propagated, so the operation
+    // time should not be attached to the response.
+    if (operationTime != LogicalTime::kUninitialized) {
+        appendOperationTime(inPlaceReplyBob, operationTime);
     }
-
-    appendOperationTime(inPlaceReplyBob, operationTime);
 
     inPlaceReplyBob.doneFast();
 
@@ -1677,8 +1710,24 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         BSONObjBuilder metadataBob;
         appendReplyMetadata(opCtx, request, &metadataBob);
 
-        auto operationTime = _getClientOperationTime(opCtx);
-        Command::generateErrorResponse(
-            opCtx, replyBuilder, e, request, command, metadataBob.done(), operationTime);
+        // Ideally this should be using _computeOperationTime, but with the code
+        // structured as it currently is we don't know the startOperationTime or
+        // readConcern at this point. Using the cluster time instead of the actual
+        // operation time is correct, but can result in extra waiting on subsequent
+        // afterClusterTime reads.
+        //
+        // TODO: SERVER-28445 change this to use _computeOperationTime once the exception handling
+        // path is moved into Command::run()
+        auto operationTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
+
+        // An uninitialized operation time means the cluster time is not propagated, so the
+        // operation time should not be attached to the error response.
+        if (operationTime != LogicalTime::kUninitialized) {
+            Command::generateErrorResponse(
+                opCtx, replyBuilder, e, request, command, metadataBob.done(), operationTime);
+        } else {
+            Command::generateErrorResponse(
+                opCtx, replyBuilder, e, request, command, metadataBob.done());
+        }
     }
 }

@@ -54,11 +54,8 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
-#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/logger/ramlog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
@@ -72,6 +69,15 @@ using std::string;
 using str::stream;
 
 namespace {
+
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                // Note: Even though we're setting UNSET here,
+                                                // kMajority implies JOURNAL if journaling is
+                                                // supported by mongod and
+                                                // writeConcernMajorityJournalDefault is set to true
+                                                // in the ReplSetConfig.
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                -1);
 
 /**
  * Returns a human-readabale name of the migration manager's state.
@@ -137,26 +143,26 @@ bool willOverrideLocalId(OperationContext* opCtx,
 bool opReplicatedEnough(OperationContext* opCtx,
                         const repl::OpTime& lastOpApplied,
                         const WriteConcernOptions& writeConcern) {
-    WriteConcernOptions majorityWriteConcern;
-    majorityWriteConcern.wTimeout = -1;
-    majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
-    Status majorityStatus = repl::getGlobalReplicationCoordinator()
-                                ->awaitReplication(opCtx, lastOpApplied, majorityWriteConcern)
-                                .status;
+    WriteConcernResult writeConcernResult;
 
-    if (!writeConcern.shouldWaitForOtherNodes()) {
-        return majorityStatus.isOK();
+    Status waitForMajorityWriteConcernStatus =
+        waitForWriteConcern(opCtx, lastOpApplied, kMajorityWriteConcern, &writeConcernResult);
+    if (!waitForMajorityWriteConcernStatus.isOK()) {
+        return false;
     }
 
     // Enforce the user specified write concern after "majority" so it covers the union of the 2
-    // write concerns
+    // write concerns in case the user's write concern is stronger than majority
     WriteConcernOptions userWriteConcern(writeConcern);
     userWriteConcern.wTimeout = -1;
-    Status userStatus = repl::getGlobalReplicationCoordinator()
-                            ->awaitReplication(opCtx, lastOpApplied, userWriteConcern)
-                            .status;
 
-    return majorityStatus.isOK() && userStatus.isOK();
+    Status waitForUserWriteConcernStatus =
+        waitForWriteConcern(opCtx, lastOpApplied, userWriteConcern, &writeConcernResult);
+    if (!waitForUserWriteConcernStatus.isOK()) {
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -980,17 +986,6 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
 
     log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> "
           << max;
-
-    {
-        // Get global lock to wait for write to be commited to journal.
-        Lock::GlobalRead lk(opCtx);
-
-        // if durability is on, force a write to journal
-        if (getDur().commitNow(opCtx)) {
-            log() << "migrate commit flushed to journal for '" << ns << "' " << redact(min)
-                  << " -> " << redact(max);
-        }
-    }
 
     return true;
 }

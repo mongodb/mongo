@@ -172,7 +172,11 @@ struct ModifierPush::PreparedState {
     // Element corresponding to _fieldRef[0.._idxFound].
     mutablebson::Element elemFound;
 
+    // The size of the array before the push.
     size_t arrayPreModSize;
+
+    // The actual position at which to push the elements, in range [0, arrayPreModSize].
+    size_t actualPosition;
 };
 
 ModifierPush::ModifierPush(ModifierPush::ModifierPushMode pushMode)
@@ -183,7 +187,7 @@ ModifierPush::ModifierPush(ModifierPush::ModifierPushMode pushMode)
       _slicePresent(false),
       _slice(0),
       _sortPresent(false),
-      _startPosition(std::numeric_limits<std::size_t>::max()),
+      _position(std::numeric_limits<std::int32_t>::max()),
       _sort(),
       _pushMode(pushMode),
       _val() {}
@@ -334,12 +338,7 @@ Status ModifierPush::init(const BSONElement& modExpr, const Options& opts, bool*
                                             << typeName(positionElem.type()));
         }
 
-        if (positionElem.numberInt() < 0) {
-            return {
-                Status(ErrorCodes::BadValue, "The $position value in $push must be non-negative.")};
-        }
-
-        _startPosition = size_t(positionElem.numberInt());
+        _position = positionElem.numberInt();
     }
 
     // Is sort present and correct?
@@ -467,6 +466,11 @@ Status ModifierPush::prepare(mutablebson::Element root,
 }
 
 namespace {
+
+/**
+ * Add 'elem' at index 'pos' in 'arrayElem'. 'arrayElem' should be an array of size 'arraySize', and
+ * 'pos' should be in the range [0, 'arraySize'].
+ */
 Status pushFirstElement(mb::Element& arrayElem,
                         const size_t arraySize,
                         const size_t pos,
@@ -475,16 +479,15 @@ Status pushFirstElement(mb::Element& arrayElem,
     if (arraySize == 0 || pos == 0) {
         return arrayElem.pushFront(elem);
     } else {
-        // Push position is at the end, or beyond
-        if (pos >= arraySize) {
+        // Push position is at the end.
+        if (pos == arraySize) {
             return arrayElem.pushBack(elem);
         }
 
         const size_t appendPos = pos - 1;
         mutablebson::Element fromElem = getNthChild(arrayElem, appendPos);
 
-        // This should not be possible since the checks above should
-        // cover us but error just in case
+        // Error if pos > arraySize.
         if (!fromElem.ok()) {
             return Status(ErrorCodes::InvalidLength,
                           str::stream() << "The specified position (" << appendPos << "/" << pos
@@ -548,6 +551,19 @@ Status ModifierPush::apply() const {
     // This is the count of the array before we change it, or 0 if missing from the doc.
     _preparedState->arrayPreModSize = countChildren(_preparedState->elemFound);
 
+    // Compute the actual position at which to push the elements.
+    int32_t actualPosition = _position;
+    // Negative positions are subtracted from the length of the array.
+    if (actualPosition < 0) {
+        actualPosition = _preparedState->arrayPreModSize + _position;
+    }
+    // Default to adding to the end of the array, even if we're out of bounds because a negative
+    // position was too negative.
+    if (actualPosition < 0 || actualPosition > int32_t(_preparedState->arrayPreModSize)) {
+        actualPosition = _preparedState->arrayPreModSize;
+    }
+    _preparedState->actualPosition = actualPosition;
+
     // 2. Add new elements to the array either by going over the $each array or by
     // appending the (old style $push) element.
     if (_eachMode || _pushMode == PUSH_ALL) {
@@ -568,7 +584,7 @@ Status ModifierPush::apply() const {
             if (first) {
                 status = pushFirstElement(_preparedState->elemFound,
                                           _preparedState->arrayPreModSize,
-                                          _startPosition,
+                                          _preparedState->actualPosition,
                                           elem);
             } else {
                 status = prevElem.addSiblingRight(elem);
@@ -588,8 +604,10 @@ Status ModifierPush::apply() const {
         if (!elem.ok()) {
             return Status(ErrorCodes::InternalError, "can't wrap element being $push-ed");
         }
-        return pushFirstElement(
-            _preparedState->elemFound, _preparedState->arrayPreModSize, _startPosition, elem);
+        return pushFirstElement(_preparedState->elemFound,
+                                _preparedState->arrayPreModSize,
+                                _preparedState->actualPosition,
+                                elem);
     }
 
     // 3. Sort the resulting array, if $sort was requested.
@@ -642,8 +660,8 @@ Status ModifierPush::log(LogBuilder* logBuilder) const {
 
     // If we sorted, sliced, or added the first items to the array, make a full array copy.
     const bool doFullCopy = _slicePresent || _sortPresent ||
-        (position == 0)                                         // first element in new/empty array
-        || (_startPosition < _preparedState->arrayPreModSize);  // add in middle
+        (position == 0)  // first element in new/empty array
+        || (_preparedState->actualPosition < _preparedState->arrayPreModSize);  // add in middle
 
     if (doFullCopy) {
         return logBuilder->addToSetsWithNewFieldName(_fieldRef.dottedField(),

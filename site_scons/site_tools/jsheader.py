@@ -1,15 +1,13 @@
-import os
+from SCons.Script import Action
 
-from jstoh import jsToHeader
-from SCons.Builder import Builder
-
-def jsToH(target, source, env):
-    jsToHeader(str(target[0]), source)
-
-jshBuilder = Builder( action=jsToH )
+def jsToH(env, target, source):
+    return env.Command(
+        target=target,
+        source=['#site_scons/site_tools/jstoh.py'] + source,
+        action=Action('$PYTHON ${SOURCES[0]} $TARGET ${SOURCES[1:]}'))
 
 def generate(env, **kw):
-    env.Append( BUILDERS=dict( JSHeader=jshBuilder ) )
+    env.AddMethod(jsToH, 'JSHeader')
 
 def exists(env):
     return True

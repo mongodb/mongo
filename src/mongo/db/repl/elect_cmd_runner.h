@@ -90,10 +90,10 @@ public:
      *
      * Returned handle can be used to schedule a callback when the process is complete.
      */
-    StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
-                                                       const ReplSetConfig& currentConfig,
-                                                       int selfIndex,
-                                                       const std::vector<HostAndPort>& targets);
+    StatusWith<executor::TaskExecutor::EventHandle> start(executor::TaskExecutor* executor,
+                                                          const ReplSetConfig& currentConfig,
+                                                          int selfIndex,
+                                                          const std::vector<HostAndPort>& targets);
 
     /**
      * Informs the ElectCmdRunner to cancel further processing.

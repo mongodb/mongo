@@ -54,6 +54,7 @@
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
@@ -374,8 +375,10 @@ void FileAllocator::run(FileAllocator* fa) {
     while (1) {
         {
             stdx::unique_lock<stdx::mutex> lk(fa->_pendingMutex);
-            if (fa->_pending.size() == 0)
+            if (fa->_pending.size() == 0) {
+                MONGO_IDLE_THREAD_BLOCK;
                 fa->_pendingUpdated.wait(lk);
+            }
         }
         while (1) {
             string name;

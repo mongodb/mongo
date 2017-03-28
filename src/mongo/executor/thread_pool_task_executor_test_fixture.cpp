@@ -43,8 +43,13 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
         stdx::make_unique<ThreadPoolMock>(netPtr, 1, std::move(options)), std::move(net));
 }
 
+ThreadPoolExecutorTest::ThreadPoolExecutorTest() {}
+
+ThreadPoolExecutorTest::ThreadPoolExecutorTest(ThreadPoolMock::Options options)
+    : _options(std::move(options)) {}
+
 ThreadPoolMock::Options ThreadPoolExecutorTest::makeThreadPoolMockOptions() const {
-    return ThreadPoolMock::Options();
+    return _options;
 }
 
 std::unique_ptr<TaskExecutor> ThreadPoolExecutorTest::makeTaskExecutor(

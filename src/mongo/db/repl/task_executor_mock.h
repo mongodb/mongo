@@ -26,37 +26,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "collection_uuid.h"
-
-#include "mongo/db/server_parameters.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/unittest/task_executor_proxy.h"
 
 namespace mongo {
+namespace repl {
 
-bool enableCollectionUUIDs = false;
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> enableCollectionUUIDsParameter(
-    ServerParameterSet::getGlobal(), "enableCollectionUUIDs", &enableCollectionUUIDs);
+/**
+ * Mock executor::TaskExecutorProxy.
+ * Supports injecting errors into scheduleWork(), scheduleWorkAt() and scheduleRemoteCommand().
+ */
+class TaskExecutorMock : public unittest::TaskExecutorProxy {
+public:
+    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
 
-namespace {
-stdx::mutex uuidGenMutex;
-auto uuidGen = SecureRandom::create();
-}  // namespace
+    TaskExecutorMock(executor::TaskExecutor* executor, ShouldFailRequestFn shouldFailRequest);
 
-// static
-CollectionUUID CollectionUUID::generateSecureRandomUUID() {
-    stdx::unique_lock<stdx::mutex> lock(uuidGenMutex);
-    int64_t randomWords[2] = {uuidGen->nextInt64(), uuidGen->nextInt64()};
-    UUID randomBytes;
-    memcpy(&randomBytes, randomWords, sizeof(randomBytes));
-    // Set version in high 4 bits of byte 6 and variant in high 2 bits of byte 8, see RFC 4122,
-    // section 4.1.1, 4.1.2 and 4.1.3.
-    randomBytes[6] &= 0x0f;
-    randomBytes[6] |= 0x40;  // v4
-    randomBytes[8] &= 0x3f;
-    randomBytes[8] |= 0x80;  // Randomly assigned
-    return CollectionUUID{randomBytes};
-}
+    StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
+    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb) override;
+
+    // Override to make scheduleWork() fail during testing.
+    bool shouldFailScheduleWork = false;
+
+    // Override to make scheduleWorkAt() fail during testing.
+    bool shouldFailScheduleWorkAt = false;
+
+    // Set to true to make scheduleWork() schedule task 1 second later instead of running
+    // immediately. This allows us to test cancellation handling in callbacks scheduled
+    // using scheduleWork().
+    bool shouldDeferScheduleWorkByOneSecond = false;
+
+private:
+    // This predicate is set at construction and is used to determine if scheduleRemoteCommand()
+    // should return an error during testing.
+    ShouldFailRequestFn _shouldFailRequest;
+};
+
+}  // namespace repl
 }  // namespace mongo

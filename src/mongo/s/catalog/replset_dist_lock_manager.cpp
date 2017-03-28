@@ -43,6 +43,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -176,6 +177,7 @@ void ReplSetDistLockManager::doTask() {
         }
 
         stdx::unique_lock<stdx::mutex> lk(_mutex);
+        MONGO_IDLE_THREAD_BLOCK;
         _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration(), [this] { return _isShutDown; });
     }
 }

@@ -35,6 +35,7 @@
 #include <boost/optional.hpp>
 #include <vector>
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -418,6 +419,7 @@ Status runAggregate(OperationContext* opCtx,
     auto pin = CursorManager::getGlobalCursorManager()->registerCursor(
         {std::move(exec),
          origNss,
+         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
          opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
          cmdObj});
     ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &pin);

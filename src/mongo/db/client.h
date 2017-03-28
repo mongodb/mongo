@@ -71,8 +71,8 @@ public:
      *
      * If provided, session's ref count will be bumped by this Client.
      */
-    static void initThread(const char* desc, transport::SessionHandle session = nullptr);
-    static void initThread(const char* desc,
+    static void initThread(StringData desc, transport::SessionHandle session = nullptr);
+    static void initThread(StringData desc,
                            ServiceContext* serviceContext,
                            transport::SessionHandle session);
 
@@ -116,7 +116,7 @@ public:
      * Inits a thread if that thread has not already been init'd, setting the thread name to
      * "desc".
      */
-    static void initThreadIfNotAlready(const char* desc);
+    static void initThreadIfNotAlready(StringData desc);
 
     /**
      * Inits a thread if that thread has not already been init'd, using the existing thread name

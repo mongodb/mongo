@@ -100,7 +100,9 @@ variables:
   jepsen_read_concern: ""
   jepsen_read_with_find_and_modify: ""
   jepsen_storage_engine: ""
-  jepsen_time_limit: --time-limit 300
+  # Empirically, we've had greater success in reproducing the issues found in MongoDB versions
+  # 3.4.0-rc3 and 3.4.0-rc4 when running Jepsen with at least --time-limit=600.
+  jepsen_time_limit: --time-limit 1200
   jepsen_write_concern: ""
 
 # Template for running Jepsen tests
@@ -187,6 +189,7 @@ variables:
   - osx-107-ssl
   - rhel62
   - rhel70
+  - rollback-3dot4-rhel-62
   - solaris-64-bit
   - suse11
   - suse12
@@ -574,7 +577,7 @@ functions:
         ${san_symbolizer}    \
         ${snmp_config_path}  \
         ${resmoke_wrapper}   \
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json --taskId=${task_id}
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json --taskId=${task_id} --staggerJobs=on
 
 
   "do jepsen setup" :
@@ -583,9 +586,27 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          git clone git@github.com:10gen/jepsen.git
-          cd jepsen/jepsen
-          git checkout mongodb-master-linearizable-2
+
+          # Build libfaketime. A version of libfaketime at least as new as v0.9.6-9-g75896bd is
+          # required to use the FAKETIME_NO_CACHE and FAKETIME_TIMESTAMP_FILE environment variables.
+          git clone git@github.com:wolfcw/libfaketime.git
+          cd libfaketime
+          git checkout 3c0ce9c8859ed136a154b61da396deece94844e0
+          make PREFIX=$(pwd)/build/ LIBDIRNAME='.' install
+
+          # Add libfaketime to mongo-binaries.tgz so it gets uploaded to each of the LXC containers.
+          # The build/ prefix of the shared object will get removed when Jepsen extracts the tarball
+          # into the /opt/mongodb/ directory.
+          gzip --stdout --decompress ../mongo-binaries.tgz > mongo-binaries.tar
+          tar --append --file=mongo-binaries.tar build/libfaketime.so.1
+          gzip --stdout mongo-binaries.tar > ../mongo-binaries.tgz
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          git clone --branch=jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
+          cd jepsen-mongodb
           branch=$(git symbolic-ref --short HEAD)
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
@@ -639,11 +660,24 @@ functions:
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
-        working_dir: src/jepsen/mongodb
+        working_dir: src/jepsen-mongodb
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern} 2>&1 | tee jepsen_${task_name}_${execution}.log
+          lein run test --test register                                   \
+                        --tarball "file:///root/mongo-binaries.tgz"       \
+                        --ssh-private-key ~/.ssh/id_rsa_lxc               \
+                        --clock-skew faketime                             \
+                        --libfaketime-path /opt/mongodb/libfaketime.so.1  \
+                        ${jepsen_key_time_limit}                          \
+                        ${jepsen_protocol_version}                        \
+                        ${jepsen_read_concern}                            \
+                        ${jepsen_read_with_find_and_modify}               \
+                        ${jepsen_storage_engine}                          \
+                        ${jepsen_time_limit}                              \
+                        ${jepsen_write_concern}                           \
+                        2>&1                                              \
+          | tee jepsen_${task_name}_${execution}.log
           end_time=$(date +%s)
           elapsed_secs=$((end_time-start_time))
           # Since we cannot use PIPESTATUS to get the exit code from the "lein run ..." pipe in dash shell,
@@ -670,7 +704,7 @@ functions:
           exit $exit_code
     - command: shell.exec
       params:
-        working_dir: src/jepsen/mongodb
+        working_dir: src/jepsen-mongodb
         script: |
           set -o verbose
           # Jepsen system failure if file exists.
@@ -786,8 +820,8 @@ functions:
       silent: true
       script: |
         process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
-        # Exclude Evergreen agent processes
-        process_exclude_list="(main)"
+        # Exclude Evergreen agent processes and other system daemons
+        process_exclude_list="(main|tuned)"
 
         if [ "Windows_NT" = "$OS" ]; then
           # Get the list of Windows tasks (tasklist list format):
@@ -806,18 +840,10 @@ functions:
           # - The first column has the process ID
           # - The second column (and beyond) has task name
 
-          # There are 2 "styles" of pgrep, figure out which one works
-          pgrep_list_full=$(pgrep -f --list-full ".*" 2>&1 > /dev/null)
-          if [ -z "$pgrep_list_full" ]; then
-            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
-          else
-            pgrep_list=$(pgrep -f -l "$process_kill_list")
-          fi
-
           # There are 2 "styles" of grep, figure out which one works
           grep=grep
-          grep_extended=$(echo "a" | $grep -E "(a)" 2>&1 > /dev/null)
-          if [ ! -z "$grep_extended" ]; then
+          echo "a" | $grep -qE "(a)" > /dev/null 2>&1
+          if [ $? -ne 0 ]; then
             # Extended grep on Solaris is in the following location
             grep=/usr/xpg4/bin/grep
             if [ ! -f $grep ]; then
@@ -826,9 +852,20 @@ functions:
             fi
           fi
 
+          # There are 2 "styles" of pgrep, figure out which one works.
+          # Due to https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1501916
+          # we cannot rely on the return status ($?) to detect if the option is supported.
+          pgrep -f --list-full ".*" 2>&1 | $grep -qE "(illegal|invalid|unrecognized) option"
+          if [ $? -ne 0 ]; then
+            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
+          else
+            pgrep_list=$(pgrep -f -l "$process_kill_list")
+          fi
+
           # Since a process name might have a CR or LF in it, we need to delete any lines from
           # pgrep which do not start with space(s) and 1 digit and trim any leading spaces.
-          processes=$(echo "$pgrep_list" | $grep -i -v -E "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
+          processes=$(echo "$pgrep_list" | $grep -ivE "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
+
           # Kill the Unix process ID with signal KILL (9)
           kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; kill -9 $pid; }
         fi
@@ -1074,7 +1111,7 @@ post:
   - command: archive.targz_pack
     params:
       target: "src/jepsen-results.tgz"
-      source_dir: "src/jepsen/mongodb/store"
+      source_dir: "src/jepsen-mongodb/store"
       include:
         - "./**"
   - command: s3.put
@@ -1388,6 +1425,9 @@ tasks:
       hang_analyzer_processes: "java"
       jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine mmapv1
+      # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
+      # out of memory issues and task timeouts during the analysis phase.
+      jepsen_time_limit: --time-limit 300
 
 - <<: *run_jepsen_template
   name: jepsen_linearizableRead_WT
@@ -5986,8 +6026,7 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -6155,8 +6194,6 @@ buildvariants:
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough
   - name: master_slave_jscore_passthrough_WT
-  - name: rlp
-  - name: rlp_WT
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
@@ -8987,3 +9024,112 @@ buildvariants:
   - name: compile_all
     distros:
     - ubuntu1604-build
+
+- name: rollback-3dot4-rhel-62
+  display_name: "~ Rollback 3.4 Enterprise RHEL 6.2"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: "\"--mongodSetParameters={use3dot4Rollback: true}\""
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-large
+  - name: auth
+  - name: auth_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: noPassthrough_WT
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_concern_linearizable_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: read_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets
+    distros:
+    - rhel62-large
+  - name: replica_sets_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_WT_ese
+    distros:
+    - rhel62-large
+  - name: replica_sets_auth
+    distros:
+    - rhel62-large
+  - name: replica_sets_pv0
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_initsync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_resync_static_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_resync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding
+    distros:
+    - rhel62-large
+  - name: sharding_WT
+    distros:
+    - rhel62-large
+  - name: sharding_WT_ese
+    distros:
+    - rhel62-large
+  - name: sharding_auth
+    distros:
+    - rhel62-large
+  - name: sharding_auth_audit_WT
+    distros:
+    - rhel62-large
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: sharding_last_stable_mongos_and_mixed_shards
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_WT
+    distros:
+    - rhel62-large
+  - name: sharding_csrs_continuous_config_stepdown_WT
+    distros:
+    - rhel62-large
+  - name: slow1
+  - name: slow1_WT

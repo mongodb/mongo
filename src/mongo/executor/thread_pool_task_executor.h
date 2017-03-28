@@ -83,6 +83,11 @@ public:
 
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
 
+    /**
+     * Drops all connections to the given host on the network interface.
+     */
+    void dropConnections(const HostAndPort& hostAndPort);
+
 private:
     class CallbackState;
     class EventState;

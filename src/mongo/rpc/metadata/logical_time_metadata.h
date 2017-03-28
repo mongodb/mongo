@@ -42,7 +42,10 @@ namespace rpc {
  * Format:
  * logicalTime: {
  *     clusterTime: <Timestamp>,
- *     signature: <SHA1 hash of clusterTime as BinData>
+ *     signature: {
+ *         hash: <SHA1 hash of clusterTime as BinData>,
+ *         keyId: <long long>
+ *     }
  * }
  */
 class LogicalTimeMetadata {

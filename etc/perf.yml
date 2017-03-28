@@ -145,7 +145,7 @@ functions:
         script: |
           set -o errexit
           source ./venv/bin/activate
-          REFTAGS="3.4.1-Baseline 3.2.11-Baseline 3.0.14-Baseline" # These are project specific
+          REFTAGS="3.4.2-Baseline 3.2.12-Baseline 3.0.14-Baseline" # These are project specific
           # Project Opts are  project specific, but don't match expansion from elsewhere.
           # We could change dsi/analysis/master to dsi/analysis/perf in DSI to get dsi/analysis/${project}/perf_override.json
           # Note project_id performance doesn't match string perf used elsewhere for ${project}
@@ -169,7 +169,7 @@ functions:
           # appropriate flags if it's `true`.
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
-          REFTAG="3.4.1-Baseline"
+          REFTAG="3.4.2-Baseline"
           OVERRIDE="../dsi/analysis/master/perf_override.json" # Note use of master here cannot use ${project}
           python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.05 --threadThreshold 0.075
   "run perf tests":
@@ -427,6 +427,23 @@ tasks:
     - func: "analyze"
       vars:
         report_analysis: true
+- name: agg-query-comparison
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "agg_query_comparison"
+        includeFilter2 : "core regression"
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+        readCmd: false
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        reports_analysis: true
 
 buildvariants:
 - name: linux-wt-standalone
@@ -448,6 +465,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: aggregation
+  - name: agg-query-comparison
   - name: query
   - name: views-aggregation
   - name: views-query
@@ -470,6 +488,7 @@ buildvariants:
   - "centos6-perf"
   tasks:
   - name: aggregation
+  - name: agg-query-comparison
   - name: query
   - name: views-aggregation
   - name: views-query

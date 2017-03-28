@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 namespace repl {
@@ -62,7 +62,7 @@ public:
 
     virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
     virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                 const ResponseStatus& response);
+                                 const executor::RemoteCommandResponse& response);
 
     virtual bool hasReceivedSufficientResponses() const;
 
@@ -83,7 +83,7 @@ private:
      * Updates the QuorumChecker state based on the data from a single heartbeat response.
      */
     void _tabulateHeartbeatResponse(const executor::RemoteCommandRequest& request,
-                                    const ResponseStatus& response);
+                                    const executor::RemoteCommandResponse& response);
 
     // Pointer to the replica set configuration for which we're checking quorum.
     const ReplSetConfig* const _rsConfig;
@@ -126,7 +126,7 @@ private:
  * - No nodes are already joined to a replica set.
  * - No node reports a replica set name other than the one in "rsConfig".
  */
-Status checkQuorumForInitiate(ReplicationExecutor* executor,
+Status checkQuorumForInitiate(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
                               const int myIndex);
 
@@ -144,7 +144,7 @@ Status checkQuorumForInitiate(ReplicationExecutor* executor,
  * - No responding node reports a replica set name other than the one in "rsConfig".
  * - All responding nodes report a config version less than the one in "rsConfig".
  */
-Status checkQuorumForReconfig(ReplicationExecutor* executor,
+Status checkQuorumForReconfig(executor::TaskExecutor* executor,
                               const ReplSetConfig& rsConfig,
                               const int myIndex);
 

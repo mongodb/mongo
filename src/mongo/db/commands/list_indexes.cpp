@@ -230,6 +230,7 @@ public:
             auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
                 {std::move(exec),
                  cursorNss,
+                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                  opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
                  cmdObj});
             cursorId = pinnedCursor.getCursor()->cursorid();

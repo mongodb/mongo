@@ -32,9 +32,21 @@
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
+namespace {
+auto getOperationTimeTracker =
+    OperationContext::declareDecoration<std::shared_ptr<OperationTimeTracker>>();
+}
 
-const OperationContext::Decoration<OperationTimeTracker> OperationTimeTracker::get =
-    OperationContext::declareDecoration<OperationTimeTracker>();
+
+std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext* opCtx) {
+    return getOperationTimeTracker(opCtx);
+}
+
+void OperationTimeTracker::set(OperationContext* opCtx,
+                               std::shared_ptr<OperationTimeTracker> trackerArg) {
+    auto& tracker = getOperationTimeTracker(opCtx);
+    tracker = std::move(trackerArg);
+}
 
 LogicalTime OperationTimeTracker::getMaxOperationTime() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);

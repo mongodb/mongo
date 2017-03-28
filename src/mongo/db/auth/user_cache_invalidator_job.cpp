@@ -45,6 +45,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -146,6 +147,7 @@ void UserCacheInvalidator::run() {
             lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
         Date_t now = Date_t::now();
         while (now < sleepUntil) {
+            MONGO_IDLE_THREAD_BLOCK;
             invalidationIntervalChangedCondition.wait_until(lock, sleepUntil.toSystemTimePoint());
             sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
             now = Date_t::now();

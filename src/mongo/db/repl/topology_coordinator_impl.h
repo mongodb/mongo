@@ -223,6 +223,7 @@ public:
                           const OpTime& lastOpApplied,
                           const OpTime& lastOpCommitted);
     virtual bool stepDownIfPending();
+    virtual bool isStepDownPending() const;
     virtual Date_t getStepDownTime() const;
     virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime,
                                                         const OpTime& lastCommitttedOpTime) const;

@@ -68,6 +68,8 @@ selector:
     - jstests/core/profile_group.js
     - jstests/core/profile_insert.js
     - jstests/core/profile_update.js
+    # The downstream syncing node affects the top output.
+    - jstests/core/top.js
 
 run_hook_interval: &run_hook_interval 20
 executor:

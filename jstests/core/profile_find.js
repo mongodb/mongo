@@ -154,4 +154,19 @@
     assert.eq(coll.find().snapshot().itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq(profileObj.query.snapshot, true, tojson(profileObj));
+
+    //
+    // Confirm that queries are truncated in the profiler as { $truncated: <string>, comment:
+    // <string> }
+    //
+    let queryPredicate = {};
+
+    for (let i = 0; i < 501; i++) {
+        queryPredicate[i] = "a".repeat(150);
+    }
+
+    assert.eq(coll.find(queryPredicate).comment("profile_find").itcount(), 0);
+    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+    assert.eq((typeof profileObj.query.$truncated), "string", tojson(profileObj));
+    assert.eq(profileObj.query.comment, "profile_find", tojson(profileObj));
 })();

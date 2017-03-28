@@ -86,7 +86,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         metadata = CollectionShardingState::get(opCtx, ns.toString())->getMetadata();
     }
 
-    if (!metadata || metadata->getKeyPattern().isEmpty()) {
+    if (!metadata) {
         warning() << "skipping orphaned data cleanup for " << ns.toString()
                   << ", collection is not sharded";
 
@@ -237,17 +237,8 @@ public:
             return false;
         }
 
-        ChunkVersion shardVersion;
-        Status status = shardingState->refreshMetadataNow(opCtx, nss, &shardVersion);
-        if (!status.isOK()) {
-            if (status.code() == ErrorCodes::RemoteChangeDetected) {
-                warning() << "Shard version in transition detected while refreshing "
-                          << "metadata for " << ns << " at version " << shardVersion;
-            } else {
-                errmsg = str::stream() << "failed to refresh shard metadata: " << redact(status);
-                return false;
-            }
-        }
+        ChunkVersion unusedShardVersion;
+        uassertStatusOK(shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion));
 
         BSONObj stoppedAtKey;
         CleanupResult cleanupResult =

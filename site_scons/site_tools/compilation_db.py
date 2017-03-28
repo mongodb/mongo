@@ -30,6 +30,16 @@ import itertools
 # communicate more gracefully?
 __COMPILATION_DB_ENTRIES=[]
 
+# Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
+# we could obtain this from SCons.
+_CSuffixes = ['.c']
+if not SCons.Util.case_sensitive_suffixes('.c', '.C'):
+    _CSuffixes.append('.C')
+
+_CXXSuffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++']
+if SCons.Util.case_sensitive_suffixes('.c', '.C'):
+    _CXXSuffixes.append('.C')
+
 # We make no effort to avoid rebuilding the entries. Someday, perhaps we could and even
 # integrate with the cache, but there doesn't seem to be much call for it.
 class __CompilationDbNode(SCons.Node.Node):
@@ -100,20 +110,15 @@ def generate(env, **kwargs):
 
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
 
-    # TODO: Is there a way to obtain the configured suffixes for C and C++
-    # from the existing obj builders? Seems unfortunate to re-iterate them.
-    CSuffixes = ['.c']
-    CXXSuffixes = ['.cc', '.cxx', '.cpp']
-
     env['COMPILATIONDB_COMSTR'] = kwargs.get(
         'COMPILATIONDB_COMSTR', 'Building compilation database $TARGET')
 
     components_by_suffix = itertools.chain(
-        itertools.product(CSuffixes, [
+        itertools.product(_CSuffixes, [
             (static_obj, SCons.Defaults.StaticObjectEmitter, '$CCCOM'),
             (shared_obj, SCons.Defaults.SharedObjectEmitter, '$SHCCCOM'),
         ]),
-        itertools.product(CXXSuffixes, [
+        itertools.product(_CXXSuffixes, [
             (static_obj, SCons.Defaults.StaticObjectEmitter, '$CXXCOM'),
             (shared_obj, SCons.Defaults.SharedObjectEmitter, '$SHCXXCOM'),
         ]),
@@ -123,13 +128,14 @@ def generate(env, **kwargs):
         suffix = entry[0]
         builder, base_emitter, command = entry[1]
 
-        builder.add_emitter(
-            suffix, SCons.Builder.ListEmitter(
-                [
-                    makeEmitCompilationDbEntry(command),
-                    base_emitter,
-                ]
-            ))
+        # Assumes a dictionary emitter
+        emitter = builder.emitter[suffix]
+        builder.emitter[suffix] = SCons.Builder.ListEmitter(
+            [
+                emitter,
+                makeEmitCompilationDbEntry(command),
+            ]
+        )
 
     env['BUILDERS']['__COMPILATIONDB_Entry'] = SCons.Builder.Builder(
         action=SCons.Action.Action(CompilationDbEntryAction, None),

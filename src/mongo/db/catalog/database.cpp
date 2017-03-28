@@ -709,7 +709,7 @@ Status userCreateNS(OperationContext* opCtx,
         uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
     } else {
         if (enableCollectionUUIDs && !collectionOptions.uuid)
-            collectionOptions.uuid.emplace(CollectionUUID::generateSecureRandomUUID());
+            collectionOptions.uuid.emplace(CollectionUUID::gen());
         invariant(
             db->createCollection(opCtx, ns, collectionOptions, createDefaultIndexes, idIndex));
     }

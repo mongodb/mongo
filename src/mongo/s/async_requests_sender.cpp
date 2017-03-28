@@ -69,17 +69,18 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     _metadataObj = metadataBuilder.obj();
 
     // Schedule the requests immediately.
+
     // We must create the notification before scheduling any requests, because the notification is
-    // signaled both on an error in scheduling the request and a request's callback. Similarly, we
-    // lock so that no callbacks signal the notification until after we are done scheduling
-    // requests, to prevent signaling the notification twice.
+    // signaled both on an error in scheduling the request and a request's callback.
     _notification.emplace();
+
+    // We lock so that no callbacks signal the notification until after we are done scheduling
+    // requests, to prevent signaling the notification twice, which is illegal.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _scheduleRequests_inlock();
 }
 AsyncRequestsSender::~AsyncRequestsSender() {
-    // Make sure any pending network I/O has been canceled.
-    kill();
+    _cancelPendingRequests();
 
     // Wait on remaining callbacks to run.
     while (!done()) {
@@ -95,36 +96,45 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
     boost::optional<Response> readyResponse;
     while (!(readyResponse = _ready())) {
         // Otherwise, wait for some response to be received.
-        _notification->get(_opCtx);
+        if (_checkForInterrupt) {
+            try {
+                _notification->get(_opCtx);
+            } catch (const UserException& ex) {
+                // If the operation is interrupted, we cancel outstanding requests and switch to
+                // waiting for the (canceled) callbacks to finish without checking for interrupts.
+                invariant(!_opCtx->checkForInterruptNoAssert().isOK());
+                _cancelPendingRequests();
+                _checkForInterrupt = false;
+                continue;
+            }
+        } else {
+            _notification->get();
+        }
     }
     return *readyResponse;
 }
 
-void AsyncRequestsSender::interrupt() {
+void AsyncRequestsSender::stopRetrying() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
-}
-
-void AsyncRequestsSender::kill() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_killed) {
-        return;
-    }
-
-    _stopRetrying = true;
-    // Cancel all outstanding requests so they return immediately.
-    for (auto& remote : _remotes) {
-        if (remote.cbHandle.isValid()) {
-            _executor->cancel(remote.cbHandle);
-        }
-    }
-    _killed = true;
 }
 
 bool AsyncRequestsSender::done() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return std::all_of(
         _remotes.begin(), _remotes.end(), [](const RemoteData& remote) { return remote.done; });
+}
+
+void AsyncRequestsSender::_cancelPendingRequests() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _stopRetrying = true;
+
+    // Cancel all outstanding requests so they return immediately.
+    for (auto& remote : _remotes) {
+        if (remote.cbHandle.isValid()) {
+            _executor->cancel(remote.cbHandle);
+        }
+    }
 }
 
 boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
@@ -256,7 +266,7 @@ void AsyncRequestsSender::_handleResponse(
         remote.swResponse = std::move(cbData.response.status);
     }
 
-    // Signal the notification indicating that the remote received a response.
+    // Signal the notification indicating that a remote received a response.
     if (!*_notification) {
         _notification->set();
     }

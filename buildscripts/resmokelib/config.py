@@ -39,9 +39,7 @@ DEFAULTS = {
     "dbpathPrefix": None,
     "dbtest": None,
     "dryRun": None,
-    "excludeWithAllTags": None,
     "excludeWithAnyTags": None,
-    "includeWithAllTags": None,
     "includeWithAnyTags": None,
     "jobs": 1,
     "mongo": None,
@@ -57,6 +55,7 @@ DEFAULTS = {
     "shellReadMode": None,
     "shellWriteMode": None,
     "shuffle": False,
+    "staggerJobs": None,
     "storageEngine": None,
     "storageEngineCacheSizeGB": None,
     "taskId": None,
@@ -88,18 +87,11 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
-# If set, then any jstests that have all of the specified tags will be excluded from the suite(s).
-EXCLUDE_WITH_ALL_TAGS = None
-
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
 
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
-
-# If set, then only jstests that have all of the specified tags will be run during the jstest
-# portion of the suite(s).
-INCLUDE_WITH_ALL_TAGS = None
 
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).
@@ -153,6 +145,9 @@ SHELL_WRITE_MODE = None
 # If true, then the order the tests run in is randomized. Otherwise the tests will run in
 # alphabetical (case-insensitive) order.
 SHUFFLE = None
+
+# If true, the launching of jobs is staggered in resmoke.py.
+STAGGER_JOBS = None 
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.

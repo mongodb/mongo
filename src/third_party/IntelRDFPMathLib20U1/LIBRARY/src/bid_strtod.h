@@ -198,11 +198,12 @@ int i,k;
    }
 
    *ps = L'\0';
-   ps0_c = malloc(k*sizeof(char));
+   ps0_c = malloc(k*sizeof(char) + 1);
    if(!ps0_c)
    { free(ps0); return NULL;}
-   for(i=0; i<=k; i++)
+   for(i=0; i<k; i++)
 	   ps0_c[i] = (ps0[i] - L'0') + '0';
+   ps0_c[k] = '\0';
    free(ps0);
 
    return ps0_c;

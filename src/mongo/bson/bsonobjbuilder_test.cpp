@@ -331,5 +331,35 @@ TEST(BSONObjBuilderTest, ResetToEmptyForNestedBuilderOnlyResetsInnerObj) {
     ASSERT_BSONOBJ_EQ(BSON("a" << 3 << "nestedObj" << BSONObj()), bob.obj());
 }
 
+TEST(BSONObjBuilderTest, ReturningAnOwningBSONObjBuilderWorks) {
+    BSONObjBuilder bob = ([] {
+        BSONObjBuilder initial;
+        initial.append("a", 1);
+        return initial;
+    })();
+    ASSERT(bob.owned());
+
+    bob.append("b", 2);
+
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "b" << 2));
+}
+
+TEST(BSONObjBuilderTest, ReturningANonOwningBSONObjBuilderWorks) {
+    BSONObjBuilder outer;
+    {
+        BSONObjBuilder bob = ([&] {
+            BSONObjBuilder initial(outer.subobjStart("nested"));
+            initial.append("a", 1);
+            return initial;
+        })();
+        ASSERT(!bob.owned());
+        ASSERT_EQ(&bob.bb(), &outer.bb());
+
+        bob.append("b", 2);
+    }
+
+    ASSERT_BSONOBJ_EQ(outer.obj(), BSON("nested" << BSON("a" << 1 << "b" << 2)));
+}
+
 }  // unnamed namespace
 }  // namespace mongo

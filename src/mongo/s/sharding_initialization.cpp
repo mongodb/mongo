@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -89,13 +90,15 @@ using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
+using executor::ShardingTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
 
-std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
+auto makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
-    return stdx::make_unique<ThreadPoolTaskExecutor>(
+    auto executor = stdx::make_unique<ThreadPoolTaskExecutor>(
         stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+    return stdx::make_unique<ShardingTaskExecutor>(std::move(executor));
 }
 
 std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
@@ -119,22 +122,17 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
 
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
-        auto net = executor::makeNetworkInterface(
+        auto exec = makeTaskExecutor(executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
             metadataHookBuilder(),
-            connPoolOptions);
-        auto netPtr = net.get();
-        auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
-            stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+            connPoolOptions));
 
         executors.emplace_back(std::move(exec));
     }
 
     // Add executor used to perform non-performance critical work.
-    auto fixedNetPtr = fixedNet.get();
-    auto fixedExec = stdx::make_unique<ThreadPoolTaskExecutor>(
-        stdx::make_unique<NetworkInterfaceThreadPool>(fixedNetPtr), std::move(fixedNet));
+    auto fixedExec = makeTaskExecutor(std::move(fixedNet));
 
     auto executorPool = stdx::make_unique<TaskExecutorPool>();
     executorPool->addExecutors(std::move(executors), std::move(fixedExec));

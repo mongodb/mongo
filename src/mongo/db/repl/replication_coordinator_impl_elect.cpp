@@ -42,8 +42,6 @@
 namespace mongo {
 namespace repl {
 
-using LockGuard = stdx::lock_guard<stdx::mutex>;
-
 namespace {
 class LoseElectionGuard {
     MONGO_DISALLOW_COPYING(LoseElectionGuard);
@@ -88,11 +86,10 @@ private:
 
 }  // namespace
 
-void ReplicationCoordinatorImpl::_startElectSelf() {
+void ReplicationCoordinatorImpl::_startElectSelf_inlock() {
     invariant(!_freshnessChecker);
     invariant(!_electCmdRunner);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
     switch (_rsConfigState) {
         case kConfigSteady:
             break;
@@ -135,11 +132,6 @@ void ReplicationCoordinatorImpl::_startElectSelf() {
 
     _freshnessChecker.reset(new FreshnessChecker);
 
-    // This is necessary because the freshnessChecker may call directly into winning an
-    // election, if there are no other MaybeUp nodes.  Winning an election attempts to lock
-    // _mutex again.
-    lk.unlock();
-
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh =
         _freshnessChecker->start(&_replExecutor,
                                  lastOpTimeApplied.getTimestamp(),
@@ -156,6 +148,7 @@ void ReplicationCoordinatorImpl::_startElectSelf() {
 }
 
 void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_freshnessChecker);
     invariant(!_electCmdRunner);
     LoseElectionGuard lossGuard(_topCoord.get(),
@@ -163,7 +156,6 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
                                 &_freshnessChecker,
                                 &_electCmdRunner,
                                 &_electionFinishedEvent);
-    LockGuard lk(_topoMutex);
 
     if (_freshnessChecker->isCanceled()) {
         LOG(2) << "Election canceled during freshness check phase";
@@ -230,12 +222,12 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
 }
 
 void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     LoseElectionGuard lossGuard(_topCoord.get(),
                                 &_replExecutor,
                                 &_freshnessChecker,
                                 &_electCmdRunner,
                                 &_electionFinishedEvent);
-    LockGuard lk(_topoMutex);
 
     invariant(_freshnessChecker);
     invariant(_electCmdRunner);
@@ -273,22 +265,24 @@ void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
     lossGuard.dismiss();
     _freshnessChecker.reset(NULL);
     _electCmdRunner.reset(NULL);
+    auto electionFinishedEvent = _electionFinishedEvent;
+    lk.unlock();
     _performPostMemberStateUpdateAction(kActionWinElection);
-    _replExecutor.signalEvent(_electionFinishedEvent);
+    _replExecutor.signalEvent(electionFinishedEvent);
 }
 
 void ReplicationCoordinatorImpl::_recoverFromElectionTie(
     const ReplicationExecutor::CallbackArgs& cbData) {
-    LockGuard topoLock(_topoMutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto now = _replExecutor.now();
-    auto lastOpApplied = getMyLastAppliedOpTime();
+    auto lastOpApplied = _getMyLastAppliedOpTime_inlock();
     const auto status = _topCoord->checkShouldStandForElection(now, lastOpApplied);
     if (!status.isOK()) {
         LOG(2) << "ReplicationCoordinatorImpl::_recoverFromElectionTie -- " << status.reason();
     } else {
         fassertStatusOK(28817, _topCoord->becomeCandidateIfElectable(now, lastOpApplied, false));
-        _startElectSelf();
+        _startElectSelf_inlock();
     }
 }
 

@@ -34,7 +34,7 @@
 
 #include <memory>
 
-#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -141,7 +141,7 @@ void TaskRunner::_runTasks() {
                 // to be equal to the client used to create the operation context.
                 Client::initThreadIfNotAlready();
                 client = &cc();
-                if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+                if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
                     AuthorizationSession::get(client)->grantInternalAuthorization();
                 }
             }

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
@@ -52,6 +53,7 @@ class RecoveryUnit;
 struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor> planExecutor,
                        NamespaceString nss,
+                       UserNameIterator authenticatedUsersIter,
                        bool isReadCommitted,
                        BSONObj originatingCommandObj)
         : exec(std::move(planExecutor)),
@@ -60,10 +62,15 @@ struct ClientCursorParams {
           queryOptions(exec->getCanonicalQuery()
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
-          originatingCommandObj(originatingCommandObj.getOwned()) {}
+          originatingCommandObj(originatingCommandObj.getOwned()) {
+        while (authenticatedUsersIter.more()) {
+            authenticatedUsers.emplace_back(authenticatedUsersIter.next());
+        }
+    }
 
     std::unique_ptr<PlanExecutor> exec;
     const NamespaceString nss;
+    std::vector<UserName> authenticatedUsers;
     bool isReadCommitted = false;
     int queryOptions = 0;
     BSONObj originatingCommandObj;
@@ -95,6 +102,10 @@ public:
 
     const NamespaceString& nss() const {
         return _nss;
+    }
+
+    UserNameIterator getAuthenticatedUsers() const {
+        return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
     }
 
     bool isReadCommitted() const {
@@ -252,6 +263,9 @@ private:
 
     // The namespace we're operating on.
     const NamespaceString _nss;
+
+    // The set of authenticated users when this cursor was created.
+    std::vector<UserName> _authenticatedUsers;
 
     const bool _isReadCommitted = false;
 

@@ -147,7 +147,7 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* opCt
     auto entry = stdx::make_unique<IndexCatalogEntry>(opCtx,
                                                       _collection->ns().ns(),
                                                       _collection->getCatalogEntry(),
-                                                      descriptorCleanup.release(),
+                                                      std::move(descriptorCleanup),
                                                       _collection->infoCache());
     std::unique_ptr<IndexAccessMethod> accessMethod(
         _collection->_dbce->getIndex(opCtx, _collection->getCatalogEntry(), entry.get()));

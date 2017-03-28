@@ -33,8 +33,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
@@ -66,7 +66,7 @@ public:
         virtual ~Algorithm();
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                     const ResponseStatus& response);
+                                     const executor::RemoteCommandResponse& response);
         virtual bool hasReceivedSufficientResponses() const;
         ElectionAbortReason shouldAbortElection() const;
 
@@ -118,11 +118,11 @@ public:
      * evh can be used to schedule a callback when the process is complete.
      * If this function returns Status::OK(), evh is then guaranteed to be signaled.
      **/
-    StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
-                                                       const Timestamp& lastOpTimeApplied,
-                                                       const ReplSetConfig& currentConfig,
-                                                       int selfIndex,
-                                                       const std::vector<HostAndPort>& targets);
+    StatusWith<executor::TaskExecutor::EventHandle> start(executor::TaskExecutor* executor,
+                                                          const Timestamp& lastOpTimeApplied,
+                                                          const ReplSetConfig& currentConfig,
+                                                          int selfIndex,
+                                                          const std::vector<HostAndPort>& targets);
 
     /**
      * Informs the freshness checker to cancel further processing.

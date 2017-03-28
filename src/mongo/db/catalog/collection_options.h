@@ -33,10 +33,21 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_uuid.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
+
+extern bool enableCollectionUUIDs;  // TODO(SERVER-27993) Replace based on upgrade/downgrade state.
+
+/**
+ * A CollectionUUID is a 128-bit unique identifier, per RFC 4122, v4. for a database collection.
+ * Newly created collections are assigned a new randomly generated CollectionUUID. In a replica-set
+ * or a sharded cluster, all nodes will use the same UUID for a given collection. The UUID stays
+ * with the collection until it is dropped, so even across renames. A copied collection must have
+ * its own new unique UUID though.
+ */
+using CollectionUUID = UUID;
 
 struct CollectionOptions {
     /**

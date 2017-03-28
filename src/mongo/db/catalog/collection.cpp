@@ -280,10 +280,6 @@ vector<std::unique_ptr<RecordCursor>> Collection::getManyCursors(OperationContex
     return _recordStore->getManyCursors(opCtx);
 }
 
-Snapshotted<BSONObj> Collection::docFor(OperationContext* opCtx, const RecordId& loc) const {
-    return Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(),
-                                _recordStore->dataFor(opCtx, loc).releaseToBson());
-}
 
 bool Collection::findDoc(OperationContext* opCtx,
                          const RecordId& loc,

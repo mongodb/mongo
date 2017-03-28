@@ -73,7 +73,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 CollectionRangeDeleter::CollectionRangeDeleter(NamespaceString nss) : _nss(std::move(nss)) {}
 
 void CollectionRangeDeleter::run() {
-    Client::initThread(getThreadName().c_str());
+    Client::initThread(getThreadName());
     ON_BLOCK_EXIT([&] { Client::destroy(); });
     auto opCtx = cc().makeOperationContext().get();
 
