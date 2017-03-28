@@ -95,12 +95,17 @@ env.Append(
 # non-debug builds, we want to prefer the sbrk allocator since this is TCMallocs preferred
 # production deployment configuration. See the use of NDEBUG and kDebugMode in
 # src/system-alloc.cc for more details.
-#
-# Additionally, for debug builds we do want to capture stacks during (de)allocations, but we don't
-# want to pay that cost for release builds. For non-debug builds we use NO_TCMALLOC_SAMPLES to
-# disable the stack trace collection.
 if not debugBuild:
-    env.Append( CPPDEFINES=["NDEBUG", "NO_TCMALLOC_SAMPLES"] )
+    env.Append( CPPDEFINES=["NDEBUG"] )
+
+# For debug builds we want to capture stacks during (de)allocations,
+# but we don't want to pay that cost for release builds. For non-debug
+# builds we use NO_TCMALLOC_SAMPLES to disable the stack trace
+# collection. For debug builds we enable stack capture, but only on
+# intel targets, since tcmalloc's unwinder is very slow on other
+# platforms (see SERVER-28502).
+if (not debugBuild) or (not env['TARGET_ARCH'] in ['x86_64', 'i386']):
+    env.Append(CPPDEFINES=["NO_TCMALLOC_SAMPLES"])
 
 env.Prepend( CPPPATH=["src/"] )
 
