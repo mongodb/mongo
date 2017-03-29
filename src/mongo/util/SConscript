@@ -83,6 +83,15 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='lru_cache_test',
+    source=[
+        'lru_cache_test.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
 env.Library(
     target='uuid',
     source=[
