@@ -204,7 +204,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
             AsyncRequestsSender ars(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                    clientRequest.getTargetingNSS().db(),
+                                    clientRequest.getTargetingNSS().db().toString(),
                                     requests,
                                     readPref);
             numSent += pendingBatches.size();

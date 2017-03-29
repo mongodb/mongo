@@ -53,7 +53,7 @@ const int kMaxNumFailedHostRetryAttempts = 3;
 
 AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
-                                         StringData db,
+                                         const std::string db,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference)
     : _opCtx(opCtx), _executor(executor), _db(std::move(db)), _readPreference(readPreference) {
@@ -96,15 +96,14 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
     boost::optional<Response> readyResponse;
     while (!(readyResponse = _ready())) {
         // Otherwise, wait for some response to be received.
-        if (_checkForInterrupt) {
+        if (_interruptStatus.isOK()) {
             try {
                 _notification->get(_opCtx);
             } catch (const UserException& ex) {
                 // If the operation is interrupted, we cancel outstanding requests and switch to
                 // waiting for the (canceled) callbacks to finish without checking for interrupts.
-                invariant(!_opCtx->checkForInterruptNoAssert().isOK());
+                _interruptStatus = ex.toStatus();
                 _cancelPendingRequests();
-                _checkForInterrupt = false;
                 continue;
             }
         } else {
@@ -157,6 +156,11 @@ boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
                                 std::move(remote.swResponse->getValue()),
                                 std::move(*remote.shardHostAndPort));
             } else {
+                // If _interruptStatus is set, promote CallbackCanceled errors to it.
+                if (!_interruptStatus.isOK() &&
+                    ErrorCodes::CallbackCanceled == remote.swResponse->getStatus().code()) {
+                    remote.swResponse = _interruptStatus;
+                }
                 return Response(std::move(remote.shardId),
                                 std::move(remote.swResponse->getStatus()),
                                 std::move(remote.shardHostAndPort));
@@ -234,7 +238,7 @@ Status AsyncRequestsSender::_scheduleRequest_inlock(size_t remoteIndex) {
     }
 
     executor::RemoteCommandRequest request(
-        *remote.shardHostAndPort, _db.toString(), remote.cmdObj, _metadataObj, _opCtx);
+        *remote.shardHostAndPort, _db, remote.cmdObj, _metadataObj, _opCtx);
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,

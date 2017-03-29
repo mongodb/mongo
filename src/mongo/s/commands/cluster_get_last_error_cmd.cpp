@@ -116,7 +116,7 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
     const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
     AsyncRequestsSender ars(opCtx,
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                            dbName,
+                            dbName.toString(),
                             requests,
                             readPref);
 

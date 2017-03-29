@@ -123,7 +123,7 @@ public:
      */
     AsyncRequestsSender(OperationContext* opCtx,
                         executor::TaskExecutor* executor,
-                        StringData db,
+                        const std::string db,
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference);
 
@@ -249,10 +249,8 @@ private:
     void _handleResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
                          size_t remoteIndex);
 
-    // Not owned here.
     OperationContext* _opCtx;
 
-    // Not owned here.
     executor::TaskExecutor* _executor;
 
     // The metadata obj to pass along with the command remote. Used to indicate that the command is
@@ -260,15 +258,18 @@ private:
     BSONObj _metadataObj;
 
     // The database against which the commands are run.
-    const StringData _db;
+    const std::string _db;
 
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;
 
-    // Used to determine whether to check for interrupt when waiting for a remote to be ready.
-    // Set to false if we are interrupted, so that we can still wait for callbacks to complete.
-    // This is only accessed by the thread in next().
-    bool _checkForInterrupt = true;
+    // Is set to a non-OK status if the client operation is interrupted.
+    // When waiting for a remote to be ready, we only check for interrupt if the _interruptStatus
+    // has not already been set to an error (so we can wait for callbacks for (canceled) outstanding
+    // requests to complete after interrupt).
+    // When processing responses from remotes, if _interruptStatus is non-OK and the response status
+    // is CallbackCanceled, we promote the response status to the _interruptStatus.
+    Status _interruptStatus = Status::OK();
 
     // Must be acquired before accessing the below data members.
     // Must also be held when calling any of the '_inlock()' helper functions.
