@@ -359,6 +359,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	} else
 		F_CLR(btree, WT_BTREE_IGNORE_CACHE);
 
+	/*
+	 * The metadata isn't blocked by in-memory cache limits because metadata
+	 * "unroll" is performed by updates that are potentially blocked by the
+	 * cache-full checks.
+	 */
+	if (WT_IS_METADATA(btree->dhandle))
+		F_SET(btree, WT_BTREE_IGNORE_CACHE);
+
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	if (cval.val)
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
