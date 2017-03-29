@@ -107,7 +107,7 @@ details.
 
 * [KVEngine](kv/kv_engine.h)
 * [RecordStore](record_store.h)
-* [RecoveryUnit](ecovery_unit.h)
+* [RecoveryUnit](recovery_unit.h)
 * [SeekableRecordCursor](record_store.h)
 * [SortedDataInterface](sorted_data_interface.h)
 * [ServerStatusSection](../commands/server_status.h)

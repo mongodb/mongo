@@ -103,10 +103,8 @@ KVStorageEngine::KVStorageEngine(
 
     _catalogRecordStore =
         _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions());
-    _catalog.reset(new KVCatalog(_catalogRecordStore.get(),
-                                 _supportsDocLocking,
-                                 _options.directoryPerDB,
-                                 _options.directoryForIndexes));
+    _catalog.reset(new KVCatalog(
+        _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
     _catalog->init(&opCtx);
 
     std::vector<std::string> collections;

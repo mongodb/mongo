@@ -33,6 +33,7 @@
 #include <boost/shared_array.hpp>
 #include <map>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -190,9 +191,14 @@ private:
 
     // This is the "persistent" data.
     struct Data {
-        Data(bool isOplog) : dataSize(0), nextId(1), isOplog(isOplog) {}
+        Data(StringData ns, bool isOplog)
+            : dataSize(0),
+              recordsMutex(str::stream() << "recordsMutex_" << ns),
+              nextId(1),
+              isOplog(isOplog) {}
 
         int64_t dataSize;
+        Lock::ResourceMutex recordsMutex;
         Records records;
         int64_t nextId;
         const bool isOplog;

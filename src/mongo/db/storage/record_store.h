@@ -278,6 +278,10 @@ public:
  * Many methods take an OperationContext parameter. This contains the RecoveryUnit, with
  * all RecordStore specific transaction information, as well as the LockState. Methods that take
  * an OperationContext may throw a WriteConflictException.
+ *
+ * This class must be thread-safe for document-level locking storage engines. In addition, for
+ * storage engines implementing the KVEngine some methods must be thread safe, see KVCatalog. Only
+ * for MMAPv1 is this class not thread-safe.
  */
 class RecordStore {
     MONGO_DISALLOW_COPYING(RecordStore);

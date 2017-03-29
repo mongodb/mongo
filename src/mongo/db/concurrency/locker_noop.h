@@ -93,7 +93,7 @@ public:
                             LockMode mode,
                             unsigned timeoutMs,
                             bool checkDeadlock) {
-        invariant(false);
+        return LockResult::LOCK_OK;
     }
 
     virtual void downgrade(ResourceId resId, LockMode newMode) {
@@ -101,7 +101,7 @@ public:
     }
 
     virtual bool unlock(ResourceId resId) {
-        invariant(false);
+        return true;
     }
 
     virtual LockMode getLockMode(ResourceId resId) const {
