@@ -97,7 +97,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     Collection* coll;
     {
         WriteUnitOfWork wunit(opCtx);
-        coll = autoDb.getDb()->getOrCreateCollection(opCtx, ns);
+        coll = autoDb.getDb()->getOrCreateCollection(opCtx, NamespaceString(ns));
         invariant(coll);
         wunit.commit();
     }

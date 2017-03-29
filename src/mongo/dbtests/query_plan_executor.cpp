@@ -147,7 +147,7 @@ public:
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         ixparams.direction = 1;
 
-        const Collection* coll = db->getCollection(nss.ns());
+        const Collection* coll = db->getCollection(&_opCtx, nss);
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
         IndexScan* ix = new IndexScan(&_opCtx, ixparams, ws.get(), NULL);
@@ -183,7 +183,7 @@ public:
         // TODO: This is not correct (create collection under S-lock)
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         WriteUnitOfWork wunit(&_opCtx);
-        Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss.ns());
+        Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss);
         collection->getCursorManager()->registerExecutor(exec);
         wunit.commit();
     }
@@ -192,7 +192,7 @@ public:
         // TODO: This is not correct (create collection under S-lock)
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         WriteUnitOfWork wunit(&_opCtx);
-        Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss.ns());
+        Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss);
         collection->getCursorManager()->deregisterExecutor(exec);
         wunit.commit();
     }
@@ -203,7 +203,7 @@ protected:
 
 private:
     IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        Collection* collection = db->getCollection(nss.ns());
+        Collection* collection = db->getCollection(&_opCtx, nss);
         std::vector<IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         ASSERT_LTE(indexes.size(), 1U);

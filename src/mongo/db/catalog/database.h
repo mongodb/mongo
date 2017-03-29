@@ -92,11 +92,12 @@ public:
                                   StringData viewName,
                                   const CollectionOptions& options) = 0;
 
-        virtual Collection* getCollection(StringData ns) const = 0;
+        virtual Collection* getCollection(OperationContext* opCtx, StringData ns) const = 0;
 
         virtual ViewCatalog* getViewCatalog() = 0;
 
-        virtual Collection* getOrCreateCollection(OperationContext* opCtx, StringData ns) = 0;
+        virtual Collection* getOrCreateCollection(OperationContext* opCtx,
+                                                  const NamespaceString& nss) = 0;
 
         virtual Status renameCollection(OperationContext* opCtx,
                                         StringData fromNS,
@@ -262,12 +263,12 @@ public:
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
-    inline Collection* getCollection(const StringData ns) const {
-        return this->_impl().getCollection(ns);
+    inline Collection* getCollection(OperationContext* opCtx, const StringData ns) const {
+        return this->_impl().getCollection(opCtx, ns);
     }
 
-    inline Collection* getCollection(const NamespaceString& ns) const {
-        return this->_impl().getCollection(ns.ns());
+    inline Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const {
+        return this->_impl().getCollection(opCtx, ns.ns());
     }
 
     /**
@@ -278,8 +279,9 @@ public:
         return this->_impl().getViewCatalog();
     }
 
-    inline Collection* getOrCreateCollection(OperationContext* const opCtx, const StringData ns) {
-        return this->_impl().getOrCreateCollection(opCtx, ns);
+    inline Collection* getOrCreateCollection(OperationContext* const opCtx,
+                                             const NamespaceString& nss) {
+        return this->_impl().getOrCreateCollection(opCtx, nss);
     }
 
     inline Status renameCollection(OperationContext* const opCtx,

@@ -196,21 +196,21 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
 }
 
 Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx,
-                                                         StringData fullns) {
-    Collection* collection = getCollection(fullns);
+                                                         const NamespaceString& nss) {
+    Collection* collection = getCollection(opCtx, nss);
 
     if (collection) {
         return collection;
     }
 
-    unique_ptr<CollectionCatalogEntry> cce(_dbEntry->getCollectionCatalogEntry(fullns));
+    unique_ptr<CollectionCatalogEntry> cce(_dbEntry->getCollectionCatalogEntry(nss.ns()));
     invariant(cce.get());
 
-    unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(fullns));
+    unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
     invariant(rs.get());  // if cce exists, so should this
 
     // Not registering AddCollectionChange since this is for collections that already exist.
-    Collection* c = new Collection(opCtx, fullns, cce.release(), rs.release(), _dbEntry);
+    Collection* c = new Collection(opCtx, nss.ns(), cce.release(), rs.release(), _dbEntry);
     return c;
 }
 
@@ -242,7 +242,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
 
     for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
         const string ns = *it;
-        _collections[ns] = _getOrCreateCollectionInstance(opCtx, ns);
+        NamespaceString nss(ns);
+        _collections[ns] = _getOrCreateCollectionInstance(opCtx, nss);
     }
 
     // At construction time of the viewCatalog, the _collections map wasn't initialized yet, so no
@@ -334,7 +335,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
         const string ns = *it;
 
-        Collection* collection = getCollection(ns);
+        Collection* collection = getCollection(opCtx, ns);
 
         if (!collection)
             continue;
@@ -373,7 +374,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, StringData fullns) {
 }
 
 Status DatabaseImpl::dropCollection(OperationContext* opCtx, StringData fullns) {
-    if (!getCollection(fullns)) {
+    if (!getCollection(opCtx, fullns)) {
         // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
     }
@@ -403,7 +404,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     LOG(1) << "dropCollection: " << fullns;
 
-    Collection* collection = getCollection(fullns);
+    Collection* collection = getCollection(opCtx, fullns);
 
     if (!collection) {
         return Status::OK();  // Post condition already met.
@@ -472,8 +473,9 @@ void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
     _collections.erase(it);
 }
 
-Collection* DatabaseImpl::getCollection(StringData ns) const {
+Collection* DatabaseImpl::getCollection(OperationContext* opCtx, StringData ns) const {
     invariant(_name == nsToDatabaseSubstring(ns));
+    dassert(!cc().getOperationContext() || opCtx == cc().getOperationContext());
     CollectionMap::const_iterator it = _collections.find(ns);
 
     if (it != _collections.end() && it->second) {
@@ -492,8 +494,10 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     BackgroundOperation::assertNoBgOpInProgForNs(fromNS);
     BackgroundOperation::assertNoBgOpInProgForNs(toNS);
 
+    NamespaceString fromNSS(fromNS);
+    NamespaceString toNSS(toNS);
     {  // remove anything cached
-        Collection* coll = getCollection(fromNS);
+        Collection* coll = getCollection(opCtx, fromNS);
 
         if (!coll)
             return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
@@ -515,22 +519,24 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
-    _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNS);
+    _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNSS);
     return s;
 }
 
-Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx, StringData ns) {
-    Collection* c = getCollection(ns);
+Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    Collection* c = getCollection(opCtx, nss);
 
     if (!c) {
-        c = createCollection(opCtx, ns);
+        c = createCollection(opCtx, nss.ns());
     }
     return c;
 }
 
-void DatabaseImpl::_checkCanCreateCollection(const NamespaceString& nss,
+void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
+                                             const NamespaceString& nss,
                                              const CollectionOptions& options) {
-    massert(17399, "collection already exists", getCollection(nss.ns()) == nullptr);
+    massert(17399, "collection already exists", getCollection(opCtx, nss) == nullptr);
     massertNamespaceNotIndex(nss.ns(), "createCollection");
 
     uassert(14037,
@@ -557,7 +563,7 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
 
     NamespaceString nss(ns);
     NamespaceString viewOnNss(nss.db(), options.viewOn);
-    _checkCanCreateCollection(nss, options);
+    _checkCanCreateCollection(opCtx, nss, options);
     audit::logCreateCollection(&cc(), ns);
 
     if (nss.isOplog())
@@ -576,14 +582,14 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     invariant(!options.isView());
 
     NamespaceString nss(ns);
-    _checkCanCreateCollection(nss, options);
+    _checkCanCreateCollection(opCtx, nss, options);
     audit::logCreateCollection(&cc(), ns);
 
     Status status = _dbEntry->createCollection(opCtx, ns, options, true /*allocateDefaultSpace*/);
     massertNoTraceStatusOK(status);
 
     opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
-    Collection* collection = _getOrCreateCollectionInstance(opCtx, ns);
+    Collection* collection = _getOrCreateCollectionInstance(opCtx, nss);
     invariant(collection);
     _collections[ns] = collection;
 
@@ -706,7 +712,7 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
     if (!NamespaceString::validCollectionComponent(ns))
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << ns);
 
-    Collection* collection = db->getCollection(ns);
+    Collection* collection = db->getCollection(opCtx, ns);
 
     if (collection)
         return Status(ErrorCodes::NamespaceExists,

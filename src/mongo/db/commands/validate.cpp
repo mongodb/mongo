@@ -111,7 +111,7 @@ public:
 
         AutoGetDb ctx(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLk(opCtx->lockState(), nss.ns(), MODE_X);
-        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(nss) : NULL;
+        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
         if (!collection) {
             if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
                 errmsg = "Cannot validate a view";

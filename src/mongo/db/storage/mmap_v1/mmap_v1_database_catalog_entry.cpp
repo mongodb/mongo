@@ -410,7 +410,7 @@ void MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
     StringData dbName = systemCollectionNamespace.db();
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
     Database* db = dbHolder().get(opCtx, dbName);
-    Collection* systemCollection = db->getCollection(systemCollectionNamespace);
+    Collection* systemCollection = db->getCollection(opCtx, systemCollectionNamespace);
     systemCollection->getCursorManager()->invalidateDocument(opCtx, record, INVALIDATION_DELETION);
 }
 

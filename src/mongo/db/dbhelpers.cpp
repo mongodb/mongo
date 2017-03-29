@@ -146,7 +146,7 @@ bool Helpers::findById(OperationContext* opCtx,
                        bool* indexFound) {
     invariant(database);
 
-    Collection* collection = database->getCollection(ns);
+    Collection* collection = database->getCollection(opCtx, ns);
     if (!collection) {
         return false;
     }
@@ -468,7 +468,7 @@ long long Helpers::removeRange(OperationContext* opCtx,
 void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
     OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    Collection* collection = context.db() ? context.db()->getCollection(nss.ns()) : nullptr;
+    Collection* collection = context.db() ? context.db()->getCollection(opCtx, nss) : nullptr;
     deleteObjects(opCtx, collection, nss, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
 }
 

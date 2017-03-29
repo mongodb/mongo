@@ -420,7 +420,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
         AutoGetOrCreateDb databaseWriteGuard(opCtx, nss.db(), MODE_X);
         auto db = databaseWriteGuard.getDb();
         invariant(db);
-        if (db->getCollection(nss)) {
+        if (db->getCollection(opCtx, nss)) {
             return {ErrorCodes::NamespaceExists,
                     str::stream() << "Collection " << nss.ns() << " already exists."};
         }
@@ -737,11 +737,11 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
     }
 
     Collection* const usersCollection =
-        adminDb->getCollection(AuthorizationManager::usersCollectionNamespace);
+        adminDb->getCollection(opCtx, AuthorizationManager::usersCollectionNamespace);
     const bool hasUsers =
         usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
     Collection* const adminVersionCollection =
-        adminDb->getCollection(AuthorizationManager::versionCollectionNamespace);
+        adminDb->getCollection(opCtx, AuthorizationManager::versionCollectionNamespace);
     BSONObj authSchemaVersionDocument;
     if (!adminVersionCollection ||
         !Helpers::findOne(opCtx,

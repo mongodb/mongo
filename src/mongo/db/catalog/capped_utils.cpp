@@ -67,7 +67,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     Database* db = autoDb.getDb();
     massert(13429, "no such database", db);
 
-    Collection* collection = db->getCollection(collectionName);
+    Collection* collection = db->getCollection(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !db->getViewCatalog()->lookup(opCtx, collectionName.ns()));
@@ -115,21 +115,21 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
                                const std::string& shortTo,
                                double size,
                                bool temp) {
-    std::string fromNs = db->name() + "." + shortFrom;
-    std::string toNs = db->name() + "." + shortTo;
+    NamespaceString fromNss(db->name(), shortFrom);
+    NamespaceString toNss(db->name(), shortTo);
 
-    Collection* fromCollection = db->getCollection(fromNs);
+    Collection* fromCollection = db->getCollection(opCtx, fromNss);
     if (!fromCollection) {
-        if (db->getViewCatalog()->lookup(opCtx, fromNs)) {
+        if (db->getViewCatalog()->lookup(opCtx, fromNss.ns())) {
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "cloneCollectionAsCapped not supported for views: "
-                                        << fromNs);
+                                        << fromNss.ns());
         }
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "source collection " << fromNs << " does not exist");
+                      str::stream() << "source collection " << fromNss.ns() << " does not exist");
     }
 
-    if (db->getCollection(toNs))
+    if (db->getCollection(opCtx, toNss))
         return Status(ErrorCodes::NamespaceExists, "to collection already exists");
 
     // create new collection
@@ -142,17 +142,17 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
         options.cappedSize = size;
         if (temp)
             options.temp = true;
-        OldClientContext ctx(opCtx, toNs);
+        OldClientContext ctx(opCtx, toNss.ns());
 
         WriteUnitOfWork wunit(opCtx);
-        Status status = userCreateNS(opCtx, ctx.db(), toNs, options.toBSON());
+        Status status = userCreateNS(opCtx, ctx.db(), toNss.ns(), options.toBSON());
         if (!status.isOK())
             return status;
         wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "cloneCollectionAsCapped", fromNs);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "cloneCollectionAsCapped", fromNss.ns());
 
-    Collection* toCollection = db->getCollection(toNs);
+    Collection* toCollection = db->getCollection(opCtx, toNss);
     invariant(toCollection);  // we created above
 
     // how much data to ignore because it won't fit anyway
@@ -165,7 +165,7 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
     long long excessSize = fromCollection->dataSize(opCtx) - allocatedSpaceGuess;
 
     std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        opCtx, fromNs, fromCollection, PlanExecutor::YIELD_MANUAL, InternalPlanner::FORWARD));
+        opCtx, fromNss.ns(), fromCollection, PlanExecutor::YIELD_MANUAL, InternalPlanner::FORWARD));
 
     exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY, fromCollection);
 
@@ -222,7 +222,7 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
         } catch (const WriteConflictException& wce) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             retries++;  // logAndBackoff expects this to be 1 on first call.
-            wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNs);
+            wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());
 
             // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
             // around call to abandonSnapshot.
@@ -261,11 +261,11 @@ Status convertToCapped(OperationContext* opCtx,
     BackgroundOperation::assertNoBgOpInProgForDb(dbname);
 
     std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
-    std::string longTmpName = str::stream() << dbname << "." << shortTmpName;
+    NamespaceString longTmpName(dbname, shortTmpName);
 
-    if (db->getCollection(longTmpName)) {
+    if (db->getCollection(opCtx, longTmpName)) {
         WriteUnitOfWork wunit(opCtx);
-        Status status = db->dropCollection(opCtx, longTmpName);
+        Status status = db->dropCollection(opCtx, longTmpName.ns());
         if (!status.isOK())
             return status;
     }
@@ -280,7 +280,7 @@ Status convertToCapped(OperationContext* opCtx,
             return status;
         }
 
-        verify(db->getCollection(longTmpName));
+        verify(db->getCollection(opCtx, longTmpName));
     }
 
     {
@@ -292,7 +292,7 @@ Status convertToCapped(OperationContext* opCtx,
                 return status;
         }
 
-        Status status = db->renameCollection(opCtx, longTmpName, collectionName.ns(), false);
+        Status status = db->renameCollection(opCtx, longTmpName.ns(), collectionName.ns(), false);
         if (!status.isOK())
             return status;
 

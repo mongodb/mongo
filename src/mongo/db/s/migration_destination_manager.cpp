@@ -500,7 +500,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // Only copy if ns doesn't already exist
         Database* const db = ctx.db();
 
-        Collection* const collection = db->getCollection(_nss);
+        Collection* const collection = db->getCollection(opCtx, _nss);
         if (!collection) {
             std::list<BSONObj> infos =
                 conn->getCollectionInfos(_nss.db().toString(), BSON("name" << _nss.coll()));
@@ -544,7 +544,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         }
 
         Database* db = ctx.db();
-        Collection* collection = db->getCollection(_nss);
+        Collection* collection = db->getCollection(opCtx, _nss);
         if (!collection) {
             _errmsg = str::stream() << "collection dropped during migration: " << _nss.ns();
             warning() << _errmsg;
@@ -919,7 +919,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             }
 
             deleteObjects(opCtx,
-                          ctx.db() ? ctx.db()->getCollection(nss.ns()) : nullptr,
+                          ctx.db() ? ctx.db()->getCollection(opCtx, nss) : nullptr,
                           nss,
                           id,
                           PlanExecutor::YIELD_MANUAL,

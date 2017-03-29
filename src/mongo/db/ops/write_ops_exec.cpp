@@ -182,7 +182,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
         assertCanWrite_inlock(opCtx, ns);
-        if (!db.getDb()->getCollection(ns.ns())) {  // someone else may have beat us to it.
+        if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
             WriteUnitOfWork wuow(opCtx);
             uassertStatusOK(userCreateNS(opCtx, db.getDb(), ns.ns(), BSONObj()));
             wuow.commit();

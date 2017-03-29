@@ -61,7 +61,7 @@ Status dropCollection(OperationContext* opCtx,
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
-        Collection* coll = db ? db->getCollection(collectionName) : nullptr;
+        Collection* coll = db ? db->getCollection(opCtx, collectionName) : nullptr;
         auto view =
             db && !coll ? db->getViewCatalog()->lookup(opCtx, collectionName.ns()) : nullptr;
 

@@ -174,10 +174,10 @@ public:
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
-    Collection* getCollection(StringData ns) const final;
+    Collection* getCollection(OperationContext* opCtx, StringData ns) const final;
 
-    Collection* getCollection(const NamespaceString& ns) const {
-        return getCollection(ns.ns());
+    Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const {
+        return getCollection(opCtx, ns.ns());
     }
 
     /**
@@ -188,7 +188,7 @@ public:
         return &_views;
     }
 
-    Collection* getOrCreateCollection(OperationContext* opCtx, StringData ns) final;
+    Collection* getOrCreateCollection(OperationContext* opCtx, const NamespaceString& nss) final;
 
     Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,
@@ -229,12 +229,14 @@ private:
      * Note: This does not add the collection to _collections map, that must be done
      * by the caller, who takes onership of the Collection*
      */
-    Collection* _getOrCreateCollectionInstance(OperationContext* opCtx, StringData fullns);
+    Collection* _getOrCreateCollectionInstance(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection.
      */
-    void _checkCanCreateCollection(const NamespaceString& nss, const CollectionOptions& options);
+    void _checkCanCreateCollection(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const CollectionOptions& options);
 
     /**
      * Deregisters and invalidates all cursors on collection 'fullns'.  Callers must specify

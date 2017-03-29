@@ -49,7 +49,7 @@ public:
 
         {
             WriteUnitOfWork wunit(&_opCtx);
-            _collection = _database->getCollection(ns());
+            _collection = _database->getCollection(&_opCtx, ns());
             if (_collection) {
                 _database->dropCollection(&_opCtx, ns());
             }

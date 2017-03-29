@@ -261,7 +261,7 @@ public:
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver((UpdateDriver::Options()));
             Database* db = ctx.db();
-            Collection* coll = db->getCollection(nss.ns());
+            Collection* coll = db->getCollection(&_opCtx, nss);
 
             // Get the RecordIds that would be returned by an in-order scan.
             vector<RecordId> recordIds;

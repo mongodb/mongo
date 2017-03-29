@@ -56,7 +56,7 @@ Status wrappedRun(OperationContext* opCtx,
     if (!serverGlobalParams.quiet.load()) {
         LOG(0) << "CMD: dropIndexes " << nss;
     }
-    Collection* collection = db ? db->getCollection(nss) : nullptr;
+    Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
 
     // If db/collection does not exist, short circuit and return.
     if (!db || !collection) {

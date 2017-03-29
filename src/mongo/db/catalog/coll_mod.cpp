@@ -222,7 +222,7 @@ Status collMod(OperationContext* opCtx,
     StringData dbName = nss.db();
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
-    Collection* coll = db ? db->getCollection(nss) : nullptr;
+    Collection* coll = db ? db->getCollection(opCtx, nss) : nullptr;
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;

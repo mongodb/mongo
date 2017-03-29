@@ -266,7 +266,7 @@ public:
             if (auto collNames = _getExactNameMatches(matcher.get())) {
                 for (auto&& collName : *collNames) {
                     auto nss = NamespaceString(db->name(), collName);
-                    Collection* collection = db->getCollection(nss);
+                    Collection* collection = db->getCollection(opCtx, nss);
                     BSONObj collBson = buildCollectionBson(opCtx, collection);
                     if (!collBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());

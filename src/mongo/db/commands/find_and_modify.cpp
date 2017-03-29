@@ -411,7 +411,7 @@ public:
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                Collection* const collection = autoDb.getDb()->getCollection(nsString.ns());
+                Collection* const collection = autoDb.getDb()->getCollection(opCtx, nsString);
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
@@ -488,7 +488,7 @@ public:
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
+                Collection* collection = autoDb.getDb()->getCollection(opCtx, nsString.ns());
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
@@ -501,7 +501,7 @@ public:
                     // Release the collection lock and reacquire a lock on the database
                     // in exclusive mode in order to create the collection.
                     collLock.relockAsDatabaseExclusive(autoDb.lock());
-                    collection = autoDb.getDb()->getCollection(nsString.ns());
+                    collection = autoDb.getDb()->getCollection(opCtx, nsString);
                     Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(opCtx, nsString);
                     if (!isPrimaryAfterRelock.isOK()) {
                         return appendCommandStatus(result, isPrimaryAfterRelock);
@@ -518,7 +518,7 @@ public:
                         }
                         wuow.commit();
 
-                        collection = autoDb.getDb()->getCollection(nsString.ns());
+                        collection = autoDb.getDb()->getCollection(opCtx, nsString);
                         invariant(collection);
                     }
                 }

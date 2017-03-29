@@ -88,7 +88,7 @@ public:
                                                          std::move(ws),
                                                          std::move(scan),
                                                          std::move(cq),
-                                                         _ctx->db()->getCollection(nss.ns()),
+                                                         _ctx->db()->getCollection(&_opCtx, nss),
                                                          PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return statusWithPlanExecutor.getValue().release();
@@ -96,17 +96,14 @@ public:
 
     void registerExecutor(PlanExecutor* exec) {
         WriteUnitOfWork wuow(&_opCtx);
-        _ctx->db()
-            ->getOrCreateCollection(&_opCtx, nss.ns())
-            ->getCursorManager()
-            ->registerExecutor(exec);
+        _ctx->db()->getOrCreateCollection(&_opCtx, nss)->getCursorManager()->registerExecutor(exec);
         wuow.commit();
     }
 
     void deregisterExecutor(PlanExecutor* exec) {
         WriteUnitOfWork wuow(&_opCtx);
         _ctx->db()
-            ->getOrCreateCollection(&_opCtx, nss.ns())
+            ->getOrCreateCollection(&_opCtx, nss)
             ->getCursorManager()
             ->deregisterExecutor(exec);
         wuow.commit();
@@ -117,7 +114,7 @@ public:
     }
 
     Collection* collection() {
-        return _ctx->db()->getCollection(nss.ns());
+        return _ctx->db()->getCollection(&_opCtx, nss);
     }
 
     // Order of these is important for initialization

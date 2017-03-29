@@ -85,7 +85,7 @@ Status renameCollection(OperationContext* opCtx,
     }
 
     Database* const sourceDB = dbHolder().get(opCtx, source.db());
-    Collection* const sourceColl = sourceDB ? sourceDB->getCollection(source.ns()) : nullptr;
+    Collection* const sourceColl = sourceDB ? sourceDB->getCollection(opCtx, source) : nullptr;
     if (!sourceColl) {
         if (sourceDB && sourceDB->getViewCatalog()->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -132,7 +132,7 @@ Status renameCollection(OperationContext* opCtx,
         // Check if the target namespace exists and if dropTarget is true.
         // Return a non-OK status if target exists and dropTarget is not true or if the collection
         // is sharded.
-        if (targetDB->getCollection(target)) {
+        if (targetDB->getCollection(opCtx, target)) {
             if (CollectionShardingState::get(opCtx, target)->getMetadata()) {
                 return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
             }

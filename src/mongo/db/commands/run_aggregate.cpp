@@ -165,7 +165,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             continue;
         }
 
-        if (!db || db->getCollection(involvedNs.ns())) {
+        if (!db || db->getCollection(opCtx, involvedNs)) {
             // If the database exists and 'involvedNs' refers to a collection namespace, then we
             // resolve it as an empty pipeline in order to read directly from the underlying
             // collection. If the database doesn't exist, then we still resolve it as an empty
@@ -246,7 +246,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
         return Status::OK();
     }
     for (auto&& potentialViewNs : pipeline->getInvolvedCollections()) {
-        if (db->getCollection(potentialViewNs.ns())) {
+        if (db->getCollection(opCtx, potentialViewNs)) {
             continue;
         }
 

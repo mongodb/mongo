@@ -352,7 +352,8 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             std::unique_ptr<Lock::CollectionLock> collectionLock;
             std::unique_ptr<OldClientContext> ctx;
 
-            auto dbName = nsToDatabaseSubstring(ns);
+            NamespaceString nss(ns);
+            auto dbName = nss.db();
 
             auto resetLocks = [&](LockMode mode) {
                 collectionLock.reset();
@@ -371,7 +372,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 ctx.reset(new OldClientContext(opCtx, ns));
             } else {
                 ctx.reset(new OldClientContext(opCtx, ns));
-                if (!ctx->db()->getCollection(ns)) {
+                if (!ctx->db()->getCollection(opCtx, nss)) {
                     // Need to implicitly create collection.  This occurs for 'u' opTypes,
                     // but not for 'i' nor 'd'.
                     ctx.reset();
@@ -557,7 +558,7 @@ private:
             return collProperties;
         }
 
-        auto collection = db->getCollection(ns);
+        auto collection = db->getCollection(opCtx, ns);
         if (!collection) {
             return collProperties;
         }
@@ -938,7 +939,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, Database* db, const BSO
     const char* ns = o.getStringField("ns");
 
     // capped collections
-    Collection* collection = db->getCollection(ns);
+    Collection* collection = db->getCollection(opCtx, ns);
     if (collection && collection->isCapped()) {
         log() << "missing doc, but this is okay for a capped collection (" << ns << ")";
         return BSONObj();
@@ -1025,7 +1026,7 @@ bool SyncTail::shouldRetry(OperationContext* opCtx, const BSONObj& o) {
         } else {
             WriteUnitOfWork wunit(opCtx);
 
-            Collection* const coll = db->getOrCreateCollection(opCtx, nss.toString());
+            Collection* const coll = db->getOrCreateCollection(opCtx, nss);
             invariant(coll);
 
             OpDebug* const nullOpDebug = nullptr;

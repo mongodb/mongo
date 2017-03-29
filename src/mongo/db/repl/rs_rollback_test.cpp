@@ -311,7 +311,7 @@ int _testRollbackDelete(OperationContext* opCtx,
     Lock::CollectionLock collLock(opCtx->lockState(), "test.t", MODE_S);
     auto db = dbHolder().get(opCtx, "test");
     ASSERT_TRUE(db);
-    auto collection = db->getCollection("test.t");
+    auto collection = db->getCollection(opCtx, "test.t");
     if (!collection) {
         return -1;
     }
@@ -816,7 +816,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
         mongo::WriteUnitOfWork wuow(_opCtx.get());
         auto db = dbHolder().openDb(_opCtx.get(), "test");
         ASSERT_TRUE(db);
-        ASSERT_TRUE(db->getOrCreateCollection(_opCtx.get(), "test.t"));
+        ASSERT_TRUE(db->getOrCreateCollection(_opCtx.get(), NamespaceString("test.t")));
         wuow.commit();
     }
     auto status =
@@ -945,7 +945,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     {
         AutoGetOrCreateDb autoDb(_opCtx.get(), "test", MODE_X);
         mongo::WriteUnitOfWork wuow(_opCtx.get());
-        auto coll = autoDb.getDb()->getCollection("test.t");
+        auto coll = autoDb.getDb()->getCollection(_opCtx.get(), "test.t");
         if (!coll) {
             coll = autoDb.getDb()->createCollection(_opCtx.get(), "test.t");
         }
@@ -1074,7 +1074,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto db = dbHolder().get(_opCtx.get(), "test");
         ASSERT_TRUE(db);
-        ASSERT_FALSE(db->getCollection("test.t"));
+        ASSERT_FALSE(db->getCollection(_opCtx.get(), "test.t"));
     }
 }
 

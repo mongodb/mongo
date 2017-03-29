@@ -89,7 +89,7 @@ public:
             }
 
             Lock::CollectionLock collectionLock(opCtx.lockState(), _ns.ns(), MODE_IX);
-            Collection* collection = db->getCollection(_ns);
+            Collection* collection = db->getCollection(&opCtx, _ns);
             if (!collection) {
                 LOG(2) << "no collection " << _ns;
                 return false;

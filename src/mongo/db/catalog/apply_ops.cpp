@@ -282,7 +282,7 @@ Status preconditionOK(OperationContext* opCtx, const BSONObj& applyOpCmd, BSONOb
                 return {ErrorCodes::NamespaceNotFound,
                         "database in ns does not exist: " + nss.ns()};
             }
-            Collection* collection = database->getCollection(nss.ns());
+            Collection* collection = database->getCollection(opCtx, nss);
             if (!collection) {
                 return {ErrorCodes::NamespaceNotFound,
                         "collection in ns does not exist: " + nss.ns()};

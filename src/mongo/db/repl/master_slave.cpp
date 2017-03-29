@@ -277,7 +277,7 @@ void ReplSource::loadAll(OperationContext* opCtx, SourceVector& v) {
         unique_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(opCtx,
                                             localSources,
-                                            ctx.db()->getCollection(localSources),
+                                            ctx.db()->getCollection(opCtx, localSources),
                                             PlanExecutor::YIELD_MANUAL));
         BSONObj obj;
         PlanExecutor::ExecState state;
@@ -318,8 +318,11 @@ void ReplSource::loadAll(OperationContext* opCtx, SourceVector& v) {
         }
     }
 
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        opCtx, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
+    unique_ptr<PlanExecutor> exec(
+        InternalPlanner::collectionScan(opCtx,
+                                        localSources,
+                                        ctx.db()->getCollection(opCtx, localSources),
+                                        PlanExecutor::YIELD_MANUAL));
     BSONObj obj;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {

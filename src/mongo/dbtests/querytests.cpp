@@ -64,7 +64,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
-            _collection = _database->getCollection(ns());
+            _collection = _database->getCollection(&_opCtx, ns());
             if (_collection) {
                 _database->dropCollection(&_opCtx, ns());
             }
@@ -191,7 +191,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             Database* db = ctx.db();
-            if (db->getCollection(ns())) {
+            if (db->getCollection(&_opCtx, ns())) {
                 _collection = NULL;
                 db->dropCollection(&_opCtx, ns());
             }
@@ -691,7 +691,7 @@ public:
         long long cursorId = c->getCursorId();
 
         auto pinnedCursor = unittest::assertGet(
-            ctx.db()->getCollection(ns)->getCursorManager()->pinCursor(cursorId));
+            ctx.db()->getCollection(&_opCtx, ns)->getCursorManager()->pinCursor(cursorId));
         ASSERT_EQUALS(three.toULL(), pinnedCursor.getCursor()->getSlaveReadTill().asULL());
     }
 };
@@ -1700,7 +1700,7 @@ public:
         {
             OldClientWriteContext ctx(&_opCtx, ns());
             auto pinnedCursor = unittest::assertGet(
-                ctx.db()->getCollection(ns())->getCursorManager()->pinCursor(cursorId));
+                ctx.db()->getCollection(&_opCtx, ns())->getCursorManager()->pinCursor(cursorId));
             string expectedAssertion = str::stream() << "Cannot kill pinned cursor: " << cursorId;
             ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_opCtx, cursorId),
                                MsgAssertionException,

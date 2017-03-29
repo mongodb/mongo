@@ -59,22 +59,22 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
     bool firstTime = true;
     for (std::list<std::string>::const_iterator it = nsToCheck.begin(); it != nsToCheck.end();
          ++it) {
-        string ns = *it;
+        NamespaceString nss(*it);
 
-        LOG(3) << "IndexRebuilder::checkNS: " << ns;
+        LOG(3) << "IndexRebuilder::checkNS: " << nss.ns();
 
         // This write lock is held throughout the index building process for this namespace.
-        Lock::DBLock lk(opCtx, nsToDatabaseSubstring(ns), MODE_X);
-        OldClientContext ctx(opCtx, ns);
+        Lock::DBLock lk(opCtx, nss.db(), MODE_X);
+        OldClientContext ctx(opCtx, nss.ns());
 
-        Collection* collection = ctx.db()->getCollection(ns);
+        Collection* collection = ctx.db()->getCollection(opCtx, nss);
         if (collection == NULL)
             continue;
 
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
         if (collection->ns().isOplog() && indexCatalog->numIndexesTotal(opCtx) > 0) {
-            warning() << ns << " had illegal indexes, removing";
+            warning() << nss.ns() << " had illegal indexes, removing";
             indexCatalog->dropAllIndexes(opCtx, true);
             continue;
         }
@@ -98,7 +98,8 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
                 continue;
             }
 
-            log() << "found " << indexesToBuild.size() << " interrupted index build(s) on " << ns;
+            log() << "found " << indexesToBuild.size() << " interrupted index build(s) on "
+                  << nss.ns();
 
             if (firstTime) {
                 log() << "note: restart the server with --noIndexBuildRetry "

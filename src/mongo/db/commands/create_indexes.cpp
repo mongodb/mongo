@@ -261,7 +261,7 @@ public:
             db = dbHolder().openDb(opCtx, ns.db());
         }
 
-        Collection* collection = db->getCollection(ns.ns());
+        Collection* collection = db->getCollection(opCtx, ns);
         if (collection) {
             result.appendBool("createdCollectionAutomatically", false);
         } else {
@@ -383,7 +383,7 @@ public:
 
             Database* db = dbHolder().get(opCtx, ns.db());
             uassert(28551, "database dropped during index build", db);
-            uassert(28552, "collection dropped during index build", db->getCollection(ns.ns()));
+            uassert(28552, "collection dropped during index build", db->getCollection(opCtx, ns));
         }
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {

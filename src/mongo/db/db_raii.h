@@ -376,7 +376,7 @@ public:
     }
 
     Collection* getCollection() const {
-        return _c.db()->getCollection(_nss.ns());
+        return _c.db()->getCollection(_opCtx, _nss);
     }
 
 private:

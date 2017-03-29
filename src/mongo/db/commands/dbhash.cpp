@@ -213,7 +213,7 @@ private:
         }
 
         *fromCache = false;
-        Collection* collection = db->getCollection(fullCollectionName);
+        Collection* collection = db->getCollection(opCtx, ns);
         if (!collection)
             return "";
 

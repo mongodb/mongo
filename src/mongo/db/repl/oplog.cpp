@@ -301,7 +301,7 @@ void truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp) {
     const NamespaceString oplogNss(rsOplogName);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
-    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
+    Collection* oplogCollection = autoDb.getDb()->getCollection(opCtx, oplogNss);
     if (!oplogCollection) {
         fassertFailedWithStatusNoTrace(
             34418,
@@ -494,7 +494,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName);
-    Collection* collection = ctx.db()->getCollection(oplogCollectionName);
+    Collection* collection = ctx.db()->getCollection(opCtx, oplogCollectionName);
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
@@ -723,7 +723,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_X));
         }
     }
-    Collection* collection = db->getCollection(ns);
+    Collection* collection = db->getCollection(opCtx, requestNss);
     IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -758,7 +758,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
             // Check if collection exists.
-            auto indexCollection = db->getCollection(indexNss);
+            auto indexCollection = db->getCollection(opCtx, indexNss);
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create index due to missing collection: "
                                   << op.toString(),
@@ -1036,7 +1036,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
     }
     {
         Database* db = dbHolder().get(opCtx, nss.ns());
-        if (db && !db->getCollection(nss.ns()) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
+        if (db && !db->getCollection(opCtx, nss) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }

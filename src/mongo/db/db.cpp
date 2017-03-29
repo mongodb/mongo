@@ -200,13 +200,13 @@ void logStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
     Database* db = autoDb.getDb();
-    Collection* collection = db->getCollection(startupLogCollectionName);
+    Collection* collection = db->getCollection(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         repl::UnreplicatedWritesBlock uwb(opCtx);
         uassertStatusOK(userCreateNS(opCtx, db, startupLogCollectionName.ns(), options));
-        collection = db->getCollection(startupLogCollectionName);
+        collection = db->getCollection(opCtx, startupLogCollectionName);
     }
     invariant(collection);
 
@@ -231,7 +231,7 @@ void checkForIdIndexes(OperationContext* opCtx, Database* db) {
         if (ns.isSystem())
             continue;
 
-        Collection* coll = db->getCollection(collectionName);
+        Collection* coll = db->getCollection(opCtx, collectionName);
         if (!coll)
             continue;
 
@@ -270,7 +270,7 @@ unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
 void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     const NamespaceString oplogNss(repl::rsOplogName);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
-    Collection* oplogCollection = db->getCollection(oplogNss);
+    Collection* oplogCollection = db->getCollection(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
         severe() << "The oplog collection " << oplogNss
                  << " is not capped; a capped oplog is a requirement for replication to function.";
@@ -352,7 +352,7 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // If a valid featureCompatibilityVersion is present, cache it as a server parameter.
         if (dbName == "admin") {
             if (Collection* versionColl =
-                    db->getCollection(FeatureCompatibilityVersion::kCollection)) {
+                    db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection)) {
                 BSONObj featureCompatibilityVersion;
                 if (Helpers::findOne(opCtx,
                                      versionColl,
@@ -369,11 +369,11 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
 
         // Major versions match, check indexes
-        const string systemIndexes = db->name() + ".system.indexes";
+        const NamespaceString systemIndexes(db->name(), "system.indexes");
 
-        Collection* coll = db->getCollection(systemIndexes);
+        Collection* coll = db->getCollection(opCtx, systemIndexes);
         unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-            opCtx, systemIndexes, coll, PlanExecutor::YIELD_MANUAL));
+            opCtx, systemIndexes.ns(), coll, PlanExecutor::YIELD_MANUAL));
 
         BSONObj index;
         PlanExecutor::ExecState state;

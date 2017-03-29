@@ -52,7 +52,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     : _viewMode(viewMode),
       _autoDb(opCtx, nss.db(), modeDB),
       _collLock(opCtx->lockState(), nss.ns(), modeColl),
-      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {
+      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(opCtx, nss) : nullptr) {
     Database* db = _autoDb.getDb();
     // If the database exists, but not the collection, check for views.
     if (_viewMode == ViewMode::kViewsForbidden && db && !_coll &&
@@ -251,7 +251,7 @@ OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, const std:
       _autodb(opCtx, _nss.db(), MODE_IX),
       _collk(opCtx->lockState(), ns, MODE_IX),
       _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
-    _collection = _c.db()->getCollection(ns);
+    _collection = _c.db()->getCollection(opCtx, ns);
     if (!_collection && !_autodb.justCreated()) {
         // relock database in MODE_X to allow collection creation
         _collk.relockAsDatabaseExclusive(_autodb.lock());

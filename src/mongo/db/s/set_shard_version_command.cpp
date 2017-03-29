@@ -226,7 +226,7 @@ public:
             }
 
             // Views do not require a shard version check.
-            if (autoDb->getDb() && !autoDb->getDb()->getCollection(nss.ns()) &&
+            if (autoDb->getDb() && !autoDb->getDb()->getCollection(opCtx, nss) &&
                 autoDb->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
                 return true;
             }

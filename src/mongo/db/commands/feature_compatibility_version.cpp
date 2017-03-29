@@ -222,7 +222,7 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
 
             // If the "admin.system.version" collection has not been created yet, explicitly create
             // it to hold the v=2 index.
-            if (!autoDB.getDb()->getCollection(nss)) {
+            if (!autoDB.getDb()->getCollection(opCtx, nss)) {
                 uassertStatusOK(
                     repl::StorageInterface::get(opCtx)->createCollection(opCtx, nss, {}));
             }

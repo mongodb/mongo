@@ -131,7 +131,7 @@ public:
         Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
         OldClientContext ctx(opCtx, toReIndexNs.ns());
 
-        Collection* collection = ctx.db()->getCollection(toReIndexNs.ns());
+        Collection* collection = ctx.db()->getCollection(opCtx, toReIndexNs);
         if (!collection) {
             if (ctx.db()->getViewCatalog()->lookup(opCtx, toReIndexNs.ns()))
                 return appendCommandStatus(

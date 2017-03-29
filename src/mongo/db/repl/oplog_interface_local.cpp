@@ -60,7 +60,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx, const std::strin
       _ctx(opCtx, collectionName),
       _exec(InternalPlanner::collectionScan(opCtx,
                                             collectionName,
-                                            _ctx.db()->getCollection(collectionName),
+                                            _ctx.db()->getCollection(opCtx, collectionName),
                                             PlanExecutor::YIELD_MANUAL,
                                             InternalPlanner::BACKWARD)) {}
 
