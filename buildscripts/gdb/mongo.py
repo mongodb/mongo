@@ -387,6 +387,7 @@ class MongoDBDumpLocks(gdb.Command):
 # Register command
 MongoDBDumpLocks()
 
+
 class BtIfActive(gdb.Command):
     """Print stack trace or a short message if the current thread is idle"""
 
@@ -397,7 +398,7 @@ class BtIfActive(gdb.Command):
         try:
             idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
         except gdb.error:
-            idle_location = None # If unsure, print a stack trace.
+            idle_location = None  # If unsure, print a stack trace.
 
         if idle_location:
             print("Thread is idle at " + idle_location.string())
@@ -406,6 +407,7 @@ class BtIfActive(gdb.Command):
 
 # Register command
 BtIfActive()
+
 
 class MongoDBUniqueStack(gdb.Command):
     """Print unique stack traces of all threads in current process"""
@@ -464,12 +466,16 @@ class MongoDBUniqueStack(gdb.Command):
             raise ValueError("Unsupported platform: {}".format(sys.platform))
         thread_info['header'] = header_format.format(**thread_info)
 
-        addrs = [] # list of return addresses from frames
+        addrs = []  # list of return addresses from frames
         frame = gdb.newest_frame()
         while frame:
             addrs.append(frame.pc())
-            frame = frame.older()
-        addrs = tuple(addrs) # tuples are hashable, lists aren't.
+            try:
+                frame = frame.older()
+            except gdb.error as err:
+                print("{} {}".format(thread_info['header'], err))
+                break
+        addrs = tuple(addrs)  # tuples are hashable, lists aren't.
 
         unique = stacks.setdefault(addrs, {'threads': []})
         unique['threads'].append(thread_info)
@@ -477,7 +483,7 @@ class MongoDBUniqueStack(gdb.Command):
             try:
                 unique['output'] = gdb.execute(arg, to_string=True).rstrip()
             except gdb.error as err:
-                raise gdb.GdbError("{} {}".format(thread_info['header'], err))
+                print("{} {}".format(thread_info['header'], err))
 
     def _dump_unique_stacks(self, stacks):
         def first_tid(stack):
@@ -488,7 +494,7 @@ class MongoDBUniqueStack(gdb.Command):
                 prefix = '' if i == 0 else 'Duplicate '
                 print(prefix + thread['header'])
             print(stack['output'])
-            print() # leave extra blank line after each thread stack
+            print()  # leave extra blank line after each thread stack
 
 # Register command
 MongoDBUniqueStack()
