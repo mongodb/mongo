@@ -1502,7 +1502,7 @@ __transaction_sync_run_chk(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	return (FLD_ISSET(conn->flags, WT_CONN_LOG_SERVER_RUN));
+	return (FLD_ISSET(conn->flags, WT_CONN_SERVER_LOG));
 }
 
 /*
@@ -1812,7 +1812,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	 * closes the connection.  This is particularly intended to catch
 	 * cases where server threads open sessions.
 	 */
-	WT_ASSERT(session, F_ISSET(conn, WT_CONN_SERVER_RUN));
+	WT_ASSERT(session, !F_ISSET(conn, WT_CONN_CLOSING));
 
 	/* Find the first inactive session slot. */
 	for (session_ret = conn->sessions,

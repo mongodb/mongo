@@ -18,6 +18,13 @@ __wt_thread_create(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 
+	/*
+	 * Creating a thread isn't a memory barrier, but WiredTiger commonly
+	 * sets flags and or state and then expects worker threads to start.
+	 * Include a barrier to ensure safety in those cases.
+	 */
+	WT_FULL_BARRIER();
+
 	/* Spawn a new thread of control. */
 	WT_SYSCALL_RETRY(pthread_create(tidret, NULL, func, arg), ret);
 	if (ret == 0)
@@ -33,6 +40,13 @@ int
 __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 {
 	WT_DECL_RET;
+
+	/*
+	 * Joining a thread isn't a memory barrier, but WiredTiger commonly
+	 * sets flags and or state and then expects worker threads to halt.
+	 * Include a barrier to ensure safety in those cases.
+	 */
+	WT_FULL_BARRIER();
 
 	WT_SYSCALL(pthread_join(tid, NULL), ret);
 	if (ret == 0)
