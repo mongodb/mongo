@@ -368,7 +368,7 @@ bool WiredTigerIndex::isEmpty(OperationContext* txn) {
     WT_CURSOR* c = curwrap.get();
     if (!c)
         return true;
-    int ret = WT_OP_CHECK(c->next(c));
+    int ret = WT_READ_CHECK(c->next(c));
     if (ret == WT_NOTFOUND)
         return true;
     invariantWTOK(ret);
@@ -429,7 +429,7 @@ bool WiredTigerIndex::isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id
     KeyString data(keyStringVersion(), key, _ordering);
     WiredTigerItem item(data.getBuffer(), data.getSize());
     c->set_key(c, item.Get());
-    int ret = WT_OP_CHECK(c->search(c));
+    int ret = WT_READ_CHECK(c->search(c));
     if (ret == WT_NOTFOUND) {
         return false;
     }
@@ -814,7 +814,7 @@ protected:
 
     void advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
-        int ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
+        int ret = WT_READ_CHECK(_forward ? c->next(c) : c->prev(c));
         if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
             return;
@@ -831,7 +831,7 @@ protected:
         const WiredTigerItem keyItem(query.getBuffer(), query.getSize());
         c->set_key(c, keyItem.Get());
 
-        int ret = WT_OP_CHECK(c->search_near(c, &cmp));
+        int ret = WT_READ_CHECK(c->search_near(c, &cmp));
         if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
             TRACE_CURSOR << "\t not found";
@@ -983,7 +983,7 @@ public:
         c->set_key(c, keyItem.Get());
 
         // Using search rather than search_near.
-        int ret = WT_OP_CHECK(c->search(c));
+        int ret = WT_READ_CHECK(c->search(c));
         if (ret != WT_NOTFOUND)
             invariantWTOK(ret);
         _cursorAtEof = ret == WT_NOTFOUND;
@@ -1034,7 +1034,7 @@ Status WiredTigerIndexUnique::_insert(WT_CURSOR* c,
     // we put them all in the "list"
     // Note that we can't omit AllZeros when there are multiple ids for a value. When we remove
     // down to a single value, it will be cleaned up.
-    ret = WT_OP_CHECK(c->search(c));
+    ret = WT_READ_CHECK(c->search(c));
     invariantWTOK(ret);
 
     WT_ITEM old;
@@ -1123,7 +1123,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
 
     // dups are allowed, so we have to deal with a vector of RecordIds.
 
-    int ret = WT_OP_CHECK(c->search(c));
+    int ret = WT_READ_CHECK(c->search(c));
     if (ret == WT_NOTFOUND) {
         triggerWriteConflictAtPoint(c);
         return;
