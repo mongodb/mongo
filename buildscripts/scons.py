@@ -7,7 +7,7 @@ import sys
 
 SCONS_VERSION = os.environ.get('SCONS_VERSION', "2.5.0")
 
-mongodb_root = os.path.dirname(os.path.dirname(__file__))
+mongodb_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 scons_dir = os.path.join(mongodb_root, 'src', 'third_party','scons-' + SCONS_VERSION,
                          'scons-local-' + SCONS_VERSION)
 
