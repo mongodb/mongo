@@ -38,6 +38,7 @@ import org.junit.runners.Suite;
     ConfigTest.class,
     CursorTest.class,
     CursorTest02.class,
+    CursorTest03.class,
     ExceptionTest.class,
     PackTest.class,
     PackTest02.class,
