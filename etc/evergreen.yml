@@ -100,6 +100,7 @@ variables:
   jepsen_read_concern: ""
   jepsen_read_with_find_and_modify: ""
   jepsen_storage_engine: ""
+  jepsen_test_name: ""
   # Empirically, we've had greater success in reproducing the issues found in MongoDB versions
   # 3.4.0-rc3 and 3.4.0-rc4 when running Jepsen with at least --time-limit=600.
   jepsen_time_limit: --time-limit 1200
@@ -664,7 +665,7 @@ functions:
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run test --test register                                   \
+          lein run test --test ${jepsen_test_name}                        \
                         --tarball "file:///root/mongo-binaries.tgz"       \
                         --ssh-private-key ~/.ssh/id_rsa_lxc               \
                         --clock-skew faketime                             \
@@ -1401,9 +1402,8 @@ tasks:
       resmoke_args: --repeat=2
       run_multiple_jobs: true
 
-## jepsen WT ##
 - <<: *run_jepsen_template
-  name: jepsen_findAndModify_WT
+  name: jepsen_register_findAndModify_WT
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -1413,9 +1413,10 @@ tasks:
       hang_analyzer_processes: "java"
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
       jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
 
 - <<: *run_jepsen_template
-  name: jepsen_linearizableRead
+  name: jepsen_register_linearizableRead
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -1425,12 +1426,13 @@ tasks:
       hang_analyzer_processes: "java"
       jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine mmapv1
+      jepsen_test_name: register
       # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
       # out of memory issues and task timeouts during the analysis phase.
       jepsen_time_limit: --time-limit 300
 
 - <<: *run_jepsen_template
-  name: jepsen_linearizableRead_WT
+  name: jepsen_register_linearizableRead_WT
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -1440,6 +1442,34 @@ tasks:
       hang_analyzer_processes: "java"
       jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_set_linearizableRead
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine mmapv1
+      jepsen_test_name: set
+      # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
+      # out of memory issues and task timeouts during the analysis phase.
+      jepsen_time_limit: --time-limit 300
+
+- <<: *run_jepsen_template
+  name: jepsen_set_linearizableRead_WT
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: set
 
 ## jstestfuzz mmapv1 ##
 - <<: *jstestfuzz_template
@@ -4034,13 +4064,19 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: jepsen_findAndModify_WT
+  - name: jepsen_register_findAndModify_WT
     distros:
     - ubuntu1404-jepsen
-  - name: jepsen_linearizableRead
+  - name: jepsen_register_linearizableRead
     distros:
     - ubuntu1404-jepsen
-  - name: jepsen_linearizableRead_WT
+  - name: jepsen_register_linearizableRead_WT
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_set_linearizableRead
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_set_linearizableRead_WT
     distros:
     - ubuntu1404-jepsen
   - name: jsCore
@@ -6784,13 +6820,19 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
-  - name: jepsen_findAndModify_WT
+  - name: jepsen_register_findAndModify_WT
     distros:
     - ubuntu1404-jepsen
-  - name: jepsen_linearizableRead
+  - name: jepsen_register_linearizableRead
     distros:
     - ubuntu1404-jepsen
-  - name: jepsen_linearizableRead_WT
+  - name: jepsen_register_linearizableRead_WT
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_set_linearizableRead
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_set_linearizableRead_WT
     distros:
     - ubuntu1404-jepsen
   - name: jsCore
