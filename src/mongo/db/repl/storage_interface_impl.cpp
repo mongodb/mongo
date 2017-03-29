@@ -306,17 +306,40 @@ Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,
 
 namespace {
 
+/**
+ * Returns Collection* from database RAII object.
+ * Returns NamespaceNotFound if the database or collection does not exist.
+ */
+template <typename AutoGetCollectionType>
+StatusWith<Collection*> getCollection(const AutoGetCollectionType& autoGetCollection,
+                                      const NamespaceString& nss,
+                                      const std::string& message) {
+    if (!autoGetCollection.getDb()) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Database [" << nss.db() << "] not found. " << message};
+    }
+
+    auto collection = autoGetCollection.getCollection();
+    if (!collection) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection [" << nss.ns() << "] not found. " << message};
+    }
+
+    return collection;
+}
+
 Status insertDocumentsSingleBatch(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   std::vector<BSONObj>::const_iterator begin,
                                   std::vector<BSONObj>::const_iterator end) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    auto collection = autoColl.getCollection();
-    if (!collection) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "The collection must exist before inserting documents, ns:"
-                              << nss.ns()};
+
+    auto collectionResult =
+        getCollection(autoColl, nss, "The collection must exist before inserting documents.");
+    if (!collectionResult.isOK()) {
+        return collectionResult.getStatus();
     }
+    auto collection = collectionResult.getValue();
 
     WriteUnitOfWork wunit(opCtx);
     OpDebug* const nullOpDebug = nullptr;
@@ -372,13 +395,14 @@ Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const Namespac
 
 StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
-    AutoGetCollectionForReadCommand collection(opCtx, nss);
-    if (!collection.getCollection()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Your oplog doesn't exist: " << nss.ns()};
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+    auto collectionResult = getCollection(autoColl, nss, "Your oplog doesn't exist.");
+    if (!collectionResult.isOK()) {
+        return collectionResult.getStatus();
     }
+    auto collection = collectionResult.getValue();
 
-    const auto options = collection.getCollection()->getCatalogEntry()->getCollectionOptions(opCtx);
+    const auto options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
     if (!options.capped)
         return {ErrorCodes::BadValue, str::stream() << nss.ns() << " isn't capped"};
 
@@ -456,12 +480,13 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-        AutoGetCollection collectionGuard(opCtx, nss, collectionAccessMode);
-        auto collection = collectionGuard.getCollection();
-        if (!collection) {
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Collection not found, ns:" << nss.ns()};
+        AutoGetCollection autoColl(opCtx, nss, collectionAccessMode);
+        auto collectionResult = getCollection(
+            autoColl, nss, str::stream() << "Unable to proceed with " << opStr << ".");
+        if (!collectionResult.isOK()) {
+            return collectionResult.getStatus();
         }
+        auto collection = collectionResult.getValue();
 
         auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
         auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
@@ -594,15 +619,13 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
 StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollectionSize(
     OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead autoColl(opCtx, nss);
-    if (!autoColl.getDb()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Database [" << nss.db().toString() << "] not found."};
+
+    auto collectionResult =
+        getCollection(autoColl, nss, "Unable to get total size of documents in collection.");
+    if (!collectionResult.isOK()) {
+        return collectionResult.getStatus();
     }
-    Collection* collection = autoColl.getCollection();
-    if (!collection) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection [" << nss.toString() << "] not found."};
-    }
+    auto collection = collectionResult.getValue();
 
     return collection->dataSize(opCtx);
 }
@@ -610,15 +633,13 @@ StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollection
 StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectionCount(
     OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead autoColl(opCtx, nss);
-    if (!autoColl.getDb()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Database [" << nss.db().toString() << "] not found."};
+
+    auto collectionResult =
+        getCollection(autoColl, nss, "Unable to get number of documents in collection.");
+    if (!collectionResult.isOK()) {
+        return collectionResult.getStatus();
     }
-    Collection* collection = autoColl.getCollection();
-    if (!collection) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection [" << nss.toString() << "] not found."};
-    }
+    auto collection = collectionResult.getValue();
 
     return collection->numRecords(opCtx);
 }
