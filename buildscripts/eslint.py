@@ -192,7 +192,7 @@ class ESLint(object):
 def is_interesting_file(file_name):
     """"Return true if this file should be checked
     """
-    return (file_name.startswith("src/mongo") or file_name.startswith("jstests") \
+    return ((file_name.startswith("src/mongo") or file_name.startswith("jstests"))
             and file_name.endswith(".js"))
 
 def _get_build_dir():
