@@ -1242,8 +1242,8 @@ struct __wt_session {
 	 * @config{split_pct, the Btree page split size as a percentage of the
 	 * maximum Btree page size\, that is\, when a Btree page is split\, it
 	 * will be split into smaller pages\, where each page is the specified
-	 * percentage of the maximum Btree page size., an integer between 25 and
-	 * 100; default \c 75.}
+	 * percentage of the maximum Btree page size., an integer between 50 and
+	 * 100; default \c 90.}
 	 * @config{type, set the type of data source used to store a column
 	 * group\, index or simple table.  By default\, a \c "file:" URI is
 	 * derived from the object name.  The \c type configuration can be used
