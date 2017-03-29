@@ -1,0 +1,79 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Sample idl
+# Demonstrates a subset of features
+# 1. string types
+# 2. int types
+# 3. a custom type, NamespaceString
+# 4. Nested structs
+# 5. Optional fields
+# 6. Default values
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/namespace_string.h"
+
+types:
+    string:
+        bson_serialization_type: string
+        description: "A BSON UTF-8 string"
+        cpp_type: "std::string"
+        deserializer: "mongo::BSONElement::str"
+
+    int:
+        bson_serialization_type: int
+        description: "A BSON 32-bit integer"
+        cpp_type: "std::int32_t"
+        deserializer: "mongo::BSONElement::_numberInt"
+
+    namespacestring:
+        bson_serialization_type: string
+        description: "A MongoDB NamespaceString"
+        cpp_type: "mongo::NamespaceString"
+        serializer: mongo::NamespaceString::toString
+        deserializer: mongo::NamespaceString
+
+    safeInt32:
+        description: Accepts any numerical type within int32 range
+        cpp_type: std::int64_t
+        bson_serialization_type:
+                                - long
+                                - int
+                                - decimal
+                                - double
+        deserializer: "mongo::BSONElement::numberInt"
+
+structs:
+    default_values:
+        description: UnitTest for a single safeInt32
+        fields:
+            stringfield:
+                type: string
+                default: '"a default"'
+                description: "An example string field with default value"
+            intfield:
+                type: int
+                default: 42
+                description: "An example int field with default value"
+            numericfield:
+                type: safeInt32
+                description: "A numeric type that supports multiple types"
+            nsfield:
+                type: namespacestring
+                description: "A namespace string type"
+            optionalField:
+                type: string
+                optional: true
+                description: "An optional string"

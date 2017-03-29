@@ -1,0 +1,311 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# IDL Unit Tests IDL file
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/namespace_string.h"
+        - "mongo/idl/idl_test_types.h"
+
+types:
+    string:
+        bson_serialization_type: string
+        description: "A BSON UTF-8 string"
+        cpp_type: "std::string"
+        deserializer: "mongo::BSONElement::str"
+
+    int:
+        bson_serialization_type: int
+        description: "A BSON 32-bit integer"
+        cpp_type: "std::int32_t"
+        deserializer: "mongo::BSONElement::_numberInt"
+
+    long:
+        bson_serialization_type: long
+        description: "A BSON 64-bit integer"
+        cpp_type: "std::int64_t"
+        deserializer: "mongo::BSONElement::_numberLong"
+
+    double:
+        bson_serialization_type: double
+        description: "A BSON 64-bit floating point number"
+        cpp_type: "double"
+        deserializer: "mongo::BSONElement::_numberDouble"
+
+    decimal:
+        bson_serialization_type: double
+        description: "A BSON 128-bit floating point decimal number"
+        cpp_type: "mongo::Decimal128"
+        deserializer: "mongo::BSONElement::_numberDecimal"
+
+    bool:
+        bson_serialization_type: bool
+        description: "A BSON bool"
+        cpp_type: "bool"
+        deserializer: "mongo::BSONElement::boolean"
+
+    # TODO: support bindata
+    # bindata:
+    #     bson_serialization_type: bindata
+    #     cpp_type: "std:"
+    #     deserializer: "mongo::BSONElement::str"
+
+    objectid:
+        bson_serialization_type: objectid
+        description: "A BSON ObjectID"
+        cpp_type: "mongo::OID"
+        deserializer: "mongo::BSONElement::OID"
+
+    date:
+        bson_serialization_type: date
+        description: "A BSON UTC DateTime"
+        cpp_type: "mongo::Date_t"
+        deserializer: "mongo::BSONElement::date"
+
+    timestamp:
+        bson_serialization_type: timestamp
+        description: "A BSON TimeStamp"
+        cpp_type: "mongo::Timestamp"
+        deserializer: "mongo::BSONElement::timestamp"
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for a string type
+#
+##################################################################################################
+
+    namespacestring:
+        bson_serialization_type: string
+        description: "A MongoDB NamespaceString"
+        cpp_type: "mongo::NamespaceString"
+        serializer: mongo::NamespaceString::toString
+        deserializer: mongo::NamespaceString
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an any type
+#
+##################################################################################################
+
+    any_basic_type:
+        bson_serialization_type: any
+        description: "An Any Type"
+        cpp_type: "mongo::AnyBasicType"
+        serializer: mongo::AnyBasicType::serialize
+        deserializer: mongo::AnyBasicType::parse
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an object type
+#
+##################################################################################################
+
+    object_basic_type:
+        bson_serialization_type: object
+        description: "An object Type"
+        cpp_type: "mongo::ObjectBasicType"
+        serializer: mongo::ObjectBasicType::serialize
+        deserializer: mongo::ObjectBasicType::parse
+
+##################################################################################################
+#
+# Test types that accept multiple serialization types
+#
+##################################################################################################
+
+    safeInt32:
+        description: Accepts any numerical type within int32 range
+        cpp_type: std::int64_t
+        bson_serialization_type: 
+                                - long
+                                - int
+                                - decimal
+                                - double
+        deserializer: "mongo::BSONElement::numberInt"
+
+
+##################################################################################################
+#
+# Unit test structs for a single value to ensure type validation works correctly
+#
+##################################################################################################
+
+structs:
+    one_string:
+        description: UnitTest for a single string
+        fields:
+            value: string
+
+    one_int:
+        description: UnitTest for a single int
+        fields:
+            value: int
+
+    one_long:
+        description: UnitTest for a single long
+        fields:
+            value: long
+
+    one_double:
+        description: UnitTest for a single double
+        fields:
+            value: double
+
+    one_decimal:
+        description: UnitTest for a single decimal
+        fields:
+            value: decimal
+
+    one_bool:
+        description: UnitTest for a single bool
+        fields:
+            value: bool
+
+    one_objectid:
+        description: UnitTest for a single objectid
+        fields:
+            value: objectid
+
+    one_date:
+        description: UnitTest for a single date
+        fields:
+            value: date
+
+    one_timestamp:
+        description: UnitTest for a single timestamp
+        fields:
+            value: timestamp
+
+##################################################################################################
+#
+# Structs to test various options for structs/fields
+#
+##################################################################################################
+    RequiredStrictField3:
+        description: UnitTest for a strict struct with 3 required fields
+        fields:
+            field1: int
+            field2: int
+            field3: int
+
+    RequiredNonStrictField3:
+        description: UnitTest for a non-strict struct with 3 required fields
+        strict: false
+        fields:
+            field1: int
+            field2: int
+            field3: int
+
+##################################################################################################
+#
+# Structs to test various options for fields
+#
+##################################################################################################
+    ignoredField:
+        description: UnitTest for a struct with an ignored_field
+        fields:
+            required_field: int
+            ignored_field:
+                type: int
+                ignore: true
+
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for a string type
+#
+##################################################################################################
+
+    one_namespacestring:
+        description: UnitTest for a single namespacestring
+        fields:
+            value: namespacestring
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an any type
+#
+##################################################################################################
+
+    one_any_basic_type:
+        description: UnitTest for a single any type
+        fields:
+            value: any_basic_type
+
+
+##################################################################################################
+#
+# Test a custom non-BSONElement deserialization and serialization methods for an object type
+#
+##################################################################################################
+
+    one_object_basic_type:
+        description: UnitTest for a single object type
+        fields:
+            value: object_basic_type
+
+
+##################################################################################################
+#
+# Test types that accept multiple serialization types
+#
+##################################################################################################
+
+    one_safeint32:
+        description: UnitTest for a single safeInt32
+        fields:
+            value: safeInt32
+
+##################################################################################################
+#
+# Test fields with default values
+#
+##################################################################################################
+
+    default_values:
+        description: UnitTest for a single safeInt32
+        fields:
+            V_string:
+                type: string
+                default: '"a default"'
+            V_int:
+                type: int
+                default: 42
+            V_long:
+                type: long
+                default: 423
+            V_double:
+                type: double
+                default: 3.14159
+            V_bool:
+                type: bool
+                default: true
+
+##################################################################################################
+#
+# Test fields with optional values
+#
+##################################################################################################
+
+    optional_field:
+        description: UnitTest for a optional field
+        fields:
+            field1:
+                type: string
+                optional: true
+            field2:
+                type: int
+                optional: true

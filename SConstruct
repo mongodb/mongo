@@ -600,6 +600,7 @@ def variable_tools_converter(val):
     return tool_list + [
         "distsrc",
         "gziptool",
+        'idl_tool',
         "jsheader",
         "mergelib",
         "mongo_integrationtest",
