@@ -973,12 +973,12 @@ Status IndexCatalog::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* entr
     invariant(_entries.release(entry->descriptor()) == entry);
     opCtx->recoveryUnit()->registerChange(
         new IndexRemoveChange(opCtx, _collection, &_entries, entry));
+    _collection->infoCache()->droppedIndex(opCtx, indexName);
     entry = NULL;
     _deleteIndexFromDisk(opCtx, indexName, indexNamespace);
 
     _checkMagic();
 
-    _collection->infoCache()->droppedIndex(opCtx, indexName);
 
     return Status::OK();
 }
