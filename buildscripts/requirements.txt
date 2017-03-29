@@ -1,0 +1,3 @@
+pyyaml == 3.11
+typing == 3.5
+unittest-xml-reporting == 2.1.0
