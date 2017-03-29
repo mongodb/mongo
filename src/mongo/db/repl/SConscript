@@ -102,7 +102,10 @@ env.Library(
     LIBDEPS=[
         'storage_interface',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/exec/exec',
+        # '$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         '$BUILD_DIR/mongo/db/query/internal_plans',
+        # '$BUILD_DIR/mongo/db/query/query', # CYCLE
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
     ],
 )

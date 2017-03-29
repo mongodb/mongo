@@ -117,6 +117,11 @@ public:
                                                      BoundInclusion boundInclusion,
                                                      std::size_t limit) override;
 
+    Status upsertById(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const BSONElement& idKey,
+                      const BSONObj& update) override;
+
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
         OperationContext* opCtx, const NamespaceString& nss) override;
 

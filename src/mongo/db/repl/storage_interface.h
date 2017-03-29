@@ -262,6 +262,19 @@ public:
                                                              BoundInclusion boundInclusion,
                                                              std::size_t limit) = 0;
 
+    /**
+     * Updates a single document in the collection referenced by the specified _id.
+     * The document is located by looking up "idKey" in the id index.
+     * "update" represents the replacement document or list of requested modifications to be applied
+     * to the document.
+     * If the document is not found, a new document will be created with the requested modifications
+     * applied.
+     */
+    virtual Status upsertById(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONElement& idKey,
+                              const BSONObj& update) = 0;
+
     using CollectionSize = uint64_t;
     using CollectionCount = uint64_t;
 

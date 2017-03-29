@@ -199,6 +199,13 @@ public:
             opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
     }
 
+    Status upsertById(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const BSONElement& idKey,
+                      const BSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "upsertbyId not implemented."};
+    }
+
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
         OperationContext* opCtx, const NamespaceString& nss) override {
         return 0;

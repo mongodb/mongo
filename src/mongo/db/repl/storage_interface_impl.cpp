@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -55,9 +56,12 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/db/repl/oplog.h"
@@ -614,6 +618,87 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
                                   boundInclusion,
                                   limit,
                                   FindDeleteMode::kDelete);
+}
+
+namespace {
+
+/**
+ * Checks _id key passed to upsertById and returns a query document for UpdateRequest.
+ */
+StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
+    auto query = BSON("_id" << idKey);
+
+    // With the ID hack, only simple _id queries are allowed. Otherwise, UpdateStage will fail with
+    // a fatal assertion.
+    if (!CanonicalQuery::isSimpleIdQuery(query)) {
+        return {ErrorCodes::InvalidIdField,
+                str::stream() << "Unable to update document with a non-simple _id query: "
+                              << query};
+    }
+
+    return query;
+}
+
+}  // namespace
+
+Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const BSONElement& idKey,
+                                        const BSONObj& update) {
+    // Validate and construct an _id query for UpdateResult.
+    // The _id key will be passed directly to IDHackStage.
+    auto queryResult = makeUpsertQuery(idKey);
+    if (!queryResult.isOK()) {
+        return queryResult.getStatus();
+    }
+    auto query = queryResult.getValue();
+
+    UpdateRequest request(nss);
+    request.setQuery(query);
+    request.setUpdates(update);
+    request.setUpsert(true);
+    invariant(!request.isMulti());  // This follows from using an exact _id query.
+    invariant(!request.shouldReturnAnyDocs());
+    invariant(PlanExecutor::YIELD_MANUAL == request.getYieldPolicy());
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        // ParsedUpdate needs to be inside the write conflict retry loop because it contains
+        // the UpdateDriver whose state may be modified while we are applying the update.
+        ParsedUpdate parsedUpdate(opCtx, &request);
+        auto parsedUpdateStatus = parsedUpdate.parseRequest();
+        if (!parsedUpdateStatus.isOK()) {
+            return parsedUpdateStatus;
+        }
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        auto collectionResult = getCollection(autoColl, nss, "Unable to update document.");
+        if (!collectionResult.isOK()) {
+            return collectionResult.getStatus();
+        }
+        auto collection = collectionResult.getValue();
+
+        // We're using the ID hack to perform the update so we have to disallow collections
+        // without an _id index.
+        auto descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+        if (!descriptor) {
+            return {ErrorCodes::IndexNotFound,
+                    "Unable to update document in a collection without an _id index."};
+        }
+
+        UpdateStageParams updateStageParams(
+            parsedUpdate.getRequest(), parsedUpdate.getDriver(), nullptr);
+        auto planExecutor = InternalPlanner::updateWithIdHack(opCtx,
+                                                              collection,
+                                                              updateStageParams,
+                                                              descriptor,
+                                                              idKey.wrap(""),
+                                                              parsedUpdate.yieldPolicy());
+
+        return planExecutor->executePlan();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "StorageInterfaceImpl::upsertById", nss.ns());
+
+    MONGO_UNREACHABLE;
 }
 
 StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollectionSize(

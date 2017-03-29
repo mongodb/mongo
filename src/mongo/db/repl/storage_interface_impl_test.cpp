@@ -80,8 +80,10 @@ BSONObj makeIdIndexSpec(const NamespaceString& nss) {
  * Generates a unique namespace from the test registration agent.
  */
 template <typename T>
-NamespaceString makeNamespace(const T& t, const char* suffix = "") {
-    return NamespaceString("local." + t.getSuiteName() + "_" + t.getTestName() + suffix);
+NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
+    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName())
+                               .substr(0, NamespaceString::MaxNsCollectionLen - suffix.length()) +
+                           suffix);
 }
 
 /**
@@ -1468,6 +1470,137 @@ TEST_F(StorageInterfaceImplTest,
                                        BoundInclusion::kIncludeEndKeyOnly,
                                        1U)
                       .getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto doc = BSON("_id" << 0 << "x" << 1);
+    auto status = storage.upsertById(opCtx, nss, doc["_id"], doc);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS("Database [nosuchdb] not found. Unable to update document.", status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.coll");
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc = BSON("_id" << 0 << "x" << 1);
+    auto status = storage.upsertById(opCtx, wrongColl, doc["_id"], doc);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS("Collection [mydb.wrongColl] not found. Unable to update document.",
+                  status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReplacesExistingDocumentInCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto originalDoc = BSON("_id" << 1 << "x" << 1);
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 0 << "x" << 0), originalDoc, BSON("_id" << 2 << "x" << 2)}));
+
+    ASSERT_OK(storage.upsertById(opCtx, nss, originalDoc["_id"], BSON("x" << 100)));
+
+    _assertDocumentsInCollectionEquals(opCtx,
+                                       nss,
+                                       {BSON("_id" << 0 << "x" << 0),
+                                        BSON("_id" << 1 << "x" << 100),
+                                        BSON("_id" << 2 << "x" << 2)});
+}
+
+TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentInsertsNewDocumentInCollectionIfIdIsNotFound) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 0 << "x" << 0), BSON("_id" << 2 << "x" << 2)}));
+
+    ASSERT_OK(storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), BSON("x" << 100)));
+
+    // _assertDocumentsInCollectionEquals() reads collection in $natural order. Assumes new document
+    // is inserted at end of collection.
+    _assertDocumentsInCollectionEquals(opCtx,
+                                       nss,
+                                       {BSON("_id" << 0 << "x" << 0),
+                                        BSON("_id" << 2 << "x" << 2),
+                                        BSON("_id" << 1 << "x" << 100)});
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReplacesExistingDocumentInIllegalClientSystemNamespace) {
+    // Checks that we can update collections with namespaces not considered "legal client system"
+    // namespaces.
+    NamespaceString nss("local.system.rollback.docs");
+    ASSERT_FALSE(legalClientSystemNS(nss.ns()));
+
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto originalDoc = BSON("_id" << 1 << "x" << 1);
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 0 << "x" << 0), originalDoc, BSON("_id" << 2 << "x" << 2)}));
+
+    ASSERT_OK(storage.upsertById(opCtx, nss, originalDoc["_id"], BSON("x" << 100)));
+
+    _assertDocumentsInCollectionEquals(opCtx,
+                                       nss,
+                                       {BSON("_id" << 0 << "x" << 0),
+                                        BSON("_id" << 1 << "x" << 100),
+                                        BSON("_id" << 2 << "x" << 2)});
+}
+
+TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReturnsFailedToParseOnNonSimpleIdQuery) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto status = storage.upsertById(
+        opCtx, nss, BSON("" << BSON("$gt" << 3)).firstElement(), BSON("x" << 100));
+    ASSERT_EQUALS(ErrorCodes::InvalidIdField, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Unable to update document with a non-simple _id query:");
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsIndexNotFoundIfCollectionDoesNotHaveAnIdIndex) {
+    CollectionOptions options;
+    options.setNoIdIndex();
+
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+
+    auto doc = BSON("_id" << 0 << "x" << 100);
+    auto status = storage.upsertById(opCtx, nss, doc["_id"], doc);
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Unable to update document in a collection without an _id index.");
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsFailedToParseWhenUpdateDocumentContainsUnknownOperator) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto status = storage.upsertById(
+        opCtx, nss, BSON("" << 1).firstElement(), BSON("$unknownUpdateOp" << BSON("x" << 1000)));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "Unknown modifier: $unknownUpdateOp");
 }
 
 TEST_F(StorageInterfaceImplTest,
