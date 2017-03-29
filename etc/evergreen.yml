@@ -1416,6 +1416,32 @@ tasks:
       jepsen_test_name: register
 
 - <<: *run_jepsen_template
+  name: jepsen_register_findAndModify_pv0
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_protocol_version: --protocol-version 0
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine mmapv1
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_register_findAndModify_pv0_WT
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_protocol_version: --protocol-version 0
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
   name: jepsen_register_linearizableRead
   commands:
   - func: "do setup"
@@ -4065,6 +4091,12 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jepsen_register_findAndModify_WT
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_register_findAndModify_pv0
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_register_findAndModify_pv0_WT
     distros:
     - ubuntu1404-jepsen
   - name: jepsen_register_linearizableRead
@@ -6821,6 +6853,12 @@ buildvariants:
   - name: dbtest_WT
   - name: ese_WT
   - name: jepsen_register_findAndModify_WT
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_register_findAndModify_pv0
+    distros:
+    - ubuntu1404-jepsen
+  - name: jepsen_register_findAndModify_pv0_WT
     distros:
     - ubuntu1404-jepsen
   - name: jepsen_register_linearizableRead
