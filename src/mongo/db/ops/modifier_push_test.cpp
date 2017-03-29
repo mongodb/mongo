@@ -1535,7 +1535,7 @@ TEST(ToPosition, NegativePositionMultiElementArray) {
     ASSERT_EQUALS(fromjson("{$set: {'a': [0, 1, 2, 5, 3, 4]}}"), logDoc);
 }
 
-TEST(ToPosition, NegativePositionOutOfBoundsDefaultsToEnd) {
+TEST(ToPosition, NegativePositionOutOfBoundsDefaultsToBeginning) {
     Document doc(fromjson("{a: [0]}"));
     Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -2}}}"));
 
@@ -1547,13 +1547,13 @@ TEST(ToPosition, NegativePositionOutOfBoundsDefaultsToEnd) {
 
     ASSERT_OK(pushMod.apply());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
+    ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
 
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
     ASSERT_OK(pushMod.log(&logBuilder));
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(fromjson("{$set: {'a.1': 1}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1, 0]}}"), logDoc);
 }
 
 TEST(ToPosition, NegativePositionPushMultipleElements) {

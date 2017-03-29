@@ -557,10 +557,13 @@ Status ModifierPush::apply() const {
     if (actualPosition < 0) {
         actualPosition = _preparedState->arrayPreModSize + _position;
     }
-    // Default to adding to the end of the array, even if we're out of bounds because a negative
-    // position was too negative.
-    if (actualPosition < 0 || actualPosition > int32_t(_preparedState->arrayPreModSize)) {
+    // Default to adding to the end of the array if the position was too high.
+    if (actualPosition > int32_t(_preparedState->arrayPreModSize)) {
         actualPosition = _preparedState->arrayPreModSize;
+    }
+    // Default to adding to the beginning of the array if the position was too low.
+    if (actualPosition < 0) {
+        actualPosition = 0;
     }
     _preparedState->actualPosition = actualPosition;
 
