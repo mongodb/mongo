@@ -2274,7 +2274,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	 * reconciliation, do it now.
 	 */
 	__wt_page_modify_clear(session, page);
-	__wt_ref_out(session, ref);
+	__wt_ref_out_int(session, ref, true);
 
 	/* Swap the new page into place. */
 	ref->page = new->page;
