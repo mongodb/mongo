@@ -5,6 +5,7 @@ from __future__ import print_function
 import gdb.printing
 import os
 import re
+import struct
 import sys
 
 try:
@@ -128,13 +129,17 @@ class BSONObjPrinter:
     def __init__(self, val):
         self.val = val
         self.ptr = self.val['_objdata'].cast(gdb.lookup_type('void').pointer())
-        self.size = self.ptr.cast(gdb.lookup_type('int').pointer()).dereference()
+        # Handle the endianness of the BSON object size, which is represented as a 32-bit integer
+        # in little-endian format.
+        inferior = gdb.selected_inferior()
+        self.size = struct.unpack('<I', inferior.read_memory(self.ptr, 4))[0]
 
     def display_hint(self):
         return 'map'
 
     def children(self):
-        if not bson:
+        # Do not decode a BSONObj with an invalid size.
+        if not bson or self.size < 5 or self.size > 17 * 1024 * 1024:
             return
 
         inferior = gdb.selected_inferior()
@@ -150,6 +155,7 @@ class BSONObjPrinter:
         ownership = "owned" if self.val['_ownedBuffer']['_buffer']['_holder']['px'] else "unowned"
 
         size = self.size
+        # Print an invalid BSONObj size in hex.
         if size < 5 or size > 17 * 1024 * 1024:
             size = hex(size)
 
