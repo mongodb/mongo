@@ -85,3 +85,43 @@ class IDLTestcase(unittest.TestCase):
             "For document:\n%s\nExpected error message '%s' but received only errors:\n %s" %
             (doc_str, error_id, errors_to_str(parsed_doc.errors)))
 
+    def assert_bind(self, doc_str):
+        # type: (unicode) -> idl.ast.IDLBoundSpec
+        """Assert a document parsed and bound correctly by the IDL compiler and returned no errors."""
+        parsed_doc = self._parse(doc_str)
+        self._assert_parse(doc_str, parsed_doc)
+
+        bound_doc = idl.binder.bind(parsed_doc.spec)
+
+        self.assertIsNone(bound_doc.errors,
+                          "Expected no binder errors\nFor document:\n%s\nReceived errors:\n\n%s" %
+                          (doc_str, errors_to_str(bound_doc.errors)))
+        self.assertIsNotNone(bound_doc.spec, "Expected a bound doc")
+
+        return bound_doc.spec
+
+    def assert_bind_fail(self, doc_str, error_id):
+        # type: (unicode, unicode) -> None
+        """
+        Assert a document parsed correctly by the YAML parser and IDL parser, but not bound by the IDL binder.
+
+        Asserts only one error is found in the document to make future IDL changes easier.
+        """
+        parsed_doc = self._parse(doc_str)
+        self._assert_parse(doc_str, parsed_doc)
+
+        bound_doc = idl.binder.bind(parsed_doc.spec)
+
+        self.assertIsNone(bound_doc.spec, "Expected no bound doc\nFor document:\n%s\n" % (doc_str))
+        self.assertIsNotNone(bound_doc.errors, "Expected binder errors")
+
+        # Assert that negative test cases are only testing one fault in a test.
+        self.assertTrue(
+            bound_doc.errors.count() == 1,
+            "For document:\n%s\nExpected only error message '%s' but received multiple errors:\n\n%s"
+            % (doc_str, error_id, errors_to_str(bound_doc.errors)))
+
+        self.assertTrue(
+            bound_doc.errors.contains(error_id),
+            "For document:\n%s\nExpected error message '%s' but received only errors:\n %s" %
+            (doc_str, error_id, errors_to_str(bound_doc.errors)))
