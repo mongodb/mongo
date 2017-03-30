@@ -61,7 +61,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-        # '$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
         # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[

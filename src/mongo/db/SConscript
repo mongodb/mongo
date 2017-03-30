@@ -566,8 +566,11 @@ env.Library(
         'db_raii.cpp',
     ],
     LIBDEPS=[
+        'curop',
         'stats/top',
         'views/views',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/s/sharding',
         #'catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[
@@ -596,7 +599,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         'curop',
         'lasterror',
-        # 'assemble_response', # CYCLE
+        #'assemble_response', # CYCLE
     ],
     LIBDEPS_TAGS=[
         # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
@@ -716,7 +719,7 @@ env.Library(
     LIBDEPS=[
         "db_raii",
         "index/index_access_methods",
-        #"catalog/catalog", # CYCYLE
+        #"catalog/catalog", # CYCLE
     ],
     LIBDEPS_TAGS=[
         # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
