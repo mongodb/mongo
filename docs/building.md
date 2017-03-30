@@ -94,7 +94,7 @@ Install the following ports:
 
   * devel/libexecinfo
   * devel/scons
-  * lang/gcc
+  * lang/clang38
   * lang/python
 
 Optional Components if you want to use system libraries instead of the libraries included with MongoDB
@@ -103,6 +103,8 @@ Optional Components if you want to use system libraries instead of the libraries
   * lang/v8
   * devel/boost
   * devel/pcre
+
+Add `CC=clang38 CXX=clang++38` to the `scons` options, when building.
 
 OpenBSD
 --------------
