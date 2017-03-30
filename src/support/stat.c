@@ -685,6 +685,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: failed eviction of pages that exceeded the in-memory maximum",
 	"cache: files with active eviction walks",
 	"cache: files with new eviction walks started",
+	"cache: force re-tuning of eviction workers once in a while",
 	"cache: hazard pointer blocked page eviction",
 	"cache: hazard pointer check calls",
 	"cache: hazard pointer check entries walked",
@@ -968,6 +969,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_force_fail = 0;
 		/* not clearing cache_eviction_walks_active */
 	stats->cache_eviction_walks_started = 0;
+	stats->cache_eviction_force_retune = 0;
 	stats->cache_eviction_hazard = 0;
 	stats->cache_hazard_checks = 0;
 	stats->cache_hazard_walks = 0;
@@ -1252,6 +1254,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_walks_active);
 	to->cache_eviction_walks_started +=
 	    WT_STAT_READ(from, cache_eviction_walks_started);
+	to->cache_eviction_force_retune +=
+	    WT_STAT_READ(from, cache_eviction_force_retune);
 	to->cache_eviction_hazard +=
 	    WT_STAT_READ(from, cache_eviction_hazard);
 	to->cache_hazard_checks += WT_STAT_READ(from, cache_hazard_checks);

@@ -206,6 +206,7 @@ connection_stats = [
     CacheStat('cache_eviction_force', 'pages evicted because they exceeded the in-memory maximum'),
     CacheStat('cache_eviction_force_delete', 'pages evicted because they had chains of deleted items'),
     CacheStat('cache_eviction_force_fail', 'failed eviction of pages that exceeded the in-memory maximum'),
+    CacheStat('cache_eviction_force_retune', 'force re-tuning of eviction workers once in a while'),
     CacheStat('cache_eviction_get_ref', 'eviction calls to get a page'),
     CacheStat('cache_eviction_get_ref_empty', 'eviction calls to get a page found queue empty'),
     CacheStat('cache_eviction_get_ref_empty2', 'eviction calls to get a page found queue empty after locking'),
