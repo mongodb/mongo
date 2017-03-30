@@ -85,10 +85,6 @@ UserNameIterator ClusterClientCursorMock::getAuthenticatedUsers() const {
     return makeUserNameIterator(emptyAuthenticatedUsers.begin(), emptyAuthenticatedUsers.end());
 }
 
-boost::optional<BSONObj> ClusterClientCursorMock::viewDefinition() const {
-    return boost::none;
-}
-
 void ClusterClientCursorMock::queueResult(const ClusterQueryResult& result) {
     _resultsQueue.push({result});
 }

@@ -52,6 +52,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
@@ -159,6 +160,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     // Get the set of shards on which we will run the query.
+
     std::vector<std::shared_ptr<Shard>> shards;
     if (primary) {
         shards.emplace_back(std::move(primary));
@@ -179,6 +181,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
             shards.emplace_back(shardStatus.getValue());
         }
     }
+
+    // Construct the query and parameters.
 
     ClusterClientCursorParams params(
         query.nss(),
@@ -213,12 +217,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
         return qrToForward.getStatus();
     }
 
-    // Use read pref to target a particular host from each shard. Also construct the find command
-    // that we will forward to each shard.
+    // Construct the find command that we will use to establish cursors, attaching the shardVersion.
+
+    std::vector<std::pair<ShardId, BSONObj>> requests;
     for (const auto& shard : shards) {
         invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::INVALID);
 
-        // Build the find command, and attach shard version if necessary.
         BSONObjBuilder cmdBuilder;
         qrToForward.getValue()->asFindCommand(&cmdBuilder);
 
@@ -230,11 +234,37 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
             version.appendForCommands(&cmdBuilder);
         }
 
-        params.remotes.emplace_back(shard->getId(), cmdBuilder.obj());
+        requests.emplace_back(shard->getId(), cmdBuilder.obj());
     }
 
+    // Establish the cursors with a consistent shardVersion across shards.
+
+    auto swCursors = establishCursors(opCtx,
+                                      Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                      query.nss(),
+                                      readPref,
+                                      requests,
+                                      query.getQueryRequest().isAllowPartialResults(),
+                                      viewDefinition);
+    if (!swCursors.isOK()) {
+        // Make sure a viewDefinition was set if the find was on a view.
+        if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swCursors.getStatus().code()) {
+            if (!viewDefinition) {
+                return {ErrorCodes::InternalError,
+                        str::stream() << "Missing resolved view definition, but remote returned "
+                                      << ErrorCodes::errorString(swCursors.getStatus().code())};
+            }
+        }
+        return swCursors.getStatus();
+    }
+
+    // Transfer the established cursors to a ClusterClientCursor.
+
+    params.remotes = std::move(swCursors.getValue());
     auto ccc = ClusterClientCursorImpl::make(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
+
+    // Retrieve enough data from the ClusterClientCursor for the first batch of results.
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
@@ -242,16 +272,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
         auto next = ccc->next(opCtx);
 
         if (!next.isOK()) {
-            if (viewDefinition &&
-                ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == next.getStatus().code()) {
-                if (!ccc->viewDefinition()) {
-                    return {ErrorCodes::InternalError,
-                            str::stream()
-                                << "Missing resolved view definition, but remote returned "
-                                << ErrorCodes::errorString(next.getStatus().code())};
-                }
-                *viewDefinition = BSON("resolvedView" << *ccc->viewDefinition());
-            }
             return next.getStatus();
         }
 
@@ -291,7 +311,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
         return CursorId(0);
     }
 
-    // Register the cursor with the cursor manager.
+    // Register the cursor with the cursor manager for subsequent getMore's.
+
     auto cursorManager = Grid::get(opCtx)->getCursorManager();
     const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
                                          : ClusterCursorManager::CursorType::NamespaceNotSharded;

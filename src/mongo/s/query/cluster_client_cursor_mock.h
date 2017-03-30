@@ -51,8 +51,6 @@ public:
 
     UserNameIterator getAuthenticatedUsers() const final;
 
-    boost::optional<BSONObj> viewDefinition() const final;
-
     long long getNumReturnedSoFar() const final;
 
     void queueResult(const ClusterQueryResult& result) final;

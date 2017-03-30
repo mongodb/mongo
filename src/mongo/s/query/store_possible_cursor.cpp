@@ -62,7 +62,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     ClusterClientCursorParams params(
         incomingCursorResponse.getValue().getNSS(),
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames());
-    params.remotes.emplace_back(server, incomingCursorResponse.getValue().getCursorId());
+    params.remotes.emplace_back(
+        server, CursorResponse(requestedNss, incomingCursorResponse.getValue().getCursorId(), {}));
 
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));

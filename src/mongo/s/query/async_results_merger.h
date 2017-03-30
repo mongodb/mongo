@@ -48,11 +48,12 @@ namespace mongo {
 class CursorResponse;
 
 /**
- * AsyncResultsMerger is used to generate results from cursor-generating commands on one or more
- * remote hosts. A cursor-generating command (e.g. the find command) is one that establishes a
- * ClientCursor and a matching cursor id on the remote host. In order to retrieve all command
- * results, getMores must be issued against each of the remote cursors until they are exhausted. The
- * results from the remote nodes are merged to present either a single sorted or unsorted stream.
+ * Given a set of cursorIds across one or more shards, the AsyncResultsMerger calls getMore on the
+ * cursors to present a single sorted or unsorted stream of documents.
+ *
+ * (A cursor-generating command (e.g. the find command) is one that establishes a ClientCursor and a
+ * matching cursorId on the remote host. In order to retrieve all document results, getMores must be
+ * issued against each of the remote cursors until they are exhausted).
  *
  * The ARM offers a non-blocking interface: if no results are immediately available on this host for
  * retrieval, calling nextEvent() schedules work on the remote hosts in order to generate further
@@ -74,16 +75,20 @@ class AsyncResultsMerger {
 
 public:
     /**
-     * Constructs a new AsyncResultsMerger. The TaskExecutor* must remain valid for the lifetime of
-     * the ARM.
+     * Takes ownership of the cursors from ClusterClientCursorParams by storing their cursorIds and
+     * the hosts on which they exist in _remotes.
+     *
+     * Additionally copies each remote's first batch of results, if one exists, into that remote's
+     * docBuffer. If a sort is specified in the ClusterClientCursorParams, places the remotes with
+     * buffered results onto _mergeQueue.
+     *
+     * The TaskExecutor* must remain valid for the lifetime of the ARM.
      */
     AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams* params);
 
     /**
-     * In order to be destroyed, either
-     *   --the cursor must have been kill()'ed and the event return from kill() must have been
-     *   signaled, or
-     *   --all cursors must have been exhausted.
+     * In order to be destroyed, either the ARM must have been kill()'ed or all cursors must have
+     * been exhausted. This is so that any unexhausted cursors are cleaned up by the ARM.
      */
     virtual ~AsyncResultsMerger();
 
@@ -148,24 +153,21 @@ public:
      * function, that has not yet been signaled. If there is an outstanding unsignaled event,
      * returns an error.
      *
-     * Conditions when event can be signaled:
-     * - Finished collecting results from all remotes.
-     * - One of the host failed with a retriable error. In this case, if ready() is false, then
-     *   the caller should call nextEvent() to retry the request on the hosts that errored. If
-     *   ready() is true, then either the error was not retriable or it has exhausted max retries.
+     * If there is a sort, the event is signaled when there are buffered results for all
+     * non-exhausted remotes.
+     * If there is no sort, the event is signaled when some remote has a buffered result.
      */
     StatusWith<executor::TaskExecutor::EventHandle> nextEvent(OperationContext* opCtx);
 
     /**
-     * Starts shutting down this ARM. Returns a handle to an event which is signaled when this
-     * cursor is safe to destroy.
+     * Starts shutting down this ARM by canceling all pending requests. Returns a handle to an event
+     * that is signaled when this ARM is safe to destroy.
+     * If there are no pending requests, schedules killCursors and signals the event immediately.
+     * Otherwise, the last callback that runs after kill() is called schedules killCursors and
+     * signals the event.
      *
      * Returns an invalid handle if the underlying task executor is shutting down. In this case,
      * killing is considered complete and the ARM may be destroyed immediately.
-     *
-     * When the underlying task executor is *not* shutting down, an ARM can only be destroyed if
-     * either 1) all its results have been exhausted or 2) the kill event returned by this method
-     * has been signaled.
      *
      * May be called multiple times (idempotent).
      */
@@ -178,17 +180,6 @@ private:
      * reported from the remote.
      */
     struct RemoteCursorData {
-        /**
-         * Creates a new uninitialized remote cursor state, which will have to send a command in
-         * order to establish its cursor id. Must only be used if the remote cursor ids are not yet
-         * known.
-         */
-        RemoteCursorData(ShardId shardId, BSONObj cmdObj);
-
-        /**
-         * Instantiates a new initialized remote cursor, which has an established cursor id. It may
-         * only be used for getMore operations.
-         */
         RemoteCursorData(HostAndPort hostAndPort, CursorId establishedCursorId);
 
         /**
@@ -208,50 +199,31 @@ private:
         bool exhausted() const;
 
         /**
-         * Given the shard id with which the cursor was initialized and a read preference, selects
-         * a host on which the cursor should be created.
-         *
-         * May not be called once a cursor has already been established.
-         */
-        Status resolveShardIdToHostAndPort(const ReadPreferenceSetting& readPref);
-
-        /**
          * Returns the Shard object associated with this remote cursor.
          */
         std::shared_ptr<Shard> getShard();
 
-        // ShardId on which a cursor will be created.
-        // TODO: This should always be set.
-        const boost::optional<ShardId> shardId;
+        // The cursor id for the remote cursor. If a remote cursor is not yet exhausted, this member
+        // will be set to a valid non-zero cursor id. If a remote cursor is now exhausted, this
+        // member will be set to zero.
+        CursorId cursorId;
 
-        // The command object for sending to the remote to establish the cursor. If a remote cursor
-        // has not been established yet, this member will be set to a valid command object. If a
-        // remote cursor has already been established, this member will be unset.
-        boost::optional<BSONObj> initialCmdObj;
+        // The exact host in the shard on which the cursor resides.
+        HostAndPort shardHostAndPort;
 
-        // The cursor id for the remote cursor. If a remote cursor has not been established yet,
-        // this member will be unset. If a remote cursor has been established and is not yet
-        // exhausted, this member will be set to a valid non-zero cursor id. If a remote cursor was
-        // established but is now exhausted, this member will be set to zero.
-        boost::optional<CursorId> cursorId;
-
+        // The buffer of results that have been retrieved but not yet returned to the caller.
         std::queue<ClusterQueryResult> docBuffer;
-        executor::TaskExecutor::CallbackHandle cbHandle;
-        Status status = Status::OK();
 
-        // Counts how many times we retried the initial cursor establishment command. It is used to
-        // make a decision based on the error type and the retry count about whether we are allowed
-        // to retry sending the request to another host from this shard.
-        int retryCount = 0;
+        // Is valid if there is currently a pending request to this remote.
+        executor::TaskExecutor::CallbackHandle cbHandle;
+
+        // Set to an error status if there is an error retrieving a response from this remote or if
+        // the command result contained an error.
+        Status status = Status::OK();
 
         // Count of fetched docs during ARM processing of the current batch. Used to reduce the
         // batchSize in getMore when mongod returned less docs than the requested batchSize.
         long long fetchedCount = 0;
-
-    private:
-        // For a cursor, which has shard id associated contains the exact host on which the remote
-        // cursor resides.
-        boost::optional<HostAndPort> _shardHostAndPort;
     };
 
     class MergingComparator {
@@ -324,6 +296,11 @@ private:
     void handleBatchResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
                              OperationContext* opCtx,
                              size_t remoteIndex);
+    /**
+     * Adds the batch of results to the RemoteCursorData. Returns false if there was an error
+     * parsing the batch.
+     */
+    bool addBatchToBuffer(size_t remoteIndex, const std::vector<BSONObj>& batch);
 
     /**
      * If there is a valid unsignaled event that has been requested via nextReady() and there are

@@ -104,10 +104,6 @@ UserNameIterator ClusterClientCursorImpl::getAuthenticatedUsers() const {
                                 _params.authenticatedUsers.end());
 }
 
-boost::optional<BSONObj> ClusterClientCursorImpl::viewDefinition() const {
-    return _params.viewDefinition;
-}
-
 long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
