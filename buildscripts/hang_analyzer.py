@@ -353,10 +353,10 @@ class GDBDumper(object):
             "set print thread-events off",  # Python calls to gdb.parse_and_eval may cause threads
                                             # to start and finish. This suppresses those messages
                                             # from appearing in the return output.
-            "file %s" % process_name,  # Solaris must load the process to read the symbols.
+            "file %s" % process_name,       # Solaris must load the process to read the symbols.
             "attach %d" % pid,
             "info sharedlibrary",
-            "info threads",  # Dump a simple list of commands to get the thread name
+            "info threads",                 # Dump a simple list of commands to get the thread name
             "set python print-stack full",
             ] + raw_stacks_commands + [
             stack_bt,
@@ -364,13 +364,14 @@ class GDBDumper(object):
             source_mongo_printers,
             source_mongo_lock,
             mongodb_uniqstack,
+            "set scheduler-locking on",     # Lock the scheduler, before running any of the
+                                            # following commands, which executes code in the
+                                            # attached process.
             dump_command,
             mongodb_dump_locks,
             mongodb_show_locks,
             mongodb_waitsfor_graph,
-            mongodb_javascript_stack,  # The mongodb-javascript-stack command executes code in
-                                       # order to dump JavaScript backtraces and should therefore
-                                       # be one of the last analysis commands.
+            mongodb_javascript_stack,
             "set confirm off",
             "quit",
             ]
