@@ -39,7 +39,7 @@
 namespace mongo {
 
 class DocumentSourceGroup final : public DocumentSource, public SplittableDocumentSource {
-public:
+  public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
@@ -96,7 +96,7 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
-private:
+  private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                  size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
@@ -147,15 +147,21 @@ private:
      */
     Value expandId(const Value& val);
 
+    struct Field {
+        std::string _fieldName;
+        Accumulator::Factory _accumulatorFactory;
+        boost::intrusive_ptr<Expression> _expression;
+    };
+
     /**
-     * 'vFieldName' contains the field names for the result documents, 'vpAccumulatorFactory'
-     * contains the accumulator factories for the result documents, and 'vpExpression' contains the
-     * common expressions used by each instance of each accumulator in order to find the right-hand
-     * side of what gets added to the accumulator. These three vectors parallel each other.
+     * '_fieldName' contains the field names for the result documents, '_accumulatorFactory'
+     * contains the accumulator factories for the result documents, and 'expression' contains the
+     * common expressions used by  instance of an accumulator in order to find the right-hand
+     * side of what gets added to the accumulator. Since these three variable are parallel to each other,
+     * it store in  struct.
      */
-    std::vector<std::string> vFieldName;
-    std::vector<Accumulator::Factory> vpAccumulatorFactory;
-    std::vector<boost::intrusive_ptr<Expression>> vpExpression;
+    std::vector<Field> _accumalatedFields;
+
 
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
