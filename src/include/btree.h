@@ -58,6 +58,12 @@
 #define	WT_BTREE_DELETE_THRESHOLD	1000
 
 /*
+ * Minimum size of the chunks (in percentage of the page size) a page gets split
+ * into during reconciliation.
+ */
+#define	WT_BTREE_MIN_SPLIT_PCT		50
+
+/*
  * WT_BTREE --
  *	A btree handle.
  */
