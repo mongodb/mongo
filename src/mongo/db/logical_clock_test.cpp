@@ -54,7 +54,7 @@ protected:
         _timeProofService = pTps.get();
         _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps));
         _serviceContext->setFastClockSource(
-                stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
+            stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
     }
 
     void tearDown() {
