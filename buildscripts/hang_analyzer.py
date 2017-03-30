@@ -301,10 +301,13 @@ class GDBDumper(object):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         root_logger.info("dir %s" % script_dir)
         gdb_dir = os.path.join(script_dir, "gdb")
-        printers_script = os.path.join(gdb_dir, "mongo.py")
+        mongo_script = os.path.join(gdb_dir, "mongo.py")
+        mongo_printers_script = os.path.join(gdb_dir, "mongo_printers.py")
         mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
 
         stack_bt = ""
+        source_mongo = "source %s" % mongo_script
+        source_mongo_printers = "source %s" % mongo_printers_script
         source_mongo_lock = "source %s" % mongo_lock_script
         mongodb_dump_locks = "mongodb-dump-locks"
         mongodb_show_locks = "mongodb-show-locks"
@@ -357,7 +360,8 @@ class GDBDumper(object):
             "set python print-stack full",
             ] + raw_stacks_commands + [
             stack_bt,
-            "source %s" % printers_script,
+            source_mongo,
+            source_mongo_printers,
             source_mongo_lock,
             mongodb_uniqstack,
             dump_command,
