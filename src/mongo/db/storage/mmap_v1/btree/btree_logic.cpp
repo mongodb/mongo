@@ -1872,19 +1872,18 @@ void BtreeLogic<BtreeLayout>::dumpBucket(const BucketType* bucket, int indentLen
     const string indent = string(indentLength, ' ');
 
     for (int i = 0; i < bucket->n; i++) {
-        log() << '\n' << indent;
         FullKey k = getFullKey(bucket, i);
         string ks = k.data.toString();
-        log() << "  " << hex << k.prevChildBucket.getOfs() << "<-- prevChildBucket for " << i
-              << '\n';
-        log() << indent << "    " << i << ' ' << redact(ks.substr(0, 30))
+        log() << indent << "  " << hex << k.prevChildBucket.getOfs() << "<-- prevChildBucket for "
+              << i;
+        log() << indent << "    " << i << ' ' << redact(ks.substr(0, 60))
               << " Loc:" << k.recordLoc.toString() << dec;
         if (getKeyHeader(bucket, i).isUnused()) {
             log() << " UNUSED";
         }
     }
 
-    log() << "\n" << indent << "  " << hex << bucket->nextChild.getOfs() << dec << endl;
+    log() << indent << "  " << hex << bucket->nextChild.getOfs() << dec << "<-- nextChild bucket";
 }
 
 template <class BtreeLayout>
