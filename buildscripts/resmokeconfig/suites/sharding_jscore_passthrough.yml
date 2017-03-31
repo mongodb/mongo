@@ -48,6 +48,8 @@ selector:
     # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
     - jstests/core/views/views_coll_stats.js
     - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+    # TODO SERVER-28577 mongos doesn't support arrayFilters option to update and findAndModify.
+    - jstests/core/update_arrayFilters.js
 
 
 executor:

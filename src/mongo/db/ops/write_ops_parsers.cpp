@@ -171,6 +171,12 @@ UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd) {
             } else if (fieldName == "collation") {
                 checkBSONType(Object, field);
                 update.collation = field.Obj();
+            } else if (fieldName == "arrayFilters") {
+                checkBSONType(Array, field);
+                for (auto arrayFilter : field.Obj()) {
+                    checkBSONType(Object, arrayFilter);
+                    update.arrayFilters.push_back(arrayFilter.Obj());
+                }
             } else if (fieldName == "multi") {
                 checkBSONType(Bool, field);
                 update.multi = field.Bool();

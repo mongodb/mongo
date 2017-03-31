@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/ops/array_filter.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
@@ -137,6 +138,11 @@ private:
      */
     Status parseUpdate();
 
+    /**
+     * Parses the array filters portion of the update request.
+     */
+    Status parseArrayFilters();
+
     // Unowned pointer to the transactional context.
     OperationContext* _opCtx;
 
@@ -145,6 +151,9 @@ private:
 
     // The collator for the parsed update.  Owned here.
     std::unique_ptr<CollatorInterface> _collator;
+
+    // The array filters for the parsed update. Owned here.
+    std::map<StringData, std::unique_ptr<ArrayFilter>> _arrayFilters;
 
     // Driver for processing updates on matched documents.
     UpdateDriver _driver;

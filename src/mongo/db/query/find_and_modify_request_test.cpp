@@ -170,6 +170,24 @@ TEST(FindAndModifyRequest, UpdateWithCollation) {
     ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
+TEST(FindAndModifyRequest, UpdateWithArrayFilters) {
+    const BSONObj query(BSON("x" << 1));
+    const BSONObj update(BSON("y" << 1));
+    const std::vector<BSONObj> arrayFilters{BSON("i" << 0)};
+
+    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    request.setArrayFilters(arrayFilters);
+
+    BSONObj expectedObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            update: { y: 1 },
+            arrayFilters: [ { i: 0 } ]
+        })json"));
+
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
+}
+
 TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
@@ -194,6 +212,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const BSONObj sort(BSON("z" << -1));
     const BSONObj collation(BSON("locale"
                                  << "en_US"));
+    const std::vector<BSONObj> arrayFilters{BSON("i" << 0)};
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
@@ -202,6 +221,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     request.setShouldReturnNew(true);
     request.setSort(sort);
     request.setCollation(collation);
+    request.setArrayFilters(arrayFilters);
     request.setWriteConcern(writeConcern);
     request.setUpsert(true);
 
@@ -213,6 +233,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
             collation: { locale: 'en_US' },
+            arrayFilters: [ { i: 0 } ],
             new: true,
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
@@ -347,6 +368,7 @@ TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getSort());
     ASSERT_BSONOBJ_EQ(BSONObj(), request.getCollation());
+    ASSERT_EQUALS(0u, request.getArrayFilters().size());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 
@@ -358,6 +380,7 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
             fields: { x: 1, y: 1 },
             sort: { z: -1 },
             collation: {locale: 'en_US' },
+            arrayFilters: [ { i: 0 } ],
             new: true
         })json"));
 
@@ -375,6 +398,8 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
     ASSERT_BSONOBJ_EQ(BSON("locale"
                            << "en_US"),
                       request.getCollation());
+    ASSERT_EQUALS(1u, request.getArrayFilters().size());
+    ASSERT_BSONOBJ_EQ(BSON("i" << 0), request.getArrayFilters()[0]);
     ASSERT_EQUALS(true, request.shouldReturnNew());
 }
 
@@ -466,6 +491,18 @@ TEST(FindAndModifyRequest, ParseWithRemoveAndReturnNew) {
             query: { x: 1 },
             remove: true,
             new: true
+        })json"));
+
+    auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
+    ASSERT_NOT_OK(parseStatus.getStatus());
+}
+
+TEST(FindAndModifyRequest, ParseWithRemoveAndArrayFilters) {
+    BSONObj cmdObj(fromjson(R"json({
+            findAndModify: 'user',
+            query: { x: 1 },
+            remove: true,
+            arrayFilters: [ { i: 0 } ]
         })json"));
 
     auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);

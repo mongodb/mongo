@@ -73,6 +73,8 @@ selector:
     - jstests/core/mr1.js
     - jstests/core/mr3.js
     - jstests/core/mr4.js
+    # TODO SERVER-28577 mongos doesn't support arrayFilters option to update and findAndModify.
+    - jstests/core/update_arrayFilters.js
     exclude_with_any_tags:
     # Tests tagged with the following will fail because they assume collections are not sharded.
     - assumes_no_implicit_collection_creation_after_drop

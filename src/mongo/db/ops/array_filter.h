@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,60 +28,45 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/extensions_callback.h"
 
 namespace mongo {
 
 /**
- * The base structure for all fields that are common for all write operations.
- *
- * Unlike ParsedUpdate and UpdateRequest (and the Delete counterparts), types deriving from this are
- * intended to represent entire operations that may consist of multiple sub-operations.
+ * A filter specifying which array elements an update modifier should apply to. For example, the
+ * array filter with id "i" and filter {i: 0} specifies that an update {$set: {"a.$[i]"}} should
+ * only apply to elements of "a" which are equal to 0.
  */
-struct ParsedWriteOp {
-    NamespaceString ns;
-    bool bypassDocumentValidation = false;
-    bool continueOnError = false;
-};
+class ArrayFilter {
 
-/**
- * A parsed insert insert operation.
- */
-struct InsertOp : ParsedWriteOp {
-    std::vector<BSONObj> documents;
-};
+public:
+    /**
+     * Parses 'rawArrayFilter' to an ArrayFilter. This succeeds if 'rawArrayFilter' is a filter over
+     * a single top-level field, which begins with a lowercase letter and contains no special
+     * characters. Otherwise, a non-OK status is returned. Callers must maintain ownership of
+     * 'rawArrayFilter'.
+     */
+    static StatusWith<std::unique_ptr<ArrayFilter>> parse(
+        BSONObj rawArrayFilter,
+        const ExtensionsCallback& extensionsCallback,
+        const CollatorInterface* collator);
 
-/**
- * A parsed update operation.
- */
-struct UpdateOp : ParsedWriteOp {
-    struct SingleUpdate {
-        BSONObj query;
-        BSONObj update;
-        BSONObj collation;
-        std::vector<BSONObj> arrayFilters;
-        bool multi = false;
-        bool upsert = false;
-    };
+    ArrayFilter(std::string id, std::unique_ptr<MatchExpression> filter)
+        : _id(std::move(id)), _filter(std::move(filter)) {}
 
-    std::vector<SingleUpdate> updates;
-};
+    StringData getId() const {
+        return _id;
+    }
 
-/**
- * A parsed Delete operation.
- */
-struct DeleteOp : ParsedWriteOp {
-    struct SingleDelete {
-        BSONObj query;
-        BSONObj collation;
-        bool multi = true;
-    };
+    MatchExpression* getFilter() const {
+        return _filter.get();
+    }
 
-    std::vector<SingleDelete> deletes;
+private:
+    // The top-level field that _filter is over.
+    const std::string _id;
+    const std::unique_ptr<MatchExpression> _filter;
 };
 
 }  // namespace mongo

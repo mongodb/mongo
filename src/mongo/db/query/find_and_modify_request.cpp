@@ -42,6 +42,7 @@ const char kCmdName[] = "findAndModify";
 const char kQueryField[] = "query";
 const char kSortField[] = "sort";
 const char kCollationField[] = "collation";
+const char kArrayFiltersField[] = "arrayFilters";
 const char kRemoveField[] = "remove";
 const char kUpdateField[] = "update";
 const char kNewField[] = "new";
@@ -49,6 +50,7 @@ const char kFieldProjectionField[] = "fields";
 const char kUpsertField[] = "upsert";
 const char kWriteConcernField[] = "writeConcern";
 
+const std::vector<BSONObj> emptyArrayFilters{};
 }  // unnamed namespace
 
 FindAndModifyRequest::FindAndModifyRequest(NamespaceString fullNs, BSONObj query, BSONObj updateObj)
@@ -97,6 +99,14 @@ BSONObj FindAndModifyRequest::toBSON() const {
         builder.append(kCollationField, _collation.get());
     }
 
+    if (_arrayFilters) {
+        BSONArrayBuilder arrayBuilder(builder.subarrayStart(kArrayFiltersField));
+        for (auto arrayFilter : _arrayFilters.get()) {
+            arrayBuilder.append(arrayFilter);
+        }
+        arrayBuilder.doneFast();
+    }
+
     if (_shouldReturnNew) {
         builder.append(kNewField, _shouldReturnNew.get());
     }
@@ -128,6 +138,28 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         }
     }
 
+    std::vector<BSONObj> arrayFilters;
+    bool arrayFiltersSet = false;
+    {
+        BSONElement arrayFiltersElt;
+        Status arrayFiltersEltStatus =
+            bsonExtractTypedField(cmdObj, kArrayFiltersField, BSONType::Array, &arrayFiltersElt);
+        if (!arrayFiltersEltStatus.isOK() && (arrayFiltersEltStatus != ErrorCodes::NoSuchKey)) {
+            return arrayFiltersEltStatus;
+        }
+        if (arrayFiltersEltStatus.isOK()) {
+            arrayFiltersSet = true;
+            for (auto arrayFilter : arrayFiltersElt.Obj()) {
+                if (arrayFilter.type() != BSONType::Object) {
+                    return {ErrorCodes::TypeMismatch,
+                            str::stream() << "Each array filter must be an object, found "
+                                          << arrayFilter.type()};
+                }
+                arrayFilters.push_back(arrayFilter.Obj());
+            }
+        }
+    }
+
     bool shouldReturnNew = cmdObj[kNewField].trueValue();
     bool isUpsert = cmdObj[kUpsertField].trueValue();
     bool isRemove = cmdObj[kRemoveField].trueValue();
@@ -151,6 +183,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
                     "Cannot specify both new=true and remove=true;"
                     " 'remove' always returns the deleted document"};
         }
+
+        if (arrayFiltersSet) {
+            return {ErrorCodes::FailedToParse, "Cannot specify arrayFilters and remove=true"};
+        }
     }
 
     FindAndModifyRequest request(std::move(fullNs), query, updateObj);
@@ -158,6 +194,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     request.setFieldProjection(fields);
     request.setSort(sort);
     request.setCollation(collation);
+    request.setArrayFilters(std::move(arrayFilters));
 
     if (!isRemove) {
         request.setShouldReturnNew(shouldReturnNew);
@@ -177,6 +214,13 @@ void FindAndModifyRequest::setSort(BSONObj sort) {
 
 void FindAndModifyRequest::setCollation(BSONObj collation) {
     _collation = collation.getOwned();
+}
+
+void FindAndModifyRequest::setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
+    _arrayFilters = std::vector<BSONObj>();
+    for (auto arrayFilter : arrayFilters) {
+        _arrayFilters->emplace_back(arrayFilter.getOwned());
+    }
 }
 
 void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {
@@ -215,6 +259,13 @@ BSONObj FindAndModifyRequest::getSort() const {
 
 BSONObj FindAndModifyRequest::getCollation() const {
     return _collation.value_or(BSONObj());
+}
+
+const std::vector<BSONObj>& FindAndModifyRequest::getArrayFilters() const {
+    if (_arrayFilters) {
+        return _arrayFilters.get();
+    }
+    return emptyArrayFilters;
 }
 
 bool FindAndModifyRequest::shouldReturnNew() const {

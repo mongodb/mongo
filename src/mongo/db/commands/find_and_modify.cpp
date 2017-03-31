@@ -144,6 +144,7 @@ void makeUpdateRequest(const FindAndModifyRequest& args,
     requestOut->setUpdates(args.getUpdateObj());
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
+    requestOut->setArrayFilters(args.getArrayFilters());
     requestOut->setUpsert(args.isUpsert());
     requestOut->setReturnDocs(args.shouldReturnNew() ? UpdateRequest::RETURN_NEW
                                                      : UpdateRequest::RETURN_OLD);

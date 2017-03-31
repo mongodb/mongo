@@ -266,6 +266,25 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='array_filter',
+    source=[
+        'array_filter.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/matcher/expressions",
+    ],
+)
+
+env.CppUnitTest(
+    target='array_filter_test',
+    source='array_filter_test.cpp',
+    LIBDEPS=[
+        'array_filter',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+    ],
+)
+
+env.Library(
     target="write_ops",
     source=[
         "delete.cpp",
@@ -278,6 +297,7 @@ env.Library(
         "write_ops_exec.cpp",
     ],
     LIBDEPS=[
+        'array_filter',
         'update_driver',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

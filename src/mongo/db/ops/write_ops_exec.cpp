@@ -499,6 +499,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* opCtx,
     request.setQuery(op.query);
     request.setCollation(op.collation);
     request.setUpdates(op.update);
+    request.setArrayFilters(op.arrayFilters);
     request.setMulti(op.multi);
     request.setUpsert(op.upsert);
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);  // ParsedUpdate overrides this for $isolated.

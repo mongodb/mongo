@@ -109,6 +109,14 @@ public:
         return _updates;
     }
 
+    inline void setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
+        _arrayFilters = arrayFilters;
+    }
+
+    inline const std::vector<BSONObj>& getArrayFilters() const {
+        return _arrayFilters;
+    }
+
     // Please see documentation on the private members matching these names for
     // explanations of the following fields.
 
@@ -185,12 +193,30 @@ public:
     }
 
     const std::string toString() const {
-        return str::stream() << " query: " << _query << " projection: " << _proj
-                             << " sort: " << _sort << " collation: " << _collation
-                             << " updated: " << _updates << " god: " << _god
-                             << " upsert: " << _upsert << " multi: " << _multi
-                             << " fromMigration: " << _fromMigration
-                             << " isExplain: " << _isExplain;
+        StringBuilder builder;
+        builder << " query: " << _query;
+        builder << " projection: " << _proj;
+        builder << " sort: " << _sort;
+        builder << " collation: " << _collation;
+        builder << " updates: " << _updates;
+
+        builder << " arrayFilters: [";
+        bool first = true;
+        for (auto arrayFilter : _arrayFilters) {
+            if (!first) {
+                builder << ", ";
+            }
+            first = false;
+            builder << arrayFilter;
+        }
+        builder << "]";
+
+        builder << " god: " << _god;
+        builder << " upsert: " << _upsert;
+        builder << " multi: " << _multi;
+        builder << " fromMigration: " << _fromMigration;
+        builder << " isExplain: " << _isExplain;
+        return builder.str();
     }
 
 private:
@@ -210,6 +236,9 @@ private:
 
     // Contains the modifiers to apply to matched objects, or a replacement document.
     BSONObj _updates;
+
+    // Filters to specify which array elements should be updated.
+    std::vector<BSONObj> _arrayFilters;
 
     // Flags controlling the update.
 
