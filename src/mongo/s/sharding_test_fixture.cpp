@@ -94,16 +94,23 @@ ShardingTestFixture::~ShardingTestFixture() = default;
 const Seconds ShardingTestFixture::kFutureTimeout{5};
 
 void ShardingTestFixture::setUp() {
-    _service = stdx::make_unique<ServiceContextNoop>();
-    _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-    _service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    _service->setTickSource(stdx::make_unique<TickSourceMock>());
-    auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
-    _transportLayer = tlMock.get();
-    _service->addAndStartTransportLayer(std::move(tlMock));
-    CollatorFactoryInterface::set(_service.get(), stdx::make_unique<CollatorFactoryMock>());
+    {
+        auto service = stdx::make_unique<ServiceContextNoop>();
+        service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+        service->setTickSource(stdx::make_unique<TickSourceMock>());
+        auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
+        _transportLayer = tlMock.get();
+        service->addAndStartTransportLayer(std::move(tlMock));
+
+        // Set the newly created service context to be the current global context so that tests,
+        // which invoke code still referencing getGlobalServiceContext will work properly.
+        setGlobalServiceContext(std::move(service));
+    }
+
+    CollatorFactoryInterface::set(serviceContext(), stdx::make_unique<CollatorFactoryMock>());
     _transportSession = transport::MockSession::create(_transportLayer);
-    _client = _service->makeClient("ShardingTestFixture", _transportSession);
+    _client = serviceContext()->makeClient("ShardingTestFixture", _transportSession);
     _opCtx = _client->makeOperationContext();
 
     // Set up executor pool used for most operations.
@@ -171,7 +178,7 @@ void ShardingTestFixture::setUp() {
                nullptr,
                stdx::make_unique<CatalogCache>(),
                std::move(shardRegistry),
-               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
+               stdx::make_unique<ClusterCursorManager>(serviceContext()->getPreciseClockSource()),
                stdx::make_unique<BalancerConfiguration>(),
                std::move(executorPool),
                _mockNetwork);
@@ -185,7 +192,6 @@ void ShardingTestFixture::tearDown() {
     _transportSession.reset();
     _opCtx.reset();
     _client.reset();
-    _service.reset();
 }
 
 void ShardingTestFixture::shutdownExecutor() {
@@ -236,9 +242,7 @@ DistLockManagerMock* ShardingTestFixture::distLock() const {
 }
 
 ServiceContext* ShardingTestFixture::serviceContext() const {
-    invariant(_service);
-
-    return _service.get();
+    return getGlobalServiceContext();
 }
 
 OperationContext* ShardingTestFixture::operationContext() const {

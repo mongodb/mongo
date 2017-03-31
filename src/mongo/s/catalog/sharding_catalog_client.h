@@ -41,7 +41,6 @@
 
 namespace mongo {
 
-class ActionLogType;
 class BatchedCommandRequest;
 class BatchedCommandResponse;
 struct BSONArray;

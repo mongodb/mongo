@@ -42,7 +42,7 @@ class ChunkManager;
 class CollatorInterface;
 class ShardKeyPattern;
 
-class ChunkManagerTestFixture : public ShardingCatalogTestFixture {
+class CatalogCacheTestFixture : public ShardingCatalogTestFixture {
 protected:
     void setUp() override;
 
@@ -68,6 +68,12 @@ protected:
      */
     executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
     scheduleRoutingInfoRefresh(const NamespaceString& nss);
+
+    /**
+     * Ensures that there are 'numShards' available in the shard registry. The shard ids are
+     * generated as "0", "1", etc.
+     */
+    void setupNShards(int numShards);
 };
 
 }  // namespace mongo
