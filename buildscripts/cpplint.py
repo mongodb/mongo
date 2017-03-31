@@ -1639,7 +1639,7 @@ def make_polyfill_regex():
     'shared_lock,',
     'shared_mutex',
     'shared_timed_mutex',
-    'this_thread',
+    'this_thread(?!::at_thread_exit)',
     'thread',
     'timed_mutex',
     'try_to_lock',
