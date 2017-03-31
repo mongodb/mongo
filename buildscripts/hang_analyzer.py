@@ -693,7 +693,7 @@ def main():
             (process_name, pid))
         signal_process(root_logger, pid, signal.SIGABRT)
 
-    # Dump python processes after signalling them.
+    # Dump python processes by signalling them.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
         # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
         # a signal handler to wait for the signal since it supports POSIX signals.
@@ -705,14 +705,6 @@ def main():
             root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" %
                 (process_name, pid))
             signal_process(root_logger, pid, signal.SIGUSR1)
-
-        process_logger = get_process_logger(options.debugger_output, pid, process_name)
-        dbg.dump_info(
-            root_logger,
-            process_logger,
-            pid,
-            process_name,
-            take_dump=False)
 
     root_logger.info("Done analyzing all processes for hangs")
 
