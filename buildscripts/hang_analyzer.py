@@ -43,7 +43,8 @@ if __name__ == "__main__" and __package__ is None:
 def call(a, logger):
     logger.info(str(a))
 
-    process = subprocess.Popen(a, stdout=subprocess.PIPE)
+    # Use a common pipe for stdout & stderr for logging.
+    process = subprocess.Popen(a, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     logger_pipe = core.pipe.LoggerPipe(logger, logging.INFO, process.stdout)
     logger_pipe.wait_until_started()
 
