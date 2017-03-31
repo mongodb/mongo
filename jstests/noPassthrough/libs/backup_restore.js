@@ -257,6 +257,7 @@ var BackupRestoreTest = function(options) {
 
         // Perform the data backup to new secondary
         if (options.backup == 'fsyncLock') {
+            rst.awaitSecondaryNodes();
             // Test that the secondary supports fsyncLock
             var ret = secondary.getDB("admin").fsyncLock();
             if (!ret.ok) {
