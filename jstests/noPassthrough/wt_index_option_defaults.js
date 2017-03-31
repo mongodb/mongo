@@ -31,9 +31,9 @@
     // Use different values for the same configuration string key to test that index-specific
     // options override collection-wide options, and that collection-wide options override
     // system-wide options.
-    var systemWideConfigString = 'split_pct=25,';
-    var collectionWideConfigString = 'split_pct=30,';
-    var indexSpecificConfigString = 'split_pct=35,';
+    var systemWideConfigString = 'split_pct=70,';
+    var collectionWideConfigString = 'split_pct=75,';
+    var indexSpecificConfigString = 'split_pct=80,';
 
     // Start up a mongod with system-wide defaults for index options and create a collection without
     // any additional options. Tests than an index without any additional options should take on the
