@@ -57,6 +57,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -235,9 +236,13 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
         Status::OK());
 
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
         ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
-                      catalogClient()->shardCollection(operationContext(),
+                      catalogClient()->shardCollection(opCtx.get(),
                                                        ns,
                                                        keyPattern,
                                                        defaultCollation,
@@ -316,8 +321,12 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogClient()->shardCollection(operationContext(),
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
+        ASSERT_OK(catalogClient()->shardCollection(opCtx.get(),
                                                    ns,
                                                    keyPattern,
                                                    defaultCollation,
@@ -505,10 +514,14 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
         ASSERT_OK(catalogClient()->shardCollection(
-            operationContext(),
+            opCtx.get(),
             ns,
             keyPattern,
             defaultCollation,
@@ -674,8 +687,12 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogClient()->shardCollection(operationContext(),
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
+        ASSERT_OK(catalogClient()->shardCollection(opCtx.get(),
                                                    ns,
                                                    keyPattern,
                                                    defaultCollation,

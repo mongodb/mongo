@@ -33,7 +33,7 @@
 #include <set>
 #include <vector>
 
-#include "mongo/s/chunk_manager_test_fixture.h"
+#include "mongo/s/catalog_cache_test_fixture.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
@@ -50,7 +50,7 @@
 
 namespace mongo {
 
-void ChunkManagerTestFixture::setUp() {
+void CatalogCacheTestFixture::setUp() {
     ShardingCatalogTestFixture::setUp();
     setRemote(HostAndPort("FakeRemoteClient:34567"));
     configTargeter()->setFindHostReturnValue(HostAndPort{CONFIG_HOST_PORT});
@@ -59,7 +59,7 @@ void ChunkManagerTestFixture::setUp() {
 }
 
 executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
-ChunkManagerTestFixture::scheduleRoutingInfoRefresh(const NamespaceString& nss) {
+CatalogCacheTestFixture::scheduleRoutingInfoRefresh(const NamespaceString& nss) {
     return launchAsync([this, nss] {
         auto client = serviceContext()->makeClient("Test");
         auto opCtx = client->makeOperationContext();
@@ -71,7 +71,22 @@ ChunkManagerTestFixture::scheduleRoutingInfoRefresh(const NamespaceString& nss) 
     });
 }
 
-std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
+void CatalogCacheTestFixture::setupNShards(int numShards) {
+    setupShards([&]() {
+        std::vector<ShardType> shards;
+        for (int i = 0; i < numShards; i++) {
+            ShardType shard;
+            shard.setName(str::stream() << i);
+            shard.setHost(str::stream() << "Host" << i << ":12345");
+
+            shards.emplace_back(std::move(shard));
+        }
+
+        return shards;
+    }());
+}
+
+std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
@@ -102,7 +117,6 @@ std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
         return coll.toBSON();
     }();
 
-    std::vector<ShardType> shards;
     std::vector<BSONObj> initialChunks;
 
     auto splitPointsIncludingEnds(splitPoints);
@@ -111,25 +125,20 @@ std::shared_ptr<ChunkManager> ChunkManagerTestFixture::makeChunkManager(
     splitPointsIncludingEnds.push_back(shardKeyPattern.getKeyPattern().globalMax());
 
     for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
-        ShardType shard;
-        shard.setName(str::stream() << (i - 1));
-        shard.setHost(str::stream() << "Host" << (i - 1) << ":12345");
-
         ChunkType chunk(
             nss,
             {shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i - 1],
                                                               false),
              shardKeyPattern.getKeyPattern().extendRangeBound(splitPointsIncludingEnds[i], false)},
             version,
-            shard.getName());
+            ShardId{str::stream() << (i - 1)});
 
         initialChunks.push_back(chunk.toConfigBSON());
-        shards.push_back(std::move(shard));
 
         version.incMajor();
     }
 
-    setupShards(shards);
+    setupNShards(initialChunks.size());
 
     auto future = scheduleRoutingInfoRefresh(nss);
 

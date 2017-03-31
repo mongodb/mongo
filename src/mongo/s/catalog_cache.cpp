@@ -39,7 +39,6 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -54,39 +53,36 @@ namespace {
 const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
 
 /**
- * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently.
- *
- * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
+ * Structure representing the generated query and sort order for a chunk diffing operation.
  */
-class CMConfigDiffTracker : public ConfigDiffTracker<std::shared_ptr<Chunk>> {
-public:
-    CMConfigDiffTracker(const NamespaceString& nss,
-                        RangeMap* currMap,
-                        ChunkVersion* maxVersion,
-                        MaxChunkVersionMap* maxShardVersions)
-        : ConfigDiffTracker<std::shared_ptr<Chunk>>(
-              nss.ns(), currMap, maxVersion, maxShardVersions) {}
-
-    bool isTracked(const ChunkType& chunk) const final {
-        // Mongos tracks all shards
-        return true;
-    }
-
-    bool isMinKeyIndexed() const final {
-        return false;
-    }
-
-    std::pair<BSONObj, std::shared_ptr<Chunk>> rangeFor(OperationContext* opCtx,
-                                                        const ChunkType& chunk) const final {
-        return std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk));
-    }
-
-    ShardId shardFor(OperationContext* opCtx, const ShardId& shardId) const final {
-        const auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-        return shard->getId();
-    }
+struct QueryAndSort {
+    const BSONObj query;
+    const BSONObj sort;
 };
+
+/**
+ * Returns the query needed to find incremental changes to a collection from the config server.
+ */
+QueryAndSort createConfigDiffQuery(const NamespaceString& nss, ChunkVersion collectionVersion) {
+    // The query has to find all the chunks $gte the current max version. Currently, any splits and
+    // merges will increment the current max version.
+    BSONObjBuilder queryB;
+    queryB.append(ChunkType::ns(), nss.ns());
+
+    {
+        BSONObjBuilder tsBuilder(queryB.subobjStart(ChunkType::DEPRECATED_lastmod()));
+        tsBuilder.appendTimestamp("$gte", collectionVersion.toLong());
+        tsBuilder.done();
+    }
+
+    // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, IN ORDER TO HANDLE CURSOR
+    // YIELDING BETWEEN CHUNKS BEING MIGRATED
+    //
+    // This ensures that changes to chunk version (which will always be higher) will always come
+    // *after* our current position in the chunk cursor
+
+    return QueryAndSort{queryB.obj(), BSON(ChunkType::DEPRECATED_lastmod() << 1)};
+}
 
 /**
  * Blocking method, which refreshes the routing information for the specified collection. If
@@ -144,8 +140,7 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
           << startingCollectionVersion;
 
     // Diff tracker should *always* find at least one chunk if collection exists
-    const auto diffQuery =
-        CMConfigDiffTracker::createConfigDiffQuery(nss, startingCollectionVersion);
+    const auto diffQuery = createConfigDiffQuery(nss, startingCollectionVersion);
 
     // Query the chunks which have changed
     std::vector<ChunkType> newChunks;
@@ -159,21 +154,41 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
         &opTime,
         repl::ReadConcernLevel::kMajorityReadConcern));
 
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "No chunks were found for the collection",
+            !newChunks.empty());
+
     ChunkVersion collectionVersion = startingCollectionVersion;
 
-    ShardVersionMap unusedShardVersions;
-    CMConfigDiffTracker differ(nss, &chunkMap, &collectionVersion, &unusedShardVersions);
+    for (const auto& chunk : newChunks) {
+        const auto& chunkVersion = chunk.getVersion();
 
-    const int diffsApplied = differ.calculateConfigDiff(opCtx, newChunks);
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Chunk " << chunk.genID(nss.ns(), chunk.getMin())
+                              << " has epoch different from that of the collection "
+                              << chunkVersion.epoch(),
+                collectionVersion.epoch() == chunkVersion.epoch());
 
-    if (diffsApplied < 1) {
-        log() << "Refresh for collection " << nss << " took " << t.millis()
-              << " ms and failed because the collection's "
-                 "sharding metadata either changed in between or "
-                 "became corrupted";
+        // Chunks must always come in incrementally sorted order
+        invariant(chunkVersion >= collectionVersion);
+        collectionVersion = chunkVersion;
 
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  "Collection sharding status changed during refresh or became corrupted");
+        // Ensure chunk references a valid shard and that the shard is available and loaded
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShard()));
+
+        // Returns the first chunk with a max key that is > min - implies that the chunk overlaps
+        // min
+        const auto low = chunkMap.upper_bound(chunk.getMin());
+
+        // Returns the first chunk with a max key that is > max - implies that the next chunk cannot
+        // not overlap max
+        const auto high = chunkMap.upper_bound(chunk.getMax());
+
+        // Erase all chunks from the map, which overlap the chunk we got from the persistent store
+        chunkMap.erase(low, high);
+
+        // Insert only the chunk itself
+        chunkMap.insert(std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk)));
     }
 
     // If at least one diff was applied, the metadata is correct, but it might not have changed so
@@ -414,6 +429,10 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase_inlo
 
     StringMap<CollectionRoutingInfoEntry> collectionEntries;
     for (const auto& coll : collections) {
+        if (coll.getDropped()) {
+            continue;
+        }
+
         collectionEntries[coll.getNs().ns()].needsRefresh = true;
     }
 
