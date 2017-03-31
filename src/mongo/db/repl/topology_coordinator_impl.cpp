@@ -1057,15 +1057,9 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     bool advancedOpTime = false;
     if (!hbResponse.isOK()) {
         if (isUnauthorized) {
-            LOG(1) << "setAuthIssue: heartbeat response failed due to authentication"
-                      " issue for member _id:"
-                   << member.getId();
             hbData.setAuthIssue(now);
         } else if (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries ||
                    alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod()) {
-            LOG(1) << "setDownValues: heartbeat response failed for member _id:" << member.getId()
-                   << ", msg:  " << hbResponse.getStatus().reason();
-
             hbData.setDownValues(now, hbResponse.getStatus().reason());
         } else {
             LOG(3) << "Bad heartbeat response from " << target << "; trying again; Retries left: "
@@ -1076,7 +1070,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         ReplSetHeartbeatResponse hbr = std::move(hbResponse.getValue());
         LOG(3) << "setUpValues: heartbeat response good for member _id:" << member.getId()
                << ", msg:  " << hbr.getHbMsg();
-        advancedOpTime = hbData.setUpValues(now, member.getHostAndPort(), std::move(hbr));
+        advancedOpTime = hbData.setUpValues(now, std::move(hbr));
     }
 
     HeartbeatResponseAction nextAction;
@@ -1741,9 +1735,7 @@ void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
             hbResponse.setSyncingTo(HostAndPort());
             hbResponse.setHbMsg("");
             _hbdata.at(primaryIndex)
-                .setUpValues(_hbdata.at(primaryIndex).getLastHeartbeat(),
-                             _rsConfig.getMemberAt(primaryIndex).getHostAndPort(),
-                             std::move(hbResponse));
+                .setUpValues(_hbdata.at(primaryIndex).getLastHeartbeat(), std::move(hbResponse));
         }
         _currentPrimaryIndex = primaryIndex;
     }

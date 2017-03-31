@@ -46,9 +46,7 @@ MemberHeartbeatData::MemberHeartbeatData()
     _lastResponse.setAppliedOpTime(OpTime());
 }
 
-bool MemberHeartbeatData::setUpValues(Date_t now,
-                                      const HostAndPort& host,
-                                      ReplSetHeartbeatResponse&& hbResponse) {
+bool MemberHeartbeatData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
     _health = 1;
     if (_upSince == Date_t()) {
         _upSince = now;
@@ -70,7 +68,7 @@ bool MemberHeartbeatData::setUpValues(Date_t now,
     }
     // Log if the state changes
     if (_lastResponse.getState() != hbResponse.getState()) {
-        log() << "Member " << host.toString() << " is now in state "
+        log() << "Member " << _hostAndPort.toString() << " is now in state "
               << hbResponse.getState().toString() << rsLog;
     }
 
@@ -87,6 +85,10 @@ void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeat
     _lastHeartbeat = now;
     _authIssue = false;
     _updatedSinceRestart = true;
+
+    if (_lastResponse.getState() != MemberState::RS_DOWN) {
+        log() << "Member " << _hostAndPort.toString() << " is now in state RS_DOWN" << rsLog;
+    }
 
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_DOWN);
@@ -105,6 +107,11 @@ void MemberHeartbeatData::setAuthIssue(Date_t now) {
     _lastHeartbeat = now;
     _authIssue = true;
     _updatedSinceRestart = true;
+
+    if (_lastResponse.getState() != MemberState::RS_UNKNOWN) {
+        log() << "Member " << _hostAndPort.toString()
+              << " is now in state RS_UNKNOWN due to authentication issue." << rsLog;
+    }
 
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_UNKNOWN);

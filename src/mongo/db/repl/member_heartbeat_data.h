@@ -147,7 +147,7 @@ public:
      * Sets values in this object from the results of a successful heartbeat command.
      * Returns whether or not the optimes advanced as a result of this heartbeat response.
      */
-    bool setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse&& hbResponse);
+    bool setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse);
 
     /**
      * Sets values in this object from the results of a erroring/failed heartbeat command.
