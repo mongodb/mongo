@@ -278,8 +278,8 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	entry->method = (*epp)->method;
 	len = strlen((*epp)->base) + strlen(",") + strlen(config) + 1;
 	WT_ERR(__wt_calloc_def(session, len, &p));
-	snprintf(p, len, "%s,%s", (*epp)->base, config);
 	entry->base = p;
+	WT_ERR(__wt_snprintf(p, len, "%s,%s", (*epp)->base, config));
 
 	/*
 	 * There may be a default value in the config argument passed in (for

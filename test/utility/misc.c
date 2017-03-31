@@ -108,14 +108,14 @@ testutil_clean_work_dir(const char *dir)
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
-	snprintf(buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir,
-		 RM_COMMAND, dir);
+	testutil_check(__wt_snprintf(
+	    buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir, RM_COMMAND, dir));
 #else
 	len = strlen(dir) + strlen(RM_COMMAND) + 1;
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
-	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
+	testutil_check(__wt_snprintf(buf, len, "%s%s", RM_COMMAND, dir));
 #endif
 
 	if ((ret = system(buf)) != 0 && ret != ENOENT)
@@ -142,7 +142,7 @@ testutil_make_work_dir(char *dir)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	/* mkdir shares syntax between Windows and Linux */
-	snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir);
+	testutil_check(__wt_snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir));
 	if ((ret = system(buf)) != 0)
 		testutil_die(ret, "%s", buf);
 	free(buf);

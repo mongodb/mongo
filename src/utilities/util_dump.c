@@ -259,14 +259,15 @@ dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp,
     const char *fmt, ...)
 	WT_GCC_FUNC_ATTRIBUTE((format (printf, 4, 5)))
 {
-	int n;
+	WT_DECL_RET;
+	size_t n;
 	va_list ap;
 
 	va_start(ap, fmt);
-	n = vsnprintf(*bufp, *leftp, fmt, ap);
+	ret = __wt_vsnprintf_len_set(*bufp, *leftp, &n, fmt, ap);
 	va_end(ap);
-	if (n < 0)
-		return (util_err(session, EINVAL, NULL));
+	if (ret != 0)
+		return (util_err(session, ret, NULL));
 	*bufp += n;
 	*leftp -= (size_t)n;
 	return (0);
@@ -435,9 +436,11 @@ dump_table_parts_config(WT_SESSION *session, WT_CURSOR *cursor,
 
 	len = strlen(entry) + strlen(name) + 1;
 	if ((uriprefix = malloc(len)) == NULL)
-		return util_err(session, errno, NULL);
-
-	snprintf(uriprefix, len, "%s%s", entry, name);
+		return (util_err(session, errno, NULL));
+	if ((ret = __wt_snprintf(uriprefix, len, "%s%s", entry, name)) != 0) {
+		free(uriprefix);
+		return (util_err(session, ret, NULL));
+	}
 
 	/*
 	 * Search the file looking for column group and index key/value pairs:

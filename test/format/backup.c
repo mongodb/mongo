@@ -63,7 +63,7 @@ copy_file(WT_SESSION *session, const char *name)
 
 	len = strlen("BACKUP") + strlen(name) + 10;
 	first = dmalloc(len);
-	(void)snprintf(first, len, "BACKUP/%s", name);
+	testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
 	testutil_check(__wt_copy_and_sync(session, name, first));
 
 	/*
@@ -72,7 +72,7 @@ copy_file(WT_SESSION *session, const char *name)
 	 */
 	len = strlen("BACKUP_COPY") + strlen(name) + 10;
 	second = dmalloc(len);
-	(void)snprintf(second, len, "BACKUP_COPY/%s", name);
+	testutil_check(__wt_snprintf(second, len, "BACKUP_COPY/%s", name));
 	testutil_check(__wt_copy_and_sync(session, first, second));
 
 	free(first);

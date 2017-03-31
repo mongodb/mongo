@@ -359,6 +359,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	} else
 		F_CLR(btree, WT_BTREE_IGNORE_CACHE);
 
+	/*
+	 * The metadata isn't blocked by in-memory cache limits because metadata
+	 * "unroll" is performed by updates that are potentially blocked by the
+	 * cache-full checks.
+	 */
+	if (WT_IS_METADATA(btree->dhandle))
+		F_SET(btree, WT_BTREE_IGNORE_CACHE);
+
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	if (cval.val)
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
@@ -780,9 +788,16 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * Get the split percentage (reconciliation splits pages into smaller
 	 * than the maximum page size chunks so we don't split every time a
 	 * new entry is added). Determine how large newly split pages will be.
+	 * Set to the minimum, if the read value is less than that.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	btree->split_pct = (int)cval.val;
+	if (cval.val < WT_BTREE_MIN_SPLIT_PCT) {
+		btree->split_pct = WT_BTREE_MIN_SPLIT_PCT;
+		WT_RET(__wt_msg(session,
+		    "Re-setting split_pct for %s to the minimum allowed of "
+		    "%d%%.", session->dhandle->name, WT_BTREE_MIN_SPLIT_PCT));
+	} else
+		btree->split_pct = (int)cval.val;
 	intl_split_size = __wt_split_page_size(btree, btree->maxintlpage);
 	leaf_split_size = __wt_split_page_size(btree, btree->maxleafpage);
 

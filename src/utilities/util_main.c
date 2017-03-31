@@ -257,9 +257,13 @@ main(int argc, char *argv[])
 		(void)util_err(NULL, errno, NULL);
 		goto err;
 	}
-	(void)snprintf(p, len, "%s,%s,%s%s%s%s",
+	if ((ret = __wt_snprintf(p, len, "%s,%s,%s%s%s%s",
 	    config == NULL ? "" : config,
-	    cmd_config == NULL ? "" : cmd_config, rec_config, p1, p2, p3);
+	    cmd_config == NULL ? "" : cmd_config,
+	    rec_config, p1, p2, p3)) != 0) {
+		(void)util_err(NULL, ret, NULL);
+		goto err;
+	}
 	config = p;
 
 	/* Open the database and a session. */
@@ -298,6 +302,7 @@ done:
 char *
 util_uri(WT_SESSION *session, const char *s, const char *type)
 {
+	WT_DECL_RET;
 	size_t len;
 	char *name;
 
@@ -321,8 +326,12 @@ util_uri(WT_SESSION *session, const char *s, const char *type)
 	 * the default type for the operation.
 	 */
 	if (strchr(s, ':') != NULL)
-		snprintf(name, len, "%s", s);
+		WT_ERR(__wt_snprintf(name, len, "%s", s));
 	else
-		snprintf(name, len, "%s:%s", type, s);
+		WT_ERR(__wt_snprintf(name, len, "%s:%s", type, s));
 	return (name);
+
+err:	free(name);
+	(void)util_err(session, ret, NULL);
+	return (NULL);
 }

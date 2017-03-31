@@ -142,8 +142,20 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 int
 __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
-	WT_RET(__key_return(session, cbt));
+	WT_CURSOR *cursor;
 
+	cursor = &cbt->iface;
+
+	/*
+	 * We may already have an internal key, in which case the cursor may
+	 * not be set up to get another copy (for example, when we rely on a
+	 * search-function result).
+	 */
+	F_CLR(cursor, WT_CURSTD_KEY_EXT);
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+		WT_RET(__key_return(session, cbt));
+		F_SET(cursor, WT_CURSTD_KEY_INT);
+	}
 	return (0);
 }
 
@@ -154,8 +166,15 @@ __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 int
 __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
+	WT_CURSOR *cursor;
+
+	cursor = &cbt->iface;
+
 	WT_RET(__wt_key_return(session, cbt));
+
+	F_CLR(cursor, WT_CURSTD_VALUE_EXT);
 	WT_RET(__value_return(session, cbt, upd));
+	F_SET(cursor, WT_CURSTD_VALUE_INT);
 
 	return (0);
 }

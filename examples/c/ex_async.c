@@ -170,12 +170,12 @@ main(void)
 		 * an asynchronous insert.
 		 */
 		/*! [async set the operation's string key] */
-		snprintf(k[i], sizeof(k), "key%d", i);
+		(void)snprintf(k[i], sizeof(k), "key%d", i);
 		op->set_key(op, k[i]);
 		/*! [async set the operation's string key] */
 
 		/*! [async set the operation's string value] */
-		snprintf(v[i], sizeof(v), "value%d", i);
+		(void)snprintf(v[i], sizeof(v), "value%d", i);
 		op->set_value(op, v[i]);
 		/*! [async set the operation's string value] */
 
@@ -218,7 +218,7 @@ main(void)
 		 * Set the operation's string key and value, and then do
 		 * an asynchronous search.
 		 */
-		snprintf(k[i], sizeof(k), "key%d", i);
+		(void)snprintf(k[i], sizeof(k), "key%d", i);
 		op->set_key(op, k[i]);
 		ret = op->search(op);
 		/*! [async search] */

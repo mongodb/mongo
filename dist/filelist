@@ -133,6 +133,7 @@ src/os_posix/os_path.c			POSIX_HOST
 src/os_posix/os_priv.c			POSIX_HOST
 src/os_posix/os_setvbuf.c		POSIX_HOST
 src/os_posix/os_sleep.c			POSIX_HOST
+src/os_posix/os_snprintf.c		POSIX_HOST
 src/os_posix/os_thread.c		POSIX_HOST
 src/os_posix/os_time.c			POSIX_HOST
 src/os_posix/os_yield.c			POSIX_HOST
@@ -152,7 +153,6 @@ src/os_win/os_snprintf.c		WINDOWS_HOST
 src/os_win/os_thread.c			WINDOWS_HOST
 src/os_win/os_time.c			WINDOWS_HOST
 src/os_win/os_utf8.c			WINDOWS_HOST
-src/os_win/os_vsnprintf.c		WINDOWS_HOST
 src/os_win/os_winerr.c			WINDOWS_HOST
 src/os_win/os_yield.c			WINDOWS_HOST
 src/packing/pack_api.c

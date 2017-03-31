@@ -52,8 +52,8 @@ main(int argc, char *argv[])
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
-	snprintf(buf, sizeof(buf),
-	    "create,extensions=(" WT_FAIL_FS_LIB "=(early_load=true))");
+	testutil_check(__wt_snprintf(buf, sizeof(buf),
+	    "create,extensions=(" WT_FAIL_FS_LIB "=(early_load=true))"));
 	testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));

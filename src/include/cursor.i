@@ -76,23 +76,6 @@ __cursor_leave(WT_SESSION_IMPL *session)
 }
 
 /*
- * __curfile_enter --
- *	Activate a file cursor.
- */
-static inline int
-__curfile_enter(WT_CURSOR_BTREE *cbt)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	if (!F_ISSET(cbt, WT_CBT_NO_TXN))
-		WT_RET(__cursor_enter(session));
-	F_SET(cbt, WT_CBT_ACTIVE);
-	return (0);
-}
-
-/*
  * __cursor_reset --
  *	Reset the cursor, it no longer holds any position.
  */
@@ -264,8 +247,12 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 	/* If the transaction is idle, check that the cache isn't full. */
 	WT_RET(__wt_txn_idle_cache_check(session));
 
-	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
-		WT_RET(__curfile_enter(cbt));
+	/* Activate the file cursor. */
+	if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
+		if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+			WT_RET(__cursor_enter(session));
+		F_SET(cbt, WT_CBT_ACTIVE);
+	}
 
 	/*
 	 * If this is an ordinary transactional cursor, make sure we are set up

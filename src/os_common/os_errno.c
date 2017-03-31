@@ -44,7 +44,7 @@ __wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 	 * Fallback to a generic message.
 	 */
 	if (session == NULL &&
-	    snprintf(errbuf, errlen, "error return: %d", error) > 0)
+	    __wt_snprintf(errbuf, errlen, "error return: %d", error) == 0)
 		return (errbuf);
 	if (session != NULL && __wt_buf_fmt(
 	    session, &session->err, "error return: %d", error) == 0)

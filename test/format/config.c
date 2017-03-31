@@ -63,39 +63,42 @@ config_setup(void)
 	config_in_memory();
 
 	/*
-	 * Choose a data source type and a file type: they're interrelated (LSM
-	 * trees are only compatible with row-store) and other items depend on
-	 * them.
+	 * Choose a file format and a data source: they're interrelated (LSM is
+	 * only compatible with row-store) and other items depend on them.
 	 */
+	if (!config_is_perm("file_type")) {
+		if (config_is_perm("data_source") && DATASOURCE("lsm"))
+			config_single("file_type=row", 0);
+		else
+			switch (mmrand(NULL, 1, 10)) {
+			case 1:					/* 10% */
+				config_single("file_type=fix", 0);
+				break;
+			case 2: case 3: case 4:			/* 30% */
+				config_single("file_type=var", 0);
+				break;				/* 60% */
+			case 5: case 6: case 7: case 8: case 9: case 10:
+				config_single("file_type=row", 0);
+				break;
+			}
+	}
+	config_map_file_type(g.c_file_type, &g.type);
+
 	if (!config_is_perm("data_source"))
 		switch (mmrand(NULL, 1, 3)) {
 		case 1:
 			config_single("data_source=file", 0);
 			break;
 		case 2:
-			if (!g.c_in_memory) {
-				config_single("data_source=lsm", 0);
-				break;
-			}
-			/* FALLTHROUGH */
-		case 3:
 			config_single("data_source=table", 0);
 			break;
-		}
-
-	if (!config_is_perm("file_type"))
-		switch (DATASOURCE("lsm") ? 5 : mmrand(NULL, 1, 10)) {
-		case 1:
-			config_single("file_type=fix", 0);
-			break;
-		case 2: case 3: case 4:
-			config_single("file_type=var", 0);
-			break;
-		case 5: case 6: case 7: case 8: case 9: case 10:
-			config_single("file_type=row", 0);
+		case 3:
+			if (g.c_in_memory || g.type != ROW)
+				config_single("data_source=table", 0);
+			else
+				config_single("data_source=lsm", 0);
 			break;
 		}
-	config_map_file_type(g.c_file_type, &g.type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still
@@ -254,8 +257,8 @@ config_compression(const char *conf_name)
 	 */
 	cstr = "none";
 	if (strcmp(conf_name, "logging_compression") == 0 && g.c_logging == 0) {
-		(void)snprintf(
-		    confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
+		testutil_check(__wt_snprintf(
+		    confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr));
 		config_single(confbuf, 0);
 		return;
 	}
@@ -299,7 +302,8 @@ config_compression(const char *conf_name)
 		break;
 	}
 
-	(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr);
+	testutil_check(__wt_snprintf(
+	    confbuf, sizeof(confbuf), "%s=%s", conf_name, cstr));
 	config_single(confbuf, 0);
 }
 
@@ -675,7 +679,8 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	long v;
+	long vlong;
+	uint32_t v;
 	char *p;
 	const char *ep;
 
@@ -740,21 +745,22 @@ config_single(const char *s, int perm)
 		return;
 	}
 
-	v = -1;
+	vlong = -1;
 	if (F_ISSET(cp, C_BOOL)) {
 		if (strncmp(ep, "off", strlen("off")) == 0)
-			v = 0;
+			vlong = 0;
 		else if (strncmp(ep, "on", strlen("on")) == 0)
-			v = 1;
+			vlong = 1;
 	}
-	if (v == -1) {
-		v = strtol(ep, &p, 10);
+	if (vlong == -1) {
+		vlong = strtol(ep, &p, 10);
 		if (*p != '\0') {
 			fprintf(stderr, "%s: %s: illegal numeric value\n",
 			    progname, s);
 			exit(EXIT_FAILURE);
 		}
 	}
+	v = (uint32_t)vlong;
 	if (F_ISSET(cp, C_BOOL)) {
 		if (v != 0 && v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",
@@ -767,7 +773,7 @@ config_single(const char *s, int perm)
 		    progname, s, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
-	*cp->v = (uint32_t)v;
+	*cp->v = v;
 }
 
 /*

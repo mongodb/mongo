@@ -413,7 +413,7 @@ __wt_cache_page_image_incr(WT_SESSION_IMPL *session, uint32_t size)
  *	Evict pages from the cache.
  */
 static inline void
-__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -456,7 +456,15 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update pages and bytes evicted. */
 	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
-	(void)__wt_atomic_addv64(&cache->pages_evict, 1);
+
+	/*
+	 * Don't count rewrites as eviction: there's no guarantee we are making
+	 * real progress.
+	 */
+	if (rewrite)
+		(void)__wt_atomic_subv64(&cache->pages_inmem, 1);
+	else
+		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
 }
 
 /*

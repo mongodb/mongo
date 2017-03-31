@@ -157,11 +157,11 @@ wt_startup(char *config_open)
 
 	testutil_make_work_dir(home);
 
-	snprintf(config_buf, sizeof(config_buf),
+	testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
-	    config_open == NULL ? "" : config_open);
+	    config_open == NULL ? "" : config_open));
 	if ((ret = wiredtiger_open(
 	    home, &event_handler, config_buf, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");

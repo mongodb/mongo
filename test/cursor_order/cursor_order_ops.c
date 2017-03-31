@@ -69,7 +69,8 @@ ops_start(SHARED_CONFIG *cfg)
 		run_info[i].cfg = cfg;
 		if (i == 0 || cfg->multiple_files) {
 			run_info[i].name = dmalloc(64);
-			snprintf(run_info[i].name, 64, FNAME, (int)i);
+			testutil_check(__wt_snprintf(
+			    run_info[i].name, 64, FNAME, (int)i));
 
 			/* Vary by orders of magnitude */
 			if (cfg->vary_nops)
@@ -93,8 +94,8 @@ ops_start(SHARED_CONFIG *cfg)
 			run_info[offset].name = dmalloc(64);
 			/* Have reverse scans read from tables with writes. */
 			name_index = i % cfg->append_inserters;
-			snprintf(
-			    run_info[offset].name, 64, FNAME, (int)name_index);
+			testutil_check(__wt_snprintf(
+			    run_info[offset].name, 64, FNAME, (int)name_index));
 
 			/* Vary by orders of magnitude */
 			if (cfg->vary_nops)
@@ -231,7 +232,7 @@ reverse_scan(void *arg)
 	id = (uintmax_t)arg;
 	s = &run_info[id];
 	cfg = s->cfg;
-	__wt_thread_id(tid, sizeof(tid));
+	testutil_check(__wt_thread_id(tid, sizeof(tid)));
 	__wt_random_init(&s->rnd);
 
 	printf(" reverse scan thread %2" PRIuMAX
@@ -272,6 +273,7 @@ append_insert_op(
 {
 	WT_ITEM *value, _value;
 	uint64_t keyno;
+	size_t len;
 	int ret;
 	char keybuf[64], valuebuf[64];
 
@@ -281,7 +283,8 @@ append_insert_op(
 
 	keyno = __wt_atomic_add64(&cfg->key_range, 1);
 	if (cfg->ftype == ROW) {
-		snprintf(keybuf, sizeof(keybuf), "%016u", (u_int)keyno);
+		testutil_check(__wt_snprintf(
+		    keybuf, sizeof(keybuf), "%016" PRIu64, keyno));
 		cursor->set_key(cursor, keybuf);
 	} else
 		cursor->set_key(cursor, (uint32_t)keyno);
@@ -291,8 +294,9 @@ append_insert_op(
 	if (cfg->ftype == FIX)
 		cursor->set_value(cursor, 0x10);
 	else {
-		value->size = (uint32_t)snprintf(
-		    valuebuf, sizeof(valuebuf), "XXX %37u", (u_int)keyno);
+		testutil_check(__wt_snprintf_len_set(
+		    valuebuf, sizeof(valuebuf), &len, "XXX %37" PRIu64, keyno));
+		value->size = (uint32_t)len;
 		cursor->set_value(cursor, value);
 	}
 	if ((ret = cursor->insert(cursor)) != 0)
@@ -318,7 +322,7 @@ append_insert(void *arg)
 	id = (uintmax_t)arg;
 	s = &run_info[id];
 	cfg = s->cfg;
-	__wt_thread_id(tid, sizeof(tid));
+	testutil_check(__wt_thread_id(tid, sizeof(tid)));
 	__wt_random_init(&s->rnd);
 
 	printf("write thread %2" PRIuMAX " starting: tid: %s, file: %s\n",

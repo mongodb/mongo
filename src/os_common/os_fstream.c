@@ -144,7 +144,7 @@ __fstream_printf(
 		p = (char *)((uint8_t *)buf->mem + buf->size);
 		WT_ASSERT(session, buf->memsize >= buf->size);
 		space = buf->memsize - buf->size;
-		len = (size_t)vsnprintf(p, space, fmt, ap_copy);
+		WT_RET(__wt_vsnprintf_len_set(p, space, &len, fmt, ap_copy));
 		va_end(ap_copy);
 
 		if (len < space) {

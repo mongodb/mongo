@@ -30,11 +30,6 @@
 
 #include <sys/wait.h>
 
-#ifdef _WIN32
-/* snprintf is not supported on <= VS2013 */
-#define	snprintf _snprintf
-#endif
-
 static char home[1024];			/* Program working dir */
 static const char * const uri = "table:main";
 
@@ -137,7 +132,8 @@ usage(void)
  * Child process creates the database and table, and then writes data into
  * the table until it is killed by the parent.
  */
-static void fill_db(void)WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void fill_db(void)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
 fill_db(void)
 {
@@ -193,9 +189,9 @@ fill_db(void)
 	max_key = min_key * 2;
 	first = true;
 	for (i = 0; i < max_key; ++i) {
-		snprintf(k, sizeof(k), "key%03d", (int)i);
-		snprintf(v, sizeof(v), "value%0*d",
-		    (int)(V_SIZE - strlen("value")), (int)i);
+		testutil_check(__wt_snprintf(k, sizeof(k), "key%03d", (int)i));
+		testutil_check(__wt_snprintf(v, sizeof(v), "value%0*d",
+		    (int)(V_SIZE - (strlen("value") + 1)), (int)i));
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		if ((ret = cursor->insert(cursor)) != 0)
