@@ -2341,10 +2341,6 @@ bool BtreeLogic<BtreeLayout>::locate(OperationContext* txn,
 
     *bucketLocOut = _locate(txn, getRootLoc(txn), owned, posOut, &found, recordLoc, direction);
 
-    if (!found) {
-        return false;
-    }
-
     skipUnusedKeys(txn, bucketLocOut, posOut, direction);
 
     return found;
