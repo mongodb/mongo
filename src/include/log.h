@@ -193,7 +193,8 @@ struct __wt_myslot {
 	wt_off_t	 end_offset;	/* My end offset in buffer */
 	wt_off_t	 offset;	/* Slot buffer offset */
 #define	WT_MYSLOT_CLOSE		0x01	/* This thread is closing the slot */
-#define	WT_MYSLOT_UNBUFFERED	0x02	/* Write directly */
+#define	WT_MYSLOT_NEEDS_RELEASE	0x02	/* This thread is releasing the slot */
+#define	WT_MYSLOT_UNBUFFERED	0x04	/* Write directly */
 	uint32_t flags;			/* Flags */
 };
 

@@ -772,9 +772,11 @@ static const char * const __stats_connection_desc[] = {
 	"lock: table lock internal thread time waiting for the table lock (usecs)",
 	"log: busy returns attempting to switch slots",
 	"log: consolidated slot closures",
+	"log: consolidated slot join active slot closed",
 	"log: consolidated slot join races",
 	"log: consolidated slot join transitions",
 	"log: consolidated slot joins",
+	"log: consolidated slot transitions unable to find free slot",
 	"log: consolidated slot unbuffered writes",
 	"log: log bytes of payload data",
 	"log: log bytes written",
@@ -1056,9 +1058,11 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lock_table_wait_internal = 0;
 	stats->log_slot_switch_busy = 0;
 	stats->log_slot_closes = 0;
+	stats->log_slot_active_closed = 0;
 	stats->log_slot_races = 0;
 	stats->log_slot_transitions = 0;
 	stats->log_slot_joins = 0;
+	stats->log_slot_no_free_slots = 0;
 	stats->log_slot_unbuffered = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
@@ -1370,9 +1374,13 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, lock_table_wait_internal);
 	to->log_slot_switch_busy += WT_STAT_READ(from, log_slot_switch_busy);
 	to->log_slot_closes += WT_STAT_READ(from, log_slot_closes);
+	to->log_slot_active_closed +=
+	    WT_STAT_READ(from, log_slot_active_closed);
 	to->log_slot_races += WT_STAT_READ(from, log_slot_races);
 	to->log_slot_transitions += WT_STAT_READ(from, log_slot_transitions);
 	to->log_slot_joins += WT_STAT_READ(from, log_slot_joins);
+	to->log_slot_no_free_slots +=
+	    WT_STAT_READ(from, log_slot_no_free_slots);
 	to->log_slot_unbuffered += WT_STAT_READ(from, log_slot_unbuffered);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);

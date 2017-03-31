@@ -405,9 +405,11 @@ struct __wt_connection_stats {
 	int64_t lock_table_wait_internal;
 	int64_t log_slot_switch_busy;
 	int64_t log_slot_closes;
+	int64_t log_slot_active_closed;
 	int64_t log_slot_races;
 	int64_t log_slot_transitions;
 	int64_t log_slot_joins;
+	int64_t log_slot_no_free_slots;
 	int64_t log_slot_unbuffered;
 	int64_t log_bytes_payload;
 	int64_t log_bytes_written;
