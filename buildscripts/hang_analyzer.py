@@ -512,8 +512,6 @@ def main():
                     (process[1], process[0]))
                 signal_process(process[0], signal.SIGUSR1)
 
-            dbg.dump_info(process[0], process[1], sys.stdout)
-
     # Suspend the timer so we can exit cleanly
     timer.cancel()
 
