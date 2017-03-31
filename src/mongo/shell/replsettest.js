@@ -136,14 +136,6 @@ var ReplSetTest = function(opts) {
         return self.liveNodes.master || false;
     }
 
-    function asCluster(conn, fn) {
-        if (self.keyFile) {
-            return authutil.asCluster(conn, self.keyFile, fn);
-        } else {
-            return fn();
-        }
-    }
-
     /**
      * Returns 'true' if the test has been configured to run without journaling enabled.
      */
@@ -773,12 +765,7 @@ var ReplSetTest = function(opts) {
      */
     this.initiateWithNodeZeroAsPrimary = function(cfg, initCmd) {
         this.initiateWithAnyNodeAsPrimary(cfg, initCmd);
-
-        // stepUp() calls awaitReplication() which requires all nodes to be authorized to run
-        // replSetGetStatus.
-        asCluster(this.nodes, function() {
-            self.stepUp(self.nodes[0]);
-        });
+        this.stepUp(this.nodes[0]);
     };
 
     /**
@@ -797,7 +784,6 @@ var ReplSetTest = function(opts) {
      */
     this.stepUp = function(node) {
         this.awaitSecondaryNodes();
-        this.awaitReplication();
         this.awaitNodesAgreeOnPrimary();
         if (this.getPrimary() === node) {
             return;
@@ -818,7 +804,6 @@ var ReplSetTest = function(opts) {
                     print("Caught exception while stepping down node '" + tojson(node.host) +
                           "': " + tojson(ex));
                 }
-                this.awaitReplication();
                 this.awaitNodesAgreeOnPrimary();
             }
 
