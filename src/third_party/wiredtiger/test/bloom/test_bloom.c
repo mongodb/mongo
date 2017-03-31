@@ -29,8 +29,6 @@
 #include "test_util.h"
 
 static struct {
-	char *progname;				/* Program name */
-
 	WT_CONNECTION *wt_conn;			/* WT_CONNECTION handle */
 	WT_SESSION *wt_session;			/* WT_SESSION handle */
 
@@ -61,10 +59,7 @@ main(int argc, char *argv[])
 {
 	int ch;
 
-	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		g.progname = argv[0];
-	else
-		++g.progname;
+	(void)testutil_set_progname(argv);
 
 	/* Set default configuration values. */
 	g.c_cache = 10;
@@ -75,7 +70,7 @@ main(int argc, char *argv[])
 	g.c_srand = 3233456;
 
 	/* Set values from the command line. */
-	while ((ch = __wt_getopt(g.progname, argc, argv, "c:f:k:o:s:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "c:f:k:o:s:")) != EOF)
 		switch (ch) {
 		case 'c':			/* Cache size */
 			g.c_cache = (u_int)atoi(__wt_optarg);
@@ -126,9 +121,9 @@ setup(void)
 	 * Open configuration -- put command line configuration options at the
 	 * end so they can override "standard" configuration.
 	 */
-	snprintf(config, sizeof(config),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s",
-	    g.progname, g.c_cache, g.config_open == NULL ? "" : g.config_open);
+	    progname, g.c_cache, g.config_open == NULL ? "" : g.config_open));
 
 	testutil_check(wiredtiger_open(NULL, NULL, config, &conn));
 
@@ -246,7 +241,7 @@ populate_entries(void)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cfkos]\n", g.progname);
+	fprintf(stderr, "usage: %s [-cfkos]\n", progname);
 	fprintf(stderr, "%s",
 	    "\t-c cache size\n"
 	    "\t-f number of bits per item\n"

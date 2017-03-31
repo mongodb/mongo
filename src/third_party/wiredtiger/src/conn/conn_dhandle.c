@@ -12,16 +12,20 @@
  * __conn_dhandle_destroy --
  *	Destroy a data handle.
  */
-static void
+static int
 __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
+	WT_DECL_RET;
+
+	WT_WITH_DHANDLE(session, dhandle, ret = __wt_btree_discard(session));
+
 	__wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
-	__wt_free(session, dhandle->handle);
 	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_stat_dsrc_discard(session, dhandle);
 	__wt_overwrite_and_free(session, dhandle);
+	return (ret);
 }
 
 /*
@@ -84,7 +88,7 @@ __wt_conn_dhandle_alloc(
 	session->dhandle = dhandle;
 	return (0);
 
-err:	__conn_dhandle_destroy(session, dhandle);
+err:	WT_TRET(__conn_dhandle_destroy(session, dhandle));
 	return (ret);
 }
 
@@ -156,11 +160,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/*
-	 * If we don't already have the schema lock, make it an error to try
-	 * to acquire it.  The problem is that we are holding an exclusive
-	 * lock on the handle, and if we attempt to acquire the schema lock
-	 * we might deadlock with a thread that has the schema lock and wants
-	 * a handle lock (specifically, checkpoint).
+	 * If we don't already have the schema lock, make it an error to try to
+	 * acquire it.  The problem is that we are holding an exclusive lock on
+	 * the handle, and if we attempt to acquire the schema lock we might
+	 * deadlock with a thread that has the schema lock and wants a handle
+	 * lock.
 	 */
 	no_schema_lock = false;
 	if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
@@ -200,6 +204,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	}
 
 	WT_TRET(__wt_btree_close(session));
+	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 	/*
 	 * If we marked a handle dead it will be closed by sweep, via
@@ -309,7 +314,8 @@ __wt_conn_btree_open(
 	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
 	    !LF_ISSET(WT_DHANDLE_LOCK_ONLY));
 
-	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING));
+	WT_ASSERT(session,
+	     !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
 	/*
 	 * If the handle is already open, it has to be closed so it can be
@@ -403,10 +409,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 		return (ret == EBUSY ? 0 : ret);
 
 	WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
-	if (WT_META_TRACKING(session))
-		WT_TRET(__wt_meta_track_handle_lock(session, false));
-	else
-		WT_TRET(__wt_session_release_btree(session));
+	WT_TRET(__wt_session_release_btree(session));
 	return (ret);
 }
 
@@ -500,7 +503,12 @@ __wt_conn_dhandle_close_all(
 
 		session->dhandle = dhandle;
 
-		/* Lock the handle exclusively. */
+		/*
+		 * Lock the handle exclusively.  If this is part of
+		 * schema-changing operation (indicated by metadata tracking
+		 * being enabled), hold the lock for the duration of the
+		 * operation.
+		 */
 		WT_ERR(__wt_session_get_btree(session,
 		    dhandle->name, dhandle->checkpoint,
 		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
@@ -611,7 +619,7 @@ __wt_conn_dhandle_discard_single(
 	 */
 	if (ret == 0 || final) {
 		__conn_btree_config_clear(session);
-		__conn_dhandle_destroy(session, dhandle);
+		WT_TRET(__conn_dhandle_destroy(session, dhandle));
 		session->dhandle = NULL;
 	}
 

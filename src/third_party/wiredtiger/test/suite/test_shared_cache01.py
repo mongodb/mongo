@@ -73,7 +73,7 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
             os.mkdir(name)
             next_conn =  self.wiredtiger_open(
                 name,
-                'create,error_prefix="' + self.shortid() + ': "' +
+                'create,error_prefix="%s",' % self.shortid() +
                 pool_opts + extra_opts)
             self.conns.append(next_conn)
             self.sessions.append(next_conn.open_session(None))

@@ -31,11 +31,11 @@ from wtscenario import make_scenarios
 
 # test_cursor10.py
 #     Cursors with projections.
-class test_cursor04(wttest.WiredTigerTestCase):
+class test_cursor10(wttest.WiredTigerTestCase):
     """
     Test cursor search and search_near
     """
-    table_name1 = 'test_cursor04'
+    table_name1 = 'test_cursor10'
     nentries = 20
 
     scenarios = make_scenarios([

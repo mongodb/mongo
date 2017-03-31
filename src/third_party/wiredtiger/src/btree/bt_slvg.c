@@ -166,13 +166,11 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	WT_DECL_RET;
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
-	bool evict_reset;
 
 	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
 	bm = btree->bm;
-	evict_reset = false;
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -182,13 +180,6 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	/* Allocate temporary buffers. */
 	WT_ERR(__wt_scr_alloc(session, 0, &ss->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &ss->tmp2));
-
-	/*
-	 * Salvage handles its own page eviction; get exclusive access to the
-	 * file, have eviction ignore the tree entirely.
-	 */
-	WT_ERR(__wt_evict_file_exclusive_on(session));
-	evict_reset = true;
 
 	/*
 	 * Step 1:
@@ -349,9 +340,6 @@ err:	WT_TRET(bm->salvage_end(bm, session));
 	/* Discard any root page we created. */
 	if (ss->root_ref.page != NULL)
 		__wt_ref_out(session, &ss->root_ref);
-
-	if (evict_reset)
-	    __wt_evict_file_exclusive_off(session);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));

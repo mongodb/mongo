@@ -438,14 +438,13 @@ config_opt(WTPERF *wtperf, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			return (EINVAL);
 		}
 		strp = (char **)valueloc;
-		newlen = v->len + 1;
 		if (*strp == NULL)
 			begin = newstr = dstrdup(v->str);
 		else {
-			newlen += strlen(*strp) + 1;
-			newstr = dcalloc(newlen, sizeof(char));
-			snprintf(newstr, newlen,
-			    "%s,%*s", *strp, (int)v->len, v->str);
+			newlen = strlen(*strp) + v->len + strlen(",") + 1;
+			newstr = dmalloc(newlen);
+			testutil_check(__wt_snprintf(newstr, newlen,
+			    "%s,%.*s", *strp, (int)v->len, v->str));
 			/* Free the old value now we've copied it. */
 			free(*strp);
 			begin = &newstr[(newlen - 1) - v->len];
@@ -712,7 +711,7 @@ config_opt_name_value(WTPERF *wtperf, const char *name, const char *value)
 							/* name="value" */
 	len = strlen(name) + strlen(value) + 4;
 	optstr = dmalloc(len);
-	snprintf(optstr, len, "%s=\"%s\"", name, value);
+	testutil_check(__wt_snprintf(optstr, len, "%s=\"%s\"", name, value));
 	ret = config_opt_str(wtperf, optstr);
 	free(optstr);
 	return (ret);

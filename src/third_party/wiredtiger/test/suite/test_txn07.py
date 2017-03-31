@@ -76,7 +76,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     def conn_config(self):
         return 'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
         'compressor=%s)' % self.compress + \
-        ',create,error_prefix="%s: ",' % self.shortid() + \
+        ',create,error_prefix="%s",' % self.shortid() + \
         "statistics=(fast)," + \
         'transaction_sync="%s",' % \
         self.sync_list[self.scenario_number % len(self.sync_list)]

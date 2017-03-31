@@ -215,7 +215,7 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	WT_CONFIG_ENTRY *entry;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	size_t cnt;
+	size_t cnt, len;
 	char *newcheck_name, *p;
 
 	/*
@@ -276,12 +276,10 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_calloc_one(session, &entry));
 	entry->method = (*epp)->method;
-	WT_ERR(__wt_calloc_def(session,
-	    strlen((*epp)->base) + strlen(",") + strlen(config) + 1, &p));
-	(void)strcpy(p, (*epp)->base);
-	(void)strcat(p, ",");
-	(void)strcat(p, config);
+	len = strlen((*epp)->base) + strlen(",") + strlen(config) + 1;
+	WT_ERR(__wt_calloc_def(session, len, &p));
 	entry->base = p;
+	WT_ERR(__wt_snprintf(p, len, "%s,%s", (*epp)->base, config));
 
 	/*
 	 * There may be a default value in the config argument passed in (for

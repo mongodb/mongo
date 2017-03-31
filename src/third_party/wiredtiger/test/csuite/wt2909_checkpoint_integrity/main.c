@@ -96,9 +96,8 @@ static void run_check_subtest(TEST_OPTS *, const char *, uint64_t, bool,
     uint64_t *);
 static void run_check_subtest_range(TEST_OPTS *, const char *, bool);
 static int run_process(TEST_OPTS *, const char *, char *[], int *);
-static int subtest_main(int, char *[], bool);
+static void subtest_main(int, char *[], bool);
 static void subtest_populate(TEST_OPTS *, bool);
-int main(int, char *[]);
 
 extern int   __wt_optind;
 
@@ -268,9 +267,11 @@ enable_failures(uint64_t allow_writes, uint64_t allow_reads)
 	char value[100];
 
 	testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
-	snprintf(value, sizeof(value), "%" PRIu64, allow_writes);
+	testutil_check(__wt_snprintf(
+	    value, sizeof(value), "%" PRIu64, allow_writes));
 	testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
-	snprintf(value, sizeof(value), "%" PRIu64, allow_reads);
+	testutil_check(__wt_snprintf(
+	    value, sizeof(value), "%" PRIu64, allow_reads));
 	testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
 }
 
@@ -326,10 +327,11 @@ run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
 	subtest_args[narg++] = (char *)"-v";	/* subtest is always verbose */
 	subtest_args[narg++] = (char *)"-p";
 	subtest_args[narg++] = (char *)"-o";
-	snprintf(sarg, sizeof(sarg), "%" PRIu64, nops);
+	testutil_check(__wt_snprintf(sarg, sizeof(sarg), "%" PRIu64, nops));
 	subtest_args[narg++] = sarg;		/* number of operations */
 	subtest_args[narg++] = (char *)"-n";
-	snprintf(rarg, sizeof(rarg), "%" PRIu64, opts->nrecords);
+	testutil_check(__wt_snprintf(
+	    rarg, sizeof(rarg), "%" PRIu64, opts->nrecords));
 	subtest_args[narg++] = rarg;		/* number of records */
 	subtest_args[narg++] = NULL;
 	testutil_assert(narg <= MAX_ARGS);
@@ -446,7 +448,7 @@ run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
  * subtest_main --
  *	The main program for the subtest
  */
-static int
+static void
 subtest_main(int argc, char *argv[], bool close_test)
 {
 	TEST_OPTS *opts, _opts;
@@ -454,8 +456,6 @@ subtest_main(int argc, char *argv[], bool close_test)
 	char config[1024], filename[1024];
 	struct rlimit rlim;
 
-	if (testutil_disable_long_tests())
-		return (0);
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
 	memset(&rlim, 0, sizeof(rlim));
@@ -466,15 +466,17 @@ subtest_main(int argc, char *argv[], bool close_test)
 	testutil_make_work_dir(opts->home);
 
 	/* Redirect stderr, stdout. */
-	sprintf(filename, "%s/%s", opts->home, STDERR_FILE);
+	testutil_check(__wt_snprintf(
+	    filename, sizeof(filename), "%s/%s", opts->home, STDERR_FILE));
 	testutil_assert(freopen(filename, "a", stderr) != NULL);
-	sprintf(filename, "%s/%s", opts->home, STDOUT_FILE);
+	testutil_check(__wt_snprintf(
+	    filename, sizeof(filename), "%s/%s", opts->home, STDOUT_FILE));
 	testutil_assert(freopen(filename, "a", stdout) != NULL);
-	snprintf(config, sizeof(config),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,cache_size=250M,log=(enabled),"
 	    "transaction_sync=(enabled,method=none),extensions=("
 	    WT_FAIL_FS_LIB
-	    "=(early_load,config={environment=true,verbose=true})]");
+	    "=(early_load,config={environment=true,verbose=true})]"));
 
 	testutil_check(wiredtiger_open(opts->home, NULL, config, &opts->conn));
 	testutil_check(
@@ -499,8 +501,6 @@ subtest_main(int argc, char *argv[], bool close_test)
 	subtest_populate(opts, close_test);
 
 	testutil_cleanup(opts);
-
-	return (0);
 }
 
 /*
@@ -622,8 +622,9 @@ main(int argc, char *argv[])
 	uint64_t nresults;
 	const char *debugger;
 
-	if (testutil_disable_long_tests())
-		return (0);
+	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+		return (EXIT_SUCCESS);
+
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
 	debugger = NULL;
@@ -635,11 +636,13 @@ main(int argc, char *argv[])
 		opts->nrecords = 50000;
 
 	while (argc > 0) {
-		if (strcmp(argv[0], "subtest") == 0)
-			return (subtest_main(argc, argv, false));
-		else if (strcmp(argv[0], "subtest_close") == 0)
-			return (subtest_main(argc, argv, true));
-		else if (strcmp(argv[0], "gdb") == 0)
+		if (strcmp(argv[0], "subtest") == 0) {
+			subtest_main(argc, argv, false);
+			return (0);
+		} else if (strcmp(argv[0], "subtest_close") == 0) {
+			subtest_main(argc, argv, true);
+			return (0);
+		} else if (strcmp(argv[0], "gdb") == 0)
 			debugger = "/usr/bin/gdb";
 		else
 			testutil_assert(false);

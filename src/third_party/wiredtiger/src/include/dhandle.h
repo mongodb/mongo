@@ -38,20 +38,20 @@
 	(((WT_CURSOR_BTREE *)((s)->meta_cursor))->btree->dhandle)
 
 #define	WT_DHANDLE_ACQUIRE(dhandle)					\
-    (void)__wt_atomic_add32(&dhandle->session_ref, 1)
+    (void)__wt_atomic_add32(&(dhandle)->session_ref, 1)
 
 #define	WT_DHANDLE_RELEASE(dhandle)					\
-    (void)__wt_atomic_sub32(&dhandle->session_ref, 1)
+    (void)__wt_atomic_sub32(&(dhandle)->session_ref, 1)
 
 #define	WT_DHANDLE_NEXT(session, dhandle, head, field) do {		\
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));\
-	if (dhandle == NULL)						\
-		dhandle = TAILQ_FIRST(head);				\
+	if ((dhandle) == NULL)						\
+		(dhandle) = TAILQ_FIRST(head);				\
 	else {								\
 		    WT_DHANDLE_RELEASE(dhandle);			\
-		    dhandle = TAILQ_NEXT(dhandle, field);		\
+		    (dhandle) = TAILQ_NEXT(dhandle, field);		\
 	}								\
-	if (dhandle != NULL)						\
+	if ((dhandle) != NULL)						\
 		    WT_DHANDLE_ACQUIRE(dhandle);			\
 } while (0)
 

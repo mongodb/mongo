@@ -57,8 +57,8 @@ thread_append(void *arg)
 		if (opts->table_type == TABLE_FIX)
 			cursor->set_value(cursor, buf[0]);
 		else {
-			snprintf(buf, sizeof(buf),
-			    "%" PRIu64 " VALUE ------", recno);
+			testutil_check(__wt_snprintf(buf, sizeof(buf),
+			    "%" PRIu64 " VALUE ------", recno));
 			cursor->set_value(cursor, buf);
 		}
 		testutil_check(cursor->insert(cursor));
@@ -94,7 +94,8 @@ thread_insert_append(void *arg)
 	    session, opts->uri, NULL, NULL, &cursor));
 
 	for (i = 0; i < opts->nrecords; ++i) {
-		snprintf(kbuf, sizeof(kbuf), "%010d KEY------", (int)i);
+		testutil_check(__wt_snprintf(
+		    kbuf, sizeof(kbuf), "%010d KEY------", (int)i));
 		cursor->set_key(cursor, kbuf);
 		cursor->set_value(cursor, "========== VALUE =======");
 		testutil_check(cursor->insert(cursor));

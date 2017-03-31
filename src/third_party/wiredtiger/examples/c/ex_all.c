@@ -848,8 +848,8 @@ my_compare(WT_COLLATOR *collator, WT_SESSION *session,
 
 	p1 = (const char *)value1->data;
 	p2 = (const char *)value2->data;
-	while (*p1 != '\0' && *p1 == *p2)
-		p1++, p2++;
+	for (; *p1 != '\0' && *p1 == *p2; ++p1, ++p2)
+		;
 
 	*cmp = (int)*p2 - (int)*p1;
 	return (0);

@@ -80,8 +80,8 @@ cycle_idle_tables(void *arg)
 	}
 
 	for (cycle_count = 0; wtperf->idle_cycle_run; ++cycle_count) {
-		snprintf(uri, sizeof(uri),
-		    "%s_cycle%07d", wtperf->uris[0], cycle_count);
+		testutil_check(__wt_snprintf(uri, sizeof(uri),
+		    "%s_cycle%07d", wtperf->uris[0], cycle_count));
 		/* Don't busy cycle in this loop. */
 		__wt_sleep(1, 0);
 

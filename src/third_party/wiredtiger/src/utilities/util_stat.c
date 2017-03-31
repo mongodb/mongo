@@ -68,7 +68,10 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		fprintf(stderr, "%s: %s\n", progname, strerror(errno));
 		goto err;
 	}
-	snprintf(uri, urilen, "statistics:%s", objname);
+	if ((ret = __wt_snprintf(uri, urilen, "statistics:%s", objname)) != 0) {
+		fprintf(stderr, "%s: %s\n", progname, strerror(ret));
+		goto err;
+	}
 
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0) {

@@ -295,12 +295,12 @@ file_config = format_meta + file_runtime_config + [
     Config('split_deepen_per_child', '0', r'''
         entries allocated per child when deepening the tree''',
         type='int', undoc=True),
-    Config('split_pct', '75', r'''
+    Config('split_pct', '90', r'''
         the Btree page split size as a percentage of the maximum Btree
         page size, that is, when a Btree page is split, it will be
         split into smaller pages, where each page is the specified
         percentage of the maximum Btree page size''',
-        min='25', max='100'),
+        min='50', max='100'),
 ]
 
 # File metadata, including both configurable and non-configurable (internal)

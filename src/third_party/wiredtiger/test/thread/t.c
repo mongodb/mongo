@@ -37,7 +37,6 @@ int multiple_files;				/* File per thread */
 int session_per_op;				/* New session per operation */
 
 static char home[512];				/* Program working dir */
-static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
@@ -59,10 +58,7 @@ main(int argc, char *argv[])
 	int ch, cnt, runs;
 	char *config_open, *working_dir;
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	config_open = NULL;
 	working_dir = NULL;
@@ -189,19 +185,15 @@ wt_connect(char *config_open)
 	};
 	int ret;
 	char config[512];
-	size_t print_count;
 
 	testutil_clean_work_dir(home);
 	testutil_make_work_dir(home);
 
-	print_count = (size_t)snprintf(config, sizeof(config),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "create,statistics=(all),error_prefix=\"%s\",%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
-	    config_open == NULL ? "" : config_open);
-
-	if (print_count >= sizeof(config))
-		testutil_die(EINVAL, "Config string too long");
+	    config_open == NULL ? "" : config_open));
 
 	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");

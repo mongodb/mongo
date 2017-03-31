@@ -226,7 +226,7 @@ __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
 	    ci->discard.offset, ci->discard.size, ci->discard.checksum));
 	a = (uint64_t)ci->file_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
-	a = (uint64_t)ci->ckpt_size;
+	a = ci->ckpt_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 
 	return (0);

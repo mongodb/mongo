@@ -167,6 +167,8 @@ do population phase; false to use existing database
 number of WiredTiger databases to use. Each database will execute the  workload using a separate home directory and complete set of worker  threads
 @par drop_tables (boolean, default=false)
 Whether to drop all tables at the end of the run, and report time taken  to do the drop.
+@par in_memory (boolean, default=false)
+Whether to create the database in-memory.
 @par icount (unsigned int, default=5000)
 number of records to initially populate. If multiple tables are  configured the count is spread evenly across all tables.
 @par idle_table_cycle (unsigned int, default=0)

@@ -309,14 +309,11 @@ void
 __wt_log_written_reset(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
 
 	conn = S2C(session);
-	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-		return;
-	log = conn->log;
-	log->log_written = 0;
-	return;
+
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		conn->log->log_written = 0;
 }
 
 /*
@@ -786,8 +783,8 @@ __log_openfile(WT_SESSION_IMPL *session,
 		__wt_log_desc_byteswap(desc);
 		if (desc->log_magic != WT_LOG_MAGIC)
 			WT_PANIC_RET(session, WT_ERROR,
-			   "log file %s corrupted: Bad magic number %" PRIu32,
-			   (*fhp)->name, desc->log_magic);
+			    "log file %s corrupted: Bad magic number %" PRIu32,
+			    (*fhp)->name, desc->log_magic);
 		if (desc->majorv > WT_LOG_MAJOR_VERSION ||
 		    (desc->majorv == WT_LOG_MAJOR_VERSION &&
 		    desc->minorv > WT_LOG_MINOR_VERSION))
@@ -1775,9 +1772,8 @@ advance:
 			if (eol)
 				/* Found a hole. This LSN is the end. */
 				break;
-			else
-				/* Last record in log.  Look for more. */
-				goto advance;
+			/* Last record in log.  Look for more. */
+			goto advance;
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
 		if (reclen > allocsize) {
@@ -2250,8 +2246,10 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 		return (0);
 
 	va_copy(ap_copy, ap);
-	len = (size_t)vsnprintf(NULL, 0, fmt, ap_copy) + 1;
+	len = 1;
+	ret = __wt_vsnprintf_len_incr(NULL, 0, &len, fmt, ap_copy);
 	va_end(ap_copy);
+	WT_RET(ret);
 
 	WT_RET(
 	    __wt_logrec_alloc(session, sizeof(WT_LOG_RECORD) + len, &logrec));
@@ -2268,7 +2266,8 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	    rec_fmt, rectype));
 	logrec->size += (uint32_t)header_size;
 
-	(void)vsnprintf((char *)logrec->data + logrec->size, len, fmt, ap);
+	WT_ERR(__wt_vsnprintf(
+	    (char *)logrec->data + logrec->size, len, fmt, ap));
 
 	__wt_verbose(session, WT_VERB_LOG,
 	    "log_printf: %s", (char *)logrec->data + logrec->size);

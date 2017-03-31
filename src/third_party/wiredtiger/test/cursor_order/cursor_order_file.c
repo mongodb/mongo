@@ -34,23 +34,21 @@ file_create(SHARED_CONFIG *cfg, const char *name)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
-	char *p, *end, config[128];
+	char config[128];
 
 	conn = cfg->conn;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		testutil_die(ret, "conn.session");
 
-	p = config;
-	end = config + sizeof(config);
-	p += snprintf(p, (size_t)(end - p),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "key_format=%s,"
 	    "internal_page_max=%d,"
 	    "split_deepen_min_child=200,"
-	    "leaf_page_max=%d,",
-	    cfg->ftype == ROW ? "S" : "r", 16 * 1024, 128 * 1024);
-	if (cfg->ftype == FIX)
-		(void)snprintf(p, (size_t)(end - p), ",value_format=3t");
+	    "leaf_page_max=%d,"
+	    "%s",
+	    cfg->ftype == ROW ? "S" : "r", 16 * 1024, 128 * 1024,
+	    cfg->ftype == FIX ? ",value_format=3t" : ""));
 
 	if ((ret = session->create(session, name, config)) != 0)
 		if (ret != EEXIST)
@@ -67,9 +65,10 @@ load(SHARED_CONFIG *cfg, const char *name)
 	WT_CURSOR *cursor;
 	WT_ITEM *value, _value;
 	WT_SESSION *session;
-	char keybuf[64], valuebuf[64];
-	int64_t keyno;
+	size_t len;
+	uint64_t keyno;
 	int ret;
+	char keybuf[64], valuebuf[64];
 
 	conn = cfg->conn;
 
@@ -83,9 +82,10 @@ load(SHARED_CONFIG *cfg, const char *name)
 		testutil_die(ret, "cursor.open");
 
 	value = &_value;
-	for (keyno = 1; keyno <= (int64_t)cfg->nkeys; ++keyno) {
+	for (keyno = 1; keyno <= cfg->nkeys; ++keyno) {
 		if (cfg->ftype == ROW) {
-			snprintf(keybuf, sizeof(keybuf), "%016u", (u_int)keyno);
+			testutil_check(__wt_snprintf(
+			    keybuf, sizeof(keybuf), "%016" PRIu64, keyno));
 			cursor->set_key(cursor, keybuf);
 		} else
 			cursor->set_key(cursor, (uint32_t)keyno);
@@ -93,8 +93,10 @@ load(SHARED_CONFIG *cfg, const char *name)
 		if (cfg->ftype == FIX)
 			cursor->set_value(cursor, 0x01);
 		else {
-			value->size = (uint32_t)snprintf(
-			    valuebuf, sizeof(valuebuf), "%37u", (u_int)keyno);
+			testutil_check(__wt_snprintf_len_set(
+			    valuebuf, sizeof(valuebuf),
+			    &len, "%37" PRIu64, keyno));
+			value->size = (uint32_t)len;
 			cursor->set_value(cursor, value);
 		}
 		if ((ret = cursor->insert(cursor)) != 0)
