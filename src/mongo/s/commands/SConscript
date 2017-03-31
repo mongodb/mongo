@@ -76,7 +76,7 @@ env.Library(
         'cluster_write.cpp',
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
-        'run_on_all_shards_cmd.cpp',
+        'scatter_gather_from_shards.cpp',
         'sharded_command_processing.cpp',
         'strategy.cpp',
     ],

@@ -61,7 +61,7 @@
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/commands/run_on_all_shards_cmd.h"
+#include "mongo/s/commands/scatter_gather_from_shards.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/store_possible_cursor.h"
@@ -84,6 +84,8 @@ using std::stringstream;
 using std::vector;
 
 namespace {
+
+const int kMaxNumStaleVersionRetries = 3;
 
 bool cursorCommandPassthrough(OperationContext* opCtx,
                               StringData dbName,
@@ -211,30 +213,90 @@ protected:
     }
 };
 
-class AllShardsCollectionCommand : public RunOnAllShardsCommand {
+class AllShardsCollectionCommand : public Command {
 protected:
-    AllShardsCollectionCommand(const char* n,
+    AllShardsCollectionCommand(const char* name,
                                const char* oldname = NULL,
-                               bool useShardConn = false,
                                bool implicitCreateDb = false)
-        : RunOnAllShardsCommand(n, oldname, useShardConn, implicitCreateDb) {}
+        : Command(name, false, oldname), _implicitCreateDb(implicitCreateDb) {}
 
-    void getShardIds(OperationContext* opCtx,
-                     const string& dbName,
-                     BSONObj& cmdObj,
-                     vector<ShardId>& shardIds) override {
-        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
-
-        const auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        if (routingInfo.cm()) {
-            // If it's a sharded collection, send it to all shards
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
-        } else {
-            // Otherwise just send it to the primary shard for the database
-            shardIds.push_back(routingInfo.primaryId());
-        }
+    bool slaveOk() const override {
+        return true;
     }
+    bool adminOnly() const override {
+        return false;
+    }
+
+    BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
+        BSONObjBuilder cmdWithVersionBob;
+        cmdWithVersionBob.appendElements(cmdObj);
+        version.appendForCommands(&cmdWithVersionBob);
+        return cmdWithVersionBob.obj();
+    }
+
+    bool run(OperationContext* opCtx,
+             const string& dbName,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& output) override {
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
+        LOG(1) << "AllShardsCollectionCommand: " << nss << " cmd:" << redact(cmdObj);
+
+        if (_implicitCreateDb) {
+            uassertStatusOK(createShardDatabase(opCtx, dbName));
+        }
+
+        Status status = Status::OK();
+        int numAttempts = 0;
+        while (numAttempts < kMaxNumStaleVersionRetries) {
+            status = Status::OK();
+            output.resetToEmpty();
+
+            // Target only shards that own data for the collection, and append the shardVersion for
+            // the collection to the command.
+            std::vector<AsyncRequestsSender::Request> requests;
+            auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            if (routingInfo.cm()) {
+                vector<ShardId> shardIds;
+                Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+                for (const ShardId& shardId : shardIds) {
+                    requests.emplace_back(
+                        std::move(shardId),
+                        appendShardVersion(cmdObj, routingInfo.cm()->getVersion(shardId)));
+                }
+            } else {
+                if (routingInfo.primary()->isConfig()) {
+                    // Don't append shard version info when contacting the config servers.
+                    requests.emplace_back(routingInfo.primaryId(), cmdObj);
+                } else {
+                    requests.emplace_back(routingInfo.primaryId(),
+                                          appendShardVersion(cmdObj, ChunkVersion::UNSHARDED()));
+                }
+            }
+
+            auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
+            if (ErrorCodes::isStaleShardingError(swResults.getStatus().code())) {
+                Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+                ++numAttempts;
+                continue;
+            }
+            status = swResults.getStatus();
+            break;
+        }
+
+        // We don't uassertStatusOK(), because that causes 'output' to be cleared, but we want to
+        // report the raw results even if there was an error.
+        if (!status.isOK()) {
+            return appendCommandStatus(output, status);
+        }
+        return true;
+    }
+
+private:
+    // Whether the requested database should be created implicitly
+    const bool _implicitCreateDb;
 };
 
 class NotAllowedOnShardedCollectionCmd : public PublicGridCommand {
@@ -281,100 +343,7 @@ public:
     CreateIndexesCmd()
         : AllShardsCollectionCommand("createIndexes",
                                      NULL, /* oldName */
-                                     true /* use ShardConnection */,
-                                     true /* implicit create db */) {
-        // createIndexes command should use ShardConnection so the getLastError would
-        // be able to properly enforce the write concern (via the saveGLEStats callback).
-    }
-
-    /**
-     * the createIndexes command doesn't require the 'ns' field to be populated
-     * so we make sure its here as its needed for the system.indexes insert
-     */
-    BSONObj fixSpec(const NamespaceString& ns, const BSONObj& original) const {
-        if (original["ns"].type() == String)
-            return original;
-        BSONObjBuilder bb;
-        bb.appendElements(original);
-        bb.append("ns", ns.toString());
-        return bb.obj();
-    }
-
-    /**
-     * @return equivalent of gle
-     */
-    BSONObj createIndexLegacy(const string& server,
-                              const NamespaceString& nss,
-                              const BSONObj& spec) const {
-        try {
-            ScopedDbConnection conn(server);
-            conn->insert(nss.getSystemIndexesCollection(), spec);
-            BSONObj gle = conn->getLastErrorDetailed(nss.db().toString());
-            conn.done();
-            return gle;
-        } catch (DBException& e) {
-            BSONObjBuilder b;
-            b.append("errmsg", e.toString());
-            b.append("code", e.getCode());
-            b.append("codeName", ErrorCodes::errorString(ErrorCodes::fromInt(e.getCode())));
-            return b.obj();
-        }
-    }
-
-    virtual BSONObj specialErrorHandler(const string& server,
-                                        const string& dbName,
-                                        const BSONObj& cmdObj,
-                                        const BSONObj& originalResult) const {
-        string errmsg = originalResult["errmsg"];
-        if (errmsg.find("no such cmd") == string::npos) {
-            // cannot use codes as 2.4 didn't have a code for this
-            return originalResult;
-        }
-
-        // we need to down convert
-
-        NamespaceString nss(dbName, cmdObj["createIndexes"].String());
-
-        if (cmdObj["indexes"].type() != Array)
-            return originalResult;
-
-        BSONObjBuilder newResult;
-        newResult.append("note", "downgraded");
-        newResult.append("sentTo", server);
-
-        BSONArrayBuilder individualResults;
-
-        bool ok = true;
-
-        BSONObjIterator indexIterator(cmdObj["indexes"].Obj());
-        while (indexIterator.more()) {
-            BSONObj spec = indexIterator.next().Obj();
-            spec = fixSpec(nss, spec);
-
-            BSONObj gle = createIndexLegacy(server, nss, spec);
-
-            individualResults.append(BSON("spec" << spec << "gle" << gle));
-
-            BSONElement e = gle["errmsg"];
-            if (e.type() == String && e.String().size() > 0) {
-                ok = false;
-                newResult.appendAs(e, "errmsg");
-                break;
-            }
-
-            e = gle["err"];
-            if (e.type() == String && e.String().size() > 0) {
-                ok = false;
-                newResult.appendAs(e, "errmsg");
-                break;
-            }
-        }
-
-        newResult.append("eachIndex", individualResults.arr());
-
-        newResult.append("ok", ok ? 1 : 0);
-        return newResult.obj();
-    }
+                                     true /* implicit create db */) {}
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -1477,11 +1446,11 @@ public:
             verify(0);
         }
 
-        // We could support arbitrary shard keys by sending commands to all shards but I don't think
-        // we should
+        // We could support arbitrary shard keys by sending commands to all shards but I don't
+        // think we should
         errmsg =
-            "GridFS fs.chunks collection must be sharded on either {files_id:1} or {files_id:1, "
-            "n:1}";
+            "GridFS fs.chunks collection must be sharded on either {files_id:1} or "
+            "{files_id:1, n:1}";
         return false;
     }
 } fileMD5Cmd;

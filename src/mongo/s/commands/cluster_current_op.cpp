@@ -38,8 +38,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/commands/run_on_all_shards_cmd.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/scatter_gather_from_shards.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -51,12 +53,15 @@ const char kOpIdFieldName[] = "opid";
 const char kClientFieldName[] = "client";
 // awkward underscores used to make this visually distinct from kClientFieldName
 const char kClient_S_FieldName[] = "client_s";
-
 const char kCommandName[] = "currentOp";
 
-class ClusterCurrentOpCommand : public RunOnAllShardsCommand {
+class ClusterCurrentOpCommand : public Command {
 public:
-    ClusterCurrentOpCommand() : RunOnAllShardsCommand(kCommandName) {}
+    ClusterCurrentOpCommand() : Command(kCommandName) {}
+
+    bool slaveOk() const override {
+        return true;
+    }
 
     bool adminOnly() const final {
         return true;
@@ -75,7 +80,33 @@ public:
         return false;
     }
 
-    void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) final {
+    using ShardAndReply = std::tuple<ShardId, BSONObj>;
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbName,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& output) override {
+
+        // Target all shards.
+        std::vector<AsyncRequestsSender::Request> requests;
+        std::vector<ShardId> shardIds;
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        for (auto&& shardId : shardIds) {
+            requests.emplace_back(std::move(shardId), cmdObj);
+        }
+
+        auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
+        if (!swResults.isOK()) {
+            return appendCommandStatus(output, swResults.getStatus());
+        }
+
+        aggregateResults(std::move(swResults.getValue()), output);
+        return true;
+    }
+
+    void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) {
         // Each shard responds with a document containing an array of subdocuments.
         // Each subdocument represents an operation running on that shard.
         // We merge the responses into a single document containg an array
@@ -99,7 +130,7 @@ public:
         BSONArrayBuilder aggregatedOpsBab(output.subarrayStart(kInprogFieldName));
 
         for (auto&& shardResponse : results) {
-            StringData shardName;
+            ShardId shardName;
             BSONObj shardResponseObj;
             std::tie(shardName, shardResponseObj) = shardResponse;
 

@@ -30,16 +30,27 @@
 
 #include <vector>
 
-#include "mongo/s/commands/run_on_all_shards_cmd.h"
+#include "mongo/s/commands/scatter_gather_from_shards.h"
+
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
 using std::vector;
 
-class DBStatsCmd : public RunOnAllShardsCommand {
+class DBStatsCmd : public Command {
 public:
-    DBStatsCmd() : RunOnAllShardsCommand("dbStats", "dbstats") {}
+    DBStatsCmd() : Command("dbStats", false, "dbstats") {}
+
+    bool slaveOk() const override {
+        return true;
+    }
+    bool adminOnly() const override {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -52,7 +63,33 @@ public:
         return false;
     }
 
-    virtual void aggregateResults(const vector<ShardAndReply>& results, BSONObjBuilder& output) {
+    using ShardAndReply = std::tuple<ShardId, BSONObj>;
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbName,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& output) override {
+
+        // Target all shards.
+        std::vector<AsyncRequestsSender::Request> requests;
+        std::vector<ShardId> shardIds;
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        for (auto&& shardId : shardIds) {
+            requests.emplace_back(std::move(shardId), cmdObj);
+        }
+
+        auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
+        if (!swResults.isOK()) {
+            return appendCommandStatus(output, swResults.getStatus());
+        }
+
+        aggregateResults(std::move(swResults.getValue()), output);
+        return true;
+    }
+
+    void aggregateResults(const vector<ShardAndReply>& results, BSONObjBuilder& output) {
         long long objects = 0;
         long long unscaledDataSize = 0;
         long long dataSize = 0;

@@ -76,6 +76,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             // no-op ignore top-level fields prefixed with $. They are for the command processor
         } else if (QueryRequest::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
             // no-op
+        } else if (str::equals("shardVersion", e.fieldName())) {
+            // no-op
         } else if (str::equals("index", e.fieldName()) && !isView) {
             BSONObj indexObj = e.Obj();
             StringData indexName;

@@ -28,14 +28,24 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/commands/run_on_all_shards_cmd.h"
+#include "mongo/s/commands/scatter_gather_from_shards.h"
+
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
-class ClusterRepairDatabaseCmd : public RunOnAllShardsCommand {
+class ClusterRepairDatabaseCmd : public Command {
 public:
-    ClusterRepairDatabaseCmd() : RunOnAllShardsCommand("repairDatabase") {}
+    ClusterRepairDatabaseCmd() : Command("repairDatabase") {}
+
+    bool slaveOk() const override {
+        return true;
+    }
+    bool adminOnly() const override {
+        return false;
+    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -47,6 +57,24 @@ public:
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbName,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& output) override {
+        // Target all shards.
+        std::vector<AsyncRequestsSender::Request> requests;
+        std::vector<ShardId> shardIds;
+        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        for (auto&& shardId : shardIds) {
+            requests.emplace_back(std::move(shardId), cmdObj);
+        }
+
+        auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
+        return appendCommandStatus(output, swResults.getStatus());
     }
 
 } clusterRepairDatabaseCmd;
