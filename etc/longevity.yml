@@ -178,7 +178,7 @@ functions:
           set -e
           set -o verbose
           source ./dsienv.sh
-          $DSI_PATH/bin/setup-cluster.sh ${cluster} false
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} false --skip-fio
 
   "configure mongodb cluster":
     - command: shell.exec
@@ -199,10 +199,10 @@ functions:
         script: |
           set -e
           set -v
-          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
+          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
+          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
           echo "Complete test for ${test} with setup ${setup}!"
     - command: "json.send"
       params:
