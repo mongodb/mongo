@@ -11,7 +11,7 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    let coll = db[jsTest.name()];
+    let coll = db["projection_dotted_paths"];
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1, "b.c": 1, "b.d": 1, c: 1}));
     assert.writeOK(coll.insert({_id: 1, a: 1, b: {c: 1, d: 1, e: 1}, c: 1, e: 1}));

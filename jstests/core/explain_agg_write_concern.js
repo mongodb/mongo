@@ -8,8 +8,9 @@
 (function() {
     "use strict";
 
-    let coll = db[jsTest.name()];
-    let outColl = db[jsTest.name() + "_out"];
+    const collName = "explain_agg_write_concern";
+    let coll = db[collName];
+    let outColl = db[collName + "_out"];
     coll.drop();
     outColl.drop();
 
