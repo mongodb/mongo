@@ -319,18 +319,22 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
     return getShardedCollectionRoutingInfoWithRefresh(opCtx, NamespaceString(ns));
 }
 
-void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccrt) {
-    if (!ccrt._cm) {
+void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvalidate) {
+    // Ensure the move constructor of CachedCollectionRoutingInfo is invoked in order to clear the
+    // input argument so it can't be used anymore
+    auto ccri(ccriToInvalidate);
+
+    if (!ccri._cm) {
         // Here we received a stale config error for a collection which we previously thought was
         // unsharded.
-        invalidateShardedCollection(ccrt._nss);
+        invalidateShardedCollection(ccri._nss);
         return;
     }
 
     // Here we received a stale config error for a collection which we previously though was sharded
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    auto it = _databases.find(NamespaceString(ccrt._cm->getns()).db());
+    auto it = _databases.find(NamespaceString(ccri._cm->getns()).db());
     if (it == _databases.end()) {
         // If the database does not exist, the collection must have been dropped so there is
         // nothing to invalidate. The getCollectionRoutingInfo will handle the reload of the
@@ -340,7 +344,7 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccrt) {
 
     auto& collections = it->second->collections;
 
-    auto itColl = collections.find(ccrt._cm->getns());
+    auto itColl = collections.find(ccri._cm->getns());
     if (itColl == collections.end()) {
         // If the collection does not exist, this means it must have been dropped since the last
         // time we retrieved a cache entry for it. Doing nothing in this case will cause the
@@ -349,7 +353,7 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccrt) {
     } else if (itColl->second.needsRefresh) {
         // Refresh has been scheduled for the collection already
         return;
-    } else if (itColl->second.routingInfo->getVersion() == ccrt._cm->getVersion()) {
+    } else if (itColl->second.routingInfo->getVersion() == ccri._cm->getVersion()) {
         // If the versions match, the last version of the routing information that we used is no
         // longer valid, so trigger a refresh.
         itColl->second.needsRefresh = true;
