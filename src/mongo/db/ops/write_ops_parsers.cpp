@@ -33,6 +33,7 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -106,15 +107,11 @@ void parseWriteCommand(StringData dbName,
         } else if (fieldName == uniqueFieldName) {
             haveUniqueField = true;
             *uniqueField = field;
-        } else if (fieldName[0] != '$') {
-            std::initializer_list<StringData> ignoredFields = {
-                "writeConcern", "maxTimeMS", "shardVersion"};
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "Unknown option to " << cmd.firstElementFieldName()
-                                  << " command: "
-                                  << fieldName,
-                    std::find(ignoredFields.begin(), ignoredFields.end(), fieldName) !=
-                        ignoredFields.end());
+        } else if (!Command::isGenericArgument(fieldName)) {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "Unknown option to " << cmd.firstElementFieldName()
+                                    << " command: "
+                                    << fieldName);
         }
     }
 

@@ -168,12 +168,12 @@ TEST(GetMoreRequestTest, parseFromBSONBatchSizeProvided) {
     ASSERT_EQUALS(200, *result.getValue().batchSize);
 }
 
-TEST(GetMoreRequestTest, parseFromBSONIgnoreDollarPrefixedFields) {
+TEST(GetMoreRequestTest, parseFromBSONIgnoreQueryOptions) {
     StatusWith<GetMoreRequest> result =
         GetMoreRequest::parseFromBSON("db",
                                       BSON("getMore" << CursorId(123) << "collection"
                                                      << "coll"
-                                                     << "$foo"
+                                                     << "$queryOptions"
                                                      << "bar"));
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("db.coll", result.getValue().nss.toString());

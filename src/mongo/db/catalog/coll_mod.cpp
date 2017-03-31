@@ -63,22 +63,20 @@ struct CollModRequest {
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                Collection* coll,
-                                               const BSONObj& cmdObj) {
+                                               const BSONObj& cmdObj,
+                                               BSONObjBuilder* oplogEntryBuilder) {
 
     bool isView = !coll;
 
     CollModRequest cmr;
 
     BSONForEach(e, cmdObj) {
-        if (str::equals("collMod", e.fieldName())) {
+        const auto fieldName = e.fieldNameStringData();
+        if (Command::isGenericArgument(fieldName)) {
+            continue;  // Don't add to oplog builder.
+        } else if (fieldName == "collMod") {
             // no-op
-        } else if (str::startsWith(e.fieldName(), "$")) {
-            // no-op ignore top-level fields prefixed with $. They are for the command processor
-        } else if (QueryRequest::cmdOptionMaxTimeMS == e.fieldNameStringData()) {
-            // no-op
-        } else if (str::equals("shardVersion", e.fieldName())) {
-            // no-op
-        } else if (str::equals("index", e.fieldName()) && !isView) {
+        } else if (fieldName == "index" && !isView) {
             BSONObj indexObj = e.Obj();
             StringData indexName;
             BSONObj keyPattern;
@@ -158,25 +156,25 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                               "existing expireAfterSeconds field is not a number");
             }
 
-        } else if (str::equals("validator", e.fieldName()) && !isView) {
+        } else if (fieldName == "validator" && !isView) {
             auto statusW = coll->parseValidator(e.Obj());
             if (!statusW.isOK())
                 return statusW.getStatus();
 
             cmr.collValidator = e;
-        } else if (str::equals("validationLevel", e.fieldName()) && !isView) {
+        } else if (fieldName == "validationLevel" && !isView) {
             auto statusW = coll->parseValidationLevel(e.String());
             if (!statusW.isOK())
                 return statusW.getStatus();
 
             cmr.collValidationLevel = e.String();
-        } else if (str::equals("validationAction", e.fieldName()) && !isView) {
+        } else if (fieldName == "validationAction" && !isView) {
             auto statusW = coll->parseValidationAction(e.String());
             if (!statusW.isOK())
                 statusW.getStatus();
 
             cmr.collValidationAction = e.String();
-        } else if (str::equals("pipeline", e.fieldName())) {
+        } else if (fieldName == "pipeline") {
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
                               "'pipeline' option only supported on a view");
@@ -185,7 +183,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
             }
             cmr.viewPipeLine = e;
-        } else if (str::equals("viewOn", e.fieldName())) {
+        } else if (fieldName == "viewOn") {
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
                               "'viewOn' option only supported on a view");
@@ -195,23 +193,24 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
             cmr.viewOn = e.str();
         } else {
-            const StringData name = e.fieldNameStringData();
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "option not supported on a view: " << name);
+                              str::stream() << "option not supported on a view: " << fieldName);
             }
             // As of SERVER-17312 we only support these two options. When SERVER-17320 is
             // resolved this will need to be enhanced to handle other options.
             typedef CollectionOptions CO;
 
-            if (name == "usePowerOf2Sizes")
+            if (fieldName == "usePowerOf2Sizes")
                 cmr.usePowerOf2Sizes = e;
-            else if (name == "noPadding")
+            else if (fieldName == "noPadding")
                 cmr.noPadding = e;
             else
                 return Status(ErrorCodes::InvalidOptions,
-                              str::stream() << "unknown option to collMod: " << name);
+                              str::stream() << "unknown option to collMod: " << fieldName);
         }
+
+        oplogEntryBuilder->append(e);
     }
 
     return {std::move(cmr)};
@@ -256,7 +255,8 @@ Status collMod(OperationContext* opCtx,
                                     << nss.ns());
     }
 
-    auto statusW = parseCollModRequest(opCtx, nss, coll, cmdObj);
+    BSONObjBuilder oplogEntryBuilder;
+    auto statusW = parseCollModRequest(opCtx, nss, coll, cmdObj, &oplogEntryBuilder);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -347,7 +347,7 @@ Status collMod(OperationContext* opCtx,
 
         // Only observe non-view collMods, as view operations are observed as operations on the
         // system.views collection.
-        getGlobalServiceContext()->getOpObserver()->onCollMod(opCtx, nss, cmdObj);
+        getGlobalServiceContext()->getOpObserver()->onCollMod(opCtx, nss, oplogEntryBuilder.obj());
     }
 
     wunit.commit();

@@ -82,7 +82,7 @@ BSONObj fixForShards(const BSONObj& orig,
     BSONObjIterator i(orig);
     while (i.more()) {
         BSONElement e = i.next();
-        const std::string fn = e.fieldName();
+        const auto fn = e.fieldNameStringData();
 
         if (fn == bypassDocumentValidationCommandOption() || fn == "map" || fn == "mapreduce" ||
             fn == "mapReduce" || fn == "mapparams" || fn == "reduce" || fn == "query" ||
@@ -92,8 +92,8 @@ BSONObj fixForShards(const BSONObj& orig,
             b.append(e);
         } else if (fn == "out" || fn == "finalize" || fn == "writeConcern") {
             // We don't want to copy these
-        } else {
-            badShardedField = fn;
+        } else if (!Command::isGenericArgument(fn)) {
+            badShardedField = fn.toString();
             return BSONObj();
         }
     }

@@ -66,9 +66,6 @@ namespace {
 
 const StringData kIndexesFieldName = "indexes"_sd;
 const StringData kCommandName = "createIndexes"_sd;
-const StringData kWriteConcern = "writeConcern"_sd;
-const StringData kMaxTimeMS = "maxTimeMS"_sd;
-const StringData kShardVersion = "shardVersion"_sd;
 
 /**
  * Parses the index specifications from 'cmdObj', validates them, and returns equivalent index
@@ -125,8 +122,8 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             }
 
             hasIndexesField = true;
-        } else if (kCommandName == cmdElemFieldName || kWriteConcern == cmdElemFieldName ||
-                   kMaxTimeMS == cmdElemFieldName || kShardVersion == cmdElemFieldName) {
+        } else if (kCommandName == cmdElemFieldName ||
+                   Command::isGenericArgument(cmdElemFieldName)) {
             continue;
         } else {
             return {ErrorCodes::BadValue,

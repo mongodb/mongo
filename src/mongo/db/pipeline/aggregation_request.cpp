@@ -83,8 +83,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
     AggregationRequest request(std::move(nss), std::move(pipeline));
 
-    const std::initializer_list<StringData> optionsParsedElseWhere = {
-        WriteConcernOptions::kWriteConcernField, kPipelineName, kCommandName};
+    const std::initializer_list<StringData> optionsParsedElseWhere = {kPipelineName, kCommandName};
 
     bool hasCursorElem = false;
     bool hasExplainElem = false;
@@ -93,24 +92,14 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     for (auto&& elem : cmdObj) {
         auto fieldName = elem.fieldNameStringData();
 
-        // $queryOptions is the exception to our '$' filter. We expect this field to be validated
-        // elsewhere.
         if (QueryRequest::kUnwrappedReadPrefField == fieldName) {
+            // We expect this field to be validated elsewhere.
             request.setUnwrappedReadPref(elem.embeddedObject());
-        }
-
-        // Ignore top-level fields prefixed with $. They are for the command processor, not us.
-        if (fieldName[0] == '$') {
-            continue;
-        }
-
-        // Ignore options that are parsed elsewhere.
-        if (std::find(optionsParsedElseWhere.begin(), optionsParsedElseWhere.end(), fieldName) !=
-            optionsParsedElseWhere.end()) {
-            continue;
-        }
-
-        if (kCursorName == fieldName) {
+        } else if (std::find(optionsParsedElseWhere.begin(),
+                             optionsParsedElseWhere.end(),
+                             fieldName) != optionsParsedElseWhere.end()) {
+            // Ignore options that are parsed elsewhere.
+        } else if (kCursorName == fieldName) {
             long long batchSize;
             auto status =
                 CursorRequest::parseCommandCursorOptions(cmdObj, kDefaultBatchSize, &batchSize);
@@ -192,7 +181,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             request.setAllowDiskUse(elem.Bool());
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
-        } else {
+        } else if (!Command::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
         }

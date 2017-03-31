@@ -70,7 +70,8 @@ const std::string kLegalResponseFieldNames[] = {
 
 
 Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
-    Status status = bsonCheckOnlyHasFields("ReplSetRequestVotes", argsObj, kLegalArgsFieldNames);
+    Status status =
+        bsonCheckOnlyHasFieldsForCommand("ReplSetRequestVotes", argsObj, kLegalArgsFieldNames);
     if (!status.isOK())
         return status;
 
