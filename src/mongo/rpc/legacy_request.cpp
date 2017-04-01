@@ -71,11 +71,6 @@ const BSONObj& LegacyRequest::getCommandArgs() const {
     return _upconvertedCommandArgs;
 }
 
-DocumentRange LegacyRequest::getInputDocs() const {
-    // return an empty document range.
-    return DocumentRange{};
-}
-
 Protocol LegacyRequest::getProtocol() const {
     return rpc::Protocol::kOpQuery;
 }

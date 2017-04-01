@@ -57,7 +57,7 @@ CommandReply::CommandReply(const Message* message) : _message(message) {
     _commandReply.shareOwnershipWith(message->sharedBuffer());
     _metadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
     _metadata.shareOwnershipWith(message->sharedBuffer());
-    _outputDocs = DocumentRange(cur.data(), messageEnd);
+    uassert(40420, "OP_COMMAND reply contains trailing bytes following metadata", cur.empty());
 }
 
 const BSONObj& CommandReply::getMetadata() const {
@@ -68,10 +68,6 @@ const BSONObj& CommandReply::getCommandReply() const {
     return _commandReply;
 }
 
-DocumentRange CommandReply::getOutputDocs() const {
-    return _outputDocs;
-}
-
 Protocol CommandReply::getProtocol() const {
     return rpc::Protocol::kOpCommandV1;
 }
@@ -79,8 +75,7 @@ Protocol CommandReply::getProtocol() const {
 bool operator==(const CommandReply& lhs, const CommandReply& rhs) {
     SimpleBSONObjComparator bsonComparator;
     return bsonComparator.evaluate(lhs._metadata == rhs._metadata) &&
-        bsonComparator.evaluate(lhs._commandReply == rhs._commandReply) &&
-        (lhs._outputDocs == rhs._outputDocs);
+        bsonComparator.evaluate(lhs._commandReply == rhs._commandReply);
 }
 
 bool operator!=(const CommandReply& lhs, const CommandReply& rhs) {

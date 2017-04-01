@@ -106,18 +106,6 @@ LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(const BSONObj& metadata) {
     return *this;
 }
 
-Status LegacyReplyBuilder::addOutputDocs(DocumentRange docs) {
-    invariant(_state == State::kOutputDocs);
-    // no op
-    return Status::OK();
-}
-
-Status LegacyReplyBuilder::addOutputDoc(const BSONObj& bson) {
-    invariant(_state == State::kOutputDocs);
-    // no op
-    return Status::OK();
-}
-
 Protocol LegacyReplyBuilder::getProtocol() const {
     return rpc::Protocol::kOpQuery;
 }

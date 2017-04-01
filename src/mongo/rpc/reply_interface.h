@@ -36,7 +36,6 @@ class BSONObj;
 class Message;
 
 namespace rpc {
-class DocumentRange;
 
 /**
  * An immutable view of an RPC Reply.
@@ -57,18 +56,6 @@ public:
      * The result of executing the command.
      */
     virtual const BSONObj& getCommandReply() const = 0;
-
-    /**
-     * A variable number of BSON documents returned by the command. It is valid for the
-     * returned range to be empty.
-     *
-     * Example usage:
-     *
-     * for (auto&& doc : reply.getOutputDocs()) {
-     *    ... do stuff with doc
-     * }
-     */
-    virtual DocumentRange getOutputDocs() const = 0;
 
     /**
      * Gets the protocol used to deserialize this reply. This should be used for validity

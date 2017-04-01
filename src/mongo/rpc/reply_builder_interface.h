@@ -41,7 +41,6 @@ class BSONObjBuilder;
 class Message;
 
 namespace rpc {
-class DocumentRange;
 
 /**
  * Constructs an RPC Reply.
@@ -87,20 +86,6 @@ public:
      */
     virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus,
                                                    const BSONObj& extraErrorInfo);
-
-    /**
-     * Add a range of output documents to the reply. This method can be called multiple times
-     * before calling done(). A non OK status indicates that the message does not have
-     * enough space to store ouput documents.
-     */
-    virtual Status addOutputDocs(DocumentRange outputDocs) = 0;
-
-    /**
-     * Add a single output document to the reply. This method can be called multiple times
-     * before calling done(). A non OK status indicates that the message does not have
-     * enough space to store ouput documents.
-     */
-    virtual Status addOutputDoc(const BSONObj& outputDoc) = 0;
 
     /**
      * Gets the protocol used to serialize this reply. This should be used for validity checks

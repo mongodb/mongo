@@ -89,18 +89,6 @@ LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
     return *this;
 }
 
-LegacyRequestBuilder& LegacyRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-    invariant(_state == State::kInputDocs);
-    // no op
-    return *this;
-}
-
-LegacyRequestBuilder& LegacyRequestBuilder::addInputDoc(BSONObj inputDoc) {
-    invariant(_state == State::kInputDocs);
-    // no op
-    return *this;
-}
-
 Protocol LegacyRequestBuilder::getProtocol() const {
     return rpc::Protocol::kOpQuery;
 }

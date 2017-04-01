@@ -75,19 +75,6 @@ CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
     return *this;
 }
 
-CommandRequestBuilder& CommandRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-    invariant(_state == State::kInputDocs);
-    auto rangeData = inputDocs.data();
-    _builder.appendBuf(rangeData.data(), rangeData.length());
-    return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
-    invariant(_state == State::kInputDocs);
-    inputDoc.appendSelfToBufBuilder(_builder);
-    return *this;
-}
-
 Protocol CommandRequestBuilder::getProtocol() const {
     return rpc::Protocol::kOpCommandV1;
 }

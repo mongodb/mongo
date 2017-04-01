@@ -70,21 +70,6 @@ CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
     return *this;
 }
 
-
-Status CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
-    invariant(_state == State::kOutputDocs);
-    auto rangeData = outputDocs.data();
-    auto dataSize = rangeData.length();
-    _builder.appendBuf(rangeData.data(), dataSize);
-    return Status::OK();
-}
-
-Status CommandReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
-    invariant(_state == State::kOutputDocs);
-    outputDoc.appendSelfToBufBuilder(_builder);
-    return Status::OK();
-}
-
 Protocol CommandReplyBuilder::getProtocol() const {
     return rpc::Protocol::kOpCommandV1;
 }

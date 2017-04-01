@@ -112,8 +112,7 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
 
     uassertStatusOK(cur.readAndAdvance<>(&obj));
     _metadata = std::move(obj.val);
-
-    _inputDocs = DocumentRange{cur.data(), messageEnd};
+    uassert(40419, "OP_COMMAND request contains trailing bytes following metadata", cur.empty());
 }
 
 StringData CommandRequest::getDatabase() const {
@@ -132,15 +131,10 @@ const BSONObj& CommandRequest::getCommandArgs() const {
     return _commandArgs;
 }
 
-DocumentRange CommandRequest::getInputDocs() const {
-    return _inputDocs;
-}
-
 bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
     return (lhs._database == rhs._database) && (lhs._commandName == rhs._commandName) &&
         SimpleBSONObjComparator::kInstance.evaluate(lhs._metadata == rhs._metadata) &&
-        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs) &&
-        (lhs._inputDocs == rhs._inputDocs);
+        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs);
 }
 
 bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {

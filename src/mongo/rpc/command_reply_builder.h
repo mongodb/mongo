@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/net/message.h"
@@ -61,9 +60,6 @@ public:
     BSONObjBuilder getInPlaceReplyBuilder(std::size_t) final;
 
     CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
-
-    Status addOutputDocs(DocumentRange outputDocs) final;
-    Status addOutputDoc(const BSONObj& outputDoc) final;
 
     Protocol getProtocol() const final;
 

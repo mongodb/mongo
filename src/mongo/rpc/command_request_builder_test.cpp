@@ -31,7 +31,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/command_request_builder.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -67,15 +66,12 @@ TEST(RequestBuilder, RoundTrip) {
     inputDoc2.appendSelfToBufBuilder(inputDocs);
     inputDoc3.appendSelfToBufBuilder(inputDocs);
 
-    rpc::DocumentRange inputDocRange{inputDocs.buf(), inputDocs.buf() + inputDocs.len()};
-
     rpc::CommandRequestBuilder r;
 
     auto msg = r.setDatabase(databaseName)
                    .setCommandName(commandName)
                    .setCommandArgs(commandArgs)
                    .setMetadata(metadata)
-                   .addInputDocs(inputDocRange)
                    .done();
 
     rpc::CommandRequest parsed(&msg);
@@ -84,8 +80,6 @@ TEST(RequestBuilder, RoundTrip) {
     ASSERT_EQUALS(parsed.getCommandName(), commandName);
     ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
     ASSERT_BSONOBJ_EQ(parsed.getCommandArgs(), commandArgs);
-    // need ostream overloads for ASSERT_EQUALS
-    ASSERT_TRUE(parsed.getInputDocs() == inputDocRange);
 }
 
 }  // namespace
