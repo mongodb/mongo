@@ -10,6 +10,7 @@ import threading
 import time
 import unittest
 
+from .. import config as _config
 from .. import logging
 
 
@@ -278,7 +279,7 @@ class TestReport(unittest.TestResult):
                 status = test_info.status
                 if status == "error":
                     # Don't distinguish between failures and errors.
-                    status = "fail"
+                    status = _config.REPORT_FAILURE_STATUS
                 elif status == "timeout":
                     # Until EVG-1536 is completed, we shouldn't distinguish between failures and
                     # interrupted tests in the report.json file. In Evergreen, the behavior to sort

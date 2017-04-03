@@ -36,6 +36,7 @@ DEST_TO_CONFIG = {
     "num_clients_per_fixture": "numClientsPerFixture",
     "prealloc_journal": "preallocJournal",
     "repeat": "repeat",
+    "report_failure_status": "reportFailureStatus",
     "report_file": "reportFile",
     "seed": "seed",
     "shell_read_mode": "shellReadMode",
@@ -165,6 +166,13 @@ def parse_command_line():
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
                       help="Repeat the given suite(s) N times, or until one fails.")
 
+    parser.add_option("--reportFailureStatus", type="choice", action="store",
+                      dest="report_failure_status", choices=("fail", "silentfail"),
+                      metavar="STATUS",
+                      help="Controls if the test failure status should be reported as failed"
+                           " or be silently ignored (STATUS=silentfail). Defaults to"
+                           " STATUS=%default.")
+
     parser.add_option("--reportFile", dest="report_file", metavar="REPORT",
                       help="Write a JSON file with test status and timing information.")
 
@@ -255,6 +263,7 @@ def update_config_vars(values):
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("numClientsPerFixture")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
+    _config.REPORT_FAILURE_STATUS = config.pop("reportFailureStatus")
     _config.REPORT_FILE = config.pop("reportFile")
     _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")

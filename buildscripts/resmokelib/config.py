@@ -50,6 +50,7 @@ DEFAULTS = {
     "nojournal": False,
     "numClientsPerFixture": 1,
     "repeat": 1,
+    "reportFailureStatus": "fail",
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "shellReadMode": None,
@@ -132,6 +133,9 @@ RANDOM_SEED = None
 
 # If set, then each suite is repeated the specified number of times.
 REPEAT = None
+
+# Controls if the test failure status should be reported as failed or be silently ignored.
+REPORT_FAILURE_STATUS = None
 
 # If set, then resmoke.py will write out a report file with the status of each test that ran.
 REPORT_FILE = None
