@@ -323,10 +323,20 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
             return;
         }
 
+        // We only need to mark ourselves as too stale once.
+        if (_tooStale) {
+            return;
+        }
+
+        // Mark yourself as too stale.
+        _tooStale = true;
+
         error() << "too stale to catch up -- entering maintenance mode";
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
         log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
+
+        // Activate maintenance mode and transition to RECOVERING.
         auto status = _replCoord->setMaintenanceMode(true);
         if (!status.isOK()) {
             warning() << "Failed to transition into maintenance mode: " << status;
@@ -359,6 +369,20 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         // No sync source found.
         sleepsecs(1);
         return;
+    }
+
+    // If we find a good sync source after having gone too stale, disable maintenance mode so we can
+    // transition to SECONDARY.
+    if (_tooStale) {
+
+        _tooStale = false;
+
+        log() << "No longer too stale. Able to sync from " << _syncSourceHost;
+
+        auto status = _replCoord->setMaintenanceMode(false);
+        if (!status.isOK()) {
+            warning() << "Failed to leave maintenance mode: " << status;
+        }
     }
 
     long long lastHashFetched;
