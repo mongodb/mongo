@@ -148,9 +148,9 @@ private:
     Value expandId(const Value& val);
 
     struct Field {
-        std::string _fieldName;
-        Accumulator::Factory _accumulatorFactory;
-        boost::intrusive_ptr<Expression> _expression;
+        std::string fieldName;
+        Accumulator::Factory accumulatorFactory;
+        boost::intrusive_ptr<Expression> expression;
     };
 
     /**
