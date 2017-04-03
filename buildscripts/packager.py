@@ -50,10 +50,14 @@ class Spec(object):
         self.gitspec = gitspec
         self.rel = rel
 
-    # Nightly version numbers can be in the form: 3.0.7-pre-, or 3.0.7-5-g3b67ac
+    # Commit-triggerd version numbers can be in the form: 3.0.7-pre-, or 3.0.7-5-g3b67ac
+    # Patch builds version numbers are in the form: 3.5.5-64-g03945fa-patch-58debcdb3ff1223c9d00005b
     #
     def is_nightly(self):
         return bool(re.search("-$", self.version())) or bool(re.search("\d-\d+-g[0-9a-f]+$", self.version()))
+
+    def is_patch(self):
+        return bool(re.search("\d-\d+-g[0-9a-f]+-patch-[0-9a-f]+$", self.version()))
 
     def is_rc(self):
         return bool(re.search("-rc\d+$", self.version()))
@@ -63,6 +67,12 @@ class Spec(object):
 
     def version(self):
         return self.ver
+
+    def patch_id(self):
+        if self.is_patch():
+            return re.sub(r'.*-([0-9a-f]+$)', r'\1', self.version())
+        else:
+            return "none"
 
     def metadata_gitspec(self):
         """Git revision to use for spec+control+init+manpage files.
@@ -81,35 +91,57 @@ class Spec(object):
         return "-org" if int(self.ver.split(".")[1])%2==0 else "-org-unstable"
 
     def prelease(self):
-      # "N" is either passed in on the command line, or "1"
+      # NOTE: This is only called for RPM packages, and only after
+      # pversion() below has been called. If you want to change this format
+      # and want DEB packages to match, make sure to update pversion()
+      # below
       #
-      # 1) Standard release - "N"
-      # 2) Nightly (snapshot) - "0.N.YYYYMMDDlatest"
-      # 3) RC's - "0.N.rcX"
+      # "N" is either passed in on the command line, or "1"
       if self.rel:
-        corenum = self.rel
+          corenum = self.rel
       else:
-        corenum = 1
-      # RC's
+          corenum = 1
+
+      # Version suffix for RPM packages:
+      # 1) RC's - "0.N.rcX"
+      # 2) Nightly (snapshot) - "0.N.latest"
+      # 3) Patch builds - "0.N.patch.<patch_id>"
+      # 4) Standard release - "N"
       if self.is_rc():
-        return "0.%s.%s" % (corenum, re.sub('.*-','',self.version()))
-      # Nightlies
+          return "0.%s.%s" % (corenum, re.sub('.*-','',self.version()))
       elif self.is_nightly():
-        return "0.%s.%s" % (corenum, time.strftime("%Y%m%d"))
+          return "0.%s.latest" % (corenum)
+      elif self.is_patch():
+          return "0.%s.patch.%s" % (corenum, self.patch_id())
       else:
-        return str(corenum)
+          return str(corenum)
 
     def pversion(self, distro):
         # Note: Debian packages have funny rules about dashes in
         # version numbers, and RPM simply forbids dashes.  pversion
         # will be the package's version number (but we need to know
         # our upstream version too).
+
+        # For RPM packages this just returns X.Y.X because of the
+        # aforementioned rules, and prelease (above) adds a suffix later,
+        # so detect this case early
+        if re.search("(suse|redhat|fedora|centos|amazon)", distro.name()):
+            return re.sub("-.*", "", self.version())
+
+        # For DEB packages, this code sets the full version. If you change
+        # this format and want RPM packages to match make sure you change
+        # prelease above as well
         if re.search("^(debian|ubuntu)", distro.name()):
-            return re.sub("-", "~", self.ver)
-        elif re.search("(suse|redhat|fedora|centos|amazon)", distro.name()):
-            return re.sub("-.*", "", self.ver)
-        else:
-            raise Exception("BUG: unsupported platform?")
+            if self.is_nightly():
+                ver = re.sub("-.*", "-latest", self.ver)
+            elif self.is_patch():
+                ver = re.sub("-.*", "", self.ver) + "-patch-" + self.patch_id()
+            else:
+                ver = self.ver
+
+            return re.sub("-", "~", ver)
+
+        raise Exception("BUG: unsupported platform?")
 
     def branch(self):
         """Return the major and minor portions of the specified version.
