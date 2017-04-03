@@ -172,6 +172,16 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
                       "new sync source.");
     }
 
+    // Sometimes our remoteLastOpApplied may be stale; if we received a document with an
+    // opTime later than remoteLastApplied, we can assume the remote is at least up to that
+    // opTime.
+    if (remoteLastOpApplied && !documents.empty()) {
+        const auto docOpTime = OpTime::parseFromOplogEntry(documents.back());
+        if (docOpTime.isOK()) {
+            remoteLastOpApplied = std::max(*remoteLastOpApplied, docOpTime.getValue());
+        }
+    }
+
     // The SyncSourceResolver never checks that the sync source candidate is actually ahead of
     // us. Rather than have it check there with an extra network roundtrip, we check here.
     if (requireFresherSyncSource && remoteLastOpApplied &&
