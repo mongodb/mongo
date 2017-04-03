@@ -37,22 +37,22 @@
 #include <set>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/json.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -993,7 +993,7 @@ public:
 WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const std::string& uri,
                                              const IndexDescriptor* desc)
-    : WiredTigerIndex(ctx, uri, desc) {}
+    : WiredTigerIndex(ctx, uri, desc), _partial(desc->isPartial()) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexUnique::newCursor(OperationContext* txn,
                                                                               bool forward) const {
@@ -1077,8 +1077,37 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
     WiredTigerItem keyItem(data.getBuffer(), data.getSize());
     c->set_key(c, keyItem.Get());
 
+    auto triggerWriteConflictAtPoint = [&keyItem](WT_CURSOR* point) {
+        // WT_NOTFOUND may occur during a background index build. Insert a dummy value and
+        // delete it again to trigger a write conflict in case this is being concurrently
+        // indexed by the background indexer.
+        point->set_key(point, keyItem.Get());
+        point->set_value(point, emptyItem.Get());
+        invariantWTOK(WT_OP_CHECK(point->insert(point)));
+        point->set_key(point, keyItem.Get());
+        invariantWTOK(WT_OP_CHECK(point->remove(point)));
+    };
+
     if (!dupsAllowed) {
-        // nice and clear
+        if (_partial) {
+            // Check that the record id matches.  We may be called to unindex records that are not
+            // present in the index due to the partial filter expression.
+            int ret = WT_OP_CHECK(c->search(c));
+            if (ret == WT_NOTFOUND) {
+                triggerWriteConflictAtPoint(c);
+                return;
+            }
+            WT_ITEM value;
+            invariantWTOK(c->get_value(c, &value));
+            BufReader br(value.data, value.size);
+            fassert(40416, br.remaining());
+            if (KeyString::decodeRecordId(&br) != id) {
+                return;
+            }
+            // Ensure there aren't any other values in here.
+            KeyString::TypeBits::fromBuffer(&br);
+            fassert(40417, !br.remaining());
+        }
         int ret = WT_OP_CHECK(c->remove(c));
         if (ret == WT_NOTFOUND) {
             return;
@@ -1091,14 +1120,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
 
     int ret = WT_OP_CHECK(c->search(c));
     if (ret == WT_NOTFOUND) {
-        // WT_NOTFOUND is only expected during a background index build. Insert a dummy value and
-        // delete it again to trigger a write conflict in case this is being concurrently indexed by
-        // the background indexer.
-        c->set_key(c, keyItem.Get());
-        c->set_value(c, emptyItem.Get());
-        invariantWTOK(WT_OP_CHECK(c->insert(c)));
-        c->set_key(c, keyItem.Get());
-        invariantWTOK(WT_OP_CHECK(c->remove(c)));
+        triggerWriteConflictAtPoint(c);
         return;
     }
     invariantWTOK(ret);

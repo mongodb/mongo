@@ -19,7 +19,7 @@
     coll.drop();
 
     // Create partial index.
-    assert.commandWorked(coll.ensureIndex({x: 1}, {partialFilterExpression: {a: 1}}));
+    assert.commandWorked(coll.ensureIndex({x: 1}, {unique: true, partialFilterExpression: {a: 1}}));
 
     assert.writeOK(coll.insert({_id: 1, x: 5, a: 2, b: 1}));  // Not in index.
     assert.writeOK(coll.insert({_id: 2, x: 6, a: 1, b: 1}));  // In index.
@@ -59,4 +59,20 @@
     // Delete that does affect partial index.
     assert.writeOK(coll.remove({x: 6}));
     assert.eq(0, getNumKeys("x_1"));
+
+    // Documents with duplicate keys that straddle the index.
+    assert.writeOK(coll.insert({_id: 3, x: 1, a: 1}));  // In index.
+    assert.writeOK(coll.insert({_id: 4, x: 1, a: 0}));  // Not in index.
+    assert.writeErrorWithCode(
+        coll.insert({_id: 5, x: 1, a: 1}),
+        ErrorCodes.DuplicateKey);  // Duplicate key constraint prevents insertion.
+
+    // Only _id 3 is in the index.
+    assert.eq(1, getNumKeys("x_1"));
+
+    // Remove _id 4, _id 3 should remain in index.
+    assert.writeOK(coll.remove({_id: 4}));
+
+    // _id 3 is still in the index.
+    assert.eq(1, getNumKeys("x_1"));
 })();
