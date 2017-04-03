@@ -14,6 +14,7 @@ import subprocess
 import re
 import requests
 import sys
+import urlparse
 import yaml
 
 API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
@@ -106,12 +107,10 @@ def find_last_activated_task(revisions, variant, branch_name):
     build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
 
     evg_cfg = read_evg_config()
-    try:
-        api_server = evg_cfg["api_server_host"]
-        # Makes some assumptions, but saves doing a full url parse.
-        if api_server.endsWith("/api"):
-            api_server = api_server[:-4]
-    except:
+    if "api_server_host" in evg_cfg:
+        api_server = "{url.scheme}://{url.netloc}".format(
+            url=urlparse.urlparse(evg_cfg["api_server_host"]))
+    else:
         api_server = API_SERVER_DEFAULT
 
     api_prefix = api_server + rest_prefix
