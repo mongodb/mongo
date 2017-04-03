@@ -917,11 +917,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* opCtx,
             request->getProj().isEmpty() && hasCollectionDefaultCollation) {
             LOG(2) << "Using idhack: " << redact(unparsedQuery);
 
-            PlanStage* idHackStage = new IDHackStage(
-                opCtx, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
-            unique_ptr<UpdateStage> root = make_unique<UpdateStage>(
-                opCtx, updateStageParams, ws.get(), collection, idHackStage);
-            return PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, policy);
+            // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
+            // WorkingSet.
+            return InternalPlanner::updateWithIdHack(opCtx,
+                                                     collection,
+                                                     updateStageParams,
+                                                     descriptor,
+                                                     unparsedQuery["_id"].wrap(),
+                                                     policy);
         }
 
         // If we're here then we don't have a parsed query, but we're also not eligible for

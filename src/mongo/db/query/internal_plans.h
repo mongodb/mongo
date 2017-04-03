@@ -41,6 +41,7 @@ class OperationContext;
 class PlanStage;
 class WorkingSet;
 struct DeleteStageParams;
+struct UpdateStageParams;
 
 /**
  * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
@@ -109,6 +110,16 @@ public:
                                                              BoundInclusion boundInclusion,
                                                              PlanExecutor::YieldPolicy yieldPolicy,
                                                              Direction direction = FORWARD);
+
+    /**
+     * Returns an IDHACK => UPDATE plan.
+     */
+    static std::unique_ptr<PlanExecutor> updateWithIdHack(OperationContext* opCtx,
+                                                          Collection* collection,
+                                                          const UpdateStageParams& params,
+                                                          const IndexDescriptor* descriptor,
+                                                          const BSONObj& key,
+                                                          PlanExecutor::YieldPolicy yieldPolicy);
 
 private:
     /**

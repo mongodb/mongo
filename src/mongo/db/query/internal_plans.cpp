@@ -36,7 +36,9 @@
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -139,6 +141,25 @@ std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithIndexScan(
                                                  InternalPlanner::IXSCAN_FETCH);
 
     root = stdx::make_unique<DeleteStage>(opCtx, params, ws.get(), collection, root.release());
+
+    auto executor =
+        PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
+    invariantOK(executor.getStatus());
+    return std::move(executor.getValue());
+}
+
+std::unique_ptr<PlanExecutor> InternalPlanner::updateWithIdHack(
+    OperationContext* opCtx,
+    Collection* collection,
+    const UpdateStageParams& params,
+    const IndexDescriptor* descriptor,
+    const BSONObj& key,
+    PlanExecutor::YieldPolicy yieldPolicy) {
+    auto ws = stdx::make_unique<WorkingSet>();
+
+    auto idHackStage = stdx::make_unique<IDHackStage>(opCtx, collection, key, ws.get(), descriptor);
+    auto root =
+        stdx::make_unique<UpdateStage>(opCtx, params, ws.get(), collection, idHackStage.release());
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
