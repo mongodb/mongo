@@ -110,6 +110,7 @@ env.Library(
     target='expression_context',
     source=[
         'expression_context.cpp',
+        'variables.cpp',
     ],
     LIBDEPS=[
         'aggregation_request',
