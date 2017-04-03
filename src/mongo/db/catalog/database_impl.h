@@ -176,9 +176,7 @@ public:
      */
     Collection* getCollection(OperationContext* opCtx, StringData ns) const final;
 
-    Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const {
-        return getCollection(opCtx, ns.ns());
-    }
+    Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const;
 
     /**
      * Get the view catalog, which holds the definition for all views created on this database. You

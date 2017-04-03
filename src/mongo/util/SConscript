@@ -96,9 +96,11 @@ env.Library(
     target='uuid',
     source=[
         'uuid.cpp',
+        'namespace_uuid_cache.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
     ],
 )
@@ -110,6 +112,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'uuid',
+    ],
+)
+
+env.CppUnitTest(
+    target='namespace_uuid_cache_test',
+    source=[
+        'namespace_uuid_cache_test.cpp'
+    ],
+    LIBDEPS=[
         'uuid',
     ],
 )

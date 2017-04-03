@@ -65,6 +65,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/namespace_uuid_cache.h"
 
 namespace mongo {
 namespace {
@@ -454,6 +455,11 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns);
 
+    // Evict namespace entry from the namespace/uuid cache.
+    if (enableCollectionUUIDs) {
+        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+        cache.evictNamespace(fullns);
+    }
     return Status::OK();
 }
 
@@ -474,12 +480,26 @@ void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
 }
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, StringData ns) const {
-    invariant(_name == nsToDatabaseSubstring(ns));
+    NamespaceString nss(ns);
+    invariant(_name == nss.db());
+    return getCollection(opCtx, nss);
+}
+
+Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const NamespaceString& nss) const {
     dassert(!cc().getOperationContext() || opCtx == cc().getOperationContext());
-    CollectionMap::const_iterator it = _collections.find(ns);
+    CollectionMap::const_iterator it = _collections.find(nss.ns());
 
     if (it != _collections.end() && it->second) {
-        return it->second;
+        Collection* found = it->second;
+        if (enableCollectionUUIDs) {
+            NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+            CollectionOptions found_options = found->getCatalogEntry()->getCollectionOptions(opCtx);
+            if (found_options.uuid) {
+                CollectionUUID uuid = found_options.uuid.get();
+                cache.ensureNamespaceInCache(nss, uuid);
+            }
+        }
+        return found;
     }
 
     return NULL;
@@ -520,6 +540,12 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
     _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNSS);
+
+    // Evict namespace entry from the namespace/uuid cache.
+    if (enableCollectionUUIDs) {
+        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+        cache.evictNamespace(fromNSS);
+    }
     return s;
 }
 
