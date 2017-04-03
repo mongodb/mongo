@@ -499,11 +499,12 @@ functions:
         script: |
           set -o errexit
           git clone git@github.com:10gen/jepsen.git
-          cd jepsen/jepsen
+          cd jepsen
           git checkout mongodb-master-linearizable-2
           branch=$(git symbolic-ref --short HEAD)
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
+          cd jepsen
           lein install
     - command: shell.exec
       params:
