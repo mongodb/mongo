@@ -712,14 +712,33 @@ TEST_F(OplogFetcherTest,
     ASSERT_OK(oqMetadata.writeToMetadata(&bob));
     auto metadataObj = bob.obj();
 
-    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource,
-                  processSingleBatch({makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
-                                      metadataObj,
-                                      Milliseconds(0)},
-                                     false)
-                      ->getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidSyncSource,
+        processSingleBatch({makeCursorResponse(0, {}), metadataObj, Milliseconds(0)}, false)
+            ->getStatus());
     ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
     ASSERT(lastEnqueuedDocuments.empty());
+}
+
+TEST_F(OplogFetcherTest, MetadataAndBatchAreProcessedWhenSyncSourceIsCurrentButMetadataIsStale) {
+    // This tests the case where the sync source metadata is behind us but we get a document which
+    // is equal to us.  Since that means the metadata is stale and can be ignored, we should accept
+    // this sync source.
+    rpc::ReplSetMetadata replMetadata(1, OpTime(), OpTime(), 1, OID::gen(), -1, -1);
+    rpc::OplogQueryMetadata oqMetadata(staleOpTime, staleOpTime, rbid, 2, 2);
+    BSONObjBuilder bob;
+    ASSERT_OK(replMetadata.writeToMetadata(&bob));
+    ASSERT_OK(oqMetadata.writeToMetadata(&bob));
+    auto metadataObj = bob.obj();
+
+    auto entry = makeNoopOplogEntry(lastFetched);
+    auto shutdownState =
+        processSingleBatch({makeCursorResponse(0, {entry}), metadataObj, Milliseconds(0)}, false);
+    ASSERT_OK(shutdownState->getStatus());
+    ASSERT(dataReplicatorExternalState->metadataWasProcessed);
+    ASSERT_EQUALS(OpTimeWithHash(entry["h"].numberLong(),
+                                 unittest::assertGet(OpTime::parseFromOplogEntry(entry))),
+                  shutdownState->getLastFetched());
 }
 
 TEST_F(OplogFetcherTest,
