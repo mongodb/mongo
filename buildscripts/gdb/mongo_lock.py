@@ -159,7 +159,11 @@ def find_frame(function_name_pattern):
         block = find_func_block(block)
         if block and re.match(function_name_pattern, block.function.name):
             return frame
-        frame = frame.older()
+        try:
+            frame = frame.older()
+        except gdb.error as err:
+            print("Ignoring GDB error '%s' in find_frame" % str(err))
+            break
     return None
 
 
