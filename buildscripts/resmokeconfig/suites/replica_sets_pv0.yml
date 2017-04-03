@@ -29,6 +29,8 @@ selector:
     - jstests/replsets/rollback_too_new.js
     # replSetGetStatus doesn't return last committed optime in PV0.
     - jstests/replsets/command_response_operation_time.js
+    # Majority read concern not supported in PV0.
+    - jstests/replsets/operation_time_read_and_write_concern.js
 
 executor:
   js_test:
