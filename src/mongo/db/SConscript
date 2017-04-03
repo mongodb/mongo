@@ -966,6 +966,28 @@ env.Library(
 )
 
 env.Library(
+    target='logical_session_id',
+    source=[
+        'logical_session_id.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/uuid',
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='logical_session_id_test',
+    source=[
+        'logical_session_id_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'logical_session_id'
+    ],
+)
+
+env.Library(
     target='logical_time',
     source=[
         'logical_time.cpp',
