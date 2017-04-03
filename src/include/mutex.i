@@ -32,7 +32,9 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 	WT_UNUSED(name);
 
 	t->lock = 0;
+	t->name = name;
 	t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
+	t->initialized = 1;
 	return (0);
 }
 
@@ -196,6 +198,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 	}
 
 	t->name = name;
+	t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
 	t->initialized = 1;
 	return (0);
 }
