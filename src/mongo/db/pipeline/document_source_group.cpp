@@ -66,7 +66,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNext() {
         invariant(initializationResult.isEOF());
     }
 
-    for (auto && accum : _currentAccumulators) {
+    for (auto&& accum : _currentAccumulators) {
         accum->reset();  // Prep accumulators for a new group.
     }
 
@@ -90,16 +90,16 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextSpilled() {
         // Inside of this loop, _firstPartOfNextGroup is the current data being processed.
         // At loop exit, it is the first value to be processed in the next group.
         switch (numAccumulators) {  // mirrors switch in spill()
-        case 1:                 // Single accumulators serialize as a single Value.
-            _currentAccumulators[0]->process(_firstPartOfNextGroup.second, true);
-        case 0:  // No accumulators so no Values.
-            break;
-        default: {  // Multiple accumulators serialize as an array of Values.
-            const vector<Value>& accumulatorStates = _firstPartOfNextGroup.second.getArray();
-            for (size_t i = 0; i < numAccumulators; i++) {
-                _currentAccumulators[i]->process(accumulatorStates[i], true);
+            case 1:                 // Single accumulators serialize as a single Value.
+                _currentAccumulators[0]->process(_firstPartOfNextGroup.second, true);
+            case 0:  // No accumulators so no Values.
+                break;
+            default: {  // Multiple accumulators serialize as an array of Values.
+                const vector<Value>& accumulatorStates = _firstPartOfNextGroup.second.getArray();
+                for (size_t i = 0; i < numAccumulators; i++) {
+                    _currentAccumulators[i]->process(accumulatorStates[i], true);
+                }
             }
-        }
         }
 
         if (!_sorterIterator->more()) {
@@ -140,8 +140,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
     do {
         // Add to the current accumulator(s).
         for (size_t i = 0; i < _currentAccumulators.size(); i++) {
-            _currentAccumulators[i]->process(_accumalatedFields[i]._expression->evaluate(_variables.get()),
-                                             _doingMerge);
+            _currentAccumulators[i]->process(
+                _accumalatedFields[i]._expression->evaluate(_variables.get()), _doingMerge);
         }
 
         // Release our references to the previous input document before asking for the next. This
@@ -219,8 +219,9 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
     const size_t n = _accumalatedFields.size();
     for (size_t i = 0; i < n; ++i) {
         intrusive_ptr<Accumulator> accum = (_accumalatedFields[i]._accumulatorFactory)(pExpCtx);
-        insides[_accumalatedFields[i]._fieldName] = Value(
-                    DOC(accum->getOpName() << _accumalatedFields[i]._expression->serialize(static_cast<bool>(explain))));
+        insides[_accumalatedFields[i]._fieldName] =
+            Value(DOC(accum->getOpName()
+                      << _accumalatedFields[i]._expression->serialize(static_cast<bool>(explain))));
     }
 
     if (_doingMerge) {
@@ -259,7 +260,7 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     intrusive_ptr<DocumentSourceGroup> groupStage(
         new DocumentSourceGroup(pExpCtx, maxMemoryUsageBytes));
     groupStage->setIdExpression(groupByExpression);
-    for (auto && statement : accumulationStatements) {
+    for (auto&& statement : accumulationStatements) {
         groupStage->addAccumulator(statement);
     }
     groupStage->_variables = stdx::make_unique<Variables>(numVariables);
@@ -267,7 +268,7 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
 }
 
 DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx,
-        size_t maxMemoryUsageBytes)
+                                         size_t maxMemoryUsageBytes)
     : DocumentSource(pExpCtx),
       _doingMerge(false),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
@@ -289,8 +290,8 @@ void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationState
 namespace {
 
 intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContext>& expCtx,
-        BSONElement groupField,
-        const VariablesParseState& vps) {
+                                            BSONElement groupField,
+                                            const VariablesParseState& vps) {
     if (groupField.type() == Object && !groupField.Obj().isEmpty()) {
         // {_id: {}} is treated as grouping on a constant, not an expression
 
@@ -299,7 +300,7 @@ intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContex
             // grouping on a $op expression
             return Expression::parseObject(expCtx, idKeyObj, vps);
         } else {
-            for (auto && field : idKeyObj) {
+            for (auto&& field : idKeyObj) {
                 uassert(17390,
                         "$group does not support inclusion-style expressions",
                         !field.isNumber() && field.type() != Bool);
@@ -327,7 +328,7 @@ void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression>
         // grouping on an "artificial" object. Rather than create the object for each input
         // in initialize(), instead group on the output of the raw expressions. The artificial
         // object will be created at the end in makeDocument() while outputting results.
-        for (auto && childExpPair : childExpressions) {
+        for (auto&& childExpPair : childExpressions) {
             _idFieldNames.push_back(childExpPair.first);
             _idExpressions.push_back(childExpPair.second);
         }
@@ -378,7 +379,7 @@ namespace {
 using GroupsMap = DocumentSourceGroup::GroupsMap;
 
 class SorterComparator {
-  public:
+public:
     typedef pair<Value, Value> Data;
 
     SorterComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
@@ -387,24 +388,24 @@ class SorterComparator {
         return _valueComparator.compare(lhs.first, rhs.first);
     }
 
-  private:
+private:
     ValueComparator _valueComparator;
 };
 
 class SpillSTLComparator {
-  public:
+public:
     SpillSTLComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
 
     bool operator()(const GroupsMap::value_type* lhs, const GroupsMap::value_type* rhs) const {
         return _valueComparator.evaluate(lhs->first < rhs->first);
     }
 
-  private:
+private:
     ValueComparator _valueComparator;
 };
 
 bool containsOnlyFieldPathsAndConstants(ExpressionObject* expressionObj) {
-    for (auto && it : expressionObj->getChildExpressions()) {
+    for (auto&& it : expressionObj->getChildExpressions()) {
         const intrusive_ptr<Expression>& childExp = it.second;
         if (dynamic_cast<ExpressionFieldPath*>(childExp.get())) {
             continue;
@@ -430,7 +431,7 @@ void getFieldPathMap(ExpressionObject* expressionObj,
     // attempt to compute a map from each FieldPath leaf to the path of that leaf. In the example,
     // this method would return: {"a.b" : "x.y"}.
 
-    for (auto && it : expressionObj->getChildExpressions()) {
+    for (auto&& it : expressionObj->getChildExpressions()) {
         intrusive_ptr<Expression> childExp = it.second;
         ExpressionObject* expObj = dynamic_cast<ExpressionObject*>(childExp.get());
         ExpressionFieldPath* expPath = dynamic_cast<ExpressionFieldPath*>(childExp.get());
@@ -451,7 +452,7 @@ void getFieldPathListForSpilled(ExpressionObject* expressionObj,
     // Given an expression, attempt to compute a vector of strings, each representing the path
     // through the object to a leaf. For example, for the expression represented by
     // {x: 2, y: {z: "$a.b"}}, the output would be ["x", "y.z"].
-    for (auto && it : expressionObj->getChildExpressions()) {
+    for (auto&& it : expressionObj->getChildExpressions()) {
         intrusive_ptr<Expression> childExp = it.second;
         ExpressionObject* expObj = dynamic_cast<ExpressionObject*>(childExp.get());
 
@@ -539,7 +540,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         /* tickle all the accumulators for the group we found */
         dassert(numAccumulators == group.size());
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(_accumalatedFields[i]._expression->evaluate(_variables.get()), _doingMerge);
+            group[i]->process(_accumalatedFields[i]._expression->evaluate(_variables.get()),
+                              _doingMerge);
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
 
@@ -549,9 +551,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
             if (!inserted &&                 // is a dup
-                    !pExpCtx->inRouter &&        // can't spill to disk in router
-                    !_extSortAllowed &&          // don't change behavior when testing external sort
-                    _sortedFiles.size() < 20) {  // don't open too many FDs
+                !pExpCtx->inRouter &&        // can't spill to disk in router
+                !_extSortAllowed &&          // don't change behavior when testing external sort
+                _sortedFiles.size() < 20) {  // don't open too many FDs
 
                 _sortedFiles.push_back(spill());
             }
@@ -559,44 +561,45 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
     }
 
     switch (input.getStatus()) {
-    case DocumentSource::GetNextResult::ReturnStatus::kAdvanced: {
-        MONGO_UNREACHABLE;  // We consumed all advances above.
-    }
-    case DocumentSource::GetNextResult::ReturnStatus::kPauseExecution: {
-        return input;  // Propagate pause.
-    }
-    case DocumentSource::GetNextResult::ReturnStatus::kEOF: {
-        // Do any final steps necessary to prepare to output results.
-        if (!_sortedFiles.empty()) {
-            _spilled = true;
-            if (!_groups->empty()) {
-                _sortedFiles.push_back(spill());
-            }
-
-            // We won't be using groups again so free its memory.
-            _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
-
-            _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
-                                      _sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
-
-            // prepare current to accumulate data
-            _currentAccumulators.reserve(numAccumulators);
-            for (size_t i = 0; i < numAccumulators; i++) {
-                _currentAccumulators.push_back((_accumalatedFields[i]._accumulatorFactory)(pExpCtx));
-            }
-
-            verify(_sorterIterator->more());  // we put data in, we should get something out.
-            _firstPartOfNextGroup = _sorterIterator->next();
-        } else {
-            // start the group iterator
-            groupsIterator = _groups->begin();
+        case DocumentSource::GetNextResult::ReturnStatus::kAdvanced: {
+            MONGO_UNREACHABLE;  // We consumed all advances above.
         }
+        case DocumentSource::GetNextResult::ReturnStatus::kPauseExecution: {
+            return input;  // Propagate pause.
+        }
+        case DocumentSource::GetNextResult::ReturnStatus::kEOF: {
+            // Do any final steps necessary to prepare to output results.
+            if (!_sortedFiles.empty()) {
+                _spilled = true;
+                if (!_groups->empty()) {
+                    _sortedFiles.push_back(spill());
+                }
 
-        // This must happen last so that, unless control gets here, we will re-enter
-        // initialization after getting a GetNextResult::ResultState::kPauseExecution.
-        _initialized = true;
-        return input;
-    }
+                // We won't be using groups again so free its memory.
+                _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
+
+                _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
+                    _sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
+
+                // prepare current to accumulate data
+                _currentAccumulators.reserve(numAccumulators);
+                for (size_t i = 0; i < numAccumulators; i++) {
+                    _currentAccumulators.push_back(
+                        (_accumalatedFields[i]._accumulatorFactory)(pExpCtx));
+                }
+
+                verify(_sorterIterator->more());  // we put data in, we should get something out.
+                _firstPartOfNextGroup = _sorterIterator->next();
+            } else {
+                // start the group iterator
+                groupsIterator = _groups->begin();
+            }
+
+            // This must happen last so that, unless control gets here, we will re-enter
+            // initialization after getting a GetNextResult::ResultState::kPauseExecution.
+            _initialized = true;
+            return input;
+        }
     }
     MONGO_UNREACHABLE;
 }
@@ -612,28 +615,28 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir));
     switch (_accumalatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
-    case 0:                             // no values, essentially a distinct
-        for (size_t i = 0; i < ptrs.size(); i++) {
-            writer.addAlreadySorted(ptrs[i]->first, Value());
-        }
-        break;
-
-    case 1:  // just one value, use optimized serialization as single Value
-        for (size_t i = 0; i < ptrs.size(); i++) {
-            writer.addAlreadySorted(ptrs[i]->first,
-                                    ptrs[i]->second[0]->getValue(/*toBeMerged=*/true));
-        }
-        break;
-
-    default:  // multiple values, serialize as array-typed Value
-        for (size_t i = 0; i < ptrs.size(); i++) {
-            vector<Value> accums;
-            for (size_t j = 0; j < ptrs[i]->second.size(); j++) {
-                accums.push_back(ptrs[i]->second[j]->getValue(/*toBeMerged=*/true));
+        case 0:                           // no values, essentially a distinct
+            for (size_t i = 0; i < ptrs.size(); i++) {
+                writer.addAlreadySorted(ptrs[i]->first, Value());
             }
-            writer.addAlreadySorted(ptrs[i]->first, Value(std::move(accums)));
-        }
-        break;
+            break;
+
+        case 1:  // just one value, use optimized serialization as single Value
+            for (size_t i = 0; i < ptrs.size(); i++) {
+                writer.addAlreadySorted(ptrs[i]->first,
+                                        ptrs[i]->second[0]->getValue(/*toBeMerged=*/true));
+            }
+            break;
+
+        default:  // multiple values, serialize as array-typed Value
+            for (size_t i = 0; i < ptrs.size(); i++) {
+                vector<Value> accums;
+                for (size_t j = 0; j < ptrs[i]->second.size(); j++) {
+                    accums.push_back(ptrs[i]->second[j]->getValue(/*toBeMerged=*/true));
+                }
+                writer.addAlreadySorted(ptrs[i]->first, Value(std::move(accums)));
+            }
+            break;
     }
 
     _groups->clear();
@@ -664,7 +667,7 @@ boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
     // those FieldPaths if it is.
     DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);  // We don't support streaming
     // based off a text score.
-    for (auto && exp : _idExpressions) {
+    for (auto&& exp : _idExpressions) {
         if (dynamic_cast<ExpressionConstant*>(exp.get())) {
             continue;
         }
@@ -692,7 +695,7 @@ boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
         return BSONObj();
     }
 
-    for (auto && obj : sorts) {
+    for (auto&& obj : sorts) {
         // Note that a sort order of, e.g., {a: 1, b: 1, c: 1} allows us to do a non-blocking group
         // for every permutation of group by (a, b, c), since we are guaranteed that documents with
         // the same value of (a, b, c) will be consecutive in the input stream, no matter what our
@@ -780,7 +783,7 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
                 outputSort.push_back("_id." + _idFieldNames[i]);
             }
         }
-        for (auto && field : outputSort) {
+        for (auto&& field : outputSort) {
             sortOrder.append(field, 1);
         }
     }
@@ -825,8 +828,8 @@ Value DocumentSourceGroup::expandId(const Value& val) {
 }
 
 Document DocumentSourceGroup::makeDocument(const Value& id,
-        const Accumulators& accums,
-        bool mergeableOutput) {
+                                           const Accumulators& accums,
+                                           bool mergeableOutput) {
     const size_t n = _accumalatedFields.size();
     MutableDocument out(1 + n);
 
@@ -870,11 +873,10 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
           expression or constant.  Here, we accumulate the output of the
           same name from the prior group.
         */
-        pMerger->addAccumulator( {
-            _accumalatedFields[i]._fieldName,
-            _accumalatedFields[i]._accumulatorFactory,
-            ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + _accumalatedFields[i]._fieldName, vps)
-        });
+        pMerger->addAccumulator({_accumalatedFields[i]._fieldName,
+                                 _accumalatedFields[i]._accumulatorFactory,
+                                 ExpressionFieldPath::parse(
+                                     pExpCtx, "$$ROOT." + _accumalatedFields[i]._fieldName, vps)});
     }
 
     pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));

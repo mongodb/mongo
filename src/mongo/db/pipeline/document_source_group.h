@@ -39,7 +39,7 @@
 namespace mongo {
 
 class DocumentSourceGroup final : public DocumentSource, public SplittableDocumentSource {
-  public:
+public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
@@ -96,7 +96,7 @@ class DocumentSourceGroup final : public DocumentSource, public SplittableDocume
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
-  private:
+private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                  size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
@@ -157,7 +157,8 @@ class DocumentSourceGroup final : public DocumentSource, public SplittableDocume
      * '_fieldName' contains the field names for the result documents, '_accumulatorFactory'
      * contains the accumulator factories for the result documents, and 'expression' contains the
      * common expressions used by  instance of an accumulator in order to find the right-hand
-     * side of what gets added to the accumulator. Since these three variable are parallel to each other,
+     * side of what gets added to the accumulator. Since these three variable are parallel to each
+     * other,
      * it store in  struct.
      */
     std::vector<Field> _accumalatedFields;
