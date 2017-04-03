@@ -172,6 +172,9 @@ public:
     Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
 
     void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+
+private:
+    bool _partial;
 };
 
 class WiredTigerIndexStandard : public WiredTigerIndex {

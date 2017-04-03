@@ -1298,9 +1298,12 @@ Status IndexCatalog::_unindexRecord(OperationContext* txn,
     prepareInsertDeleteOptions(txn, index->descriptor(), &options);
     options.logIfError = logIfError;
 
-    // For unindex operations, dupsAllowed=false really means that it is safe to delete anything
-    // that matches the key, without checking the RecordID, since dups are impossible. We need
-    // to disable this behavior for in-progress indexes. See SERVER-17487 for more details.
+    // On WiredTiger, we do blind unindexing of records for efficiency.  However, when duplicates
+    // are allowed in unique indexes, WiredTiger does not do blind unindexing, and instead confirms
+    // that the recordid matches the element we are removing.
+    // We need to disable blind-deletes for in-progress indexes, in order to force recordid-matching
+    // for unindex operations, since initial sync can build an index over a collection with
+    // duplicates. See SERVER-17487 for more details.
     options.dupsAllowed = options.dupsAllowed || !index->isReady(txn);
 
     int64_t removed;
