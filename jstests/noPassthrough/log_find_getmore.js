@@ -9,6 +9,26 @@
     load("jstests/libs/check_log.js");
     load("jstests/libs/profiler.js");
 
+    function assertLogLineContains(conn, parts) {
+        if (typeof(parts) == 'string') {
+            return assertLogLineContains(conn, [parts]);
+        }
+
+        const logLines = checkLog.getGlobalLog(conn);
+        for (var line of logLines) {
+            var foundParts = 0;
+            for (var part of parts) {
+                if (line.indexOf(part) == -1) {
+                    foundParts += 1;
+                }
+            }
+            if (foundParts == parts.length) {
+                return;
+            }
+        }
+        doassert("failed to find log line containing all of " + tojson(parts));
+    }
+
     const conn = MongoRunner.runMongod();
     assert.neq(null, conn, "mongod was unable to start up");
 
@@ -41,10 +61,10 @@
     let logLine =
         'command log_getmore.test appName: "MongoDB Shell" command: find { find: "test", filter:' +
         ' { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: false, sort:' +
-        ' { a: 1.0 }, hint: { a: 1.0 } }';
+        ' { a: 1.0 }, hint: { a: 1.0 }';
 
     // Check the logs to verify that find appears as above.
-    checkLog.contains(conn, logLine);
+    assertLogLineContains(conn, logLine);
 
     // TEST: Verify the log format of a getMore command following a find command.
 
@@ -63,13 +83,15 @@
                                         cursorIdString.length - "\")".length);
     }
 
-    logLine = 'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
-        cursorIdToString(cursorid) +
-        ', collection: "test", batchSize: 5.0 } originatingCommand: { find: "test", ' +
-        'filter: { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: ' +
-        'false, sort: { a: 1.0 }, hint: { a: 1.0 } }';
+    logLine = [
+        'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
+            cursorIdToString(cursorid) + ', collection: "test", batchSize: 5.0',
+        'originatingCommand: { find: "test", ' +
+            'filter: { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: ' +
+            'false, sort: { a: 1.0 }, hint: { a: 1.0 }'
+    ];
 
-    checkLog.contains(conn, logLine);
+    assertLogLineContains(conn, logLine);
 
     // TEST: Verify the log format of a getMore command following an aggregation.
     cursor = coll.aggregate([{$match: {a: {$gt: 0}}}], {cursor: {batchSize: 0}, hint: {a: 1}});
@@ -77,12 +99,14 @@
 
     assert.eq(cursor.itcount(), 10);
 
-    logLine = 'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
-        cursorIdToString(cursorid) +
-        ', collection: "test" } originatingCommand: { aggregate: "test", pipeline: ' +
-        '[ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 } }';
+    logLine = [
+        'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
+            cursorIdToString(cursorid) + ', collection: "test"',
+        'originatingCommand: { aggregate: "test", pipeline: ' +
+            '[ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
+    ];
 
-    checkLog.contains(conn, logLine);
+    assertLogLineContains(conn, logLine);
 
     //
     // Legacy tests.
@@ -98,9 +122,9 @@
 
     logLine =
         'query log_getmore.test appName: "MongoDB Shell" query: { find: "test", filter: { a: { ' +
-        '$gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 } }';
+        '$gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
 
-    checkLog.contains(conn, logLine);
+    assertLogLineContains(conn, logLine);
 
     // TEST: Verify that a legacy getMore following a find is logged in the expected format. This
     // should be upconverted to resemble a getMore command, with the preceding upconverted legacy
@@ -111,9 +135,9 @@
     logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
         cursorIdToString(cursorid) +
         ', collection: "test", batchSize: 5 } originatingCommand: { find: "test", filter: { a: {' +
-        ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 } }';
+        ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
 
-    checkLog.contains(conn, logLine);
+    assertLogLineContains(conn, logLine);
 
     // TEST: Verify that a legacy getMore following an aggregation is logged in the expected format.
     // This should be upconverted to resemble a getMore command, with the preceding aggregation in
@@ -123,10 +147,12 @@
 
     assert.eq(cursor.itcount(), 10);
 
-    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
-        cursorIdToString(cursorid) +
-        ', collection: "test", batchSize: 0 } originatingCommand: { aggregate: "test", pipeline:' +
-        ' [ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 } }';
+    logLine = [
+        'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
+            cursorIdToString(cursorid) + ', collection: "test", batchSize: 0',
+        'originatingCommand: { aggregate: "test", pipeline:' +
+            ' [ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
+    ];
 
-    checkLog.contains(conn, logLine);
+    assertLogLineContains(conn, logLine);
 })();

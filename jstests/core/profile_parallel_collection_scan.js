@@ -17,7 +17,10 @@
     testDB.setProfilingLevel(2);
 
     const parallelCollectionScanCmd = {parallelCollectionScan: testColl.getName(), numCursors: 1};
-    const profileEntryFilter = {op: "command", command: parallelCollectionScanCmd};
+    const profileEntryFilter = {op: "command"};
+    for (var field in parallelCollectionScanCmd) {
+        profileEntryFilter['command.' + field] = parallelCollectionScanCmd[field];
+    }
 
     let cmdRes = assert.commandWorked(testDB.runCommand(parallelCollectionScanCmd));
 
@@ -31,5 +34,8 @@
         testDB.runCommand({getMore: firstCursor.id, collection: getMoreCollName}));
 
     const getMoreProfileEntry = getLatestProfilerEntry(testDB, {op: "getmore"});
-    assert.eq(getMoreProfileEntry.originatingCommand, parallelCollectionScanCmd);
+    for (var field in parallelCollectionScanCmd) {
+        assert.eq(
+            getMoreProfileEntry.originatingCommand[field], parallelCollectionScanCmd[field], field);
+    }
 })();

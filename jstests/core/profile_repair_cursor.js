@@ -16,10 +16,9 @@
 
     testDB.setProfilingLevel(2);
 
-    const repairCursorCmd = {repairCursor: testColl.getName()};
-    const profileEntryFilter = {op: "command", command: repairCursorCmd};
+    const profileEntryFilter = {op: "command", "command.repairCursor": testColl.getName()};
 
-    let cmdRes = testDB.runCommand(repairCursorCmd);
+    let cmdRes = testDB.runCommand({repairCursor: testColl.getName()});
     if (cmdRes.code === ErrorCodes.CommandNotSupported) {
         // Some storage engines do not support this command, so we can skip this test.
         return;
@@ -35,5 +34,5 @@
         testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
 
     const getMoreProfileEntry = getLatestProfilerEntry(testDB, {op: "getmore"});
-    assert.eq(getMoreProfileEntry.originatingCommand, repairCursorCmd);
+    assert.eq(getMoreProfileEntry.originatingCommand.repairCursor, testColl.getName());
 })();
