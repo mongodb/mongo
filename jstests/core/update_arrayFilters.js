@@ -1,5 +1,4 @@
 // Tests for the arrayFilters option to update and findAndModify.
-// TODO SERVER-28576: Implement these tests in terms of the shell helpers.
 (function() {
     "use strict";
 
@@ -7,107 +6,198 @@
     coll.drop();
 
     //
-    // Update.
+    // Tests for update.
     //
 
-    // Non-array arrayFilters fail to parse.
-    let res = db.runCommand(
-        {update: coll.getName(), updates: [{q: {}, u: {$set: {a: 5}}, arrayFilters: {i: 0}}]});
-    assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
+    if (db.getMongo().writeMode() !== "commands") {
+        assert.throws(function() {
+            coll.update({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]});
+        });
+    } else {
+        // Non-array arrayFilters fails to parse.
+        assert.writeError(coll.update({}, {$set: {a: 5}}, {arrayFilters: {i: 0}}),
+                          ErrorCodes.TypeMismatch);
 
-    // Non-object array filter fail to parse.
-    res = db.runCommand(
-        {update: coll.getName(), updates: [{q: {}, u: {$set: {a: 5}}, arrayFilters: ["bad"]}]});
-    assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
+        // Non-object array filter fails to parse.
+        assert.writeError(coll.update({}, {$set: {a: 5}}, {arrayFilters: ["bad"]}),
+                          ErrorCodes.TypeMismatch);
 
-    // Bad array filter fails to parse.
-    res = db.runCommand({
-        update: coll.getName(),
-        updates: [{q: {}, u: {$set: {a: 5}}, arrayFilters: [{i: 0, j: 0}]}]
-    });
-    assert(res.hasOwnProperty("writeErrors"), tojson(res));
-    assert.eq(res.writeErrors.length, 1, tojson(res.writeErrors));
-    assert.writeError(res.writeErrors[0], ErrorCodes.FailedToParse);
-    assert.neq(-1,
-               res.writeErrors[0].errmsg.indexOf(
-                   "Each array filter must use a single top-level field name"),
-               "update failed for a reason other than failing to parse array filters");
+        // Bad array filter fails to parse.
+        let res = coll.update({}, {$set: {a: 5}}, {arrayFilters: [{i: 0, j: 0}]});
+        assert.writeError(res, ErrorCodes.FailedToParse);
+        assert.neq(-1,
+                   res.getWriteError().errmsg.indexOf(
+                       "Each array filter must use a single top-level field name"),
+                   "update failed for a reason other than failing to parse array filters");
 
-    // Multiple array filters with the same id fails to parse.
-    res = db.runCommand({
-        update: coll.getName(),
-        updates: [{q: {}, u: {$set: {a: 5}}, arrayFilters: [{i: 0}, {j: 0}, {i: 1}]}]
-    });
-    assert(res.hasOwnProperty("writeErrors"), tojson(res));
-    assert.eq(res.writeErrors.length, 1, tojson(res.writeErrors));
-    assert.writeError(res.writeErrors[0], ErrorCodes.FailedToParse);
-    assert.neq(
-        -1,
-        res.writeErrors[0].errmsg.indexOf(
-            "Found multiple array filters with the same top-level field name"),
-        "update failed for a reason other than multiple array filters with the same top-level field name");
+        // Multiple array filters with the same id fails to parse.
+        res = coll.update({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}, {j: 0}, {i: 1}]});
+        assert.writeError(res, ErrorCodes.FailedToParse);
+        assert.neq(
+            -1,
+            res.getWriteError().errmsg.indexOf(
+                "Found multiple array filters with the same top-level field name"),
+            "update failed for a reason other than multiple array filters with the same top-level field name");
 
-    // Good value for arrayFilters succeeds.
-    res = db.runCommand({
-        update: coll.getName(),
-        updates: [{q: {}, u: {$set: {a: 5}}, arrayFilters: [{i: 0}, {j: 0}]}]
-    });
-    assert(!res.hasOwnProperty("writeErrors"), tojson(res));
+        // Good value for arrayFilters succeeds.
+        assert.writeOK(coll.update({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}, {j: 0}]}));
+    }
 
     //
-    // FindAndModify.
+    // Tests for findAndModify.
     //
 
-    // Non-array arrayFilters fail to parse.
-    res = db.runCommand(
-        {findAndModify: coll.getName(), query: {}, update: {$set: {a: 5}}, arrayFilters: {i: 0}});
-    assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
+    // Non-array arrayFilters fails to parse.
+    assert.throws(function() {
+        coll.findAndModify({query: {}, update: {$set: {a: 5}}, arrayFilters: {i: 0}});
+    });
 
-    // Non-object array filter fail to parse.
-    res = db.runCommand(
-        {findAndModify: coll.getName(), query: {}, update: {$set: {a: 5}}, arrayFilters: ["bad"]});
-    assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
+    // Non-object array filter fails to parse.
+    assert.throws(function() {
+        coll.findAndModify({query: {}, update: {$set: {a: 5}}, arrayFilters: ["bad"]});
+    });
 
     // arrayFilters option not allowed with remove=true.
-    res = db.runCommand(
-        {findAndModify: coll.getName(), query: {}, remove: true, arrayFilters: [{i: 0}]});
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
-    assert.neq(
-        -1,
-        res.errmsg.indexOf("Cannot specify arrayFilters and remove=true"),
-        "findAndModify failed for a reason other than specifying arrayFilters with remove=true");
+    assert.throws(function() {
+        coll.findAndModify({query: {}, remove: true, arrayFilters: [{i: 0}]});
+    });
 
     // Bad array filter fails to parse.
-    res = db.runCommand({
-        findAndModify: coll.getName(),
-        query: {},
-        update: {$set: {a: 5}},
-        arrayFilters: [{i: 0, j: 0}]
+    assert.throws(function() {
+        coll.findAndModify({query: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0, j: 0}]});
     });
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
-    assert.neq(-1,
-               res.errmsg.indexOf("Each array filter must use a single top-level field name"),
-               "findAndModify failed for a reason other than failing to parse array filters");
 
     // Multiple array filters with the same id fails to parse.
-    res = db.runCommand({
-        findAndModify: coll.getName(),
-        query: {},
-        update: {$set: {a: 5}},
-        arrayFilters: [{i: 0}, {j: 0}, {i: 1}]
+    assert.throws(function() {
+        coll.findAndModify(
+            {query: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}, {j: 0}, {i: 1}]});
     });
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
-    assert.neq(
-        -1,
-        res.errmsg.indexOf("Found multiple array filters with the same top-level field name"),
-        "findAndModify failed for a reason other than multiple array filters with the same top-level field name");
 
     // Good value for arrayFilters succeeds.
-    res = db.runCommand({
-        findAndModify: coll.getName(),
-        query: {},
-        update: {$set: {a: 5}},
-        arrayFilters: [{i: 0}, {j: 0}]
+    assert.eq(
+        null,
+        coll.findAndModify({query: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}, {j: 0}]}));
+
+    //
+    // Tests for the bulk API.
+    //
+
+    if (db.getMongo().writeMode() !== "commands") {
+        let bulk = coll.initializeUnorderedBulkOp();
+        bulk.find({});
+        assert.throws(function() {
+            bulk.arrayFilters([{i: 0}]);
+        });
+    } else {
+        // update().
+        let bulk = coll.initializeUnorderedBulkOp();
+        bulk.find({}).arrayFilters("bad").update({$set: {a: 5}});
+        assert.throws(function() {
+            bulk.execute();
+        });
+        bulk = coll.initializeUnorderedBulkOp();
+        bulk.find({}).arrayFilters([{i: 0}]).update({$set: {a: 5}});
+        assert.writeOK(bulk.execute());
+
+        // updateOne().
+        bulk = coll.initializeUnorderedBulkOp();
+        bulk.find({}).arrayFilters("bad").updateOne({$set: {a: 5}});
+        assert.throws(function() {
+            bulk.execute();
+        });
+        bulk = coll.initializeUnorderedBulkOp();
+        bulk.find({}).arrayFilters([{i: 0}]).updateOne({$set: {a: 5}});
+        assert.writeOK(bulk.execute());
+    }
+
+    //
+    // Tests for the CRUD API.
+    //
+
+    // findOneAndUpdate().
+    assert.throws(function() {
+        coll.findOneAndUpdate({}, {$set: {a: 5}}, {arrayFilters: "bad"});
     });
-    assert.commandWorked(res);
+    assert.eq(null, coll.findOneAndUpdate({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]}));
+
+    // updateOne().
+    if (db.getMongo().writeMode() !== "commands") {
+        assert.throws(function() {
+            coll.updateOne({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]});
+        });
+    } else {
+        assert.throws(function() {
+            coll.updateOne({}, {$set: {a: 5}}, {arrayFilters: "bad"});
+        });
+        let res = coll.updateOne({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]});
+        assert.eq(0, res.modifiedCount);
+    }
+
+    // updateMany().
+    if (db.getMongo().writeMode() !== "commands") {
+        assert.throws(function() {
+            coll.updateMany({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]});
+        });
+    } else {
+        assert.throws(function() {
+            coll.updateMany({}, {$set: {a: 5}}, {arrayFilters: "bad"});
+        });
+        let res = coll.updateMany({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]});
+        assert.eq(0, res.modifiedCount);
+    }
+
+    // updateOne with bulkWrite().
+    if (db.getMongo().writeMode() !== "commands") {
+        assert.throws(function() {
+            coll.bulkWrite(
+                [{updateOne: {filter: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}]}}]);
+        });
+    } else {
+        assert.throws(function() {
+            coll.bulkWrite(
+                [{updateOne: {filter: {}, update: {$set: {a: 5}}, arrayFilters: "bad"}}]);
+        });
+        let res = coll.bulkWrite(
+            [{updateOne: {filter: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}]}}]);
+        assert.eq(0, res.matchedCount);
+    }
+
+    // updateMany with bulkWrite().
+    if (db.getMongo().writeMode() !== "commands") {
+        assert.throws(function() {
+            coll.bulkWrite(
+                [{updateMany: {filter: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}]}}]);
+        });
+    } else {
+        assert.throws(function() {
+            coll.bulkWrite(
+                [{updateMany: {filter: {}, update: {$set: {a: 5}}, arrayFilters: "bad"}}]);
+        });
+        let res = coll.bulkWrite(
+            [{updateMany: {filter: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}]}}]);
+        assert.eq(0, res.matchedCount);
+    }
+
+    //
+    // Tests for explain().
+    //
+
+    // update().
+    if (db.getMongo().writeMode() !== "commands") {
+        assert.throws(function() {
+            coll.explain().update({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]});
+        });
+    } else {
+        assert.throws(function() {
+            coll.explain().update({}, {$set: {a: 5}}, {arrayFilters: "bad"});
+        });
+        assert.commandWorked(coll.explain().update({}, {$set: {a: 5}}, {arrayFilters: [{i: 0}]}));
+    }
+
+    // findAndModify().
+    assert.throws(function() {
+        coll.explain().findAndModify({query: {}, update: {$set: {a: 5}}, arrayFilters: "bad"});
+    });
+    assert.commandWorked(
+        coll.explain().findAndModify({query: {}, update: {$set: {a: 5}}, arrayFilters: [{i: 0}]}));
 })();
