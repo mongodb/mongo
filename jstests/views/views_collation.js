@@ -266,6 +266,69 @@
             viewsDB.runCommand(
                 {collMod: "esView", viewOn: "simpleCollection", pipeline: [graphLookupFilView]}),
             ErrorCodes.OptionNotSupportedOnView);
+
+        // Views cannot be dropped and recreated with a different collation if other views depend on
+        // that view.
+        assert.commandWorked(viewsDB.runCommand(
+            {create: "filView2", viewOn: "filView", collation: {locale: "fil"}}));
+        assert.commandWorked(viewsDB.runCommand({drop: "filView"}));
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "filView", viewOn: "simpleCollection"}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {create: "filView", viewOn: "simpleCollection", collation: {locale: "en"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandWorked(
+            viewsDB.createView("filView", "ukCollection", [], {collation: {locale: "fil"}}));
+
+        // Views cannot be dropped and recreated with a different collation if other views depend on
+        // that view via $lookup or $graphLookup.
+        assert.commandWorked(viewsDB.runCommand(
+            {collMod: "filView2", viewOn: "simpleCollection", pipeline: [lookupFilView]}));
+        assert.commandWorked(viewsDB.runCommand({drop: "filView"}));
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "filView", viewOn: "simpleCollection"}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {create: "filView", viewOn: "simpleCollection", collation: {locale: "en"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandWorked(viewsDB.runCommand(
+            {create: "filView", viewOn: "ukCollection", pipeline: [], collation: {locale: "fil"}}));
+
+        assert.commandWorked(viewsDB.runCommand(
+            {collMod: "filView2", viewOn: "simpleCollection", pipeline: [graphLookupFilView]}));
+        assert.commandWorked(viewsDB.runCommand({drop: "filView"}));
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "filView", viewOn: "simpleCollection"}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand(
+                {create: "filView", viewOn: "simpleCollection", collation: {locale: "en"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+
+        // If two views "A" and "C" have different collations and depend on the namespace "B", then
+        // "B"
+        // cannot be created as a view.
+        assert.commandWorked(
+            viewsDB.runCommand({create: "A", viewOn: "B", collation: {locale: "hsb"}}));
+        assert.commandWorked(
+            viewsDB.runCommand({create: "B", viewOn: "other", collation: {locale: "hsb"}}));
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "C", viewOn: "B", collation: {locale: "wae"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandWorked(viewsDB.runCommand({drop: "B"}));
+        assert.commandWorked(
+            viewsDB.runCommand({create: "C", viewOn: "B", collation: {locale: "wae"}}));
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "B", viewOn: "other", collation: {locale: "hsb"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(
+            viewsDB.runCommand({create: "B", viewOn: "other", collation: {locale: "wae"}}),
+            ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(viewsDB.runCommand({create: "B", viewOn: "other"}),
+                                     ErrorCodes.OptionNotSupportedOnView);
     }
 
     // Run the test on a standalone.

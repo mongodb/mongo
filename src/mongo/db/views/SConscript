@@ -37,6 +37,7 @@ env.CppUnitTest(
     target='view_catalog_test',
     source=[
         'view_catalog_test.cpp',
+        'view_graph_test.cpp',
     ],
     LIBDEPS=[
         'views',
