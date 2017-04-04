@@ -1,32 +1,30 @@
-// database.h
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2017 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #pragma once
 
@@ -35,22 +33,17 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-
-class Collection;
-class DatabaseCatalogEntry;
-class IndexCatalog;
-class NamespaceDetails;
-class OperationContext;
-
 /**
  * Represents a logical database containing Collections.
  *
@@ -60,6 +53,74 @@ class OperationContext;
 class Database {
 public:
     typedef StringMap<Collection*> CollectionMap;
+
+    class Impl {
+    public:
+        virtual ~Impl() = 0;
+
+        virtual void init(OperationContext* opCtx) = 0;
+
+        virtual void close(OperationContext* opCtx) = 0;
+
+        virtual const std::string& name() const = 0;
+
+        virtual void clearTmpCollections(OperationContext* opCtx) = 0;
+
+        virtual Status setProfilingLevel(OperationContext* opCtx, int newLevel) = 0;
+
+        virtual int getProfilingLevel() const = 0;
+
+        virtual const char* getProfilingNS() const = 0;
+
+        virtual void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) = 0;
+
+        virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
+
+        virtual Status dropCollection(OperationContext* opCtx, StringData fullns) = 0;
+        virtual Status dropCollectionEvenIfSystem(OperationContext* opCtx,
+                                                  const NamespaceString& fullns) = 0;
+
+        virtual Status dropView(OperationContext* opCtx, StringData fullns) = 0;
+
+        virtual Collection* createCollection(OperationContext* opCtx,
+                                             StringData ns,
+                                             const CollectionOptions& options,
+                                             bool createDefaultIndexes,
+                                             const BSONObj& idIndex) = 0;
+
+        virtual Status createView(OperationContext* opCtx,
+                                  StringData viewName,
+                                  const CollectionOptions& options) = 0;
+
+        virtual Collection* getCollection(StringData ns) const = 0;
+
+        virtual ViewCatalog* getViewCatalog() = 0;
+
+        virtual Collection* getOrCreateCollection(OperationContext* opCtx, StringData ns) = 0;
+
+        virtual Status renameCollection(OperationContext* opCtx,
+                                        StringData fromNS,
+                                        StringData toNS,
+                                        bool stayTemp) = 0;
+
+        virtual const NamespaceString& getSystemIndexesName() const = 0;
+
+        virtual const std::string& getSystemViewsName() const = 0;
+
+        virtual CollectionMap& collections() = 0;
+        virtual const CollectionMap& collections() const = 0;
+    };
+
+private:
+    static std::unique_ptr<Impl> makeImpl(Database* _this,
+                                          OperationContext* opCtx,
+                                          StringData name,
+                                          DatabaseCatalogEntry* dbEntry);
+
+public:
+    using factory_function_type = decltype(makeImpl);
+
+    static void registerFactory(stdx::function<factory_function_type> factory);
 
     /**
      * Iterating over a Database yields Collection* pointers.
@@ -72,31 +133,31 @@ public:
         using reference = const value_type&;
         using difference_type = ptrdiff_t;
 
-        iterator() = default;
-        iterator(CollectionMap::const_iterator it) : _it(it) {}
+        explicit inline iterator() = default;
+        inline iterator(CollectionMap::const_iterator it) : _it(std::move(it)) {}
 
-        reference operator*() const {
+        inline reference operator*() const {
             return _it->second;
         }
 
-        pointer operator->() const {
+        inline pointer operator->() const {
             return &_it->second;
         }
 
-        bool operator==(const iterator& other) {
-            return _it == other._it;
+        inline friend bool operator==(const iterator& lhs, const iterator& rhs) {
+            return lhs._it == rhs._it;
         }
 
-        bool operator!=(const iterator& other) {
-            return _it != other._it;
+        inline friend bool operator!=(const iterator& lhs, const iterator& rhs) {
+            return !(lhs == rhs);
         }
 
-        iterator& operator++() {
+        inline iterator& operator++() {
             ++_it;
             return *this;
         }
 
-        iterator operator++(int) {
+        inline iterator operator++(int) {
             auto oldPosition = *this;
             ++_it;
             return oldPosition;
@@ -106,27 +167,39 @@ public:
         CollectionMap::const_iterator _it;
     };
 
-    Database(OperationContext* opCtx, StringData name, DatabaseCatalogEntry* dbEntry);
-
-    // must call close first
-    ~Database();
-
-    iterator begin() const {
-        return iterator(_collections.begin());
+    explicit inline Database(OperationContext* const opCtx,
+                             const StringData name,
+                             DatabaseCatalogEntry* const dbEntry)
+        : _pimpl(makeImpl(this, opCtx, name, dbEntry)) {
+        this->_impl().init(opCtx);
     }
 
-    iterator end() const {
-        return iterator(_collections.end());
+    // must call close first
+    inline ~Database() = default;
+
+    inline Database(Database&&) = delete;
+    inline Database& operator=(Database&&) = delete;
+
+    inline iterator begin() const {
+        return iterator(this->_impl().collections().begin());
+    }
+
+    inline iterator end() const {
+        return iterator(this->_impl().collections().end());
     }
 
     // closes files and other cleanup see below.
-    void close(OperationContext* opCtx);
-
-    const std::string& name() const {
-        return _name;
+    inline void close(OperationContext* const opCtx) {
+        return this->_impl().close(opCtx);
     }
 
-    void clearTmpCollections(OperationContext* opCtx);
+    inline const std::string& name() const {
+        return this->_impl().name();
+    }
+
+    inline void clearTmpCollections(OperationContext* const opCtx) {
+        return this->_impl().clearTmpCollections(opCtx);
+    }
 
     /**
      * Sets a new profiling level for the database and returns the outcome.
@@ -134,61 +207,87 @@ public:
      * @param opCtx Operation context which to use for creating the profiling collection.
      * @param newLevel New profiling level to use.
      */
-    Status setProfilingLevel(OperationContext* opCtx, int newLevel);
-
-    int getProfilingLevel() const {
-        return _profile;
-    }
-    const char* getProfilingNS() const {
-        return _profileName.c_str();
+    inline Status setProfilingLevel(OperationContext* const opCtx, const int newLevel) {
+        return this->_impl().setProfilingLevel(opCtx, newLevel);
     }
 
-    void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale = 1);
+    inline int getProfilingLevel() const {
+        return this->_impl().getProfilingLevel();
+    }
 
-    const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
+    inline const char* getProfilingNS() const {
+        return this->_impl().getProfilingNS();
+    }
+
+    inline void getStats(OperationContext* const opCtx,
+                         BSONObjBuilder* const output,
+                         const double scale = 1) {
+        return this->_impl().getStats(opCtx, output, scale);
+    }
+
+    inline const DatabaseCatalogEntry* getDatabaseCatalogEntry() const {
+        return this->_impl().getDatabaseCatalogEntry();
+    }
 
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
      * that is required.
      */
-    Status dropCollection(OperationContext* opCtx, StringData fullns);
-    Status dropCollectionEvenIfSystem(OperationContext* opCtx, const NamespaceString& fullns);
+    inline Status dropCollection(OperationContext* const opCtx, const StringData fullns) {
+        return this->_impl().dropCollection(opCtx, fullns);
+    }
+    inline Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
+                                             const NamespaceString& fullns) {
+        return this->_impl().dropCollectionEvenIfSystem(opCtx, fullns);
+    }
 
-    Status dropView(OperationContext* opCtx, StringData fullns);
+    inline Status dropView(OperationContext* const opCtx, const StringData fullns) {
+        return this->_impl().dropView(opCtx, fullns);
+    }
 
-    Collection* createCollection(OperationContext* opCtx,
-                                 StringData ns,
-                                 const CollectionOptions& options = CollectionOptions(),
-                                 bool createDefaultIndexes = true,
-                                 const BSONObj& idIndex = BSONObj());
+    inline Collection* createCollection(OperationContext* const opCtx,
+                                        StringData ns,
+                                        const CollectionOptions& options = CollectionOptions(),
+                                        const bool createDefaultIndexes = true,
+                                        const BSONObj& idIndex = BSONObj()) {
+        return this->_impl().createCollection(opCtx, ns, options, createDefaultIndexes, idIndex);
+    }
 
-    Status createView(OperationContext* opCtx,
-                      StringData viewName,
-                      const CollectionOptions& options);
+    inline Status createView(OperationContext* const opCtx,
+                             const StringData viewName,
+                             const CollectionOptions& options) {
+        return this->_impl().createView(opCtx, viewName, options);
+    }
 
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
      */
-    Collection* getCollection(StringData ns) const;
+    inline Collection* getCollection(const StringData ns) const {
+        return this->_impl().getCollection(ns);
+    }
 
-    Collection* getCollection(const NamespaceString& ns) const {
-        return getCollection(ns.ns());
+    inline Collection* getCollection(const NamespaceString& ns) const {
+        return this->_impl().getCollection(ns.ns());
     }
 
     /**
      * Get the view catalog, which holds the definition for all views created on this database. You
      * must be holding a database lock to use this accessor.
      */
-    ViewCatalog* getViewCatalog() {
-        return &_views;
+    inline ViewCatalog* getViewCatalog() {
+        return this->_impl().getViewCatalog();
     }
 
-    Collection* getOrCreateCollection(OperationContext* opCtx, StringData ns);
+    inline Collection* getOrCreateCollection(OperationContext* const opCtx, const StringData ns) {
+        return this->_impl().getOrCreateCollection(opCtx, ns);
+    }
 
-    Status renameCollection(OperationContext* opCtx,
-                            StringData fromNS,
-                            StringData toNS,
-                            bool stayTemp);
+    inline Status renameCollection(OperationContext* const opCtx,
+                                   const StringData fromNS,
+                                   const StringData toNS,
+                                   const bool stayTemp) {
+        return this->_impl().renameCollection(opCtx, fromNS, toNS, stayTemp);
+    }
 
     /**
      * Physically drops the specified opened database and removes it from the server's metadata. It
@@ -199,63 +298,60 @@ public:
      */
     static void dropDatabase(OperationContext* opCtx, Database* db);
 
-    static Status validateDBName(StringData dbname);
+    /**
+     * Registers an implementation of `Database::dropDatabase` for use by library clients.
+     * This is necessary to allow `catalog/database` to be a vtable edge.
+     * @param impl Implementation of `dropDatabase` to install.
+     * @note This call is not thread safe.
+     */
+    static void registerDropDatabaseImpl(stdx::function<decltype(dropDatabase)> impl);
 
-    const NamespaceString& getSystemIndexesName() const {
-        return _indexesName;
+    // static Status validateDBName( StringData dbname );
+
+    inline const NamespaceString& getSystemIndexesName() const {
+        return this->_impl().getSystemIndexesName();
     }
 
-    const std::string& getSystemViewsName() const {
-        return _viewsName;
+    inline const std::string& getSystemViewsName() const {
+        return this->_impl().getSystemViewsName();
     }
 
 private:
-    /**
-     * Gets or creates collection instance from existing metadata,
-     * Returns NULL if invalid
-     *
-     * Note: This does not add the collection to _collections map, that must be done
-     * by the caller, who takes onership of the Collection*
-     */
-    Collection* _getOrCreateCollectionInstance(OperationContext* opCtx, StringData fullns);
+    // This structure exists to give us a customization point to decide how to force users of this
+    // class to depend upon the corresponding `database.cpp` Translation Unit (TU).  All public
+    // forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
+    struct TUHook {
+        static void hook() noexcept;
 
-    /**
-     * Throws if there is a reason 'ns' cannot be created as a user collection.
-     */
-    void _checkCanCreateCollection(const NamespaceString& nss, const CollectionOptions& options);
+        explicit inline TUHook() noexcept {
+            if (kDebugBuild)
+                this->hook();
+        }
+    };
 
-    /**
-     * Deregisters and invalidates all cursors on collection 'fullns'.  Callers must specify
-     * 'reason' for why the cache is being cleared.
-     */
-    void _clearCollectionCache(OperationContext* opCtx,
-                               StringData fullns,
-                               const std::string& reason);
+    inline const Impl& _impl() const {
+        TUHook{};
+        return *this->_pimpl;
+    }
 
-    class AddCollectionChange;
-    class RemoveCollectionChange;
+    inline Impl& _impl() {
+        TUHook{};
+        return *this->_pimpl;
+    }
 
-    const std::string _name;  // "dbname"
-
-    DatabaseCatalogEntry* _dbEntry;  // not owned here
-
-    const std::string _profileName;      // "dbname.system.profile"
-    const NamespaceString _indexesName;  // "dbname.system.indexes"
-    const std::string _viewsName;        // "dbname.system.views"
-
-    int _profile;  // 0=off.
-
-    CollectionMap _collections;
-
-    DurableViewCatalogImpl _durableViews;  // interface for system.views operations
-    ViewCatalog _views;                    // in-memory representation of _durableViews
-
-    friend class Collection;
-    friend class NamespaceDetails;
-    friend class IndexCatalog;
+    std::unique_ptr<Impl> _pimpl;
 };
 
 void dropAllDatabasesExceptLocal(OperationContext* opCtx);
+
+/**
+ * Registers an implementation of `dropAllDatabaseExceptLocal` for use by library clients.
+ * This is necessary to allow `catalog/database` to be a vtable edge.
+ * @param impl Implementation of `dropAllDatabaseExceptLocal` to install.
+ * @note This call is not thread safe.
+ */
+void registerDropAllDatabasesExceptLocalImpl(
+    stdx::function<decltype(dropAllDatabasesExceptLocal)> impl);
 
 /**
  * Creates the namespace 'ns' in the database 'db' according to 'options'. If 'createDefaultIndexes'
@@ -271,4 +367,11 @@ Status userCreateNS(OperationContext* opCtx,
                     bool createDefaultIndexes = true,
                     const BSONObj& idIndex = BSONObj());
 
+/**
+ * Registers an implementation of `userCreateNS` for use by library clients.
+ * This is necessary to allow `catalog/database` to be a vtable edge.
+ * @param impl Implementation of `userCreateNS` to install.
+ * @note This call is not thread safe.
+ */
+void registerUserCreateNSImpl(stdx::function<decltype(userCreateNS)> impl);
 }  // namespace mongo

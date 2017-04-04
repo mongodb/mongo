@@ -125,6 +125,9 @@ public:
 
     inline ~IndexCatalogEntry() = default;
 
+    inline IndexCatalogEntry(IndexCatalogEntry&&) = delete;
+    inline IndexCatalogEntry& operator=(IndexCatalogEntry&&) = delete;
+
     inline const std::string& ns() const {
         return this->_impl().ns();
     }

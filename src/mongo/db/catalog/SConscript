@@ -67,6 +67,15 @@ env.Library(
 )
 
 env.Library(
+    target='database',
+    source=[
+        "database.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
     target='catalog',
     source=[
         "apply_ops.cpp",
@@ -77,7 +86,7 @@ env.Library(
         "collection_info_cache.cpp",
         "create_collection.cpp",
         "cursor_manager.cpp",
-        "database.cpp",
+        "database_impl.cpp",
         "database_holder.cpp",
         "drop_collection.cpp",
         "drop_database.cpp",
@@ -89,6 +98,7 @@ env.Library(
     ],
     LIBDEPS=[
         'collection_options',
+        'database',
         'index_catalog_entry',
         'index_key_validate',
         '$BUILD_DIR/mongo/base',

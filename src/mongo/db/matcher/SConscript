@@ -144,6 +144,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/fts/base',
         '$BUILD_DIR/mongo/scripting/scripting_server',
         'expressions',
+        '$BUILD_DIR/mongo/db/catalog/database',
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[

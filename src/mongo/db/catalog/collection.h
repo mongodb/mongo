@@ -59,6 +59,7 @@ class CollectionCatalogEntry;
 class DatabaseCatalogEntry;
 class ExtentManager;
 class IndexCatalog;
+class DatabaseImpl;
 class MatchExpression;
 class MultiIndexBlock;
 class OpDebug;
@@ -536,7 +537,7 @@ private:
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<SnapshotName> _minVisibleSnapshot;
 
-    friend class Database;
+    friend class DatabaseImpl;
     friend class IndexCatalog;
     friend class NamespaceDetails;
 };
