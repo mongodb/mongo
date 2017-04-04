@@ -293,7 +293,20 @@ void appendStorageEngineList(BSONObjBuilder* result) {
 
 void ServiceContext::setKillAllOperations() {
     stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+
+    // Ensure that all newly created operation contexts will immediately be in the interrupted state
     _globalKill.store(true);
+
+    // Interrupt all active operations
+    for (auto&& client : _clients) {
+        stdx::lock_guard<Client> lk(*client);
+        auto opCtxToKill = client->getOperationContext();
+        if (opCtxToKill) {
+            killOperation(opCtxToKill, ErrorCodes::InterruptedAtShutdown);
+        }
+    }
+
+    // Notify any listeners who need to reach to the server shutting down
     for (const auto listener : _killOpListeners) {
         try {
             listener->interruptAll();

@@ -1,5 +1,3 @@
-// querytests.cpp : query.{h,cpp} unit tests.
-
 /**
  *    Copyright (C) 2008 10gen Inc.
  *
@@ -39,8 +37,8 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/global_timestamp.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find.h"
@@ -57,10 +55,6 @@ using std::endl;
 using std::string;
 using std::vector;
 
-namespace {
-const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
-}  // namespace
-
 class Base {
 public:
     Base() : _scopedXact(&_txn, MODE_X), _lk(_txn.lockState()), _context(&_txn, ns()) {
@@ -75,7 +69,7 @@ public:
             wunit.commit();
         }
 
-        addIndex(fromjson("{\"a\":1}"));
+        addIndex(IndexSpec().addKey("a").unique(false));
     }
 
     ~Base() {
@@ -93,9 +87,10 @@ protected:
         return "unittests.querytests";
     }
 
-    void addIndex(const BSONObj& key) {
-        Helpers::ensureIndex(
-            &_txn, _collection, key, kIndexVersion, false, key.firstElementFieldName());
+    void addIndex(const IndexSpec& spec) {
+        DBDirectClient client(&_txn);
+        client.createIndex(ns(), spec);
+        client.getLastError();
     }
 
     void insert(const char* s) {
@@ -132,8 +127,9 @@ protected:
 class FindOneOr : public Base {
 public:
     void run() {
-        addIndex(BSON("b" << 1));
-        addIndex(BSON("c" << 1));
+        addIndex(IndexSpec().addKey("b").unique(false));
+        addIndex(IndexSpec().addKey("c").unique(false));
+
         insert(BSON("b" << 2 << "_id" << 0));
         insert(BSON("c" << 3 << "_id" << 1));
         BSONObj query = fromjson("{$or:[{b:2},{c:3}]}");
@@ -168,7 +164,8 @@ public:
         // Check findOne() returning location, requiring indexed scan without index.
         ASSERT_THROWS(Helpers::findOne(&_txn, _collection, query, true), MsgAssertionException);
 
-        addIndex(BSON("b" << 1));
+        addIndex(IndexSpec().addKey("b").unique(false));
+
         // Check findOne() returning object, requiring indexed scan with index.
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, true));
         // Check findOne() returning location, requiring indexed scan with index.
