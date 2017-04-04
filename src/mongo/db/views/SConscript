@@ -45,6 +45,7 @@ env.CppUnitTest(
         'resolved_view_test.cpp',
         'view_catalog_test.cpp',
         'view_definition_test.cpp',
+        'view_graph_test.cpp',
     ],
     LIBDEPS=[
         'views',

@@ -27,10 +27,12 @@
 */
 #pragma once
 
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
@@ -39,9 +41,10 @@ namespace mongo {
 class ViewDefinition;
 
 /**
- * Validates that the graph of view dependencies is acyclic and within the allowed depth.
- * Each node is represented by an integer id, and stores integer ids for its parents and children
- * in the graph.
+ * Represents the dependencies of views on other namespaces and validates that this graph is acyclic
+ * and smaller than the maximum diameter. It also checks that the views in each connected component
+ * have compatible collations, and that all possible view pipelines stay within the maximum size in
+ * bytes.
  *
  * This is owned and managed by the ViewCatalog.
  */
@@ -55,22 +58,30 @@ public:
     ViewGraph() = default;
 
     /**
-     * Called when a view is added to the catalog. 'refs' are a list of namespaces that the view
-     * represented by 'viewNss' references in its viewOn or pipeline. Checks if this view introduces
-     * a cycle, max diameter, or max pipeline size. If an error is detected, it will not insert.
+     * Inserts a new node for 'view' in the graph, which must not already be present. 'refs'
+     * contains the list of namespaces referred to by the view in its "viewOn" or "pipeline".
+     * 'pipelineSize' is the size of the view's pipeline, in bytes. If inserting the view would
+     * violate one of the graph's validity properties, the insertion is reverted and a non-OK status
+     * is returned.
+     *
+     * This method is intended for validating a view that is created or modified by a user
+     * operation.
      */
-    Status insertAndValidate(const NamespaceString& viewNss,
+    Status insertAndValidate(const ViewDefinition& view,
                              const std::vector<NamespaceString>& refs,
-                             const int pipelineSize);
+                             int pipelineSize);
 
     /**
-     * Called when view definitions are being reloaded from the catalog (e.g. on restart of mongod).
-     * Does the same as insertAndValidate except does not check for cycles, max diameter, or max
-     * pipeline size.
+     * Like insertAndValidate(), inserts a new node for 'view' in the graph, which must not already
+     * be present. However, no validation is performed. The insertion is not rolled back even if it
+     * puts the graph into an invalid state.
+     *
+     * This method is intended for quickly repopulating the graph with view definitions that are
+     * assumed to be already valid.
      */
-    void insertWithoutValidating(const NamespaceString& viewNss,
+    void insertWithoutValidating(const ViewDefinition& view,
                                  const std::vector<NamespaceString>& refs,
-                                 const int pipelineSize);
+                                 int pipelineSize);
 
     /**
      * Called when a view is removed from the catalog. If the view does not exist in the graph it is
@@ -83,17 +94,43 @@ public:
      */
     void clear();
 
+    /**
+     * Returns the number of namespaces tracked by the view graph. Only exposed for testing.
+     */
+    size_t size() const;
+
 private:
-    // A graph node represents a namespace. The parent-child relation is defined as a parent
-    // references the child either through viewOn or in $lookup/$graphLookup/$facet in its pipeline.
-    // E.g. the command {create: "a", viewOn: "b", pipeline: [{$lookup: {from: "c"}}]}
-    // means the node for "a" is a parent of nodes for "b" and "c" since it references them.
+    // A graph node represents a namespace. We say that a node A is a parent of B if A is a view and
+    // it references B via its "viewOn" or $lookup/$graphLookup/$facet in its "pipeline".
+    //
+    // This node represents a view namespace if and only if 'children' is nonempty and 'collator' is
+    // set.
     struct Node {
-        // Note, a view may refer to the same child more than once, but we only need to know the
-        // set of children and parents, since we do not need to traverse duplicates.
-        stdx::unordered_set<uint64_t> parents;
-        stdx::unordered_set<uint64_t> children;
+        /**
+         * Returns true if this node represents a view.
+         */
+        bool isView() const {
+            invariant(children.empty() == !static_cast<bool>(collator));
+            return !children.empty();
+        }
+
+        // The fully-qualified namespace that this node represents.
         std::string ns;
+
+        // Represents the namespaces depended on by this view. A view may refer to the same child
+        // more than once, but we store the children as a set because each namespace need not be
+        // traversed more than once.
+        stdx::unordered_set<uint64_t> children;
+
+        // Represents the views that depend on this namespace.
+        stdx::unordered_set<uint64_t> parents;
+
+        // When set, this is an unowned pointer to the view's collation, or nullptr if the view has
+        // the binary collation. When not set, this namespace is not a view and we don't care about
+        // its collator.
+        boost::optional<const CollatorInterface*> collator;
+
+        // The size of this view's "pipeline", in bytes.
         int size = 0;
     };
 
@@ -107,21 +144,28 @@ private:
     using StatsMap = stdx::unordered_map<uint64_t, NodeStats>;
 
     /**
-     * Recursively traverses parents of this node and computes their heights and sizes. Returns an
-     * error if the maximum depth is exceeded or the pipeline size exceeds the max.
+     * Recursively validates the parents of 'currentId', filling out statistics about the node
+     * represented by that id in 'statsMap'. The recursion level is tracked in 'currentDepth' to
+     * limit recursive calls.
+     *
+     * A non-OK status is returned if 'currentId' or its parents violate any of the graph's
+     * validity properties.
      */
-    ErrorCodes::Error _getParentsStats(uint64_t currentId, int currentDepth, StatsMap* statsMap);
+    Status _validateParents(uint64_t currentId, int currentDepth, StatsMap* statsMap);
 
     /**
-     * Recursively traverses children of the starting node and computes their heights and sizes.
-     * Returns an error if the maximum depth is exceeded, a cycle is detected through the starting
-     * node, or the pipeline size exceeds the max.
+     * Recursively validates the children of 'currentId', filling out statistics about the node
+     * represented by that id in 'statsMap'. The recursion level is tracked in 'currentDepth' to
+     * limit recursive calls. Both 'startingId' and 'traversalIds' are used to detect cycles.
+     *
+     * A non-OK status is returned if 'currentId' or its children violate any of the graph's
+     * validity properties.
      */
-    ErrorCodes::Error _getChildrenStatsAndCheckCycle(uint64_t startingId,
-                                                     uint64_t currentId,
-                                                     int currentDepth,
-                                                     StatsMap* statsMap,
-                                                     std::vector<uint64_t>* cycleIds);
+    Status _validateChildren(uint64_t startingId,
+                             uint64_t currentId,
+                             int currentDepth,
+                             StatsMap* statsMap,
+                             std::vector<uint64_t>* traversalIds);
 
     /**
      * Gets the id for this namespace, and creates an id if it doesn't exist.
@@ -132,7 +176,7 @@ private:
     // i.e. existing views, collections, and non-existing namespaces.
     StringMap<uint64_t> _namespaceIds;
 
-    // Maps node ids to nodes. There is a 1-1 correspondance with _namespaceIds, hence the lifetime
+    // Maps node ids to nodes. There is a 1-1 correspondence with _namespaceIds, hence the lifetime
     // of a node is the same as the lifetime as its corresponding node id.
     stdx::unordered_map<uint64_t, Node> _graph;
     static uint64_t _idCounter;

@@ -198,9 +198,9 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
             if (!collationStatus.isOK()) {
                 return collationStatus;
             }
-            return _viewGraph.insertAndValidate(viewDef.name(), refs, pipelineSize);
+            return _viewGraph.insertAndValidate(viewDef, refs, pipelineSize);
         } else {
-            _viewGraph.insertWithoutValidating(viewDef.name(), refs, pipelineSize);
+            _viewGraph.insertWithoutValidating(viewDef, refs, pipelineSize);
             return Status::OK();
         }
     };
