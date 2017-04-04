@@ -32,7 +32,6 @@
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -40,8 +39,7 @@ namespace mongo {
 void LogicalClockTest::setUp() {
     auto service = getGlobalServiceContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock = stdx::make_unique<LogicalClock>(service, std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
 }
 

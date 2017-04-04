@@ -48,7 +48,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
@@ -132,8 +131,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     ServiceContext* service = getGlobalServiceContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock = stdx::make_unique<LogicalClock>(service, std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
 
     repl::setGlobalReplicationCoordinator(

@@ -202,11 +202,12 @@ error_code("CannotBuildIndexKeys", 201)
 error_code("NetworkInterfaceExceededTimeLimit", 202)
 error_code("ShardingStateNotInitialized", 203)
 error_code("TimeProofMismatch", 204)
-error_code("ClusterTimeFailsRateLimiter", 205);
+error_code("ClusterTimeFailsRateLimiter", 205)
 error_code("NoSuchSession", 206)
 error_code("InvalidUUID", 207)
 error_code("TooManyLocks", 208)
 error_code("StaleClusterTime", 209)
+error_code("CannotVerifyAndSignLogicalTime", 210)
 
 # Error codes 4000-8999 are reserved.
 

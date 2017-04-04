@@ -52,7 +52,8 @@ protected:
         _serviceContext = stdx::make_unique<ServiceContextNoop>();
         auto pTps = stdx::make_unique<TimeProofService>();
         _timeProofService = pTps.get();
-        _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps));
+        _clock = stdx::make_unique<LogicalClock>(_serviceContext.get());
+        _clock->setTimeProofService(std::move(pTps));
         _serviceContext->setFastClockSource(
             stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
     }
@@ -82,6 +83,16 @@ protected:
     const unsigned currentWallClockSecs() {
         return durationCount<Seconds>(
             _serviceContext->getFastClockSource()->now().toDurationSinceEpoch());
+    }
+
+    void resetTimeProofService() {
+        auto pTps = stdx::make_unique<TimeProofService>();
+        _timeProofService = pTps.get();
+        _clock->setTimeProofService(std::move(pTps));
+    }
+
+    void unsetTimeProofService() {
+        _clock->setTimeProofService(std::unique_ptr<TimeProofService>());
     }
 
 private:
@@ -167,6 +178,44 @@ TEST_F(LogicalClockTestBase, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
     getClock()->initClusterTimeFromTrustedSource(veryOldTime);
 
     ASSERT_TRUE(getClock()->getClusterTime().getTime() == veryOldTime);
+}
+
+// A clock with no TimeProofService should reject new times in advanceClusterTime.
+TEST_F(LogicalClockTestBase, AdvanceClusterTimeFailsWithoutTimeProofService) {
+    LogicalTime initialTime(Timestamp(10));
+    getClock()->initClusterTimeFromTrustedSource(initialTime);
+
+    unsetTimeProofService();
+
+    SignedLogicalTime l1 = makeSignedLogicalTime(LogicalTime(Timestamp(100)));
+    ASSERT_EQ(ErrorCodes::CannotVerifyAndSignLogicalTime, getClock()->advanceClusterTime(l1));
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == initialTime);
+
+    resetTimeProofService();
+
+    SignedLogicalTime l2 = makeSignedLogicalTime(LogicalTime(Timestamp(200)));
+    ASSERT_OK(getClock()->advanceClusterTime(l2));
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == l2.getTime());
+}
+
+// A clock with no TimeProofService can still advance its time through certain methods.
+TEST_F(LogicalClockTestBase, CertainMethodsCanAdvanceClockWithoutTimeProofService) {
+    unsetTimeProofService();
+
+    LogicalTime t1(Timestamp(100));
+    getClock()->initClusterTimeFromTrustedSource(t1);
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == t1);
+
+    auto t2 = getClock()->reserveTicks(1);
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == t2);
+
+    LogicalTime t3(Timestamp(300));
+    ASSERT_OK(getClock()->signAndAdvanceClusterTime(t3));
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == t3);
+
+    SignedLogicalTime l4 = makeSignedLogicalTime(LogicalTime(Timestamp(400)));
+    ASSERT_OK(getClock()->advanceClusterTimeFromTrustedSource(l4));
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == l4.getTime());
 }
 
 }  // unnamed namespace

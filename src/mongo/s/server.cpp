@@ -288,9 +288,7 @@ static ExitCode runMongosServer() {
 
     auto opCtx = cc().makeOperationContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(opCtx->getServiceContext(), std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(opCtx->getServiceContext());
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
 
     {

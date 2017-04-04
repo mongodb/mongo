@@ -44,6 +44,9 @@ public:
 
     SignedLogicalTime() = default;
 
+    explicit SignedLogicalTime(LogicalTime time, long long keyId)
+        : _time(std::move(time)), _keyId(keyId) {}
+
     explicit SignedLogicalTime(LogicalTime time, TimeProof proof, long long keyId)
         : _time(std::move(time)), _proof(std::move(proof)), _keyId(keyId) {}
 
@@ -51,7 +54,7 @@ public:
         return _time;
     }
 
-    const TimeProof& getProof() const {
+    boost::optional<TimeProof> getProof() const {
         return _proof;
     }
 
@@ -65,7 +68,7 @@ public:
 
 private:
     LogicalTime _time;
-    TimeProof _proof;
+    boost::optional<TimeProof> _proof;
     long long _keyId{0};
 };
 

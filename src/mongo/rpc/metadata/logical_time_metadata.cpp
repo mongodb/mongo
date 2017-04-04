@@ -105,7 +105,7 @@ void LogicalTimeMetadata::writeToMetadata(BSONObjBuilder* metadataBuilder) const
     _clusterTime.getTime().asTimestamp().append(subObjBuilder.bb(), kClusterTimeFieldName);
 
     BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart(kSignatureFieldName));
-    _clusterTime.getProof().appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);
+    _clusterTime.getProof()->appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);
     signatureObjBuilder.append(kSignatureKeyIdFieldName, _clusterTime.getKeyId());
     signatureObjBuilder.doneFast();
 

@@ -43,7 +43,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
@@ -55,9 +54,7 @@ void ServiceContextMongoDTest::setUp() {
     Client::initThread(getThreadName());
     ServiceContext* serviceContext = getServiceContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
     if (!serviceContext->getGlobalStorageEngine()) {

@@ -1321,8 +1321,11 @@ void appendReplyMetadata(OperationContext* opCtx,
                 .writeToMetadata(metadataBob);
         }
 
-        rpc::LogicalTimeMetadata logicalTimeMetadata(LogicalClock::get(opCtx)->getClusterTime());
-        logicalTimeMetadata.writeToMetadata(metadataBob);
+        if (LogicalClock::get(opCtx)->canVerifyAndSign()) {
+            rpc::LogicalTimeMetadata logicalTimeMetadata(
+                LogicalClock::get(opCtx)->getClusterTime());
+            logicalTimeMetadata.writeToMetadata(metadataBob);
+        }
     }
 
     // If we're a shard other than the config shard, attach the last configOpTime we know about.

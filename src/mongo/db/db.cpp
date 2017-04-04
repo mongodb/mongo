@@ -894,9 +894,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
