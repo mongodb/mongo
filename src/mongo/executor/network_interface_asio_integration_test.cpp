@@ -34,12 +34,8 @@
 #include <exception>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/async_timer_asio.h"
-#include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/network_interface_asio_integration_fixture.h"
 #include "mongo/executor/network_interface_asio_test_utils.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
@@ -55,115 +51,12 @@ namespace mongo {
 namespace executor {
 namespace {
 
-using StartCommandCB = stdx::function<void(const RemoteCommandResponse&)>;
-
-class NetworkInterfaceASIOIntegrationTest : public mongo::unittest::Test {
-public:
-    void startNet(NetworkInterfaceASIO::Options options = NetworkInterfaceASIO::Options()) {
-        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
-        options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
-#ifdef _WIN32
-        // Connections won't queue on windows, so attempting to open too many connections
-        // concurrently will result in refused connections and test failure.
-        options.connectionPoolOptions.maxConnections = 16u;
-#else
-        options.connectionPoolOptions.maxConnections = 256u;
-#endif
-        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
-        _net->startup();
-    }
-
-    void tearDown() override {
-        if (!_net->inShutdown()) {
-            _net->shutdown();
-        }
-    }
-
-    NetworkInterfaceASIO& net() {
-        return *_net;
-    }
-
-    ConnectionString fixture() {
-        return unittest::getFixtureConnectionString();
-    }
-
-    void randomNumberGenerator(PseudoRandom* generator) {
-        _rng = generator;
-    }
-
-    PseudoRandom* randomNumberGenerator() {
-        return _rng;
-    }
-
-    void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                      RemoteCommandRequest& request,
-                      StartCommandCB onFinish) {
-        net().startCommand(cbHandle, request, onFinish);
-    }
-
-    Deferred<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                               RemoteCommandRequest& request) {
-        Deferred<RemoteCommandResponse> deferred;
-        net().startCommand(cbHandle, request, [deferred](RemoteCommandResponse resp) mutable {
-            deferred.emplace(std::move(resp));
-        });
-        return deferred;
-    }
-
-    RemoteCommandResponse runCommandSync(RemoteCommandRequest& request) {
-        auto deferred = runCommand(makeCallbackHandle(), request);
-        auto& res = deferred.get();
-        if (res.isOK()) {
-            log() << "got command result: " << res.toString();
-        } else {
-            log() << "command failed: " << res.status;
-        }
-        return res;
-    }
-
-    void assertCommandOK(StringData db,
-                         const BSONObj& cmd,
-                         Milliseconds timeoutMillis = Milliseconds(-1)) {
-        RemoteCommandRequest request{
-            fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
-        auto res = runCommandSync(request);
-        ASSERT_OK(res.status);
-        ASSERT_OK(getStatusFromCommandResult(res.data));
-    }
-
-    void assertCommandFailsOnClient(StringData db,
-                                    const BSONObj& cmd,
-                                    Milliseconds timeoutMillis,
-                                    ErrorCodes::Error reason) {
-        RemoteCommandRequest request{
-            fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
-        auto res = runCommandSync(request);
-        ASSERT_EQ(reason, res.status.code());
-    }
-
-    void assertCommandFailsOnServer(StringData db,
-                                    const BSONObj& cmd,
-                                    Milliseconds timeoutMillis,
-                                    ErrorCodes::Error reason) {
-        RemoteCommandRequest request{
-            fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
-        auto res = runCommandSync(request);
-        ASSERT_OK(res.status);
-        auto serverStatus = getStatusFromCommandResult(res.data);
-        ASSERT_EQ(reason, serverStatus);
-    }
-
-private:
-    std::unique_ptr<NetworkInterfaceASIO> _net;
-    PseudoRandom* _rng = nullptr;
-};
-
-TEST_F(NetworkInterfaceASIOIntegrationTest, Ping) {
+TEST_F(NetworkInterfaceASIOIntegrationFixture, Ping) {
     startNet();
     assertCommandOK("admin", BSON("ping" << 1));
 }
 
-TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
+TEST_F(NetworkInterfaceASIOIntegrationFixture, Timeouts) {
     startNet();
     // This sleep command will take 10 seconds, so we should time out client side first given
     // our timeout of 100 milliseconds.
@@ -172,8 +65,8 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
                                             << "none"
                                             << "secs"
                                             << 10),
-                               Milliseconds(100),
-                               ErrorCodes::ExceededTimeLimit);
+                               ErrorCodes::ExceededTimeLimit,
+                               Milliseconds(100));
 
     // Run a sleep command that should return before we hit the ASIO timeout.
     assertCommandOK("admin",
@@ -186,7 +79,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
 
 class StressTestOp {
 public:
-    using Fixture = NetworkInterfaceASIOIntegrationTest;
+    using Fixture = NetworkInterfaceASIOIntegrationFixture;
     using Pool = ThreadPoolInterface;
 
     void run(Fixture* fixture,
@@ -203,8 +96,8 @@ public:
         fixture->startCommand(cb, request, onFinish);
 
         if (_cancel) {
-            invariant(fixture->randomNumberGenerator());
-            sleepmillis(fixture->randomNumberGenerator()->nextInt32(10));
+            invariant(fixture->getRandomNumberGenerator());
+            sleepmillis(fixture->getRandomNumberGenerator()->nextInt32(10));
             fixture->net().cancelCommand(cb);
         }
     }
@@ -252,7 +145,7 @@ private:
     bool _cancel;
 };
 
-TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
+TEST_F(NetworkInterfaceASIOIntegrationFixture, StressTest) {
     constexpr std::size_t numOps = 500;
     RemoteCommandResponse testResults[numOps];
     ErrorCodes::Error expectedResults[numOps];
@@ -265,7 +158,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
 
     log() << "Random seed is " << seed;
     auto rng = PseudoRandom(seed);  // TODO: read from command line
-    randomNumberGenerator(&rng);
+    setRandomNumberGenerator(&rng);
     log() << "Starting stress test...";
 
     for (std::size_t i = 0; i < numOps; ++i) {
@@ -329,13 +222,13 @@ class HangingHook : public executor::NetworkConnectionHook {
 
 
 // Test that we time out a command if the connection hook hangs.
-TEST_F(NetworkInterfaceASIOIntegrationTest, HookHangs) {
+TEST_F(NetworkInterfaceASIOIntegrationFixture, HookHangs) {
     NetworkInterfaceASIO::Options options;
     options.networkConnectionHook = stdx::make_unique<HangingHook>();
     startNet(std::move(options));
 
     assertCommandFailsOnClient(
-        "admin", BSON("ping" << 1), Seconds(1), ErrorCodes::ExceededTimeLimit);
+        "admin", BSON("ping" << 1), ErrorCodes::ExceededTimeLimit, Seconds(1));
 }
 
 }  // namespace

@@ -34,8 +34,12 @@
 namespace mongo {
 
 /**
- * if doc is ok, then return is BSONObj()
- * otherwise, BSONObj is what should be inserted instead
+ * Validates that 'doc' is legal for insertion, possibly with some modifications.
+ *
+ * This function returns:
+ *  - a non-OK status if 'doc' is not valid;
+ *  - an empty BSONObj if 'doc' can be inserted as-is; or
+ *  - a non-empty BSONObj representing what should be inserted instead of 'doc'.
  */
 StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc);
 

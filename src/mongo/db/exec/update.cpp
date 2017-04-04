@@ -32,6 +32,10 @@
 
 #include "mongo/db/exec/update.h"
 
+#include <algorithm>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -64,15 +68,34 @@ namespace {
 const char idFieldName[] = "_id";
 const FieldRef idFieldRef(idFieldName);
 
-Status storageValid(const mb::Document&, const bool = true);
-Status storageValid(const mb::ConstElement&, const bool = true);
-Status storageValidChildren(const mb::ConstElement&, const bool = true);
+StatusWith<std::uint32_t> storageValid(const mb::Document&,
+                                       bool deep,
+                                       std::uint32_t recursionLevel);
+StatusWith<std::uint32_t> storageValid(const mb::ConstElement&,
+                                       bool deep,
+                                       std::uint32_t recursionLevel);
+StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement&,
+                                               bool deep,
+                                               std::uint32_t recursionLevel);
 
 /**
- * mutable::document storageValid check -- like BSONObj::_okForStorage
+ * Validates that the MutableBSON document 'doc' is acceptable for storage in a collection. If
+ * 'deep' is true, the check is performed recursively on subdocuments.
+ *
+ * An error is returned if the validation fails or if 'recursionLevel' exceeds the maximum allowable
+ * depth. On success, an integer is returned that represents the nesting depth of this document.
  */
-Status storageValid(const mb::Document& doc, const bool deep) {
+StatusWith<std::uint32_t> storageValid(const mb::Document& doc,
+                                       bool deep,
+                                       std::uint32_t recursionLevel) {
+    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Document exceeds maximum nesting depth of "
+                                    << BSONDepth::getMaxDepthForUserStorage());
+    }
+
     mb::ConstElement currElem = doc.root().leftChild();
+    std::uint32_t greatestDepth = recursionLevel;
     while (currElem.ok()) {
         if (currElem.getFieldName() == idFieldName) {
             switch (currElem.getType()) {
@@ -86,13 +109,20 @@ Status storageValid(const mb::Document& doc, const bool deep) {
                     break;
             }
         }
-        Status s = storageValid(currElem, deep);
-        if (!s.isOK())
-            return s;
+
+        // Get the nesting depth of this child element.
+        auto depth = storageValid(currElem, deep, recursionLevel + 1);
+        if (!depth.isOK()) {
+            return depth;
+        }
+
+        // The depth of this document is the depth of its deepest child, so we only keep track of
+        // the maximum depth seen so far.
+        greatestDepth = std::max(greatestDepth, depth.getValue());
         currElem = currElem.rightSibling();
     }
 
-    return Status::OK();
+    return greatestDepth;
 }
 
 /**
@@ -122,9 +152,13 @@ Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep)
 
     // Found a $id field
     if (currName == "$id") {
-        Status s = storageValidChildren(curr, deep);
-        if (!s.isOK())
-            return s;
+        // We don't care about the recursion level being accurate, as the validate() command will
+        // perform full validation of the updated object.
+        const uint32_t recursionLevel = 0;
+        auto depth = storageValidChildren(curr, deep, recursionLevel);
+        if (!depth.isOK()) {
+            return depth.getStatus();
+        }
 
         curr = curr.leftSibling();
         if (!curr.ok() || (curr.getFieldName() != "$ref")) {
@@ -159,29 +193,49 @@ Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep)
 }
 
 /**
- * Checks that all parents, of the element passed in, are valid for storage
+ * Checks that all of the parents of the MutableBSON element 'elem' are valid for storage. Note that
+ * 'elem' must be in a valid state when using this function.
  *
- * Note: The elem argument must be in a valid state when using this function
+ * An error is returned if the validation fails, or if 'recursionLevel' exceeds the maximum
+ * allowable depth. On success, an integer is returned that represents the number of steps from this
+ * element to the root through ancestor nodes.
  */
-Status storageValidParents(const mb::ConstElement& elem) {
+StatusWith<std::uint32_t> storageValidParents(const mb::ConstElement& elem,
+                                              std::uint32_t recursionLevel) {
+    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Document exceeds maximum nesting depth of "
+                                    << BSONDepth::getMaxDepthForUserStorage());
+    }
+
     const mb::ConstElement& root = elem.getDocument().root();
     if (elem != root) {
         const mb::ConstElement& parent = elem.parent();
         if (parent.ok() && parent != root) {
-            Status s = storageValid(parent, false);
-            if (s.isOK()) {
-                s = storageValidParents(parent);
+            const bool doRecursiveCheck = false;
+            const uint32_t parentsRecursionLevel = 0;
+            auto height = storageValid(parent, doRecursiveCheck, parentsRecursionLevel);
+            if (height.isOK()) {
+                height = storageValidParents(parent, recursionLevel + 1);
             }
-
-            return s;
+            return height;
         }
+        return recursionLevel + 1;
     }
-    return Status::OK();
+    return recursionLevel;
 }
 
-Status storageValid(const mb::ConstElement& elem, const bool deep) {
+StatusWith<std::uint32_t> storageValid(const mb::ConstElement& elem,
+                                       const bool deep,
+                                       std::uint32_t recursionLevel) {
     if (!elem.ok())
         return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
+
+    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Document exceeds maximum nesting depth of "
+                                    << BSONDepth::getMaxDepthForUserStorage());
+    }
 
     // Field names of elements inside arrays are not meaningful in mutable bson,
     // so we do not want to validate them.
@@ -210,27 +264,38 @@ Status storageValid(const mb::ConstElement& elem, const bool deep) {
 
     if (deep) {
         // Check children if there are any.
-        Status s = storageValidChildren(elem, deep);
-        if (!s.isOK())
-            return s;
+        auto depth = storageValidChildren(elem, deep, recursionLevel);
+        if (!depth.isOK()) {
+            return depth;
+        }
+        invariant(depth.getValue() >= recursionLevel);
+        return depth.getValue();
     }
 
-    return Status::OK();
+    return recursionLevel;
 }
 
-Status storageValidChildren(const mb::ConstElement& elem, const bool deep) {
-    if (!elem.hasChildren())
-        return Status::OK();
+StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement& elem,
+                                               const bool deep,
+                                               std::uint32_t recursionLevel) {
+    if (!elem.hasChildren()) {
+        return recursionLevel;
+    }
 
+    std::uint32_t greatestDepth = recursionLevel;
     mb::ConstElement curr = elem.leftChild();
     while (curr.ok()) {
-        Status s = storageValid(curr, deep);
-        if (!s.isOK())
-            return s;
+        auto depth = storageValid(curr, deep, recursionLevel + 1);
+        if (!depth.isOK()) {
+            return depth.getStatus();
+        }
+
+        // Find the maximum depth amongst all of the children of 'elem'.
+        greatestDepth = std::max(greatestDepth, depth.getValue());
         curr = curr.rightSibling();
     }
 
-    return Status::OK();
+    return greatestDepth;
 }
 
 /**
@@ -261,9 +326,12 @@ inline Status validate(const BSONObj& original,
     if (updatedFields.empty() || !opts.enforceOkForStorage) {
         if (opts.enforceOkForStorage) {
             // No specific fields were updated so the whole doc must be checked
-            Status s = storageValid(updated, true);
-            if (!s.isOK())
-                return s;
+            const bool doRecursiveCheck = true;
+            const std::uint32_t recursionLevel = 1;
+            auto documentDepth = storageValid(updated, doRecursiveCheck, recursionLevel);
+            if (!documentDepth.isOK()) {
+                return documentDepth.getStatus();
+            }
         }
 
         // Check all immutable fields
@@ -290,14 +358,28 @@ inline Status validate(const BSONObj& original,
             // newElem might be missing if $unset/$renamed-away
             if (newElem.ok()) {
                 // Check element, and its children
-                Status s = storageValid(newElem, true);
-                if (!s.isOK())
-                    return s;
+                const bool doRecursiveCheck = true;
+                const std::uint32_t recursionLevel = 0;
+                auto newElemDepth = storageValid(newElem, doRecursiveCheck, recursionLevel);
+                if (!newElemDepth.isOK()) {
+                    return newElemDepth.getStatus();
+                }
 
                 // Check parents to make sure they are valid as well.
-                s = storageValidParents(newElem);
-                if (!s.isOK())
-                    return s;
+                auto parentsDepth = storageValidParents(newElem, recursionLevel);
+                if (!parentsDepth.isOK()) {
+                    return parentsDepth.getStatus();
+                }
+
+                // Ensure that the combined depths of both the new element and its parents do not
+                // exceed the maximum BSON depth.
+                if (newElemDepth.getValue() + parentsDepth.getValue() >
+                    BSONDepth::getMaxDepthForUserStorage()) {
+                    return {ErrorCodes::Overflow,
+                            str::stream() << "Update operation causes document to exceed maximum "
+                                             "nesting depth of "
+                                          << BSONDepth::getMaxDepthForUserStorage()};
+                }
             }
             // Check if the updated field conflicts with immutable fields
             immutableFieldRef.findConflicts(&current, &changedImmutableFields);
