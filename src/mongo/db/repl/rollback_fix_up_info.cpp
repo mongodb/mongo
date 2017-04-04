@@ -41,7 +41,16 @@
 namespace mongo {
 namespace repl {
 
-const NamespaceString RollbackFixUpInfo::kRollbackDocsNamespace("local.system.rollback.docs");
+namespace {
+
+const auto kRollbackNamespacePrefix = "local.system.rollback."_sd;
+
+}  // namespace
+
+const NamespaceString RollbackFixUpInfo::kRollbackDocsNamespace(kRollbackNamespacePrefix + "docs");
+
+const NamespaceString RollbackFixUpInfo::kRollbackCollectionUuidNamespace(kRollbackNamespacePrefix +
+                                                                          "collectionUuid");
 
 RollbackFixUpInfo::RollbackFixUpInfo(StorageInterface* storageInterface)
     : _storageInterface(storageInterface) {
@@ -53,9 +62,53 @@ Status RollbackFixUpInfo::processSingleDocumentOplogEntry(OperationContext* opCt
                                                           const BSONElement& docId,
                                                           SingleDocumentOpType opType) {
     SingleDocumentOperationDescription desc(collectionUuid, docId, opType);
-    auto update = desc.toBSON();
+    return _upsertById(opCtx, kRollbackDocsNamespace, desc.toBSON());
+}
+
+Status RollbackFixUpInfo::processCreateCollectionOplogEntry(OperationContext* opCtx,
+                                                            const UUID& collectionUuid) {
+    // TODO: Remove references to this collection UUID from other rollback fix up info collections.
+
+    CollectionUuidDescription desc(collectionUuid, {});
+    return _upsertById(opCtx, kRollbackCollectionUuidNamespace, desc.toBSON());
+}
+
+Status RollbackFixUpInfo::processDropCollectionOplogEntry(OperationContext* opCtx,
+                                                          const UUID& collectionUuid,
+                                                          const NamespaceString& nss) {
+    CollectionUuidDescription desc(collectionUuid, nss);
+    return _upsertById(opCtx, kRollbackCollectionUuidNamespace, desc.toBSON());
+}
+
+Status RollbackFixUpInfo::processRenameCollectionOplogEntry(
+    OperationContext* opCtx,
+    const UUID& sourceCollectionUuid,
+    const NamespaceString& sourceNss,
+    boost::optional<CollectionUuidAndNss> targetCollectionUuidAndNss) {
+    CollectionUuidDescription sourceDesc(sourceCollectionUuid, sourceNss);
+
+    auto status = _upsertById(opCtx, kRollbackCollectionUuidNamespace, sourceDesc.toBSON());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // If target collection is not dropped during the rename operation, there is nothing further to
+    // do.
+    if (!targetCollectionUuidAndNss) {
+        return Status::OK();
+    }
+
+    CollectionUuidDescription targetDesc(targetCollectionUuidAndNss->first,
+                                         targetCollectionUuidAndNss->second);
+    return _upsertById(opCtx, kRollbackCollectionUuidNamespace, targetDesc.toBSON());
+}
+
+Status RollbackFixUpInfo::_upsertById(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const BSONObj& update) {
     auto key = update["_id"];
-    return _storageInterface->upsertById(opCtx, kRollbackDocsNamespace, key, update);
+    invariant(!key.eoo());
+    return _storageInterface->upsertById(opCtx, nss, key, update);
 }
 
 }  // namespace repl

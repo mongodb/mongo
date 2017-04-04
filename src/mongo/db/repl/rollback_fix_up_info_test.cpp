@@ -28,10 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/rollback_fix_up_info.h"
@@ -71,10 +73,11 @@ private:
 protected:
     /**
      * Check collection contents against given vector of documents.
+     * Ordering of documents in collection does not need to match order in provided vector.
      */
     void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
                                             const NamespaceString& nss,
-                                            const std::vector<BSONObj>& expectedDocs);
+                                            std::initializer_list<BSONObj> expectedDocs);
 
     std::unique_ptr<StorageInterface> _storageInterface;
 };
@@ -90,6 +93,8 @@ void RollbackFixUpInfoTest::setUp() {
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {}));
+    ASSERT_OK(_storageInterface->createCollection(
+        opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {}));
 }
 
 void RollbackFixUpInfoTest::tearDown() {
@@ -100,7 +105,8 @@ void RollbackFixUpInfoTest::tearDown() {
 /**
  * Returns string representation of a vector of BSONObj.
  */
-std::string _toString(const std::vector<BSONObj>& docs) {
+template <typename T>
+std::string _toString(const T& docs) {
     str::stream ss;
     ss << "[";
     bool first = true;
@@ -117,7 +123,9 @@ std::string _toString(const std::vector<BSONObj>& docs) {
 }
 
 void RollbackFixUpInfoTest::_assertDocumentsInCollectionEquals(
-    OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& expectedDocs) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::initializer_list<BSONObj> expectedDocs) {
     auto indexName = "_id_"_sd;
     const auto actualDocs = unittest::assertGet(
         _storageInterface->findDocuments(opCtx,
@@ -127,14 +135,17 @@ void RollbackFixUpInfoTest::_assertDocumentsInCollectionEquals(
                                          {},
                                          BoundInclusion::kIncludeStartKeyOnly,
                                          10000U));
-    auto iter = actualDocs.cbegin();
     std::string msg = str::stream() << "expected: " << _toString(expectedDocs)
                                     << "; actual: " << _toString(actualDocs);
-    for (const auto& doc : expectedDocs) {
-        ASSERT_TRUE(iter != actualDocs.cend()) << msg;
-        ASSERT_BSONOBJ_EQ(doc, *(iter++));
+    ASSERT_EQUALS(expectedDocs.size(), actualDocs.size()) << msg;
+
+    auto unorderedExpectedDocsSet =
+        mongo::SimpleBSONObjComparator::kInstance.makeBSONObjUnorderedSet(expectedDocs);
+    for (const auto& doc : actualDocs) {
+        std::string docMsg = str::stream() << "Unexpected document " << doc << " in collection "
+                                           << nss.ns() << ": " << msg;
+        ASSERT_TRUE(unorderedExpectedDocsSet.find(doc) != unorderedExpectedDocsSet.end()) << docMsg;
     }
-    ASSERT_TRUE(iter == actualDocs.cend()) << msg;
 }
 
 TEST_F(RollbackFixUpInfoTest,
@@ -234,6 +245,146 @@ TEST_F(RollbackFixUpInfoTest,
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {expectedDocument});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessCreateCollectionOplogEntryInsertsDocumentIntoRollbackCollectionUuidCollectionWithEmptyNamespace) {
+    auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                               << "c"
+                               << "ns"
+                               << "mydb.$cmd"
+                               << "ui"
+                               << UUID::gen().toBSON().firstElement()
+                               << "o"
+                               << BSON("create"
+                                       << "mynewcoll"
+                                       << "idIndex"
+                                       << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                                                   << "_id_"
+                                                   << "ns"
+                                                   << "mydb.mynewcoll")));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString commandNss(operation["ns"].String());
+    auto collectionName = operation["o"].Obj().firstElement().String();
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processCreateCollectionOplogEntry(opCtx.get(), collectionUuid));
+
+    auto expectedDocument = BSON("_id" << collectionUuid.toBSON().firstElement() << "ns"
+                                       << "");
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {expectedDocument});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessDropCollectionOplogEntryInsertsDocumentIntoRollbackCollectionUuidCollection) {
+    auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                               << "c"
+                               << "ns"
+                               << "mydb.$cmd"
+                               << "ui"
+                               << UUID::gen().toBSON().firstElement()
+                               << "o"
+                               << BSON("drop"
+                                       << "mydroppedcoll"));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString commandNss(operation["ns"].String());
+    auto collectionName = operation["o"].Obj().firstElement().String();
+    NamespaceString nss(commandNss.db(), collectionName);
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processDropCollectionOplogEntry(opCtx.get(), collectionUuid, nss));
+
+    auto expectedDocument =
+        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << nss.ns());
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {expectedDocument});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessRenameCollectionOplogEntryWithDropTargetFalseInsertsOneDocumentIntoRollbackCollectionUuidCollection) {
+    auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                               << "c"
+                               << "ns"
+                               << "mydb.$cmd"
+                               << "ui"
+                               << UUID::gen().toBSON().firstElement()
+                               << "o"
+                               << BSON("renameCollection"
+                                       << "mydb.prevCollName"
+                                       << "to"
+                                       << "mydb.newCollName"
+                                       << "stayTemp"
+                                       << false
+                                       << "dropTarget"
+                                       << false));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString sourceNss(operation["o"].Obj().firstElement().String());
+    ASSERT_EQUALS(ErrorCodes::UnknownError, UUID::parse(operation["o"].Obj()["dropTarget"]));
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processRenameCollectionOplogEntry(
+        opCtx.get(), collectionUuid, sourceNss, boost::none));
+
+    auto expectedDocument =
+        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << sourceNss.ns());
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {expectedDocument});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessRenameCollectionOplogEntryWithValidDropTargetUuidInsertsTwoDocumentsIntoRollbackCollectionUuidCollection) {
+    auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                               << "c"
+                               << "ns"
+                               << "mydb.$cmd"
+                               << "ui"
+                               << UUID::gen().toBSON().firstElement()
+                               << "o"
+                               << BSON("renameCollection"
+                                       << "mydb.prevCollName"
+                                       << "to"
+                                       << "mydb.newCollName"
+                                       << "stayTemp"
+                                       << false
+                                       << "dropTarget"
+                                       << UUID::gen().toBSON().firstElement()));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString sourceNss(operation["o"].Obj().firstElement().String());
+    NamespaceString targetNss(operation["o"].Obj()["to"].String());
+    auto droppedCollectionUuid =
+        unittest::assertGet(UUID::parse(operation["o"].Obj()["dropTarget"]));
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processRenameCollectionOplogEntry(
+        opCtx.get(), collectionUuid, sourceNss, std::make_pair(droppedCollectionUuid, targetNss)));
+
+    auto expectedDocument1 =
+        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << sourceNss.ns());
+    auto expectedDocument2 =
+        BSON("_id" << droppedCollectionUuid.toBSON().firstElement() << "ns" << targetNss.ns());
+
+    _assertDocumentsInCollectionEquals(opCtx.get(),
+                                       RollbackFixUpInfo::kRollbackCollectionUuidNamespace,
+                                       {expectedDocument1, expectedDocument2});
 }
 
 }  // namespace

@@ -58,4 +58,28 @@ TEST(RollbackFixUpInfoDescriptionsTest, SingleDocumentDescriptionToBson) {
     ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
 }
 
+TEST(RollbackFixUpInfoDescriptionsTest, CollectionUuidDescriptionToBson) {
+    auto collectionUuid = UUID::gen();
+    NamespaceString nss("mydb.mylostcoll");
+
+    RollbackFixUpInfo::CollectionUuidDescription description(collectionUuid, nss);
+
+    auto expectedDocument =
+        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << nss.ns());
+
+    ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
+}
+
+TEST(RollbackFixUpInfoDescriptionsTest, CollectionUuidDescriptionWithEmptyNamespaceToBson) {
+    auto collectionUuid = UUID::gen();
+    NamespaceString emptyNss;
+
+    RollbackFixUpInfo::CollectionUuidDescription description(collectionUuid, emptyNss);
+
+    auto expectedDocument = BSON("_id" << collectionUuid.toBSON().firstElement() << "ns"
+                                       << "");
+
+    ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
+}
+
 }  // namespace

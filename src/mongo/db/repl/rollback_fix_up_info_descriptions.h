@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/rollback_fix_up_info.h"
 #include "mongo/util/uuid.h"
 
@@ -56,6 +57,26 @@ private:
     UUID _collectionUuid;
     BSONObj _wrappedDocId;
     RollbackFixUpInfo::SingleDocumentOpType _opType;
+};
+
+/**
+ * Represents a document in the "kCollectionUuidNamespace" namespace.
+ * Contains information to roll back collection drops and renames.
+ */
+class RollbackFixUpInfo::CollectionUuidDescription {
+    MONGO_DISALLOW_COPYING(CollectionUuidDescription);
+
+public:
+    CollectionUuidDescription(const UUID& collectionUuid, const NamespaceString& nss);
+
+    /**
+     * Returns a BSON representation of this object.
+     */
+    BSONObj toBSON() const;
+
+private:
+    UUID _collectionUuid;
+    NamespaceString _nss;
 };
 
 }  // namespace repl

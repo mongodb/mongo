@@ -28,15 +28,19 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <utility>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 class BSONElement;
 class OperationContext;
-class UUID;
 
 namespace repl {
 
@@ -64,6 +68,16 @@ public:
     static const NamespaceString kRollbackDocsNamespace;
 
     /**
+     * Contains mappings of collection UUID -> namespace.
+     * This collection is used to roll back create, drop and rename operations.
+     * For drops and renames, the namespace in the mapping will be the full namespace to restore
+     * in the database catalog.
+     * For collection creation, the namespace will be set to empty to indicate that the collection
+     * should be dropped.
+     */
+    static const NamespaceString kRollbackCollectionUuidNamespace;
+
+    /**
      * Creates an instance of RollbackFixUpInfo.
      */
     explicit RollbackFixUpInfo(StorageInterface* storageInterface);
@@ -87,7 +101,58 @@ public:
                                            const BSONElement& docId,
                                            SingleDocumentOpType opType);
 
+    /**
+     * Processes an oplog entry representing a create collection command. Stores information about
+     * this operation into "kRollbackCollectionUuidNamespace" to allow us to roll back this
+     * operation later by dropping the collection from the catalog by UUID.
+     *
+     * The mapping in the "kRollbackCollectionUuidNamespace" collection will contain the
+     * empty namespace.
+     */
+    class CollectionUuidDescription;
+    Status processCreateCollectionOplogEntry(OperationContext* opCtx, const UUID& collectionUuid);
+
+    /**
+     * Processes an oplog entry representing a drop collection command. Stores information about
+     * this operation into "kRollbackCollectionUuidNamespace" to allow us to roll back this
+     * operation later by restoring the UUID mapping in the catalog.
+     */
+    Status processDropCollectionOplogEntry(OperationContext* opCtx,
+                                           const UUID& collectionUuid,
+                                           const NamespaceString& nss);
+
+    /**
+     * Processes an oplog entry representing a rename collection command. Stores information about
+     * this operation into "kRollbackCollectionUuidNamespace" to allow us to roll back this
+     * operation later by restoring the UUID mapping(s) in the catalog.
+     *
+     * "targetCollectionUuidAndNss" is derived from the "dropTarget" and "to" fields of the
+     * renameCollection oplogEntry.
+     *
+     * If the target collection did not exist when the rename operation was applied
+     * (targetCollectionUuidAndNss is valid), this function will insert one document into
+     * "kRollbackCollectionUuidNamespace":
+     *     source UUID -> namespace mapping.
+     *
+     * If the target collection was dropped when the rename operation was applied
+     * (targetCollectionUuidAndNss is valid), this function will insert two documents into
+     * "kRollbackCollectionUuidNamespace":
+     *     source UUID -> namespace mapping; and
+     *     dropped target UUID -> namespace mapping
+     */
+    using CollectionUuidAndNss = std::pair<UUID, NamespaceString>;
+    Status processRenameCollectionOplogEntry(
+        OperationContext* opCtx,
+        const UUID& sourceCollectionUuid,
+        const NamespaceString& sourceNss,
+        boost::optional<CollectionUuidAndNss> targetCollectionUuidAndNss);
+
 private:
+    /**
+     * Upserts a single document using the _id field of the document in "update".
+     */
+    Status _upsertById(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& update);
+
     StorageInterface* const _storageInterface;
 };
 
