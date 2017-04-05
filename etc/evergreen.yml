@@ -578,7 +578,15 @@ functions:
         ${san_symbolizer}    \
         ${snmp_config_path}  \
         ${resmoke_wrapper}   \
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json --taskId=${task_id} --staggerJobs=on
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py \
+          ${resmoke_args}                   \
+          $extra_args                       \
+          ${test_flags}                     \
+          --log=buildlogger                 \
+          --reportFile=report.json          \
+          --staggerJobs=on                  \
+          --tagFile=etc/test_lifecycle.yml  \
+          --taskId=${task_id}
 
 
   "do jepsen setup" :
