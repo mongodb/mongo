@@ -1021,6 +1021,17 @@ env.Library(
 )
 
 env.Library(
+    target='keys_collection_document',
+    source=[
+        'keys_collection_document.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
+        'time_proof_service'
+    ],
+)
+
+env.Library(
     target='logical_clock',
     source=[
         'logical_clock.cpp',
@@ -1031,6 +1042,16 @@ env.Library(
         'signed_logical_time',
         'time_proof_service',
         '$BUILD_DIR/mongo/util/clock_source_mock'
+    ],
+)
+
+env.CppUnitTest(
+    target='keys_collection_document_test',
+    source=[
+        'keys_collection_document_test.cpp',
+    ],
+    LIBDEPS=[
+        'keys_collection_document',
     ],
 )
 
