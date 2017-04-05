@@ -28,7 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/client.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
@@ -66,6 +69,40 @@ std::ostream& operator<<(std::ostream& os, stdx::future_status futureStatus) {
             return os << "timeout";
         default:
             MONGO_UNREACHABLE;
+    }
+}
+
+TEST(OperationContextTest, CanHaveLogicalSessionId) {
+    // Test that we can create opCtx's with or without a logical session id
+    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+
+    // No session id
+    {
+        auto opCtx = client->makeOperationContext();
+        ASSERT(!opCtx->getLogicalSessionId());
+    }
+
+    {
+        auto opCtx = serviceCtx->makeOperationContext(client.get());
+        ASSERT(!opCtx->getLogicalSessionId());
+    }
+
+    // With a session id
+    auto res = LogicalSessionId::parse("00000000-abab-4000-8000-000000000000");
+    ASSERT(res.isOK());
+    auto lsid = res.getValue();
+
+    {
+        auto opCtx = client->makeOperationContext(lsid);
+        ASSERT(opCtx->getLogicalSessionId());
+        ASSERT_EQUALS(*(opCtx->getLogicalSessionId()), lsid);
+    }
+
+    {
+        auto opCtx = serviceCtx->makeOperationContext(client.get(), lsid);
+        ASSERT(opCtx->getLogicalSessionId());
+        ASSERT_EQUALS(*(opCtx->getLogicalSessionId()), lsid);
     }
 }
 

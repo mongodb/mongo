@@ -75,9 +75,12 @@ MONGO_FP_DECLARE(checkForInterruptFail);
 
 }  // namespace
 
-OperationContext::OperationContext(Client* client, unsigned int opId)
+OperationContext::OperationContext(Client* client,
+                                   unsigned int opId,
+                                   boost::optional<LogicalSessionId> lsid)
     : _client(client),
       _opId(opId),
+      _lsid(std::move(lsid)),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 

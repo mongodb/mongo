@@ -28,12 +28,14 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -268,6 +270,13 @@ public:
     }
 
     /**
+     * Returns the session ID associated with this operation, if there is one.
+     */
+    boost::optional<LogicalSessionId> getLogicalSessionId() const {
+        return _lsid;
+    }
+
+    /**
      * Returns WriteConcernOptions of the current operation
      */
     const WriteConcernOptions& getWriteConcern() const {
@@ -379,7 +388,7 @@ public:
     Microseconds getRemainingMaxTimeMicros() const;
 
 protected:
-    OperationContext(Client* client, unsigned int opId);
+    OperationContext(Client* client, unsigned int opId, boost::optional<LogicalSessionId> lsid);
 
 private:
     /**
@@ -411,6 +420,7 @@ private:
     friend class repl::UnreplicatedWritesBlock;
     Client* const _client;
     const unsigned int _opId;
+    boost::optional<LogicalSessionId> _lsid;
 
     std::unique_ptr<Locker> _locker;
 

@@ -124,8 +124,9 @@ void Client::reportState(BSONObjBuilder& builder) {
     }
 }
 
-ServiceContext::UniqueOperationContext Client::makeOperationContext() {
-    return getServiceContext()->makeOperationContext(this);
+ServiceContext::UniqueOperationContext Client::makeOperationContext(
+    boost::optional<LogicalSessionId> lsid) {
+    return getServiceContext()->makeOperationContext(this, std::move(lsid));
 }
 
 void Client::setOperationContext(OperationContext* opCtx) {

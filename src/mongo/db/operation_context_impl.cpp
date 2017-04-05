@@ -30,6 +30,7 @@
 
 #include "mongo/db/operation_context_impl.h"
 
+#include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/db/client.h"
@@ -51,8 +52,10 @@ std::unique_ptr<Locker> newLocker() {
 
 using std::string;
 
-OperationContextImpl::OperationContextImpl(Client* client, unsigned opId)
-    : OperationContext(client, opId) {
+OperationContextImpl::OperationContextImpl(Client* client,
+                                           unsigned opId,
+                                           boost::optional<LogicalSessionId> lsid)
+    : OperationContext(client, opId, std::move(lsid)) {
     setLockState(newLocker());
     StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
     setRecoveryUnit(storageEngine->newRecoveryUnit(), kNotInUnitOfWork);
