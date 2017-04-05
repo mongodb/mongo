@@ -204,9 +204,6 @@ private:
     // need it for multiple "getNext()" calls.
     boost::optional<Document> _input;
 
-    // The variables that are in scope to be used by the '_startWith' expression.
-    std::unique_ptr<Variables> _variables;
-
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;
 

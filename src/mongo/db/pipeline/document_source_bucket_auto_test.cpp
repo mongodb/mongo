@@ -353,18 +353,12 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
     expCtx->extSortAllowed = true;
     const size_t maxMemoryUsageBytes = 1000;
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
-    auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
-                                                            groupByExpression,
-                                                            idGen.getIdCount(),
-                                                            numBuckets,
-                                                            {},
-                                                            nullptr,
-                                                            maxMemoryUsageBytes);
+    auto bucketAutoStage = DocumentSourceBucketAuto::create(
+        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::create({Document{{"a", 0}, {"largeStr", largeStr}},
@@ -395,18 +389,12 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
     expCtx->extSortAllowed = true;
     const size_t maxMemoryUsageBytes = 1000;
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
-    auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
-                                                            groupByExpression,
-                                                            idGen.getIdCount(),
-                                                            numBuckets,
-                                                            {},
-                                                            nullptr,
-                                                            maxMemoryUsageBytes);
+    auto bucketAutoStage = DocumentSourceBucketAuto::create(
+        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
     auto sort = DocumentSourceSort::create(expCtx, BSON("_id" << -1), -1, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
@@ -557,7 +545,7 @@ TEST_F(BucketAutoTests, FailsWithInvalidNumberOfBuckets) {
     const int numBuckets = 0;
     ASSERT_THROWS_CODE(
         DocumentSourceBucketAuto::create(
-            getExpCtx(), ExpressionConstant::create(getExpCtx(), Value(0)), 0, numBuckets),
+            getExpCtx(), ExpressionConstant::create(getExpCtx(), Value(0)), numBuckets),
         UserException,
         40243);
 }
@@ -641,18 +629,12 @@ TEST_F(BucketAutoTests, FailsWithInvalidOutputFieldName) {
 void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const size_t maxMemoryUsageBytes = 1000;
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
-    auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
-                                                            groupByExpression,
-                                                            idGen.getIdCount(),
-                                                            numBuckets,
-                                                            {},
-                                                            nullptr,
-                                                            maxMemoryUsageBytes);
+    auto bucketAutoStage = DocumentSourceBucketAuto::create(
+        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::create(
@@ -683,18 +665,12 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     expCtx->extSortAllowed = false;
     const size_t maxMemoryUsageBytes = 1000;
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
-    auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
-                                                            groupByExpression,
-                                                            idGen.getIdCount(),
-                                                            numBuckets,
-                                                            {},
-                                                            nullptr,
-                                                            maxMemoryUsageBytes);
+    auto bucketAutoStage = DocumentSourceBucketAuto::create(
+        expCtx, groupByExpression, numBuckets, {}, nullptr, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes / 2, 'x');
     auto mock = DocumentSourceMock::create({Document{{"a", 0}, {"largeStr", largeStr}},

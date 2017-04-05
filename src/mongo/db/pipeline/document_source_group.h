@@ -60,7 +60,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<AccumulationStatement> accumulationStatements,
-        Variables::Id numVariables,
         size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     /**
@@ -141,7 +140,7 @@ private:
     /**
      * Computes the internal representation of the group key.
      */
-    Value computeId(Variables* vars);
+    Value computeId();
 
     /**
      * Converts the internal representation of the group key to the _id shape specified by the
@@ -162,7 +161,6 @@ private:
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
     size_t _maxMemoryUsageBytes;
-    std::unique_ptr<Variables> _variables;
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
 

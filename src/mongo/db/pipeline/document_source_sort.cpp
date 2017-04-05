@@ -109,8 +109,7 @@ long long DocumentSourceSort::getLimit() const {
 }
 
 void DocumentSourceSort::addKey(StringData fieldPath, bool ascending) {
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
+    VariablesParseState vps = pExpCtx->variablesParseState;
     vSortKey.push_back(ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + fieldPath.toString(), vps));
     vAscending.push_back(ascending);
 }
@@ -192,8 +191,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
                     "$meta is the only expression supported by $sort right now",
                     metaDoc.firstElement().fieldNameStringData() == "$meta");
 
-            VariablesIdGenerator idGen;
-            VariablesParseState vps(&idGen);
+            VariablesParseState vps = pExpCtx->variablesParseState;
             pSort->vSortKey.push_back(ExpressionMeta::parse(pExpCtx, metaDoc.firstElement(), vps));
 
             // If sorting by textScore, sort highest scores first. If sorting by randVal, order
@@ -308,15 +306,15 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
 }
 
 Value DocumentSourceSort::extractKey(const Document& d) const {
-    Variables vars(0, d);
+    pExpCtx->variables.setRoot(d);
     if (vSortKey.size() == 1) {
-        return vSortKey[0]->evaluate(&vars);
+        return vSortKey[0]->evaluate();
     }
 
     vector<Value> keys;
     keys.reserve(vSortKey.size());
     for (size_t i = 0; i < vSortKey.size(); i++) {
-        keys.push_back(vSortKey[i]->evaluate(&vars));
+        keys.push_back(vSortKey[i]->evaluate());
     }
     return Value(std::move(keys));
 }

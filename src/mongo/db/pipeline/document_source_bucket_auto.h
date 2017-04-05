@@ -69,7 +69,6 @@ public:
     static boost::intrusive_ptr<DocumentSourceBucketAuto> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
-        Variables::Id numVariables,
         int numBuckets,
         std::vector<AccumulationStatement> accumulationStatements = {},
         const boost::intrusive_ptr<GranularityRounder>& granularityRounder = nullptr,
@@ -87,7 +86,6 @@ protected:
 private:
     DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                              const boost::intrusive_ptr<Expression>& groupByExpression,
-                             Variables::Id numVariables,
                              int numBuckets,
                              std::vector<AccumulationStatement> accumulationStatements,
                              const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
@@ -154,7 +152,6 @@ private:
     bool _populated = false;
     std::vector<Bucket> _buckets;
     std::vector<Bucket>::iterator _bucketsIterator;
-    std::unique_ptr<Variables> _variables;
     boost::intrusive_ptr<Expression> _groupByExpression;
     boost::intrusive_ptr<GranularityRounder> _granularityRounder;
     long long _nDocuments = 0;

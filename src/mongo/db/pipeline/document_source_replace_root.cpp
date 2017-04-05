@@ -49,12 +49,13 @@ class ReplaceRootTransformation final
     : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
 
 public:
-    ReplaceRootTransformation() {}
+    ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : _expCtx(expCtx) {}
 
     Document applyTransformation(Document input) final {
         // Extract subdocument in the form of a Value.
-        _variables->setRoot(input);
-        Value newRoot = _newRoot->evaluate(_variables.get());
+        _expCtx->variables.setRoot(input);
+        Value newRoot = _newRoot->evaluate();
 
         // The newRoot expression, if it exists, must evaluate to an object.
         uassert(40228,
@@ -104,7 +105,7 @@ public:
 
         // Create the pointer, parse the stage, and return.
         std::unique_ptr<ReplaceRootTransformation> parsedReplaceRoot =
-            stdx::make_unique<ReplaceRootTransformation>();
+            stdx::make_unique<ReplaceRootTransformation>(expCtx);
         parsedReplaceRoot->parse(expCtx, spec);
         return parsedReplaceRoot;
     }
@@ -112,8 +113,7 @@ public:
     // Check for valid replaceRoot options, and populate internal state variables.
     void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONElement& spec) {
         // We need a VariablesParseState in order to parse the 'newRoot' expression.
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
+        VariablesParseState vps = expCtx->variablesParseState;
 
         // Get the options from this stage. Currently the only option is newRoot.
         for (auto&& argument : spec.Obj()) {
@@ -131,12 +131,11 @@ public:
 
         // Check that there was a new root specified.
         uassert(40231, "no newRoot specified for the $replaceRoot stage", _newRoot);
-        _variables = stdx::make_unique<Variables>(idGenerator.getIdCount());
     }
 
 private:
-    std::unique_ptr<Variables> _variables;
     boost::intrusive_ptr<Expression> _newRoot;
+    const boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 REGISTER_DOCUMENT_SOURCE(replaceRoot,

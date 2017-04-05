@@ -325,9 +325,10 @@ void DocumentSourceGraphLookUp::performSearch() {
     // Make sure _input is set before calling performSearch().
     invariant(_input);
 
-    _variables->setRoot(*_input);
-    Value startingValue = _startWith->evaluateInternal(_variables.get());
-    _variables->clearRoot();
+    auto& variables = pExpCtx->variables;
+    variables.setRoot(*_input);
+    Value startingValue = _startWith->evaluateInternal();
+    variables.clearRoot();
 
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     if (startingValue.isArray()) {
@@ -494,7 +495,6 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
                                       depthField,
                                       maxDepth,
                                       unwindSrc));
-    source->_variables.reset(new Variables());
     return source;
 }
 
@@ -509,8 +509,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
     boost::optional<long long> maxDepth;
     boost::optional<BSONObj> additionalFilter;
 
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
+    VariablesParseState vps = expCtx->variablesParseState;
 
     for (auto&& argument : elem.Obj()) {
         const auto argName = argument.fieldNameStringData();
@@ -606,8 +605,6 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                                       depthField,
                                       maxDepth,
                                       boost::none));
-
-    newSource->_variables.reset(new Variables(idGenerator.getIdCount()));
 
     return std::move(newSource);
 }

@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -99,9 +100,13 @@ void Variables::uassertValidNameForUserRead(StringData varName) {
 
 void Variables::setValue(Id id, const Value& value) {
     uassert(17199, "can't use Variables::setValue to set a reserved builtin variable", id >= 0);
-    auto varIndex = static_cast<size_t>(id);
-    invariant(varIndex < _numVars);
-    _rest[varIndex] = value;
+
+    const auto idAsSizeT = static_cast<size_t>(id);
+    if (idAsSizeT >= _valueList.size()) {
+        _valueList.resize(idAsSizeT + 1);
+    }
+
+    _valueList[id] = value;
 }
 
 Value Variables::getValue(Id id) const {
@@ -117,9 +122,10 @@ Value Variables::getValue(Id id) const {
         }
     }
 
-    auto varIndex = static_cast<size_t>(id);
-    invariant(varIndex < _numVars);
-    return _rest[varIndex];
+    uassert(40434,
+            str::stream() << "Requesting Variables::getValue with an out of range id: " << id,
+            static_cast<size_t>(id) < _valueList.size());
+    return _valueList[id];
 }
 
 Document Variables::getDocument(Id id) const {
@@ -142,7 +148,6 @@ Variables::Id VariablesParseState::defineVariable(StringData name) {
             Variables::kBuiltinVarNameToId.find(name) == Variables::kBuiltinVarNameToId.end());
 
     Variables::Id id = _idGenerator->generateId();
-    invariant(id >= 0);
     _variables[name] = id;
     return id;
 }

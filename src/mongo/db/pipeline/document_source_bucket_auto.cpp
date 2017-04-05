@@ -118,8 +118,8 @@ Value DocumentSourceBucketAuto::extractKey(const Document& doc) {
         return Value(BSONNULL);
     }
 
-    _variables->setRoot(doc);
-    Value key = _groupByExpression->evaluate(_variables.get());
+    pExpCtx->variables.setRoot(doc);
+    Value key = _groupByExpression->evaluate();
 
     if (_granularityRounder) {
         uassert(40258,
@@ -151,9 +151,9 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
     bucket._max = entry.first;
 
     const size_t numAccumulators = _accumulatorFactories.size();
-    _variables->setRoot(entry.second);
+    pExpCtx->variables.setRoot(entry.second);
     for (size_t k = 0; k < numAccumulators; k++) {
-        bucket._accums[k]->process(_expressions[k]->evaluate(_variables.get()), false);
+        bucket._accums[k]->process(_expressions[k]->evaluate(), false);
     }
 }
 
@@ -358,7 +358,6 @@ Value DocumentSourceBucketAuto::serialize(
 intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
-    Variables::Id numVariables,
     int numBuckets,
     std::vector<AccumulationStatement> accumulationStatements,
     const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
@@ -375,7 +374,6 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     }
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
-                                        numVariables,
                                         numBuckets,
                                         accumulationStatements,
                                         granularityRounder,
@@ -385,7 +383,6 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
 DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
-    Variables::Id numVariables,
     int numBuckets,
     std::vector<AccumulationStatement> accumulationStatements,
     const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
@@ -393,7 +390,6 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     : DocumentSource(pExpCtx),
       _nBuckets(numBuckets),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
-      _variables(stdx::make_unique<Variables>(numVariables)),
       _groupByExpression(groupByExpression),
       _granularityRounder(granularityRounder) {
 
@@ -434,8 +430,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
+    VariablesParseState vps = pExpCtx->variablesParseState;
     vector<AccumulationStatement> accumulationStatements;
     boost::intrusive_ptr<Expression> groupByExpression;
     boost::optional<int> numBuckets;
@@ -489,12 +484,8 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
             "$bucketAuto requires 'groupBy' and 'buckets' to be specified",
             groupByExpression && numBuckets);
 
-    return DocumentSourceBucketAuto::create(pExpCtx,
-                                            groupByExpression,
-                                            idGenerator.getIdCount(),
-                                            numBuckets.get(),
-                                            accumulationStatements,
-                                            granularityRounder);
+    return DocumentSourceBucketAuto::create(
+        pExpCtx, groupByExpression, numBuckets.get(), accumulationStatements, granularityRounder);
 }
 }  // namespace mongo
 

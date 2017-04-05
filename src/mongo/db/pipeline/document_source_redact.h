@@ -56,12 +56,11 @@ private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const boost::intrusive_ptr<Expression>& previsit);
 
-    // These both work over _variables
+    // These both work over pExpCtx->variables.
     boost::optional<Document> redactObject();  // redacts CURRENT
     Value redactValue(const Value& in);
 
     Variables::Id _currentId;
-    std::unique_ptr<Variables> _variables;
     boost::intrusive_ptr<Expression> _expression;
 };
 

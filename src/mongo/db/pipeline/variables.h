@@ -29,6 +29,8 @@
 #pragma once
 
 #include "mongo/db/pipeline/document.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -38,27 +40,33 @@ class Variables {
     MONGO_DISALLOW_COPYING(Variables);
 
 public:
-    /**
-     * Each unique variable is assigned a unique id of this type. Negative ids are reserved for
-     * system variables and non-negative ids are allocated for user variables.
-     */
-    typedef int64_t Id;
+    // Each unique variable is assigned a unique id of this type. Negative ids are reserved for
+    // system variables and non-negative ids are allocated for user variables.
+    using Id = int64_t;
 
     /**
-     * Constructs a placeholder for expressions that use no variables (even builtins like ROOT or
-     * REMOVE).
+     * Generates Variables::Id and keeps track of the number of Ids handed out.
      */
-    Variables() : _numVars(0) {}
+    class IdGenerator {
+    public:
+        IdGenerator() : _nextId(0) {}
 
-    explicit Variables(size_t numVars, const Document& root = Document())
-        : _root(root), _rest(numVars == 0 ? NULL : new Value[numVars]), _numVars(numVars) {}
+        Variables::Id generateId() {
+            return _nextId++;
+        }
+
+    private:
+        Variables::Id _nextId;
+    };
+
+    Variables() = default;
 
     static void uassertValidNameForUserWrite(StringData varName);
     static void uassertValidNameForUserRead(StringData varName);
 
     // Ids for builtin variables.
-    static constexpr Id kRootId = Id(-1);
-    static constexpr Id kRemoveId = Id(-2);
+    static constexpr Variables::Id kRootId = Id(-1);
+    static constexpr Variables::Id kRemoveId = Id(-2);
 
     // Map from builtin var name to reserved id number.
     static const StringMap<Id> kBuiltinVarNameToId;
@@ -80,45 +88,27 @@ public:
      * Sets the value of a user-defined variable. Illegal to use with the reserved builtin variables
      * defined above.
      */
-    void setValue(Id id, const Value& value);
+    void setValue(Variables::Id id, const Value& value);
 
     /**
      * Gets the value of a user-defined or system variable.
      */
-    Value getValue(Id id) const;
+    Value getValue(Variables::Id id) const;
 
     /**
      * Returns Document() for non-document values, but otherwise identical to getValue().
      */
-    Document getDocument(Id id) const;
+    Document getDocument(Variables::Id id) const;
+
+    IdGenerator* useIdGenerator() {
+        return &_idGenerator;
+    }
+
 
 private:
     Document _root;
-    const std::unique_ptr<Value[]> _rest;
-    const size_t _numVars;
-};
-
-/**
- * Generates Variables::Ids and keeps track of the number of Ids handed out.
- */
-class VariablesIdGenerator {
-public:
-    VariablesIdGenerator() : _nextId(0) {}
-
-    Variables::Id generateId() {
-        return _nextId++;
-    }
-
-    /**
-     * Returns the number of Ids handed out by this Generator.
-     * Return value is intended to be passed to Variables constructor.
-     */
-    Variables::Id getIdCount() const {
-        return _nextId;
-    }
-
-private:
-    Variables::Id _nextId;
+    IdGenerator _idGenerator;
+    std::vector<Value> _valueList;
 };
 
 /**
@@ -130,7 +120,8 @@ private:
  */
 class VariablesParseState {
 public:
-    explicit VariablesParseState(VariablesIdGenerator* idGenerator) : _idGenerator(idGenerator) {}
+    explicit VariablesParseState(Variables::IdGenerator* variableIdGenerator)
+        : _idGenerator(variableIdGenerator) {}
 
     /**
      * Assigns a named variable a unique Id. This differs from all other variables, even
@@ -150,8 +141,10 @@ public:
     Variables::Id getVariable(StringData name) const;
 
 private:
+    // Not owned here.
+    Variables::IdGenerator* _idGenerator;
+
     StringMap<Variables::Id> _variables;
-    VariablesIdGenerator* _idGenerator;
 };
 
 }  // namespace mongo
