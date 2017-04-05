@@ -33,9 +33,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/vote_requester.h"
-#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
@@ -44,7 +44,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using unittest::assertGet;
@@ -108,7 +107,8 @@ protected:
         return _requester->hasReceivedSufficientResponses();
     }
 
-    void processResponse(const RemoteCommandRequest& request, const ResponseStatus& response) {
+    void processResponse(const RemoteCommandRequest& request,
+                         const RemoteCommandResponse& response) {
         _requester->processResponse(request, response);
     }
 
@@ -128,61 +128,55 @@ protected:
                                     Milliseconds(0));
     }
 
-    ResponseStatus badResponseStatus() {
-        return ResponseStatus(ErrorCodes::NodeNotFound, "not on my watch");
+    RemoteCommandResponse badRemoteCommandResponse() {
+        return RemoteCommandResponse(ErrorCodes::NodeNotFound, "not on my watch");
     }
 
-    ResponseStatus votedYes() {
+    RemoteCommandResponse votedYes() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(true);
         response.setTerm(1);
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
+        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
     }
 
-    ResponseStatus votedNoBecauseConfigVersionDoesNotMatch() {
+    RemoteCommandResponse votedNoBecauseConfigVersionDoesNotMatch() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's config version differs from mine");
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
+        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
     }
 
-    ResponseStatus votedNoBecauseSetNameDiffers() {
+    RemoteCommandResponse votedNoBecauseSetNameDiffers() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's set name differs from mine");
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
+        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
     }
 
-    ResponseStatus votedNoBecauseLastOpTimeIsGreater() {
+    RemoteCommandResponse votedNoBecauseLastOpTimeIsGreater() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's data is staler than mine");
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
+        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
     }
 
-    ResponseStatus votedNoBecauseTermIsGreater() {
+    RemoteCommandResponse votedNoBecauseTermIsGreater() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(false);
         response.setTerm(3);
         response.setReason("candidate's term is lower than mine");
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
+        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
     }
 
-    ResponseStatus votedNoBecauseAlreadyVoted() {
+    RemoteCommandResponse votedNoBecauseAlreadyVoted() {
         ReplSetRequestVotesResponse response;
         response.setVoteGranted(false);
         response.setTerm(2);
         response.setReason("already voted for another candidate this term");
-        return ResponseStatus(
-            NetworkInterfaceMock::Response(response.toBSON(), BSONObj(), Milliseconds(10)));
+        return RemoteCommandResponse(response.toBSON(), BSONObj(), Milliseconds(10));
     }
 
     std::unique_ptr<VoteRequester::Algorithm> _requester;
@@ -278,7 +272,7 @@ TEST_F(VoteRequesterTest, LastOpTimeIsGreaterWinElection) {
 TEST_F(VoteRequesterTest, FailedToContactWinElection) {
     startCapturingLogMessages();
     ASSERT_FALSE(hasReceivedSufficientResponses());
-    processResponse(requestFrom("host1"), badResponseStatus());
+    processResponse(requestFrom("host1"), badRemoteCommandResponse());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1, countLogLinesContaining("failed to receive response from host1:27017"));
     processResponse(requestFrom("host2"), votedYes());
@@ -318,7 +312,7 @@ TEST_F(VoteRequesterTest, NotEnoughVotesLoseElection) {
     processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1, countLogLinesContaining("received a no vote from host1:27017"));
-    processResponse(requestFrom("host2"), badResponseStatus());
+    processResponse(requestFrom("host2"), badRemoteCommandResponse());
     ASSERT_EQUALS(1, countLogLinesContaining("failed to receive response from host2:27017"));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());
@@ -376,7 +370,7 @@ TEST_F(VoteRequesterDryRunTest, LastOpTimeIsGreaterWinElection) {
 TEST_F(VoteRequesterDryRunTest, FailedToContactWinElection) {
     startCapturingLogMessages();
     ASSERT_FALSE(hasReceivedSufficientResponses());
-    processResponse(requestFrom("host1"), badResponseStatus());
+    processResponse(requestFrom("host1"), badRemoteCommandResponse());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1, countLogLinesContaining("failed to receive response from host1:27017"));
     processResponse(requestFrom("host2"), votedYes());
@@ -416,7 +410,7 @@ TEST_F(VoteRequesterDryRunTest, NotEnoughVotesLoseElection) {
     processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
     ASSERT_FALSE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(1, countLogLinesContaining("received a no vote from host1:27017"));
-    processResponse(requestFrom("host2"), badResponseStatus());
+    processResponse(requestFrom("host2"), badRemoteCommandResponse());
     ASSERT_EQUALS(1, countLogLinesContaining("failed to receive response from host2:27017"));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT(VoteRequester::Result::kInsufficientVotes == getResult());

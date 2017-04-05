@@ -35,7 +35,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/util/log.h"
 
@@ -43,6 +42,7 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 ElectCmdRunner::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                      int selfIndex,
@@ -104,7 +104,7 @@ bool ElectCmdRunner::Algorithm::hasReceivedSufficientResponses() const {
 }
 
 void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& request,
-                                                const ResponseStatus& response) {
+                                                const RemoteCommandResponse& response) {
     ++_actualResponses;
 
     if (response.isOK()) {

@@ -35,8 +35,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 

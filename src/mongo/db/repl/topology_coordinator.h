@@ -34,7 +34,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"

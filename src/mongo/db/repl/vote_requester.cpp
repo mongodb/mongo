@@ -34,7 +34,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
@@ -43,6 +42,7 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                     long long candidateIndex,
@@ -89,7 +89,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
 }
 
 void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& request,
-                                               const ResponseStatus& response) {
+                                               const RemoteCommandResponse& response) {
     auto logLine = log();
     logLine << "VoteRequester(term " << _term << (_dryRun ? " dry run" : "") << ") ";
     _responsesProcessed++;
@@ -140,12 +140,13 @@ unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
 VoteRequester::VoteRequester() : _isCanceled(false) {}
 VoteRequester::~VoteRequester() {}
 
-StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(ReplicationExecutor* executor,
-                                                                  const ReplSetConfig& rsConfig,
-                                                                  long long candidateIndex,
-                                                                  long long term,
-                                                                  bool dryRun,
-                                                                  OpTime lastDurableOpTime) {
+StatusWith<executor::TaskExecutor::EventHandle> VoteRequester::start(
+    executor::TaskExecutor* executor,
+    const ReplSetConfig& rsConfig,
+    long long candidateIndex,
+    long long term,
+    bool dryRun,
+    OpTime lastDurableOpTime) {
     _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastDurableOpTime));
     _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
     return _runner->start();
