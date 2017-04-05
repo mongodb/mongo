@@ -59,6 +59,7 @@ DEFAULTS = {
     "staggerJobs": None,
     "storageEngine": None,
     "storageEngineCacheSizeGB": None,
+    "tagFile": None,
     "taskId": None,
     "wiredTigerCollectionConfigString": None,
     "wiredTigerEngineConfigString": None,
@@ -160,6 +161,9 @@ STORAGE_ENGINE = None
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine cache size.
 STORAGE_ENGINE_CACHE_SIZE = None
+
+# The tag file to use that associates tests with tags.
+TAG_FILE = None
 
 # If set, then the Evergreen task Id value will be transmitted to logkeeper when creating builds and
 # tests.

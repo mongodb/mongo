@@ -45,6 +45,7 @@ DEST_TO_CONFIG = {
     "stagger_jobs": "staggerJobs",
     "storage_engine": "storageEngine",
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
+    "tag_file": "tagFile",
     "task_id": "taskId",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
@@ -203,6 +204,9 @@ def parse_command_line():
                       metavar="CONFIG", help="Set the storage engine cache size configuration"
                       " setting for all mongod's.")
 
+    parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
+                      help="A YAML file that associates tests and tags.")
+
     parser.add_option("--taskId", dest="task_id", metavar="TASK_ID",
                       help="Set the Id of the Evergreen task running the tests.")
 
@@ -271,6 +275,7 @@ def update_config_vars(values):
     _config.STAGGER_JOBS = config.pop("staggerJobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storageEngine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
+    _config.TAG_FILE = config.pop("tagFile")
     _config.TASK_ID = config.pop("taskId")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")

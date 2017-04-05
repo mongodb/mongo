@@ -1,0 +1,7 @@
+# This file is used to tag JS tests that run under resmoke.py.
+selector:
+  js_test:
+    # jstests/core/example.js:  # Single file tag
+    # - example_tag
+    # jstests/core/all*.js  # Multiple file tag
+    # - multiple_file_tag
