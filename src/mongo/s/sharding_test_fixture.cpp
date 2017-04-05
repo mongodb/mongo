@@ -43,6 +43,7 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -80,12 +81,21 @@ using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using executor::ShardingTaskExecutor;
 using rpc::ShardingEgressMetadataHookForMongos;
 using unittest::assertGet;
 
 using std::string;
 using std::vector;
 using unittest::assertGet;
+
+namespace {
+std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
+    std::unique_ptr<NetworkInterfaceMock> net) {
+    auto testExecutor = makeThreadPoolTestExecutor(std::move(net));
+    return stdx::make_unique<ShardingTaskExecutor>(std::move(testExecutor));
+}
+}
 
 ShardingTestFixture::ShardingTestFixture() = default;
 
@@ -117,14 +127,14 @@ void ShardingTestFixture::setUp() {
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
     fixedNet->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
     _mockNetwork = fixedNet.get();
-    auto fixedExec = makeThreadPoolTestExecutor(std::move(fixedNet));
+    auto fixedExec = makeShardingTestExecutor(std::move(fixedNet));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
     _executor = fixedExec.get();
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
     netForPool->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
     auto _mockNetworkForPool = netForPool.get();
-    auto execForPool = makeThreadPoolTestExecutor(std::move(netForPool));
+    auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =
         stdx::make_unique<NetworkTestEnv>(execForPool.get(), _mockNetworkForPool);
     std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;

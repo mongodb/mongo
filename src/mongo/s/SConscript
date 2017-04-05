@@ -112,6 +112,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_mock',
+        '$BUILD_DIR/mongo/db/s/sharding_task_executor',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
@@ -168,6 +169,17 @@ env.Library(
     ],
     LIBDEPS=[
         'sharding_mongod_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target='cluster_last_error_info_test',
+    source=[
+        'cluster_last_error_info_test.cpp',
+    ],
+    LIBDEPS=[
+        'cluster_last_error_info',
+        'sharding_test_fixture',
     ],
 )
 

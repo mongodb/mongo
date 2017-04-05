@@ -72,7 +72,7 @@ public:
                      BSONObjBuilder& result) {
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(cc()).disable();
-            ClusterLastErrorInfo::get(cc()).disableForCommand();
+            ClusterLastErrorInfo::get(cc())->disableForCommand();
         }
 
         errmsg = "replSetGetStatus is not supported through mongos";

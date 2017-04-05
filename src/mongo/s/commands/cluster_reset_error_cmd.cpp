@@ -67,7 +67,7 @@ public:
                      BSONObjBuilder& result) {
         LastError::get(cc()).reset();
 
-        const std::set<std::string>* shards = ClusterLastErrorInfo::get(cc()).getPrevShardHosts();
+        const std::set<std::string>* shards = ClusterLastErrorInfo::get(cc())->getPrevShardHosts();
 
         for (std::set<std::string>::const_iterator i = shards->begin(); i != shards->end(); i++) {
             const std::string shardName = *i;

@@ -241,13 +241,13 @@ public:
 
         // For compatibility with 2.4 sharded GLE, we always enforce the write concern
         // across all shards.
-        const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc()).getPrevHostOpTimes());
+        const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc())->getPrevHostOpTimes());
 
         std::vector<LegacyWCResponse> wcResponses;
         auto status = enforceLegacyWriteConcern(opCtx, dbname, cmdObj, hostOpTimes, &wcResponses);
 
         // Don't forget about our last hosts, reset the client info
-        ClusterLastErrorInfo::get(cc()).disableForCommand();
+        ClusterLastErrorInfo::get(cc())->disableForCommand();
 
         // We're now done contacting all remote servers, just report results
 

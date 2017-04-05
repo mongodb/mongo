@@ -118,8 +118,12 @@ void ServiceEntryPointMongos::_sessionLoop(const transport::SessionHandle& sessi
 
         // Start a new LastError session. Any exceptions thrown from here onwards will be returned
         // to the caller (if the type of the message permits it).
-        ClusterLastErrorInfo::get(opCtx->getClient()).newRequest();
-        LastError::get(opCtx->getClient()).startRequest();
+        auto client = opCtx->getClient();
+        if (!ClusterLastErrorInfo::get(client)) {
+            ClusterLastErrorInfo::get(client) = std::make_shared<ClusterLastErrorInfo>();
+        }
+        ClusterLastErrorInfo::get(client)->newRequest();
+        LastError::get(client).startRequest();
 
         DbMessage dbm(message);
 

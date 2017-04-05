@@ -419,7 +419,7 @@ ShardConnection::ShardConnection(const ConnectionString& connectionString,
     if (isMongos()) {
         // In mongos, we record this connection as having been used for useful work to provide
         // useful information in getLastError.
-        ClusterLastErrorInfo::get(cc()).addShardHost(csString);
+        ClusterLastErrorInfo::get(cc())->addShardHost(csString);
     }
 }
 
