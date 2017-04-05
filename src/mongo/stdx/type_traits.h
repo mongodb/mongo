@@ -64,7 +64,7 @@ using std::void_t;
 }  // namespace stdx
 }  // namespace mongo
 
-#elif __cplusplus >= 201402
+#else
 
 namespace mongo {
 namespace stdx {
