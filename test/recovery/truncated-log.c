@@ -130,7 +130,7 @@ usage(void)
 
 /*
  * Child process creates the database and table, and then writes data into
- * the table until it is killed by the parent.
+ * the table until it switches into log file 2.
  */
 static void fill_db(void)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -246,7 +246,7 @@ fill_db(void)
 	}
 	if (fclose(fp) != 0)
 		testutil_die(errno, "fclose");
-	abort();
+	exit(0);
 	/* NOTREACHED */
 }
 
@@ -286,9 +286,7 @@ main(int argc, char *argv[])
 	testutil_make_work_dir(home);
 
 	/*
-	 * Fork a child to insert as many items.  We will then randomly
-	 * kill the child, run recovery and make sure all items we wrote
-	 * exist after recovery runs.
+	 * Fork a child to do its work.  Wait for it to exit.
 	 */
 	if ((pid = fork()) < 0)
 		testutil_die(errno, "fork");
