@@ -45,7 +45,7 @@ namespace mongo {
 namespace repl {
 
 /**
- * Holder of state for initial sync (DataReplicator).
+ * Holder of state for initial sync (InitialSyncer).
  */
 struct InitialSyncState {
     InitialSyncState(std::unique_ptr<DatabasesCloner> cloner) : dbsCloner(std::move(cloner)){};

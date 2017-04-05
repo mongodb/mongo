@@ -85,7 +85,7 @@ struct MemberState;
 class StorageInterface;
 
 
-struct DataReplicatorOptions {
+struct InitialSyncerOptions {
     /** Function to return optime of last operation applied on this node */
     using GetMyLastOptimeFn = stdx::function<OpTime()>;
 
@@ -104,7 +104,7 @@ struct DataReplicatorOptions {
     Seconds blacklistSyncSourcePenaltyForNetworkConnectionError{10};
     Minutes blacklistSyncSourcePenaltyForOplogStartMissing{10};
 
-    // DataReplicator waits this long before retrying getApplierBatchCallback() if there are
+    // InitialSyncer waits this long before retrying getApplierBatchCallback() if there are
     // currently no operations available to apply or if the 'rsSyncApplyStop' failpoint is active.
     // This default value is based on the duration in BackgroundSync::waitForMore() and
     // SyncTail::tryPopAndWaitForMore().
@@ -129,14 +129,14 @@ struct DataReplicatorOptions {
     std::uint32_t oplogFetcherMaxFetcherRestarts = 0;
 
     std::string toString() const {
-        return str::stream() << "DataReplicatorOptions -- "
+        return str::stream() << "InitialSyncerOptions -- "
                              << " localOplogNs: " << localOplogNS.toString()
                              << " remoteOplogNS: " << remoteOplogNS.toString();
     }
 };
 
 /**
- * The data replicator provides services to keep collection in sync by replicating
+ * The initial syncer provides services to keep collection in sync by replicating
  * changes via an oplog source to the local system storage.
  *
  * This class will use existing machinery like the Executor to schedule work and
@@ -146,8 +146,8 @@ struct DataReplicatorOptions {
  * Entry Points:
  *      -- startup: Start initial sync.
  */
-class DataReplicator {
-    MONGO_DISALLOW_COPYING(DataReplicator);
+class InitialSyncer {
+    MONGO_DISALLOW_COPYING(InitialSyncer);
 
 public:
     /**
@@ -156,7 +156,7 @@ public:
     typedef stdx::function<void(const StatusWith<OpTimeWithHash>& lastApplied)> OnCompletionFn;
 
     /**
-     * Callback completion guard for data replicator.
+     * Callback completion guard for initial syncer.
      */
     using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTimeWithHash>>;
 
@@ -175,19 +175,19 @@ public:
         std::uint32_t maxFailedInitialSyncAttempts{0};
         Date_t initialSyncStart;
         Date_t initialSyncEnd;
-        std::vector<DataReplicator::InitialSyncAttemptInfo> initialSyncAttemptInfos;
+        std::vector<InitialSyncer::InitialSyncAttemptInfo> initialSyncAttemptInfos;
 
         std::string toString() const;
         BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
     };
 
-    DataReplicator(DataReplicatorOptions opts,
-                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-                   StorageInterface* storage,
-                   const OnCompletionFn& onCompletion);
+    InitialSyncer(InitialSyncerOptions opts,
+                  std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+                  StorageInterface* storage,
+                  const OnCompletionFn& onCompletion);
 
-    virtual ~DataReplicator();
+    virtual ~InitialSyncer();
 
     /**
      * Returns true if an initial sync is currently running or in the process of shutting down.
@@ -234,7 +234,7 @@ public:
     enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
 
     /**
-     * Returns current data replicator state.
+     * Returns current initial syncer state.
      * For testing only.
      */
     State getState_forTest() const;
@@ -253,7 +253,7 @@ private:
     void _cancelRemainingWork_inlock();
 
     /**
-     * Returns true if the data replicator has received a shutdown request (_state is ShuttingDown).
+     * Returns true if the initial syncer has received a shutdown request (_state is ShuttingDown).
      */
     bool _isShuttingDown() const;
     bool _isShuttingDown_inlock() const;
@@ -538,7 +538,7 @@ private:
     void _cancelHandle_inlock(executor::TaskExecutor::CallbackHandle handle);
 
     /**
-     * Starts up component and checks data replicator's shutdown state at the same time.
+     * Starts up component and checks initial syncer's shutdown state at the same time.
      * If component's startup() fails, resets 'component' (which is assumed to be a unique_ptr
      * to the component type).
      */
@@ -566,7 +566,7 @@ private:
     //      _mutex or be in a callback in _exec to read.
 
     mutable stdx::mutex _mutex;                                                 // (S)
-    const DataReplicatorOptions _opts;                                          // (R)
+    const InitialSyncerOptions _opts;                                           // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)
     StorageInterface* _storage;                                                 // (R)
@@ -608,7 +608,7 @@ private:
     // Used to signal changes in _state.
     mutable stdx::condition_variable _stateCondition;
 
-    // Current data replicator state. See comments for State enum class for details.
+    // Current initial syncer state. See comments for State enum class for details.
     State _state = State::kPreStart;  // (M)
 
     // Passed to CollectionCloner via DatabasesCloner.

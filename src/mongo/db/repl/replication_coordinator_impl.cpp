@@ -280,9 +280,9 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
     return ReplicationCoordinator::modeNone;
 }
 
-DataReplicatorOptions createDataReplicatorOptions(
+InitialSyncerOptions createInitialSyncerOptions(
     ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
-    DataReplicatorOptions options;
+    InitialSyncerOptions options;
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
     options.setMyLastOptime = [replCoord, externalState](const OpTime& opTime) {
         replCoord->setMyLastAppliedOpTime(opTime);
@@ -577,19 +577,19 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 }
 
 void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* txn) {
-    std::shared_ptr<DataReplicator> drCopy;
+    std::shared_ptr<InitialSyncer> initialSyncerCopy;
     {
         LockGuard lk(_mutex);
-        _dr.swap(drCopy);
+        _initialSyncer.swap(initialSyncerCopy);
     }
-    if (drCopy) {
+    if (initialSyncerCopy) {
         LOG(1)
-            << "ReplicationCoordinatorImpl::_stopDataReplication calling DataReplicator::shutdown.";
-        const auto status = drCopy->shutdown();
+            << "ReplicationCoordinatorImpl::_stopDataReplication calling InitialSyncer::shutdown.";
+        const auto status = initialSyncerCopy->shutdown();
         if (!status.isOK()) {
-            warning() << "DataReplicator shutdown failed: " << status;
+            warning() << "InitialSyncer shutdown failed: " << status;
         }
-        drCopy.reset();
+        initialSyncerCopy.reset();
         // Do not return here, fall through.
     }
     LOG(1) << "ReplicationCoordinatorImpl::_stopDataReplication calling "
@@ -654,22 +654,22 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             _externalState->startSteadyStateReplication(txn.get(), this);
         };
 
-        std::shared_ptr<DataReplicator> drCopy;
+        std::shared_ptr<InitialSyncer> initialSyncerCopy;
         try {
             {
-                // Must take the lock to set _dr, but not call it.
+                // Must take the lock to set _initialSyncer, but not call it.
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
-                drCopy = std::make_shared<DataReplicator>(
-                    createDataReplicatorOptions(this, _externalState.get()),
+                initialSyncerCopy = std::make_shared<InitialSyncer>(
+                    createInitialSyncerOptions(this, _externalState.get()),
                     stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
                                                                               _externalState.get()),
                     _storage,
                     onCompletion);
-                _dr = drCopy;
+                _initialSyncer = initialSyncerCopy;
             }
-            // DataReplicator::startup() must be called outside lock because it uses features (eg.
+            // InitialSyncer::startup() must be called outside lock because it uses features (eg.
             // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
-            uassertStatusOK(drCopy->startup(txn, numInitialSyncAttempts));
+            uassertStatusOK(initialSyncerCopy->startup(txn, numInitialSyncAttempts.load()));
         } catch (...) {
             auto status = exceptionToStatus();
             log() << "Initial Sync failed to start: " << status;
@@ -745,7 +745,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
     log() << "shutting down replication subsystems";
 
     // Used to shut down outside of the lock.
-    std::shared_ptr<DataReplicator> drCopy;
+    std::shared_ptr<InitialSyncer> initialSyncerCopy;
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         fassert(28533, !_inShutdown);
@@ -766,7 +766,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
         _replicationWaiterList.signalAndRemoveAll_inlock();
         _opTimeWaiterList.signalAndRemoveAll_inlock();
         _currentCommittedSnapshotCond.notify_all();
-        _dr.swap(drCopy);
+        _initialSyncer.swap(initialSyncerCopy);
     }
 
     {
@@ -775,14 +775,14 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
     }
 
     // joining the replication executor is blocking so it must be run outside of the mutex
-    if (drCopy) {
-        LOG(1) << "ReplicationCoordinatorImpl::shutdown calling DataReplicator::shutdown.";
-        const auto status = drCopy->shutdown();
+    if (initialSyncerCopy) {
+        LOG(1) << "ReplicationCoordinatorImpl::shutdown calling InitialSyncer::shutdown.";
+        const auto status = initialSyncerCopy->shutdown();
         if (!status.isOK()) {
-            warning() << "DataReplicator shutdown failed: " << status;
+            warning() << "InitialSyncer shutdown failed: " << status;
         }
-        drCopy->join();
-        drCopy.reset();
+        initialSyncerCopy->join();
+        initialSyncerCopy.reset();
     }
     _externalState->shutdown(txn);
     _replExecutor.shutdown();
@@ -2058,8 +2058,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
     BSONObj initialSyncProgress;
     if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSync) {
         LockGuard lk(_mutex);
-        if (_dr) {
-            initialSyncProgress = _dr->getInitialSyncProgress();
+        if (_initialSyncer) {
+            initialSyncProgress = _initialSyncer->getInitialSyncProgress();
         }
     }
 
@@ -2225,7 +2225,7 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* txn,
         auto opTime = _getMyLastAppliedOpTime_inlock();
         _topCoord->prepareSyncFromResponse(target, opTime, resultObj, &result);
         // If we are in the middle of an initial sync, do a resync.
-        doResync = result.isOK() && _dr && _dr->isActive();
+        doResync = result.isOK() && _initialSyncer && _initialSyncer->isActive();
     }
 
     if (doResync) {

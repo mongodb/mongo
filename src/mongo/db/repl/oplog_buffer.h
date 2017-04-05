@@ -44,7 +44,7 @@ namespace repl {
 
 /**
  * Interface for temporary container of oplog entries (in BSON format) from sync source by
- * OplogFetcher that will be read by applier in the DataReplicator.
+ * OplogFetcher that will be read by applier in the InitialSyncer.
  *
  * Implementations are only required to support one pusher and one popper.
  */
