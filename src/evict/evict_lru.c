@@ -271,8 +271,19 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_evict_thread_chk --
+ *	Check to decide if the eviction thread should continue running.
+ */
+bool
+__wt_evict_thread_chk(WT_SESSION_IMPL *session)
+{
+	return (F_ISSET(S2C(session), WT_CONN_EVICTION_RUN));
+}
+
+/*
  * __wt_evict_thread_run --
- *	Starting point for an eviction thread.
+ *	Entry function for an eviction thread.  This is called repeatedly
+ *	from the thread group code so it does not need to loop itself.
  */
 int
 __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
@@ -285,73 +296,83 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	conn = S2C(session);
 	cache = conn->cache;
 
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 	/*
-	 * Ensure the cache stuck timer is initialized when starting eviction.
+	 * The thread group code calls us repeatedly.  So each call is one pass
+	 * through eviction.
 	 */
-	if (thread->id == 0)
-		__wt_epoch(session, &cache->stuck_ts);
-#endif
+	if (conn->evict_server_running &&
+	    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
+		/*
+		 * Cannot use WT_WITH_PASS_LOCK because this is a try lock.
+		 * Fix when that is supported.  We set the flag on both sessions
+		 * because we may call clear_walk when we are walking with
+		 * the walk session, locked.
+		 */
+		F_SET(session, WT_SESSION_LOCKED_PASS);
+		F_SET(cache->walk_session, WT_SESSION_LOCKED_PASS);
+		ret = __evict_server(session, &did_work);
+		F_CLR(cache->walk_session, WT_SESSION_LOCKED_PASS);
+		F_CLR(session, WT_SESSION_LOCKED_PASS);
+		was_intr = cache->pass_intr != 0;
+		__wt_spin_unlock(session, &cache->evict_pass_lock);
+		WT_ERR(ret);
 
-	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
-	    F_ISSET(thread, WT_THREAD_RUN)) {
-		if (conn->evict_server_running &&
-		    __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
-			/*
-			 * Cannot use WT_WITH_PASS_LOCK because this is a try
-			 * lock.  Fix when that is supported.  We set the flag
-			 * on both sessions because we may call clear_walk when
-			 * we are walking with the walk session, locked.
-			 */
-			F_SET(session, WT_SESSION_LOCKED_PASS);
-			F_SET(cache->walk_session, WT_SESSION_LOCKED_PASS);
-			ret = __evict_server(session, &did_work);
-			F_CLR(cache->walk_session, WT_SESSION_LOCKED_PASS);
-			F_CLR(session, WT_SESSION_LOCKED_PASS);
-			was_intr = cache->pass_intr != 0;
-			__wt_spin_unlock(session, &cache->evict_pass_lock);
-			WT_ERR(ret);
-
-			/*
-			 * If the eviction server was interrupted, wait until
-			 * requests have been processed: the system may
-			 * otherwise be busy so don't go to sleep.
-			 */
-			if (was_intr) {
-				while (cache->pass_intr != 0 &&
-				    F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
-				    F_ISSET(thread, WT_THREAD_RUN))
-					__wt_yield();
-				continue;
-			}
-
+		/*
+		 * If the eviction server was interrupted, wait until requests
+		 * have been processed: the system may otherwise be busy so
+		 * don't go to sleep.
+		 */
+		if (was_intr)
+			while (cache->pass_intr != 0 &&
+			    F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
+			    F_ISSET(thread, WT_THREAD_RUN))
+				__wt_yield();
+		else {
 			__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping");
 
 			/* Don't rely on signals: check periodically. */
-			__wt_cond_auto_wait(
-			    session, cache->evict_cond, did_work, NULL);
+			__wt_cond_auto_wait(session,
+			    cache->evict_cond, did_work, NULL);
 			__wt_verbose(session, WT_VERB_EVICTSERVER, "waking");
-		} else
-			WT_ERR(__evict_lru_pages(session, false));
-	}
+		}
+	} else
+		WT_ERR(__evict_lru_pages(session, false));
 
+	if (0) {
+err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
+	}
+	return (ret);
+}
+
+/*
+ * __wt_evict_thread_stop --
+ *	Shutdown function for an eviction thread.
+ */
+int
+__wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
+{
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	if (thread->id != 0)
+		return (0);
+
+	conn = S2C(session);
+	cache = conn->cache;
 	/*
 	 * The only time the first eviction thread is stopped is on shutdown:
 	 * in case any trees are still open, clear all walks now so that they
 	 * can be closed.
 	 */
-	if (thread->id == 0) {
-		WT_WITH_PASS_LOCK(session,
-		    ret = __evict_clear_all_walks(session));
-		WT_ERR(ret);
-		/*
-		 * The only two cases when the eviction server is expected to
-		 * stop are when recovery is finished or when the connection is
-		 * closing.
-		 */
-		WT_ASSERT(session,
-		    F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_RECOVERING));
-	}
+	WT_WITH_PASS_LOCK(session, ret = __evict_clear_all_walks(session));
+	WT_ERR(ret);
+	/*
+	 * The only two cases when the eviction server is expected to
+	 * stop are when recovery is finished or when the connection is
+	 * closing.
+	 */
+	WT_ASSERT(session, F_ISSET(conn, WT_CONN_CLOSING | WT_CONN_RECOVERING));
 
 	__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction thread exiting");
@@ -472,7 +493,15 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_thread_group_create(session, &conn->evict_threads,
 	    "eviction-server", conn->evict_threads_min, conn->evict_threads_max,
-	     WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL, __wt_evict_thread_run));
+	     WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL, __wt_evict_thread_chk,
+	     __wt_evict_thread_run, __wt_evict_thread_stop));
+
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
+	/*
+	 * Ensure the cache stuck timer is initialized when starting eviction.
+	 */
+	__wt_epoch(session, &conn->cache->stuck_ts);
+#endif
 
 	/*
 	 * Allow queues to be populated now that the eviction threads
@@ -970,8 +999,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		thread_surplus = conn->evict_threads.current_threads -
 		    conn->evict_threads_min;
 		for (i = 0; i < thread_surplus; i++) {
-			WT_ERR(__wt_thread_group_stop_one(
-			    session, &conn->evict_threads, false));
+			__wt_thread_group_stop_one(
+			    session, &conn->evict_threads);
 			WT_STAT_CONN_INCR(session,
 			    cache_eviction_worker_removed);
 		}
@@ -1055,10 +1084,10 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 				 * were unable to acquire the thread group lock.
 				 * Break out of trying.
 				 */
-				WT_ERR(__wt_thread_group_stop_one(
-				    session, &conn->evict_threads, false));
+				__wt_thread_group_stop_one(
+				    session, &conn->evict_threads);
 				WT_STAT_CONN_INCR(session,
-				  cache_eviction_worker_removed);
+				    cache_eviction_worker_removed);
 			}
 			WT_STAT_CONN_SET(session,
 			    cache_eviction_stable_state_workers,
@@ -1094,8 +1123,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			 * unable to acquire the thread group lock.  Break out
 			 * of trying.
 			 */
-			WT_ERR(__wt_thread_group_start_one(session,
-			    &conn->evict_threads, false));
+			__wt_thread_group_start_one(session,
+			    &conn->evict_threads, false);
 			WT_STAT_CONN_INCR(session,
 			    cache_eviction_worker_created);
 			__wt_verbose(session, WT_VERB_EVICTSERVER,
