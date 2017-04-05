@@ -137,7 +137,10 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         self.check(self.session2, "isolation=read-uncommitted", current)
 
         # Opening a clone of the database home directory should run
-        # recovery and see the committed results.
+        # recovery and see the committed results.  Flush the log because
+        # the backup may not get all the log records if we are running
+        # without a sync option.  Use sync=off to force a write to the OS.
+        self.session.log_flush('sync=off')
         self.backup(self.backup_dir)
         backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
         backup_conn = self.wiredtiger_open(self.backup_dir, backup_conn_params)
