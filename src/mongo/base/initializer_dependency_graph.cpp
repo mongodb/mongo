@@ -85,11 +85,18 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
     unordered_set<std::string> visitedNodeNames;
 
     sortedNames->clear();
-    for (NodeMap::const_iterator iter = _nodes.begin(), end = _nodes.end(); iter != end; ++iter) {
+    for (const auto& node : _nodes) {
         Status status =
-            recursiveTopSort(_nodes, *iter, &inProgressNodeNames, &visitedNodeNames, sortedNames);
+            recursiveTopSort(_nodes, node, &inProgressNodeNames, &visitedNodeNames, sortedNames);
         if (Status::OK() != status)
             return status;
+    }
+    for (const auto& node : _nodes) {
+        if (!node.second.fn) {
+            std::ostringstream os;
+            os << "No implementation provided for initializer " << node.first;
+            return {ErrorCodes::BadValue, os.str()};
+        }
     }
     return Status::OK();
 }
@@ -99,6 +106,7 @@ Status InitializerDependencyGraph::recursiveTopSort(const NodeMap& nodeMap,
                                                     std::vector<std::string>* inProgressNodeNames,
                                                     unordered_set<std::string>* visitedNodeNames,
                                                     std::vector<std::string>* sortedNames) {
+
     /*
      * The top sort is performed by depth-first traversal starting at each node in the
      * dependency graph, short-circuited any time a node is seen that has already been visited
@@ -113,14 +121,11 @@ Status InitializerDependencyGraph::recursiveTopSort(const NodeMap& nodeMap,
     if ((*visitedNodeNames).count(currentNode.first))
         return Status::OK();
 
-    if (!currentNode.second.fn)
-        return Status(ErrorCodes::BadValue, currentNode.first);
-
     inProgressNodeNames->push_back(currentNode.first);
 
-    std::vector<std::string>::iterator firstOccurence =
+    auto firstOccurence =
         std::find(inProgressNodeNames->begin(), inProgressNodeNames->end(), currentNode.first);
-    if (firstOccurence + 1 != inProgressNodeNames->end()) {
+    if (std::next(firstOccurence) != inProgressNodeNames->end()) {
         sortedNames->clear();
         std::copy(firstOccurence, inProgressNodeNames->end(), std::back_inserter(*sortedNames));
         std::ostringstream os;
@@ -130,13 +135,14 @@ Status InitializerDependencyGraph::recursiveTopSort(const NodeMap& nodeMap,
         return Status(ErrorCodes::GraphContainsCycle, os.str());
     }
 
-    for (unordered_set<std::string>::const_iterator iter = currentNode.second.prerequisites.begin(),
-                                                    end = currentNode.second.prerequisites.end();
-         iter != end;
-         ++iter) {
-        NodeMap::const_iterator nextNode = nodeMap.find(*iter);
-        if (nextNode == nodeMap.end())
-            return Status(ErrorCodes::BadValue, *iter);
+    for (const auto& prereq : currentNode.second.prerequisites) {
+        auto nextNode = nodeMap.find(prereq);
+        if (nextNode == nodeMap.end()) {
+            std::ostringstream os;
+            os << "Initializer " << currentNode.first << " depends on missing initializer "
+               << prereq;
+            return {ErrorCodes::BadValue, os.str()};
+        }
 
         Status status = recursiveTopSort(
             nodeMap, *nextNode, inProgressNodeNames, visitedNodeNames, sortedNames);
