@@ -24,7 +24,7 @@
     // Lower the election timeout to make the test run faster since it waits for multiple elections.
     var conf = rst.getReplSetConfig();
     conf.settings = {
-        electionTimeoutMillis: 3000,
+        electionTimeoutMillis: 6000,
     };
     rst.initiate(conf);
 
@@ -59,31 +59,42 @@
 
     jsTestLog("Test that last vote is set on successive elections");
 
-    for (var i = 0; i < 3; i++) {
+    // Run a few successive elections, alternating who becomes primary.
+    var numElections = 3;
+    for (var i = 0; i < numElections; i++) {
         var primary = rst.getPrimary();
+        var secondary = rst.getSecondary();
         var term = getLatestOp(primary).t;
+
         jsTestLog("Last vote should have term: " + term + " and candidate: " + primary.host +
                   ", index: " + rst.getNodeId(primary));
         rst.nodes.forEach(function(node) {
             assertNodeHasLastVote(node, term, primary);
         });
+
         assert.throws(function() {
-            primary.adminCommand({replSetStepDown: 5, force: true});
+            primary.adminCommand({replSetStepDown: 60 * 10, force: true});
         });
+
+        // Make sure a new primary has been established.
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+        rst.waitForState(secondary, ReplSetTest.State.PRIMARY);
+
+        // Reset election timeout for the old primary.
+        assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
     }
 
     var term = getLatestOp(rst.getPrimary()).t + 100;
 
     jsTestLog("Test that last vote is loaded on startup");
-    // We cannot reconfig nodes[0] to have priority 0 if it is currently the primary.
-    if (rst.getPrimary() === rst.nodes[0]) {
-        jsTestLog("Stepping down node 0 before reconfig");
-        assert.throws(function() {
-            rst.nodes[0].adminCommand({replSetStepDown: 5, force: true});
-        });
-        rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
-    }
+
+    // Ensure that all ops are replicated before stepping up node 1.
+    rst.awaitReplication();
+
+    // We cannot reconfig node 0 to have priority 0 if it is currently the primary,
+    // so we make sure node 1 is primary.
+    jsTestLog("Stepping up node 1");
+    rst.stepUp(rst.nodes[1]);
 
     jsTestLog("Reconfiguring cluster to make node 0 unelectable so it stays SECONDARY on restart");
     conf = rst.getReplSetConfigFromNode();
