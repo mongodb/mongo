@@ -526,10 +526,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 static inline bool
 __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_BTREE *btree;
 
-	conn = S2C(session);
 	btree = S2BT(session);
 
 	/*
@@ -550,7 +548,8 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
 		return (false);
 	if (r->orig_btree_checkpoint_gen == btree->checkpoint_gen &&
-	    r->orig_txn_checkpoint_gen == conn->txn_global.checkpoint_gen &&
+	    r->orig_txn_checkpoint_gen ==
+	    __wt_gen(session, WT_GEN_CHECKPOINT) &&
 	    r->orig_btree_checkpoint_gen == r->orig_txn_checkpoint_gen)
 		return (false);
 	return (true);
@@ -810,12 +809,10 @@ __rec_write_init(WT_SESSION_IMPL *session,
     WT_REF *ref, uint32_t flags, WT_SALVAGE_COOKIE *salvage, void *reconcilep)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
 
 	btree = S2BT(session);
-	conn = S2C(session);
 	page = ref->page;
 
 	if ((r = *(WT_RECONCILE **)reconcilep) == NULL) {
@@ -845,7 +842,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	 * These are all ordered reads, but we only need one.
 	 */
 	r->orig_btree_checkpoint_gen = btree->checkpoint_gen;
-	r->orig_txn_checkpoint_gen = conn->txn_global.checkpoint_gen;
+	r->orig_txn_checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	/*

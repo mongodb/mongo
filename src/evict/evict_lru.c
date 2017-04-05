@@ -1468,7 +1468,8 @@ retry:	while (slot < max_entries) {
 				    ret = __evict_walk_file(
 				    session, queue, max_entries, &slot));
 
-				WT_ASSERT(session, session->split_gen == 0);
+				WT_ASSERT(session, __wt_session_gen(
+				    session, WT_GEN_SPLIT) == 0);
 			}
 			__wt_spin_unlock(session, &cache->evict_walk_lock);
 			WT_ERR(ret);

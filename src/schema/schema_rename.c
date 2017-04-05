@@ -277,7 +277,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		ret = __wt_bad_object_type(session, uri);
 
 	/* Bump the schema generation so that stale data is ignored. */
-	++S2C(session)->schema_gen;
+	(void)__wt_gen_next(session, WT_GEN_SCHEMA);
 
 	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 

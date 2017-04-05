@@ -81,15 +81,8 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_cond_alloc(
 	    session, "LSM worker cond", &conn->lsm_manager.work_cond));
 
-	/*
-	 * Generation numbers.
-	 *
-	 * Start split generations at one.  Threads publish this generation
-	 * number before examining tree structures, and zero when they leave.
-	 * We need to distinguish between threads that are in a tree before the
-	 * first split has happened, and threads that are not in a tree.
-	 */
-	conn->split_gen = 1;
+	/* Initialize the generation manager. */
+	__wt_gen_init(session);
 
 	/*
 	 * Block manager.

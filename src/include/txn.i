@@ -126,7 +126,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 */
 	oldest_id = txn_global->oldest_id;
 	include_checkpoint_txn = btree == NULL ||
-	    btree->checkpoint_gen != txn_global->checkpoint_gen;
+	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT);
 	WT_READ_BARRIER();
 	checkpoint_pinned = txn_global->checkpoint_pinned;
 

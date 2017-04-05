@@ -1355,8 +1355,8 @@ __wt_page_can_evict(
 	 * discards its WT_REF array, and a thread traversing the original
 	 * parent page index might see a freed WT_REF.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) && !__wt_split_obsolete(
-	    session, page->pg_intl_split_gen))
+	if (WT_PAGE_IS_INTERNAL(page) &&
+	    page->pg_intl_split_gen >= __wt_gen_oldest(session, WT_GEN_SPLIT))
 		return (false);
 
 	/*

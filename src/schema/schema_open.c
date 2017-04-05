@@ -502,7 +502,7 @@ __schema_open_table(WT_SESSION_IMPL *session,
 		    table->name);
 
 	/* Copy the schema generation into the new table. */
-	table->schema_gen = S2C(session)->schema_gen;
+	table->schema_gen = __wt_gen(session, WT_GEN_SCHEMA);
 
 	*tablep = table;
 

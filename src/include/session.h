@@ -167,25 +167,31 @@ struct __wt_session_impl {
 					/* Hashed table reference list array */
 	TAILQ_HEAD(__tables_hash, __wt_table) *tablehash;
 
-	/*
-	 * Split stash memory persists past session close because it's accessed
-	 * by threads of control other than the thread owning the session.
-	 *
-	 * Splits can "free" memory that may still be in use, and we use a
-	 * split generation number to track it, that is, the session stores a
-	 * reference to the memory and allocates a split generation; when no
-	 * session is reading from that split generation, the memory can be
-	 * freed for real.
-	 */
-	struct __wt_split_stash {
-		uint64_t    split_gen;	/* Split generation */
-		void       *p;		/* Memory, length */
-		size_t	    len;
-	} *split_stash;			/* Split stash array */
-	size_t  split_stash_cnt;	/* Array entries */
-	size_t  split_stash_alloc;	/* Allocated bytes */
+					/* Generations manager */
+#define	WT_GEN_CHECKPOINT	0	/* Checkpoint generation */
+#define	WT_GEN_HAZARD		1	/* Hazard pointer */
+#define	WT_GEN_SCHEMA		2	/* Schema version */
+#define	WT_GEN_SPLIT		3	/* Page splits */
+#define	WT_GENERATIONS		4	/* Total generation manager entries */
+	volatile uint64_t generations[WT_GENERATIONS];
 
-	uint64_t split_gen;		/* Reading split generation */
+	/*
+	 * Session memory persists past session close because it's accessed by
+	 * threads of control other than the thread owning the session. For
+	 * example, btree splits and hazard pointers can "free" memory that's
+	 * still in use. In order to eventually free it, it's stashed here with
+	 * with its generation number; when no thread is reading in generation,
+	 * the memory can be freed for real.
+	 */
+	struct __wt_session_stash {
+		struct __wt_stash {
+			void	*p;	/* Memory, length */
+			size_t	 len;
+			uint64_t gen;	/* Generation */
+		} *list;
+		size_t  cnt;		/* Array entries */
+		size_t  alloc;		/* Allocated bytes */
+	} stash[WT_GENERATIONS];
 
 	/*
 	 * Hazard pointers.

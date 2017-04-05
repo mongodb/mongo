@@ -507,7 +507,8 @@ struct __wt_page {
 #define	WT_INTL_INDEX_GET_SAFE(page)					\
 	((page)->u.intl.__index)
 #define	WT_INTL_INDEX_GET(session, page, pindex) do {			\
-	WT_ASSERT(session, (session)->split_gen != 0);			\
+	WT_ASSERT(session,						\
+	    __wt_session_gen(session, WT_GEN_SPLIT) != 0);		\
 	(pindex) = WT_INTL_INDEX_GET_SAFE(page);			\
 } while (0)
 #define	WT_INTL_INDEX_SET(page, v) do {					\
@@ -1097,22 +1098,16 @@ struct __wt_insert_head {
  * already have a split generation, leave it alone.  If our caller is examining
  * an index, we don't want the oldest split generation to move forward and
  * potentially free it.
- *
- * Check that we haven't raced with a split_gen update after publishing: we
- * rely on the published value not being missed when scanning for the oldest
- * active split_gen.
  */
 #define	WT_ENTER_PAGE_INDEX(session) do {				\
-	uint64_t __prev_split_gen = (session)->split_gen;		\
+	uint64_t __prev_split_gen =					\
+	    __wt_session_gen(session, WT_GEN_SPLIT);			\
 	if (__prev_split_gen == 0)					\
-		do {                                                    \
-			WT_PUBLISH((session)->split_gen,		\
-			    S2C(session)->split_gen);                   \
-		} while ((session)->split_gen != S2C(session)->split_gen)
+		__wt_session_gen_enter(session, WT_GEN_SPLIT);
 
 #define	WT_LEAVE_PAGE_INDEX(session)					\
 	if (__prev_split_gen == 0)					\
-		(session)->split_gen = 0;				\
+		__wt_session_gen_leave(session, WT_GEN_SPLIT);		\
 	} while (0)
 
 #define	WT_WITH_PAGE_INDEX(session, e)					\

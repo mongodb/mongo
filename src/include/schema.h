@@ -68,8 +68,8 @@ struct __wt_table {
 	bool cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
 
-	uint32_t refcnt;	/* Number of open cursors */
-	uint32_t schema_gen;	/* Cached schema generation number */
+	uint32_t refcnt;		/* Number of open cursors */
+	uint64_t schema_gen;		/* Cached schema generation number */
 };
 
 /*

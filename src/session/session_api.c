@@ -99,6 +99,9 @@ __wt_session_release_resources(WT_SESSION_IMPL *session)
 	if (session->reconcile_cleanup != NULL)
 		WT_TRET(session->reconcile_cleanup(session));
 
+	/* Stashed memory. */
+	__wt_stash_discard(session);
+
 	/*
 	 * Discard scratch buffers, error memory; last, just in case a cleanup
 	 * routine uses scratch buffers.
