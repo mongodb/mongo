@@ -247,47 +247,6 @@ void ClusterWriter::write(OperationContext* opCtx,
 
     // Config writes and shard writes are done differently
     if (nss.db() == NamespaceString::kConfigDb || nss.db() == NamespaceString::kAdminDb) {
-        // w:majority is the only valid write concern for writes to the config servers. We also
-        // allow w:1 to come in on a user-initiated write, though we convert it here to w:majority
-        // before sending it to the config servers.
-        bool rewriteCmdWithWriteConcern = false;
-
-        WriteConcernOptions writeConcern;
-
-        if (request->isWriteConcernSet()) {
-            Status status = writeConcern.parse(request->getWriteConcern());
-            if (!status.isOK()) {
-                toBatchError(status, response);
-                return;
-            }
-
-            if (!writeConcern.validForConfigServers()) {
-                toBatchError(Status(ErrorCodes::InvalidOptions,
-                                    "Invalid replication write concern.  Writes to config servers "
-                                    "must use w:'majority'"),
-                             response);
-                return;
-            }
-
-            if (writeConcern.wMode == "") {
-                invariant(writeConcern.wNumNodes == 1);
-                rewriteCmdWithWriteConcern = true;
-            }
-        } else {
-            rewriteCmdWithWriteConcern = true;
-        }
-
-        std::unique_ptr<BatchedCommandRequest> requestWithWriteConcern;
-
-        if (rewriteCmdWithWriteConcern) {
-            requestWithWriteConcern.reset(new BatchedCommandRequest(request->getBatchType()));
-            request->cloneTo(requestWithWriteConcern.get());
-            writeConcern.wMode = WriteConcernOptions::kMajority;
-            writeConcern.wNumNodes = 0;
-            requestWithWriteConcern->setWriteConcern(writeConcern.toBSON());
-            request = requestWithWriteConcern.get();
-        }
-
         Grid::get(opCtx)->catalogClient(opCtx)->writeConfigServerDirect(opCtx, *request, response);
     } else {
         TargeterStats targeterStats;

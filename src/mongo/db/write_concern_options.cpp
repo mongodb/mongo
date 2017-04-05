@@ -94,7 +94,6 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
     BSONElement fsyncEl;
     BSONElement wEl;
 
-
     for (auto e : obj) {
         const auto fieldName = e.fieldNameStringData();
         if (fieldName == kJFieldName) {
@@ -212,10 +211,6 @@ BSONObj WriteConcernOptions::toBSON() const {
 
 bool WriteConcernOptions::shouldWaitForOtherNodes() const {
     return !wMode.empty() || wNumNodes > 1;
-}
-
-bool WriteConcernOptions::validForConfigServers() const {
-    return wMode == kMajority;
 }
 
 }  // namespace mongo
