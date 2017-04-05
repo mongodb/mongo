@@ -24,18 +24,14 @@ DefaultEnvironment(tools=[])
 # after calling DefaultEnvironment, for the sake of paranoia.
 import mongo
 import mongo.platform as mongo_platform
+import mongo.toolchain as mongo_toolchain
+import mongo.generators as mongo_generators
 
 EnsurePythonVersion(2, 7)
 EnsureSConsVersion(2, 5)
 
 from buildscripts import utils
 from buildscripts import moduleconfig
-
-from mongo_scons_utils import (
-    default_buildinfo_environment_data,
-    default_variant_dir_generator,
-    get_toolchain_ver,
-)
 
 import libdeps
 
@@ -644,7 +640,7 @@ env_vars.Add('MAXLINELENGTH',
 # default_buildinfo_environment_data() function for examples of how to use this.
 env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
-    default=default_buildinfo_environment_data())
+    default=mongo_generators.default_buildinfo_environment_data())
 
 env_vars.Add('MONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
@@ -727,7 +723,7 @@ env_vars.Add('TOOLS',
 
 env_vars.Add('VARIANT_DIR',
     help='Sets the name (or generator function) for the variant directory',
-    default=default_variant_dir_generator,
+    default=mongo_generators.default_variant_dir_generator,
 )
 
 env_vars.Add('VERBOSE',
@@ -1115,8 +1111,8 @@ elif not detectConf.CheckForOS(env['TARGET_OS']):
 
 detectConf.Finish()
 
-env['CC_VERSION'] = get_toolchain_ver(env, 'CC')
-env['CXX_VERSION'] = get_toolchain_ver(env, 'CXX')
+env['CC_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CC')
+env['CXX_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CXX')
 
 if not env['HOST_ARCH']:
     env['HOST_ARCH'] = env['TARGET_ARCH']
