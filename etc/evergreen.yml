@@ -1311,6 +1311,7 @@ tasks:
           - "./build/**.gcno"
           - "repo/**"
           - "src/mongo/util/options_parser/test_config_files/**"
+          - "library_dependency_graph.json"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -1373,6 +1374,18 @@ tasks:
           rm -rf ${install_directory|/data/mongo-install-directory}
 
           ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/library_dependency_graph.json
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/library_dependency_graph.${build_id}.json
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/json
+        display_name: Library Dependency Graph (library_dependency_graph.json)
+        build_variants: [enterprise-ubuntu-dynamic-1604-64-bit]
 
     # Run the C++ unittests as part of compile_all. The compiled binaries are automatically
     # installed into the top-level directory by SCons.
@@ -8799,6 +8812,7 @@ buildvariants:
     use_scons_cache: true
     scons_cache_mode: all
     build_mongoreplay: true
+    additional_targets: dagger
   tasks:
   - name: compile
     distros:
