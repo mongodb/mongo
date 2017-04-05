@@ -103,7 +103,11 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
     // Since a text search must use an index, it must be the first stage in the pipeline. We cannot
     // combine a non-text stage with a text stage, as that may turn an invalid pipeline into a
     // valid one, unbeknownst to the user.
-    if (nextMatch && !nextMatch->_isTextQuery) {
+    if (nextMatch) {
+        // Text queries are not allowed anywhere except as the first stage. This is checked before
+        // optimization.
+        invariant(!nextMatch->_isTextQuery);
+
         // Merge 'nextMatch' into this stage.
         joinMatchWith(nextMatch);
 
@@ -342,11 +346,6 @@ Document redactSafePortionTopLevel(BSONObj query) {
 
 BSONObj DocumentSourceMatch::redactSafePortion() const {
     return redactSafePortionTopLevel(getQuery()).toBson();
-}
-
-void DocumentSourceMatch::setSource(DocumentSource* source) {
-    uassert(17313, "$match with $text is only allowed as the first pipeline stage", !_isTextQuery);
-    DocumentSource::setSource(source);
 }
 
 bool DocumentSourceMatch::isTextQuery(const BSONObj& query) {

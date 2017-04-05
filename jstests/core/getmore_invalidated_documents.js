@@ -8,7 +8,7 @@
 (function() {
     "use strict";
 
-    var t = db.jstests_getmore_invalidation;
+    var t = db.getmore_invalidated_documents;
 
     var count;
     var cursor;

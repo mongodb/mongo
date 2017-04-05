@@ -209,38 +209,31 @@ public:
     virtual GetNextResult getNext() = 0;
 
     /**
-     * Inform the source that it is no longer needed and may release its resources.  After
-     * dispose() is called the source must still be able to handle iteration requests, but may
-     * become eof().
-     * NOTE: For proper mutex yielding, dispose() must be called on any DocumentSource that will
-     * not be advanced until eof(), see SERVER-6123.
+     * Informs the stage that it is no longer needed and can release its resources. After dispose()
+     * is called the stage must still be able to handle calls to getNext(), but can return kEOF.
+     *
+     * This is a non-virtual public interface to ensure dispose() is threaded through the entire
+     * pipeline. Subclasses should override doDispose() to implement their disposal.
      */
-    virtual void dispose();
+    void dispose() {
+        doDispose();
+        if (pSource) {
+            pSource->dispose();
+        }
+    }
 
     /**
-       Get the source's name.
-
-       @returns the std::string name of the source as a constant string;
-         this is static, and there's no need to worry about adopting it
+     * Get the stage's name.
      */
     virtual const char* getSourceName() const;
 
     /**
-      Set the underlying source this source should use to get Documents
-      from.
-
-      It is an error to set the source more than once.  This is to
-      prevent changing sources once the original source has been started;
-      this could break the state maintained by the DocumentSource.
-
-      This pointer is not reference counted because that has led to
-      some circular references.  As a result, this doesn't keep
-      sources alive, and is only intended to be used temporarily for
-      the lifetime of a Pipeline::run().
-
-      @param pSource the underlying source to use
+     * Set the underlying source this source should use to get Documents from. Must not throw
+     * exceptions.
      */
-    virtual void setSource(DocumentSource* pSource);
+    virtual void setSource(DocumentSource* source) {
+        pSource = source;
+    }
 
     /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
@@ -436,9 +429,6 @@ public:
     }
 
 protected:
-    /**
-       Base constructor.
-     */
     explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
@@ -458,6 +448,11 @@ protected:
         return std::next(itr);
     };
 
+    /**
+     * Release any resources held by this stage. After doDispose() is called the stage must still be
+     * able to handle calls to getNext(), but can return kEOF.
+     */
+    virtual void doDispose() {}
 
     /*
       Most DocumentSources have an underlying source they get their data
@@ -580,7 +575,7 @@ public:
          *
          * This function returns a non-OK status if parsing the pipeline failed.
          */
-        virtual StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+        virtual StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
             const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
 

@@ -327,10 +327,9 @@ Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
     return out.freeze();
 }
 
-void DocumentSourceBucketAuto::dispose() {
+void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
     _bucketsIterator = _buckets.end();
-    pSource->dispose();
 }
 
 Value DocumentSourceBucketAuto::serialize(

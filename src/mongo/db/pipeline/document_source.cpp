@@ -83,11 +83,6 @@ const char* DocumentSource::getSourceName() const {
     return unknown;
 }
 
-void DocumentSource::setSource(DocumentSource* pTheSource) {
-    verify(!isValidInitialSource());
-    pSource = pTheSource;
-}
-
 intrusive_ptr<DocumentSource> DocumentSource::optimize() {
     return this;
 }
@@ -190,12 +185,6 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
         }
     }
     return doOptimizeAt(itr, container);
-}
-
-void DocumentSource::dispose() {
-    if (pSource) {
-        pSource->dispose();
-    }
 }
 
 void DocumentSource::serializeToArray(vector<Value>& array,

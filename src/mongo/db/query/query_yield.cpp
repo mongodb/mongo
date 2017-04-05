@@ -72,6 +72,9 @@ void QueryYield::yieldAllLocks(OperationContext* opCtx,
     // locks). If we are yielding, we are at a safe place to do so.
     opCtx->recoveryUnit()->abandonSnapshot();
 
+    // Track the number of yields in CurOp.
+    CurOp::get(opCtx)->yielded();
+
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
 
     MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
@@ -81,9 +84,6 @@ void QueryYield::yieldAllLocks(OperationContext* opCtx,
             sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
         }
     }
-
-    // Track the number of yields in CurOp.
-    CurOp::get(opCtx)->yielded();
 
     if (fetcher) {
         fetcher->fetch();

@@ -148,7 +148,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        RangePreserver preserver(collection);
+        RangePreserver preserver(opCtx, collection);
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
@@ -159,7 +159,7 @@ public:
             return statusWithPlanExecutor.getStatus();
         }
 
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         Explain::explainStages(exec.get(), collection, verbosity, out);
         return Status::OK();
@@ -216,7 +216,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        RangePreserver preserver(collection);
+        RangePreserver preserver(opCtx, collection);
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
@@ -227,7 +227,7 @@ public:
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
         auto curOp = CurOp::get(opCtx);

@@ -51,7 +51,7 @@ private:
     Lock::DBLock _dbLock;
     Lock::CollectionLock _collectionLock;
     OldClientContext _ctx;
-    std::unique_ptr<PlanExecutor> _exec;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx, const std::string& collectionName)
@@ -61,7 +61,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx, const std::strin
       _exec(InternalPlanner::collectionScan(opCtx,
                                             collectionName,
                                             _ctx.db()->getCollection(opCtx, collectionName),
-                                            PlanExecutor::YIELD_MANUAL,
+                                            PlanExecutor::NO_YIELD,
                                             InternalPlanner::BACKWARD)) {}
 
 StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {

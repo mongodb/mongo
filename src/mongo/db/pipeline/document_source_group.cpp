@@ -169,7 +169,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
     return std::move(out);
 }
 
-void DocumentSourceGroup::dispose() {
+void DocumentSourceGroup::doDispose() {
     // Free our resources.
     _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
     _sorterIterator.reset();
@@ -178,9 +178,6 @@ void DocumentSourceGroup::dispose() {
     groupsIterator = _groups->end();
 
     _firstDocOfNextGroup = boost::none;
-
-    // Free our source's resources.
-    pSource->dispose();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {

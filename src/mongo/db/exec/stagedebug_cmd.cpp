@@ -193,7 +193,7 @@ public:
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
         fassert(28536, statusWithPlanExecutor.getStatus());
-        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 

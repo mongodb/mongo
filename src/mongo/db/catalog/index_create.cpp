@@ -295,14 +295,15 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
 
     unsigned long long n = 0;
 
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        _opCtx, _collection->ns().ns(), _collection, PlanExecutor::YIELD_MANUAL));
+    PlanExecutor::YieldPolicy yieldPolicy;
     if (_buildInBackground) {
         invariant(_allowInterruption);
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, _collection);
+        yieldPolicy = PlanExecutor::YIELD_AUTO;
     } else {
-        exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY, _collection);
+        yieldPolicy = PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;
     }
+    auto exec =
+        InternalPlanner::collectionScan(_opCtx, _collection->ns().ns(), _collection, yieldPolicy);
 
     Snapshotted<BSONObj> objToIndex;
     RecordId loc;

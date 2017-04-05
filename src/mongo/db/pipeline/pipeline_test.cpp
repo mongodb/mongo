@@ -806,8 +806,8 @@ public:
     virtual ~Base() {}
 
 protected:
-    intrusive_ptr<Pipeline> mergePipe;
-    intrusive_ptr<Pipeline> shardPipe;
+    std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipe;
+    std::unique_ptr<Pipeline, Pipeline::Deleter> shardPipe;
 
 private:
     OperationContextNoop _opCtx;

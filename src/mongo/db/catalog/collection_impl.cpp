@@ -924,7 +924,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     Status status = _indexCatalog.dropAllIndexes(opCtx, true);
     if (!status.isOK())
         return status;
-    _cursorManager.invalidateAll(false, "collection truncated");
+    _cursorManager.invalidateAll(opCtx, false, "collection truncated");
 
     // 3) truncate record store
     status = _recordStore->truncate(opCtx);
@@ -947,7 +947,7 @@ void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx, RecordId end, 
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
     invariant(_indexCatalog.numIndexesInProgress(opCtx) == 0);
 
-    _cursorManager.invalidateAll(false, "capped collection truncated");
+    _cursorManager.invalidateAll(opCtx, false, "capped collection truncated");
     _recordStore->cappedTruncateAfter(opCtx, end, inclusive);
 }
 

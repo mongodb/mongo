@@ -107,7 +107,8 @@ public:
      * Wraps a sort stage with a QueuedDataStage in a plan executor. Returns the plan executor,
      * which is owned by the caller.
      */
-    PlanExecutor* makePlanExecutorWithSortStage(Collection* coll) {
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutorWithSortStage(
+        Collection* coll) {
         // Build the mock scan stage which feeds the data.
         auto ws = make_unique<WorkingSet>();
         auto queuedDataStage = make_unique<QueuedDataStage>(&_opCtx, ws.get());
@@ -128,7 +129,7 @@ public:
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_opCtx, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
-        return statusWithPlanExecutor.getValue().release();
+        return std::move(statusWithPlanExecutor.getValue());
     }
 
     // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.  Used to
@@ -167,9 +168,9 @@ public:
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
         // totally) correct.
@@ -328,7 +329,7 @@ public:
         set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
-        unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
+        auto exec = makePlanExecutorWithSortStage(coll);
         SortStage* ss = static_cast<SortStage*>(exec->getRootStage());
         SortKeyGeneratorStage* keyGenStage =
             static_cast<SortKeyGeneratorStage*>(ss->getChildren()[0].get());
@@ -437,7 +438,7 @@ public:
         set<RecordId> recordIds;
         getRecordIds(&recordIds, coll);
 
-        unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
+        auto exec = makePlanExecutorWithSortStage(coll);
         SortStage* ss = static_cast<SortStage*>(exec->getRootStage());
         SortKeyGeneratorStage* keyGenStage =
             static_cast<SortKeyGeneratorStage*>(ss->getChildren()[0].get());
@@ -566,8 +567,8 @@ public:
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);
         ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);

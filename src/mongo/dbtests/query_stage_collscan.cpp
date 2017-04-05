@@ -105,9 +105,9 @@ public:
             make_unique<CollectionScan>(&_opCtx, params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Use the runner to count the number of objects scanned.
         int count = 0;
@@ -219,9 +219,9 @@ public:
         unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_opCtx, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
         PlanExecutor::ExecState state;
@@ -253,9 +253,9 @@ public:
         unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_opCtx, params, ws.get(), nullptr);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(ps), params.collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
         PlanExecutor::ExecState state;

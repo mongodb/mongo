@@ -143,7 +143,7 @@ private:
             return statusWithPlanExecutor.getStatus();
         }
 
-        unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
+        auto planExecutor = std::move(statusWithPlanExecutor.getValue());
 
         Explain::explainStages(planExecutor.get(), coll, verbosity, out);
         return Status::OK();
@@ -174,7 +174,7 @@ private:
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
-        unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
+        auto planExecutor = std::move(statusWithPlanExecutor.getValue());
 
         auto curOp = CurOp::get(opCtx);
         {

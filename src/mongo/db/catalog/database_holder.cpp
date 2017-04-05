@@ -169,7 +169,7 @@ Database* DatabaseHolder::openDb(OperationContext* opCtx, StringData ns, bool* j
     return it->second;
 }
 
-void DatabaseHolder::close(OperationContext* opCtx, StringData ns) {
+void DatabaseHolder::close(OperationContext* opCtx, StringData ns, const std::string& reason) {
     invariant(opCtx->lockState()->isW());
 
     const StringData dbName = _todb(ns);
@@ -181,14 +181,17 @@ void DatabaseHolder::close(OperationContext* opCtx, StringData ns) {
         return;
     }
 
-    it->second->close(opCtx);
+    it->second->close(opCtx, reason);
     delete it->second;
     _dbs.erase(it);
 
     getGlobalServiceContext()->getGlobalStorageEngine()->closeDatabase(opCtx, dbName.toString());
 }
 
-bool DatabaseHolder::closeAll(OperationContext* opCtx, BSONObjBuilder& result, bool force) {
+bool DatabaseHolder::closeAll(OperationContext* opCtx,
+                              BSONObjBuilder& result,
+                              bool force,
+                              const std::string& reason) {
     invariant(opCtx->lockState()->isW());
 
     stdx::lock_guard<SimpleMutex> lk(_m);
@@ -213,7 +216,7 @@ bool DatabaseHolder::closeAll(OperationContext* opCtx, BSONObjBuilder& result, b
         }
 
         Database* db = _dbs[name];
-        db->close(opCtx);
+        db->close(opCtx, reason);
         delete db;
 
         _dbs.erase(name);

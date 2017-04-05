@@ -125,7 +125,7 @@ public:
     }
 
     // closes files and other cleanup see below.
-    void close(OperationContext* opCtx) final;
+    void close(OperationContext* opCtx, const std::string& reason) final;
 
     const std::string& name() const final {
         return _name;

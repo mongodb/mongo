@@ -234,7 +234,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.
-        RangePreserver preserver(collection);
+        RangePreserver preserver(opCtx, collection);
 
         auto statusWithPlanExecutor =
             getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);
@@ -243,7 +243,7 @@ public:
             return false;
         }
 
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         auto curOp = CurOp::get(opCtx);
         {

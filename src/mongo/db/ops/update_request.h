@@ -54,6 +54,7 @@ public:
         // Return the document as it is after the update.
         RETURN_NEW
     };
+
     inline UpdateRequest(const NamespaceString& nsString)
         : _nsString(nsString),
           _god(false),
@@ -63,7 +64,7 @@ public:
           _lifecycle(NULL),
           _isExplain(false),
           _returnDocs(ReturnDocOption::RETURN_NONE),
-          _yieldPolicy(PlanExecutor::YIELD_MANUAL) {}
+          _yieldPolicy(PlanExecutor::NO_YIELD) {}
 
     const NamespaceString& getNamespaceString() const {
         return _nsString;
@@ -275,7 +276,7 @@ private:
     // without another query before or after the update.
     ReturnDocOption _returnDocs;
 
-    // Whether or not the update should yield. Defaults to YIELD_MANUAL.
+    // Whether or not the update should yield. Defaults to NO_YIELD.
     PlanExecutor::YieldPolicy _yieldPolicy;
 };
 

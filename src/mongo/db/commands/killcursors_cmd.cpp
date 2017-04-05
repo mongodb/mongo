@@ -80,7 +80,7 @@ private:
 
             // Make sure the namespace of the cursor matches the namespace passed to the killCursors
             // command so we can be sure we checked the correct privileges.
-            auto ccPin = cursorManager->pinCursor(cursorId);
+            auto ccPin = cursorManager->pinCursor(opCtx, cursorId);
             if (ccPin.isOK()) {
                 auto cursorNs = ccPin.getValue().getCursor()->nss();
                 if (cursorNs != nss) {

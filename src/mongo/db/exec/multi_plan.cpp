@@ -365,7 +365,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             doneWorking = true;
         } else if (PlanStage::NEED_YIELD == state) {
             if (id == WorkingSet::INVALID_ID) {
-                if (!yieldPolicy->allowedToYield())
+                if (!yieldPolicy->canAutoYield())
                     throw WriteConflictException();
             } else {
                 WorkingSetMember* member = candidate.ws->get(id);
@@ -374,7 +374,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
                 _fetcher.reset(member->releaseFetcher());
             }
 
-            if (yieldPolicy->allowedToYield()) {
+            if (yieldPolicy->canAutoYield()) {
                 yieldPolicy->forceYield();
             }
 

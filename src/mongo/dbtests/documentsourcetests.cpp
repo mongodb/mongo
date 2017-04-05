@@ -105,7 +105,7 @@ protected:
             &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
         auto exec = uassertStatusOK(
-            getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
+            getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD));
 
         exec->saveState();
         _source = DocumentSourceCursor::create(ctx.getCollection(), std::move(exec), _ctx);
@@ -270,6 +270,7 @@ public:
     void run() {
         createSource(BSON("$natural" << 1));
         ASSERT_EQ(source()->getOutputSorts().size(), 0U);
+        source()->dispose();
     }
 };
 
@@ -281,6 +282,7 @@ public:
 
         ASSERT_EQ(source()->getOutputSorts().size(), 1U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
+        source()->dispose();
     }
 };
 
@@ -292,6 +294,7 @@ public:
 
         ASSERT_EQ(source()->getOutputSorts().size(), 1U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << -1)), 1U);
+        source()->dispose();
     }
 };
 
@@ -304,6 +307,7 @@ public:
         ASSERT_EQ(source()->getOutputSorts().size(), 2U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1 << "b" << -1)), 1U);
+        source()->dispose();
     }
 };
 
@@ -338,6 +342,7 @@ public:
             ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
             ASSERT_FALSE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
         }
+        source()->dispose();
     }
 };
 

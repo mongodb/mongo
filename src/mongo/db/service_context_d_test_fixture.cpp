@@ -105,7 +105,7 @@ void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
     // allocates resources to track these empty databases. These resources not released by
     // dropAllDatabasesExceptLocal() will be leaked at exit unless we call DatabaseHolder::closeAll.
     BSONObjBuilder unused;
-    invariant(dbHolder().closeAll(opCtx, unused, false));
+    invariant(dbHolder().closeAll(opCtx, unused, false, "all databases dropped"));
 }
 
 }  // namespace mongo

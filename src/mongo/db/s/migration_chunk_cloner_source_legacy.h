@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/move_chunk_request.h"
@@ -48,7 +49,6 @@ class BSONArrayBuilder;
 class BSONObjBuilder;
 class Collection;
 class Database;
-class PlanExecutor;
 class RecordId;
 
 class MigrationChunkClonerSourceLegacy final : public MigrationChunkClonerSource {
@@ -181,7 +181,7 @@ private:
 
     // Registered deletion notifications plan executor, which will listen for document deletions
     // during the cloning stage
-    std::unique_ptr<PlanExecutor> _deleteNotifyExec;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _deleteNotifyExec;
 
     // Protects the entries below
     stdx::mutex _mutex;

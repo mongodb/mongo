@@ -51,16 +51,10 @@ public:
     BSONObjSet getOutputSorts() final {
         return _outputSorts;
     }
-    /**
-     * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     bool isValidInitialSource() const final {
         return true;
     }
-    void dispose() final;
 
     void detachFromOperationContext() final;
 
@@ -72,7 +66,7 @@ public:
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         Collection* collection,
-        std::unique_ptr<PlanExecutor> exec,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /*
@@ -139,11 +133,33 @@ public:
         return _planSummaryStats;
     }
 
+protected:
+    /**
+     * Disposes of '_exec' and '_rangePreserver' if they haven't been disposed already. This
+     * involves taking a collection lock.
+     */
+    void doDispose() final;
+
+    /**
+     * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     DocumentSourceCursor(Collection* collection,
-                         std::unique_ptr<PlanExecutor> exec,
+                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    ~DocumentSourceCursor();
 
+    /**
+     * Acquires locks to properly destroy and de-register '_exec'. '_exec' must be non-null.
+     */
+    void cleanupExecutor();
+
+    /**
+     * Reads a batch of data from '_exec'.
+     */
     void loadBatch();
 
     void recordPlanSummaryStats();
@@ -159,8 +175,10 @@ private:
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement
 
+    // Both '_rangePreserver' and '_exec' must be destroyed while holding the collection lock.
     RangePreserver _rangePreserver;
-    std::unique_ptr<PlanExecutor> _exec;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
+
     BSONObjSet _outputSorts;
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;

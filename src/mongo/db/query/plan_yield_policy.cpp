@@ -59,7 +59,7 @@ PlanYieldPolicy::PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* 
       _planYielding(nullptr) {}
 
 bool PlanYieldPolicy::shouldYield() {
-    if (!allowedToYield())
+    if (!canAutoYield())
         return false;
     invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
     if (_forceYield)
@@ -73,7 +73,7 @@ void PlanYieldPolicy::resetTimer() {
 
 bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
     invariant(_planYielding);
-    invariant(allowedToYield());
+    invariant(canAutoYield());
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
     // again right away. We delay the resetTimer() call so that the clock doesn't start ticking

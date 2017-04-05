@@ -280,9 +280,11 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     return itr;
 }
 
-void DocumentSourceLookUp::dispose() {
-    _pipeline.reset();
-    pSource->dispose();
+void DocumentSourceLookUp::doDispose() {
+    if (_pipeline) {
+        _pipeline->dispose(pExpCtx->opCtx);
+        _pipeline.reset();
+    }
 }
 
 BSONObj DocumentSourceLookUp::makeMatchStageFromInput(const Document& input,
@@ -379,7 +381,16 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
             makeMatchStageFromInput(*_input, _localField, _foreignFieldFieldName, filter);
         // We've already allocated space for the trailing $match stage in '_fromPipeline'.
         _fromPipeline.back() = matchStage;
+
+        if (_pipeline) {
+            _pipeline->dispose(pExpCtx->opCtx);
+        }
         _pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
+
+        // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
+        // potentially be used by multiple OperationContexts, and the $lookup stage is part of an
+        // outer Pipeline that will propagate dispose() calls before being destroyed.
+        _pipeline.get_deleter().dismissDisposal();
 
         _cursorIndex = 0;
         _nextValue = _pipeline->getNext();

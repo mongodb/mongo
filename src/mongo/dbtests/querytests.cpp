@@ -282,8 +282,8 @@ public:
         {
             // Check internal server handoff to getmore.
             OldClientWriteContext ctx(&_opCtx, ns);
-            auto pinnedCursor =
-                unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
+            auto pinnedCursor = unittest::assertGet(
+                ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId));
             ASSERT_EQUALS(2, pinnedCursor.getCursor()->pos());
         }
 
@@ -382,7 +382,8 @@ public:
         {
             AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns));
             ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
-            ASSERT_OK(ctx.getCollection()->getCursorManager()->pinCursor(cursorId).getStatus());
+            ASSERT_OK(
+                ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
         }
 
         // Check that the cursor can be iterated until all documents are returned.
@@ -691,7 +692,7 @@ public:
         long long cursorId = c->getCursorId();
 
         auto pinnedCursor = unittest::assertGet(
-            ctx.db()->getCollection(&_opCtx, ns)->getCursorManager()->pinCursor(cursorId));
+            ctx.db()->getCollection(&_opCtx, ns)->getCursorManager()->pinCursor(&_opCtx, cursorId));
         ASSERT_EQUALS(three.toULL(), pinnedCursor.getCursor()->getSlaveReadTill().asULL());
     }
 };
@@ -1647,8 +1648,8 @@ public:
         ClientCursor* clientCursor = 0;
         {
             AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns()));
-            auto clientCursorPin =
-                unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
+            auto clientCursorPin = unittest::assertGet(
+                ctx.getCollection()->getCursorManager()->pinCursor(&_opCtx, cursorId));
             clientCursor = clientCursorPin.getCursor();
             // clientCursorPointer destructor unpins the cursor.
         }
@@ -1699,8 +1700,10 @@ public:
 
         {
             OldClientWriteContext ctx(&_opCtx, ns());
-            auto pinnedCursor = unittest::assertGet(
-                ctx.db()->getCollection(&_opCtx, ns())->getCursorManager()->pinCursor(cursorId));
+            auto pinnedCursor = unittest::assertGet(ctx.db()
+                                                        ->getCollection(&_opCtx, ns())
+                                                        ->getCursorManager()
+                                                        ->pinCursor(&_opCtx, cursorId));
             string expectedAssertion = str::stream() << "Cannot kill pinned cursor: " << cursorId;
             ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_opCtx, cursorId),
                                MsgAssertionException,
@@ -1785,14 +1788,15 @@ public:
 
 class CursorManagerTest {
 public:
-    std::unique_ptr<PlanExecutor> makeFakePlanExecutor(OperationContext* opCtx) {
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
+        OperationContext* opCtx) {
         auto workingSet = stdx::make_unique<WorkingSet>();
         auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx, workingSet.get());
         return unittest::assertGet(PlanExecutor::make(opCtx,
                                                       std::move(workingSet),
                                                       std::move(queuedDataStage),
                                                       NamespaceString{"test.collection"},
-                                                      PlanExecutor::YieldPolicy::YIELD_MANUAL));
+                                                      PlanExecutor::YieldPolicy::NO_YIELD));
     }
 };
 
@@ -1803,8 +1807,10 @@ public:
         for (int i = 0; i < 1000; i++) {
             auto exec = makeFakePlanExecutor(opCtx.get());
             auto cursorPin = CursorManager::getGlobalCursorManager()->registerCursor(
+                opCtx.get(),
                 {std::move(exec), NamespaceString{"test.collection"}, {}, false, BSONObj()});
             ASSERT_TRUE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
+            cursorPin.deleteUnderlying();
         }
     }
 };
@@ -1818,8 +1824,10 @@ public:
         for (int i = 0; i < 1000; i++) {
             auto exec = makeFakePlanExecutor(opCtx.get());
             auto cursorPin = testManager.registerCursor(
+                opCtx.get(),
                 {std::move(exec), NamespaceString{"test.collection"}, {}, false, BSONObj()});
             ASSERT_FALSE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
+            cursorPin.deleteUnderlying();
         }
     }
 };
@@ -1834,6 +1842,7 @@ public:
         for (int i = 0; i < 1000; i++) {
             auto exec = makeFakePlanExecutor(opCtx.get());
             auto cursorPin = testManager.registerCursor(
+                opCtx.get(),
                 {std::move(exec), NamespaceString{"test.collection"}, {}, false, BSONObj()});
             auto cursorId = cursorPin.getCursor()->cursorid();
             if (prefix) {
@@ -1841,6 +1850,7 @@ public:
             } else {
                 prefix = extractLeading32Bits(cursorId);
             }
+            cursorPin.deleteUnderlying();
         }
     }
 

@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/find.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -209,10 +210,14 @@ void generateBatch(int ntoreturn,
         }
     }
 
-    if (PlanExecutor::DEAD == *state || PlanExecutor::FAILURE == *state) {
-        // Propagate this error to caller.
+    // Propagate any errors to the caller.
+    if (PlanExecutor::FAILURE == *state) {
         error() << "getMore executor error, stats: " << redact(Explain::getWinningPlanStats(exec));
         uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
+    } else if (PlanExecutor::DEAD == *state) {
+        uasserted(ErrorCodes::QueryPlanKilled,
+                  str::stream() << "PlanExecutor killed: "
+                                << WorkingSetCommon::toStatusString(obj));
     }
 }
 
@@ -279,7 +284,8 @@ Message getMore(OperationContext* opCtx,
     } else {
         readLock.emplace(opCtx, nss);
         Collection* collection = readLock->getCollection();
-        uassert(17356, "collection dropped between getMore calls", collection);
+        uassert(
+            ErrorCodes::OperationFailed, "collection dropped between getMore calls", collection);
         cursorManager = collection->getCursorManager();
     }
 
@@ -296,7 +302,7 @@ Message getMore(OperationContext* opCtx,
     // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
     // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
     // CC, so don't delete it.
-    auto ccPin = cursorManager->pinCursor(cursorid);
+    auto ccPin = cursorManager->pinCursor(opCtx, cursorid);
 
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
@@ -311,9 +317,13 @@ Message getMore(OperationContext* opCtx,
     bb.skip(sizeof(QueryResult::Value));
 
     if (!ccPin.isOK()) {
-        invariant(ccPin == ErrorCodes::CursorNotFound);
-        cursorid = 0;
-        resultFlags = ResultFlag_CursorNotFound;
+        if (ccPin == ErrorCodes::CursorNotFound) {
+            cursorid = 0;
+            resultFlags = ResultFlag_CursorNotFound;
+        } else {
+            invariant(ccPin == ErrorCodes::QueryPlanKilled);
+            uassertStatusOK(ccPin.getStatus());
+        }
     } else {
         ClientCursor* cc = ccPin.getValue().getCursor();
 
@@ -533,7 +543,7 @@ std::string runQuery(OperationContext* opCtx,
     }
 
     // We have a parsed query. Time to get the execution plan for it.
-    std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
+    auto exec = uassertStatusOK(
         getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO));
 
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
@@ -631,14 +641,6 @@ std::string runQuery(OperationContext* opCtx,
         }
     }
 
-    // If we cache the executor later, we want to deregister it as it receives notifications
-    // anyway by virtue of being cached.
-    //
-    // If we don't cache the executor later, we are deleting it, so it must be deregistered.
-    //
-    // So, no matter what, deregister the executor.
-    exec->deregisterExec();
-
     // Caller expects exceptions thrown in certain cases.
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
@@ -662,6 +664,7 @@ std::string runQuery(OperationContext* opCtx,
 
         // Allocate a new ClientCursor and register it with the cursor manager.
         ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+            opCtx,
             {std::move(exec),
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),

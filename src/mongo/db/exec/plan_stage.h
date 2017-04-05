@@ -261,6 +261,29 @@ public:
      */
     void invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
 
+    /*
+     * Releases any resources held by this stage. It is an error to use a PlanStage in any way after
+     * calling dispose(). Does not throw exceptions.
+     *
+     * Propagates to all children, then calls doDispose().
+     */
+    void dispose(OperationContext* opCtx) {
+        try {
+            // We may or may not be attached during disposal. We can't call
+            // reattachToOperationContext()
+            // directly, since that will assert that '_opCtx' is not set.
+            _opCtx = opCtx;
+            invariant(!_opCtx || opCtx == opCtx);
+
+            for (auto&& child : _children) {
+                child->dispose(opCtx);
+            }
+            doDispose();
+        } catch (...) {
+            std::terminate();
+        }
+    }
+
     /**
      * Retrieve a list of this stage's children. This stage keeps ownership of
      * its children.
@@ -352,6 +375,11 @@ protected:
      * OperationContext* (the one to which the stage is reattaching).
      */
     virtual void doReattachToOperationContext() {}
+
+    /**
+     * Does stage-specific destruction. Must not throw exceptions.
+     */
+    virtual void doDispose() {}
 
     /**
      * Does the stage-specific invalidation work.

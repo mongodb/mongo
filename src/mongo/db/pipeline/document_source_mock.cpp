@@ -58,7 +58,7 @@ Value DocumentSourceMock::serialize(boost::optional<ExplainOptions::Verbosity> e
     return Value(Document{{getSourceName(), Document()}});
 }
 
-void DocumentSourceMock::dispose() {
+void DocumentSourceMock::doDispose() {
     isDisposed = true;
 }
 

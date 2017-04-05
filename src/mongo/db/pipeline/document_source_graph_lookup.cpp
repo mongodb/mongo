@@ -164,11 +164,10 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
     }
 }
 
-void DocumentSourceGraphLookUp::dispose() {
+void DocumentSourceGraphLookUp::doDispose() {
     _cache.clear();
     _frontier.clear();
     _visited.clear();
-    pSource->dispose();
 }
 
 void DocumentSourceGraphLookUp::doBreadthFirstSearch() {

@@ -974,8 +974,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 o.hasField("_id"));
 
         if (opType[1] == 0) {
-            deleteObjects(
-                opCtx, collection, requestNss, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
+            deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
         } else
             verify(opType[1] == 'b');  // "db" advertisement
         if (incrementOpsAppliedStats) {

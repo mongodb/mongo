@@ -96,16 +96,13 @@ public:
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
-        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
-        // 'exec' will be used in getMore(). It was automatically registered on construction
-        // due to the auto yield policy, so it could yield during plan selection. We deregister
-        // it now so that it can be registed with ClientCursor.
-        exec->deregisterExec();
         exec->saveState();
         exec->detachFromOperationContext();
 
         auto pinnedCursor = collection->getCursorManager()->registerCursor(
+            opCtx,
             {std::move(exec),
              ns,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),

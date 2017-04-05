@@ -922,7 +922,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                           ctx.db() ? ctx.db()->getCollection(opCtx, nss) : nullptr,
                           nss,
                           id,
-                          PlanExecutor::YIELD_MANUAL,
                           true /* justOne */,
                           false /* god */,
                           true /* fromMigrate */);

@@ -166,9 +166,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -236,9 +236,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -306,9 +306,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -379,9 +379,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -451,9 +451,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Only getting results from the a:1 index scan.
         for (int i = 0; i < N; ++i) {
@@ -510,9 +510,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < numIndices; ++i) {
             BSONObj obj;
@@ -794,9 +794,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
@@ -868,9 +868,9 @@ public:
             make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;

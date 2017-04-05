@@ -114,7 +114,7 @@ const DeleteRequest* ParsedDelete::getRequest() const {
 
 PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
     if (_request->isGod()) {
-        return PlanExecutor::YIELD_MANUAL;
+        return PlanExecutor::NO_YIELD;
     }
     if (_request->getYieldPolicy() == PlanExecutor::YIELD_AUTO && isIsolated()) {
         return PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;  // Don't yield locks.

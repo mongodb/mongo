@@ -50,7 +50,6 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetNextResult getNext() final;
-    void dispose() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final;
 
@@ -95,6 +94,9 @@ public:
     // Virtuals for SplittableDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+protected:
+    void doDispose() final;
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

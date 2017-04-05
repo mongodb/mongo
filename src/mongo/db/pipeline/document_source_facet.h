@@ -59,11 +59,11 @@ class DocumentSourceFacet final : public DocumentSourceNeedsMongod,
                                   public SplittableDocumentSource {
 public:
     struct FacetPipeline {
-        FacetPipeline(std::string name, boost::intrusive_ptr<Pipeline> pipeline)
+        FacetPipeline(std::string name, std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
 
         std::string name;
-        boost::intrusive_ptr<Pipeline> pipeline;
+        std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline;
     };
 
     class LiteParsed : public LiteParsedDocumentSource {
@@ -130,6 +130,9 @@ public:
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext(OperationContext* opCtx) final;
     bool needsPrimaryShard() const final;
+
+protected:
+    void doDispose() final;
 
 private:
     DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,

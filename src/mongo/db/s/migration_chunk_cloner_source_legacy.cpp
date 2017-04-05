@@ -436,7 +436,10 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
 
     // If we have drained all the cloned data, there is no need to keep the delete notify executor
     // around
-    if (_cloneLocs.empty()) {
+    if (_cloneLocs.empty() && _deleteNotifyExec) {
+        // We have a different OperationContext than when we created the PlanExecutor, so need to
+        // manually destroy it ourselves.
+        _deleteNotifyExec->dispose(opCtx, collection->getCursorManager());
         _deleteNotifyExec.reset();
     }
 
@@ -473,7 +476,9 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
 
     if (_deleteNotifyExec) {
         AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
-
+        const auto cursorManager =
+            autoColl.getCollection() ? autoColl.getCollection()->getCursorManager() : nullptr;
+        _deleteNotifyExec->dispose(opCtx, cursorManager);
         _deleteNotifyExec.reset();
     }
 }
@@ -542,7 +547,6 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     }
 
     _deleteNotifyExec = std::move(statusWithDeleteNotificationPlanExecutor.getValue());
-    _deleteNotifyExec->registerExec(collection);
 
     // Assume both min and max non-empty, append MinKey's to make them fit chosen index
     const KeyPattern kp(idx->keyPattern());
@@ -550,18 +554,15 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     BSONObj min = Helpers::toKeyFormat(kp.extendRangeBound(_args.getMinKey(), false));
     BSONObj max = Helpers::toKeyFormat(kp.extendRangeBound(_args.getMaxKey(), false));
 
-    std::unique_ptr<PlanExecutor> exec(
-        InternalPlanner::indexScan(opCtx,
-                                   collection,
-                                   idx,
-                                   min,
-                                   max,
-                                   BoundInclusion::kIncludeStartKeyOnly,
-                                   PlanExecutor::YIELD_MANUAL));
-
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.
-    exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
+    auto exec = InternalPlanner::indexScan(opCtx,
+                                           collection,
+                                           idx,
+                                           min,
+                                           max,
+                                           BoundInclusion::kIncludeStartKeyOnly,
+                                           PlanExecutor::YIELD_AUTO);
 
     // Use the average object size to estimate how many objects a full chunk would carry do that
     // while traversing the chunk's range using the sharding index, below there's a fair amount of

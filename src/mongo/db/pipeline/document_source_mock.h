@@ -48,7 +48,6 @@ public:
     const char* getSourceName() const override;
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
-    void dispose() override;
     bool isValidInitialSource() const override {
         return true;
     }
@@ -89,6 +88,9 @@ public:
     bool isExpCtxInjected = false;
 
     BSONObjSet sorts;
+
+protected:
+    void doDispose() override;
 };
 
 }  // namespace mongo

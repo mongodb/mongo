@@ -46,11 +46,12 @@ public:
      * object does. The ClientCursorPin guarantees that the underlying ClientCursor is not deleted
      * until this object goes out of scope.
      */
-    RangePreserver(const Collection* collection) {
+    RangePreserver(OperationContext* opCtx, const Collection* collection) {
         // Empty collections don't have any data we need to preserve
         if (collection) {
             // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
-            _pin.emplace(collection->getCursorManager()->registerRangePreserverCursor(collection));
+            _pin.emplace(
+                collection->getCursorManager()->registerRangePreserverCursor(opCtx, collection));
         }
     }
 

@@ -60,7 +60,7 @@ public:
 
         virtual void init(OperationContext* opCtx) = 0;
 
-        virtual void close(OperationContext* opCtx) = 0;
+        virtual void close(OperationContext* opCtx, const std::string& reason) = 0;
 
         virtual const std::string& name() const = 0;
 
@@ -190,8 +190,8 @@ public:
     }
 
     // closes files and other cleanup see below.
-    inline void close(OperationContext* const opCtx) {
-        return this->_impl().close(opCtx);
+    inline void close(OperationContext* const opCtx, const std::string& reason) {
+        return this->_impl().close(opCtx, reason);
     }
 
     inline const std::string& name() const {

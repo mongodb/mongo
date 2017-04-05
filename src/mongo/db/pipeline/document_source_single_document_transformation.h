@@ -69,16 +69,19 @@ public:
     const char* getSourceName() const final;
     GetNextResult getNext() final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
-    void dispose() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
 
     bool canSwapWithMatch() const final {
         return true;
     }
+
+protected:
+    void doDispose() final;
+
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
 
 private:
     // Stores transformation logic.

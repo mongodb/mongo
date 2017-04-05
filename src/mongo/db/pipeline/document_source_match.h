@@ -55,7 +55,6 @@ public:
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
-    void setSource(DocumentSource* Source) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
@@ -154,7 +153,7 @@ private:
     DepsTracker _dependencies;
 
     BSONObj _predicate;
-    bool _isTextQuery;
+    const bool _isTextQuery;
 };
 
 }  // namespace mongo

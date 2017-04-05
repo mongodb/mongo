@@ -43,7 +43,6 @@ public:
 
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    void dispose() final;
     BSONObjSet getOutputSorts() final;
     void serializeToArray(
         std::vector<Value>& array,
@@ -57,12 +56,6 @@ public:
     bool canSwapWithMatch() const final {
         return true;
     }
-
-    /**
-     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);
@@ -95,6 +88,15 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+protected:
+    void doDispose() final;
+
+    /**
+     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
 
 private:
     DocumentSourceGraphLookUp(

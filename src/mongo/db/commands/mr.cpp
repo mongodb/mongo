@@ -1114,7 +1114,15 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
         _opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO, QueryPlannerParams::NO_TABLE_SCAN);
     verify(statusWithPlanExecutor.isOK());
 
-    unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
+
+    // Make sure the PlanExecutor is destroyed while holding a collection lock.
+    ON_BLOCK_EXIT([&exec, &ctx, opCtx, this] {
+        if (!ctx) {
+            AutoGetCollection autoColl(opCtx, _config.incLong, MODE_IS);
+            exec.reset();
+        }
+    });
 
     // iterate over all sorted objects
     BSONObj o;
@@ -1404,7 +1412,7 @@ public:
 
             Collection* collection = ctx.getCollection();
             if (collection) {
-                rangePreserver.reset(new RangePreserver(collection));
+                rangePreserver.reset(new RangePreserver(opCtx, collection));
             }
 
             // Get metadata before we check our version, to make sure it doesn't increment
@@ -1502,7 +1510,7 @@ public:
                 }
                 std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-                unique_ptr<PlanExecutor> exec;
+                unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
                 {
                     Database* db = scopedAutoDb->getDb();
                     Collection* coll = State::getCollectionOrUassert(opCtx, db, config.nss);

@@ -40,11 +40,12 @@ namespace mongo {
 
 class BSONObj;
 class Collection;
-class RecordId;
-class PlanStage;
+class CursorManager;
 class PlanExecutor;
-struct PlanStageStats;
+class PlanStage;
 class PlanYieldPolicy;
+class RecordId;
+struct PlanStageStats;
 class WorkingSet;
 
 /**
@@ -80,8 +81,8 @@ public:
     };
 
     /**
-     * The yielding policy of the plan executor.  By default, an executor does not yield itself
-     * (YIELD_MANUAL).
+     * The yielding policy of the plan executor. By default, an executor does not yield itself
+     * (NO_YIELD).
      */
     enum YieldPolicy {
         // Any call to getNext() may yield. In particular, the executor may be killed during any
@@ -91,37 +92,63 @@ public:
 
         // This will handle WriteConflictExceptions that occur while processing the query, but
         // will not yield locks. abandonSnapshot() will be called if a WriteConflictException
-        // occurs so callers must be prepared to get a new snapshot.
+        // occurs so callers must be prepared to get a new snapshot. A PlanExecutor constructed with
+        // this yield policy will not be registered to receive invalidations, so the caller must
+        // hold their locks continuously from construction to destruction.
         WRITE_CONFLICT_RETRY_ONLY,
 
-        // Owner must yield manually if yields are requested.  How to yield yourself:
-        //
-        // 0. Let's say you have PlanExecutor* exec.
-        //
-        // 1. Register your PlanExecutor with ClientCursor. Registered executors are informed
-        // about RecordId deletions and namespace invalidation, as well as other important
-        // events. Do this by calling registerExec() on the executor. Alternatively, this can
-        // be done per-yield (as described below).
-        //
-        // 2. Construct a PlanYieldPolicy 'policy', passing 'exec' to the constructor.
-        //
-        // 3. Call PlanYieldPolicy::yield() on 'policy'. If your PlanExecutor is not yet
-        // registered (because you want to register on a per-yield basis), then pass
-        // 'true' to yield().
-        //
-        // 4. The call to yield() returns a boolean indicating whether or not 'exec' is
-        // still alove. If it is false, then 'exec' was killed during the yield and is
-        // no longer valid.
-        //
-        // It is not possible to handle WriteConflictExceptions in this mode without restarting
-        // the query.
+        // Use this policy if you want to disable auto-yielding, but will release locks while using
+        // the PlanExecutor. Any WriteConflictExceptions will be raised to the caller of getNext().
         YIELD_MANUAL,
+
+        // Can be used in one of the following scenarios:
+        //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
+        //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
+        //    locked during execution. For example, a PlanExecutor containing a PipelineProxyStage
+        //    which is being used to execute an aggregation pipeline.
+        NO_YIELD,
+    };
+
+    /**
+     * This class will ensure a PlanExecutor is disposed before it is deleted.
+     */
+    class Deleter {
+    public:
+        /**
+         * Constructs an empty deleter. Useful for creating a
+         * unique_ptr<PlanExecutor, PlanExecutor::Deleter> without populating it.
+         */
+        Deleter() {}
+
+        Deleter(OperationContext* opCtx, const Collection* collection);
+
+        /**
+         * If an owner of a std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> wants to assume
+         * responsibility for calling PlanExecutor::dispose(), they can call dismissDisposal(). If
+         * dismissed, a Deleter will not call dispose() when deleting the PlanExecutor.
+         */
+        void dismissDisposal() {
+            _dismissed = true;
+        }
+
+        /**
+         * If 'execPtr' hasn't already been disposed, will call dispose(). Also, if 'execPtr' has
+         * been registered with the CursorManager, will deregister it. If 'execPtr' is a yielding
+         * PlanExecutor, callers must hold a lock on the collection in at least MODE_IS.
+         */
+        void operator()(PlanExecutor* execPtr);
+
+    private:
+        OperationContext* _opCtx = nullptr;
+        CursorManager* _cursorManager = nullptr;
+
+        bool _dismissed = false;
     };
 
     //
     // Factory methods.
     //
-    // On success, return a new PlanExecutor, owned by the caller, through 'out'.
+    // On success, return a new PlanExecutor, owned by the caller.
     //
     // Passing YIELD_AUTO to any of these factories will construct a yielding executor which
     // may yield in the following circumstances:
@@ -129,57 +156,58 @@ public:
     //   2) On any call to getNext().
     //   3) While executing the plan inside executePlan().
     //
-    // The executor will also be automatically registered to receive notifications in the
-    // case of YIELD_AUTO, so no further calls to registerExec() or setYieldPolicy() are
-    // necessary.
+    // The executor will also be automatically registered to receive notifications in the case of
+    // YIELD_AUTO or YIELD_MANUAL.
     //
 
     /**
      * Used when there is no canonical query and no query solution.
      *
-     * Right now this is only for idhack updates which neither canonicalize
-     * nor go through normal planning.
+     * Right now this is only for idhack updates which neither canonicalize nor go through normal
+     * planning.
      */
-    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
-                                                          std::unique_ptr<WorkingSet> ws,
-                                                          std::unique_ptr<PlanStage> rt,
-                                                          const Collection* collection,
-                                                          YieldPolicy yieldPolicy);
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        const Collection* collection,
+        YieldPolicy yieldPolicy);
 
     /**
-     * Used when we have a NULL collection and no canonical query. In this case,
-     * we need to explicitly pass a namespace to the plan executor.
+     * Used when we have a NULL collection and no canonical query. In this case, we need to
+     * explicitly pass a namespace to the plan executor.
      */
-    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
-                                                          std::unique_ptr<WorkingSet> ws,
-                                                          std::unique_ptr<PlanStage> rt,
-                                                          NamespaceString nss,
-                                                          YieldPolicy yieldPolicy);
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        NamespaceString nss,
+        YieldPolicy yieldPolicy);
 
     /**
-     * Used when there is a canonical query but no query solution (e.g. idhack
-     * queries, queries against a NULL collection, queries using the subplan stage).
+     * Used when there is a canonical query but no query solution (e.g. idhack queries, queries
+     * against a NULL collection, queries using the subplan stage).
      */
-    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
-                                                          std::unique_ptr<WorkingSet> ws,
-                                                          std::unique_ptr<PlanStage> rt,
-                                                          std::unique_ptr<CanonicalQuery> cq,
-                                                          const Collection* collection,
-                                                          YieldPolicy yieldPolicy);
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        std::unique_ptr<CanonicalQuery> cq,
+        const Collection* collection,
+        YieldPolicy yieldPolicy);
 
     /**
-     * The constructor for the normal case, when you have a collection, a canonical query,
-     * and a query solution.
+     * The constructor for the normal case, when you have a collection, a canonical query, and a
+     * query solution.
      */
-    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
-                                                          std::unique_ptr<WorkingSet> ws,
-                                                          std::unique_ptr<PlanStage> rt,
-                                                          std::unique_ptr<QuerySolution> qs,
-                                                          std::unique_ptr<CanonicalQuery> cq,
-                                                          const Collection* collection,
-                                                          YieldPolicy yieldPolicy);
-
-    ~PlanExecutor();
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        std::unique_ptr<QuerySolution> qs,
+        std::unique_ptr<CanonicalQuery> cq,
+        const Collection* collection,
+        YieldPolicy yieldPolicy);
 
     //
     // Accessors
@@ -312,26 +340,27 @@ public:
     //
 
     /**
-     * Register this plan executor with the collection cursor manager so that it
-     * receives notifications for events that happen while yielding any locks.
+     * If we're yielding locks, the database we're operating over or any collection we're relying on
+     * may be dropped. Plan executors are notified of such events by calling markAsKilled().
+     * Callers must specify the 'reason' for why this executor is being killed. Subsequent calls to
+     * getNext() will return DEAD, and fill 'objOut' with an error detail including 'reason'.
+     */
+    void markAsKilled(std::string reason);
+
+    /**
+     * Cleans up any state associated with this PlanExecutor. Must be called before deleting this
+     * PlanExecutor. It is illegal to use a PlanExecutor after calling dispose(). 'cursorManager'
+     * may be null.
      *
-     * Deregistration happens automatically when this plan executor is destroyed.
+     * There are multiple cleanup scenarios:
+     *  - This PlanExecutor will only ever use one OperationContext. In this case the
+     *    PlanExecutor::Deleter will automatically call dispose() before deleting the PlanExecutor,
+     *    and the owner need not call dispose().
+     *  - This PlanExecutor may use multiple OperationContexts over its lifetime. In this case it
+     *    is the owner's responsibility to call dispose() with a valid OperationContext before
+     *    deleting the PlanExecutor.
      */
-    void registerExec(const Collection* collection);
-
-    /**
-     * Unregister this PlanExecutor. Normally you want the PlanExecutor to be registered
-     * for its lifetime, and you shouldn't have to call this explicitly.
-     */
-    void deregisterExec();
-
-    /**
-     * If we're yielding locks, the database we're operating over or any collection we're
-     * relying on may be dropped.  When this happens all cursors and plan executors on that
-     * database and collection are killed or deleted in some fashion.  Callers must specify
-     * the 'reason' for why this executor is being killed.
-     */
-    void kill(std::string reason);
+    void dispose(OperationContext* opCtx, CursorManager* cursorManager);
 
     /**
      * If we're yielding locks, writes may occur to documents that we rely on to keep valid
@@ -344,20 +373,6 @@ public:
      * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
      */
     static std::string statestr(ExecState s);
-
-    /**
-     * Change the yield policy of the PlanExecutor to 'policy'. If 'registerExecutor' is true,
-     * and the yield policy is YIELD_AUTO, then the plan executor gets registered to receive
-     * notifications of events from other threads.
-     *
-     * Everybody who sets the policy to YIELD_AUTO really wants to call registerExec()
-     * immediately after EXCEPT commands that create cursors...so we expose the ability to
-     * register (or not) here, rather than require all users to have yet another RAII object.
-     * Only cursor-creating things like find.cpp set registerExecutor to false.
-     */
-    void setYieldPolicy(YieldPolicy policy,
-                        const Collection* collection,
-                        bool registerExecutor = true);
 
     /**
      * Stash the BSONObj so that it gets returned from the PlanExecutor on a later call to
@@ -379,27 +394,25 @@ public:
      */
     BSONObjSet getOutputSorts() const;
 
+    /**
+     * Communicate to this PlanExecutor that it is no longer registered with the CursorManager as a
+     * 'non-cached PlanExecutor'.
+     */
+    void unsetRegistered() {
+        _registered = false;
+    }
+
+    bool isMarkedAsKilled() {
+        return static_cast<bool>(_killReason);
+    };
+
+    const std::string& getKillReason() {
+        invariant(isMarkedAsKilled());
+        return *_killReason;
+    }
+
 private:
     ExecState getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
-
-    /**
-     * RAII approach to ensuring that plan executors are deregistered.
-     *
-     * While retrieving the first batch of results, runQuery manually registers the executor
-     * with ClientCursor.  Certain query execution paths, namely $where, can throw an exception.
-     * If we fail to deregister the executor, we will call invalidate/kill on the
-     * still-registered-yet-deleted executor.
-     *
-     * For any subsequent calls to getMore, the executor is already registered with ClientCursor
-     * by virtue of being cached, so this exception-proofing is not required.
-     */
-    struct ScopedExecutorRegistration {
-        ScopedExecutorRegistration(PlanExecutor* exec, const Collection* collection);
-        ~ScopedExecutorRegistration();
-
-        PlanExecutor* const _exec;
-        const Collection* const _collection;
-    };
 
     /**
      * New PlanExecutor instances are created with the static make() methods above.
@@ -410,19 +423,27 @@ private:
                  std::unique_ptr<QuerySolution> qs,
                  std::unique_ptr<CanonicalQuery> cq,
                  const Collection* collection,
-                 NamespaceString nss);
+                 NamespaceString nss,
+                 YieldPolicy yieldPolicy);
+
+    /**
+     * A PlanExecutor must be disposed before destruction. In most cases, this will happen
+     * automatically through a PlanExecutor::Deleter or a ClientCursor.
+     */
+    ~PlanExecutor();
 
     /**
      * Public factory methods delegate to this private factory to do their work.
      */
-    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
-                                                          std::unique_ptr<WorkingSet> ws,
-                                                          std::unique_ptr<PlanStage> rt,
-                                                          std::unique_ptr<QuerySolution> qs,
-                                                          std::unique_ptr<CanonicalQuery> cq,
-                                                          const Collection* collection,
-                                                          NamespaceString nss,
-                                                          YieldPolicy yieldPolicy);
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
+        OperationContext* opCtx,
+        std::unique_ptr<WorkingSet> ws,
+        std::unique_ptr<PlanStage> rt,
+        std::unique_ptr<QuerySolution> qs,
+        std::unique_ptr<CanonicalQuery> cq,
+        const Collection* collection,
+        NamespaceString nss,
+        YieldPolicy yieldPolicy);
 
     /**
      * Clients of PlanExecutor expect that on receiving a new instance from one of the make()
@@ -439,14 +460,10 @@ private:
      * ErrorCodes::QueryPlanKilled if plan execution cannot proceed due to a concurrent write or
      * catalog operation.
      */
-    Status pickBestPlan(YieldPolicy policy, const Collection* collection);
+    Status pickBestPlan(const Collection* collection);
 
-    bool killed() {
-        return static_cast<bool>(_killReason);
-    };
-
-    // The OperationContext that we're executing within.  We need this in order to release
-    // locks.
+    // The OperationContext that we're executing within. This can be updated if necessary by using
+    // detachFromOperationContext() and reattachToOperationContext().
     OperationContext* _opCtx;
 
     std::unique_ptr<CanonicalQuery> _cq;
@@ -454,14 +471,9 @@ private:
     std::unique_ptr<QuerySolution> _qs;
     std::unique_ptr<PlanStage> _root;
 
-    // If _killReason has a value, then we have been killed and the value represents the reason
-    // for the kill.
-    // The ScopedExecutorRegistration skips dereigstering the plan executor when the plan executor
-    // has been killed, so _killReason must outlive _safety.
+    // If _killReason has a value, then we have been killed and the value represents the reason for
+    // the kill.
     boost::optional<std::string> _killReason;
-
-    // Deregisters this executor when it is destroyed.
-    std::unique_ptr<ScopedExecutorRegistration> _safety;
 
     // What namespace are we operating over?
     NamespaceString _nss;
@@ -476,7 +488,11 @@ private:
     // stages.
     std::queue<BSONObj> _stash;
 
-    enum { kUsable, kSaved, kDetached } _currentState = kUsable;
+    enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
+
+    // Set to true if this PlanExecutor is registered with the CursorManager as a 'non-cached
+    // PlanExecutor' to receive invalidations.
+    bool _registered = false;
 
     bool _everDetachedFromOperationContext = false;
 };

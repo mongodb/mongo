@@ -151,7 +151,7 @@ DatabaseImpl::~DatabaseImpl() {
         delete i->second;
 }
 
-void DatabaseImpl::close(OperationContext* opCtx) {
+void DatabaseImpl::close(OperationContext* opCtx, const std::string& reason) {
     // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
     invariant(opCtx->lockState()->isW());
 
@@ -160,6 +160,11 @@ void DatabaseImpl::close(OperationContext* opCtx) {
 
     if (BackgroundOperation::inProgForDb(_name)) {
         log() << "warning: bg op in prog during close db? " << _name;
+    }
+
+    for (auto&& pair : _collections) {
+        auto* coll = pair.second;
+        coll->getCursorManager()->invalidateAll(opCtx, true, reason);
     }
 }
 
@@ -417,6 +422,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     audit::logDropCollection(&cc(), fullns.toString());
 
+    collection->getCursorManager()->invalidateAll(opCtx, true, "collection dropped");
     Status s = collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
     if (!s.isOK()) {
@@ -475,7 +481,7 @@ void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
     // Takes ownership of the collection
     opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
 
-    it->second->getCursorManager()->invalidateAll(false, reason);
+    it->second->getCursorManager()->invalidateAll(opCtx, false, reason);
     _collections.erase(it);
 }
 
@@ -667,7 +673,7 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
         Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(coll->ns().ns(), true);
     }
 
-    dbHolder().close(opCtx, name);
+    dbHolder().close(opCtx, name, "database dropped");
     db = NULL;  // d is now deleted
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {

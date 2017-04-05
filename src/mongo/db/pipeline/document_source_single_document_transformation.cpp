@@ -70,7 +70,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
     return this;
 }
 
-void DocumentSourceSingleDocumentTransformation::dispose() {
+void DocumentSourceSingleDocumentTransformation::doDispose() {
     _parsedTransform.reset();
 }
 

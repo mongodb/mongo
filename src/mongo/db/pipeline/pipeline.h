@@ -43,18 +43,58 @@
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
-class CollatorInterface;
-class DocumentSource;
-class OperationContext;
 class ExpressionContext;
+class DocumentSource;
+class CollatorInterface;
+class OperationContext;
 
 /**
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
  * pipeline.
  */
-class Pipeline : public IntrusiveCounterUnsigned {
+class Pipeline {
 public:
     typedef std::list<boost::intrusive_ptr<DocumentSource>> SourceContainer;
+
+    /**
+     * This class will ensure a Pipeline is disposed before it is deleted.
+     */
+    class Deleter {
+    public:
+        /**
+         * Constructs an empty deleter. Useful for creating a
+         * unique_ptr<Pipeline, Pipeline::Deleter> without populating it.
+         */
+        Deleter() {}
+
+        explicit Deleter(OperationContext* opCtx) : _opCtx(opCtx) {}
+
+        /**
+         * If an owner of a std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> wants to assume
+         * responsibility for calling PlanExecutor::dispose(), they can call dismissDisposal(). If
+         * dismissed, a Deleter will not call dispose() when deleting the PlanExecutor.
+         */
+        void dismissDisposal() {
+            _dismissed = true;
+        }
+
+        /**
+         * Calls dispose() on 'pipeline', unless this Deleter has been dismissed.
+         */
+        void operator()(Pipeline* pipeline) {
+            // It is illegal to call this method on a default-constructed Deleter.
+            invariant(_opCtx);
+            if (!_dismissed) {
+                pipeline->dispose(_opCtx);
+            }
+            delete pipeline;
+        }
+
+    private:
+        OperationContext* _opCtx = nullptr;
+
+        bool _dismissed = false;
+    };
 
     /**
      * Parses a Pipeline from a BSONElement representing a list of DocumentSources. Returns a non-OK
@@ -65,7 +105,7 @@ public:
      * will not be used during execution of the pipeline. Doing so may cause comparisons made during
      * parse-time to return the wrong results.
      */
-    static StatusWith<boost::intrusive_ptr<Pipeline>> parse(
+    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> parse(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -75,7 +115,7 @@ public:
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
      * is present but is not the last stage.
      */
-    static StatusWith<boost::intrusive_ptr<Pipeline>> create(
+    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> create(
         SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -104,15 +144,25 @@ public:
     void reattachToOperationContext(OperationContext* opCtx);
 
     /**
-      Split the current Pipeline into a Pipeline for each shard, and
-      a Pipeline that combines the results within mongos.
+     * Releases any resources held by this pipeline such as PlanExecutors or in-memory structures.
+     * Must be called before deleting a Pipeline.
+     *
+     * There are multiple cleanup scenarios:
+     *  - This Pipeline will only ever use one OperationContext. In this case the Pipeline::Deleter
+     *    will automatically call dispose() before deleting the Pipeline, and the owner need not
+     *    call dispose().
+     *  - This Pipeline may use multiple OperationContexts over its lifetime. In this case it
+     *    is the owner's responsibility to call dispose() with a valid OperationContext before
+     *    deleting the Pipeline.
+     */
+    void dispose(OperationContext* opCtx);
 
-      This permanently alters this pipeline for the merging operation.
-
-      @returns the Spec for the pipeline command that should be sent
-        to the shards
+    /**
+     * Split the current Pipeline into a Pipeline for each shard, and a Pipeline that combines the
+     * results within mongos. This permanently alters this pipeline for the merging operation, and
+     * returns a Pipeline object that should be executed on each targeted shard.
     */
-    boost::intrusive_ptr<Pipeline> splitForSharded();
+    std::unique_ptr<Pipeline, Pipeline::Deleter> splitForSharded();
 
     /** If the pipeline starts with a $match, return its BSON predicate.
      *  Returns empty BSON if the first stage isn't $match.
@@ -164,14 +214,12 @@ public:
         return _sources;
     }
 
-    /*
-      PipelineD is a "sister" class that has additional functionality
-      for the Pipeline.  It exists because of linkage requirements.
-      Pipeline needs to function in mongod and mongos.  PipelineD
-      contains extra functionality required in mongod, and which can't
-      appear in mongos because the required symbols are unavailable
-      for linking there.  Consider PipelineD to be an extension of this
-      class for mongod only.
+    /**
+     * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists
+     * because of linkage requirements. Pipeline needs to function in mongod and mongos. PipelineD
+     * contains extra functionality required in mongod, and which can't appear in mongos because the
+     * required symbols are unavailable for linking there. Consider PipelineD to be an extension of
+     * this class for mongod only.
      */
     friend class PipelineD;
 
@@ -189,12 +237,20 @@ private:
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
     Pipeline(SourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
 
+    ~Pipeline();
+
     /**
      * Stitch together the source pointers by calling setSource() for each source in '_sources'.
      * This function must be called any time the order of stages within the pipeline changes, e.g.
      * in optimizePipeline().
      */
     void stitch();
+
+    /**
+     * Reset all stages' child pointers to nullptr. Used to prevent dangling pointers during the
+     * optimization process, where we might swap or destroy stages.
+     */
+    void unstitch();
 
     /**
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
@@ -205,5 +261,6 @@ private:
     SourceContainer _sources;
 
     boost::intrusive_ptr<ExpressionContext> pCtx;
+    bool _disposed = false;
 };
 }  // namespace mongo

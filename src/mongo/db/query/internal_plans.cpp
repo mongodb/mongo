@@ -43,12 +43,13 @@
 
 namespace mongo {
 
-std::unique_ptr<PlanExecutor> InternalPlanner::collectionScan(OperationContext* opCtx,
-                                                              StringData ns,
-                                                              Collection* collection,
-                                                              PlanExecutor::YieldPolicy yieldPolicy,
-                                                              const Direction direction,
-                                                              const RecordId startLoc) {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
+    OperationContext* opCtx,
+    StringData ns,
+    Collection* collection,
+    PlanExecutor::YieldPolicy yieldPolicy,
+    const Direction direction,
+    const RecordId startLoc) {
     std::unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
 
     if (NULL == collection) {
@@ -71,7 +72,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::collectionScan(OperationContext* 
     return std::move(statusWithPlanExecutor.getValue());
 }
 
-std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithCollectionScan(
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithCollectionScan(
     OperationContext* opCtx,
     Collection* collection,
     const DeleteStageParams& params,
@@ -91,15 +92,16 @@ std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithCollectionScan(
 }
 
 
-std::unique_ptr<PlanExecutor> InternalPlanner::indexScan(OperationContext* opCtx,
-                                                         const Collection* collection,
-                                                         const IndexDescriptor* descriptor,
-                                                         const BSONObj& startKey,
-                                                         const BSONObj& endKey,
-                                                         BoundInclusion boundInclusion,
-                                                         PlanExecutor::YieldPolicy yieldPolicy,
-                                                         Direction direction,
-                                                         int options) {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
+    OperationContext* opCtx,
+    const Collection* collection,
+    const IndexDescriptor* descriptor,
+    const BSONObj& startKey,
+    const BSONObj& endKey,
+    BoundInclusion boundInclusion,
+    PlanExecutor::YieldPolicy yieldPolicy,
+    Direction direction,
+    int options) {
     auto ws = stdx::make_unique<WorkingSet>();
 
     std::unique_ptr<PlanStage> root = _indexScan(opCtx,
@@ -118,7 +120,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::indexScan(OperationContext* opCtx
     return std::move(executor.getValue());
 }
 
-std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithIndexScan(
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithIndexScan(
     OperationContext* opCtx,
     Collection* collection,
     const DeleteStageParams& params,
@@ -148,7 +150,7 @@ std::unique_ptr<PlanExecutor> InternalPlanner::deleteWithIndexScan(
     return std::move(executor.getValue());
 }
 
-std::unique_ptr<PlanExecutor> InternalPlanner::updateWithIdHack(
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
     OperationContext* opCtx,
     Collection* collection,
     const UpdateStageParams& params,

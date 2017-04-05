@@ -46,7 +46,6 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetNextResult getNext() final;
-    void dispose() final;
     const char* getSourceName() const final;
 
     /**
@@ -81,6 +80,9 @@ public:
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+protected:
+    void doDispose() final;
 
 private:
     DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

@@ -94,7 +94,8 @@ public:
      * Given a match expression, represented as the BSON object 'filterObj', create a PlanExecutor
      * capable of executing a simple collection scan.
      */
-    unique_ptr<PlanExecutor> makeCollScanExec(Collection* coll, BSONObj& filterObj) {
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(Collection* coll,
+                                                                     BSONObj& filterObj) {
         CollectionScanParams csparams;
         csparams.collection = coll;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -134,10 +135,11 @@ public:
      *
      * Returns a PlanExecutor capable of executing an index scan
      * over the specified index with the specified bounds.
-     *
-     * The caller takes ownership of the returned PlanExecutor*.
      */
-    PlanExecutor* makeIndexScanExec(Database* db, BSONObj& indexSpec, int start, int end) {
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIndexScanExec(Database* db,
+                                                                      BSONObj& indexSpec,
+                                                                      int start,
+                                                                      int end) {
         // Build the index scan stage.
         IndexScanParams ixparams;
         ixparams.descriptor = getIndex(db, indexSpec);
@@ -168,7 +170,7 @@ public:
                                                          coll,
                                                          PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        return statusWithPlanExecutor.getValue().release();
+        return std::move(statusWithPlanExecutor.getValue());
     }
 
     size_t numCursors() {
@@ -177,24 +179,6 @@ public:
         if (!collection)
             return 0;
         return collection->getCursorManager()->numCursors();
-    }
-
-    void registerExec(PlanExecutor* exec) {
-        // TODO: This is not correct (create collection under S-lock)
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        WriteUnitOfWork wunit(&_opCtx);
-        Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss);
-        collection->getCursorManager()->registerExecutor(exec);
-        wunit.commit();
-    }
-
-    void deregisterExec(PlanExecutor* exec) {
-        // TODO: This is not correct (create collection under S-lock)
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        WriteUnitOfWork wunit(&_opCtx);
-        Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss);
-        collection->getCursorManager()->deregisterExecutor(exec);
-        wunit.commit();
     }
 
 protected:
@@ -227,8 +211,7 @@ public:
         BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
         Collection* coll = ctx.getCollection();
-        unique_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
-        registerExec(exec.get());
+        auto exec = makeCollScanExec(coll, filterObj);
 
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -237,8 +220,6 @@ public:
         // After dropping the collection, the plan executor should be dead.
         dropCollection();
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
-
-        deregisterExec(exec.get());
     }
 };
 
@@ -255,8 +236,7 @@ public:
         BSONObj indexSpec = BSON("a" << 1);
         addIndex(indexSpec);
 
-        unique_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
-        registerExec(exec.get());
+        auto exec = makeIndexScanExec(ctx.db(), indexSpec, 7, 10);
 
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -265,8 +245,6 @@ public:
         // After dropping the collection, the plan executor should be dead.
         dropCollection();
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
-
-        deregisterExec(exec.get());
     }
 };
 
@@ -293,8 +271,8 @@ public:
 
         // Create an "inner" plan executor and register it with the cursor manager so that it can
         // get notified when the collection is dropped.
-        unique_ptr<PlanExecutor> innerExec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
-        registerExec(innerExec.get());
+        unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
+            makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
 
         // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
         // in the pipeline.
@@ -304,29 +282,20 @@ public:
 
         // Create the output PlanExecutor that pulls results from the pipeline.
         auto ws = make_unique<WorkingSet>();
-        auto proxy = make_unique<PipelineProxyStage>(&_opCtx, pipeline, ws.get());
+        auto proxy = make_unique<PipelineProxyStage>(&_opCtx, std::move(pipeline), ws.get());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
+            &_opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        unique_ptr<PlanExecutor> outerExec = std::move(statusWithPlanExecutor.getValue());
-
-        // Register the "outer" plan executor with the cursor manager so it can get notified when
-        // the collection is dropped.
-        registerExec(outerExec.get());
+        auto outerExec = std::move(statusWithPlanExecutor.getValue());
 
         dropCollection();
 
         // Verify that the aggregation pipeline returns an error because its "inner" plan executor
         // has been killed due to the collection being dropped.
-        ASSERT_THROWS_CODE(pipeline->getNext(), UserException, ErrorCodes::QueryPlanKilled);
-
-        // Verify that the "outer" plan executor has been killed due to the collection being
-        // dropped.
         BSONObj objOut;
-        ASSERT_EQUALS(PlanExecutor::DEAD, outerExec->getNext(&objOut, nullptr));
-
-        deregisterExec(outerExec.get());
+        ASSERT_THROWS_CODE(
+            outerExec->getNext(&objOut, nullptr), UserException, ErrorCodes::QueryPlanKilled);
     }
 };
 
@@ -388,7 +357,7 @@ public:
         BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
         Collection* coll = ctx.getCollection();
-        unique_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
+        auto exec = makeCollScanExec(coll, filterObj);
 
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -415,7 +384,7 @@ public:
         addIndex(indexSpec);
 
         BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-        unique_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 2, 5));
+        auto exec = makeIndexScanExec(ctx.db(), indexSpec, 2, 5);
 
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -435,7 +404,10 @@ namespace ClientCursor {
 using mongo::ClientCursor;
 
 /**
- * Test invalidation of ClientCursor.
+ * Tests that invalidating a cursor without dropping the collection while the cursor is not in use
+ * will keep the cursor registered. After being invalidated, pinning the cursor should take
+ * ownership of the cursor and calling getNext() on its PlanExecutor should return an error
+ * including the error message.
  */
 class Invalidate : public PlanExecutorBase {
 public:
@@ -449,19 +421,62 @@ public:
         auto exec = makeCollScanExec(coll, filterObj);
 
         // Make a client cursor from the plan executor.
-        coll->getCursorManager()->registerCursor({std::move(exec), nss, {}, false, BSONObj()});
+        auto cursorPin = coll->getCursorManager()->registerCursor(
+            &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
 
-        // There should be one cursor before invalidation,
-        // and zero cursors after invalidation.
+        auto cursorId = cursorPin.getCursor()->cursorid();
+        cursorPin.release();
+
         ASSERT_EQUALS(1U, numCursors());
-        coll->getCursorManager()->invalidateAll(false, "Invalidate Test");
+        auto invalidateReason = "Invalidate Test";
+        const bool collectionGoingAway = false;
+        coll->getCursorManager()->invalidateAll(&_opCtx, collectionGoingAway, invalidateReason);
+        // Since the collection is not going away, the cursor should remain open, but be killed.
+        ASSERT_EQUALS(1U, numCursors());
+
+        // Pinning a killed cursor should result in an error and clean up the cursor.
+        ASSERT_EQ(ErrorCodes::QueryPlanKilled,
+                  coll->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
         ASSERT_EQUALS(0U, numCursors());
     }
 };
 
 /**
- * Test that pinned client cursors persist even after
- * invalidation.
+ * Tests that invalidating a cursor and dropping the collection while the cursor is not in use will
+ * not keep the cursor registered.
+ */
+class InvalidateWithDrop : public PlanExecutorBase {
+public:
+    void run() {
+        OldClientWriteContext ctx(&_opCtx, nss.ns());
+        insert(BSON("a" << 1 << "b" << 1));
+
+        BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
+
+        Collection* coll = ctx.getCollection();
+        auto exec = makeCollScanExec(coll, filterObj);
+
+        // Make a client cursor from the plan executor.
+        auto cursorPin = coll->getCursorManager()->registerCursor(
+            &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
+
+        auto cursorId = cursorPin.getCursor()->cursorid();
+        cursorPin.release();
+
+        ASSERT_EQUALS(1U, numCursors());
+        auto invalidateReason = "Invalidate Test";
+        const bool collectionGoingAway = true;
+        coll->getCursorManager()->invalidateAll(&_opCtx, collectionGoingAway, invalidateReason);
+        // Since the collection is going away, the cursor should not remain open.
+        ASSERT_EQ(ErrorCodes::CursorNotFound,
+                  coll->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
+        ASSERT_EQUALS(0U, numCursors());
+    }
+};
+
+/**
+ * Tests that invalidating a cursor while it is in use will deregister it from the cursor manager,
+ * transferring ownership to the pinned cursor.
  */
 class InvalidatePinned : public PlanExecutorBase {
 public:
@@ -476,13 +491,13 @@ public:
 
         // Make a client cursor from the plan executor.
         auto ccPin = collection->getCursorManager()->registerCursor(
-            {std::move(exec), nss, {}, false, BSONObj()});
+            &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
 
         // If the cursor is pinned, it sticks around, even after invalidation.
         ASSERT_EQUALS(1U, numCursors());
         const std::string invalidateReason("InvalidatePinned Test");
-        collection->getCursorManager()->invalidateAll(false, invalidateReason);
-        ASSERT_EQUALS(1U, numCursors());
+        collection->getCursorManager()->invalidateAll(&_opCtx, false, invalidateReason);
+        ASSERT_EQUALS(0U, numCursors());
 
         // The invalidation should have killed the plan executor.
         BSONObj objOut;
@@ -499,10 +514,9 @@ public:
 };
 
 /**
- * Test that client cursors time out and get
- * deleted.
+ * Test that client cursors time out and get deleted.
  */
-class Timeout : public PlanExecutorBase {
+class ShouldTimeout : public PlanExecutorBase {
 public:
     void run() {
         {
@@ -519,7 +533,41 @@ public:
 
             // Make a client cursor from the plan executor.
             collection->getCursorManager()->registerCursor(
-                {std::move(exec), nss, {}, false, BSONObj()});
+                &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
+        }
+
+        // There should be one cursor before timeout,
+        // and zero cursors after timeout.
+        ASSERT_EQUALS(1U, numCursors());
+        CursorManager::timeoutCursorsGlobal(&_opCtx, 600001);
+        ASSERT_EQUALS(0U, numCursors());
+    }
+};
+
+/**
+ * Test that client cursors which have been marked as killed time out and get deleted.
+ */
+class KilledCursorsShouldTimeout : public PlanExecutorBase {
+public:
+    void run() {
+        {
+            OldClientWriteContext ctx(&_opCtx, nss.ns());
+            insert(BSON("a" << 1 << "b" << 1));
+        }
+
+        {
+            AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
+            Collection* collection = ctx.getCollection();
+
+            BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
+            auto exec = makeCollScanExec(collection, filterObj);
+
+            // Make a client cursor from the plan executor, and immediately kill it.
+            auto* cursorManager = collection->getCursorManager();
+            cursorManager->registerCursor(&_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
+            const bool collectionGoingAway = false;
+            cursorManager->invalidateAll(
+                &_opCtx, collectionGoingAway, "KilledCursorsShouldTimeoutTest");
         }
 
         // There should be one cursor before timeout,
@@ -543,8 +591,10 @@ public:
         add<SnapshotControl>();
         add<SnapshotTest>();
         add<ClientCursor::Invalidate>();
+        add<ClientCursor::InvalidateWithDrop>();
         add<ClientCursor::InvalidatePinned>();
-        add<ClientCursor::Timeout>();
+        add<ClientCursor::ShouldTimeout>();
+        add<ClientCursor::KilledCursorsShouldTimeout>();
     }
 };
 

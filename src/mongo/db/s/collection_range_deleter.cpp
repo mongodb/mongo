@@ -181,7 +181,7 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
                                                min,
                                                max,
                                                BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanExecutor::YIELD_MANUAL,
+                                               PlanExecutor::NO_YIELD,
                                                InternalPlanner::FORWARD,
                                                InternalPlanner::IXSCAN_FETCH);
         RecordId rloc;

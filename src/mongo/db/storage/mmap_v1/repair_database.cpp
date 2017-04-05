@@ -448,7 +448,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
         repairFileDeleter->success();
 
     // Close the database so we can rename/delete the original data files
-    dbHolder().close(opCtx, dbName);
+    dbHolder().close(opCtx, dbName, "database closed for repair");
 
     if (backupOriginalFiles) {
         _renameForBackup(dbName, reservedPath);

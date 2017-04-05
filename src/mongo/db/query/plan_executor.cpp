@@ -55,12 +55,11 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
-using stdx::make_unique;
 
 namespace {
 
 namespace {
-MONGO_FP_DECLARE(planExecutorAlwaysDead);
+MONGO_FP_DECLARE(planExecutorAlwaysFails);
 }  // namespace
 
 /**
@@ -85,21 +84,23 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
 }
 
 // static
-StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
-                                                        unique_ptr<WorkingSet> ws,
-                                                        unique_ptr<PlanStage> rt,
-                                                        const Collection* collection,
-                                                        YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    OperationContext* opCtx,
+    unique_ptr<WorkingSet> ws,
+    unique_ptr<PlanStage> rt,
+    const Collection* collection,
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(
         opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, {}, yieldPolicy);
 }
 
 // static
-StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
-                                                        unique_ptr<WorkingSet> ws,
-                                                        unique_ptr<PlanStage> rt,
-                                                        NamespaceString nss,
-                                                        YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    OperationContext* opCtx,
+    unique_ptr<WorkingSet> ws,
+    unique_ptr<PlanStage> rt,
+    NamespaceString nss,
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(rt),
@@ -111,24 +112,26 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
 }
 
 // static
-StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
-                                                        unique_ptr<WorkingSet> ws,
-                                                        unique_ptr<PlanStage> rt,
-                                                        unique_ptr<CanonicalQuery> cq,
-                                                        const Collection* collection,
-                                                        YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    OperationContext* opCtx,
+    unique_ptr<WorkingSet> ws,
+    unique_ptr<PlanStage> rt,
+    unique_ptr<CanonicalQuery> cq,
+    const Collection* collection,
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(
         opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, {}, yieldPolicy);
 }
 
 // static
-StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
-                                                        unique_ptr<WorkingSet> ws,
-                                                        unique_ptr<PlanStage> rt,
-                                                        unique_ptr<QuerySolution> qs,
-                                                        unique_ptr<CanonicalQuery> cq,
-                                                        const Collection* collection,
-                                                        YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    OperationContext* opCtx,
+    unique_ptr<WorkingSet> ws,
+    unique_ptr<PlanStage> rt,
+    unique_ptr<QuerySolution> qs,
+    unique_ptr<CanonicalQuery> cq,
+    const Collection* collection,
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(rt),
@@ -140,24 +143,29 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
 }
 
 // static
-StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
-                                                        unique_ptr<WorkingSet> ws,
-                                                        unique_ptr<PlanStage> rt,
-                                                        unique_ptr<QuerySolution> qs,
-                                                        unique_ptr<CanonicalQuery> cq,
-                                                        const Collection* collection,
-                                                        NamespaceString nss,
-                                                        YieldPolicy yieldPolicy) {
-    unique_ptr<PlanExecutor> exec(new PlanExecutor(opCtx,
-                                                   std::move(ws),
-                                                   std::move(rt),
-                                                   std::move(qs),
-                                                   std::move(cq),
-                                                   collection,
-                                                   std::move(nss)));
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
+    OperationContext* opCtx,
+    unique_ptr<WorkingSet> ws,
+    unique_ptr<PlanStage> rt,
+    unique_ptr<QuerySolution> qs,
+    unique_ptr<CanonicalQuery> cq,
+    const Collection* collection,
+    NamespaceString nss,
+    YieldPolicy yieldPolicy) {
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(
+        new PlanExecutor(opCtx,
+                         std::move(ws),
+                         std::move(rt),
+                         std::move(qs),
+                         std::move(cq),
+                         collection,
+                         std::move(nss),
+                         yieldPolicy),
+        PlanExecutor::Deleter(opCtx, collection));
 
     // Perform plan selection, if necessary.
-    Status status = exec->pickBestPlan(yieldPolicy, collection);
+    Status status = exec->pickBestPlan(collection);
     if (!status.isOK()) {
         return status;
     }
@@ -171,14 +179,16 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
                            unique_ptr<QuerySolution> qs,
                            unique_ptr<CanonicalQuery> cq,
                            const Collection* collection,
-                           NamespaceString nss)
+                           NamespaceString nss,
+                           YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
       _nss(std::move(nss)),
-      _yieldPolicy(new PlanYieldPolicy(this, YIELD_MANUAL)) {
+      // There's no point in yielding if the collection doesn't exist.
+      _yieldPolicy(new PlanYieldPolicy(this, collection ? yieldPolicy : NO_YIELD)) {
     // We may still need to initialize _nss from either collection or _cq.
     if (!_nss.isEmpty()) {
         return;  // We already have an _nss set, so there's nothing more to do.
@@ -186,17 +196,18 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
 
     if (collection) {
         _nss = collection->ns();
+        if (_yieldPolicy->canReleaseLocksDuringExecution()) {
+            collection->getCursorManager()->registerExecutor(this);
+            _registered = true;
+        }
     } else {
         invariant(_cq);
         _nss = _cq->getQueryRequest().nss();
     }
 }
 
-Status PlanExecutor::pickBestPlan(YieldPolicy policy, const Collection* collection) {
+Status PlanExecutor::pickBestPlan(const Collection* collection) {
     invariant(_currentState == kUsable);
-    // For YIELD_AUTO, this will both set an auto yield policy on the PlanExecutor and
-    // register it to receive notifications.
-    this->setYieldPolicy(policy, collection);
 
     // First check if we need to do subplanning.
     PlanStage* foundStage = getStageByType(_root.get(), STAGE_SUBPLAN);
@@ -226,7 +237,9 @@ Status PlanExecutor::pickBestPlan(YieldPolicy policy, const Collection* collecti
     return Status::OK();
 }
 
-PlanExecutor::~PlanExecutor() {}
+PlanExecutor::~PlanExecutor() {
+    invariant(_currentState = kDisposed);
+}
 
 // static
 string PlanExecutor::statestr(ExecState s) {
@@ -295,7 +308,7 @@ void PlanExecutor::saveState() {
     // boundaries.
     WorkingSetCommon::prepareForSnapshotChange(_workingSet.get());
 
-    if (!killed()) {
+    if (!isMarkedAsKilled()) {
         _root->saveState();
     }
     _currentState = kSaved;
@@ -305,7 +318,7 @@ bool PlanExecutor::restoreState() {
     try {
         return restoreStateWithoutRetrying();
     } catch (const WriteConflictException& wce) {
-        if (!_yieldPolicy->allowedToYield())
+        if (!_yieldPolicy->canAutoYield())
             throw;
 
         // Handles retries by calling restoreStateWithoutRetrying() in a loop.
@@ -316,12 +329,12 @@ bool PlanExecutor::restoreState() {
 bool PlanExecutor::restoreStateWithoutRetrying() {
     invariant(_currentState == kSaved);
 
-    if (!killed()) {
+    if (!isMarkedAsKilled()) {
         _root->restoreState();
     }
 
     _currentState = kUsable;
-    return !killed();
+    return !isMarkedAsKilled();
 }
 
 void PlanExecutor::detachFromOperationContext() {
@@ -345,7 +358,7 @@ void PlanExecutor::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 void PlanExecutor::invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    if (!killed()) {
+    if (!isMarkedAsKilled()) {
         _root->invalidate(opCtx, dl, type);
     }
 }
@@ -369,17 +382,17 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
 }
 
 PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut) {
-    MONGO_FAIL_POINT_BLOCK(planExecutorAlwaysDead, customKill) {
-        const BSONObj& data = customKill.getData();
-        BSONElement customKillNS = data["namespace"];
-        if (!customKillNS || _nss.ns() == customKillNS.str()) {
-            deregisterExec();
-            kill("hit planExecutorAlwaysDead fail point");
-        }
+    if (MONGO_FAIL_POINT(planExecutorAlwaysFails)) {
+        Status status(ErrorCodes::OperationFailed,
+                      str::stream() << "PlanExecutor hit planExecutorAlwaysFails fail point");
+        *objOut =
+            Snapshotted<BSONObj>(SnapshotId(), WorkingSetCommon::buildMemberStatusObject(status));
+
+        return PlanExecutor::FAILURE;
     }
 
     invariant(_currentState == kUsable);
-    if (killed()) {
+    if (isMarkedAsKilled()) {
         if (NULL != objOut) {
             Status status(ErrorCodes::OperationFailed,
                           str::stream() << "Operation aborted because: " << *_killReason);
@@ -415,7 +428,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             if (!_yieldPolicy->yield(fetcher.get())) {
                 // A return of false from a yield should only happen if we've been killed during the
                 // yield.
-                invariant(killed());
+                invariant(isMarkedAsKilled());
 
                 if (NULL != objOut) {
                     Status status(ErrorCodes::OperationFailed,
@@ -475,7 +488,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
             if (id == WorkingSet::INVALID_ID) {
-                if (!_yieldPolicy->allowedToYield())
+                if (!_yieldPolicy->canAutoYield())
                     throw WriteConflictException();
                 CurOp::get(_opCtx)->debug().writeConflicts++;
                 writeConflictsInARow++;
@@ -491,7 +504,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
             }
 
             // If we're allowed to, we will yield next time through the loop.
-            if (_yieldPolicy->allowedToYield())
+            if (_yieldPolicy->canAutoYield())
                 _yieldPolicy->forceYield();
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
@@ -513,23 +526,29 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
 
 bool PlanExecutor::isEOF() {
     invariant(_currentState == kUsable);
-    return killed() || (_stash.empty() && _root->isEOF());
+    return isMarkedAsKilled() || (_stash.empty() && _root->isEOF());
 }
 
-void PlanExecutor::registerExec(const Collection* collection) {
-    // There's no need to register a PlanExecutor for which the underlying collection
-    // doesn't exist.
-    if (collection) {
-        _safety.reset(new ScopedExecutorRegistration(this, collection));
-    }
-}
-
-void PlanExecutor::deregisterExec() {
-    _safety.reset();
-}
-
-void PlanExecutor::kill(string reason) {
+void PlanExecutor::markAsKilled(string reason) {
     _killReason = std::move(reason);
+}
+
+void PlanExecutor::dispose(OperationContext* opCtx, CursorManager* cursorManager) {
+    if (_currentState == kDisposed) {
+        return;
+    }
+
+    // If we are registered with the CursorManager we need to be sure to deregister ourselves.
+    // However, if we have been killed we should not attempt to deregister ourselves, since the
+    // caller of markAsKilled() will have done that already, and the CursorManager may no longer
+    // exist. Note that the caller's collection lock prevents us from being marked as killed during
+    // this method, since any interruption event requires a lock in at least MODE_IX.
+    if (cursorManager && _registered && !isMarkedAsKilled()) {
+        dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IS));
+        cursorManager->deregisterExecutor(this);
+    }
+    _root->dispose(opCtx);
+    _currentState = kDisposed;
 }
 
 Status PlanExecutor::executePlan() {
@@ -541,7 +560,7 @@ Status PlanExecutor::executePlan() {
     }
 
     if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-        if (killed()) {
+        if (isMarkedAsKilled()) {
             return Status(ErrorCodes::QueryPlanKilled,
                           str::stream() << "Operation aborted because: " << *_killReason);
         }
@@ -552,56 +571,33 @@ Status PlanExecutor::executePlan() {
                                     << PlanExecutor::statestr(state));
     }
 
-    invariant(!killed());
+    invariant(!isMarkedAsKilled());
     invariant(PlanExecutor::IS_EOF == state);
     return Status::OK();
 }
 
-void PlanExecutor::setYieldPolicy(YieldPolicy policy,
-                                  const Collection* collection,
-                                  bool registerExecutor) {
-    if (!collection) {
-        // If the collection doesn't exist, then there's no need to yield at all.
-        invariant(!_yieldPolicy->allowedToYield());
-        return;
-    }
-
-    _yieldPolicy->setPolicy(policy);
-    if (PlanExecutor::YIELD_AUTO == policy) {
-        // Runners that yield automatically generally need to be registered so that
-        // after yielding, they receive notifications of events like deletions and
-        // index drops. The only exception is that a few PlanExecutors get registered
-        // by ClientCursor instead of being registered here. This is unneeded if we only do
-        // partial "yields" for WriteConflict retrying.
-        if (registerExecutor) {
-            this->registerExec(collection);
-        }
-    }
-}
 
 void PlanExecutor::enqueue(const BSONObj& obj) {
     _stash.push(obj.getOwned());
 }
 
 //
-// ScopedExecutorRegistration
+// PlanExecutor::Deleter
 //
 
-// PlanExecutor::ScopedExecutorRegistration
-PlanExecutor::ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec,
-                                                                     const Collection* collection)
-    : _exec(exec), _collection(collection) {
-    invariant(_collection);
-    _collection->getCursorManager()->registerExecutor(_exec);
-}
+PlanExecutor::Deleter::Deleter(OperationContext* opCtx, const Collection* collection)
+    : _opCtx(opCtx), _cursorManager(collection ? collection->getCursorManager() : nullptr) {}
 
-PlanExecutor::ScopedExecutorRegistration::~ScopedExecutorRegistration() {
-    if (_exec->killed()) {
-        // If the plan executor has been killed, then it's possible that the collection
-        // no longer exists.
-        return;
+void PlanExecutor::Deleter::operator()(PlanExecutor* execPtr) {
+    try {
+        invariant(_opCtx);  // It is illegal to invoke operator() on a default constructed Deleter.
+        if (!_dismissed) {
+            execPtr->dispose(_opCtx, _cursorManager);
+        }
+        delete execPtr;
+    } catch (...) {
+        std::terminate();
     }
-    _collection->getCursorManager()->deregisterExecutor(_exec);
 }
 
 }  // namespace mongo

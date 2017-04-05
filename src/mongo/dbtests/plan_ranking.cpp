@@ -133,7 +133,7 @@ public:
             _mps->addPlan(solutions[i], root, ws.get());
         }
         // This is what sets a backup plan, should we test for it.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
                                     _opCtx.getServiceContext()->getFastClockSource());
         _mps->pickBestPlan(&yieldPolicy);
         ASSERT(_mps->bestPlanChosen());

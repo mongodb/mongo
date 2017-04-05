@@ -119,12 +119,12 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
     auto statusWithPlanExecutor =
-        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_MANUAL, options);
+        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::NO_YIELD, options);
     massert(17245,
             "Could not get executor for query " + query.toString(),
             statusWithPlanExecutor.isOK());
 
-    unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
     PlanExecutor::ExecState state;
     BSONObj obj;
     RecordId loc;
@@ -182,8 +182,8 @@ RecordId Helpers::findById(OperationContext* opCtx,
 
 bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        opCtx, ns, ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
+    auto exec =
+        InternalPlanner::collectionScan(opCtx, ns, ctx.getCollection(), PlanExecutor::NO_YIELD);
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
     CurOp::get(opCtx)->done();
@@ -201,11 +201,8 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
 
 bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) {
     AutoGetCollectionForReadCommand autoColl(opCtx, NamespaceString(ns));
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(opCtx,
-                                                                  ns,
-                                                                  autoColl.getCollection(),
-                                                                  PlanExecutor::YIELD_MANUAL,
-                                                                  InternalPlanner::BACKWARD));
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, ns, autoColl.getCollection(), PlanExecutor::NO_YIELD, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
     // Non-yielding collection scans from InternalPlanner will never error.
@@ -353,17 +350,15 @@ long long Helpers::removeRange(OperationContext* opCtx,
                 return -1;
             }
 
-            unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(opCtx,
-                                           collection,
-                                           desc,
-                                           min,
-                                           max,
-                                           boundInclusion,
-                                           PlanExecutor::YIELD_MANUAL,
-                                           InternalPlanner::FORWARD,
-                                           InternalPlanner::IXSCAN_FETCH));
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
+            auto exec = InternalPlanner::indexScan(opCtx,
+                                                   collection,
+                                                   desc,
+                                                   min,
+                                                   max,
+                                                   boundInclusion,
+                                                   PlanExecutor::YIELD_AUTO,
+                                                   InternalPlanner::FORWARD,
+                                                   InternalPlanner::IXSCAN_FETCH);
 
             RecordId rloc;
             BSONObj obj;
@@ -469,7 +464,7 @@ void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& ns
     OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
     Collection* collection = context.db() ? context.db()->getCollection(opCtx, nss) : nullptr;
-    deleteObjects(opCtx, collection, nss, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
+    deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 
 Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {

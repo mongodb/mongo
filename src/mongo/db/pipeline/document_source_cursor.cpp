@@ -64,20 +64,6 @@ DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
     return std::move(out);
 }
 
-void DocumentSourceCursor::dispose() {
-    _currentBatch.clear();
-    if (!_exec) {
-        return;
-    }
-
-    // We must hold a collection lock to destroy a PlanExecutor to ensure the CursorManager will
-    // still exist and can be safely told to deregister the PlanExecutor.
-    invariant(pExpCtx->opCtx);
-    AutoGetCollection autoColl(pExpCtx->opCtx, _exec->nss(), MODE_IS);
-    _exec.reset();
-    _rangePreserver.release();
-}
-
 void DocumentSourceCursor::loadBatch() {
     if (!_exec) {
         // No more documents.
@@ -85,45 +71,46 @@ void DocumentSourceCursor::loadBatch() {
         return;
     }
 
-    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
-    _exec->restoreState();
-
-    int memUsageBytes = 0;
-    BSONObj obj;
     PlanExecutor::ExecState state;
+    BSONObj resultObj;
     {
-        ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
+        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
+        _exec->restoreState();
 
-        while ((state = _exec->getNext(&obj, nullptr)) == PlanExecutor::ADVANCED) {
-            if (_shouldProduceEmptyDocs) {
-                _currentBatch.push_back(Document());
-            } else if (_dependencies) {
-                _currentBatch.push_back(_dependencies->extractFields(obj));
-            } else {
-                _currentBatch.push_back(Document::fromBsonWithMetaData(obj));
-            }
+        int memUsageBytes = 0;
+        {
+            ON_BLOCK_EXIT([this] { recordPlanSummaryStats(); });
 
-            if (_limit) {
-                if (++_docsAddedToBatches == _limit->getLimit()) {
-                    break;
+            while ((state = _exec->getNext(&resultObj, nullptr)) == PlanExecutor::ADVANCED) {
+                if (_shouldProduceEmptyDocs) {
+                    _currentBatch.push_back(Document());
+                } else if (_dependencies) {
+                    _currentBatch.push_back(_dependencies->extractFields(resultObj));
+                } else {
+                    _currentBatch.push_back(Document::fromBsonWithMetaData(resultObj));
                 }
-                verify(_docsAddedToBatches < _limit->getLimit());
-            }
 
-            memUsageBytes += _currentBatch.back().getApproximateSize();
+                if (_limit) {
+                    if (++_docsAddedToBatches == _limit->getLimit()) {
+                        break;
+                    }
+                    verify(_docsAddedToBatches < _limit->getLimit());
+                }
 
-            if (memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
-                // End this batch and prepare PlanExecutor for yielding.
-                _exec->saveState();
-                return;
+                memUsageBytes += _currentBatch.back().getApproximateSize();
+
+                if (memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
+                    // End this batch and prepare PlanExecutor for yielding.
+                    _exec->saveState();
+                    return;
+                }
             }
         }
     }
 
     // If we got here, there won't be any more documents, so destroy our PlanExecutor. Note we can't
     // use dispose() since we want to keep the current batch.
-    _exec.reset();
-    _rangePreserver.release();
+    cleanupExecutor();
 
     switch (state) {
         case PlanExecutor::ADVANCED:
@@ -132,12 +119,12 @@ void DocumentSourceCursor::loadBatch() {
         case PlanExecutor::DEAD: {
             uasserted(ErrorCodes::QueryPlanKilled,
                       str::stream() << "collection or index disappeared when cursor yielded: "
-                                    << WorkingSetCommon::toStatusString(obj));
+                                    << WorkingSetCommon::toStatusString(resultObj));
         }
         case PlanExecutor::FAILURE: {
             uasserted(17285,
                       str::stream() << "cursor encountered an error: "
-                                    << WorkingSetCommon::toStatusString(obj));
+                                    << WorkingSetCommon::toStatusString(resultObj));
         }
         default:
             MONGO_UNREACHABLE;
@@ -226,12 +213,44 @@ void DocumentSourceCursor::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-DocumentSourceCursor::DocumentSourceCursor(Collection* collection,
-                                           std::unique_ptr<PlanExecutor> exec,
-                                           const intrusive_ptr<ExpressionContext>& pCtx)
+void DocumentSourceCursor::doDispose() {
+    _currentBatch.clear();
+    if (!_exec) {
+        // We've already properly disposed of our PlanExecutor.
+        return;
+    }
+    cleanupExecutor();
+}
+
+void DocumentSourceCursor::cleanupExecutor() {
+    invariant(_exec);
+    auto* opCtx = pExpCtx->opCtx;
+    // We need to be careful to not use AutoGetCollection here, since we only need the lock to
+    // protect potential access to the Collection's CursorManager, and AutoGetCollection may throw
+    // if this namespace has since turned into a view. Using Database::getCollection() will simply
+    // return nullptr if the collection has since turned into a view. In this case, '_exec' will
+    // already have been marked as killed when the collection was dropped, and we won't need to
+    // access the CursorManager to properly dispose of it.
+    AutoGetDb dbLock(opCtx, _exec->nss().db(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), MODE_IS);
+    auto collection = dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
+    auto cursorManager = collection ? collection->getCursorManager() : nullptr;
+    _exec->dispose(opCtx, cursorManager);
+    _exec.reset();
+    _rangePreserver.release();
+}
+
+DocumentSourceCursor::~DocumentSourceCursor() {
+    invariant(!_exec);  // '_exec' should have been cleaned up via dispose() before destruction.
+}
+
+DocumentSourceCursor::DocumentSourceCursor(
+    Collection* collection,
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+    const intrusive_ptr<ExpressionContext>& pCtx)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
-      _rangePreserver(collection),
+      _rangePreserver(pExpCtx->opCtx, collection),
       _exec(std::move(exec)),
       _outputSorts(_exec->getOutputSorts()) {
 
@@ -245,7 +264,7 @@ DocumentSourceCursor::DocumentSourceCursor(Collection* collection,
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     Collection* collection,
-    std::unique_ptr<PlanExecutor> exec,
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
     intrusive_ptr<DocumentSourceCursor> source(
         new DocumentSourceCursor(collection, std::move(exec), pExpCtx));

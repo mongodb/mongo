@@ -100,11 +100,8 @@ void DocumentSourceSort::serializeToArray(
     }
 }
 
-void DocumentSourceSort::dispose() {
+void DocumentSourceSort::doDispose() {
     _output.reset();
-    if (pSource) {
-        pSource->dispose();
-    }
 }
 
 long long DocumentSourceSort::getLimit() const {

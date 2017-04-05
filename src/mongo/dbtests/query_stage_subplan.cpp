@@ -131,7 +131,7 @@ public:
             new SubplanStage(&_opCtx, collection, &ws, plannerParams, cq.get()));
 
         // Plan selection should succeed due to falling back on regular planning.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
     }
 };
@@ -174,7 +174,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_opCtx, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Nothing is in the cache yet, so neither branch should have been planned from
@@ -232,7 +232,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_opCtx, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Nothing is in the cache yet, so neither branch should have been planned from
@@ -291,7 +291,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_opCtx, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Nothing is in the cache yet, so neither branch should have been planned from
@@ -548,7 +548,7 @@ public:
             new SubplanStage(&_opCtx, collection, &ws, plannerParams, cq.get()));
 
         // Plan selection should succeed due to falling back on regular planning.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         // Work the stage until it produces all results.
@@ -608,7 +608,7 @@ public:
         std::unique_ptr<SubplanStage> subplan(
             new SubplanStage(&_opCtx, collection, &ws, plannerParams, cq.get()));
 
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
         size_t numResults = 0;

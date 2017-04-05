@@ -242,7 +242,7 @@ Status repairDatabase(OperationContext* opCtx,
     }
 
     // Close the db to invalidate all current users and caches.
-    dbHolder().close(opCtx, dbName);
+    dbHolder().close(opCtx, dbName, "database closed for repair");
     ON_BLOCK_EXIT([&dbName, &opCtx] {
         try {
             // Open the db after everything finishes.

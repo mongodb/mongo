@@ -147,7 +147,7 @@ public:
             &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
                                     _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 
@@ -219,7 +219,7 @@ public:
             &_opCtx, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
 
         // This should succeed after triggering a replan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL,
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD,
                                     _opCtx.getServiceContext()->getFastClockSource());
         ASSERT_OK(cachedPlanStage.pickBestPlan(&yieldPolicy));
 

@@ -60,13 +60,6 @@ public:
         return allPrefixes(_sort);
     }
 
-    /**
-     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
-    void dispose() final;
-
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
@@ -121,6 +114,14 @@ public:
     boost::intrusive_ptr<DocumentSourceLimit> getLimitSrc() const {
         return limitSrc;
     }
+
+protected:
+    /**
+     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+    void doDispose() final;
 
 private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

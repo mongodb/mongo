@@ -87,7 +87,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) override {
         MONGO_UNREACHABLE;

@@ -178,7 +178,7 @@ public:
                                           str::stream() << "renameCollection failed: " << info};
     }
 
-    StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
         // 'expCtx' may represent the settings for an aggregation pipeline on a different namespace
@@ -205,7 +205,8 @@ public:
         auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
         uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
 
-        PipelineD::prepareCursorSource(autoColl.getCollection(), nullptr, pipeline.getValue());
+        PipelineD::prepareCursorSource(
+            autoColl.getCollection(), nullptr, pipeline.getValue().get());
 
         return pipeline;
     }
@@ -220,10 +221,8 @@ private:
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
  * percentage of the collection.
  */
-StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* collection,
-                                                                OperationContext* opCtx,
-                                                                long long sampleSize,
-                                                                long long numRecords) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorExecutor(
+    Collection* collection, OperationContext* opCtx, long long sampleSize, long long numRecords) {
     double kMaxSampleRatioForRandCursor = 0.05;
     if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
         return {nullptr};
@@ -290,7 +289,7 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
         opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
 }
 
-StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
     OperationContext* opCtx,
     Collection* collection,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -338,7 +337,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
 
 void PipelineD::prepareCursorSource(Collection* collection,
                                     const AggregationRequest* aggRequest,
-                                    const intrusive_ptr<Pipeline>& pipeline) {
+                                    Pipeline* pipeline) {
     auto expCtx = pipeline->getContext();
     dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(expCtx->ns.ns(), MODE_IS));
 
@@ -440,11 +439,11 @@ void PipelineD::prepareCursorSource(Collection* collection,
         collection, pipeline, expCtx, std::move(exec), deps, queryObj, sortObj, projForQuery);
 }
 
-StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(
     OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
-    const intrusive_ptr<Pipeline>& pipeline,
+    Pipeline* pipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
     const intrusive_ptr<DocumentSourceSort>& sortStage,
     const DepsTracker& deps,
@@ -514,7 +513,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
                                                               aggRequest,
                                                               plannerOpts);
 
-            std::unique_ptr<PlanExecutor> exec;
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             if (swExecutorSortAndProj.isOK()) {
                 // Success! We have a non-blocking sort and a covered projection.
                 exec = std::move(swExecutorSortAndProj.getValue());
@@ -573,9 +572,9 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
 }
 
 void PipelineD::addCursorSource(Collection* collection,
-                                const intrusive_ptr<Pipeline>& pipeline,
+                                Pipeline* pipeline,
                                 const intrusive_ptr<ExpressionContext>& expCtx,
-                                unique_ptr<PlanExecutor> exec,
+                                unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                 DepsTracker deps,
                                 const BSONObj& queryObj,
                                 const BSONObj& sortObj,
@@ -614,7 +613,7 @@ void PipelineD::addCursorSource(Collection* collection,
     pipeline->optimizePipeline();
 }
 
-std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline) {
+std::string PipelineD::getPlanSummaryStr(const Pipeline* pPipeline) {
     if (auto docSourceCursor =
             dynamic_cast<DocumentSourceCursor*>(pPipeline->_sources.front().get())) {
         return docSourceCursor->getPlanSummaryStr();
@@ -623,8 +622,7 @@ std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& p
     return "";
 }
 
-void PipelineD::getPlanSummaryStats(const boost::intrusive_ptr<Pipeline>& pPipeline,
-                                    PlanSummaryStats* statsOut) {
+void PipelineD::getPlanSummaryStats(const Pipeline* pPipeline, PlanSummaryStats* statsOut) {
     invariant(statsOut);
 
     if (auto docSourceCursor =

@@ -62,14 +62,7 @@ public:
         return true;
     }
 
-    /**
-     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwindSrc'
-     * field.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
-    void dispose() final;
 
     BSONObjSet getOutputSorts() final {
         return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.fullPath()});
@@ -115,6 +108,16 @@ public:
         _handlingUnwind = true;
     }
 
+protected:
+    void doDispose() final;
+
+    /**
+     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwindSrc'
+     * field.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,
@@ -152,7 +155,7 @@ private:
     // The following members are used to hold onto state across getNext() calls when
     // '_handlingUnwind' is true.
     long long _cursorIndex = 0;
-    boost::intrusive_ptr<Pipeline> _pipeline;
+    std::unique_ptr<Pipeline, Pipeline::Deleter> _pipeline;
     boost::optional<Document> _input;
     boost::optional<Document> _nextValue;
 };

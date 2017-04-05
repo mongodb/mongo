@@ -495,7 +495,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
         auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
         auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
 
-        std::unique_ptr<PlanExecutor> planExecutor;
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor;
         if (!indexName) {
             if (!startKey.isEmpty()) {
                 return {ErrorCodes::NoSuchKey,
@@ -509,12 +509,12 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             // Use collection scan.
             planExecutor = isFind
                 ? InternalPlanner::collectionScan(
-                      opCtx, nss.ns(), collection, PlanExecutor::YIELD_MANUAL, direction)
+                      opCtx, nss.ns(), collection, PlanExecutor::NO_YIELD, direction)
                 : InternalPlanner::deleteWithCollectionScan(
                       opCtx,
                       collection,
                       makeDeleteStageParamsForDeleteDocuments(),
-                      PlanExecutor::YIELD_MANUAL,
+                      PlanExecutor::NO_YIELD,
                       direction);
         } else {
             // Use index scan.
@@ -551,7 +551,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                              bounds.first,
                                              bounds.second,
                                              boundInclusion,
-                                             PlanExecutor::YIELD_MANUAL,
+                                             PlanExecutor::NO_YIELD,
                                              direction,
                                              InternalPlanner::IXSCAN_FETCH)
                 : InternalPlanner::deleteWithIndexScan(opCtx,
@@ -561,7 +561,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                        bounds.first,
                                                        bounds.second,
                                                        boundInclusion,
-                                                       PlanExecutor::YIELD_MANUAL,
+                                                       PlanExecutor::NO_YIELD,
                                                        direction);
         }
 
@@ -659,7 +659,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
     request.setUpsert(true);
     invariant(!request.isMulti());  // This follows from using an exact _id query.
     invariant(!request.shouldReturnAnyDocs());
-    invariant(PlanExecutor::YIELD_MANUAL == request.getYieldPolicy());
+    invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         // ParsedUpdate needs to be inside the write conflict retry loop because it contains

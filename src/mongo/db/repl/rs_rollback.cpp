@@ -539,8 +539,8 @@ void syncFixUp(OperationContext* opCtx,
             Helpers::RemoveSaver removeSaver("rollback", "", *it);
 
             // perform a collection scan and write all documents in the collection to disk
-            std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                opCtx, *it, db->getCollection(opCtx, *it), PlanExecutor::YIELD_AUTO));
+            auto exec = InternalPlanner::collectionScan(
+                opCtx, *it, db->getCollection(opCtx, *it), PlanExecutor::YIELD_AUTO);
             BSONObj curObj;
             PlanExecutor::ExecState execState;
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
@@ -720,7 +720,6 @@ void syncFixUp(OperationContext* opCtx,
                                           collection,
                                           docNss,
                                           pattern,
-                                          PlanExecutor::YIELD_MANUAL,
                                           true,   // justone
                                           true);  // god
                         }
