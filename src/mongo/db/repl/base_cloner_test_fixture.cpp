@@ -157,8 +157,10 @@ void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi,
 
 void BaseClonerTest::scheduleNetworkResponse(const BSONObj& obj) {
     if (!getNet()->hasReadyRequests()) {
+        BSONObjBuilder b;
+        getExecutor().appendDiagnosticBSON(&b);
         log() << "Expected network request for resp: " << obj;
-        log() << "      replExec: " << getExecutor().getDiagnosticString();
+        log() << "      replExec: " << b.done();
         log() << "      net:" << getNet()->getDiagnosticString();
     }
     if (getStatus() != getDetectableErrorStatus()) {
@@ -190,9 +192,6 @@ void BaseClonerTest::finishProcessingNetworkResponse() {
 }
 
 void BaseClonerTest::testLifeCycle() {
-    // GetDiagnosticString
-    ASSERT_FALSE(getCloner()->getDiagnosticString().empty());
-
     // IsActiveAfterStart
     ASSERT_FALSE(getCloner()->isActive());
     ASSERT_OK(getCloner()->startup());

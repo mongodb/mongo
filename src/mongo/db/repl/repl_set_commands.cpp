@@ -76,8 +76,7 @@ class ReplExecutorSSM : public ServerStatusMetric {
 public:
     ReplExecutorSSM() : ServerStatusMetric("repl.executor") {}
     virtual void appendAtLeaf(BSONObjBuilder& b) const {
-        ReplicationExecutor* exec = getGlobalReplicationCoordinator()->getExecutor();
-        b.append("executor", exec->getDiagnosticBSON());
+        getGlobalReplicationCoordinator()->appendDiagnosticBSON(&b);
     }
 } replExecutorSSM;
 

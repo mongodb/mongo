@@ -142,24 +142,6 @@ const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos_forTest() const {
     return _collectionInfos;
 }
 
-std::string DatabaseCloner::getDiagnosticString() const {
-    LockGuard lk(_mutex);
-    return _getDiagnosticString_inlock();
-}
-
-std::string DatabaseCloner::_getDiagnosticString_inlock() const {
-    str::stream output;
-    output << "DatabaseCloner";
-    output << " executor: " << _executor->getDiagnosticString();
-    output << " source: " << _source.toString();
-    output << " database: " << _dbname;
-    output << " listCollections filter" << _listCollectionsFilter;
-    output << " active: " << _isActive_inlock();
-    output << " collection info objects (empty if listCollections is in progress): "
-           << _collectionInfos.size();
-    return output;
-}
-
 bool DatabaseCloner::isActive() const {
     LockGuard lk(_mutex);
     return _isActive_inlock();

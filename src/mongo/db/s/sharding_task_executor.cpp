@@ -64,8 +64,8 @@ void ShardingTaskExecutor::join() {
     _executor->join();
 }
 
-std::string ShardingTaskExecutor::getDiagnosticString() const {
-    return _executor->getDiagnosticString();
+void ShardingTaskExecutor::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
+    _executor->appendDiagnosticBSON(builder);
 }
 
 Date_t ShardingTaskExecutor::now() {

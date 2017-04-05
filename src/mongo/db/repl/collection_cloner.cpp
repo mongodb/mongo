@@ -154,21 +154,6 @@ const NamespaceString& CollectionCloner::getSourceNamespace() const {
     return _sourceNss;
 }
 
-std::string CollectionCloner::getDiagnosticString() const {
-    LockGuard lk(_mutex);
-    str::stream output;
-    output << "CollectionCloner";
-    output << " executor: " << _executor->getDiagnosticString();
-    output << " source: " << _source.toString();
-    output << " source namespace: " << _sourceNss.toString();
-    output << " destination namespace: " << _destNss.toString();
-    output << " collection options: " << _options.toBSON();
-    output << " active: " << _isActive_inlock();
-    output << " listIndexes fetcher: " << _listIndexesFetcher.getDiagnosticString();
-    output << " find fetcher: " << (_findFetcher ? _findFetcher->getDiagnosticString() : "");
-    return output;
-}
-
 bool CollectionCloner::isActive() const {
     LockGuard lk(_mutex);
     return _isActive_inlock();

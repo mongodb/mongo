@@ -410,6 +410,11 @@ LogicalTime ReplicationCoordinatorImpl::_getCurrentCommittedLogicalTime_inlock()
     return LogicalTime(_getCurrentCommittedSnapshotOpTime_inlock().getTimestamp());
 }
 
+void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob) {
+    BSONObjBuilder eBuilder(bob->subobjStart("executor"));
+    _replExecutor.appendDiagnosticBSON(&eBuilder);
+}
+
 void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
     _replExecutor.appendConnectionStats(stats);
 }

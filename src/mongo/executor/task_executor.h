@@ -134,9 +134,9 @@ public:
     virtual void join() = 0;
 
     /**
-     * Returns diagnostic information.
+     * Writes diagnostic information into "b".
      */
-    virtual std::string getDiagnosticString() const = 0;
+    virtual void appendDiagnosticBSON(BSONObjBuilder* b) const = 0;
 
     /**
      * Gets the current time.  Callbacks should use this method to read the system clock.

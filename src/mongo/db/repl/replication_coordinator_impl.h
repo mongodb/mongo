@@ -105,9 +105,11 @@ public:
 
     virtual void shutdown(OperationContext* opCtx) override;
 
-    virtual ReplicationExecutor* getExecutor() override {
+    ReplicationExecutor* getExecutor() {
         return &_replExecutor;
     }
+
+    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override;
 
     virtual const ReplSettings& getSettings() const override;
 

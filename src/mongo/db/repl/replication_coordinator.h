@@ -73,7 +73,6 @@ class OplogReader;
 class OpTime;
 class ReadConcernArgs;
 class ReplSetConfig;
-class ReplicationExecutor;
 class ReplSetHeartbeatArgs;
 class ReplSetHeartbeatArgsV1;
 class ReplSetHeartbeatResponse;
@@ -131,11 +130,6 @@ public:
      * blocking until all replication-related shutdown tasks are complete.
      */
     virtual void shutdown(OperationContext* opCtx) = 0;
-
-    /**
-     * Returns a pointer to the ReplicationExecutor.
-     */
-    virtual ReplicationExecutor* getExecutor() = 0;
 
     /**
      * Returns a reference to the parsed command line arguments that are related to replication.
@@ -855,6 +849,11 @@ public:
      * Gets the latest OpTime of the currentCommittedSnapshot.
      */
     virtual OpTime getCurrentCommittedSnapshotOpTime() const = 0;
+
+    /**
+     * Appends diagnostics about the replication subsystem.
+     */
+    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) = 0;
 
     /**
      * Appends connection information to the provided BSONObjBuilder.

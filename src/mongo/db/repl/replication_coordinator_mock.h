@@ -57,9 +57,7 @@ public:
 
     virtual void shutdown(OperationContext* opCtx);
 
-    virtual ReplicationExecutor* getExecutor() override {
-        return nullptr;
-    };
+    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override {}
 
     virtual const ReplSettings& getSettings() const;
 

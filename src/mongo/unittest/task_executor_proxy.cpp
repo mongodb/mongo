@@ -57,8 +57,8 @@ void TaskExecutorProxy::join() {
     _executor->join();
 }
 
-std::string TaskExecutorProxy::getDiagnosticString() const {
-    return _executor->getDiagnosticString();
+void TaskExecutorProxy::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
+    _executor->appendDiagnosticBSON(builder);
 }
 
 Date_t TaskExecutorProxy::now() {

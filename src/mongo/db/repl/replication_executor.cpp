@@ -71,59 +71,45 @@ ReplicationExecutor::~ReplicationExecutor() {
 }
 
 BSONObj ReplicationExecutor::getDiagnosticBSON() const {
+    BSONObjBuilder b;
+    appendDiagnosticBSON(&b);
+    return b.obj();
+}
+
+void ReplicationExecutor::appendDiagnosticBSON(BSONObjBuilder* builder) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    BSONObjBuilder builder;
 
     // Counters
-    BSONObjBuilder counters(builder.subobjStart("counters"));
-    counters.appendIntOrLL("eventCreated", _counterCreatedEvents);
-    counters.appendIntOrLL("eventWait", _counterCreatedEvents);
-    counters.appendIntOrLL("cancels", _counterCancels);
-    counters.appendIntOrLL("waits", _counterWaits);
-    counters.appendIntOrLL("scheduledNetCmd", _counterScheduledCommands);
-    counters.appendIntOrLL("scheduledDBWork", _counterScheduledDBWorks);
-    counters.appendIntOrLL("scheduledXclWork", _counterScheduledExclusiveWorks);
-    counters.appendIntOrLL("scheduledWorkAt", _counterScheduledWorkAts);
-    counters.appendIntOrLL("scheduledWork", _counterScheduledWorks);
-    counters.appendIntOrLL("schedulingFailures", _counterSchedulingFailures);
-    counters.done();
+    {
+        BSONObjBuilder counters(builder->subobjStart("counters"));
+        counters.appendIntOrLL("eventCreated", _counterCreatedEvents);
+        counters.appendIntOrLL("eventWait", _counterCreatedEvents);
+        counters.appendIntOrLL("cancels", _counterCancels);
+        counters.appendIntOrLL("waits", _counterWaits);
+        counters.appendIntOrLL("scheduledNetCmd", _counterScheduledCommands);
+        counters.appendIntOrLL("scheduledDBWork", _counterScheduledDBWorks);
+        counters.appendIntOrLL("scheduledXclWork", _counterScheduledExclusiveWorks);
+        counters.appendIntOrLL("scheduledWorkAt", _counterScheduledWorkAts);
+        counters.appendIntOrLL("scheduledWork", _counterScheduledWorks);
+        counters.appendIntOrLL("schedulingFailures", _counterSchedulingFailures);
+    }
 
     // Queues
-    BSONObjBuilder queues(builder.subobjStart("queues"));
-    queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
-    queues.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
-    queues.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
-    queues.appendIntOrLL("sleepers", _sleepersQueue.size());
-    queues.appendIntOrLL("ready", _readyQueue.size());
-    queues.appendIntOrLL("free", _freeQueue.size());
-    queues.done();
+    {
+        BSONObjBuilder queues(builder->subobjStart("queues"));
+        queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
+        queues.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
+        queues.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
+        queues.appendIntOrLL("sleepers", _sleepersQueue.size());
+        queues.appendIntOrLL("ready", _readyQueue.size());
+        queues.appendIntOrLL("free", _freeQueue.size());
+        queues.done();
+    }
 
-    builder.appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
-    builder.appendIntOrLL("eventWaiters", _totalEventWaiters);
-    builder.append("shuttingDown", _inShutdown);
-    builder.append("networkInterface", _networkInterface->getDiagnosticString());
-    return builder.obj();
-}
-
-std::string ReplicationExecutor::getDiagnosticString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _getDiagnosticString_inlock();
-}
-
-std::string ReplicationExecutor::_getDiagnosticString_inlock() const {
-    str::stream output;
-    output << "ReplicationExecutor";
-    output << " networkInProgress:" << _networkInProgressQueue.size();
-    output << " dbWorkInProgress:" << _dbWorkInProgressQueue.size();
-    output << " exclusiveInProgress:" << _exclusiveLockInProgressQueue.size();
-    output << " sleeperQueue:" << _sleepersQueue.size();
-    output << " ready:" << _readyQueue.size();
-    output << " free:" << _freeQueue.size();
-    output << " unsignaledEvents:" << _unsignaledEvents.size();
-    output << " eventWaiters:" << _totalEventWaiters;
-    output << " shuttingDown:" << _inShutdown;
-    output << " networkInterface:" << _networkInterface->getDiagnosticString();
-    return output;
+    builder->appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
+    builder->appendIntOrLL("eventWaiters", _totalEventWaiters);
+    builder->append("shuttingDown", _inShutdown);
+    builder->append("networkInterface", _networkInterface->getDiagnosticString());
 }
 
 Date_t ReplicationExecutor::now() {

@@ -58,7 +58,6 @@ namespace repl {
 class LastVote;
 class ReplSettings;
 class ReplicationCoordinator;
-class ReplicationExecutor;
 
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
