@@ -96,6 +96,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
             // This isn't a config server we're talking to.
             return;
         }
+        uassertStatusOK(status);
 
         const long long minKnownConfigServerMode = 1;
         const long long maxKnownConfigServerMode = 2;

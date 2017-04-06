@@ -65,7 +65,17 @@ BSONObjBuilder CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBy
 
 CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
     invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
+    BSONObjBuilder bob(_builder);
+    for (auto elem : metadata) {
+        if (elem.fieldNameStringData() == "$configServerState") {
+            bob.appendAs(elem, "configsvr");
+        } else {
+            bob.append(elem);
+        }
+    }
     _state = State::kOutputDocs;
     return *this;
 }

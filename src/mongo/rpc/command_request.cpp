@@ -110,8 +110,20 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
                           << '\'',
             _commandArgs.firstElementFieldName() == _commandName);
 
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
     uassertStatusOK(cur.readAndAdvance<>(&obj));
-    _metadata = std::move(obj.val);
+    BSONObjBuilder metadataBuilder;
+    for (auto elem : obj.val) {
+        if (elem.fieldNameStringData() == "configsvr") {
+            metadataBuilder.appendAs(elem, "$configServerState");
+        } else {
+            metadataBuilder.append(elem);
+        }
+    }
+    _metadata = metadataBuilder.obj();
+
     uassert(40419, "OP_COMMAND request contains trailing bytes following metadata", cur.empty());
 }
 

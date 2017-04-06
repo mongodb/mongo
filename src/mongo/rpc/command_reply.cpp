@@ -55,8 +55,21 @@ CommandReply::CommandReply(const Message* message) : _message(message) {
 
     _commandReply = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
     _commandReply.shareOwnershipWith(message->sharedBuffer());
-    _metadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
-    _metadata.shareOwnershipWith(message->sharedBuffer());
+
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
+    auto rawMetadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    BSONObjBuilder metadataBuilder;
+    for (auto elem : rawMetadata) {
+        if (elem.fieldNameStringData() == "configsvr") {
+            metadataBuilder.appendAs(elem, "$configServerState");
+        } else {
+            metadataBuilder.append(elem);
+        }
+    }
+    _metadata = metadataBuilder.obj();
+
     uassert(40420, "OP_COMMAND reply contains trailing bytes following metadata", cur.empty());
 }
 
