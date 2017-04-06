@@ -643,6 +643,22 @@ TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithMissingCollection) {
     ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_IS).getDb());
 }
 
+TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithSystemCollection) {
+    NamespaceString nss("local.system.mysyscoll");
+    ASSERT_TRUE(nss.isSystem());
+
+    // If we can create a system collection using the StorageInterface, we should be able to drop it
+    // using the same interface.
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+
+    ASSERT_OK(storage.createCollection(opCtx, nss, {}));
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
+
+    ASSERT_OK(storage.dropCollection(opCtx, nss));
+    ASSERT_FALSE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
+}
+
 TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsInvalidNamespaceIfCollectionIsMissing) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

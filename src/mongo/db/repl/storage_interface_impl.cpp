@@ -445,7 +445,7 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
             return Status::OK();
         }
         WriteUnitOfWork wunit(opCtx);
-        const auto status = autoDB.getDb()->dropCollection(opCtx, nss.ns());
+        const auto status = autoDB.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
         if (status.isOK()) {
             wunit.commit();
         }
