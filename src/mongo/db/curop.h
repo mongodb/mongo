@@ -233,15 +233,18 @@ public:
     }
 
     /**
-     * Returns true iff the elapsed time of this operation is such that it should be profiled.
-     * Uses total time if the operation is done, current elapsed time otherwise.
+     * Returns true if the elapsed time of this operation is such that it should be profiled or
+     * profile level is set to 2. Uses total time if the operation is done, current elapsed time
+     * otherwise. The argument shouldSample prevents slow diagnostic logging at profile 1
+     * when set to false.
      */
-    bool shouldDBProfile() {
-        if (_dbprofile <= 0)
-            return false;
-
+    bool shouldDBProfile(bool shouldSample = true) {
+        // Profile level 2 should override any sample rate or slowms settings.
         if (_dbprofile >= 2)
             return true;
+
+        if (!shouldSample || _dbprofile <= 0)
+            return false;
 
         long long opMicros = isDone() ? totalTimeMicros() : elapsedMicros();
         return opMicros >= serverGlobalParams.slowMS * 1000LL;

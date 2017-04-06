@@ -119,7 +119,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
             log() << curOp->debug().report(opCtx->getClient(), *curOp, lockerInfo.stats);
         }
 
-        if (shouldSample && curOp->shouldDBProfile()) {
+        if (curOp->shouldDBProfile(shouldSample)) {
             profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
         }
     } catch (const DBException& ex) {

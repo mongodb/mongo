@@ -628,7 +628,7 @@ void assembleResponse(OperationContext* opCtx,
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
-    if (shouldSample && currentOp.shouldDBProfile()) {
+    if (currentOp.shouldDBProfile(shouldSample)) {
         // Performance profiling is on
         if (opCtx->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";
