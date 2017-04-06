@@ -17,6 +17,7 @@ selector:
     # Enable when 3.6 becomes last-stable.
     - jstests/sharding/views.js
     - jstests/sharding/view_rewrite.js
+    - jstests/sharding/explain_agg_read_pref.js
     # New feature in v3.6 mongos
     - jstests/sharding/logical_time_metadata.js
     # New feature in v3.6 mongos and mongod.

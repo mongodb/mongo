@@ -66,10 +66,13 @@ namespace {
 //
 // produces the corresponding explain command:
 //
-//   {explain: {aggregate: "myCollection", pipline: [], ...}, verbosity: ...}
+//   {explain: {aggregate: "myCollection", pipline: [], ...}, $queryOptions: {...}, verbosity: ...}
 Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity verbosity) {
     MutableDocument explainCommandBuilder;
     explainCommandBuilder["explain"] = Value(aggregateCommand);
+    // Downstream host targeting code expects queryOptions at the top level of the command object.
+    explainCommandBuilder[QueryRequest::kUnwrappedReadPrefField] =
+        Value(aggregateCommand[QueryRequest::kUnwrappedReadPrefField]);
 
     // Add explain command options.
     for (auto&& explainOption : ExplainOptions::toBSON(verbosity)) {
