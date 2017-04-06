@@ -131,7 +131,8 @@ TEST(RecordStoreTestHarness, Simple1InsertDocWroter) {
         {
             WriteUnitOfWork uow(opCtx.get());
             DummyDocWriter dw;
-            StatusWith<RecordId> res = rs->insertRecordWithDocWriter(opCtx.get(), &dw);
+            StatusWith<RecordId> res =
+                rs->insertRecordWithDocWriterT(opCtx.get(), &dw, Timestamp(1));
             ASSERT_OK(res.getStatus());
             loc1 = res.getValue();
             uow.commit();

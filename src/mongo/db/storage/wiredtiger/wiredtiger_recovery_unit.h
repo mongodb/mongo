@@ -1,5 +1,3 @@
-// wiredtiger_recovery_unit.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -32,19 +30,17 @@
 
 #include <wiredtiger.h>
 
-#include <memory.h>
-
+#include <boost/optional.hpp>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -54,35 +50,37 @@ class BSONObjBuilder;
 class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
     WiredTigerRecoveryUnit(WiredTigerSessionCache* sc);
+    ~WiredTigerRecoveryUnit();
 
-    virtual ~WiredTigerRecoveryUnit();
+    void beginUnitOfWork(OperationContext* opCtx) override;
+    void commitUnitOfWork() override;
+    void abortUnitOfWork() override;
 
-    void beginUnitOfWork(OperationContext* opCtx) final;
-    void commitUnitOfWork() final;
-    void abortUnitOfWork() final;
+    bool waitUntilDurable() override;
 
-    virtual bool waitUntilDurable();
+    void registerChange(Change* change) override;
 
-    virtual void registerChange(Change* change);
+    void abandonSnapshot() override;
 
-    virtual void abandonSnapshot();
-
-    virtual void* writingPtr(void* data, size_t len);
-
-    virtual void setRollbackWritesDisabled() {}
-
-    virtual SnapshotId getSnapshotId() const;
-
-    Status setReadFromMajorityCommittedSnapshot() final;
-    bool isReadingFromMajorityCommittedSnapshot() const final {
+    Status setReadFromMajorityCommittedSnapshot() override;
+    bool isReadingFromMajorityCommittedSnapshot() const override {
         return _readFromMajorityCommittedSnapshot;
     }
 
-    boost::optional<SnapshotName> getMajorityCommittedSnapshot() const final;
+    boost::optional<SnapshotName> getMajorityCommittedSnapshot() const override;
+
+    SnapshotId getSnapshotId() const override;
+
+    Status setTimestamp(SnapshotName timestamp) override;
+
+    void* writingPtr(void* data, size_t len) override;
+
+    void setRollbackWritesDisabled() override {}
 
     // ---- WT STUFF
 
     WiredTigerSession* getSession(OperationContext* opCtx);
+    void setIsOplogReader();
 
     /**
      * Returns a session without starting a new WT txn on the session. Will not close any already
@@ -98,11 +96,6 @@ public:
         return _active;
     }
     void assertInActiveTxn() const;
-
-    void setOplogReadTill(const RecordId& id);
-    RecordId getOplogReadTill() const {
-        return _oplogReadTill;
-    }
 
     static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
         return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
@@ -124,7 +117,9 @@ private:
 
     void _ensureSession();
     void _txnClose(bool commit);
-    void _txnOpen(OperationContext* opCtx);
+    void _txnOpen();
+
+    char* _getOplogReaderConfigString();
 
     WiredTigerSessionCache* _sessionCache;  // not owned
     UniqueWiredTigerSession _session;
@@ -132,11 +127,10 @@ private:
     bool _inUnitOfWork;
     bool _active;
     uint64_t _mySnapshotId;
-    RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
     std::unique_ptr<Timer> _timer;
-
+    bool _isOplogReader = false;
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
 };

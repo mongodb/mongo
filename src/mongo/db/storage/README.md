@@ -1,8 +1,8 @@
 Storage Engine API
 ==================
 
-The purpose of the Storage Engine API is to allow for pluggable storage engines in MongoDB, see
-also the [Storage FAQ][].  This document gives a brief overview of the API, and provides pointers
+The purpose of the Storage Engine API is to allow for pluggable storage engines in MongoDB (refer
+to the [Storage FAQ][]). This document gives a brief overview of the API, and provides pointers
 to places with more detailed documentation. Where referencing code, links are to the version that
 was current at the time when the reference was made. Always compare with the latest version for
 changes not yet reflected here.  For questions on the API that are not addressed by this material,
@@ -35,15 +35,15 @@ indexes.
 A RecordId is a unique identifier, assigned by the storage engine, for a specific document or entry
 in a record store at a given time. For storage engines based in the KVEngine the record identity is
 fixed, but other storage engines, such as MMAPv1, may change it when updating a document. Note that
-this can be very expensive, as indexes map to the RecordId. A single document with a large array
-may have thousands of index entries, resulting in very expensive updates.
+changing record ids can be very expensive, as indexes map to the RecordId. A single document with a
+large array may have thousands of index entries, resulting in very expensive updates.
 
 #### Cloning and bulk operations
 Currently all cloning, [initial sync][] and other operations are done in terms of operating on
 individual documents, though there is a BulkBuilder class for more efficiently building indexes.
 
 ### Locking and Concurrency
-MongoDB uses multi-granular intent locking, see the [Concurrency FAQ][]. In all cases, this will
+MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all cases, this will
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
 with respect to other accesses. Storage engines can choose to support document-level concurrency,
 in which case the storage engine is responsible for any additional synchronization necessary. For
@@ -57,7 +57,7 @@ storage engine.
 
 ### Transactions
 Each operation creates an OperationContext with a new RecoveryUnit, implemented by the storage
-engine, that lives until the  operation finishes. Currently, query operations that return a cursor
+engine, that lives until the operation finishes. Currently, query operations that return a cursor
 to the client live as long as that client cursor, with the operation context switching between its
 own recovery unit and that of the client cursor. In a few other cases an internal command may use
 an extra recovery unit as well. The recovery unit must implement transaction semantics as described
@@ -77,18 +77,18 @@ otherwise the guarantee of atomic updates on a document and all its indexes woul
 Storage engines must provide snapshot isolation, either through locking (as is the case for the
 MMAPv1 engine), through multi-version concurrency control (MVCC) or otherwise. The first read
 implicitly establishes the snapshot. Operations can always see all changes they make in the context
-of a recovery unit, but other operations cannot until a successfull commit.
+of a recovery unit, but other operations cannot until a successful commit.
 
 #### Durability
 Once a transaction is committed, it is not necessarily durable: if, and only if the server fails,
 as result of power loss or otherwise, the database may recover to an earlier point in time.
 However, atomicity of transactions must remain preserved. Similarly, in a replica set, a primary
-that becomes unavailable may need to rollback to an earlier state when rejoining the replicas et,
+that becomes unavailable may need to roll back to an earlier state when rejoining the replica set,
 if its changes were not yet seen by a majority of nodes. The RecoveryUnit implements methods to
 allow operations to wait for their committed transactions to become durable.
 
 A transaction may become visible to other transactions as soon as it commits, and a storage engine
-may use a group commit bundling a number of transactions to achieve durability. Alternatively, a
+may use a group commit, bundling a number of transactions to achieve durability. Alternatively, a
 storage engine may wait for durability at commit time.
 
 ### Write Conflicts
@@ -98,11 +98,20 @@ in deadlock or violate other resource constraints. In such cases the storage eng
 WriteConflictException to signal the transient failure. MongoDB will handle the exception, abort
 and restart the transaction.
 
+### Point-in-time snapshot reads
+Two functions on the RecoveryUnit help storage engines implement point-in-time reads: setTimestamp()
+and selectSnapshot().  setTimestamp() is used by write transactions to label any forthcoming writes
+with a timestamp; these timestamps are then used to produce a point-in-time read transaction via a
+call to selectSnapshot() at the start of the read.  The storage engine must produce the effect of
+reading from a snapshot that includes only writes with timestamps at or earlier than the
+selectSnapshot timestamp.  This means that a point-in-time read may slice across prior write
+transactions by hiding only some data from a given write transaction, if that transaction had a
+different timestamp set prior to each write it did.
 
 Classes to implement
 --------------------
 
-A storage engine should generally implement the following classes. See their definition for more
+A storage engine should generally implement the following classes. See their definitions for more
 details.
 
 * [KVEngine](kv/kv_engine.h)

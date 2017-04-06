@@ -44,6 +44,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -379,18 +380,27 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                                                          const BSONObj& config) {
     try {
         createOplog(opCtx);
+        const auto& kRsOplogNamespace = NamespaceString::kRsOplogNamespace;
 
-        writeConflictRetry(
-            opCtx, "initiate oplog entry", "local.oplog.rs", [this, &opCtx, &config] {
-                Lock::GlobalWrite globalWrite(opCtx);
+        writeConflictRetry(opCtx,
+                           "initiate oplog entry",
+                           kRsOplogNamespace.toString(),
+                           [this, &opCtx, &config, &kRsOplogNamespace] {
+                               Lock::GlobalWrite globalWrite(opCtx);
 
-                WriteUnitOfWork wuow(opCtx);
-                Helpers::putSingleton(opCtx, configCollectionName, config);
-                const auto msgObj = BSON("msg"
-                                         << "initiating set");
-                _service->getOpObserver()->onOpMessage(opCtx, msgObj);
-                wuow.commit();
-            });
+                               WriteUnitOfWork wuow(opCtx);
+                               Helpers::putSingleton(opCtx, configCollectionName, config);
+                               const auto msgObj = BSON("msg"
+                                                        << "initiating set");
+                               _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                               wuow.commit();
+                               // ReplSetTest assumes that immediately after the replSetInitiate
+                               // command returns, it can allow other nodes to initial sync with no
+                               // retries and they will succeed.  Unfortunately, initial sync will
+                               // fail if it finds its sync source has an empty oplog.  Thus, we
+                               // need to wait here until the seed document is visible in our oplog.
+                               waitForAllEarlierOplogWritesToBeVisible(opCtx);
+                           });
 
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
@@ -778,10 +788,10 @@ void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
         manager->dropAllSnapshots();
 }
 
-void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotName newCommitPoint) {
+void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotInfo newCommitPoint) {
     auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
     invariant(manager);  // This should never be called if there is no SnapshotManager.
-    manager->setCommittedSnapshot(newCommitPoint);
+    manager->setCommittedSnapshot(newCommitPoint.name, newCommitPoint.opTime.getTimestamp());
 }
 
 void ReplicationCoordinatorExternalStateImpl::createSnapshot(OperationContext* opCtx,

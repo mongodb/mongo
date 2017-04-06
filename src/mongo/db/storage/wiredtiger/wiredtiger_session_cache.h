@@ -210,6 +210,10 @@ public:
         return _cursorEpoch.load();
     }
 
+    WiredTigerKVEngine* getKVEngine() const {
+        return _engine;
+    }
+
 private:
     WiredTigerKVEngine* _engine;  // not owned, might be NULL
     WT_CONNECTION* _conn;         // not owned
@@ -235,10 +239,10 @@ private:
     AtomicUInt32 _lastSyncTime;
     stdx::mutex _lastSyncMutex;
 
-    // Notified when we commit to the journal.
-    JournalListener* _journalListener = &NoOpJournalListener::instance;
     // Protects _journalListener.
     stdx::mutex _journalListenerMutex;
+    // Notified when we commit to the journal.
+    JournalListener* _journalListener = &NoOpJournalListener::instance;
 
     /**
      * Returns a session to the cache for later reuse. If closeAll was called between getting this

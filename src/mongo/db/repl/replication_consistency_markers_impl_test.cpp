@@ -305,12 +305,13 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
     ASSERT_OK(getStorageInterface()->insertDocument(
         opCtx,
         minValidNss,
-        BSON("_id" << OID::gen() << MinValidDocument::kMinValidTimestampFieldName
-                   << minValidTime.getTimestamp()
-                   << MinValidDocument::kMinValidTermFieldName
-                   << minValidTime.getTerm()
-                   << MinValidDocument::kOldOplogDeleteFromPointFieldName
-                   << time1)));
+        TimestampedBSONObj{BSON("_id" << OID::gen() << MinValidDocument::kMinValidTimestampFieldName
+                                      << minValidTime.getTimestamp()
+                                      << MinValidDocument::kMinValidTermFieldName
+                                      << minValidTime.getTerm()
+                                      << MinValidDocument::kOldOplogDeleteFromPointFieldName
+                                      << time1),
+                           SnapshotName(0)}));
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     // Set the feature compatibility version to 3.6.

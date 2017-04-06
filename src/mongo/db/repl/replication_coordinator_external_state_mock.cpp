@@ -211,7 +211,7 @@ void ReplicationCoordinatorExternalStateMock::startProducerIfStopped() {}
 
 void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
 
-void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(SnapshotName newCommitPoint) {
+void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(SnapshotInfo newCommitPoint) {
 }
 
 void ReplicationCoordinatorExternalStateMock::createSnapshot(OperationContext* opCtx,

@@ -63,9 +63,6 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
-//#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << x
-#define RS_ITERATOR_TRACE(x)
-
 namespace mongo {
 
 using std::unique_ptr;
@@ -79,22 +76,35 @@ static const int kMaximumRecordStoreVersion = 1;
 MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
 MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
 
-bool shouldUseOplogHack(OperationContext* opCtx, const std::string& uri) {
+void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);
-    if (!appMetadata.isOK()) {
-        return false;
-    }
+    fassertStatusOK(39999, appMetadata);
 
-    return (appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
+    fassertNoTrace(39998, appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
 }
-
 }  // namespace
 
 MONGO_FP_DECLARE(WTWriteConflictException);
 MONGO_FP_DECLARE(WTWriteConflictExceptionForReads);
-MONGO_FP_DECLARE(WTPausePrimaryOplogDurabilityLoop);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
+
+class WiredTigerRecordStore::OplogInsertChange final : public RecoveryUnit::Change {
+public:
+    OplogInsertChange(WiredTigerOplogManager* om) : _om(om) {}
+
+    void commit() final {
+        _om->triggerJournalFlush();
+    }
+
+    void rollback() final {
+        // Trigger even on rollback since it might make later commits visible.
+        _om->triggerJournalFlush();
+    }
+
+private:
+    WiredTigerOplogManager* const _om;
+};
 
 class WiredTigerRecordStore::OplogStones::InsertChange final : public RecoveryUnit::Change {
 public:
@@ -608,7 +618,9 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     return StatusWith<std::string>(ss);
 }
 
-WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx, Params params)
+WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
+                                             OperationContext* ctx,
+                                             Params params)
     : RecordStore(params.ns),
       _uri(params.uri),
       _tableId(WiredTigerSession::genTableId()),
@@ -622,11 +634,11 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx, Params param
       _cappedSleep(0),
       _cappedSleepMS(0),
       _cappedCallback(params.cappedCallback),
+      _shuttingDown(false),
       _cappedDeleteCheckCount(0),
-      _useOplogHack(shouldUseOplogHack(ctx, _uri)),
       _sizeStorer(params.sizeStorer),
       _sizeStorerCounter(0),
-      _shuttingDown(false) {
+      _kvEngine(kvEngine) {
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
                                ctx, _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
                                .getStatus();
@@ -654,12 +666,15 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx, Params param
             WiredTigerUtil::useTableLogging(NamespaceString(ns()),
                                             getGlobalReplSettings().usingReplSets())));
     }
+
+    if (_isOplog) {
+        checkOplogFormatVersion(ctx, _uri);
+    }
 }
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
     {
         stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
-        stdx::lock_guard<stdx::mutex> lk2(_uncommittedRecordIdsMutex);
         _shuttingDown = true;
     }
 
@@ -672,9 +687,9 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
         _oplogStones->kill();
     }
 
-    if (_oplogJournalThread.joinable()) {
-        _opsWaitingForJournalCV.notify_one();
-        _oplogJournalThread.join();
+    if (_isOplog) {
+        // Delete oplog visibility manager on KV engine.
+        _kvEngine->deleteOplogManager();
     }
 }
 
@@ -683,7 +698,6 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
     if (auto record = cursor->next()) {
         int64_t max = record->id.repr();
-        _oplog_highestSeen = record->id;
         _nextIdNum.store(1 + max);
 
         if (_sizeStorer) {
@@ -718,9 +732,8 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
     }
 
     if (_isOplog) {
-        _oplogJournalThread = stdx::thread(&WiredTigerRecordStore::_oplogJournalThreadLoop,
-                                           this,
-                                           WiredTigerRecoveryUnit::get(opCtx)->getSessionCache());
+        invariant(_kvEngine);
+        _kvEngine->initializeOplogManager(opCtx, _uri, this);
     }
 }
 
@@ -946,9 +959,6 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
             if (newestIdToDelete >= justInserted)  // TODO: use oldest uncommitted instead
                 break;
 
-            if (_shuttingDown)
-                break;
-
             WT_ITEM old_value;
             invariantWTOK(truncateEnd->get_value(truncateEnd, &old_value));
 
@@ -956,6 +966,9 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
             sizeSaved += old_value.size;
 
             stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+            if (_shuttingDown)
+                break;
+
             if (_cappedCallback) {
                 uassertStatusOK(_cappedCallback->aboutToDeleteCapped(
                     opCtx,
@@ -1091,14 +1104,23 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
            << " records totaling to " << _dataSize.load() << " bytes";
 }
 
+Status WiredTigerRecordStore::insertRecordsT(OperationContext* opCtx,
+                                             std::vector<Record>* records,
+                                             std::vector<Timestamp>* timestamps,
+                                             bool enforceQuota) {
+    return _insertRecords(opCtx, records->data(), timestamps->data(), records->size());
+}
+
 Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,
                                             std::vector<Record>* records,
                                             bool enforceQuota) {
-    return _insertRecords(opCtx, records->data(), records->size());
+    invariant(false);
+    return Status::OK();
 }
 
 Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              Record* records,
+                                             Timestamp* timestamps,
                                              size_t nRecords) {
     // We are kind of cheating on capped collections since we write all of them at once ....
     // Simplest way out would be to just block vector writes for everything except oplog ?
@@ -1115,20 +1137,24 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
+    if (_isOplog) {
+        // Register a change to notify the oplog journal flusher thread when this transaction
+        // finishes.
+        opCtx->recoveryUnit()->registerChange(new OplogInsertChange(_kvEngine->getOplogManager()));
+    }
+
     RecordId highestId = RecordId();
     dassert(nRecords != 0);
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = records[i];
-        if (_useOplogHack) {
+        if (_isOplog) {
             StatusWith<RecordId> status =
                 oploghack::extractKey(record.data.data(), record.data.size());
             if (!status.isOK())
                 return status.getStatus();
             record.id = status.getValue();
         } else if (_isCapped) {
-            stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
             record.id = _nextId();
-            _addUncommittedRecordId_inlock(opCtx, record.id);
         } else {
             record.id = _nextId();
         }
@@ -1136,14 +1162,21 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         highestId = record.id;
     }
 
-    if (_useOplogHack && (highestId > _oplog_highestSeen)) {
-        stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-        if (highestId > _oplog_highestSeen)
-            _oplog_highestSeen = highestId;
-    }
-
     for (size_t i = 0; i < nRecords; i++) {
         auto& record = records[i];
+        if (_isOplog) {
+            Timestamp ts;
+            if (timestamps[i].isNull()) {
+                // If the timestamp is 0, that probably means someone inserted a document directly
+                // into the oplog.  In this case, use the RecordId as the timestamp, since they are
+                // one and the same.
+                ts = Timestamp(record.id.repr());
+            } else {
+                ts = timestamps[i];
+            }
+            LOG(4) << "inserting record into oplog with timestamp " << ts.asULL();
+            fassertStatusOK(39001, opCtx->recoveryUnit()->setTimestamp(SnapshotName(ts)));
+        }
         setKey(c, record.id);
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
@@ -1165,55 +1198,47 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* opCtx,
-                                                         const char* data,
-                                                         int len,
-                                                         bool enforceQuota) {
+StatusWith<RecordId> WiredTigerRecordStore::insertRecordT(
+    OperationContext* opCtx, const char* data, int len, Timestamp timestamp, bool enforceQuota) {
     Record record = {RecordId(), RecordData(data, len)};
-    Status status = _insertRecords(opCtx, &record, 1);
+    Status status = _insertRecords(opCtx, &record, &timestamp, 1);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     return StatusWith<RecordId>(record.id);
 }
 
-void WiredTigerRecordStore::_dealtWithCappedId(SortedRecordIds::iterator it, bool didCommit) {
-    invariant(it->isNormal());
-    stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    if (didCommit && _isOplog && *it != _oplog_highestSeen) {
-        // Defer removal from _uncommittedRecordIds until it is durable. We don't need to wait for
-        // durability of ops that didn't commit because they won't become durable.
-        // As an optimization, we only defer visibility until durable if new ops were created while
-        // we were pending. This makes single-threaded w>1 workloads faster and is safe because
-        // durability follows commit order for commits that are fully sequenced (B doesn't call
-        // commit until after A's commit call returns).
-        const bool wasEmpty = _opsWaitingForJournal.empty();
-        _opsWaitingForJournal.push_back(it);
-        if (wasEmpty) {
-            _opsWaitingForJournalCV.notify_one();
-        }
-    } else {
-        _uncommittedRecordIds.erase(it);
-        _opsBecameVisibleCV.notify_all();
+StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* opCtx,
+                                                         const char* data,
+                                                         int len,
+                                                         bool enforceQuota) {
+    Record record = {RecordId(), RecordData(data, len)};
+    Timestamp timestamp;
+    Status status = _insertRecords(opCtx, &record, &timestamp, 1);
+    if (!status.isOK())
+        return StatusWith<RecordId>(status);
+    return StatusWith<RecordId>(record.id);
+}
+
+bool WiredTigerRecordStore::isOpHidden_forTest(const RecordId& id) const {
+    invariant(id.repr() > 0);
+    invariant(_kvEngine->getOplogManager());
+    return _kvEngine->getOplogManager()->getOplogReadTimestamp() <
+        static_cast<std::uint64_t>(id.repr());
+}
+
+void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
+    stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+    // This wakes up cursors blocking in await_data.
+    if (_cappedCallback) {
+        _cappedCallback->notifyCappedWaitersIfNeeded();
     }
 }
 
-bool WiredTigerRecordStore::isCappedHidden(const RecordId& id) const {
-    stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    if (_uncommittedRecordIds.empty()) {
-        return false;
-    }
-    return _uncommittedRecordIds.front() <= id;
-}
-
-RecordId WiredTigerRecordStore::lowestCappedHiddenRecord() const {
-    stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    return _uncommittedRecordIds.empty() ? RecordId() : _uncommittedRecordIds.front();
-}
-
-Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx,
-                                                         const DocWriter* const* docs,
-                                                         size_t nDocs,
-                                                         RecordId* idsOut) {
+Status WiredTigerRecordStore::insertRecordsWithDocWriterT(OperationContext* opCtx,
+                                                          const DocWriter* const* docs,
+                                                          Timestamp* timestamps,
+                                                          size_t nDocs,
+                                                          RecordId* idsOut) {
     std::unique_ptr<Record[]> records(new Record[nDocs]);
 
     // First get all the sizes so we can allocate a single buffer for all documents. Eventually it
@@ -1236,7 +1261,7 @@ Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx
     }
     invariant(pos == (buffer.get() + totalSize));
 
-    Status s = _insertRecords(opCtx, records.get(), nDocs);
+    Status s = _insertRecords(opCtx, records.get(), timestamps, nDocs);
     if (!s.isOK())
         return s;
 
@@ -1324,15 +1349,6 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     invariantWTOK(c->get_value(c, &value));
 
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
-}
-
-void WiredTigerRecordStore::_oplogSetStartHack(WiredTigerRecoveryUnit* wru) const {
-    stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    if (_uncommittedRecordIds.empty()) {
-        wru->setOplogReadTill(_oplog_highestSeen);
-    } else {
-        wru->setOplogReadTill(_uncommittedRecordIds.front());
-    }
 }
 
 std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
@@ -1505,113 +1521,20 @@ Status WiredTigerRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* out
     return Status(ErrorCodes::CommandNotSupported, "this storage engine does not support touch");
 }
 
-Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* opCtx,
-                                                   const Timestamp& opTime) {
-    StatusWith<RecordId> id = oploghack::keyForOptime(opTime);
-    if (!id.isOK())
-        return id.getStatus();
-
-    stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    _addUncommittedRecordId_inlock(opCtx, id.getValue());
-    return Status::OK();
-}
-
-class WiredTigerRecordStore::CappedInsertChange : public RecoveryUnit::Change {
-public:
-    CappedInsertChange(WiredTigerRecordStore* rs, SortedRecordIds::iterator it)
-        : _rs(rs), _it(it) {}
-
-    virtual void commit() {
-        _rs->_dealtWithCappedId(_it, true);
-        // Do not notify here because all committed inserts notify, always.
-    }
-
-    virtual void rollback() {
-        // Notify on rollback since it might make later commits visible.
-        _rs->_dealtWithCappedId(_it, false);
-        stdx::lock_guard<stdx::mutex> lk(_rs->_cappedCallbackMutex);
-        if (_rs->_cappedCallback)
-            _rs->_cappedCallback->notifyCappedWaitersIfNeeded();
-    }
-
-private:
-    WiredTigerRecordStore* const _rs;
-    const SortedRecordIds::iterator _it;
-};
-
-void WiredTigerRecordStore::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache) try {
-    Client::initThread("WTOplogJournalThread");
-    while (true) {
-        stdx::unique_lock<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-        {
-            MONGO_IDLE_THREAD_BLOCK;
-            _opsWaitingForJournalCV.wait(
-                lk, [&] { return _shuttingDown || !_opsWaitingForJournal.empty(); });
-        }
-
-        while (!_shuttingDown && MONGO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
-            lk.unlock();
-            sleepmillis(10);
-            lk.lock();
-        }
-
-        if (_shuttingDown)
-            return;
-
-        decltype(_opsWaitingForJournal) opsAboutToBeJournaled = {};
-        _opsWaitingForJournal.swap(opsAboutToBeJournaled);
-
-        lk.unlock();
-        const bool forceCheckpoint = false;
-        const bool stableCheckpoint = false;
-        sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
-        lk.lock();
-
-        for (auto&& op : opsAboutToBeJournaled) {
-            _uncommittedRecordIds.erase(op);
-        }
-
-        _opsBecameVisibleCV.notify_all();
-        lk.unlock();
-
-        stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
-        if (_cappedCallback) {
-            _cappedCallback->notifyCappedWaitersIfNeeded();
-        }
-    }
-} catch (...) {
-    std::terminate();
-}
-
 void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
-
-    // This function must not start a WT transaction, otherwise we will get stuck in an infinite
-    // loop of WCE handling when the getCursor() is called.
-
-    stdx::unique_lock<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    const auto waitingFor = _oplog_highestSeen;
-    opCtx->waitForConditionOrInterrupt(_opsBecameVisibleCV, lk, [&] {
-        return _uncommittedRecordIds.empty() || _uncommittedRecordIds.front() > waitingFor;
-    });
-}
-
-void WiredTigerRecordStore::_addUncommittedRecordId_inlock(OperationContext* opCtx, RecordId id) {
-    dassert(_uncommittedRecordIds.empty() || _uncommittedRecordIds.back() < id);
-    SortedRecordIds::iterator it = _uncommittedRecordIds.insert(_uncommittedRecordIds.end(), id);
-    invariant(it->isNormal());
-    opCtx->recoveryUnit()->registerChange(new CappedInsertChange(this, it));
-    _oplog_highestSeen = id;
+    auto oplogManager = _kvEngine->getOplogManager();
+    if (oplogManager) {
+        oplogManager->waitForAllEarlierOplogWritesToBeVisible(this, opCtx);
+    }
 }
 
 boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
     OperationContext* opCtx, const RecordId& startingPosition) const {
-    if (!_useOplogHack)
+    if (!_isOplog)
         return boost::none;
 
-    {
-        WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
-        _oplogSetStartHack(wru);
+    if (_isOplog) {
+        WiredTigerRecoveryUnit::get(opCtx)->setIsOplogReader();
     }
 
     WiredTigerCursor cursor(_uri, _tableId, true, opCtx);
@@ -1641,7 +1564,7 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
 }
 
 RecordId WiredTigerRecordStore::_nextId() {
-    invariant(!_useOplogHack);
+    invariant(!_isOplog);
     RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
     invariant(out.isNormal());
     return out;
@@ -1754,9 +1677,25 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
 
     wuow.commit();
 
-    if (_useOplogHack) {
-        // Forget that we've ever seen a higher timestamp than we now have.
-        _oplog_highestSeen = lastKeptId;
+    if (_isOplog) {
+        // Immediately rewind visibility to our truncation point, to prevent new
+        // transactions from appearing.
+        Timestamp truncTs(lastKeptId.repr());
+
+
+        char commitTSConfigString["commit_timestamp="_sd.size() +
+                                  (8 * 2) /* 8 hexadecimal characters */ + 1 /* trailing null */];
+        auto size = std::snprintf(commitTSConfigString,
+                                  sizeof(commitTSConfigString),
+                                  "commit_timestamp=%llx",
+                                  truncTs.asULL());
+
+        invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));
+        auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
+        invariantWTOK(conn->set_timestamp(conn, commitTSConfigString));
+
+        _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);
+        LOG(1) << "truncation new read timestamp: " << truncTs;
     }
 
     if (_oplogStones) {
@@ -1765,15 +1704,20 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     }
 }
 
+Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* opCtx,
+                                                   const Timestamp& opTime) {
+    // This starts a new transaction and gives it a timestamp.
+    // This is required for oplog visibility to work correctly, as WiredTiger uses the transaction
+    // list to determine where there are holes in the oplog.
+    return opCtx->recoveryUnit()->setTimestamp(SnapshotName(opTime));
+}
+
 // Cursor Base:
 
 WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
                                                                  const WiredTigerRecordStore& rs,
                                                                  bool forward)
-    : _rs(rs),
-      _opCtx(opCtx),
-      _forward(forward),
-      _readUntilForOplog(WiredTigerRecoveryUnit::get(opCtx)->getOplogReadTill()) {
+    : _rs(rs), _opCtx(opCtx), _forward(forward) {
     _cursor.emplace(rs.getURI(), rs.tableId(), true, opCtx);
 }
 
@@ -1808,11 +1752,6 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.
         throw WriteConflictException();
-    }
-
-    if (!isVisible(id)) {
-        _eof = true;
-        return {};
     }
 
     WT_ITEM value;
@@ -1860,6 +1799,10 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
 }
 
 bool WiredTigerRecordStoreCursorBase::restore() {
+    if (_rs._isOplog && _forward) {
+        WiredTigerRecoveryUnit::get(_opCtx)->setIsOplogReader();
+    }
+
     if (!_cursor)
         _cursor.emplace(_rs.getURI(), _rs.tableId(), true, _opCtx);
 
@@ -1920,32 +1863,13 @@ void WiredTigerRecordStoreCursorBase::reattachToOperationContext(OperationContex
     // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
 }
 
-bool WiredTigerRecordStoreCursorBase::isVisible(const RecordId& id) {
-    if (!_rs._isCapped)
-        return true;
-
-    if (!_forward)
-        return true;
-
-    if (_readUntilForOplog.isNull() || !_rs._isOplog) {
-        // this is the normal capped case
-        return !_rs.isCappedHidden(id);
-    }
-
-    // this is for oplogs
-    if (id == _readUntilForOplog) {
-        // we allow if its been committed already
-        return !_rs.isCappedHidden(id);
-    }
-
-    return id < _readUntilForOplog;
-}
-
 // Standard Implementations:
 
 
-StandardWiredTigerRecordStore::StandardWiredTigerRecordStore(OperationContext* opCtx, Params params)
-    : WiredTigerRecordStore(opCtx, params) {}
+StandardWiredTigerRecordStore::StandardWiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
+                                                             OperationContext* opCtx,
+                                                             Params params)
+    : WiredTigerRecordStore(kvEngine, opCtx, params) {}
 
 RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
     std::int64_t recordId;
@@ -1972,7 +1896,7 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
             !opCtx->lockState()->isCollectionLockedForMode(_ns, MODE_X)) {
             throw WriteConflictException();
         }
-        _oplogSetStartHack(wru);
+        wru->setIsOplogReader();
     }
 
     return stdx::make_unique<WiredTigerRecordStoreStandardCursor>(opCtx, *this, forward);
@@ -2007,10 +1931,11 @@ bool WiredTigerRecordStoreStandardCursor::hasWrongPrefix(WT_CURSOR* cursor,
 
 // Prefixed Implementations:
 
-PrefixedWiredTigerRecordStore::PrefixedWiredTigerRecordStore(OperationContext* opCtx,
+PrefixedWiredTigerRecordStore::PrefixedWiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
+                                                             OperationContext* opCtx,
                                                              Params params,
                                                              KVPrefix prefix)
-    : WiredTigerRecordStore(opCtx, params), _prefix(prefix) {}
+    : WiredTigerRecordStore(kvEngine, opCtx, params), _prefix(prefix) {}
 
 std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
     OperationContext* opCtx, bool forward) const {
@@ -2022,7 +1947,7 @@ std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
             !opCtx->lockState()->isCollectionLockedForMode(_ns, MODE_X)) {
             throw WriteConflictException();
         }
-        _oplogSetStartHack(wru);
+        wru->setIsOplogReader();
     }
 
     return stdx::make_unique<WiredTigerRecordStorePrefixedCursor>(opCtx, *this, _prefix, forward);

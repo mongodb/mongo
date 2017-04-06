@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -211,17 +212,19 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        Lock::GlobalWrite lk(&_opCtx);
-        OldClientContext ctx(&_opCtx, ns);
-        WriteUnitOfWork wunit(&_opCtx);
-        Database* db = ctx.db();
-        Collection* coll = db->getCollection(&_opCtx, ns);
-        if (!coll) {
-            coll = db->createCollection(&_opCtx, ns);
-        }
+        ::mongo::writeConflictRetry(&_opCtx, "deleteAll", ns, [&] {
+            Lock::GlobalWrite lk(&_opCtx);
+            OldClientContext ctx(&_opCtx, ns);
+            WriteUnitOfWork wunit(&_opCtx);
+            Database* db = ctx.db();
+            Collection* coll = db->getCollection(&_opCtx, ns);
+            if (!coll) {
+                coll = db->createCollection(&_opCtx, ns);
+            }
 
-        ASSERT_OK(coll->truncate(&_opCtx));
-        wunit.commit();
+            ASSERT_OK(coll->truncate(&_opCtx));
+            wunit.commit();
+        });
     }
     void insert(const BSONObj& o) const {
         Lock::GlobalWrite lk(&_opCtx);

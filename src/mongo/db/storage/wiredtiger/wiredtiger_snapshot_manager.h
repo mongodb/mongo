@@ -39,12 +39,15 @@
 
 namespace mongo {
 
+class WiredTigerOplogManager;
+
 class WiredTigerSnapshotManager final : public SnapshotManager {
     MONGO_DISALLOW_COPYING(WiredTigerSnapshotManager);
 
 public:
     explicit WiredTigerSnapshotManager(WT_CONNECTION* conn) {
         invariantWTOK(conn->open_session(conn, NULL, NULL, &_session));
+        _conn = conn;
     }
 
     ~WiredTigerSnapshotManager() {
@@ -52,8 +55,8 @@ public:
     }
 
     Status prepareForCreateSnapshot(OperationContext* opCtx) final;
-    Status createSnapshot(OperationContext* ru, const SnapshotName& name) final;
-    void setCommittedSnapshot(const SnapshotName& name) final;
+    Status createSnapshot(OperationContext* opCtx, const SnapshotName& name) final;
+    void setCommittedSnapshot(const SnapshotName& name, Timestamp ts) final;
     void cleanupUnneededSnapshots() final;
     void dropAllSnapshots() final;
 
@@ -74,6 +77,11 @@ public:
     SnapshotName beginTransactionOnCommittedSnapshot(WT_SESSION* session) const;
 
     /**
+     * Starts a transaction on the oplog using an appropriate timestamp for oplog visiblity.
+     */
+    void beginTransactionOnOplog(WiredTigerOplogManager* oplogManager, WT_SESSION* session) const;
+
+    /**
      * Returns lowest SnapshotName that could possibly be used by a future call to
      * beginTransactionOnCommittedSnapshot, or boost::none if there is currently no committed
      * snapshot.
@@ -86,6 +94,9 @@ public:
 private:
     mutable stdx::mutex _mutex;  // Guards all members.
     boost::optional<SnapshotName> _committedSnapshot;
-    WT_SESSION* _session;  // only used for dropping snapshots.
+    Timestamp _oldestKeptTimestamp;  // The timestamp communicated to WiredTiger before which no
+                                     // timestamp history is preserved.
+    WT_SESSION* _session;
+    WT_CONNECTION* _conn;
 };
 }

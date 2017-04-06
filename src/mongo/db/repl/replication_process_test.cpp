@@ -111,16 +111,18 @@ TEST_F(ReplicationProcessTest,
     // Collection is not empty but does not contain document with _id "rollbackProgress".
     ASSERT_OK(_storageInterface->insertDocument(opCtx.get(),
                                                 ReplicationProcess::kRollbackProgressNamespace,
-                                                BSON("_id"
-                                                     << "not progress")));
+                                                TimestampedBSONObj{BSON("_id"
+                                                                        << "not progress"),
+                                                                   SnapshotName(0)}));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, replicationProcess.getRollbackProgress(opCtx.get()));
 }
 
 TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFieldIsNotAnOpTime) {
-    auto doc = BSON("_id"
-                    << "rollbackProgress"
-                    << "applyUntil"
-                    << "not op time!");
+    auto doc = TimestampedBSONObj{BSON("_id"
+                                       << "rollbackProgress"
+                                       << "applyUntil"
+                                       << "not op time!"),
+                                  SnapshotName(0)};
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
@@ -136,13 +138,14 @@ TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFi
 
 TEST_F(ReplicationProcessTest,
        GetRollbackProgressReturnsTypeMismatchIfApplyUntilFieldContainsBadTimestampValue) {
-    auto doc = BSON("_id"
-                    << "rollbackProgress"
-                    << "applyUntil"
-                    << BSON("ts"
-                            << "not_timestamp"
-                            << "t"
-                            << 1LL));
+    auto doc = TimestampedBSONObj{BSON("_id"
+                                       << "rollbackProgress"
+                                       << "applyUntil"
+                                       << BSON("ts"
+                                               << "not_timestamp"
+                                               << "t"
+                                               << 1LL)),
+                                  SnapshotName(0)};
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
@@ -159,10 +162,11 @@ TEST_F(ReplicationProcessTest,
 TEST_F(ReplicationProcessTest,
        GetRollbackProgressReturnsApplyUntilOpTimeIfDocumentExistsWithIdProgress) {
     OpTime applyUntil({Seconds(123), 0}, 1LL);
-    auto doc = BSON("_id"
-                    << "rollbackProgress"
-                    << "applyUntil"
-                    << applyUntil);
+    auto doc = TimestampedBSONObj{BSON("_id"
+                                       << "rollbackProgress"
+                                       << "applyUntil"
+                                       << applyUntil),
+                                  SnapshotName(0)};
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));

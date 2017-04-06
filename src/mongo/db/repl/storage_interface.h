@@ -42,6 +42,7 @@
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -50,6 +51,11 @@ struct CollectionOptions;
 class OperationContext;
 
 namespace repl {
+
+struct TimestampedBSONObj {
+    BSONObj obj;
+    SnapshotName timestamp;
+};
 
 /**
  * Storage interface used by the replication system to interact with storage.
@@ -98,17 +104,18 @@ public:
         const std::vector<BSONObj>& secondaryIndexSpecs) = 0;
 
     /**
-     * Inserts a document into a collection.
+     * Inserts a document with a timestamp into a collection.
      *
      * NOTE: If the collection doesn't exist, it will not be created, and instead
      * an error is returned.
      */
     virtual Status insertDocument(OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  const BSONObj& doc) = 0;
+                                  const TimestampedBSONObj& doc) = 0;
 
     /**
-     * Inserts the given documents into the collection.
+     * Inserts the given documents, with associated timestamps and statement id's, into the
+     * collection.
      * It is an error to call this function with an empty set of documents.
      */
     virtual Status insertDocuments(OperationContext* opCtx,

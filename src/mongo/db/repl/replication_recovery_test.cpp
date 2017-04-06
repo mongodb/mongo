@@ -137,11 +137,12 @@ BSONObj _makeInsertDocument(int t) {
 /**
  * Generates oplog entries with the given number used for the timestamp.
  */
-BSONObj _makeOplogEntry(int t) {
-    return BSON("ts" << Timestamp(t, t) << "h" << t << "ns" << testNs.ns() << "v" << 2 << "op"
-                     << "i"
-                     << "o"
-                     << _makeInsertDocument(t));
+TimestampedBSONObj _makeOplogEntry(int t) {
+    return {BSON("ts" << Timestamp(t, t) << "h" << t << "ns" << testNs.ns() << "v" << 2 << "op"
+                      << "i"
+                      << "o"
+                      << _makeInsertDocument(t)),
+            SnapshotName(t)};
 }
 
 /**
@@ -188,7 +189,7 @@ void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
 void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
     std::vector<BSONObj> expectedOplog(timestamps.size());
     std::transform(timestamps.begin(), timestamps.end(), expectedOplog.begin(), [](int ts) {
-        return _makeOplogEntry(ts);
+        return _makeOplogEntry(ts).obj;
     });
     _assertDocumentsInCollectionEquals(opCtx, oplogNs, expectedOplog);
 }

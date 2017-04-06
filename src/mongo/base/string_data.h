@@ -162,30 +162,30 @@ public:
      * null-terminated, so if using this without checking size(), you are likely doing
      * something wrong.
      */
-    const char* rawData() const {
+    constexpr const char* rawData() const {
         return _data;
     }
 
-    size_t size() const {
+    constexpr size_t size() const {
         return _size;
     }
-    bool empty() const {
+    constexpr bool empty() const {
         return size() == 0;
     }
     std::string toString() const {
         return std::string(_data, size());
     }
-    char operator[](unsigned pos) const {
+    constexpr char operator[](unsigned pos) const {
         return _data[pos];
     }
 
     //
     // iterators
     //
-    const_iterator begin() const {
+    constexpr const_iterator begin() const {
         return rawData();
     }
-    const_iterator end() const {
+    constexpr const_iterator end() const {
         return rawData() + size();
     }
 

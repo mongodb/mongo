@@ -68,12 +68,6 @@ TEST(RecordStore_CappedVisibility, EmptyInitialState) {
     ASSERT(!rs->getCursor(longLivedOp.get(), false)->next());
 
     RecordId lowestHiddenId = doInsert(longLivedOp, rs);
-
-    // Collection still looks empty to forward iteration but not reverse or seekExact.
-    ASSERT(!rs->getCursor(longLivedOp.get(), true)->next());
-    ASSERT_ID_EQ(rs->getCursor(longLivedOp.get(), false)->next(), lowestHiddenId);
-    ASSERT_ID_EQ(rs->getCursor(longLivedOp.get())->seekExact(lowestHiddenId), lowestHiddenId);
-
     RecordId otherId;
     {
         auto opCtx = harness->newOperationContext();
@@ -87,25 +81,21 @@ TEST(RecordStore_CappedVisibility, EmptyInitialState) {
 
         otherId = doInsert(opCtx, rs);
 
-        ASSERT(!rs->getCursor(opCtx.get(), true)->next());
+        // Can read own writes.
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), true)->next(), otherId);
         ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), otherId);
         ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(otherId), otherId);
 
         wuow.commit();
-
-        ASSERT(!rs->getCursor(opCtx.get(), true)->next());
-        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(otherId), otherId);
-        ASSERT(!rs->getCursor(opCtx.get())->seekExact(lowestHiddenId));
     }
 
     // longLivedOp is still on old snapshot so it can't see otherId yet.
-    ASSERT(!rs->getCursor(longLivedOp.get(), true)->next());
+    ASSERT_ID_EQ(rs->getCursor(longLivedOp.get(), true)->next(), lowestHiddenId);
     ASSERT_ID_EQ(rs->getCursor(longLivedOp.get(), false)->next(), lowestHiddenId);
     ASSERT_ID_EQ(rs->getCursor(longLivedOp.get())->seekExact(lowestHiddenId), lowestHiddenId);
     ASSERT(!rs->getCursor(longLivedOp.get())->seekExact(otherId));
 
-    // This makes all documents visible and lets longLivedOp get a new snapshot.
+    // Make all documents visible and let longLivedOp get a new snapshot.
     longLivedWuow.commit();
 
     ASSERT_ID_EQ(rs->getCursor(longLivedOp.get(), true)->next(), lowestHiddenId);

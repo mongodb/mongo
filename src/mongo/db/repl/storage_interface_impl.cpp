@@ -126,7 +126,8 @@ Status StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
 
     BSONObjBuilder bob;
     rbid.serialize(&bob);
-    return insertDocument(opCtx, _rollbackIdNss, bob.done());
+    SnapshotName noTimestamp;  // This write is not replicated.
+    return insertDocument(opCtx, _rollbackIdNss, TimestampedBSONObj{bob.done(), noTimestamp});
 }
 
 Status StorageInterfaceImpl::incrementRollbackID(OperationContext* opCtx) {
@@ -263,8 +264,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
 Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,
                                             const NamespaceString& nss,
-                                            const BSONObj& doc) {
-    return insertDocuments(opCtx, nss, {InsertStatement(doc)});
+                                            const TimestampedBSONObj& doc) {
+    return insertDocuments(opCtx, nss, {InsertStatement(doc.obj, doc.timestamp)});
 }
 
 namespace {

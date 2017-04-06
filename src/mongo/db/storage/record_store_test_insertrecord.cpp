@@ -127,7 +127,8 @@ TEST(RecordStoreTestHarness, InsertRecordUsingDocWriter) {
             StringDocWriter docWriter("my record", false);
 
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecordWithDocWriter(opCtx.get(), &docWriter);
+            StatusWith<RecordId> res =
+                rs->insertRecordWithDocWriterT(opCtx.get(), &docWriter, Timestamp(1));
             ASSERT_OK(res.getStatus());
             loc = res.getValue();
             uow.commit();
@@ -161,7 +162,8 @@ TEST(RecordStoreTestHarness, InsertMultipleRecordsUsingDocWriter) {
             StringDocWriter docWriter(ss.str(), false);
 
             WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res = rs->insertRecordWithDocWriter(opCtx.get(), &docWriter);
+            StatusWith<RecordId> res =
+                rs->insertRecordWithDocWriterT(opCtx.get(), &docWriter, Timestamp(1));
             ASSERT_OK(res.getStatus());
             locs[i] = res.getValue();
             uow.commit();

@@ -146,11 +146,11 @@ protected:
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
-        _storageInterface.insertDocumentFn =
-            [this](OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
-                ++_storageInterfaceWorkDone.documentsInsertedCount;
-                return Status::OK();
-            };
+        _storageInterface.insertDocumentFn = [this](
+            OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& doc) {
+            ++_storageInterfaceWorkDone.documentsInsertedCount;
+            return Status::OK();
+        };
         _storageInterface.insertDocumentsFn = [this](OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      const std::vector<InsertStatement>& ops) {

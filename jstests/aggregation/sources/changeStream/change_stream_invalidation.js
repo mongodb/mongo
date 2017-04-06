@@ -10,6 +10,16 @@
     // with the pipeline, then insert the changes, then run assertNextBatchMatches with the result
     // of startWatchingChanges and the expected set of results.
     function startWatchingChanges(pipeline, collection) {
+        // TODO: SERVER-29126
+        // While change streams still uses read concern level local instead of read concern level
+        // majority, we need to use causal consistency to be able to immediately read our own writes
+        // out of the oplog.  Once change streams read from the majority snapshot, we can remove
+        // these synchronization points from this test.
+        assert.commandWorked(db.runCommand({
+            find: "foo",
+            readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+        }));
+
         let res = assert.commandWorked(
             db.runCommand({aggregate: collection.getName(), "pipeline": pipeline, cursor: {}}));
         assert.neq(res.cursor.id, 0);
@@ -27,9 +37,10 @@
     // Write a document to the collection and test that the change stream returns it
     // and getMore command closes the cursor afterwards.
     const collGetMore = db.change_stream_getmore_invalidations;
-    // We awaited the replicaiton of the first write, so the change stream shouldn't return it.
+    // We awaited the replication of the first write, so the change stream shouldn't return it.
     // Use { w: "majority" } to deal with journaling correctly, even though we only have one node.
     assert.writeOK(collGetMore.insert({_id: 0, a: 1}, {writeConcern: {w: "majority"}}));
+
     let aggcursor = startWatchingChanges([{$changeStream: {}}, oplogProjection], collGetMore);
     assert.neq(aggcursor.id, 0);
     assert.eq(aggcursor.firstBatch.length, 0);
@@ -52,6 +63,16 @@
     assert.eq(aggcursor.firstBatch.length, 0);
 
     assert.writeOK(collAgg.insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    // TODO: SERVER-29126
+    // While change streams still uses read concern level local instead of read concern level
+    // majority, we need to use causal consistency to be able to immediately read our own writes
+    // out of the oplog.  Once change streams read from the majority snapshot, we can remove
+    // these synchronization points from this test.
+    assert.commandWorked(db.runCommand({
+        find: "foo",
+        readConcern: {level: "local", afterClusterTime: db.getMongo().getOperationTime()}
+    }));
+
     res =
         assert.commandWorked(db.runCommand({getMore: aggcursor.id, collection: collAgg.getName()}));
     aggcursor = res.cursor;

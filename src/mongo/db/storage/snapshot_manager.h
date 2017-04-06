@@ -80,7 +80,7 @@ public:
      * can be done later. In particular, cleaning up of old snapshots should be deferred until
      * cleanupUnneededSnapshots is called.
      */
-    virtual void setCommittedSnapshot(const SnapshotName& name) = 0;
+    virtual void setCommittedSnapshot(const SnapshotName& name, Timestamp ts) = 0;
 
     /**
      * Cleans up all snapshots older than the current committed snapshot.

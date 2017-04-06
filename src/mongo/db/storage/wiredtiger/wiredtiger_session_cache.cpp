@@ -389,4 +389,5 @@ void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(
     WiredTigerSession* session) const {
     session->_cache->releaseSession(session);
 }
+
 }  // namespace mongo

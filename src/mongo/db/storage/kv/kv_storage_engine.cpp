@@ -376,4 +376,7 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
+void KVStorageEngine::replicationBatchIsComplete() const {
+    return _engine->replicationBatchIsComplete();
+}
 }  // namespace mongo

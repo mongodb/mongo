@@ -34,17 +34,12 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
-#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 namespace {
@@ -159,7 +154,7 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
     if (!_active) {
-        _txnOpen(opCtx);
+        _txnOpen();
     }
     return _session.get();
 }
@@ -183,10 +178,6 @@ void* WiredTigerRecoveryUnit::writingPtr(void* data, size_t len) {
     MONGO_UNREACHABLE;
 }
 
-void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& id) {
-    _oplogReadTill = id;
-}
-
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_active);
     WT_SESSION* s = _session->getSession();
@@ -207,7 +198,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     }
     _active = false;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
-    _oplogReadTill = RecordId();
+    _isOplogReader = false;
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
@@ -233,7 +224,7 @@ boost::optional<SnapshotName> WiredTigerRecoveryUnit::getMajorityCommittedSnapsh
     return _majorityCommittedSnapshot;
 }
 
-void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
+void WiredTigerRecoveryUnit::_txnOpen() {
     invariant(!_active);
     _ensureSession();
 
@@ -241,17 +232,41 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     if (shouldLog(kSlowTransactionSeverity)) {
         _timer.reset(new Timer());
     }
-    WT_SESSION* s = _session->getSession();
+    WT_SESSION* session = _session->getSession();
 
     if (_readFromMajorityCommittedSnapshot) {
         _majorityCommittedSnapshot =
-            _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(s);
+            _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
+    } else if (_isOplogReader) {
+        _sessionCache->snapshotManager().beginTransactionOnOplog(
+            _sessionCache->getKVEngine()->getOplogManager(), session);
     } else {
-        invariantWTOK(s->begin_transaction(s, NULL));
+        invariantWTOK(session->begin_transaction(session, NULL));
     }
 
     LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;
     _active = true;
+}
+
+
+Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
+    _ensureSession();
+    LOG(3) << "WT set timestamp of future write operations to " << timestamp;
+    WT_SESSION* session = _session->getSession();
+    invariant(_inUnitOfWork);
+
+    // Starts the WT transaction associated with this session.
+    getSession(nullptr);
+
+    const std::string conf = str::stream() << "commit_timestamp=" << timestamp.toString();
+    auto rc = session->timestamp_transaction(session, conf.c_str());
+    return wtRCToStatus(rc, "timestamp_transaction");
+}
+
+void WiredTigerRecoveryUnit::setIsOplogReader() {
+    // Note: it would be nice to assert !active here, but OplogStones currently opens a cursor on
+    // the oplog while the recovery unit is already active.
+    _isOplogReader = true;
 }
 
 // ---------------------

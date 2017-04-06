@@ -66,7 +66,7 @@ public:
 
     Status insertDocument(OperationContext* opCtx,
                           const NamespaceString& nss,
-                          const BSONObj& doc) override;
+                          const TimestampedBSONObj& doc) override;
 
     Status insertDocuments(OperationContext* opCtx,
                            const NamespaceString& nss,

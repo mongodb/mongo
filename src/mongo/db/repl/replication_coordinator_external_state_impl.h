@@ -100,7 +100,7 @@ public:
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     void dropAllSnapshots() final;
-    void updateCommittedSnapshot(SnapshotName newCommitPoint) final;
+    void updateCommittedSnapshot(SnapshotInfo newCommitPoint) final;
     void createSnapshot(OperationContext* opCtx, SnapshotName name) final;
     void forceSnapshotCreation() final;
     virtual bool snapshotsEnabled() const;

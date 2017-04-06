@@ -40,8 +40,10 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -51,6 +53,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
@@ -63,42 +66,32 @@ using std::stringstream;
 
 class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
-    static WT_CONNECTION* createConnection(StringData dbpath, StringData extraStrings) {
-        WT_CONNECTION* conn = NULL;
-
-        std::stringstream ss;
-        ss << "create,";
-        ss << "statistics=(all),";
-        ss << extraStrings;
-        string config = ss.str();
-        int ret = wiredtiger_open(dbpath.toString().c_str(), NULL, config.c_str(), &conn);
-        ASSERT_OK(wtRCToStatus(ret));
-        ASSERT(conn);
-
-        return conn;
-    }
-
     WiredTigerHarnessHelper()
         : _dbpath("wt_test"),
-          _conn(createConnection(_dbpath.path(), "")),
-          _sessionCache(new WiredTigerSessionCache(_conn)) {}
+          _engine(kWiredTigerEngineName, _dbpath.path(), &_cs, "", 1, false, false, false, false) {}
 
     WiredTigerHarnessHelper(StringData extraStrings)
         : _dbpath("wt_test"),
-          _conn(createConnection(_dbpath.path(), extraStrings)),
-          _sessionCache(new WiredTigerSessionCache(_conn)) {}
+          _engine(kWiredTigerEngineName,
+                  _dbpath.path(),
+                  &_cs,
+                  extraStrings.toString(),
+                  1,
+                  false,
+                  false,
+                  false,
+                  false) {}
 
-    ~WiredTigerHarnessHelper() {
-        delete _sessionCache;
-        _conn->close(_conn, NULL);
-    }
+
+    ~WiredTigerHarnessHelper() {}
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
         return newNonCappedRecordStore("a.b");
     }
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit(_sessionCache);
+        WiredTigerRecoveryUnit* ru =
+            dynamic_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
         OperationContextNoop opCtx(ru);
         string uri = "table:" + ns;
 
@@ -126,7 +119,7 @@ public:
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
 
-        auto ret = stdx::make_unique<StandardWiredTigerRecordStore>(&opCtx, params);
+        auto ret = stdx::make_unique<StandardWiredTigerRecordStore>(&_engine, &opCtx, params);
         ret->postConstructorInit(&opCtx);
         return std::move(ret);
     }
@@ -139,7 +132,8 @@ public:
     virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
                                                               int64_t cappedMaxSize,
                                                               int64_t cappedMaxDocs) {
-        WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit(_sessionCache);
+        WiredTigerRecoveryUnit* ru =
+            dynamic_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
         OperationContextNoop opCtx(ru);
         string uri = "table:a.b";
 
@@ -170,27 +164,28 @@ public:
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
 
-        auto ret = stdx::make_unique<StandardWiredTigerRecordStore>(&opCtx, params);
+        auto ret = stdx::make_unique<StandardWiredTigerRecordStore>(&_engine, &opCtx, params);
         ret->postConstructorInit(&opCtx);
         return std::move(ret);
     }
 
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return stdx::make_unique<WiredTigerRecoveryUnit>(_sessionCache);
+        return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
     }
 
     virtual bool supportsDocLocking() final {
         return true;
     }
 
-    virtual WT_CONNECTION* conn() const {
-        return _conn;
+    virtual WT_CONNECTION* conn() {
+        return _engine.getConnection();
     }
 
 private:
     unittest::TempDir _dbpath;
-    WT_CONNECTION* _conn;
-    WiredTigerSessionCache* _sessionCache;
+    ClockSourceMock _cs;
+
+    WiredTigerKVEngine _engine;
 };
 
 std::unique_ptr<HarnessHelper> makeHarnessHelper() {
@@ -262,7 +257,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.cappedCallback = nullptr;
         params.sizeStorer = &ss;
 
-        auto ret = new StandardWiredTigerRecordStore(opCtx.get(), params);
+        auto ret = new StandardWiredTigerRecordStore(nullptr, opCtx.get(), params);
         ret->postConstructorInit(opCtx.get());
         rs.reset(ret);
     }
@@ -433,7 +428,7 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
     params.cappedCallback = nullptr;
     params.sizeStorer = sizeStorer.get();
 
-    auto ret = new StandardWiredTigerRecordStore(opCtx.get(), params);
+    auto ret = new StandardWiredTigerRecordStore(nullptr, opCtx.get(), params);
     ret->postConstructorInit(opCtx.get());
     rs.reset(ret);
 

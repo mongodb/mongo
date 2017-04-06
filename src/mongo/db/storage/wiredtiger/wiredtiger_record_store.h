@@ -39,6 +39,7 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -66,12 +67,10 @@ class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
 extern const std::string kWiredTigerEngineName;
-typedef std::list<RecordId> SortedRecordIds;
 
 class WiredTigerRecordStore : public RecordStore {
     friend class WiredTigerRecordStoreCursorBase;
 
-    // Only the `_isOplog` member? Move to protected?
     friend class StandardWiredTigerRecordStore;
     friend class PrefixedWiredTigerRecordStore;
 
@@ -113,7 +112,7 @@ public:
         bool isReadOnly;
     };
 
-    WiredTigerRecordStore(OperationContext* opCtx, Params params);
+    WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, OperationContext* opCtx, Params params);
 
     virtual ~WiredTigerRecordStore();
 
@@ -140,6 +139,14 @@ public:
 
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& id);
 
+    virtual Status insertRecordsT(OperationContext* opCtx,
+                                  std::vector<Record>* records,
+                                  std::vector<Timestamp>* timestamps,
+                                  bool enforceQuota);
+
+    virtual StatusWith<RecordId> insertRecordT(
+        OperationContext* opCtx, const char* data, int len, Timestamp timestamp, bool enforceQuota);
+
     virtual Status insertRecords(OperationContext* opCtx,
                                  std::vector<Record>* records,
                                  bool enforceQuota);
@@ -149,10 +156,19 @@ public:
                                               int len,
                                               bool enforceQuota);
 
+    virtual Status insertRecordsWithDocWriterT(OperationContext* opCtx,
+                                               const DocWriter* const* docs,
+                                               Timestamp* timestamps,
+                                               size_t nDocs,
+                                               RecordId* idsOut);
+
     virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,
                                               size_t nDocs,
-                                              RecordId* idsOut);
+                                              RecordId* idsOut) {
+        invariant(false);
+    };
+
 
     virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
@@ -225,13 +241,6 @@ public:
 
     Status updateCappedSize(OperationContext* opCtx, long long cappedSize) final;
 
-    bool isOplog() const {
-        return _isOplog;
-    }
-    bool usingOplogHack() const {
-        return _useOplogHack;
-    }
-
     void setCappedCallback(CappedCallback* cb) {
         stdx::lock_guard<stdx::mutex> lk(_cappedCallbackMutex);
         _cappedCallback = cb;
@@ -251,8 +260,7 @@ public:
         _sizeStorer = ss;
     }
 
-    bool isCappedHidden(const RecordId& id) const;
-    RecordId lowestCappedHiddenRecord() const;
+    bool isOpHidden_forTest(const RecordId& id) const;
 
     bool inShutdown() const;
 
@@ -268,6 +276,8 @@ public:
 
     // Returns false if the oplog was dropped while waiting for a deletion request.
     bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx);
+
+    void notifyCappedWaitersIfNeeded();
 
     class OplogStones;
 
@@ -293,16 +303,16 @@ protected:
 private:
     class RandomCursor;
 
-    class CappedInsertChange;
+    class OplogInsertChange;
     class NumRecordsChange;
     class DataSizeChange;
 
     static WiredTigerRecoveryUnit* _getRecoveryUnit(OperationContext* opCtx);
 
-    void _dealtWithCappedId(SortedRecordIds::iterator it, bool didCommit);
-    void _addUncommittedRecordId_inlock(OperationContext* opCtx, RecordId id);
-
-    Status _insertRecords(OperationContext* opCtx, Record* records, size_t nRecords);
+    Status _insertRecords(OperationContext* opCtx,
+                          Record* records,
+                          Timestamp* timestamps,
+                          size_t nRecords);
 
     RecordId _nextId();
     void _setId(RecordId id);
@@ -310,8 +320,7 @@ private:
     void _changeNumRecords(OperationContext* opCtx, int64_t diff);
     void _increaseDataSize(OperationContext* opCtx, int64_t amount);
     RecordData _getData(const WiredTigerCursor& cursor) const;
-    void _oplogSetStartHack(WiredTigerRecoveryUnit* wru) const;
-    void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache);
+
 
     const std::string _uri;
     const uint64_t _tableId;  // not persisted
@@ -331,17 +340,12 @@ private:
     AtomicInt64 _cappedSleep;
     AtomicInt64 _cappedSleepMS;
     CappedCallback* _cappedCallback;
-    stdx::mutex _cappedCallbackMutex;  // guards _cappedCallback.
+    bool _shuttingDown;
+    stdx::mutex _cappedCallbackMutex;  // guards _cappedCallback and _shuttingDown
 
     // See comment in ::cappedDeleteAsNeeded
     int _cappedDeleteCheckCount;
     mutable stdx::timed_mutex _cappedDeleterMutex;
-
-    const bool _useOplogHack;
-
-    SortedRecordIds _uncommittedRecordIds;
-    RecordId _oplog_highestSeen;
-    mutable stdx::mutex _uncommittedRecordIdsMutex;
 
     AtomicInt64 _nextIdNum;
     AtomicInt64 _dataSize;
@@ -350,22 +354,18 @@ private:
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     int _sizeStorerCounter;
 
-    bool _shuttingDown;
+    WiredTigerKVEngine* _kvEngine;  // not owned.
 
     // Non-null if this record store is underlying the active oplog.
     std::shared_ptr<OplogStones> _oplogStones;
-
-    // These use the _uncommittedRecordIdsMutex and are only used when _isOplog is true.
-    stdx::condition_variable _opsWaitingForJournalCV;
-    mutable stdx::condition_variable _opsBecameVisibleCV;
-    std::vector<SortedRecordIds::iterator> _opsWaitingForJournal;
-    stdx::thread _oplogJournalThread;
 };
 
 
 class StandardWiredTigerRecordStore final : public WiredTigerRecordStore {
 public:
-    StandardWiredTigerRecordStore(OperationContext* opCtx, Params params);
+    StandardWiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
+                                  OperationContext* opCtx,
+                                  Params params);
 
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                             bool forward) const override;
@@ -390,7 +390,10 @@ protected:
 
 class PrefixedWiredTigerRecordStore final : public WiredTigerRecordStore {
 public:
-    PrefixedWiredTigerRecordStore(OperationContext* opCtx, Params params, KVPrefix prefix);
+    PrefixedWiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
+                                  OperationContext* opCtx,
+                                  Params params,
+                                  KVPrefix prefix);
 
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                             bool forward) const override;
@@ -466,7 +469,6 @@ protected:
     boost::optional<WiredTigerCursor> _cursor;
     bool _eof = false;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
-    const RecordId _readUntilForOplog;
 
 private:
     bool isVisible(const RecordId& id);

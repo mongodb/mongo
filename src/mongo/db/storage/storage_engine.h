@@ -328,6 +328,15 @@ public:
      */
     virtual void setInitialDataTimestamp(SnapshotName snapshotName) {}
 
+    /**
+     *  Notifies the storage engine that a replication batch has completed.
+     *  This means that all the writes associated with the oplog entries in the batch are
+     *  finished and no new writes with timestamps associated with those oplog entries will show
+     *  up in the future.
+     *  This function can be used to ensure oplog visibility rules are not broken, for example.
+     */
+    virtual void replicationBatchIsComplete() const {};
+
     // (CollectionName, IndexName)
     typedef std::pair<std::string, std::string> CollectionIndexNamePair;
 

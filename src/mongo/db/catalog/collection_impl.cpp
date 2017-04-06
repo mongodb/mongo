@@ -321,6 +321,7 @@ StatusWithMatchExpression CollectionImpl::parseValidator(const BSONObj& validato
 
 Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
                                                const DocWriter* const* docs,
+                                               Timestamp* timestamps,
                                                size_t nDocs) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
@@ -331,7 +332,7 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     invariant(!_indexCatalog.haveAnyIndexes());
     invariant(!_mustTakeCappedLockOnInsert);
 
-    Status status = _recordStore->insertRecordsWithDocWriter(opCtx, docs, nDocs);
+    Status status = _recordStore->insertRecordsWithDocWriterT(opCtx, docs, timestamps, nDocs);
     if (!status.isOK())
         return status;
 
@@ -433,7 +434,8 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
 
     if (_mustTakeCappedLockOnInsert)
         synchronizeOnCappedInFlightResource(opCtx->lockState(), _ns);
-
+    // TODO SERVER-30638: using timestamp 0 for these inserts, which are non-oplog so we don't yet
+    // care about their correct timestamps.
     StatusWith<RecordId> loc = _recordStore->insertRecord(
         opCtx, doc.objdata(), doc.objsize(), _enforceQuota(enforceQuota));
 
@@ -485,11 +487,17 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 
     std::vector<Record> records;
     records.reserve(count);
+    std::vector<Timestamp> timestamps;
+    timestamps.reserve(count);
+
     for (auto it = begin; it != end; it++) {
         Record record = {RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())};
         records.push_back(record);
+        Timestamp timestamp = Timestamp(it->timestamp.asU64());
+        timestamps.push_back(timestamp);
     }
-    Status status = _recordStore->insertRecords(opCtx, &records, _enforceQuota(enforceQuota));
+    Status status =
+        _recordStore->insertRecordsT(opCtx, &records, &timestamps, _enforceQuota(enforceQuota));
     if (!status.isOK())
         return status;
 
@@ -710,8 +718,9 @@ StatusWith<RecordId> CollectionImpl::_updateDocumentWithMove(OperationContext* o
                                                              OplogUpdateEntryArgs* args,
                                                              const SnapshotId& sid) {
     // Insert new record.
-    StatusWith<RecordId> newLocation = _recordStore->insertRecord(
-        opCtx, newDoc.objdata(), newDoc.objsize(), _enforceQuota(enforceQuota));
+    // TODO SERVER-30638, thread through actual timestamps.
+    StatusWith<RecordId> newLocation = _recordStore->insertRecordT(
+        opCtx, newDoc.objdata(), newDoc.objsize(), Timestamp(), _enforceQuota(enforceQuota));
     if (!newLocation.isOK()) {
         return newLocation;
     }

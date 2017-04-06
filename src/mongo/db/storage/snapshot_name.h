@@ -39,7 +39,8 @@ namespace mongo {
 class SnapshotName {
 public:
     explicit SnapshotName(uint64_t value) : _value(value) {}
-    explicit SnapshotName(Timestamp ts) : SnapshotName(ts.asULL()) {}
+    explicit SnapshotName(Timestamp timestamp) : _value(timestamp.asULL()) {}
+    SnapshotName() : _value(0) {}
 
     /**
      * Returns a SnapshotName guaranteed to compare < all names of actual snapshots.

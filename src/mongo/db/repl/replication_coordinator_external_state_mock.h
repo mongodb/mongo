@@ -87,7 +87,7 @@ public:
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     virtual void dropAllSnapshots();
-    virtual void updateCommittedSnapshot(SnapshotName newCommitPoint);
+    virtual void updateCommittedSnapshot(SnapshotInfo newCommitPoint);
     virtual void createSnapshot(OperationContext* opCtx, SnapshotName name);
     virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;

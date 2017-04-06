@@ -235,12 +235,12 @@ protected:
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
-        _storageInterface->insertDocumentFn =
-            [this](OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
-                LockGuard lock(_storageInterfaceWorkDoneMutex);
-                ++_storageInterfaceWorkDone.documentsInsertedCount;
-                return Status::OK();
-            };
+        _storageInterface->insertDocumentFn = [this](
+            OperationContext* opCtx, const NamespaceString& nss, const TimestampedBSONObj& doc) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
+            ++_storageInterfaceWorkDone.documentsInsertedCount;
+            return Status::OK();
+        };
         _storageInterface->insertDocumentsFn = [this](OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const std::vector<InsertStatement>& ops) {
@@ -2046,9 +2046,9 @@ TEST_F(
     auto opCtx = makeOpCtx();
 
     NamespaceString insertDocumentNss;
-    BSONObj insertDocumentDoc;
+    TimestampedBSONObj insertDocumentDoc;
     _storageInterface->insertDocumentFn = [&insertDocumentDoc, &insertDocumentNss](
-        OperationContext*, const NamespaceString& nss, const BSONObj& doc) {
+        OperationContext*, const NamespaceString& nss, const TimestampedBSONObj& doc) {
         insertDocumentNss = nss;
         insertDocumentDoc = doc;
         return Status(ErrorCodes::OperationFailed, "failed to insert oplog entry");
@@ -2095,7 +2095,7 @@ TEST_F(
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
     ASSERT_EQUALS(_options.localOplogNS, insertDocumentNss);
-    ASSERT_BSONOBJ_EQ(oplogEntry, insertDocumentDoc);
+    ASSERT_BSONOBJ_EQ(oplogEntry, insertDocumentDoc.obj);
 }
 
 TEST_F(
@@ -2105,9 +2105,9 @@ TEST_F(
     auto opCtx = makeOpCtx();
 
     NamespaceString insertDocumentNss;
-    BSONObj insertDocumentDoc;
+    TimestampedBSONObj insertDocumentDoc;
     _storageInterface->insertDocumentFn = [initialSyncer, &insertDocumentDoc, &insertDocumentNss](
-        OperationContext*, const NamespaceString& nss, const BSONObj& doc) {
+        OperationContext*, const NamespaceString& nss, const TimestampedBSONObj& doc) {
         insertDocumentNss = nss;
         insertDocumentDoc = doc;
         initialSyncer->shutdown().transitional_ignore();
@@ -2155,7 +2155,7 @@ TEST_F(
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
     ASSERT_EQUALS(_options.localOplogNS, insertDocumentNss);
-    ASSERT_BSONOBJ_EQ(oplogEntry, insertDocumentDoc);
+    ASSERT_BSONOBJ_EQ(oplogEntry, insertDocumentDoc.obj);
 }
 
 TEST_F(

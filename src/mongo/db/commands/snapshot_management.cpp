@@ -124,7 +124,7 @@ public:
 
         Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
         auto name = SnapshotName(cmdObj.firstElement().Long());
-        snapshotManager->setCommittedSnapshot(name);
+        snapshotManager->setCommittedSnapshot(name, Timestamp(name.asU64()));
         return true;
     }
 };

@@ -157,6 +157,7 @@ public:
 
     Status insertDocumentsForOplog(OperationContext* opCtx,
                                    const DocWriter* const* docs,
+                                   Timestamp* timestamps,
                                    size_t nDocs) {
         std::abort();
     }

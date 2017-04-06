@@ -102,8 +102,12 @@ public:
     explicit InsertStatement(BSONObj toInsert) : doc(toInsert) {}
 
     InsertStatement(StmtId statementId, BSONObj toInsert) : stmtId(statementId), doc(toInsert) {}
+    InsertStatement(StmtId statementId, BSONObj toInsert, SnapshotName ts)
+        : stmtId(statementId), timestamp(ts), doc(toInsert) {}
+    InsertStatement(BSONObj toInsert, SnapshotName ts) : timestamp(ts), doc(toInsert) {}
 
     StmtId stmtId = kUninitializedStmtId;
+    SnapshotName timestamp = SnapshotName();
     BSONObj doc;
 };
 
@@ -265,6 +269,7 @@ public:
 
         virtual Status insertDocumentsForOplog(OperationContext* opCtx,
                                                const DocWriter* const* docs,
+                                               Timestamp* timestamps,
                                                size_t nDocs) = 0;
 
         virtual Status insertDocument(OperationContext* opCtx,
@@ -518,8 +523,9 @@ public:
      */
     inline Status insertDocumentsForOplog(OperationContext* const opCtx,
                                           const DocWriter* const* const docs,
+                                          Timestamp* timestamps,
                                           const size_t nDocs) {
-        return this->_impl().insertDocumentsForOplog(opCtx, docs, nDocs);
+        return this->_impl().insertDocumentsForOplog(opCtx, docs, timestamps, nDocs);
     }
 
     /**

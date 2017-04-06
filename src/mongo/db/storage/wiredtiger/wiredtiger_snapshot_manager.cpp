@@ -31,7 +31,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -53,11 +56,20 @@ Status WiredTigerSnapshotManager::createSnapshot(OperationContext* opCtx,
     return wtRCToStatus(session->snapshot(session, config.c_str()));
 }
 
-void WiredTigerSnapshotManager::setCommittedSnapshot(const SnapshotName& name) {
+void WiredTigerSnapshotManager::setCommittedSnapshot(const SnapshotName& name, Timestamp ts) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     invariant(!_committedSnapshot || *_committedSnapshot <= name);
     _committedSnapshot = name;
+
+    char oldestTSConfigString["oldest_timestamp="_sd.size() + (8 * 2) /* 16 hexadecimal digits */ +
+                              1 /* trailing null */];
+    auto size = std::snprintf(
+        oldestTSConfigString, sizeof(oldestTSConfigString), "oldest_timestamp=%llx", ts.asULL());
+    invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
+    invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
+    _oldestKeptTimestamp = ts;
+    LOG(2) << "oldest_timestamp set to " << oldestTSConfigString;
 }
 
 void WiredTigerSnapshotManager::cleanupUnneededSnapshots() {
@@ -74,6 +86,7 @@ void WiredTigerSnapshotManager::cleanupUnneededSnapshots() {
 void WiredTigerSnapshotManager::dropAllSnapshots() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _committedSnapshot = boost::none;
+
     invariantWTOK(_session->snapshot(_session, "drop=(all)"));
 }
 
@@ -104,6 +117,25 @@ SnapshotName WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     invariantWTOK(session->begin_transaction(session, config.str().c_str()));
 
     return *_committedSnapshot;
+}
+
+void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* oplogManager,
+                                                        WT_SESSION* session) const {
+    auto allCommittedTimestamp = oplogManager->getOplogReadTimestamp();
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    // Choose a read timestamp that is >= oldest_timestamp, but <= all_committed.
+    // Using "unsigned long long" here to ensure that the snprintf works with %llx on all
+    // platforms.
+    unsigned long long readTimestamp =
+        std::max<std::uint64_t>(allCommittedTimestamp, _oldestKeptTimestamp.asULL());
+
+    char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 16 hexadecimal digits */ +
+                            1 /* trailing null */];
+    auto size = std::snprintf(
+        readTSConfigString, sizeof(readTSConfigString), "read_timestamp=%llx", readTimestamp);
+    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
+    invariantWTOK(session->begin_transaction(session, readTSConfigString));
 }
 
 }  // namespace mongo

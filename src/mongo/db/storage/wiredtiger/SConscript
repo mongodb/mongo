@@ -37,6 +37,7 @@ if wiredtiger:
             'wiredtiger_global_options.cpp',
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',
+            'wiredtiger_oplog_manager.cpp',
             'wiredtiger_record_store.cpp',
             'wiredtiger_recovery_unit.cpp',
             'wiredtiger_session_cache.cpp',
@@ -113,11 +114,13 @@ if wiredtiger:
     wtEnv.Library(
         target='additional_wiredtiger_record_store_tests',
         source=[
+            'record_store_test_oplog.cpp',
             'wiredtiger_record_store_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
             '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+            '$BUILD_DIR/mongo/util/clock_source_mock',
             'storage_wiredtiger_mock',
         ],
     )

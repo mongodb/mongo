@@ -133,6 +133,26 @@ public:
     virtual SnapshotId getSnapshotId() const = 0;
 
     /**
+     * Sets a timestamp to assign to future writes in a transaction.
+     * All subsequent writes will be assigned this timestamp.
+     * If setTimestamp() is called again, specifying a new timestamp, future writes will use this
+     * new timestamp but past writes remain with their originally assigned timestamps.
+     * Writes that occur before any setTimestamp() is called will be assigned the timestamp
+     * specified in the last setTimestamp() call in the transaction, at commit time.
+     */
+    virtual Status setTimestamp(SnapshotName timestamp) {
+        return Status::OK();
+    }
+
+    /**
+     * Chooses which snapshot to use for read transactions.
+     */
+    virtual Status selectSnapshot(SnapshotName timestamp) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "point-in-time reads are not implemented for this storage engine");
+    }
+
+    /**
      * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
      * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
      *

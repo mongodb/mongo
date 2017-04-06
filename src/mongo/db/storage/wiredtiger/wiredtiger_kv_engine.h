@@ -39,6 +39,7 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -48,6 +49,7 @@ namespace mongo {
 
 class ClockSource;
 class JournalListener;
+class WiredTigerRecordStore;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
@@ -181,6 +183,30 @@ public:
 
     void syncSizeInfo(bool sync) const;
 
+    /*
+     * Initializes and reference counts an oplog manager, to control oplog entry visibility for
+     * reads.
+     * The oplogManager object is held by this class but is constructed and deleted as per
+     * the Oplog record store (the record store corresponding to the oplog collection).  If
+     * multiple oplog record stores are created, the first oplog record store to be constructed will
+     * construct the Manager, and the last oplog record store to be deleted will destruct the
+     * Manager.
+     */
+    void initializeOplogManager(OperationContext* opCtx,
+                                const std::string& uri,
+                                WiredTigerRecordStore* oplogRecordStore);
+    void deleteOplogManager();
+
+    WiredTigerOplogManager* getOplogManager() const {
+        return _oplogManager.get();
+    }
+
+    /*
+     * This function is called when replication has completed a batch.  In this function, we
+     * refresh our oplog visiblity read-at-timestamp value.
+     */
+    void replicationBatchIsComplete() const override;
+
     /**
      * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the
      * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefroe in
@@ -213,6 +239,15 @@ private:
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
+
+    // Mutex used to protect use of _oplogManager and _oplogManagerCount by this instance of KV
+    // engine.
+    // Other uses by the record store are managed by itself and do not need to lock, other
+    // than at shutdown (delete).
+    mutable stdx::mutex _oplogManagerMutex;
+    std::unique_ptr<WiredTigerOplogManager> _oplogManager;
+    std::size_t _oplogManagerCount = 0;
+
     std::string _canonicalName;
     std::string _path;
     std::string _wtOpenConfig;

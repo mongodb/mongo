@@ -201,6 +201,9 @@ public:
                         _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
                     }
                 }
+            } catch (const WriteConflictException& wce) {
+                // Temporary: remove this after WT-3483
+                warning() << "Checkpoint encountered a write conflict exception.";
             } catch (const AssertionException& exc) {
                 invariant(exc.code() == ErrorCodes::ShutdownInProgress);
             }
@@ -726,9 +729,9 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
 
     std::unique_ptr<WiredTigerRecordStore> ret;
     if (prefix == KVPrefix::kNotPrefixed) {
-        ret = stdx::make_unique<StandardWiredTigerRecordStore>(opCtx, params);
+        ret = stdx::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
     } else {
-        ret = stdx::make_unique<PrefixedWiredTigerRecordStore>(opCtx, params, prefix);
+        ret = stdx::make_unique<PrefixedWiredTigerRecordStore>(this, opCtx, params, prefix);
     }
     ret->postConstructorInit(opCtx);
 
@@ -1030,4 +1033,29 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
 
     return _checkpointThread->supportsRecoverToStableTimestamp();
 }
+
+void WiredTigerKVEngine::initializeOplogManager(OperationContext* opCtx,
+                                                const std::string& uri,
+                                                WiredTigerRecordStore* oplogRecordStore) {
+    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
+    if (_oplogManagerCount == 0)
+        _oplogManager.reset(new WiredTigerOplogManager(opCtx, uri, oplogRecordStore));
+    _oplogManagerCount++;
+}
+
+void WiredTigerKVEngine::deleteOplogManager() {
+    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
+    invariant(_oplogManagerCount > 0);
+    _oplogManagerCount--;
+    if (_oplogManagerCount == 0)
+        _oplogManager.reset();
+}
+
+void WiredTigerKVEngine::replicationBatchIsComplete() const {
+    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
+    if (_oplogManager) {
+        _oplogManager->triggerJournalFlush();
+    }
+}
+
 }  // namespace mongo

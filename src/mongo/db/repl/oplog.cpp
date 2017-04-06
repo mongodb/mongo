@@ -383,17 +383,23 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     "u" update
     "d" delete
     "c" db cmd
-    "db" declares presence of a database (ns is set to the db name + '.')
+    "db" declares presence of a database (ns is set to the db name + '.') (master/slave only)
     "n" no op
-
-   bb param:
-     if not null, specifies a boolean to pass along to the other side as b: param.
-     used for "justOne" or "upsert" flags on 'd', 'u'
 */
+
+
+/*
+ * writers - an array with size nDocs of DocWriter objects.
+ * timestamps - an array with size nDocs of respective Timestamp objects for each DocWriter.
+ * oplogCollection - collection to be written to.
+ * replicationMode - ReplSet or MasterSlave.
+ * finalOpTime - the OpTime of the last DocWriter object.
+ */
 void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
                   const DocWriter* const* writers,
-                  size_t nWriters,
+                  Timestamp* timestamps,
+                  size_t nDocs,
                   Collection* oplogCollection,
                   ReplicationCoordinator::Mode replicationMode,
                   OpTime finalOpTime) {
@@ -407,7 +413,7 @@ void _logOpsInner(OperationContext* opCtx,
 
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
     // instead we do a single copy to the destination in the record store.
-    checkOplogInsert(oplogCollection->insertDocumentsForOplog(opCtx, writers, nWriters));
+    checkOplogInsert(oplogCollection->insertDocumentsForOplog(opCtx, writers, timestamps, nDocs));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit([opCtx, replCoord, finalOpTime] {
@@ -436,6 +442,7 @@ OpTime logOp(OperationContext* opCtx,
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     auto replMode = replCoord->getReplicationMode();
     OplogSlot slot;
+    WriteUnitOfWork wuow(opCtx);
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
 
     Timestamp prevTs;
@@ -457,7 +464,9 @@ OpTime logOp(OperationContext* opCtx,
                                prevTs,
                                preAndPostTs);
     const DocWriter* basePtr = &writer;
-    _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
+    auto timestamp = slot.opTime.getTimestamp();
+    _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, replMode, slot.opTime);
+    wuow.commit();
     return slot.opTime;
 }
 
@@ -483,6 +492,8 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     std::unique_ptr<OplogSlot[]> slots(new OplogSlot[count]);
     auto replMode = replCoord->getReplicationMode();
+
+    WriteUnitOfWork wuow(opCtx);
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
     auto wallTime = Date_t::now();
 
@@ -491,6 +502,7 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
         prevTs = OperationContextSession::get(opCtx)->getLastWriteOpTimeTs();
     }
 
+    auto timestamps = stdx::make_unique<Timestamp[]>(count);
     for (size_t i = 0; i < count; i++) {
         auto insertStatement = begin[i];
         writers.emplace_back(_logOpWriter(opCtx,
@@ -507,14 +519,22 @@ repl::OpTime logInsertOps(OperationContext* opCtx,
                                           prevTs,
                                           {}));
         prevTs = slots[i].opTime.getTimestamp();
+        timestamps[i] = slots[i].opTime.getTimestamp();
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
     for (size_t i = 0; i < count; i++) {
         basePtrs[i] = &writers[i];
     }
-    _logOpsInner(opCtx, nss, basePtrs.get(), count, oplog, replMode, slots[count - 1].opTime);
-
+    _logOpsInner(opCtx,
+                 nss,
+                 basePtrs.get(),
+                 timestamps.get(),
+                 count,
+                 oplog,
+                 replMode,
+                 slots[count - 1].opTime);
+    wuow.commit();
     return slots[count - 1].opTime;
 }
 
@@ -909,20 +929,25 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
-    std::array<StringData, 6> names = {"o", "ui", "ns", "op", "b", "o2"};
-    std::array<BSONElement, 6> fields;
+    std::array<StringData, 7> names = {"ts", "o", "ui", "ns", "op", "b", "o2"};
+    std::array<BSONElement, 7> fields;
     op.getFields(names, &fields);
-    BSONElement& fieldO = fields[0];
-    BSONElement& fieldUI = fields[1];
-    BSONElement& fieldNs = fields[2];
-    BSONElement& fieldOp = fields[3];
-    BSONElement& fieldB = fields[4];
-    BSONElement& fieldO2 = fields[5];
+    BSONElement& fieldTs = fields[0];
+    BSONElement& fieldO = fields[1];
+    BSONElement& fieldUI = fields[2];
+    BSONElement& fieldNs = fields[3];
+    BSONElement& fieldOp = fields[4];
+    BSONElement& fieldB = fields[5];
+    BSONElement& fieldO2 = fields[6];
 
     BSONObj o;
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
 
+    SnapshotName timestamp;
+    if (fieldTs.ok()) {
+        timestamp = SnapshotName(fieldTs.timestamp());
+    }
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
 
@@ -992,7 +1017,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             for (auto elem : fieldO.Obj()) {
                 // Note: we don't care about statement ids here since the secondaries don't create
                 // their own oplog entries.
-                insertObjs.emplace_back(elem.Obj());
+                insertObjs.emplace_back(elem.Obj(), timestamp);
             }
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "Failed to apply insert due to empty array element: "
@@ -1036,8 +1061,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (!needToDoUpsert) {
                 WriteUnitOfWork wuow(opCtx);
                 OpDebug* const nullOpDebug = nullptr;
-                auto status =
-                    collection->insertDocument(opCtx, InsertStatement(o), nullOpDebug, true);
+                auto status = collection->insertDocument(
+                    opCtx, InsertStatement(o, timestamp), nullOpDebug, true);
                 if (status.isOK()) {
                     wuow.commit();
                 } else if (status == ErrorCodes::DuplicateKey) {
@@ -1286,7 +1311,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     getGlobalAuthorizationManager()->logOp(opCtx, opType, nss, o, nullptr);
     wuow.commit();
-
     return Status::OK();
 }
 

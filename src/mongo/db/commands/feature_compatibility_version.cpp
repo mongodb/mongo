@@ -36,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -227,9 +228,11 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         uassertStatusOK(storageInterface->insertDocument(
             opCtx,
             nss,
-            BSON("_id" << FeatureCompatibilityVersion::kParameterName
-                       << FeatureCompatibilityVersion::kVersionField
-                       << FeatureCompatibilityVersionCommandParser::kVersion36)));
+            repl::TimestampedBSONObj{
+                BSON("_id" << FeatureCompatibilityVersion::kParameterName
+                           << FeatureCompatibilityVersion::kVersionField
+                           << FeatureCompatibilityVersionCommandParser::kVersion36),
+                SnapshotName()}));  // No timestamp because this write is not replicated.
     }
 }
 

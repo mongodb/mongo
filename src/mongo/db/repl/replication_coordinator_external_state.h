@@ -59,6 +59,31 @@ class LastVote;
 class ReplSettings;
 class ReplicationCoordinator;
 
+struct SnapshotInfo {
+    OpTime opTime;
+    SnapshotName name;
+
+    bool operator==(const SnapshotInfo& other) const {
+        return std::tie(opTime, name) == std::tie(other.opTime, other.name);
+    }
+    bool operator!=(const SnapshotInfo& other) const {
+        return std::tie(opTime, name) != std::tie(other.opTime, other.name);
+    }
+    bool operator<(const SnapshotInfo& other) const {
+        return std::tie(opTime, name) < std::tie(other.opTime, other.name);
+    }
+    bool operator<=(const SnapshotInfo& other) const {
+        return std::tie(opTime, name) <= std::tie(other.opTime, other.name);
+    }
+    bool operator>(const SnapshotInfo& other) const {
+        return std::tie(opTime, name) > std::tie(other.opTime, other.name);
+    }
+    bool operator>=(const SnapshotInfo& other) const {
+        return std::tie(opTime, name) >= std::tie(other.opTime, other.name);
+    }
+    std::string toString() const;
+};
+
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
  * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
@@ -254,7 +279,7 @@ public:
      *
      * It is illegal to call with a newCommitPoint that does not name an existing snapshot.
      */
-    virtual void updateCommittedSnapshot(SnapshotName newCommitPoint) = 0;
+    virtual void updateCommittedSnapshot(SnapshotInfo newCommitPoint) = 0;
 
     /**
      * Creates a new snapshot.

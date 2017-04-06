@@ -274,13 +274,6 @@ InitialSyncerOptions createInitialSyncerOptions(
 }
 }  // namespace
 
-std::string ReplicationCoordinatorImpl::SnapshotInfo::toString() const {
-    BSONObjBuilder bob;
-    bob.append("optime", opTime.toBSON());
-    bob.append("name-id", name.toString());
-    return bob.obj().toString();
-}
-
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     ServiceContext* service,
     const ReplSettings& settings,
@@ -3359,7 +3352,7 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();
 
-    _externalState->updateCommittedSnapshot(newCommittedSnapshot.name);
+    _externalState->updateCommittedSnapshot(newCommittedSnapshot);
 
     // Wake up any threads waiting for read concern or write concern.
     _wakeReadyWaiters_inlock();

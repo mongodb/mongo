@@ -801,6 +801,7 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
 void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     const StatusWith<Fetcher::QueryResponse>& result,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    Timestamp oplogSeedDocTimestamp;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         auto status = _checkForShutdownAndConvertStatus_inlock(
@@ -817,7 +818,8 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
             return;
         }
         auto&& optimeWithHash = optimeWithHashStatus.getValue();
-        _initialSyncState->stopTimestamp = optimeWithHash.opTime.getTimestamp();
+        oplogSeedDocTimestamp = _initialSyncState->stopTimestamp =
+            optimeWithHash.opTime.getTimestamp();
 
         if (_initialSyncState->beginTimestamp == _initialSyncState->stopTimestamp) {
             _lastApplied = optimeWithHash;
@@ -835,7 +837,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     {
         const auto& documents = result.getValue().documents;
         invariant(!documents.empty());
-        const auto& oplogSeedDoc = documents.front();
+        const BSONObj oplogSeedDoc = documents.front();
         LOG(2) << "Inserting oplog seed document: " << oplogSeedDoc;
 
         auto opCtx = makeOpCtx();
@@ -843,7 +845,10 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         // override its behavior in tests. See InitialSyncerReturnsCallbackCanceledAndDoesNot-
         // ScheduleRollbackCheckerIfShutdownAfterInsertingInsertOplogSeedDocument in
         // initial_syncer_test.cpp
-        auto status = _storage->insertDocument(opCtx.get(), _opts.localOplogNS, oplogSeedDoc);
+        auto status = _storage->insertDocument(
+            opCtx.get(),
+            _opts.localOplogNS,
+            TimestampedBSONObj{oplogSeedDoc, SnapshotName(oplogSeedDocTimestamp)});
         if (!status.isOK()) {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);

@@ -419,31 +419,6 @@ private:
     using ScheduleFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         const executor::TaskExecutor::CallbackFn& work)>;
 
-    struct SnapshotInfo {
-        OpTime opTime;
-        SnapshotName name;
-
-        bool operator==(const SnapshotInfo& other) const {
-            return std::tie(opTime, name) == std::tie(other.opTime, other.name);
-        }
-        bool operator!=(const SnapshotInfo& other) const {
-            return std::tie(opTime, name) != std::tie(other.opTime, other.name);
-        }
-        bool operator<(const SnapshotInfo& other) const {
-            return std::tie(opTime, name) < std::tie(other.opTime, other.name);
-        }
-        bool operator<=(const SnapshotInfo& other) const {
-            return std::tie(opTime, name) <= std::tie(other.opTime, other.name);
-        }
-        bool operator>(const SnapshotInfo& other) const {
-            return std::tie(opTime, name) > std::tie(other.opTime, other.name);
-        }
-        bool operator>=(const SnapshotInfo& other) const {
-            return std::tie(opTime, name) >= std::tie(other.opTime, other.name);
-        }
-        std::string toString() const;
-    };
-
     class LoseElectionGuardV1;
     class LoseElectionDryRunGuardV1;
 

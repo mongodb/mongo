@@ -33,6 +33,13 @@
 namespace mongo {
 namespace repl {
 
+std::string SnapshotInfo::toString() const {
+    BSONObjBuilder bob;
+    bob.append("optime", opTime.toBSON());
+    bob.append("name-id", name.toString());
+    return bob.obj().toString();
+}
+
 ReplicationCoordinatorExternalState::ReplicationCoordinatorExternalState() {}
 ReplicationCoordinatorExternalState::~ReplicationCoordinatorExternalState() {}
 

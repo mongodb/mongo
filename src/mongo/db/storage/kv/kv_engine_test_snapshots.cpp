@@ -221,7 +221,7 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
     // Now there is a committed snapshot.
-    snapshotManager->setCommittedSnapshot(name);
+    snapshotManager->setCommittedSnapshot(name, Timestamp(name.asU64()));
     ASSERT_OK(ru->setReadFromMajorityCommittedSnapshot());
 
     // Not anymore!
@@ -238,7 +238,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
 
     // Start an operation using a committed snapshot.
     auto name = prepareAndCreateSnapshot();
-    snapshotManager->setCommittedSnapshot(name);
+    snapshotManager->setCommittedSnapshot(name, Timestamp(name.asU64()));
     ASSERT_OK(op->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
     ASSERT_EQ(itCountOn(op), 0);  // acquires a snapshot.
 
@@ -289,17 +289,17 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     auto snap4 = prepareAndCreateSnapshot();
 
     // If these fail, everything is busted.
-    snapshotManager->setCommittedSnapshot(snap0);
+    snapshotManager->setCommittedSnapshot(snap0, Timestamp(snap0.asU64()));
     ASSERT_EQ(itCountCommitted(), 0);
-    snapshotManager->setCommittedSnapshot(snap1);
+    snapshotManager->setCommittedSnapshot(snap1, Timestamp(snap1.asU64()));
     ASSERT_EQ(itCountCommitted(), 1);
 
     // If this fails, the snapshot is from the 'create' time rather than the 'prepare' time.
-    snapshotManager->setCommittedSnapshot(snap2);
+    snapshotManager->setCommittedSnapshot(snap2, Timestamp(snap2.asU64()));
     ASSERT_EQ(itCountCommitted(), 2);
 
     // If this fails, the snapshot contains writes that weren't yet committed.
-    snapshotManager->setCommittedSnapshot(snap3);
+    snapshotManager->setCommittedSnapshot(snap3, Timestamp(snap3.asU64()));
     ASSERT_EQ(itCountCommitted(), 3);
 
     // This op should keep its original snapshot until abandoned.
@@ -308,7 +308,7 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     ASSERT_EQ(itCountOn(longOp), 3);
 
     // If this fails, the snapshot contains writes that were rolled back.
-    snapshotManager->setCommittedSnapshot(snap4);
+    snapshotManager->setCommittedSnapshot(snap4, Timestamp(snap4.asU64()));
     ASSERT_EQ(itCountCommitted(), 4);
 
     // If this fails, longOp changed snapshots at an illegal time.
@@ -339,19 +339,19 @@ TEST_F(SnapshotManagerTests, UpdateAndDelete) {
     deleteRecordAndCommit(id);
     auto snapAfterDelete = prepareAndCreateSnapshot();
 
-    snapshotManager->setCommittedSnapshot(snapBeforeInsert);
+    snapshotManager->setCommittedSnapshot(snapBeforeInsert, Timestamp(snapBeforeInsert.asU64()));
     ASSERT_EQ(itCountCommitted(), 0);
     ASSERT(!readRecordCommitted(id));
 
-    snapshotManager->setCommittedSnapshot(snapDog);
+    snapshotManager->setCommittedSnapshot(snapDog, Timestamp(snapDog.asU64()));
     ASSERT_EQ(itCountCommitted(), 1);
     ASSERT_EQ(readStringCommitted(id), "Dog");
 
-    snapshotManager->setCommittedSnapshot(snapCat);
+    snapshotManager->setCommittedSnapshot(snapCat, Timestamp(snapCat.asU64()));
     ASSERT_EQ(itCountCommitted(), 1);
     ASSERT_EQ(readStringCommitted(id), "Cat");
 
-    snapshotManager->setCommittedSnapshot(snapAfterDelete);
+    snapshotManager->setCommittedSnapshot(snapAfterDelete, Timestamp(snapAfterDelete.asU64()));
     ASSERT_EQ(itCountCommitted(), 0);
     ASSERT(!readRecordCommitted(id));
 }
