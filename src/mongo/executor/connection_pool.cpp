@@ -98,6 +98,13 @@ public:
      */
     size_t createdConnections(const stdx::unique_lock<stdx::mutex>& lk);
 
+    /**
+     * Returns the total number of connections currently open that belong to
+     * this pool. This is the sum of refreshingConnections, availableConnections,
+     * and inUseConnections.
+     */
+    size_t openConnections(const stdx::unique_lock<stdx::mutex>& lk);
+
 private:
     using OwnedConnection = std::unique_ptr<ConnectionInterface>;
     using OwnershipPool = std::unordered_map<ConnectionInterface*, OwnedConnection>;
@@ -229,6 +236,16 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
     }
 }
 
+size_t ConnectionPool::getNumConnectionsPerHost(const HostAndPort& hostAndPort) const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto iter = _pools.find(hostAndPort);
+    if (iter != _pools.end()) {
+        return iter->second->openConnections(lk);
+    }
+
+    return 0;
+}
+
 void ConnectionPool::returnConnection(ConnectionInterface* conn) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -264,6 +281,10 @@ size_t ConnectionPool::SpecificPool::availableConnections(
 
 size_t ConnectionPool::SpecificPool::createdConnections(const stdx::unique_lock<stdx::mutex>& lk) {
     return _created;
+}
+
+size_t ConnectionPool::SpecificPool::openConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+    return _checkedOutPool.size() + _readyPool.size() + _processingPool.size();
 }
 
 void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
