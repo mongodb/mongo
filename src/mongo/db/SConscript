@@ -735,11 +735,6 @@ env.Library(
     ],
     LIBDEPS=[
         "db_raii",
-        #"catalog/catalog", # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -749,9 +744,13 @@ env.Library(
         "prefetch.cpp",
     ],
     LIBDEPS=[
-        "catalog/catalog",
+        #"catalog/catalog", # CYCLE
         "dbhelpers",
         "index/index_access_methods",
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -797,6 +796,7 @@ env.Library(
     LIBDEPS=[
         "background",
         "catalog/index_key_validate",
+        "$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1",
         #"catalog/catalog", # CYCLE
     ],
     LIBDEPS_TAGS=[

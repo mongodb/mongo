@@ -5,16 +5,74 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='oplog',
+    source=[
+        'oplog.cpp',
+        'oplogreader.cpp',
+    ],
+    LIBDEPS=[
+        'repl_coordinator_interface',
+        'repl_coordinator_global',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/background',
+        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/index_d',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ],
+)
+
+env.Library(
+    target='rollback_source_impl',
+    source=[
+        'rollback_source_impl.cpp',
+    ],
+    LIBDEPS=[
+        'repl_coordinator_interface',
+        'repl_coordinator_global',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/background',
+        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/index_d',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ],
+)
+
+
+
+env.Library(
     target='bgsync',
     source=[
         'bgsync.cpp',
     ],
     LIBDEPS=[
+        'oplog',
         'abstract_async_component',
         'data_replicator_external_state_impl',
         'oplog_interface_local',
+        'oplog_interface_remote',
         'repl_coordinator_interface',
         'rollback_impl',
+        'rollback_source_impl',
         'rs_rollback',
         'storage_interface',
         'sync_source_resolver',
@@ -31,12 +89,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/fail_point',
-        #'$BUILD_DIR/mongo/db/repl/serveronly', # CYCLE
-        #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -103,9 +155,7 @@ env.Library(
         'storage_interface',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/exec/exec',
-        # '$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         '$BUILD_DIR/mongo/db/query/internal_plans',
-        # '$BUILD_DIR/mongo/db/query/query', # CYCLE
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
     ],
 )
@@ -234,11 +284,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/db_raii',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-28): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        '$BUILD_DIR/mongo/db/catalog/database',
     ],
 )
 
@@ -384,10 +430,12 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/commands/dcommands',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/prefetch',
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
@@ -397,11 +445,9 @@ env.Library(
         'storage_interface',
         'bgsync',
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
-        #'serveronly', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-10): See `CYCLE` tags above.
+        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ]
 )
@@ -1240,17 +1286,15 @@ env.Library(
     source=[
         "master_slave.cpp",
         'noop_writer.cpp',
-        "oplog.cpp",
-        "oplogreader.cpp",
         "replication_coordinator_external_state_impl.cpp",
         "replication_info.cpp",
         "resync.cpp",
-        'rollback_source_impl.cpp',
         "rs_sync.cpp",
         "sync_source_feedback.cpp",
     ],
     LIBDEPS=[
         'bgsync',
+        'rollback_source_impl',
         'oplog_buffer_collection',
         'oplog_interface_remote',
         'optime',
@@ -1281,7 +1325,7 @@ env.Library(
         # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-28): See `CYCLE` tags above.
+        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )

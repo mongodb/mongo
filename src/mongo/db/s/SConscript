@@ -94,6 +94,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/database',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/range_deleter',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -107,11 +109,11 @@ env.Library(
         'migration_types',
         'sharding_task_executor',
         'type_shard_identity',
+        #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE
         #'$BUILD_DIR/mongo/db/query/query', # CYCLE
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
         #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
     ],
     LIBDEPS_TAGS=[

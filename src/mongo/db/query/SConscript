@@ -74,18 +74,20 @@ env.Library(
         "query_common",
         "query_planner",
         "query_planner_test_lib",
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
         "$BUILD_DIR/mongo/db/curop",
         "$BUILD_DIR/mongo/db/exec/exec",
         "$BUILD_DIR/mongo/db/s/sharding",
         "$BUILD_DIR/mongo/db/storage/oplog_hack",
         "$BUILD_DIR/mongo/util/elapsed_tracker",
-        #"$BUILD_DIR/mongo/db/matcher/expressions_mongod_only", # CYCLE
-        #'$BUILD_DIR/mongo/db/clientcursor',, # CYCLE
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",
+        #'$BUILD_DIR/mongo/db/clientcursor', # CYCLE
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above.
+        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
