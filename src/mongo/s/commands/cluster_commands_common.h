@@ -32,7 +32,9 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/stdx/memory.h"
 
@@ -41,6 +43,38 @@ namespace mongo {
 class CachedCollectionRoutingInfo;
 class CachedDatabaseInfo;
 class OperationContext;
+
+/**
+ * Utility function to target all shards for a request that does not have a specific namespace.
+ */
+std::vector<AsyncRequestsSender::Request> buildRequestsForAllShards(OperationContext* opCtx,
+                                                                    const BSONObj& cmdObj);
+
+/**
+ * Utility function to get the set of shards to target for a request on a specific namespace.
+ *
+ * Selects shards to target based on 'routingInfo', and constructs a vector of requests, one per
+ * targeted shard, where the cmdObj to send to each shard has been modified to include the shard's
+ * shardVersion.
+ */
+std::vector<AsyncRequestsSender::Request> buildRequestsForTargetedShards(
+    OperationContext* opCtx, const CachedCollectionRoutingInfo& routingInfo, const BSONObj& cmdObj);
+
+using ShardAndReply = std::tuple<ShardId, BSONObj>;
+
+/**
+ * Logic for commands that simply map out to all shards then fold the results into
+ * a single response.
+ *
+ * All shards are contacted in parallel.
+ */
+StatusWith<std::vector<ShardAndReply>> gatherResults(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    int options,
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    BSONObjBuilder* output);
 
 /**
  * Utility function to compute a single error code from a vector of command results.

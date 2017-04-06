@@ -39,7 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/scatter_gather_from_shards.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -88,20 +88,11 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& output) override {
-
-        // Target all shards.
-        std::vector<AsyncRequestsSender::Request> requests;
-        std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
-        for (auto&& shardId : shardIds) {
-            requests.emplace_back(std::move(shardId), cmdObj);
-        }
-
+        auto requests = buildRequestsForAllShards(opCtx, cmdObj);
         auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
         if (!swResults.isOK()) {
             return appendCommandStatus(output, swResults.getStatus());
         }
-
         aggregateResults(std::move(swResults.getValue()), output);
         return true;
     }

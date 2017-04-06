@@ -61,7 +61,6 @@
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/commands/scatter_gather_from_shards.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/store_possible_cursor.h"
@@ -253,28 +252,9 @@ protected:
             status = Status::OK();
             output.resetToEmpty();
 
-            // Target only shards that own data for the collection, and append the shardVersion for
-            // the collection to the command.
-            std::vector<AsyncRequestsSender::Request> requests;
             auto routingInfo = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            if (routingInfo.cm()) {
-                vector<ShardId> shardIds;
-                Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
-                for (const ShardId& shardId : shardIds) {
-                    requests.emplace_back(
-                        std::move(shardId),
-                        appendShardVersion(cmdObj, routingInfo.cm()->getVersion(shardId)));
-                }
-            } else {
-                if (routingInfo.primary()->isConfig()) {
-                    // Don't append shard version info when contacting the config servers.
-                    requests.emplace_back(routingInfo.primaryId(), cmdObj);
-                } else {
-                    requests.emplace_back(routingInfo.primaryId(),
-                                          appendShardVersion(cmdObj, ChunkVersion::UNSHARDED()));
-                }
-            }
+            auto requests = buildRequestsForTargetedShards(opCtx, routingInfo, cmdObj);
 
             auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
             if (ErrorCodes::isStaleShardingError(swResults.getStatus().code())) {
