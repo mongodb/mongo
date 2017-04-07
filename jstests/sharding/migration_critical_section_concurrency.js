@@ -33,30 +33,30 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.commandWorked(
         st.s0.adminCommand({moveChunk: 'TestDB.Coll0', find: {Key: 1}, to: st.shard1.shardName}));
 
-    // Pause the move chunk operation in the critical section
-    pauseMigrateAtStep(st.shard1, migrateStepNames.steady);
+    // Pause the move chunk operation just before it leaves the critical section
+    pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
+
     var joinMoveChunk = moveChunkParallel(
         staticMongod, st.s0.host, {Key: 1}, null, 'TestDB.Coll1', st.shard1.shardName);
 
-    // Wait till the donor reaches the critical section
-    waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+    waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
     // Ensure that operations for 'Coll0' are not stalled
-    assert.eq(1, coll0.find({Key: {$lte: -1}}).maxTimeMS(5000).itcount());
-    assert.eq(1, coll0.find({Key: {$gte: 1}}).maxTimeMS(5000).itcount());
-    assert.writeOK(coll0.insert({Key: -2, Value: '-2'}, {writeConcern: {wtimeout: 5000}}));
-    assert.writeOK(coll0.insert({Key: 2, Value: '2'}, {writeConcern: {wtimeout: 5000}}));
-    assert.eq(2, coll0.find({Key: {$lte: -1}}).maxTimeMS(5000).itcount());
-    assert.eq(2, coll0.find({Key: {$gte: 1}}).maxTimeMS(5000).itcount());
+    assert.eq(1, coll0.find({Key: {$lte: -1}}).itcount());
+    assert.eq(1, coll0.find({Key: {$gte: 1}}).itcount());
+    assert.writeOK(coll0.insert({Key: -2, Value: '-2'}));
+    assert.writeOK(coll0.insert({Key: 2, Value: '2'}));
+    assert.eq(2, coll0.find({Key: {$lte: -1}}).itcount());
+    assert.eq(2, coll0.find({Key: {$gte: 1}}).itcount());
 
     // Ensure that operations for non-sharded collections are not stalled
     var collUnsharded = testDB.CollUnsharded;
-    assert.eq(0, collUnsharded.find({}).maxTimeMS(5000).itcount());
-    assert.writeOK(
-        collUnsharded.insert({TestKey: 0, Value: 'Zero'}, {writeConcern: {wtimeout: 5000}}));
-    assert.eq(1, collUnsharded.find({}).maxTimeMS(5000).itcount());
+    assert.eq(0, collUnsharded.find({}).itcount());
+    assert.writeOK(collUnsharded.insert({TestKey: 0, Value: 'Zero'}));
+    assert.eq(1, collUnsharded.find({}).itcount());
 
-    unpauseMigrateAtStep(st.shard1, migrateStepNames.steady);
+    unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
+
     joinMoveChunk();
 
     st.stop();
