@@ -85,16 +85,6 @@ TEST(CommandRequest, ParseAllFields) {
     ASSERT_BSONOBJ_EQ(opCmd.getCommandArgs(), commandArgs);
 }
 
-TEST(CommandRequest, InvalidNSThrows) {
-    rpc::CommandRequestBuilder crb;
-    crb.setDatabase("foo////!!!!<><><>");
-    crb.setCommandName("ping");
-    crb.setCommandArgs(BSON("ping" << 1));
-    crb.setMetadata(BSONObj());
-    auto msg = crb.done();
-    ASSERT_THROWS_CODE(rpc::CommandRequest{&msg}, AssertionException, ErrorCodes::InvalidNamespace);
-}
-
 TEST(CommandRequest, EmptyCommandObjThrows) {
     rpc::CommandRequestBuilder crb;
     crb.setDatabase("someDb");

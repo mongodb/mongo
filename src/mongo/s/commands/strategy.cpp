@@ -124,10 +124,13 @@ void execCommandHandler(OperationContext* opCtx,
     std::tie(cmdObj, queryFlags) = uassertStatusOK(
         rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata()));
 
-    std::string db = request.getDatabase().rawData();
-    BSONObjBuilder result;
+    std::string db = request.getDatabase().toString();
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid database name: '" << db << "'",
+            NamespaceString::validDBName(db, NamespaceString::DollarInDbNameBehavior::Allow));
 
-    execCommandClient(opCtx, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
+    BSONObjBuilder result;
+    execCommandClient(opCtx, command, queryFlags, db, cmdObj, result);
 
     replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
 }

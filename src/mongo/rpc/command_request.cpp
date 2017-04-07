@@ -39,7 +39,6 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -50,9 +49,6 @@ namespace rpc {
 
 namespace {
 // None of these include null byte
-const std::size_t kMaxDatabaseLength = 63;
-const std::size_t kMinDatabaseLength = 1;
-
 const std::size_t kMinCommandNameLength = 1;
 const std::size_t kMaxCommandNameLength = 128;
 
@@ -72,20 +68,6 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     Terminated<'\0', StringData> str;
     uassertStatusOK(cur.readAndAdvance<>(&str));
     _database = std::move(str.value);
-
-    uassert(28636,
-            str::stream() << "Database parsed in OP_COMMAND message must be between "
-                          << kMinDatabaseLength
-                          << " and "
-                          << kMaxDatabaseLength
-                          << " bytes. Got: "
-                          << _database,
-            (_database.size() >= kMinDatabaseLength) && (_database.size() <= kMaxDatabaseLength));
-
-    uassert(
-        ErrorCodes::InvalidNamespace,
-        str::stream() << "Invalid database name: '" << _database << "'",
-        NamespaceString::validDBName(_database, NamespaceString::DollarInDbNameBehavior::Allow));
 
     uassertStatusOK(cur.readAndAdvance<>(&str));
     _commandName = std::move(str.value);
