@@ -423,9 +423,9 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     for (auto it = begin; it != end; it++) {
         if (hasIdIndex && (*it)["_id"].eoo()) {
             return Status(ErrorCodes::InternalError,
-                          str::stream() << "CollectionImpl::insertDocument got "
-                                           "document without _id for ns:"
-                                        << _ns.ns());
+                          str::stream()
+                              << "Collection::insertDocument got document without _id for ns:"
+                              << _ns.ns());
         }
 
         auto status = checkValidation(opCtx, *it);
@@ -668,7 +668,7 @@ StatusWith<RecordId> CollectionImpl::updateDocument(OperationContext* opCtx,
     BSONElement oldId = oldDoc.value()["_id"];
     if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
         return StatusWith<RecordId>(
-            ErrorCodes::InternalError, "in CollectionImpl::updateDocument _id mismatch", 13596);
+            ErrorCodes::InternalError, "in Collection::updateDocument _id mismatch", 13596);
 
     // The MMAPv1 storage engine implements capped collections in a way that does not allow records
     // to grow beyond their original size. If MMAPv1 part of a replicaset with storage engines that
@@ -1299,7 +1299,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
 
     try {
         ValidateResultsMap indexNsResultsMap;
-        auto indexValidator = std::make_unique<RecordStoreValidateAdaptor>(
+        auto indexValidator = stdx::make_unique<RecordStoreValidateAdaptor>(
             opCtx, level, &_indexCatalog, &indexNsResultsMap);
 
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe
