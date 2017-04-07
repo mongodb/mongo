@@ -773,9 +773,8 @@ env.Library(
 )
 
 env.Library(
-    target="rw_concern_d",
+    target="write_concern_d",
     source=[
-        "read_concern.cpp",
         "write_concern.cpp",
     ],
     LIBDEPS=[
@@ -941,7 +940,7 @@ env.Library(
         "repl/sync_tail",
         "repl/topology_coordinator_impl",
         "run_commands",
-        "rw_concern_d",
+        "write_concern_d",
         "s/commands",
         "s/metadata",
         "s/sharding",
