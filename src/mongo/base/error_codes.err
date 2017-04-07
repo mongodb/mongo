@@ -205,6 +205,7 @@ error_code("TimeProofMismatch", 204)
 error_code("ClusterTimeFailsRateLimiter", 205);
 error_code("NoSuchSession", 206)
 error_code("InvalidUUID", 207)
+error_code("TooManyLocks", 208)
 
 # Error codes 4000-8999 are reserved.
 
