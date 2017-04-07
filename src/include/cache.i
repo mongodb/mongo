@@ -360,11 +360,13 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 
 	/*
 	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
-	 * that case, or when holding the schema or handle list locks (which
-	 * block eviction), we don't want to highjack the thread for eviction.
+	 * that case, or when holding the handle list, schema or table locks
+	 * (which can block checkpoints and eviction), don't block the thread
+	 * for eviction.
 	 */
 	if (F_ISSET(session, WT_SESSION_NO_EVICTION |
-	    WT_SESSION_LOCKED_HANDLE_LIST_WRITE | WT_SESSION_LOCKED_SCHEMA))
+	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA |
+	    WT_SESSION_LOCKED_TABLE))
 		return (0);
 
 	/* In memory configurations don't block when the cache is full. */
@@ -372,11 +374,14 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 		return (0);
 
 	/*
-	 * Threads operating on cache-resident trees are ignored because they're
-	 * not contributing to the problem.
+	 * Threads operating on cache-resident trees are ignored because
+	 * they're not contributing to the problem.  We also don't block while
+	 * reading metadata because we're likely to be holding some other
+	 * resources that could block checkpoints or eviction.
 	 */
 	btree = S2BT_SAFE(session);
-	if (btree != NULL && F_ISSET(btree, WT_BTREE_IN_MEMORY))
+	if (btree != NULL && (F_ISSET(btree, WT_BTREE_IN_MEMORY) ||
+	    WT_IS_METADATA(session->dhandle)))
 		return (0);
 
 	/* Check if eviction is needed. */
