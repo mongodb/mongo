@@ -301,11 +301,10 @@ __wt_async_worker(void *arg)
 		WT_ERR(__async_op_dequeue(conn, session, &op));
 		if (op != NULL && op != &async->flush_op) {
 			/*
-			 * If an operation fails, we want the worker thread to
-			 * keep running, unless there is a panic.
+			 * Operation failure doesn't cause the worker thread to
+			 * exit.
 			 */
 			(void)__async_worker_op(session, op, &worker);
-			WT_ERR(WT_SESSION_CHECK_PANIC(session));
 		} else if (async->flush_state == WT_ASYNC_FLUSHING) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
