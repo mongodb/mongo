@@ -79,7 +79,6 @@ __thread_group_shrink(
 		if (thread == NULL)
 			continue;
 
-		/* Wake threads to ensure they notice the state change */
 		WT_ASSERT(session, thread->tid != 0);
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
 		    "Stopping utility thread: %p:%" PRIu32,
@@ -92,8 +91,27 @@ __thread_group_shrink(
 		 */
 		__wt_cond_signal(session, thread->pause_cond);
 		__wt_cond_signal(session, group->wait_cond);
+	}
+
+	/*
+	 * We have to perform the join without holding the lock because
+	 * the threads themselves may be waiting on the lock.
+	 */
+	__wt_writeunlock(session, &group->lock);
+	for (current_slot = group->alloc; current_slot > new_count; ) {
+		thread = group->threads[--current_slot];
+
+		if (thread == NULL)
+			continue;
 		WT_TRET(__wt_thread_join(session, thread->tid));
 		WT_TRET(__wt_cond_destroy(session, &thread->pause_cond));
+	}
+	__wt_writelock(session, &group->lock);
+	for (current_slot = group->alloc; current_slot > new_count; ) {
+		thread = group->threads[--current_slot];
+
+		if (thread == NULL)
+			continue;
 		WT_ASSERT(session, thread->session != NULL);
 		wt_session = (WT_SESSION *)thread->session;
 		WT_TRET(wt_session->close(wt_session, NULL));
