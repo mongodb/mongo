@@ -331,10 +331,12 @@ Status applyOps(OperationContext* txn,
     // Perform write ops atomically
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            BSONObjBuilder intermediateResult;
             WriteUnitOfWork wunit(txn);
             numApplied = 0;
-            uassertStatusOK(_applyOps(txn, dbName, applyOpCmd, result, &numApplied));
+            uassertStatusOK(_applyOps(txn, dbName, applyOpCmd, &intermediateResult, &numApplied));
             wunit.commit();
+            result->appendElements(intermediateResult.obj());
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "applyOps", dbName);
     } catch (const DBException& ex) {
