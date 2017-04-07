@@ -60,7 +60,7 @@
 
     // Validate that after replication, the local write data is now returned by the same query.
     restartReplicationOnSecondaries(replTest);
-    replTest.awaitReplication();
+    replTest.awaitLastOpCommitted();
 
     res = assert.commandWorked(testDB.runCommand({
         find: collectionName,
