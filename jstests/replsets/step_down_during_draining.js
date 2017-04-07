@@ -58,7 +58,7 @@ load("jstests/replsets/rslib.js");
     var numDocuments = 20;
     var coll = primary.getDB("foo").foo;
     assert.writeOK(coll.insert({x: 0}, {writeConcern: {w: 3}}));
-    replSet.awaitReplication();
+    replSet.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
 
     // Enable fail point to stop replication.
     var secondaries = replSet.getSecondaries();
