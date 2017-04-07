@@ -9,9 +9,11 @@ skip	dist/flags.py
 skip	dist/java_doc.py
 skip	dist/log.py
 skip	dist/log_data.py
+skip	dist/s_label_loop.py
 skip	dist/stat.py
 skip	dist/stat_data.py
 skip	dist/style.py
+skip	dist/wtperf_config.py
 skip	lang/java/java_doc.i
 skip	lang/java/src/com/wiredtiger/db/AsyncOp.java
 skip	lang/java/src/com/wiredtiger/db/AsyncOpType.java

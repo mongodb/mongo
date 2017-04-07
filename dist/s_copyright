@@ -117,6 +117,8 @@ fi
 	-e '/api\/leveldb\/hyperleveldb\//d' \
 	-e '/api\/leveldb\/leveldb\//d' \
 	-e '/api\/leveldb\/rocksdb\//d' \
+	-e '/checksum\/power8\//d' \
+	-e '/checksum\/zseries\//d' \
 	-e '/\/3rdparty\//d' \
 	-e '/\/node_modules\//d' \
 	-e '/dist\/__/d' \
