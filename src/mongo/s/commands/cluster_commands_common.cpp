@@ -96,9 +96,7 @@ std::vector<AsyncRequestsSender::Request> buildRequestsForTargetedShards(
     return requests;
 }
 
-using ShardAndReply = std::tuple<ShardId, BSONObj>;
-
-StatusWith<std::vector<ShardAndReply>> gatherResults(
+StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponsesFromShards(
     OperationContext* opCtx,
     const std::string& dbName,
     const BSONObj& cmdObj,
@@ -129,10 +127,10 @@ StatusWith<std::vector<ShardAndReply>> gatherResults(
 
     // Get the responses.
 
-    std::vector<ShardAndReply> results;                 // Stores results by ShardId
-    BSONObjBuilder subobj(output->subobjStart("raw"));  // Stores results by ConnectionString
-    BSONObjBuilder errors;                              // Stores errors by ConnectionString
-    int commonErrCode = -1;                             // Stores the overall error code
+    std::vector<AsyncRequestsSender::Response> responses;  // Stores results by ShardId
+    BSONObjBuilder subobj(output->subobjStart("raw"));     // Stores results by ConnectionString
+    BSONObjBuilder errors;                                 // Stores errors by ConnectionString
+    int commonErrCode = -1;                                // Stores the overall error code
 
     BSONElement wcErrorElem;
     ShardId wcErrorShardId;
@@ -158,7 +156,7 @@ StatusWith<std::vector<ShardAndReply>> gatherResults(
                 return status;
             }
 
-            auto result = std::move(response.swResponse.getValue().data);
+            auto result = response.swResponse.getValue().data;
             if (!hasWCError) {
                 if ((wcErrorElem = result["writeConcernError"])) {
                     wcErrorShardId = response.shardId;
@@ -169,7 +167,7 @@ StatusWith<std::vector<ShardAndReply>> gatherResults(
             if (status.isOK()) {
                 // The command status was OK.
                 subobj.append(shard->getConnString().toString(), result);
-                results.emplace_back(std::move(response.shardId), std::move(result));
+                responses.push_back(std::move(response));
                 continue;
             }
         }
@@ -189,7 +187,7 @@ StatusWith<std::vector<ShardAndReply>> gatherResults(
             commonErrCode = 0;
         }
         subobj.append(shard->getConnString().toString(), result);
-        results.emplace_back(std::move(response.shardId), std::move(result));
+        responses.push_back(response);
     }
 
     subobj.done();
@@ -207,7 +205,7 @@ StatusWith<std::vector<ShardAndReply>> gatherResults(
         return {ErrorCodes::OperationFailed, errobj.toString()};
     }
 
-    return results;
+    return responses;
 }
 
 int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {

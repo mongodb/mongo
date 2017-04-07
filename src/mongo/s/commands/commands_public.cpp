@@ -84,8 +84,6 @@ using std::vector;
 
 namespace {
 
-const int kMaxNumStaleVersionRetries = 3;
-
 bool cursorCommandPassthrough(OperationContext* opCtx,
                               StringData dbName,
                               const ShardId& shardId,
@@ -256,13 +254,14 @@ protected:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             auto requests = buildRequestsForTargetedShards(opCtx, routingInfo, cmdObj);
 
-            auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
-            if (ErrorCodes::isStaleShardingError(swResults.getStatus().code())) {
+            auto swResponses =
+                gatherResponsesFromShards(opCtx, dbName, cmdObj, options, requests, &output);
+            if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
                 Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
                 ++numAttempts;
                 continue;
             }
-            status = swResults.getStatus();
+            status = swResponses.getStatus();
             break;
         }
 

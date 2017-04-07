@@ -66,8 +66,9 @@ public:
              std::string& errmsg,
              BSONObjBuilder& output) override {
         auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-        auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
-        return appendCommandStatus(output, swResults.getStatus());
+        auto swResponses =
+            gatherResponsesFromShards(opCtx, dbName, cmdObj, options, requests, &output);
+        return appendCommandStatus(output, swResponses.getStatus());
     }
 
 } clusterRepairDatabaseCmd;

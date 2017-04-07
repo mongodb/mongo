@@ -63,8 +63,6 @@ public:
         return false;
     }
 
-    using ShardAndReply = std::tuple<ShardId, BSONObj>;
-
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
@@ -72,15 +70,26 @@ public:
              std::string& errmsg,
              BSONObjBuilder& output) override {
         auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-        auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
-        if (!swResults.isOK()) {
-            return appendCommandStatus(output, swResults.getStatus());
+        auto swResponses =
+            gatherResponsesFromShards(opCtx, dbName, cmdObj, options, requests, &output);
+        if (!swResponses.isOK()) {
+            // We failed to obtain a response or error from all shards.
+            return appendCommandStatus(output, swResponses.getStatus());
         }
-        aggregateResults(std::move(swResults.getValue()), output);
+
+        // Only aggregate results if we got a success response from every shard.
+        auto responses = std::move(swResponses.getValue());
+        if (std::all_of(
+                responses.begin(), responses.end(), [](AsyncRequestsSender::Response response) {
+                    return response.swResponse.getStatus().isOK();
+                })) {
+            aggregateResults(std::move(responses), output);
+        }
         return true;
     }
 
-    void aggregateResults(const vector<ShardAndReply>& results, BSONObjBuilder& output) {
+    void aggregateResults(const vector<AsyncRequestsSender::Response>& responses,
+                          BSONObjBuilder& output) {
         long long objects = 0;
         long long unscaledDataSize = 0;
         long long dataSize = 0;
@@ -93,8 +102,9 @@ public:
         long long freeListNum = 0;
         long long freeListSize = 0;
 
-        for (const ShardAndReply& shardAndReply : results) {
-            const BSONObj& b = std::get<1>(shardAndReply);
+        for (const auto& response : responses) {
+            invariant(response.swResponse.getStatus().isOK());
+            const BSONObj& b = response.swResponse.getValue().data;
 
             objects += b["objects"].numberLong();
             unscaledDataSize += b["avgObjSize"].numberLong() * b["objects"].numberLong();

@@ -60,15 +60,13 @@ std::vector<AsyncRequestsSender::Request> buildRequestsForAllShards(OperationCon
 std::vector<AsyncRequestsSender::Request> buildRequestsForTargetedShards(
     OperationContext* opCtx, const CachedCollectionRoutingInfo& routingInfo, const BSONObj& cmdObj);
 
-using ShardAndReply = std::tuple<ShardId, BSONObj>;
-
 /**
- * Logic for commands that simply map out to all shards then fold the results into
- * a single response.
+ * Utility function to scatter 'requests' to shards and fold the responses into a single response.
  *
- * All shards are contacted in parallel.
+ * Places the raw responses from shards into a field 'raw' in 'output', and also returns the raw
+ * responses as a vector so that additional aggregate logic can be applied to them.
  */
-StatusWith<std::vector<ShardAndReply>> gatherResults(
+StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponsesFromShards(
     OperationContext* opCtx,
     const std::string& dbName,
     const BSONObj& cmdObj,

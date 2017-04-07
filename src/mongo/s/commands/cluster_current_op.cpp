@@ -80,8 +80,6 @@ public:
         return false;
     }
 
-    using ShardAndReply = std::tuple<ShardId, BSONObj>;
-
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
@@ -89,15 +87,26 @@ public:
              std::string& errmsg,
              BSONObjBuilder& output) override {
         auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-        auto swResults = gatherResults(opCtx, dbName, cmdObj, options, requests, &output);
-        if (!swResults.isOK()) {
-            return appendCommandStatus(output, swResults.getStatus());
+        auto swResponses =
+            gatherResponsesFromShards(opCtx, dbName, cmdObj, options, requests, &output);
+        if (!swResponses.isOK()) {
+            // We failed to obtain a response or error from all shards.
+            return appendCommandStatus(output, swResponses.getStatus());
         }
-        aggregateResults(std::move(swResults.getValue()), output);
+
+        // Only aggregate results if we got a success response from every shard.
+        auto responses = std::move(swResponses.getValue());
+        if (std::all_of(
+                responses.begin(), responses.end(), [](AsyncRequestsSender::Response response) {
+                    return response.swResponse.getStatus().isOK();
+                })) {
+            aggregateResults(std::move(responses), output);
+        }
         return true;
     }
 
-    void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) {
+    void aggregateResults(const std::vector<AsyncRequestsSender::Response>& responses,
+                          BSONObjBuilder& output) {
         // Each shard responds with a document containing an array of subdocuments.
         // Each subdocument represents an operation running on that shard.
         // We merge the responses into a single document containg an array
@@ -120,16 +129,15 @@ public:
         // RunOnAllShardsCommand will handle returning an error to the user.
         BSONArrayBuilder aggregatedOpsBab(output.subarrayStart(kInprogFieldName));
 
-        for (auto&& shardResponse : results) {
-            ShardId shardName;
-            BSONObj shardResponseObj;
-            std::tie(shardName, shardResponseObj) = shardResponse;
+        for (const auto& response : responses) {
+            invariant(response.swResponse.getStatus().isOK());
+            BSONObj shardResponseObj = std::move(response.swResponse.getValue().data);
 
             auto shardOps = shardResponseObj[kInprogFieldName];
 
             // legacy behavior
             if (!shardOps.isABSONObj()) {
-                warning() << "invalid currentOp response from shard " << shardName
+                warning() << "invalid currentOp response from shard " << response.shardId
                           << ", got: " << redact(shardOps);
                 continue;
             }
@@ -140,7 +148,7 @@ public:
                 // maintain legacy behavior
                 // but log it first
                 if (!shardOp.isABSONObj()) {
-                    warning() << "invalid currentOp response from shard " << shardName
+                    warning() << "invalid currentOp response from shard " << response.shardId
                               << ", got: " << redact(shardOp);
                     continue;
                 }
@@ -151,13 +159,13 @@ public:
                         uassert(28630,
                                 str::stream() << "expected numeric opid from currentOp response"
                                               << " from shard "
-                                              << shardName
+                                              << response.shardId
                                               << ", got: "
                                               << shardOpElement,
                                 shardOpElement.isNumber());
 
                         modifiedShardOpBob.append(kOpIdFieldName,
-                                                  str::stream() << shardName << ":"
+                                                  str::stream() << response.shardId << ":"
                                                                 << shardOpElement.numberInt());
                     } else if (fieldName == kClientFieldName) {
                         modifiedShardOpBob.appendAs(shardOpElement, kClient_S_FieldName);
