@@ -47,6 +47,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -85,9 +86,10 @@ void ReplCoordTest::setUp() {
 }
 
 void ReplCoordTest::tearDown() {
-    if (_externalState) {
-        _externalState->setStoreLocalConfigDocumentToHang(false);
-    }
+    getGlobalFailPointRegistry()
+        ->getFailPoint("blockHeartbeatReconfigFinish")
+        ->setMode(FailPoint::off);
+
     if (_callShutdown) {
         auto opCtx = makeOperationContext();
         shutdown(opCtx.get());

@@ -68,6 +68,7 @@ using CBHandle = ReplicationExecutor::CallbackHandle;
 using CBHStatus = StatusWith<CBHandle>;
 
 MONGO_FP_DECLARE(blockHeartbeatStepdown);
+MONGO_FP_DECLARE(blockHeartbeatReconfigFinish);
 
 }  // namespace
 
@@ -538,7 +539,19 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const ReplicationExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
     StatusWith<int> myIndex) {
+
     if (cbData.status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
+    if (MONGO_FAIL_POINT(blockHeartbeatReconfigFinish)) {
+        _replExecutor.scheduleWorkAt(
+            _replExecutor.now() + Milliseconds{10},
+            stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
+                       this,
+                       stdx::placeholders::_1,
+                       newConfig,
+                       myIndex));
         return;
     }
 

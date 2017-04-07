@@ -53,7 +53,6 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
       _canAcquireGlobalSharedLock(true),
       _storeLocalConfigDocumentStatus(Status::OK()),
       _storeLocalLastVoteDocumentStatus(Status::OK()),
-      _storeLocalConfigDocumentShouldHang(false),
       _storeLocalLastVoteDocumentShouldHang(false),
       _connectionsClosed(false),
       _threadsStarted(false) {}
@@ -127,12 +126,6 @@ StatusWith<BSONObj> ReplicationCoordinatorExternalStateMock::loadLocalConfigDocu
 
 Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(OperationContext* opCtx,
                                                                          const BSONObj& config) {
-    {
-        stdx::unique_lock<stdx::mutex> lock(_shouldHangConfigMutex);
-        while (_storeLocalConfigDocumentShouldHang) {
-            _shouldHangConfigCondVar.wait(lock);
-        }
-    }
     if (_storeLocalConfigDocumentStatus.isOK()) {
         setLocalConfigDocument(StatusWith<BSONObj>(config));
         return Status::OK();
@@ -186,14 +179,6 @@ void ReplicationCoordinatorExternalStateMock::setLastOpTime(const StatusWith<OpT
 
 void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentStatus(Status status) {
     _storeLocalConfigDocumentStatus = status;
-}
-
-void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(bool hang) {
-    stdx::unique_lock<stdx::mutex> lock(_shouldHangConfigMutex);
-    _storeLocalConfigDocumentShouldHang = hang;
-    if (!hang) {
-        _shouldHangConfigCondVar.notify_all();
-    }
 }
 
 bool ReplicationCoordinatorExternalStateMock::threadsStarted() const {

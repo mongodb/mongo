@@ -42,6 +42,7 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -462,8 +463,9 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
 
-    // set hbreconfig to hang while in progress
-    getExternalState()->setStoreLocalConfigDocumentToHang(true);
+    getGlobalFailPointRegistry()
+        ->getFailPoint("blockHeartbeatReconfigFinish")
+        ->setMode(FailPoint::alwaysOn);
 
     // hb reconfig
     NetworkInterfaceMock* net = getNet();
@@ -547,7 +549,9 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     ASSERT_EQUALS(1,
                   countLogLinesContaining("Not standing for election; processing "
                                           "a configuration change"));
-    getExternalState()->setStoreLocalConfigDocumentToHang(false);
+    getGlobalFailPointRegistry()
+        ->getFailPoint("blockHeartbeatReconfigFinish")
+        ->setMode(FailPoint::off);
 }
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequestVotes) {
