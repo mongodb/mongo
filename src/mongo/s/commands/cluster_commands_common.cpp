@@ -100,30 +100,22 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponsesFromShards
     OperationContext* opCtx,
     const std::string& dbName,
     const BSONObj& cmdObj,
-    int options,
     const std::vector<AsyncRequestsSender::Request>& requests,
     BSONObjBuilder* output) {
     // Extract the readPreference from the command.
-    rpc::ServerSelectionMetadata ssm;
-    BSONObjBuilder unusedCmdBob;
-    BSONObjBuilder upconvertedMetadataBob;
-    uassertStatusOK(rpc::ServerSelectionMetadata::upconvert(
-        cmdObj, options, &unusedCmdBob, &upconvertedMetadataBob));
-    auto upconvertedMetadata = upconvertedMetadataBob.obj();
-    auto ssmElem = upconvertedMetadata.getField(rpc::ServerSelectionMetadata::fieldName());
-    if (!ssmElem.eoo()) {
-        ssm = uassertStatusOK(rpc::ServerSelectionMetadata::readFromMetadata(ssmElem));
-    }
-    auto readPref = ssm.getReadPreference();
+    const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
+    const auto readPrefObj = queryOptionsObj.getObjectField(QueryRequest::kWrappedReadPrefField);
+    const auto readPref = readPrefObj.isEmpty()
+        ? ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet())
+        : uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefObj));
 
     // Send the requests.
 
-    AsyncRequestsSender ars(
-        opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        dbName,
-        requests,
-        readPref ? *readPref : ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet()));
+    AsyncRequestsSender ars(opCtx,
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            dbName,
+                            requests,
+                            readPref);
 
     // Get the responses.
 

@@ -176,8 +176,7 @@ public:
 
         // Extract read preference. If no read preference is specified in the query, will we pass
         // down a "primaryOnly" or "secondary" read pref, depending on the slaveOk setting.
-        auto readPref =
-            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        auto readPref = ClusterFind::extractUnwrappedReadPref(cmdObj);
         if (!readPref.isOK()) {
             return appendCommandStatus(result, readPref.getStatus());
         }

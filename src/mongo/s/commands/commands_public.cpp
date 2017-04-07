@@ -89,7 +89,6 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
                               const ShardId& shardId,
                               const BSONObj& cmdObj,
                               const NamespaceString& nss,
-                              int options,
                               BSONObjBuilder* out) {
     const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
@@ -97,12 +96,7 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
     }
     const auto shard = shardStatus.getValue();
     ScopedDbConnection conn(shard->getConnString());
-    auto cursor = conn->query(str::stream() << dbName << ".$cmd",
-                              cmdObj,
-                              -1,    // nToReturn
-                              0,     // nToSkip
-                              NULL,  // fieldsToReturn
-                              options);
+    auto cursor = conn->query(str::stream() << dbName << ".$cmd", cmdObj, /* nToReturn=*/-1);
     if (!cursor || !cursor->more()) {
         return Command::appendCommandStatus(
             *out, {ErrorCodes::OperationFailed, "failed to read command response from shard"});
@@ -164,12 +158,6 @@ protected:
         return false;
     }
 
-    // Override if passthrough should also send query options
-    // Safer as off by default, can slowly enable as we add more tests
-    virtual bool passOptions() const {
-        return false;
-    }
-
     bool adminPassthrough(OperationContext* opCtx,
                           const ShardId& shardId,
                           const BSONObj& cmdObj,
@@ -182,22 +170,13 @@ protected:
                      const ShardId& shardId,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        return passthrough(opCtx, db, shardId, cmdObj, 0, result);
-    }
-
-    bool passthrough(OperationContext* opCtx,
-                     const std::string& db,
-                     const ShardId& shardId,
-                     const BSONObj& cmdObj,
-                     int options,
-                     BSONObjBuilder& result) {
         const auto shard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
         ShardConnection conn(shard->getConnString(), "");
 
         BSONObj res;
-        bool ok = conn->runCommand(db, cmdObj, res, passOptions() ? options : 0);
+        bool ok = conn->runCommand(db, cmdObj, res);
         conn.done();
 
         // First append the properly constructed writeConcernError. It will then be skipped
@@ -254,8 +233,7 @@ protected:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             auto requests = buildRequestsForTargetedShards(opCtx, routingInfo, cmdObj);
 
-            auto swResponses =
-                gatherResponsesFromShards(opCtx, dbName, cmdObj, options, requests, &output);
+            auto swResponses = gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output);
             if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
                 Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
                 ++numAttempts;
@@ -296,7 +274,7 @@ protected:
                 str::stream() << "can't do command: " << getName() << " on sharded collection",
                 !routingInfo.cm());
 
-        return passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, options, result);
+        return passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, result);
     }
 };
 
@@ -923,10 +901,6 @@ public:
         return false;
     }
 
-    bool passOptions() const override {
-        return true;
-    }
-
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         const auto nsElt = cmdObj.firstElement().embeddedObjectUserCheck()["ns"];
         uassert(ErrorCodes::InvalidNamespace,
@@ -1004,10 +978,6 @@ class SplitVectorCmd : public NotAllowedOnShardedCollectionCmd {
 public:
     SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
 
-    bool passOptions() const override {
-        return true;
-    }
-
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -1052,10 +1022,6 @@ public:
         help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
-    bool passOptions() const override {
-        return true;
-    }
-
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) override {
@@ -1079,7 +1045,7 @@ public:
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         if (!routingInfo.cm()) {
-            if (passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, options, result)) {
+            if (passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, result)) {
                 return true;
             }
 
@@ -1442,10 +1408,6 @@ public:
         h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand";
     }
 
-    bool passOptions() const override {
-        return true;
-    }
-
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) override {
@@ -1498,25 +1460,19 @@ public:
         }
 
         // Extract the readPreference from the command.
-        rpc::ServerSelectionMetadata ssm;
-        BSONObjBuilder unusedCmdBob;
-        BSONObjBuilder upconvertedMetadataBob;
-        uassertStatusOK(rpc::ServerSelectionMetadata::upconvert(
-            cmdObj, options, &unusedCmdBob, &upconvertedMetadataBob));
-        auto upconvertedMetadata = upconvertedMetadataBob.obj();
-        auto ssmElem = upconvertedMetadata.getField(rpc::ServerSelectionMetadata::fieldName());
-        if (!ssmElem.eoo()) {
-            ssm = uassertStatusOK(rpc::ServerSelectionMetadata::readFromMetadata(ssmElem));
-        }
-        auto readPref = ssm.getReadPreference();
+        const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
+        const auto readPrefObj =
+            queryOptionsObj.getObjectField(QueryRequest::kWrappedReadPrefField);
+        const auto readPref = readPrefObj.isEmpty()
+            ? ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet())
+            : uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefObj));
 
         // Send the requests.
-        AsyncRequestsSender ars(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-            dbName,
-            requests,
-            readPref ? *readPref : ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet()));
+        AsyncRequestsSender ars(opCtx,
+                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                dbName,
+                                requests,
+                                readPref);
 
         // Receive the responses.
         multimap<double, BSONObj> results;  // TODO: maybe use merge-sort instead
@@ -1671,8 +1627,7 @@ public:
 
         const auto& dbInfo = dbInfoStatus.getValue();
 
-        return cursorCommandPassthrough(
-            opCtx, dbName, dbInfo.primaryId(), cmdObj, nss, options, &result);
+        return cursorCommandPassthrough(opCtx, dbName, dbInfo.primaryId(), cmdObj, nss, &result);
     }
 
 } cmdListCollections;
@@ -1721,7 +1676,7 @@ public:
         const auto commandNss = NamespaceString::makeListIndexesNSS(nss.db(), nss.coll());
 
         return cursorCommandPassthrough(
-            opCtx, nss.db(), routingInfo.primaryId(), cmdObj, commandNss, options, &result);
+            opCtx, nss.db(), routingInfo.primaryId(), cmdObj, commandNss, &result);
     }
 
 } cmdListIndexes;

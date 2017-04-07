@@ -359,6 +359,7 @@ void Strategy::clientCommandOp(OperationContext* opCtx,
     BSONObj cmdObj = q.query;
 
     {
+        bool haveReadPref = false;
         BSONElement e = cmdObj.firstElement();
         if (e.type() == Object && (e.fieldName()[0] == '$' ? str::equals("query", e.fieldName() + 1)
                                                            : str::equals("query", e.fieldName()))) {
@@ -366,6 +367,7 @@ void Strategy::clientCommandOp(OperationContext* opCtx,
             if (cmdObj.hasField(Query::ReadPrefField.name())) {
                 // The command has a read preference setting. We don't want to lose this information
                 // so we copy this to a new field called $queryOptions.$readPreference
+                haveReadPref = true;
                 BSONObjBuilder finalCmdObjBuilder;
                 finalCmdObjBuilder.appendElements(e.embeddedObject());
 
@@ -377,6 +379,21 @@ void Strategy::clientCommandOp(OperationContext* opCtx,
             } else {
                 cmdObj = e.embeddedObject();
             }
+        }
+
+        if (!haveReadPref && q.queryOptions & QueryOption_SlaveOk) {
+            // If the slaveOK bit is set, behave as-if read preference secondary-preferred was
+            // specified.
+            BSONObjBuilder finalCmdObjBuilder;
+            finalCmdObjBuilder.appendElements(cmdObj);
+
+            BSONObjBuilder queryOptionsBuilder(finalCmdObjBuilder.subobjStart("$queryOptions"));
+            queryOptionsBuilder.append(
+                Query::ReadPrefField.name(),
+                ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toBSON());
+            queryOptionsBuilder.done();
+
+            cmdObj = finalCmdObjBuilder.obj();
         }
     }
 

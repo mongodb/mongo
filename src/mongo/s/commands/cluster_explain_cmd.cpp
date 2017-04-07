@@ -129,8 +129,7 @@ public:
                        str::stream() << "Explain failed due to unknown command: " << cmdName});
         }
 
-        auto readPref =
-            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        auto readPref = ClusterFind::extractUnwrappedReadPref(cmdObj);
         if (!readPref.isOK()) {
             return appendCommandStatus(result, readPref.getStatus());
         }

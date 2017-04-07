@@ -464,8 +464,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 
-StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BSONObj& cmdObj,
-                                                                        const bool isSlaveOk) {
+StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BSONObj& cmdObj) {
     BSONElement queryOptionsElt;
     auto status = bsonExtractTypedField(
         cmdObj, QueryRequest::kUnwrappedReadPrefField, BSONType::Object, &queryOptionsElt);
@@ -485,11 +484,8 @@ StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BS
         return status;
     }
 
-    // If there is no explicit read preference, the value we use depends on the setting of the slave
-    // ok bit.
-    ReadPreference pref =
-        isSlaveOk ? mongo::ReadPreference::SecondaryPreferred : mongo::ReadPreference::PrimaryOnly;
-    return ReadPreferenceSetting(pref, TagSet());
+    // If there is no explicit read preference, that means primary only.
+    return ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly);
 }
 
 }  // namespace mongo

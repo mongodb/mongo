@@ -70,7 +70,6 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponsesFromShards
     OperationContext* opCtx,
     const std::string& dbName,
     const BSONObj& cmdObj,
-    int options,
     const std::vector<AsyncRequestsSender::Request>& requests,
     BSONObjBuilder* output);
 
