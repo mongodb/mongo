@@ -113,10 +113,11 @@ Status IndexCatalog::init(OperationContext* opCtx) {
         }
 
         BSONObj keyPattern = spec.getObjectField("key");
-        IndexDescriptor* descriptor =
-            new IndexDescriptor(_collection, _getAccessMethodName(opCtx, keyPattern), spec);
+        auto descriptor = stdx::make_unique<IndexDescriptor>(
+            _collection, _getAccessMethodName(opCtx, keyPattern), spec);
         const bool initFromDisk = true;
-        IndexCatalogEntry* entry = _setupInMemoryStructures(opCtx, descriptor, initFromDisk);
+        IndexCatalogEntry* entry =
+            _setupInMemoryStructures(opCtx, std::move(descriptor), initFromDisk);
 
         fassert(17340, entry->isReady(opCtx));
     }
@@ -132,11 +133,8 @@ Status IndexCatalog::init(OperationContext* opCtx) {
     return Status::OK();
 }
 
-IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* opCtx,
-                                                          IndexDescriptor* descriptor,
-                                                          bool initFromDisk) {
-    unique_ptr<IndexDescriptor> descriptorCleanup(descriptor);
-
+IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(
+    OperationContext* opCtx, std::unique_ptr<IndexDescriptor> descriptor, bool initFromDisk) {
     Status status = _isSpecOk(opCtx, descriptor->infoObj());
     if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
@@ -144,10 +142,11 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* opCt
         fassertFailedNoTrace(28782);
     }
 
+    auto* const descriptorPtr = descriptor.get();
     auto entry = stdx::make_unique<IndexCatalogEntry>(opCtx,
                                                       _collection->ns().ns(),
                                                       _collection->getCatalogEntry(),
-                                                      std::move(descriptorCleanup),
+                                                      std::move(descriptor),
                                                       _collection->infoCache());
     std::unique_ptr<IndexAccessMethod> accessMethod(
         _collection->dbce()->getIndex(opCtx, _collection->getCatalogEntry(), entry.get()));
@@ -157,7 +156,7 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* opCt
     _entries.add(entry.release());
 
     if (!initFromDisk) {
-        opCtx->recoveryUnit()->onRollback([this, opCtx, descriptor] {
+        opCtx->recoveryUnit()->onRollback([ this, opCtx, descriptor = descriptorPtr ] {
             // Need to preserve indexName as descriptor no longer exists after remove().
             const std::string indexName = descriptor->indexName();
             _entries.remove(descriptor);
@@ -165,8 +164,8 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* opCt
         });
     }
 
-    invariant(save == _entries.find(descriptor));
-    invariant(save == _entries.find(descriptor->indexName()));
+    invariant(save == _entries.find(descriptorPtr));
+    invariant(save == _entries.find(descriptorPtr->indexName()));
 
     return save;
 }
@@ -354,7 +353,7 @@ IndexCatalog::IndexBuildBlock::IndexBuildBlock(OperationContext* opCtx,
       _catalog(collection->getIndexCatalog()),
       _ns(_catalog->_collection->ns().ns()),
       _spec(spec.getOwned()),
-      _entry(NULL),
+      _entry(nullptr),
       _opCtx(opCtx) {
     invariant(collection);
 }
@@ -362,27 +361,27 @@ IndexCatalog::IndexBuildBlock::IndexBuildBlock(OperationContext* opCtx,
 Status IndexCatalog::IndexBuildBlock::init() {
     // need this first for names, etc...
     BSONObj keyPattern = _spec.getObjectField("key");
-    IndexDescriptor* descriptor =
-        new IndexDescriptor(_collection, IndexNames::findPluginName(keyPattern), _spec);
-    unique_ptr<IndexDescriptor> descriptorCleaner(descriptor);
+    auto descriptor = stdx::make_unique<IndexDescriptor>(
+        _collection, IndexNames::findPluginName(keyPattern), _spec);
 
     _indexName = descriptor->indexName();
     _indexNamespace = descriptor->indexNamespace();
 
     /// ----------   setup on disk structures ----------------
 
-    Status status = _collection->getCatalogEntry()->prepareForIndexBuild(_opCtx, descriptor);
+    Status status = _collection->getCatalogEntry()->prepareForIndexBuild(_opCtx, descriptor.get());
     if (!status.isOK())
         return status;
 
+    auto* const descriptorPtr = descriptor.get();
     /// ----------   setup in memory structures  ----------------
     const bool initFromDisk = false;
-    _entry = _catalog->_setupInMemoryStructures(_opCtx, descriptorCleaner.release(), initFromDisk);
+    _entry = _catalog->_setupInMemoryStructures(_opCtx, std::move(descriptor), initFromDisk);
 
     // Register this index with the CollectionInfoCache to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
-    _collection->infoCache()->addedIndex(_opCtx, descriptor);
+    _collection->infoCache()->addedIndex(_opCtx, descriptorPtr);
 
     return Status::OK();
 }
@@ -974,7 +973,7 @@ Status IndexCatalog::_dropIndex(OperationContext* opCtx, IndexCatalogEntry* entr
     opCtx->recoveryUnit()->registerChange(
         new IndexRemoveChange(opCtx, _collection, &_entries, entry));
     _collection->infoCache()->droppedIndex(opCtx, indexName);
-    entry = NULL;
+    entry = nullptr;
     _deleteIndexFromDisk(opCtx, indexName, indexNamespace);
 
     _checkMagic();
@@ -1045,7 +1044,7 @@ int IndexCatalog::numIndexesReady(OperationContext* opCtx) const {
 }
 
 bool IndexCatalog::haveIdIndex(OperationContext* opCtx) const {
-    return findIdIndex(opCtx) != NULL;
+    return findIdIndex(opCtx) != nullptr;
 }
 
 IndexCatalog::IndexIterator::IndexIterator(OperationContext* opCtx,
@@ -1056,20 +1055,20 @@ IndexCatalog::IndexIterator::IndexIterator(OperationContext* opCtx,
       _catalog(cat),
       _iterator(cat->_entries.begin()),
       _start(true),
-      _prev(NULL),
-      _next(NULL) {}
+      _prev(nullptr),
+      _next(nullptr) {}
 
 bool IndexCatalog::IndexIterator::more() {
     if (_start) {
         _advance();
         _start = false;
     }
-    return _next != NULL;
+    return _next != nullptr;
 }
 
 IndexDescriptor* IndexCatalog::IndexIterator::next() {
     if (!more())
-        return NULL;
+        return nullptr;
     _prev = _next;
     _advance();
     return _prev->descriptor();
@@ -1086,7 +1085,7 @@ IndexCatalogEntry* IndexCatalog::IndexIterator::catalogEntry(const IndexDescript
 }
 
 void IndexCatalog::IndexIterator::_advance() {
-    _next = NULL;
+    _next = nullptr;
 
     while (_iterator != _catalog->_entries.end()) {
         IndexCatalogEntry* entry = _iterator->get();
@@ -1119,7 +1118,7 @@ IndexDescriptor* IndexCatalog::findIdIndex(OperationContext* opCtx) const {
         if (desc->isIdIndex())
             return desc;
     }
-    return NULL;
+    return nullptr;
 }
 
 IndexDescriptor* IndexCatalog::findIndexByName(OperationContext* opCtx,
@@ -1131,7 +1130,7 @@ IndexDescriptor* IndexCatalog::findIndexByName(OperationContext* opCtx,
         if (desc->indexName() == name)
             return desc;
     }
-    return NULL;
+    return nullptr;
 }
 
 IndexDescriptor* IndexCatalog::findIndexByKeyPatternAndCollationSpec(
@@ -1148,7 +1147,7 @@ IndexDescriptor* IndexCatalog::findIndexByKeyPatternAndCollationSpec(
             return desc;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 void IndexCatalog::findIndexesByKeyPattern(OperationContext* opCtx,
@@ -1168,7 +1167,7 @@ void IndexCatalog::findIndexesByKeyPattern(OperationContext* opCtx,
 IndexDescriptor* IndexCatalog::findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                          const BSONObj& shardKey,
                                                          bool requireSingleKey) const {
-    IndexDescriptor* best = NULL;
+    IndexDescriptor* best = nullptr;
 
     IndexIterator ii = getIndexIterator(opCtx, false);
     while (ii.more()) {
@@ -1245,10 +1244,11 @@ const IndexDescriptor* IndexCatalog::refreshEntry(OperationContext* opCtx,
     BSONObj keyPattern = spec.getObjectField("key");
 
     // Re-register this index in the index catalog with the new spec.
-    IndexDescriptor* newDesc =
-        new IndexDescriptor(_collection, _getAccessMethodName(opCtx, keyPattern), spec);
+    auto newDesc = stdx::make_unique<IndexDescriptor>(
+        _collection, _getAccessMethodName(opCtx, keyPattern), spec);
     const bool initFromDisk = false;
-    const IndexCatalogEntry* newEntry = _setupInMemoryStructures(opCtx, newDesc, initFromDisk);
+    const IndexCatalogEntry* newEntry =
+        _setupInMemoryStructures(opCtx, std::move(newDesc), initFromDisk);
     invariant(newEntry->isReady(opCtx));
 
     // Return the new descriptor.

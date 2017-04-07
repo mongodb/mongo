@@ -400,7 +400,7 @@ private:
     // initFromDisk: Avoids registering a change to undo this operation when set to true.
     //               You must set this flag if calling this function outside of a UnitOfWork.
     IndexCatalogEntry* _setupInMemoryStructures(OperationContext* opCtx,
-                                                IndexDescriptor* descriptor,
+                                                std::unique_ptr<IndexDescriptor> descriptor,
                                                 bool initFromDisk);
 
     // Apply a set of transformations to the user-provided index object 'spec' to make it
