@@ -215,7 +215,7 @@ real_worker(void)
 			    }
 		} else if (ret == WT_ROLLBACK) {
 			if ((ret = session->rollback_transaction(
-			   session, NULL)) != 0) {
+			    session, NULL)) != 0) {
 				(void)log_print_err(
 				    "real_worker:rollback_transaction", ret, 1);
 				goto err;

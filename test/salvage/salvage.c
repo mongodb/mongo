@@ -522,7 +522,7 @@ build(int ikey, int ivalue, int cnt)
 			break;
 		case WT_PAGE_ROW_LEAF:
 			testutil_check(__wt_snprintf(
-			   kbuf, sizeof(kbuf), "%010d KEY------", ikey));
+			    kbuf, sizeof(kbuf), "%010d KEY------", ikey));
 			key.data = kbuf;
 			key.size = 20;
 			cursor->set_key(cursor, &key);

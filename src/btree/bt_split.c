@@ -41,7 +41,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
 {
 	/* We should only call safe free if we aren't pinning the memory. */
 	WT_ASSERT(session,
-	   __wt_session_gen(session, WT_GEN_SPLIT) != split_gen);
+	    __wt_session_gen(session, WT_GEN_SPLIT) != split_gen);
 
 	/*
 	 * We have swapped something in a page: if we don't have exclusive

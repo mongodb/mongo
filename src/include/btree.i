@@ -424,7 +424,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 	modify = page->modify;
 
 	/* Update the bytes in-memory to reflect the eviction. */
-	__wt_cache_decr_check_uint64(session, &S2BT(session)->bytes_inmem,
+	__wt_cache_decr_check_uint64(session, &btree->bytes_inmem,
 	    page->memory_footprint, "WT_BTREE.bytes_inmem");
 	__wt_cache_decr_check_uint64(session, &cache->bytes_inmem,
 	    page->memory_footprint, "WT_CACHE.bytes_inmem");

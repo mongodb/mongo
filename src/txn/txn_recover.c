@@ -441,7 +441,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * last checkpoint was done with logging disabled, recovery should not
 	 * run.  Scan the metadata to figure out the largest file ID.
 	 */
-	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_EXISTED) ||
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_EXISTED) ||
 	    WT_IS_MAX_LSN(&metafile->ckpt_lsn)) {
 		WT_ERR(__recovery_file_scan(&r));
 		conn->next_file_id = r.max_fileid;

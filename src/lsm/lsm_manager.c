@@ -388,7 +388,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 		__wt_readlock(session, &conn->dhandle_lock);
 		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST_READ);
 		dhandle_locked = true;
-		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
+		TAILQ_FOREACH(lsm_tree, &conn->lsmqh, q) {
 			if (!lsm_tree->active)
 				continue;
 			__wt_epoch(session, &now);

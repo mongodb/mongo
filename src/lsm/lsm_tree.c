@@ -499,7 +499,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	__wt_epoch(session, &lsm_tree->last_flush_ts);
 
 	/* Now the tree is setup, make it visible to others. */
-	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
+	TAILQ_INSERT_HEAD(&conn->lsmqh, lsm_tree, q);
 	if (!exclusive)
 		lsm_tree->active = true;
 	F_SET(lsm_tree, WT_LSM_TREE_OPEN);

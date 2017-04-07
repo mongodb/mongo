@@ -393,8 +393,8 @@ err:		__wt_buf_free(session, key);
 	 * arithmetic is signed, so underflow isn't fatal, but check anyway so
 	 * we don't skew low over time.
 	 */
-	if (remove_cnt > S2C(session)->las_record_cnt)
-		S2C(session)->las_record_cnt = 0;
+	if (remove_cnt > conn->las_record_cnt)
+		conn->las_record_cnt = 0;
 	else if (remove_cnt > 0)
 		(void)__wt_atomic_subi64(&conn->las_record_cnt, remove_cnt);
 

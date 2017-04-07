@@ -4386,8 +4386,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			WT_RET(__rec_split_raw(session, r, val->len));
 	} else
 		if (WT_CHECK_CROSSING_BND(r, val->len))
-			WT_RET(__rec_split_crossing_bnd(
-			    session, r, val->len));
+			WT_RET(__rec_split_crossing_bnd(session, r, val->len));
 
 	/* Copy the value onto the page. */
 	if (!deleted && !overflow_type && btree->dictionary)
