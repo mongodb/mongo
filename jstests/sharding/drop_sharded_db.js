@@ -36,10 +36,10 @@
     assert.neq(null, dbAOnShard.unsharded.findOne({dummy: 1}));
 
     // Drop the non-suffixed db and ensure that it is the only one that was dropped.
-    dbA.dropDatabase();
+    assert.commandWorked(dbA.dropDatabase());
     var dbs = mongos.getDBNames();
     for (var i = 0; i < dbs.length; i++) {
-        assert.neq(dbs, "" + dbA);
+        assert.neq(dbs[i], "" + dbA);
     }
 
     assert.eq(0, config.databases.count({_id: dbA.getName()}));
