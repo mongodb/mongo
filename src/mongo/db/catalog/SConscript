@@ -67,6 +67,15 @@ env.Library(
 )
 
 env.Library(
+    target='collection',
+    source=[
+        "collection.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
     target='database',
     source=[
         "database.cpp",
@@ -81,8 +90,8 @@ env.Library(
         "apply_ops.cpp",
         "capped_utils.cpp",
         "coll_mod.cpp",
-        "collection.cpp",
         "collection_compact.cpp",
+        "collection_impl.cpp",
         "collection_info_cache.cpp",
         "create_collection.cpp",
         "cursor_manager.cpp",
@@ -97,6 +106,7 @@ env.Library(
         "rename_collection.cpp",
     ],
     LIBDEPS=[
+        'collection',
         'collection_options',
         'database',
         'index_catalog_entry',

@@ -56,7 +56,7 @@ struct InsertDeleteOptions;
  */
 class IndexCatalog {
 public:
-    IndexCatalog(Collection* collection);
+    explicit IndexCatalog(Collection* collection, int maxNumIndexesAllowed);
     ~IndexCatalog();
 
     // must be called before used

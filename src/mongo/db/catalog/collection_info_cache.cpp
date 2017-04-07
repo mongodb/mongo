@@ -49,10 +49,10 @@
 
 namespace mongo {
 
-CollectionInfoCache::CollectionInfoCache(Collection* collection)
+CollectionInfoCache::CollectionInfoCache(Collection* collection, const NamespaceString& ns)
     : _collection(collection),
       _keysComputed(false),
-      _planCache(new PlanCache(collection->ns().ns())),
+      _planCache(new PlanCache(ns.ns())),
       _querySettings(new QuerySettings()),
       _indexUsageTracker(getGlobalServiceContext()->getPreciseClockSource()) {}
 

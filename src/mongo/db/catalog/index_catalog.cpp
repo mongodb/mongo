@@ -86,10 +86,10 @@ const BSONObj IndexCatalog::_idObj = BSON("_id" << 1);
 
 // -------------
 
-IndexCatalog::IndexCatalog(Collection* collection)
+IndexCatalog::IndexCatalog(Collection* collection, int maxNumIndexesAllowed)
     : _magic(INDEX_CATALOG_UNINIT),
       _collection(collection),
-      _maxNumIndexesAllowed(_collection->getCatalogEntry()->getMaxAllowedIndexes()) {}
+      _maxNumIndexesAllowed(maxNumIndexesAllowed) {}
 
 IndexCatalog::~IndexCatalog() {
     if (_magic != INDEX_CATALOG_UNINIT) {
@@ -150,7 +150,7 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* opCt
                                                       std::move(descriptorCleanup),
                                                       _collection->infoCache());
     std::unique_ptr<IndexAccessMethod> accessMethod(
-        _collection->_dbce->getIndex(opCtx, _collection->getCatalogEntry(), entry.get()));
+        _collection->dbce()->getIndex(opCtx, _collection->getCatalogEntry(), entry.get()));
     entry->init(std::move(accessMethod));
 
     IndexCatalogEntry* save = entry.get();
@@ -197,7 +197,7 @@ bool IndexCatalog::_shouldOverridePlugin(OperationContext* opCtx, const BSONObj&
     string pluginName = IndexNames::findPluginName(keyPattern);
     bool known = IndexNames::isKnownName(pluginName);
 
-    if (!_collection->_dbce->isOlderThan24(opCtx)) {
+    if (!_collection->dbce()->isOlderThan24(opCtx)) {
         // RulesFor24+
         // This assert will be triggered when downgrading from a future version that
         // supports an index plugin unsupported by this version.
@@ -244,7 +244,7 @@ Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded(OperationContext* opCt
         return Status::OK();
     }
 
-    DatabaseCatalogEntry* dbce = _collection->_dbce;
+    DatabaseCatalogEntry* dbce = _collection->dbce();
 
     if (!dbce->isOlderThan24(opCtx)) {
         return Status::OK();  // these checks have already been done

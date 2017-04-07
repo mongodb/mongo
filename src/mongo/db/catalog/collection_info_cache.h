@@ -47,7 +47,7 @@ class OperationContext;
  */
 class CollectionInfoCache {
 public:
-    CollectionInfoCache(Collection* collection);
+    explicit CollectionInfoCache(Collection* collection, const NamespaceString& ns);
 
     ~CollectionInfoCache();
 

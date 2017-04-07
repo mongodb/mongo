@@ -424,7 +424,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         return s;
     }
 
-    verify(collection->_details->getTotalIndexCount(opCtx) == 0);
+    verify(collection->getCatalogEntry()->getTotalIndexCount(opCtx) == 0);
     LOG(1) << "\t dropIndexes done";
 
     Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fullns.toString());
@@ -469,7 +469,7 @@ void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
     // Takes ownership of the collection
     opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
 
-    it->second->_cursorManager.invalidateAll(false, reason);
+    it->second->getCursorManager()->invalidateAll(false, reason);
     _collections.erase(it);
 }
 
