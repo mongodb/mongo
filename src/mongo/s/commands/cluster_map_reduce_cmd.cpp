@@ -179,7 +179,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         Timer t;
@@ -326,7 +325,7 @@ public:
 
             try {
                 Strategy::commandOp(
-                    opCtx, dbname, shardedCommand, 0, nss.ns(), q, collation, &mrCommandResults);
+                    opCtx, dbname, shardedCommand, nss.ns(), q, collation, &mrCommandResults);
             } catch (DBException& e) {
                 e.addContext(str::stream() << "could not run map command on all shards for ns "
                                            << nss.ns()
@@ -479,7 +478,6 @@ public:
                     Strategy::commandOp(opCtx,
                                         outDB,
                                         finalCmdObj,
-                                        0,
                                         outputCollNss.ns(),
                                         query,
                                         CollationSpec::kSimpleSpec,

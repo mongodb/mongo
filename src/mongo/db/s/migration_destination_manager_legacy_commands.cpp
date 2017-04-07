@@ -88,7 +88,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto shardingState = ShardingState::get(opCtx);
@@ -202,7 +201,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         ShardingState::get(opCtx)->migrationDestinationManager()->report(result);
@@ -243,7 +241,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
@@ -291,7 +288,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto const mdm = ShardingState::get(opCtx)->migrationDestinationManager();

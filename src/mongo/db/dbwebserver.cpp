@@ -231,7 +231,7 @@ public:
             string errmsg;
 
             BSONObjBuilder sub;
-            if (!c->run(opCtx, "admin.$cmd", co, 0, errmsg, sub))
+            if (!c->run(opCtx, "admin.$cmd", co, errmsg, sub))
                 buf.append(cmd, errmsg);
             else
                 buf.append(cmd, sub.obj());

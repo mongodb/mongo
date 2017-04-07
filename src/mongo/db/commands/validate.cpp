@@ -78,7 +78,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {

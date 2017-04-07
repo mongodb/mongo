@@ -168,7 +168,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const bool isExplain = false;
@@ -200,7 +199,7 @@ public:
 
             BSONObjBuilder aggResult;
             (void)Command::findCommand("aggregate")
-                ->run(opCtx, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+                ->run(opCtx, dbname, viewAggregation.getValue(), errmsg, aggResult);
 
             if (ResolvedView::isResolvedViewErrorResponse(aggResult.asTempObj())) {
                 result.appendElements(aggResult.obj());

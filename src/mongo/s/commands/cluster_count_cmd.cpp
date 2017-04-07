@@ -72,7 +72,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -138,14 +137,8 @@ public:
         }
 
         std::vector<Strategy::CommandResult> countResult;
-        Strategy::commandOp(opCtx,
-                            dbname,
-                            countCmdBuilder.done(),
-                            options,
-                            nss.ns(),
-                            filter,
-                            collation,
-                            &countResult);
+        Strategy::commandOp(
+            opCtx, dbname, countCmdBuilder.done(), nss.ns(), filter, collation, &countResult);
 
         if (countResult.size() == 1 &&
             ResolvedView::isResolvedViewErrorResponse(countResult[0].result)) {
@@ -171,7 +164,7 @@ public:
 
             BSONObjBuilder aggResult;
             Command::findCommand("aggregate")
-                ->run(opCtx, dbname, resolvedAggCmd, options, errmsg, aggResult);
+                ->run(opCtx, dbname, resolvedAggCmd, errmsg, aggResult);
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult.obj());
@@ -256,7 +249,6 @@ public:
         Strategy::commandOp(opCtx,
                             dbname,
                             explainCmdBob.obj(),
-                            options,
                             nss.ns(),
                             targetingQuery,
                             targetingCollation,
@@ -292,7 +284,7 @@ public:
             nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
 
             return ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, 0, out);
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
         }
 
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);

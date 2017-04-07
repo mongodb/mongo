@@ -122,7 +122,6 @@ public:
     static void commandOp(OperationContext* opCtx,
                           const std::string& db,
                           const BSONObj& command,
-                          int options,
                           const std::string& versionedNS,
                           const BSONObj& targetingQuery,
                           const BSONObj& targetingCollation,

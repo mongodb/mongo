@@ -91,7 +91,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         auto shardingState = ShardingState::get(opCtx);

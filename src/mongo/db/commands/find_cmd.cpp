@@ -230,7 +230,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -312,7 +311,7 @@ public:
 
             Command* agg = Command::findCommand("aggregate");
             try {
-                agg->run(opCtx, dbname, viewAggregationCommand.getValue(), options, errmsg, result);
+                agg->run(opCtx, dbname, viewAggregationCommand.getValue(), errmsg, result);
             } catch (DBException& error) {
                 if (error.getCode() == ErrorCodes::InvalidPipelineOperator) {
                     return appendCommandStatus(

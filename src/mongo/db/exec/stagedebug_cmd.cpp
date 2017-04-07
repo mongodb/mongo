@@ -140,7 +140,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         BSONElement argElt = cmdObj["stageDebug"];

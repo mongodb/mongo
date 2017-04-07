@@ -75,7 +75,6 @@ public:
                                const Namespaces& namespaces,
                                const AggregationRequest& request,
                                BSONObj cmdObj,
-                               int options,
                                BSONObjBuilder* result);
 
 private:
@@ -95,16 +94,14 @@ private:
                                  DBClientBase* conn,
                                  const Namespaces& namespaces,
                                  const AggregationRequest& aggRequest,
-                                 BSONObj cmd,
-                                 int queryOptions);
+                                 BSONObj cmd);
 
     static Status aggPassthrough(OperationContext* opCtx,
                                  const Namespaces& namespaces,
                                  const ShardId& shardId,
                                  const AggregationRequest& aggRequest,
                                  BSONObj cmd,
-                                 BSONObjBuilder* result,
-                                 int queryOptions);
+                                 BSONObjBuilder* result);
 };
 
 }  // namespace mongo

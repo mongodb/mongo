@@ -1362,7 +1362,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmd,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         Timer t;
@@ -1716,7 +1715,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

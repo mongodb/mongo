@@ -73,7 +73,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& db,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError::get(opCtx->getClient()).reset();
@@ -107,7 +106,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         //
@@ -316,7 +314,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError* le = &LastError::get(opCtx->getClient());

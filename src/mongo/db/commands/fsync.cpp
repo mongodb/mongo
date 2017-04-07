@@ -120,7 +120,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         if (opCtx->lockState()->isLocked()) {
@@ -294,7 +293,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         log() << "command: unlock requested";

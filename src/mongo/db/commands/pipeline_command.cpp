@@ -93,7 +93,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(db, cmdObj));

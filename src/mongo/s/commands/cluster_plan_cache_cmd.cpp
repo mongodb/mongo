@@ -89,7 +89,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result);
 
@@ -113,7 +112,6 @@ private:
 bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
                               const std::string& dbName,
                               BSONObj& cmdObj,
-                              int options,
                               std::string& errMsg,
                               BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -124,7 +122,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
     vector<Strategy::CommandResult> results;
     const BSONObj query;
     Strategy::commandOp(
-        opCtx, dbName, cmdObj, options, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
+        opCtx, dbName, cmdObj, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
 
     // Set value of first shard result's "ok" field.
     bool clusterCmdResult = true;

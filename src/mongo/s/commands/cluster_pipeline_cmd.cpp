@@ -76,7 +76,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
@@ -89,8 +88,8 @@ public:
         ClusterAggregate::Namespaces nsStruct;
         nsStruct.requestedNss = nss;
         nsStruct.executionNss = std::move(nss);
-        auto status = ClusterAggregate::runAggregate(
-            opCtx, nsStruct, request.getValue(), cmdObj, options, &result);
+        auto status =
+            ClusterAggregate::runAggregate(opCtx, nsStruct, request.getValue(), cmdObj, &result);
         appendCommandStatus(result, status);
         return status.isOK();
     }
@@ -118,17 +117,11 @@ public:
                                  BSON("$readPreference" << readPrefObj));
         }
 
-        int options = 0;
-        if (serverSelectionMetadata.isSecondaryOk()) {
-            options |= QueryOption_SlaveOk;
-        }
-
         ClusterAggregate::Namespaces nsStruct;
         nsStruct.requestedNss = nss;
         nsStruct.executionNss = std::move(nss);
 
-        return ClusterAggregate::runAggregate(
-            opCtx, nsStruct, request.getValue(), cmdObj, options, out);
+        return ClusterAggregate::runAggregate(opCtx, nsStruct, request.getValue(), cmdObj, out);
     }
 } clusterPipelineCmd;
 

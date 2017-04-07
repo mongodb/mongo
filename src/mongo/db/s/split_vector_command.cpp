@@ -114,7 +114,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         //

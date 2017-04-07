@@ -85,7 +85,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
                                       const AggregationRequest& request,
                                       BSONObj cmdObj,
-                                      int options,
                                       BSONObjBuilder* result) {
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
@@ -118,13 +117,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     if (!executionNsRoutingInfo.cm()) {
-        return aggPassthrough(opCtx,
-                              namespaces,
-                              executionNsRoutingInfo.primary()->getId(),
-                              request,
-                              cmdObj,
-                              result,
-                              options);
+        return aggPassthrough(
+            opCtx, namespaces, executionNsRoutingInfo.primary()->getId(), request, cmdObj, result);
     }
 
     const auto chunkMgr = executionNsRoutingInfo.cm();
@@ -204,7 +198,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     Strategy::commandOp(opCtx,
                         namespaces.executionNss.db().toString(),
                         shardedCommand,
-                        options,
                         namespaces.executionNss.ns(),
                         shardQuery,
                         request.getCollation(),
@@ -291,7 +284,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
     BSONObj mergedResults =
-        aggRunCommand(opCtx, conn.get(), namespaces, request, mergeCmd.freeze().toBson(), options);
+        aggRunCommand(opCtx, conn.get(), namespaces, request, mergeCmd.freeze().toBson());
     conn.done();
 
     if (auto wcErrorElem = mergedResults["writeConcernError"]) {
@@ -412,15 +405,13 @@ BSONObj ClusterAggregate::aggRunCommand(OperationContext* opCtx,
                                         DBClientBase* conn,
                                         const Namespaces& namespaces,
                                         const AggregationRequest& aggRequest,
-                                        BSONObj cmd,
-                                        int queryOptions) {
+                                        BSONObj cmd) {
     // Temporary hack. See comment on declaration for details.
     auto cursor = conn->query(namespaces.executionNss.db() + ".$cmd",
                               cmd,
-                              -1,    // nToReturn
-                              0,     // nToSkip
-                              NULL,  // fieldsToReturn
-                              queryOptions);
+                              -1,  // nToReturn
+                              0,   // nToSkip
+                              NULL);
     massert(17014,
             str::stream() << "aggregate command didn't return results on host: "
                           << conn->toString(),
@@ -455,8 +446,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const AggregationRequest& aggRequest,
                                         BSONObj cmdObj,
-                                        BSONObjBuilder* out,
-                                        int queryOptions) {
+                                        BSONObjBuilder* out) {
     // Temporary hack. See comment on declaration for details.
     auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
@@ -472,7 +462,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
 
     ShardConnection conn(shardStatus.getValue()->getConnString(), "");
-    BSONObj result = aggRunCommand(opCtx, conn.get(), namespaces, aggRequest, cmdObj, queryOptions);
+    BSONObj result = aggRunCommand(opCtx, conn.get(), namespaces, aggRequest, cmdObj);
     conn.done();
 
     // First append the properly constructed writeConcernError. It will then be skipped
@@ -500,7 +490,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         nsStruct.executionNss = resolvedView.getNamespace();
 
         return ClusterAggregate::runAggregate(
-            opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, queryOptions, out);
+            opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
     }
 
     return getStatusFromCommandResult(result);

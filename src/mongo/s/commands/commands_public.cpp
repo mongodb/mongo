@@ -213,7 +213,6 @@ protected:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& output) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -263,7 +262,6 @@ protected:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
@@ -370,7 +368,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& output) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -385,14 +382,8 @@ public:
 
         vector<Strategy::CommandResult> results;
         const BSONObj query;
-        Strategy::commandOp(opCtx,
-                            dbName,
-                            cmdObj,
-                            options,
-                            cm->getns(),
-                            query,
-                            CollationSpec::kSimpleSpec,
-                            &results);
+        Strategy::commandOp(
+            opCtx, dbName, cmdObj, cm->getns(), query, CollationSpec::kSimpleSpec, &results);
 
         BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
         bool isValid = true;
@@ -448,7 +439,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) override {
         uassertStatusOK(createShardDatabase(opCtx, dbName));
@@ -481,7 +471,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const auto fullNsFromElt = cmdObj.firstElement();
@@ -540,7 +529,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const auto todbElt = cmdObj["todb"];
@@ -614,7 +602,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -795,7 +782,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
@@ -1000,7 +986,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const std::string ns = parseNs(dbName, cmdObj);
@@ -1008,8 +993,7 @@ public:
                 "Performing splitVector across dbs isn't supported via mongos",
                 str::startsWith(ns, dbName));
 
-        return NotAllowedOnShardedCollectionCmd::run(
-            opCtx, dbName, cmdObj, options, errmsg, result);
+        return NotAllowedOnShardedCollectionCmd::run(opCtx, dbName, cmdObj, errmsg, result);
     }
 
 } splitVectorCmd;
@@ -1037,7 +1021,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -1077,7 +1060,7 @@ public:
 
                 BSONObjBuilder aggResult;
                 Command::findCommand("aggregate")
-                    ->run(opCtx, dbName, resolvedAggCmd, options, errmsg, aggResult);
+                    ->run(opCtx, dbName, resolvedAggCmd, errmsg, aggResult);
 
                 ViewResponseFormatter formatter(aggResult.obj());
                 auto formatStatus = formatter.appendAsDistinctResponse(&result);
@@ -1127,7 +1110,7 @@ public:
 
             ShardConnection conn(shardStatus.getValue()->getConnString(), nss.ns());
             BSONObj res;
-            bool ok = conn->runCommand(nss.db().toString(), cmdObj, res, options);
+            bool ok = conn->runCommand(nss.db().toString(), cmdObj, res);
             conn.done();
 
             if (!ok) {
@@ -1196,7 +1179,6 @@ public:
         Strategy::commandOp(opCtx,
                             dbname,
                             explainCmdBob.obj(),
-                            options,
                             nss.ns(),
                             targetingQuery,
                             targetingCollation.getValue(),
@@ -1233,7 +1215,7 @@ public:
             nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
 
             return ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, 0, out);
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
         }
 
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
@@ -1279,7 +1261,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
@@ -1298,7 +1279,7 @@ public:
 
             vector<Strategy::CommandResult> results;
             Strategy::commandOp(
-                opCtx, dbName, cmdObj, 0, nss.ns(), finder, CollationSpec::kSimpleSpec, &results);
+                opCtx, dbName, cmdObj, nss.ns(), finder, CollationSpec::kSimpleSpec, &results);
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
@@ -1334,7 +1315,6 @@ public:
                     Strategy::commandOp(opCtx,
                                         dbName,
                                         shardCmd,
-                                        0,
                                         nss.ns(),
                                         finder,
                                         CollationSpec::kSimpleSpec,
@@ -1423,7 +1403,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -1569,7 +1548,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         RARELY {
@@ -1615,7 +1593,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) final {
         auto nss = NamespaceString::makeListCollectionsNSS(dbName);
@@ -1665,7 +1642,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) final {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));

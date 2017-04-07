@@ -164,7 +164,7 @@ unsigned long long DBDirectClient::count(
 
     std::string errmsg;
     BSONObjBuilder result;
-    bool runRetval = countCmd->run(_opCtx, dbname, cmdObj, options, errmsg, result);
+    bool runRetval = countCmd->run(_opCtx, dbname, cmdObj, errmsg, result);
     if (!runRetval) {
         Command::appendCommandStatus(result, runRetval, errmsg);
         Status commandStatus = getStatusFromCommandResult(result.obj());

@@ -113,7 +113,6 @@ PlanCacheCommand::PlanCacheCommand(const string& name,
 bool PlanCacheCommand::run(OperationContext* opCtx,
                            const string& dbname,
                            BSONObj& cmdObj,
-                           int options,
                            string& errmsg,
                            BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));

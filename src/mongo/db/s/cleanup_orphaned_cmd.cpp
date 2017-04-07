@@ -206,7 +206,6 @@ public:
     bool run(OperationContext* opCtx,
              string const& db,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         string ns;

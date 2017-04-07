@@ -67,7 +67,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int,
              std::string& errmsg,
              BSONObjBuilder& result) {
         auto snapshotManager =
@@ -117,7 +116,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int,
              std::string& errmsg,
              BSONObjBuilder& result) {
         auto snapshotManager =

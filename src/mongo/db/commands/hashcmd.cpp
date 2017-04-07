@@ -82,7 +82,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& db,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         result.appendAs(cmdObj.firstElement(), "key");

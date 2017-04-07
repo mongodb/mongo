@@ -452,12 +452,11 @@ void Strategy::clientCommandOp(OperationContext* opCtx,
 void Strategy::commandOp(OperationContext* opCtx,
                          const string& db,
                          const BSONObj& command,
-                         int options,
                          const string& versionedNS,
                          const BSONObj& targetingQuery,
                          const BSONObj& targetingCollation,
                          std::vector<CommandResult>* results) {
-    QuerySpec qSpec(db + ".$cmd", command, BSONObj(), 0, 1, options);
+    QuerySpec qSpec(db + ".$cmd", command, BSONObj(), 0, 1, 0);
 
     ParallelSortClusteredCursor cursor(
         qSpec, CommandInfo(versionedNS, targetingQuery, targetingCollation));
@@ -651,7 +650,6 @@ Status Strategy::explainFind(OperationContext* opCtx,
     Strategy::commandOp(opCtx,
                         qr.nss().db().toString(),
                         explainCmdBob.obj(),
-                        options,
                         qr.nss().toString(),
                         qr.getFilter(),
                         qr.getCollation(),
@@ -746,14 +744,14 @@ void execCommandClient(OperationContext* opCtx,
     bool ok = false;
     try {
         if (!supportsWriteConcern) {
-            ok = c->run(opCtx, dbname.toString(), cmdObj, queryOptions, errmsg, result);
+            ok = c->run(opCtx, dbname.toString(), cmdObj, errmsg, result);
         } else {
             // Change the write concern while running the command.
             const auto oldWC = opCtx->getWriteConcern();
             ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
             opCtx->setWriteConcern(wcResult.getValue());
 
-            ok = c->run(opCtx, dbname.toString(), cmdObj, queryOptions, errmsg, result);
+            ok = c->run(opCtx, dbname.toString(), cmdObj, errmsg, result);
         }
     } catch (const DBException& e) {
         result.resetToEmpty();

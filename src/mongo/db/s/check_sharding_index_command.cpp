@@ -85,7 +85,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& jsobj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));

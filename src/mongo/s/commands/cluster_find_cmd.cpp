@@ -137,13 +137,12 @@ public:
                 resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
-            int queryOptions = 0;
             ClusterAggregate::Namespaces nsStruct;
             nsStruct.requestedNss = std::move(nss);
             nsStruct.executionNss = std::move(resolvedView.getNamespace());
 
             auto status = ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, queryOptions, out);
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
             appendCommandStatus(*out, status);
             return status;
         }
@@ -154,7 +153,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         // We count find command as a query op.
@@ -214,7 +212,7 @@ public:
                 nsStruct.executionNss = std::move(resolvedView.getNamespace());
 
                 auto status = ClusterAggregate::runAggregate(
-                    opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, options, &result);
+                    opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &result);
                 appendCommandStatus(result, status);
                 return status.isOK();
             }
