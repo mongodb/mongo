@@ -177,7 +177,7 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
 
 void MessageCompressorManager::clientFinish(const BSONObj& input) {
     auto elem = input.getField("compression");
-    LOG(3) << "Finishing client-side compreession negotiation";
+    LOG(3) << "Finishing client-side compression negotiation";
 
     // We're about to update the compressor list with the negotiation result from the server.
     _negotiated.clear();
