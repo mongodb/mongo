@@ -34,7 +34,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
         st.s0.adminCommand({moveChunk: 'TestDB.Coll0', find: {Key: 1}, to: st.shard1.shardName}));
 
     // Pause the move chunk operation in the critical section
-    pauseMigrateAtStep(st.shard1, migrateStepNames.done);
+    pauseMigrateAtStep(st.shard1, migrateStepNames.steady);
     var joinMoveChunk = moveChunkParallel(
         staticMongod, st.s0.host, {Key: 1}, null, 'TestDB.Coll1', st.shard1.shardName);
 
@@ -56,7 +56,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
         collUnsharded.insert({TestKey: 0, Value: 'Zero'}, {writeConcern: {wtimeout: 5000}}));
     assert.eq(1, collUnsharded.find({}).maxTimeMS(5000).itcount());
 
-    unpauseMigrateAtStep(st.shard1, migrateStepNames.done);
+    unpauseMigrateAtStep(st.shard1, migrateStepNames.steady);
     joinMoveChunk();
 
     st.stop();
