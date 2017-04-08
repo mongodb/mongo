@@ -72,6 +72,9 @@ public:
 
     using Map = stdx::unordered_map<K, iterator, Hash, KeyEqual>;
 
+    using key_type = K;
+    using mapped_type = V;
+
     /**
      * Inserts a new entry into the cache. If the given key already exists in the cache,
      * then we will drop the old entry and replace it with the given new entry. The cache
@@ -103,7 +106,7 @@ public:
             this->_list.pop_back();
 
             invariant(this->size() <= this->_maxSize);
-            return result;
+            return std::move(result);
         }
 
         invariant(this->size() <= this->_maxSize);
@@ -167,28 +170,29 @@ public:
     }
 
     /**
-     * Removes the element in the cache stored for this key, if one exists.
+     * Removes the element in the cache stored for this key, if one
+     * exists. Returns the count of elements erased.
      */
-    void remove(const K& key) {
+    typename Map::size_type erase(const K& key) {
         auto it = this->_map.find(key);
         if (it == this->_map.end()) {
-            return;
+            return 0;
         }
 
         this->_list.erase(it->second);
         this->_map.erase(it);
+        return 1;
     }
 
     /**
-     * Removes the element pointed to by the given iterator from this cache.
+     * Removes the element pointed to by the given iterator from this
+     * cache, and returns an iterator to the next least recently used
+     * element, or the end iterator, if no such element exists.
      */
-    void remove(iterator it) {
-        if (it == this->_list.end()) {
-            return;
-        }
-
-        this->_map.erase(it->first);
-        this->_list.erase(it);
+    iterator erase(iterator it) {
+        invariant(it != this->_list.end());
+        invariant(this->_map.erase(it->first) == 1);
+        return this->_list.erase(it);
     }
 
     /**
@@ -212,6 +216,10 @@ public:
      */
     std::size_t size() const {
         return this->_list.size();
+    }
+
+    bool empty() const {
+        return this->_list.empty();
     }
 
     /**
@@ -254,6 +262,10 @@ public:
      */
     const_iterator cend() const {
         return this->_list.cend();
+    }
+
+    typename Map::size_type count(const K& key) const {
+        return this->_map.count(key);
     }
 
 private:

@@ -200,8 +200,8 @@ TEST(LRUCacheTest, SizeZeroCache) {
     assertEquals(cache.size(), size_t(0));
     assertNotInCache(cache, 3);
 
-    // Remove should be a no-op
-    cache.remove(4);
+    // Erase should be a no-op
+    assertEquals(cache.erase(4), size_t(0));
     assertEquals(cache.size(), size_t(0));
     assertNotInCache(cache, 4);
 
@@ -231,11 +231,12 @@ TEST(LRUCacheTest, StressTest) {
         assertEquals(found->second, s);
         assertEquals(found, cache.begin());
 
-        cache.remove(found);
+        const auto nextAfterFound = std::next(found);
+        assertEquals(cache.erase(found), nextAfterFound);
         assertEquals(cache.size(), size_t(maxSize - 1));
         cache.add(s, s);
         assertEquals(cache.size(), size_t(maxSize));
-        cache.remove(s);
+        assertEquals(cache.erase(s), size_t(1));
         assertEquals(cache.size(), size_t(maxSize - 1));
         cache.add(s, s);
     }
@@ -366,11 +367,11 @@ TEST(LRUCacheTest, ReplaceKeyTest) {
 
 // Test that calling add() with a key that already exists in the cache deletes
 // the existing entry and gets promoted properly
-TEST(LRUCacheTest, RemoveByKey) {
+TEST(LRUCacheTest, EraseByKey) {
     runWithDifferentSizes([](int maxSize) {
 
         // Test replacement for any position in the original cache
-        // i <= maxSize so we remove a non-existent element
+        // i <= maxSize so we erase a non-existent element
         for (int i = 0; i <= maxSize; i++) {
             LRUCache<int, int> cache(maxSize);
 
@@ -382,11 +383,12 @@ TEST(LRUCacheTest, RemoveByKey) {
 
             assertEquals(cache.size(), size_t(maxSize));
 
-            // Remove an element
-            cache.remove(i);
+            // Erase an element
             if (i != maxSize) {
+                assertEquals(cache.erase(i), size_t(1));
                 assertEquals(cache.size(), size_t(maxSize - 1));
             } else {
+                assertEquals(cache.erase(i), size_t(0));
                 assertEquals(cache.size(), size_t(maxSize));
             }
 
@@ -403,12 +405,11 @@ TEST(LRUCacheTest, RemoveByKey) {
 }
 
 // Test removal of elements by iterator from the cache
-TEST(LRUCacheTest, RemoveByIterator) {
+TEST(LRUCacheTest, EraseByIterator) {
     runWithDifferentSizes([](int maxSize) {
 
         // Test replacement for any position in the original cache
-        // i <= maxSize so we remove a non-existent element
-        for (int i = 0; i <= maxSize; i++) {
+        for (int i = 0; i < maxSize; i++) {
             LRUCache<int, int> cache(maxSize);
 
             // Fill up the cache
@@ -426,7 +427,8 @@ TEST(LRUCacheTest, RemoveByIterator) {
                 elem--;
             }
 
-            cache.remove(it);
+            auto nextElement = std::next(it);
+            assertEquals(cache.erase(it), nextElement);
 
             if (i == maxSize) {
                 assertEquals(cache.size(), size_t(maxSize));
@@ -574,6 +576,26 @@ TEST(LRUCacheTest, CustomHashAndEqualityTypeTest) {
     assertNotEquals(found, cache.end());
     assertNotEquals(found->second, b);
     assertEquals(found->second, sortaEqual._b);
+}
+
+TEST(LRUCacheTest, EmptyTest) {
+    const int maxSize = 4;
+    LRUCache<int, int> cache(maxSize);
+    assertEquals(cache.empty(), true);
+    cache.add(1, 2);
+    assertEquals(cache.empty(), false);
+    cache.erase(1);
+    assertEquals(cache.empty(), true);
+}
+
+TEST(LRUCacheTest, CountTest) {
+    const int maxSize = 4;
+    LRUCache<int, int> cache(maxSize);
+    assertEquals(cache.count(1), size_t(0));
+    cache.add(1, 2);
+    assertEquals(cache.count(1), size_t(1));
+    cache.erase(1);
+    assertEquals(cache.count(1), size_t(0));
 }
 
 }  // namespace

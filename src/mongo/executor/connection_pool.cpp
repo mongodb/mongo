@@ -39,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
+#include "mongo/util/lru_cache.h"
 #include "mongo/util/scopeguard.h"
 
 // One interesting implementation note herein concerns how setup() and
@@ -115,6 +116,7 @@ public:
 private:
     using OwnedConnection = std::unique_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
+    using LRUOwnershipPool = LRUCache<OwnershipPool::key_type, OwnershipPool::mapped_type>;
     using Request = std::pair<Date_t, GetConnectionCallback>;
     struct RequestComparator {
         bool operator()(const Request& a, const Request& b) {
@@ -130,7 +132,10 @@ private:
 
     void shutdown();
 
-    OwnedConnection takeFromPool(OwnershipPool& pool, ConnectionInterface* connection);
+    template <typename OwnershipPoolType>
+    typename OwnershipPoolType::mapped_type takeFromPool(
+        OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr);
+
     OwnedConnection takeFromProcessingPool(ConnectionInterface* connection);
 
     void updateStateInLock();
@@ -140,7 +145,7 @@ private:
 
     const HostAndPort _hostAndPort;
 
-    OwnershipPool _readyPool;
+    LRUOwnershipPool _readyPool;
     OwnershipPool _processingPool;
     OwnershipPool _droppedProcessingPool;
     OwnershipPool _checkedOutPool;
@@ -269,6 +274,7 @@ void ConnectionPool::returnConnection(ConnectionInterface* conn) {
 ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent, const HostAndPort& hostAndPort)
     : _parent(parent),
       _hostAndPort(hostAndPort),
+      _readyPool(std::numeric_limits<size_t>::max()),
       _requestTimer(parent->_factory->makeTimer()),
       _generation(0),
       _inFulfillRequests(false),
@@ -413,7 +419,8 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
                                               OwnedConnection conn) {
     auto connPtr = conn.get();
 
-    _readyPool[connPtr] = std::move(conn);
+    // This makes the connection the new most-recently-used connection.
+    _readyPool.add(connPtr, std::move(conn));
 
     // Our strategy for refreshing connections is to check them out and
     // immediately check them back in (which kicks off the refresh logic in
@@ -497,6 +504,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
     auto guard = MakeGuard([&] { _inFulfillRequests = false; });
 
     while (_requests.size()) {
+        // _readyPool is an LRUCache, so its begin() object is the MRU item.
         auto iter = _readyPool.begin();
 
         if (iter == _readyPool.end())
@@ -646,8 +654,9 @@ void ConnectionPool::SpecificPool::shutdown() {
     _parent->_pools.erase(_hostAndPort);
 }
 
-ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::takeFromPool(
-    OwnershipPool& pool, ConnectionInterface* connPtr) {
+template <typename OwnershipPoolType>
+typename OwnershipPoolType::mapped_type ConnectionPool::SpecificPool::takeFromPool(
+    OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr) {
     auto iter = pool.find(connPtr);
     invariant(iter != pool.end());
 
