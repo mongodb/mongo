@@ -121,4 +121,7 @@
         {configureFailPoint: 'fetcherHangBeforeStart', mode: 'off'}));
     checkLog.contains(nodes[2],
                       "Upstream node rolled back after verifying that it had our MinValid point.");
+
+    rst.awaitSecondaryNodes();
+    rst.stopSet();
 }());
