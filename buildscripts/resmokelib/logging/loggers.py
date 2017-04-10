@@ -10,7 +10,6 @@ import sys
 from . import buildlogger
 from . import formatters
 
-
 _DEFAULT_FORMAT = "[%(name)s] %(message)s"
 
 EXECUTOR_LOGGER_NAME = "executor"
@@ -32,8 +31,11 @@ def _build_logger_server(logging_config):
 
 
 def configure_loggers(logging_config):
-    buildlogger.BUILDLOGGER_FALLBACK = BaseLogger("fallback")
-    buildlogger.BUILDLOGGER_FALLBACK.addHandler(_fallback_buildlogger_handler())
+    buildlogger.BUILDLOGGER_FALLBACK = BaseLogger("buildlogger")
+    # The 'buildlogger' prefix is not added to the fallback logger since the prefix of the original
+    # logger will be there as part of the logged message.
+    buildlogger.BUILDLOGGER_FALLBACK.addHandler(
+        _fallback_buildlogger_handler(include_logger_name=False))
     build_logger_server = _build_logger_server(logging_config)
     fixture_logger = FixtureRootLogger(logging_config, build_logger_server)
     tests_logger = TestsRootLogger(logging_config, build_logger_server)
@@ -335,11 +337,14 @@ class TestQueueLogger(BaseLogger):
 
 # Util methods
 
-def _fallback_buildlogger_handler():
+def _fallback_buildlogger_handler(include_logger_name=True):
     """
     Returns a handler that writes to stderr.
     """
-    log_format = "[buildlogger:%(name)s] %(message)s"
+    if include_logger_name:
+        log_format = "[fallback] [%(name)s] %(message)s"
+    else:
+        log_format = "[fallback] %(message)s"
     formatter = formatters.ISO8601Formatter(fmt=log_format)
 
     handler = logging.StreamHandler(sys.stderr)
