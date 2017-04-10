@@ -1595,41 +1595,6 @@ public:
 
 } geo2dFindNearCmd;
 
-class CompactCmd : public Command {
-public:
-    CompactCmd() : Command("compact") {}
-
-    bool slaveOk() const override {
-        return true;
-    }
-
-    bool adminOnly() const override {
-        return false;
-    }
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
-        ActionSet actions;
-        actions.addAction(ActionType::compact);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    bool run(OperationContext* opCtx,
-             const string& dbName,
-             BSONObj& cmdObj,
-             int options,
-             string& errmsg,
-             BSONObjBuilder& result) override {
-        uasserted(ErrorCodes::CommandNotSupported, "compact not allowed through mongos");
-    }
-
-} compactCmd;
-
 class EvalCmd : public PublicGridCommand {
 public:
     EvalCmd() : PublicGridCommand("eval", "$eval") {}
