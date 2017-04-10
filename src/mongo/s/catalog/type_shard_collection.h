@@ -45,49 +45,47 @@ class StatusWith;
 
 /**
  * This class represents the layout and contents of documents contained in the shard server's
- * config.collections collections. All manipulation of documents coming from that collection should
+ * config.collections collection. All manipulation of documents coming from that collection should
  * be done with this class.
  *
  * Expected shard server config.collections collection format:
  *   {
- *      "_id" : "foo.bar",  // will eventually become a UUID field, when it becomes available
+ *      "_id" : "foo.bar",                               // will become UUID when available
  *      "ns" : "foo.bar",
+ *      "epoch" : ObjectId("58b6fd76132358839e409e47"),  // will remove when UUID becomes available
  *      "key" : {
  *          "_id" : 1
  *      },
- *      "lastConsistentCollectionVersionEpoch" : ObjectId("58b6fd76132358839e409e47"),
- *      "lastConsistentCollectionVersion" : ISODate("1970-02-19T17:02:47.296Z")
+ *      "defaultCollation" : {
+ *          "locale" : "fr_CA"
+ *      },
+ *      "unique" : false,
+ *      "refreshing" : true
+ *      "refreshSequenceNumber" : 5
  *   }
  *
- * The 'lastConsistentCollectionVersion' is written by shard primaries and used by shard
- * secondaries. A secondary uses the value to refresh chunk metadata up to the chunk with that
- * chunk version. Chunk metadata updates on the shard involve multiple chunks collection document
- * writes, during which time the data can be inconsistent and should not be loaded.
  */
 class ShardCollectionType {
 public:
-    // Name of the collections collection in the config server.
+    // Name of the collections collection on the shard server.
     static const std::string ConfigNS;
 
     static const BSONField<std::string> uuid;
     static const BSONField<std::string> ns;
+    static const BSONField<OID> epoch;
     static const BSONField<BSONObj> keyPattern;
-    static const BSONField<OID> lastConsistentCollectionVersionEpoch;
-    static const BSONField<Date_t> lastConsistentCollectionVersion;
-
-    explicit ShardCollectionType(const CollectionType& collType);
+    static const BSONField<BSONObj> defaultCollation;
+    static const BSONField<bool> unique;
+    static const BSONField<bool> refreshing;
+    static const BSONField<long long> refreshSequenceNumber;
 
     /**
-     * Constructs a new ShardCollectionType object from BSON retrieved from a shard server. Also
-     * does validation of the contents.
+     * Constructs a new ShardCollectionType object from BSON. Also does validation of the contents.
      */
     static StatusWith<ShardCollectionType> fromBSON(const BSONObj& source);
 
     /**
-     * Returns the BSON representation of the entry for the shard collection schema.
-     *
-     * This function only appends the fields and values relevant to shards that are SET on the
-     * ShardCollectionType object. No field is guaranteed to be appended.
+     * Returns the BSON representation of this shard collection type object.
      */
     BSONObj toBSON() const;
 
@@ -101,41 +99,81 @@ public:
     }
     void setUUID(const NamespaceString& uuid);
 
-    const NamespaceString& getNs() const {
-        return _ns;
+    const NamespaceString& getNss() const {
+        return _nss;
     }
-    void setNs(const NamespaceString& ns);
+    void setNss(const NamespaceString& nss);
+
+    const OID& getEpoch() const {
+        return _epoch;
+    }
+    void setEpoch(const OID& epoch);
 
     const KeyPattern& getKeyPattern() const {
         return _keyPattern;
     }
     void setKeyPattern(const KeyPattern& keyPattern);
 
-    const ChunkVersion& getLastConsistentCollectionVersion() const {
-        return _lastConsistentCollectionVersion.get();
+    const BSONObj& getDefaultCollation() const {
+        return _defaultCollation;
     }
-    void setLastConsistentCollectionVersion(const ChunkVersion& lastConsistentCollectionVersion);
+    void setDefaultCollation(const BSONObj& collation) {
+        _defaultCollation = collation.getOwned();
+    }
 
-    bool isLastConsistentCollectionVersionSet() const;
+    const bool getUnique() const {
+        return _unique;
+    }
+    void setUnique(bool unique) {
+        _unique = unique;
+    }
 
-    const OID getLastConsistentCollectionVersionEpoch() const;
+    const bool hasRefreshing() const {
+        return _refreshing.is_initialized();
+    }
+    const bool getRefreshing() const;
+    void setRefreshing(bool refreshing) {
+        _refreshing = refreshing;
+    }
+
+    const bool hasRefreshSequenceNumber() const {
+        return _refreshSequenceNumber.is_initialized();
+    }
+    const long long getRefreshSequenceNumber() const;
+    void setRefreshSequenceNumber(const long long seqNum) {
+        _refreshSequenceNumber = seqNum;
+    }
 
 private:
     ShardCollectionType(const NamespaceString& uuid,
-                        const NamespaceString& ns,
-                        const KeyPattern& keyPattern);
+                        const NamespaceString& nss,
+                        const OID& epoch,
+                        const KeyPattern& keyPattern,
+                        const BSONObj& defaultCollation,
+                        const bool& unique);
 
+    // Will become the UUID when available. Currently a duplicate of '_nss'.
     NamespaceString _uuid;
 
     // The full namespace (with the database prefix).
-    NamespaceString _ns;
+    NamespaceString _nss;
+
+    // Uniquely identifies this instance of the collection, in case of drop/create.
+    OID _epoch;
 
     // Sharding key. If collection is dropped, this is no longer required.
     KeyPattern _keyPattern;
 
-    // used by shard secondaries to safely refresh chunk metadata up to this version: higher
-    // versions may put the chunk metadata into an inconsistent state.
-    boost::optional<ChunkVersion> _lastConsistentCollectionVersion;
+    // Optional collection default collation. If empty, implies simple collation.
+    BSONObj _defaultCollation;
+
+    // Uniqueness of the sharding key.
+    bool _unique;
+
+    // Refresh fields set by primaries and used by shard secondaries to safely refresh chunk
+    // metadata.
+    boost::optional<bool> _refreshing{boost::none};
+    boost::optional<long long> _refreshSequenceNumber{boost::none};
 };
 
 }  // namespace mongo
