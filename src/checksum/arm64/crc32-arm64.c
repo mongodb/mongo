@@ -91,7 +91,7 @@ __wt_checksum_hw(const void *chunk, size_t len)
 void
 __wt_checksum_init(void)
 {
-#if defined(HAVE_CRC32_HARDWARE)
+#if defined(__linux__) && defined(HAVE_CRC32_HARDWARE)
 	unsigned long caps = getauxval(AT_HWCAP);
 
 	if (caps & HWCAP_CRC32)
