@@ -195,16 +195,17 @@ void ReplCoordTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPo
     ASSERT_NE(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
-ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc, Milliseconds millis) {
+executor::RemoteCommandResponse ReplCoordTest::makeResponseStatus(const BSONObj& doc,
+                                                                  Milliseconds millis) {
     return makeResponseStatus(doc, BSONObj(), millis);
 }
 
-ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc,
-                                                 const BSONObj& metadata,
-                                                 Milliseconds millis) {
+executor::RemoteCommandResponse ReplCoordTest::makeResponseStatus(const BSONObj& doc,
+                                                                  const BSONObj& metadata,
+                                                                  Milliseconds millis) {
     log() << "Responding with " << doc << " (metadata: " << metadata << "; elapsed: " << millis
           << ")";
-    return ResponseStatus(RemoteCommandResponse(doc, metadata, millis));
+    return RemoteCommandResponse(doc, metadata, millis);
 }
 
 void ReplCoordTest::simulateEnoughHeartbeatsForAllNodesUp() {

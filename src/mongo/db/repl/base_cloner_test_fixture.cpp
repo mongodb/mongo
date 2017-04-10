@@ -140,16 +140,15 @@ void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi, const
     auto net = getNet();
     Milliseconds millis(0);
     RemoteCommandResponse response(obj, BSONObj(), millis);
-    executor::TaskExecutor::ResponseStatus responseStatus(response);
     log() << "Scheduling response to request:" << noi->getDiagnosticString() << " -- resp:" << obj;
-    net->scheduleResponse(noi, net->now(), responseStatus);
+    net->scheduleResponse(noi, net->now(), response);
 }
 
 void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi,
                                              ErrorCodes::Error code,
                                              const std::string& reason) {
     auto net = getNet();
-    executor::TaskExecutor::ResponseStatus responseStatus(code, reason);
+    RemoteCommandResponse responseStatus(code, reason);
     log() << "Scheduling error response to request:" << noi->getDiagnosticString()
           << " -- status:" << responseStatus.status.toString();
     net->scheduleResponse(noi, net->now(), responseStatus);

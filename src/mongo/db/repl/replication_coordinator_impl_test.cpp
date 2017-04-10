@@ -362,8 +362,9 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
     ASSERT_EQUALS("admin", noi->getRequest().dbname);
     ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
-    getNet()->scheduleResponse(
-        noi, startDate + Milliseconds(10), ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
+    getNet()->scheduleResponse(noi,
+                               startDate + Milliseconds(10),
+                               RemoteCommandResponse(ErrorCodes::NoSuchKey, "No response"));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
@@ -398,7 +399,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     getNet()->scheduleResponse(
         noi,
         startDate + Milliseconds(10),
-        ResponseStatus(RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8))));
+        RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8)));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());

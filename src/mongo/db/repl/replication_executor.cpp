@@ -268,13 +268,13 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::onEvent(
 static void remoteCommandFinished(const ReplicationExecutor::CallbackArgs& cbData,
                                   const ReplicationExecutor::RemoteCommandCallbackFn& cb,
                                   const RemoteCommandRequest& request,
-                                  const ResponseStatus& response) {
+                                  const RemoteCommandResponse& response) {
     if (cbData.status.isOK()) {
         cb(ReplicationExecutor::RemoteCommandCallbackArgs(
             cbData.executor, cbData.myHandle, request, response));
     } else {
         cb(ReplicationExecutor::RemoteCommandCallbackArgs(
-            cbData.executor, cbData.myHandle, request, ResponseStatus(cbData.status)));
+            cbData.executor, cbData.myHandle, request, cbData.status));
     }
 }
 
@@ -283,11 +283,11 @@ static void remoteCommandFailedEarly(const ReplicationExecutor::CallbackArgs& cb
                                      const RemoteCommandRequest& request) {
     invariant(!cbData.status.isOK());
     cb(ReplicationExecutor::RemoteCommandCallbackArgs(
-        cbData.executor, cbData.myHandle, request, ResponseStatus(cbData.status)));
+        cbData.executor, cbData.myHandle, request, cbData.status));
 }
 
 void ReplicationExecutor::_finishRemoteCommand(const RemoteCommandRequest& request,
-                                               const ResponseStatus& response,
+                                               const RemoteCommandResponse& response,
                                                const CallbackHandle& cbHandle,
                                                const uint64_t expectedHandleGeneration,
                                                const RemoteCommandCallbackFn& cb) {

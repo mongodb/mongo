@@ -138,7 +138,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
     _voteRequester.reset(new VoteRequester);
 
     long long term = _topCoord->getTerm();
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh =
+    StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
         _voteRequester->start(&_replExecutor,
                               _rsConfig,
                               _selfIndex,
@@ -190,7 +190,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     LastVote lastVote{originalTerm + 1, _selfIndex};
 
     auto cbStatus = _replExecutor.scheduleDBWork(
-        [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
+        [this, lastVote](const executor::TaskExecutor::CallbackArgs& cbData) {
             _writeLastVoteForMyElection(lastVote, cbData);
         });
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -201,7 +201,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
 }
 
 void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
-    LastVote lastVote, const ReplicationExecutor::CallbackArgs& cbData) {
+    LastVote lastVote, const executor::TaskExecutor::CallbackArgs& cbData) {
     // storeLocalLastVoteDocument can call back in to the replication coordinator,
     // so _mutex must be unlocked here.  However, we cannot return until we
     // lock it because we want to lose the election on cancel or error and
@@ -236,7 +236,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
     const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
 
     _voteRequester.reset(new VoteRequester);
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
+    StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor, _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;

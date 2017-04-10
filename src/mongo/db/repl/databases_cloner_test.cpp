@@ -104,8 +104,7 @@ public:
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
         RemoteCommandResponse response(obj, BSONObj(), millis);
-        executor::TaskExecutor::ResponseStatus responseStatus(response);
-        net->scheduleResponse(noi, net->now(), responseStatus);
+        net->scheduleResponse(noi, net->now(), response);
     }
 
     void scheduleNetworkResponse(std::string cmdName, Status errorStatus) {
@@ -242,11 +241,11 @@ protected:
             log() << "Sending response for network request:";
             log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
             log() << "     resp:" << responses[processedRequests].second;
-            net->scheduleResponse(
-                noi,
-                net->now(),
-                executor::TaskExecutor::ResponseStatus(RemoteCommandResponse(
-                    responses[processedRequests].second, BSONObj(), Milliseconds(10))));
+            net->scheduleResponse(noi,
+                                  net->now(),
+                                  RemoteCommandResponse(responses[processedRequests].second,
+                                                        BSONObj(),
+                                                        Milliseconds(10)));
 
             if ((Date_t::now() - lastLog) > Seconds(1)) {
                 lastLog = Date_t();

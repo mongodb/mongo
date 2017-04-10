@@ -44,7 +44,6 @@
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/service_context.h"
@@ -62,10 +61,6 @@ namespace mongo {
 namespace repl {
 
 namespace {
-
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
-using CBHandle = ReplicationExecutor::CallbackHandle;
-using CBHStatus = StatusWith<CBHandle>;
 
 MONGO_FP_DECLARE(blockHeartbeatStepdown);
 MONGO_FP_DECLARE(blockHeartbeatReconfigFinish);
@@ -88,7 +83,7 @@ Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset() {
     return Milliseconds(randomOffset);
 }
 
-void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackArgs cbData,
+void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
                                                     const HostAndPort& target,
                                                     int targetIndex) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -115,7 +110,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::Callbac
 
     const RemoteCommandRequest request(
         target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);
-    const ReplicationExecutor::RemoteCommandCallbackFn callback =
+    const executor::TaskExecutor::RemoteCommandCallbackFn callback =
         stdx::bind(&ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                    this,
                    stdx::placeholders::_1,
@@ -141,7 +136,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
 }
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
-    const ReplicationExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // remove handle from queued heartbeats
@@ -321,7 +316,7 @@ namespace {
 /**
  * This callback is purely for logging and has no effect on any other operations
  */
-void remoteStepdownCallback(const ReplicationExecutor::RemoteCommandCallbackArgs& cbData) {
+void remoteStepdownCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
     const Status status = cbData.response.status;
     if (status == ErrorCodes::CallbackCanceled) {
         return;
@@ -348,13 +343,13 @@ void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort
         nullptr);
 
     log() << "Requesting " << target << " step down from primary";
-    CBHStatus cbh = _replExecutor.scheduleRemoteCommand(request, remoteStepdownCallback);
+    auto cbh = _replExecutor.scheduleRemoteCommand(request, remoteStepdownCallback);
     if (cbh.getStatus() != ErrorCodes::ShutdownInProgress) {
         fassert(18808, cbh.getStatus());
     }
 }
 
-ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
+executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
     auto finishEvent = _makeEvent();
     if (!finishEvent) {
         return finishEvent;
@@ -366,8 +361,8 @@ ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
 }
 
 void ReplicationCoordinatorImpl::_stepDownFinish(
-    const ReplicationExecutor::CallbackArgs& cbData,
-    const ReplicationExecutor::EventHandle& finishedEvent) {
+    const executor::TaskExecutor::CallbackArgs& cbData,
+    const executor::TaskExecutor::EventHandle& finishedEvent) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -440,7 +435,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
-    const ReplicationExecutor::CallbackArgs& cbData, const ReplSetConfig& newConfig) {
+    const executor::TaskExecutor::CallbackArgs& cbData, const ReplSetConfig& newConfig) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -458,7 +453,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
-    const ReplicationExecutor::CallbackArgs& cbd, const ReplSetConfig& newConfig) {
+    const executor::TaskExecutor::CallbackArgs& cbd, const ReplSetConfig& newConfig) {
     if (cbd.status.code() == ErrorCodes::CallbackCanceled) {
         log() << "The callback to persist the replica set configuration was canceled - "
               << "the configuration was not persisted but was used: " << newConfig.toBSON();
@@ -536,7 +531,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
-    const ReplicationExecutor::CallbackArgs& cbData,
+    const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
     StatusWith<int> myIndex) {
 
@@ -615,15 +610,17 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     auto evh = _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     lk.unlock();
     if (evh) {
-        _replExecutor.onEvent(evh, [this, action](const CallbackArgs& cbArgs) {
-            _performPostMemberStateUpdateAction(action);
-        });
+        _replExecutor.onEvent(evh,
+                              [this, action](const executor::TaskExecutor::CallbackArgs& cbArgs) {
+                                  _performPostMemberStateUpdateAction(action);
+                              });
     } else {
         _performPostMemberStateUpdateAction(action);
     }
 }
 
-void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(const StatusWith<CBHandle>& handle) {
+void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(
+    const StatusWith<executor::TaskExecutor::CallbackHandle>& handle) {
     if (handle.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
@@ -631,7 +628,8 @@ void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(const StatusWith<C
     _heartbeatHandles.push_back(handle.getValue());
 }
 
-void ReplicationCoordinatorImpl::_untrackHeartbeatHandle_inlock(const CBHandle& handle) {
+void ReplicationCoordinatorImpl::_untrackHeartbeatHandle_inlock(
+    const executor::TaskExecutor::CallbackHandle& handle) {
     const HeartbeatHandles::iterator newEnd =
         std::remove(_heartbeatHandles.begin(), _heartbeatHandles.end(), handle);
     invariant(newEnd != _heartbeatHandles.end());
@@ -641,9 +639,10 @@ void ReplicationCoordinatorImpl::_untrackHeartbeatHandle_inlock(const CBHandle& 
 void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     LOG_FOR_HEARTBEATS(2) << "Cancelling all heartbeats.";
 
-    std::for_each(_heartbeatHandles.begin(),
-                  _heartbeatHandles.end(),
-                  stdx::bind(&ReplicationExecutor::cancel, &_replExecutor, stdx::placeholders::_1));
+    std::for_each(
+        _heartbeatHandles.begin(),
+        _heartbeatHandles.end(),
+        stdx::bind(&executor::TaskExecutor::cancel, &_replExecutor, stdx::placeholders::_1));
     // Heartbeat callbacks will remove themselves from _heartbeatHandles when they execute with
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
 
@@ -676,7 +675,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
 }
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
-    const ReplicationExecutor::CallbackArgs& cbData) {
+    const executor::TaskExecutor::CallbackArgs& cbData) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     // Only reset the callback handle if it matches, otherwise more will be coming through
     if (cbData.myHandle == _handleLivenessTimeoutCbh) {

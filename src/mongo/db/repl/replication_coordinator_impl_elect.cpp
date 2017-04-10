@@ -48,10 +48,10 @@ class LoseElectionGuard {
 
 public:
     LoseElectionGuard(TopologyCoordinator* topCoord,
-                      ReplicationExecutor* executor,
+                      executor::TaskExecutor* executor,
                       std::unique_ptr<FreshnessChecker>* freshnessChecker,
                       std::unique_ptr<ElectCmdRunner>* electCmdRunner,
-                      ReplicationExecutor::EventHandle* electionFinishedEvent)
+                      executor::TaskExecutor::EventHandle* electionFinishedEvent)
         : _topCoord(topCoord),
           _executor(executor),
           _freshnessChecker(freshnessChecker),
@@ -77,10 +77,10 @@ public:
 
 private:
     TopologyCoordinator* const _topCoord;
-    ReplicationExecutor* const _executor;
+    executor::TaskExecutor* const _executor;
     std::unique_ptr<FreshnessChecker>* const _freshnessChecker;
     std::unique_ptr<ElectCmdRunner>* const _electCmdRunner;
-    const ReplicationExecutor::EventHandle* _electionFinishedEvent;
+    const executor::TaskExecutor::EventHandle* _electionFinishedEvent;
     bool _dismissed;
 };
 
@@ -107,7 +107,7 @@ void ReplicationCoordinatorImpl::_startElectSelf_inlock() {
     }
 
     log() << "Standing for election";
-    const StatusWith<ReplicationExecutor::EventHandle> finishEvh = _replExecutor.makeEvent();
+    const StatusWith<executor::TaskExecutor::EventHandle> finishEvh = _replExecutor.makeEvent();
     if (finishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
@@ -132,7 +132,7 @@ void ReplicationCoordinatorImpl::_startElectSelf_inlock() {
 
     _freshnessChecker.reset(new FreshnessChecker);
 
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh =
+    StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
         _freshnessChecker->start(&_replExecutor,
                                  lastOpTimeApplied.getTimestamp(),
                                  _rsConfig,
@@ -209,7 +209,7 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
     }
 
     _electCmdRunner.reset(new ElectCmdRunner);
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electCmdRunner->start(
+    StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh = _electCmdRunner->start(
         &_replExecutor, _rsConfig, _selfIndex, _topCoord->getMaybeUpHostAndPorts());
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
@@ -272,7 +272,7 @@ void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
 }
 
 void ReplicationCoordinatorImpl::_recoverFromElectionTie(
-    const ReplicationExecutor::CallbackArgs& cbData) {
+    const executor::TaskExecutor::CallbackArgs& cbData) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto now = _replExecutor.now();

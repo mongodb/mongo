@@ -365,8 +365,6 @@ private:
     EventHandle _finishedEvent;
 };
 
-typedef ReplicationExecutor::ResponseStatus ResponseStatus;
-
 /**
  * Description of a scheduled but not-yet-run work item.
  *

@@ -1373,7 +1373,7 @@ protected:
         return config;
     }
 
-    ResponseStatus makeFreshnessScanResponse(OpTime opTime) {
+    executor::RemoteCommandResponse makeFreshnessScanResponse(OpTime opTime) {
         // OpTime part of replSetGetStatus.
         return makeResponseStatus(BSON("optimes" << BSON("appliedOpTime" << opTime.toBSON())));
     }

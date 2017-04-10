@@ -62,7 +62,6 @@
 #include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
@@ -97,8 +96,6 @@ MONGO_FP_DECLARE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
-using CBHandle = ReplicationExecutor::CallbackHandle;
-using CBHStatus = StatusWith<CBHandle>;
 using EventHandle = executor::TaskExecutor::EventHandle;
 using executor::NetworkInterface;
 using NextAction = Fetcher::NextAction;
@@ -472,7 +469,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
 }
 
 void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
-    const ReplicationExecutor::CallbackArgs& cbData,
+    const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& localConfig,
     const StatusWith<OpTime>& lastOpTimeStatus,
     const StatusWith<LastVote>& lastVoteStatus) {
@@ -811,12 +808,12 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
     _topCoord->clearSyncSourceBlacklist();
 }
 
-ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::setFollowerMode_nonBlocking(
+executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::setFollowerMode_nonBlocking(
     const MemberState& newState, bool* success) {
-    StatusWith<ReplicationExecutor::EventHandle> finishedSettingFollowerMode =
-        _replExecutor.makeEvent();
+
+    auto finishedSettingFollowerMode = _replExecutor.makeEvent();
     if (finishedSettingFollowerMode.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return ReplicationExecutor::EventHandle();
+        return {};
     }
     fassert(18812, finishedSettingFollowerMode.getStatus());
     _setFollowerModeFinish(newState, finishedSettingFollowerMode.getValue(), success);
@@ -833,7 +830,7 @@ bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
 
 void ReplicationCoordinatorImpl::_setFollowerModeFinish(
     const MemberState& newState,
-    const ReplicationExecutor::EventHandle& finishedSettingFollowerMode,
+    const executor::TaskExecutor::EventHandle& finishedSettingFollowerMode,
     bool* success) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -1876,7 +1873,7 @@ bool ReplicationCoordinatorImpl::_tryToStepDown(const Date_t waitUntil,
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(
-    const ReplicationExecutor::CallbackArgs& cbData) {
+    const executor::TaskExecutor::CallbackArgs& cbData) {
     if (!cbData.status.isOK()) {
         return;
     }
@@ -2465,7 +2462,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     auto reconfigFinished = uassertStatusOK(_replExecutor.makeEvent());
     const auto reconfigFinishFn =
         [ this, newConfig, myIndex = myIndex.getValue(), reconfigFinished ](
-            const ReplicationExecutor::CallbackArgs& cbData) {
+            const executor::TaskExecutor::CallbackArgs& cbData) {
 
         if (!cbData.status.isOK()) {
             return;
@@ -2476,7 +2473,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     // If it's a force reconfig, the primary node may not be electable after the configuration
     // change.  In case we are that primary node, finish the reconfig under the global lock,
     // so that the step down occurs safely.
-    CBHStatus cbhStatus(ErrorCodes::InternalError, "reconfigFinishFn hasn't been scheduled");
+    StatusWith<CallbackHandle> cbhStatus(ErrorCodes::InternalError,
+                                         "reconfigFinishFn hasn't been scheduled");
     if (args.force) {
         cbhStatus = _replExecutor.scheduleWorkWithGlobalExclusiveLock(reconfigFinishFn);
     } else {
@@ -2496,7 +2494,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const ReplSetConfig& newConfig,
     int myIndex,
-    const ReplicationExecutor::EventHandle& finishedEvent) {
+    const executor::TaskExecutor::EventHandle& finishedEvent) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     invariant(_rsConfigState == kConfigReconfiguring);
@@ -3165,7 +3163,7 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
 }
 
 void ReplicationCoordinatorImpl::_unblacklistSyncSource(
-    const ReplicationExecutor::CallbackArgs& cbData, const HostAndPort& host) {
+    const executor::TaskExecutor::CallbackArgs& cbData, const HostAndPort& host) {
     if (cbData.status == ErrorCodes::CallbackCanceled)
         return;
 
@@ -3785,7 +3783,8 @@ void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
     _indexPrefetchConfig = cfg;
 }
 
-ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inTopoLock() {
+executor::TaskExecutor::EventHandle
+ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inTopoLock() {
     if (_topCoord->getRole() != TopologyCoordinator::Role::candidate) {
         return {};
     }

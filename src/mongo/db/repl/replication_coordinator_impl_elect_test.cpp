@@ -146,11 +146,13 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     net->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     // blackhole heartbeat
-    net->scheduleResponse(noi, net->now(), ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+    net->scheduleResponse(
+        noi, net->now(), executor::RemoteCommandResponse(ErrorCodes::OperationFailed, "timeout"));
     net->runReadyNetworkOperations();
     // blackhole freshness
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
-    net->scheduleResponse(noi2, net->now(), ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+    net->scheduleResponse(
+        noi2, net->now(), executor::RemoteCommandResponse(ErrorCodes::OperationFailed, "timeout"));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 

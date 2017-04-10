@@ -59,18 +59,17 @@ class TopologyCoordinatorImpl;
 class ReplCoordTest : public mongo::unittest::Test {
 public:
     /**
-     * Makes a ResponseStatus with the given "doc" response and optional elapsed time "millis".
+     * Makes a command response with the given "doc" response and optional elapsed time "millis".
      */
-    static ResponseStatus makeResponseStatus(const BSONObj& doc,
-                                             Milliseconds millis = Milliseconds(0));
+    static executor::RemoteCommandResponse makeResponseStatus(
+        const BSONObj& doc, Milliseconds millis = Milliseconds(0));
 
     /**
-     * Makes a ResponseStatus with the given "doc" response, metadata and optional elapsed time
+     * Makes a command response with the given "doc" response, metadata and optional elapsed time
      * "millis".
      */
-    static ResponseStatus makeResponseStatus(const BSONObj& doc,
-                                             const BSONObj& metadata,
-                                             Milliseconds millis = Milliseconds(0));
+    static executor::RemoteCommandResponse makeResponseStatus(
+        const BSONObj& doc, const BSONObj& metadata, Milliseconds millis = Milliseconds(0));
 
     /**
      * Constructs a ReplSetConfig from the given BSON, or raises a test failure exception.

@@ -99,7 +99,6 @@ using unittest::log;
 
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
-using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 struct CollectionCloneInfo {
@@ -153,12 +152,11 @@ public:
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
         RemoteCommandResponse response(obj, BSONObj(), millis);
-        executor::TaskExecutor::ResponseStatus responseStatus(response);
         log() << "Sending response for network request:";
         log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
         log() << "     resp:" << response;
 
-        net->scheduleResponse(noi, net->now(), responseStatus);
+        net->scheduleResponse(noi, net->now(), response);
     }
 
     void scheduleNetworkResponse(std::string cmdName, Status errorStatus) {

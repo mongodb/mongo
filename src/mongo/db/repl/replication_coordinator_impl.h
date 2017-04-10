@@ -47,6 +47,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/storage/snapshot_name.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
@@ -375,8 +376,8 @@ public:
      * When the operation is complete (wait() returns), 'success' will be set to true
      * if the member state has been set successfully.
      */
-    ReplicationExecutor::EventHandle setFollowerMode_nonBlocking(const MemberState& newState,
-                                                                 bool* success);
+    executor::TaskExecutor::EventHandle setFollowerMode_nonBlocking(const MemberState& newState,
+                                                                    bool* success);
 
     /**
      * Non-blocking version of updateTerm.
@@ -385,7 +386,7 @@ public:
      * to a status telling if the term increased or a stepdown was triggered.
 
      */
-    ReplicationExecutor::EventHandle updateTerm_forTest(
+    executor::TaskExecutor::EventHandle updateTerm_forTest(
         long long term, TopologyCoordinator::UpdateTermResult* updateResult);
 
     /**
@@ -525,7 +526,7 @@ private:
 
     typedef std::vector<SlaveInfo> SlaveInfoVector;
 
-    typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+    typedef std::vector<executor::TaskExecutor::CallbackHandle> HeartbeatHandles;
 
     /**
      * Appends a "replicationProgress" section with data for each member in set.
@@ -603,8 +604,7 @@ private:
 
     /**
      * Helper to update our saved config, cancel any pending heartbeats, and kick off sending
-     * new heartbeats based on the new config.  Must *only* be called from within the
-     * ReplicationExecutor context.
+     * new heartbeats based on the new config.
      *
      * Returns an action to be performed after unlocking _mutex, via
      * _performPostMemberStateUpdateAction.
@@ -628,7 +628,7 @@ private:
      * need to change as a result of time passing - for instance becoming PRIMARY when a single
      * node replica set member's stepDown period ends.
      */
-    void _handleTimePassing(const ReplicationExecutor::CallbackArgs& cbData);
+    void _handleTimePassing(const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
      * Helper method for _awaitReplication that takes an already locked unique_lock, but leaves
@@ -697,9 +697,10 @@ private:
      * supply an event, "finishedSettingFollowerMode", and wait for that event to
      * be signaled.  Do not observe "*success" until after the event is signaled.
      */
-    void _setFollowerModeFinish(const MemberState& newState,
-                                const ReplicationExecutor::EventHandle& finishedSettingFollowerMode,
-                                bool* success);
+    void _setFollowerModeFinish(
+        const MemberState& newState,
+        const executor::TaskExecutor::EventHandle& finishedSettingFollowerMode,
+        bool* success);
 
     /**
      * Helper method for updating our tracking of the last optime applied by a given node.
@@ -742,13 +743,13 @@ private:
      *
      * Schedules additional heartbeats, triggers elections and step downs, etc.
      */
-    void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackArgs& cbData,
+    void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
                                   int targetIndex);
 
     void _trackHeartbeatHandle_inlock(
-        const StatusWith<ReplicationExecutor::CallbackHandle>& handle);
+        const StatusWith<executor::TaskExecutor::CallbackHandle>& handle);
 
-    void _untrackHeartbeatHandle_inlock(const ReplicationExecutor::CallbackHandle& handle);
+    void _untrackHeartbeatHandle_inlock(const executor::TaskExecutor::CallbackHandle& handle);
 
     /*
      * Return a randomized offset amount that is scaled in proportion to the size of the
@@ -789,7 +790,7 @@ private:
      *
      * Scheduled by _scheduleHeartbeatToTarget_inlock.
      */
-    void _doMemberHeartbeat(ReplicationExecutor::CallbackArgs cbData,
+    void _doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
                             const HostAndPort& target,
                             int targetIndex);
 
@@ -811,7 +812,7 @@ private:
      * Callback that finishes the work started in _startLoadLocalConfig and sets _rsConfigState
      * to kConfigSteady, so that we can begin processing heartbeats and reconfigs.
      */
-    void _finishLoadLocalConfig(const ReplicationExecutor::CallbackArgs& cbData,
+    void _finishLoadLocalConfig(const executor::TaskExecutor::CallbackArgs& cbData,
                                 const ReplSetConfig& localConfig,
                                 const StatusWith<OpTime>& lastOpTimeStatus,
                                 const StatusWith<LastVote>& lastVoteStatus);
@@ -838,7 +839,7 @@ private:
      */
     void _finishReplSetReconfig(const ReplSetConfig& newConfig,
                                 int myIndex,
-                                const ReplicationExecutor::EventHandle& finishedEvent);
+                                const executor::TaskExecutor::EventHandle& finishedEvent);
 
     /**
      * Changes _rsConfigState to newState, and notify any waiters.
@@ -906,7 +907,7 @@ private:
      * This job will be scheduled to run in DB worker threads.
      */
     void _writeLastVoteForMyElection(LastVote lastVote,
-                                     const ReplicationExecutor::CallbackArgs& cbData);
+                                     const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
      * Starts VoteRequester to run the real election when last vote write has completed.
@@ -924,7 +925,7 @@ private:
     /**
      * Callback called after a random delay, to prevent repeated election ties.
      */
-    void _recoverFromElectionTie(const ReplicationExecutor::CallbackArgs& cbData);
+    void _recoverFromElectionTie(const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
      * Removes 'host' from the sync source blacklist. If 'host' isn't found, it's simply
@@ -932,7 +933,7 @@ private:
      *
      * Must be scheduled as a callback.
      */
-    void _unblacklistSyncSource(const ReplicationExecutor::CallbackArgs& cbData,
+    void _unblacklistSyncSource(const executor::TaskExecutor::CallbackArgs& cbData,
                                 const HostAndPort& host);
 
     /**
@@ -943,15 +944,15 @@ private:
     /**
      * Schedules stepdown to run with the global exclusive lock.
      */
-    ReplicationExecutor::EventHandle _stepDownStart();
+    executor::TaskExecutor::EventHandle _stepDownStart();
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
      * shared or global exclusive lock.
      * Signals 'finishedEvent' on successful completion.
      */
-    void _stepDownFinish(const ReplicationExecutor::CallbackArgs& cbData,
-                         const ReplicationExecutor::EventHandle& finishedEvent);
+    void _stepDownFinish(const executor::TaskExecutor::CallbackArgs& cbData,
+                         const executor::TaskExecutor::EventHandle& finishedEvent);
 
     /**
      * Schedules a replica set config change.
@@ -962,19 +963,19 @@ private:
      * Callback that continues a heartbeat-initiated reconfig after a running election
      * completes.
      */
-    void _heartbeatReconfigAfterElectionCanceled(const ReplicationExecutor::CallbackArgs& cbData,
+    void _heartbeatReconfigAfterElectionCanceled(const executor::TaskExecutor::CallbackArgs& cbData,
                                                  const ReplSetConfig& newConfig);
 
     /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
      */
-    void _heartbeatReconfigStore(const ReplicationExecutor::CallbackArgs& cbd,
+    void _heartbeatReconfigStore(const executor::TaskExecutor::CallbackArgs& cbd,
                                  const ReplSetConfig& newConfig);
 
     /**
      * Conclusion actions of a heartbeat-triggered reconfiguration.
      */
-    void _heartbeatReconfigFinish(const ReplicationExecutor::CallbackArgs& cbData,
+    void _heartbeatReconfigFinish(const executor::TaskExecutor::CallbackArgs& cbData,
                                   const ReplSetConfig& newConfig,
                                   StatusWith<int> myIndex);
 
@@ -1055,7 +1056,7 @@ private:
      * Callback which marks downed nodes as down, triggers a stepdown if a majority of nodes are no
      * longer visible, and reschedules itself.
      */
-    void _handleLivenessTimeout(const ReplicationExecutor::CallbackArgs& cbData);
+    void _handleLivenessTimeout(const executor::TaskExecutor::CallbackArgs& cbData);
 
     /**
      * If "updatedMemberId" is the current _earliestMemberId, cancels the current
@@ -1182,7 +1183,7 @@ private:
      *
      * Caller must already have locked the _topoMutex.
      */
-    ReplicationExecutor::EventHandle _cancelElectionIfNeeded_inTopoLock();
+    executor::TaskExecutor::EventHandle _cancelElectionIfNeeded_inTopoLock();
 
     /**
      * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
@@ -1315,11 +1316,11 @@ private:
 
     // Event that the election code will signal when the in-progress election completes.
     // Unspecified value when _freshnessChecker is NULL.
-    ReplicationExecutor::EventHandle _electionFinishedEvent;  // (M)
+    executor::TaskExecutor::EventHandle _electionFinishedEvent;  // (M)
 
     // Event that the election code will signal when the in-progress election dry run completes,
     // which includes writing the last vote and scheduling the real election.
-    ReplicationExecutor::EventHandle _electionDryRunFinishedEvent;  // (M)
+    executor::TaskExecutor::EventHandle _electionDryRunFinishedEvent;  // (M)
 
     // Whether we slept last time we attempted an election but possibly tied with other nodes.
     bool _sleptLastElection;  // (M)
@@ -1369,10 +1370,10 @@ private:
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
 
     // Callback Handle used to cancel a scheduled LivenessTimeout callback.
-    ReplicationExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)
+    executor::TaskExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)
 
     // Callback Handle used to cancel a scheduled ElectionTimeout callback.
-    ReplicationExecutor::CallbackHandle _handleElectionTimeoutCbh;  // (M)
+    executor::TaskExecutor::CallbackHandle _handleElectionTimeoutCbh;  // (M)
 
     // Election timeout callback will not run before this time.
     // If this date is Date_t(), the callback is either unscheduled or canceled.
@@ -1380,7 +1381,7 @@ private:
     Date_t _handleElectionTimeoutWhen;  // (M)
 
     // Callback Handle used to cancel a scheduled PriorityTakover callback.
-    ReplicationExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)
+    executor::TaskExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)
 
     // Priority takeover callback will not run before this time.
     // If this date is Date_t(), the callback is either unscheduled or canceled.
