@@ -180,26 +180,24 @@
     rst.awaitReplication();
     checkOpInOplog(stepUpResults.newPrimary, stepUpResults.latestOpOnOldPrimary, 0);
 
-    // TODO: Uncomment case 6 when SERVER-28751 gets fixed.
-    //
-    // jsTest.log("Case 6: The primary needs to catch up with no timeout, but steps down.");
-    // var stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
+    jsTest.log("Case 6: The primary needs to catch up with no timeout, but steps down.");
+    var stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
 
-    // // Step-down command should abort catchup.
-    // try {
-    //     printjson(stepUpResults.newPrimary.adminCommand({replSetStepDown: 60}));
-    // } catch (e) {
-    //     print(e);
-    // }
-    // // Rename the primary.
-    // var steppedDownPrimary = stepUpResults.newPrimary;
-    // var newPrimary = rst.getPrimary();
-    // assert.neq(newPrimary, steppedDownPrimary);
+    // Step-down command should abort catchup.
+    try {
+        printjson(stepUpResults.newPrimary.adminCommand({replSetStepDown: 60}));
+    } catch (e) {
+        print(e);
+    }
+    // Rename the primary.
+    var steppedDownPrimary = stepUpResults.newPrimary;
+    var newPrimary = rst.getPrimary();
+    assert.neq(newPrimary, steppedDownPrimary);
 
-    // // Enable data replication on the stepped down primary and make sure it syncs old writes.
-    // rst.nodes.forEach(reconnect);
-    // restartServerReplication(stepUpResults.oldSecondaries);
-    // rst.awaitReplication();
-    // checkOpInOplog(steppedDownPrimary, stepUpResults.latestOpOnOldPrimary, 1);
+    // Enable data replication on the stepped down primary and make sure it syncs old writes.
+    rst.nodes.forEach(reconnect);
+    restartServerReplication(stepUpResults.oldSecondaries);
+    rst.awaitReplication();
+    checkOpInOplog(steppedDownPrimary, stepUpResults.latestOpOnOldPrimary, 1);
 
 })();

@@ -747,7 +747,7 @@ private:
      * one attempt to step down. See implementation of this method and stepDown for
      * details.
      */
-    bool _tryToStepDown(Date_t waitUntil, Date_t stepdownUntil, bool force);
+    bool _tryToStepDown_inlock(Date_t waitUntil, Date_t stepdownUntil, bool force);
 
     bool _canAcceptWritesFor_inlock(const NamespaceString& ns);
 

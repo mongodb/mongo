@@ -2292,10 +2292,7 @@ void TopologyCoordinatorImpl::processLoseElection() {
     }
 }
 
-bool TopologyCoordinatorImpl::stepDown(Date_t until,
-                                       bool force,
-                                       const OpTime& lastOpApplied,
-                                       const OpTime& lastOpCommitted) {
+bool TopologyCoordinatorImpl::stepDown(Date_t until, bool force, const OpTime& lastOpApplied) {
 
     // force==true overrides all other checks.
     if (force) {
@@ -2304,12 +2301,8 @@ bool TopologyCoordinatorImpl::stepDown(Date_t until,
         return true;
     }
 
-    // Ensure a majority of caught up nodes.
-    if (lastOpCommitted < lastOpApplied) {
-        return false;
-    }
-
-    // Now make sure we also have at least one caught up node that is also electable.
+    // We already checked in ReplicationCoordinator that a majority of nodes are caught up.
+    // Here we must check that we also have at least one caught up node that is electable.
     for (int memberIndex = 0; memberIndex < _rsConfig.getNumMembers(); memberIndex++) {
         // ignore your self
         if (memberIndex == _selfIndex) {

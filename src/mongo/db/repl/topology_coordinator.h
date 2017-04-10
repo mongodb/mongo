@@ -405,15 +405,14 @@ public:
      *      C2. If C1 holds, then there must exist at least one electable secondary node in the
      *      majority set M.
      *
-     * If C1 and C2 hold, a step down occurs and this method returns true. Else, the step down
+     * C1 should already be checked in ReplicationCoordinator. This method checks C2.
+     *
+     * If C2 holds, a step down occurs and this method returns true. Else, the step down
      * fails and this method returns false.
      *
      * NOTE: It is illegal to call this method if the node is not a primary.
      */
-    virtual bool stepDown(Date_t until,
-                          bool force,
-                          const OpTime& lastOpApplied,
-                          const OpTime& lastOpCommitted) = 0;
+    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied) = 0;
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
