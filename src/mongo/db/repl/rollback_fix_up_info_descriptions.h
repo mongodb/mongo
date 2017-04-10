@@ -28,10 +28,14 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <iosfwd>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/rollback_fix_up_info.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -99,5 +103,75 @@ private:
     BSONObj _optionsObj;
 };
 
+/**
+ * Represents a document in the "kRollbackIndexNamespace" namespace.
+ * Contains information to roll back operations on indexes - creation, drops, and updates to TTL
+ * expiration settings.
+ */
+class RollbackFixUpInfo::IndexDescription {
+    MONGO_DISALLOW_COPYING(IndexDescription);
+
+public:
+    /**
+     * For op types insert and drop.
+     */
+    IndexDescription(const UUID& collectionUuid,
+                     const std::string& indexName,
+                     RollbackFixUpInfo::IndexOpType opType,
+                     const BSONObj& infoObj);
+
+    /**
+     * For op type update TTL only.
+     */
+    IndexDescription(const UUID& collectionUuid,
+                     const std::string& indexName,
+                     Seconds expireAfterSeconds);
+
+    /**
+     * Returns op type.
+     */
+    RollbackFixUpInfo::IndexOpType getOpType() const;
+
+    /**
+     * Returns op type as string.
+     */
+    std::string getOpTypeAsString() const;
+
+    /**
+     * Returns optional TTL index expiration.
+     */
+    boost::optional<Seconds> getExpireAfterSeconds() const;
+
+    /**
+     * Parses op type from BSON document representation.
+     */
+    static StatusWith<RollbackFixUpInfo::IndexOpType> parseOpType(const BSONObj& doc);
+
+    /**
+     * Returns a BSON representation of this object.
+     */
+    BSONObj toBSON() const;
+
+    /**
+     * Returns a BSON document containing the _id for the document to be updated.
+     * For UpdateTTL op type only.
+     */
+    BSONObj makeIdKey() const;
+
+private:
+    UUID _collectionUuid;
+    std::string _indexName;
+    RollbackFixUpInfo::IndexOpType _opType;
+    BSONObj _infoObj;
+    boost::optional<Seconds> _expireAfterSeconds = boost::none;
+};
+
 }  // namespace repl
+
+/**
+ * Insertion operator for RollbackFixUpInfo::IndexOpType. Formats op type for output stream.
+ * For testing only.
+ */
+std::ostream& operator<<(std::ostream& os, const repl::RollbackFixUpInfo::IndexOpType& opType);
+
 }  // namespace mongo

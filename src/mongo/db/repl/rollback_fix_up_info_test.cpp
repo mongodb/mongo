@@ -97,6 +97,8 @@ void RollbackFixUpInfoTest::setUp() {
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {}));
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionOptionsNamespace, {}));
+    ASSERT_OK(_storageInterface->createCollection(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {}));
 }
 
 void RollbackFixUpInfoTest::tearDown() {
@@ -427,6 +429,390 @@ TEST_F(RollbackFixUpInfoTest,
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionOptionsNamespace, {expectedDocument});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessCreateIndexOplogEntryInsertsDocumentIntoRollbackIndexCollectionWithEmptyInfoObj) {
+    auto operation =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "mydb.$cmd"
+                  << "ui"
+                  << UUID::gen().toBSON().firstElement()
+                  << "o"
+                  << BSON("createIndex" << 1 << "v" << 2 << "key" << BSON("b" << 1) << "name"
+                                        << "b_1"
+                                        << "ns"
+                                        << "mydb.mycoll"
+                                        << "expireAfterSeconds"
+                                        << 60));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    auto indexName = operation["o"].Obj()["name"].String();
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
+
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "create"
+                   << "infoObj"
+                   << BSONObj());
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {expectedDocument});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessCreateIndexOplogEntryWhenExistingDocumentHasDropOpTypeRemovesExistingDocument) {
+
+    // State of oplog:
+    // {createIndex: indexA}, ...., {dropIndexes: indexA}, ....
+    // (earliest optime) ---> (latest optime)
+    //
+    // Oplog entries are processed in reverse optime order.
+
+    // First, process dropIndexes. This should insert a document into the collection with a 'drop'
+    // op type.
+    auto collectionUuid = UUID::gen();
+    std::string indexName = "b_1";
+    auto infoObj = BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << indexName << "ns"
+                            << "mydb.mycoll");
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processDropIndexOplogEntry(
+        opCtx.get(), collectionUuid, indexName, infoObj));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(),
+        RollbackFixUpInfo::kRollbackIndexNamespace,
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
+                                             << "indexName"
+                                             << indexName)
+                    << "operationType"
+                    << "drop"
+                    << "infoObj"
+                    << infoObj)});
+
+    // Next, process createIndex. This should cancel out the existing 'drop' operation and remove
+    // existing document from the collection.
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
+    _assertDocumentsInCollectionEquals(opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessCreateIndexOplogEntryWhenExistingDocumentHasUpdateTTLOpTypeReplacesExistingDocument) {
+
+    // State of oplog:
+    // {createIndex: indexA}, ...., {collMod: indexA}, ....
+    // (earliest optime) ---> (latest optime)
+    //
+    // Oplog entries are processed in reverse optime order.
+
+    // First, process collMod. This should insert a document into the collection with an 'updateTTL'
+    // op type.
+    auto collectionUuid = UUID::gen();
+    std::string indexName = "b_1";
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processUpdateIndexTTLOplogEntry(
+        opCtx.get(), collectionUuid, indexName, Seconds(60)));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(),
+        RollbackFixUpInfo::kRollbackIndexNamespace,
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
+                                             << "indexName"
+                                             << indexName)
+                    << "operationType"
+                    << "updateTTL"
+                    << "infoObj"
+                    << BSON("expireAfterSeconds" << 60))});
+
+    // Next, process createIndex. This should replace the existing 'updateTTL' operation so that
+    // we drop the index when it's time to apply the fix up info.
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(),
+        RollbackFixUpInfo::kRollbackIndexNamespace,
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
+                                             << "indexName"
+                                             << indexName)
+                    << "operationType"
+                    << "create"
+                    << "infoObj"
+                    << BSONObj())});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessCreateIndexOplogEntryReplacesExistingDocumentAndReturnsFailedToParseErrorWhenExistingDocumentContainsUnrecognizedOperationType) {
+
+    auto collectionUuid = UUID::gen();
+    std::string indexName = "b_1";
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+
+    auto malformedDoc =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "unknownIndexOpType"
+                   << "infoObj"
+                   << BSON("expireAfterSeconds" << 60));
+    ASSERT_OK(_storageInterface->upsertById(opCtx.get(),
+                                            RollbackFixUpInfo::kRollbackIndexNamespace,
+                                            malformedDoc["_id"],
+                                            malformedDoc));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {malformedDoc});
+
+    // Process createIndex. This should log an error when checking the operation type on the
+    // existing document. The malformed document should be replaced.
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
+
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "create"
+                   << "infoObj"
+                   << BSONObj());
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {expectedDocument});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessUpdateIndexTTLOplogEntryInsertsDocumentIntoRollbackIndexCollectionWithPartialInfoObj) {
+    auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                               << "c"
+                               << "ns"
+                               << "mydb.$cmd"
+                               << "ui"
+                               << UUID::gen().toBSON().firstElement()
+                               << "o"
+                               << BSON("collMod"
+                                       << "mycoll"
+                                       << "index"
+                                       << BSON("name"
+                                               << "b_1"
+                                               << "expireAfterSeconds"
+                                               << 120))
+                               << "o2"
+                               << BSON("expireAfterSeconds_before" << 60));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    auto indexName = operation["o"].Obj().firstElement().String();
+    auto expireAfterSeconds =
+        mongo::Seconds(operation["o2"].Obj()["expireAfterSeconds_before"].numberLong());
+    auto infoObj = BSON("expireAfterSeconds" << durationCount<Seconds>(expireAfterSeconds));
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processUpdateIndexTTLOplogEntry(
+        opCtx.get(), collectionUuid, indexName, expireAfterSeconds));
+
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "updateTTL"
+                   << "infoObj"
+                   << infoObj);
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {expectedDocument});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessUpdateIndexTTLOplogEntryWhenExistingDocumentHasDropOpTypeUpdatesExpirationInExistingDocument) {
+    auto collectionUuid = UUID::gen();
+    NamespaceString nss("mydb.mycoll");
+    std::string indexName = "b_1";
+
+    // First populate collection with document with optype 'drop' and an indexinfo obj
+    // describing a TTL index with a expiration of 120 seconds.
+    // This document is the result of processing a dropIndexes oplog entry as we start rollback.
+    auto infoObj =
+        BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << indexName << "ns" << nss.ns()
+                 << "expireAfterSeconds"
+                 << 120);
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processDropIndexOplogEntry(
+        opCtx.get(), collectionUuid, indexName, infoObj));
+
+    // Process a collMod oplog entry that changes the expiration from 60 seconds to 120 seconds.
+    // Chronologically, this operation happens before the dropIndexes command but since oplog
+    // entries are processed in reverse order, we process the collMod operation after dropIndexes.
+    // We provide the previous 'expireAfterSeconds' value (60 seconds) to
+    // processUpdateTTLOplogEntry().
+    ASSERT_OK(rollbackFixUpInfo.processUpdateIndexTTLOplogEntry(
+        opCtx.get(), collectionUuid, indexName, Seconds(60)));
+
+    // Expected index info obj is the same as 'infoObj' except for the 'expireAfterSeconds' field
+    // which should reflect the TTL expiration passed to processUpdateIndexTTLOplogEntry().
+    BSONObjBuilder bob;
+    for (const auto& elt : infoObj) {
+        if ("expireAfterSeconds"_sd == elt.fieldNameStringData()) {
+            bob.append("expireAfterSeconds", 60);
+        } else {
+            bob.append(elt);
+        }
+    }
+    auto expectedInfoObj = bob.obj();
+
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "drop"
+                   << "infoObj"
+                   << expectedInfoObj);
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {expectedDocument});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessUpdateIndexTTLOplogEntryWhenExistingDocumentHasUpdateTTLOpTypeReplacesExistingDocument) {
+    auto collectionUuid = UUID::gen();
+    std::string indexName = "b_1";
+
+    // First, process a collMod oplog entry to populate the collection with document with optype
+    // 'updateTTL' and an expiration of 120 seconds. 120 seconds is the expiration of the TTL index
+    // BEFORE the oplog entry was applied and is what goes into the rollback fix up info.
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processUpdateIndexTTLOplogEntry(
+        opCtx.get(), collectionUuid, indexName, Seconds(120)));
+
+    // Process a second collMod oplog entry that changes the expiration from 60 seconds to 120
+    // seconds.
+    // This should simply update the expiration in the existing "updateTTL" document in the
+    // "kRollbackIndexNamespace" collection. We provide the previous 'expireAfterSeconds' value
+    // (60 seconds) to processUpdateTTLOplogEntry().
+    ASSERT_OK(rollbackFixUpInfo.processUpdateIndexTTLOplogEntry(
+        opCtx.get(), collectionUuid, indexName, Seconds(60)));
+
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "updateTTL"
+                   << "infoObj"
+                   << BSON("expireAfterSeconds" << 60));
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {expectedDocument});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessDropIndexOplogEntryInsertsDocumentIntoRollbackIndexCollectionWithCompleteInfoObj) {
+    auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                               << "c"
+                               << "ns"
+                               << "mydb.$cmd"
+                               << "ui"
+                               << UUID::gen().toBSON().firstElement()
+                               << "o"
+                               << BSON("dropIndexes"
+                                       << "mycoll"
+                                       << "index"
+                                       << "b_1")
+                               << "o2"
+                               << BSON("v" << 2 << "key" << BSON("b" << 1) << "name"
+                                           << "b_1"
+                                           << "ns"
+                                           << "mydb.mycoll"
+                                           << "expireAfterSeconds"
+                                           << 120));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    auto indexName = operation["o"].Obj()["index"].String();
+    auto infoObj = operation["o2"].Obj();
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processDropIndexOplogEntry(
+        opCtx.get(), collectionUuid, indexName, infoObj));
+
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
+                                            << indexName)
+                   << "operationType"
+                   << "drop"
+                   << "infoObj"
+                   << infoObj);
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {expectedDocument});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessDropIndexOplogEntryWhenExistingDocumentHasCreateOpTypeReplacesExistingDocument) {
+
+    // State of oplog:
+    // {dropIndexes: indexA}, ...., {createIndex: indexA}, ....
+    // (earliest optime) ---> (latest optime)
+    //
+    // Oplog entries are processed in reverse optime order.
+
+    // First, process createIndex. This should insert a document into the collection with a 'create'
+    // op type.
+    auto collectionUuid = UUID::gen();
+    std::string indexName = "b_1";
+    auto infoObj = BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << indexName << "ns"
+                            << "mydb.mycoll");
+
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(),
+        RollbackFixUpInfo::kRollbackIndexNamespace,
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
+                                             << "indexName"
+                                             << indexName)
+                    << "operationType"
+                    << "create"
+                    << "infoObj"
+                    << BSONObj())});
+
+    // Next, process dropIndexes. This should replace the existing 'create' operation with an entry
+    // with the 'drop' operation type. When fixing up the indexes for the 'drop' (ie. we need to
+    // re-create the index), we would have to drop any existing indexes in the collection with the
+    // same name before proceeding with the index creation
+    ASSERT_OK(rollbackFixUpInfo.processDropIndexOplogEntry(
+        opCtx.get(), collectionUuid, indexName, infoObj));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(),
+        RollbackFixUpInfo::kRollbackIndexNamespace,
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
+                                             << "indexName"
+                                             << indexName)
+                    << "operationType"
+                    << "drop"
+                    << "infoObj"
+                    << infoObj)});
 }
 
 }  // namespace

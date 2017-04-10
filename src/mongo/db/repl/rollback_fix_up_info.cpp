@@ -32,11 +32,13 @@
 
 #include "mongo/db/repl/rollback_fix_up_info.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/rollback_fix_up_info_descriptions.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -55,6 +57,9 @@ const NamespaceString RollbackFixUpInfo::kRollbackCollectionUuidNamespace(kRollb
 
 const NamespaceString RollbackFixUpInfo::kRollbackCollectionOptionsNamespace(
     kRollbackNamespacePrefix + "collectionOptions");
+
+const NamespaceString RollbackFixUpInfo::kRollbackIndexNamespace(kRollbackNamespacePrefix +
+                                                                 "indexes");
 
 RollbackFixUpInfo::RollbackFixUpInfo(StorageInterface* storageInterface)
     : _storageInterface(storageInterface) {
@@ -122,12 +127,112 @@ Status RollbackFixUpInfo::processCollModOplogEntry(OperationContext* opCtx,
     return _upsertById(opCtx, kRollbackCollectionOptionsNamespace, desc.toBSON());
 }
 
+Status RollbackFixUpInfo::processCreateIndexOplogEntry(OperationContext* opCtx,
+                                                       const UUID& collectionUuid,
+                                                       const std::string& indexName) {
+    IndexDescription desc(collectionUuid, indexName, IndexOpType::kCreate, {});
+
+    // If the existing document (that may or may not exist in the "kRollbackIndexNamespace"
+    // collection) has a 'drop' op type, this oplog entry will cancel out the previously processed
+    // 'dropIndexes" oplog entry. We should remove the existing document from the collection and not
+    // insert a new document.
+    BSONObjBuilder bob;
+    bob.append("_id", desc.makeIdKey());
+    auto key = bob.obj();
+    auto deleteResult =
+        _storageInterface->deleteDocuments(opCtx,
+                                           kRollbackIndexNamespace,
+                                           "_id_"_sd,
+                                           StorageInterface::ScanDirection::kForward,
+                                           key,
+                                           BoundInclusion::kIncludeStartKeyOnly,
+                                           1U);
+    if (deleteResult.isOK() && !deleteResult.getValue().empty()) {
+        auto doc = deleteResult.getValue().front();
+        auto opTypeResult = IndexDescription::parseOpType(doc);
+        if (!opTypeResult.isOK()) {
+            invariant(ErrorCodes::FailedToParse == opTypeResult.getStatus());
+            warning() << "While processing createIndex oplog entry for index " << indexName
+                      << " in collection with UUID " << collectionUuid.toString()
+                      << ", found existing entry in rollback collection " << kRollbackIndexNamespace
+                      << " with unrecognized operation type:" << doc
+                      << ". Replacing existing entry.";
+            return _upsertIndexDescription(opCtx, desc);
+        } else if (IndexOpType::kDrop == opTypeResult.getValue()) {
+            return Status::OK();
+        }
+        // Fall through and replace existing document.
+    }
+
+    return _upsertIndexDescription(opCtx, desc);
+}
+
+Status RollbackFixUpInfo::processUpdateIndexTTLOplogEntry(OperationContext* opCtx,
+                                                          const UUID& collectionUuid,
+                                                          const std::string& indexName,
+                                                          Seconds expireAfterSeconds) {
+    IndexDescription desc(collectionUuid, indexName, expireAfterSeconds);
+    return _upsertIndexDescription(opCtx, desc);
+}
+
+Status RollbackFixUpInfo::processDropIndexOplogEntry(OperationContext* opCtx,
+                                                     const UUID& collectionUuid,
+                                                     const std::string& indexName,
+                                                     const BSONObj& infoObj) {
+    IndexDescription desc(collectionUuid, indexName, IndexOpType::kDrop, infoObj);
+    return _upsertIndexDescription(opCtx, desc);
+}
+
 Status RollbackFixUpInfo::_upsertById(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const BSONObj& update) {
     auto key = update["_id"];
     invariant(!key.eoo());
     return _storageInterface->upsertById(opCtx, nss, key, update);
+}
+
+Status RollbackFixUpInfo::_upsertIndexDescription(OperationContext* opCtx,
+                                                  const IndexDescription& description) {
+    switch (description.getOpType()) {
+        case IndexOpType::kCreate:
+        case IndexOpType::kDrop:
+            return _upsertById(opCtx, kRollbackIndexNamespace, description.toBSON());
+        case IndexOpType::kUpdateTTL: {
+            // For updateTTL, if there is an existing document in the collection with a "drop" op
+            // type, we should update the index info obj in the existing document and leave the op
+            // type unchanged. Otherwise, we assume that the existing document has an op type of
+            // "updateTTL"; or is not present in the collection. Therefore, it is safe to overwrite
+            // any existing data.
+            //
+            // It's not possible for the existing document to have a "create" op type while
+            // processing a collMod (updateTTL) because this implies the follow sequence of
+            // of operations in the oplog:
+            //    ..., collMod, ..., createIndex, ...
+            // (createIndex gets processed before collMod)
+            // This is illegal because there's a missing dropIndex oplog entry between the collMod
+            // and createIndex oplog entries.
+            auto expireAfterSeconds = description.getExpireAfterSeconds();
+            invariant(expireAfterSeconds);
+            BSONObjBuilder updateBob;
+            {
+                BSONObjBuilder setOnInsertBob(updateBob.subobjStart("$setOnInsert"));
+                setOnInsertBob.append("operationType", description.getOpTypeAsString());
+            }
+            {
+                BSONObjBuilder setBob(updateBob.subobjStart("$set"));
+                setBob.append("infoObj.expireAfterSeconds",
+                              durationCount<Seconds>(*expireAfterSeconds));
+            }
+            auto updateDoc = updateBob.obj();
+
+            BSONObjBuilder bob;
+            bob.append("_id", description.makeIdKey());
+            auto key = bob.obj();
+            return _storageInterface->upsertById(
+                opCtx, kRollbackIndexNamespace, key.firstElement(), updateDoc);
+        }
+    }
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace repl
