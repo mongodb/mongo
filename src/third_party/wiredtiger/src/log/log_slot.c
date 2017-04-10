@@ -286,12 +286,13 @@ __log_slot_new(WT_SESSION_IMPL *session)
  */
 static int
 __log_slot_switch_internal(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced)
+    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced, bool *did_work)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	bool free_slot, release;
+	uint32_t joined;
 
 	log = S2C(session)->log;
 	release = false;
@@ -305,6 +306,18 @@ __log_slot_switch_internal(
 	 */
 	if (slot != log->active_slot)
 		return (0);
+	/*
+	 * If the current active slot is unused and this is a forced switch,
+	 * we're done.  If this is a non-forced switch we always switch
+	 * because the slot could be part of an unbuffered operation.
+	 */
+	joined = WT_LOG_SLOT_JOINED(slot->slot_state);
+	if (joined == 0 && forced) {
+		WT_STAT_CONN_INCR(session, log_force_write_skip);
+		if (did_work != NULL)
+			*did_work = false;
+		return (0);
+	}
 	WT_RET(WT_SESSION_CHECK_PANIC(session));
 
 	/*
@@ -352,8 +365,8 @@ __log_slot_switch_internal(
  *	Switch out the current slot and set up a new one.
  */
 int
-__wt_log_slot_switch(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool retry, bool forced)
+__wt_log_slot_switch(WT_SESSION_IMPL *session,
+    WT_MYSLOT *myslot, bool retry, bool forced, bool *did_work)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
@@ -373,7 +386,8 @@ __wt_log_slot_switch(
 	 */
 	do {
 		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __log_slot_switch_internal(session, myslot, forced));
+		    ret = __log_slot_switch_internal(
+		    session, myslot, forced, did_work));
 		if (ret == EBUSY) {
 			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
 			__wt_yield();

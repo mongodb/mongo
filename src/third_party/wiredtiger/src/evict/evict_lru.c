@@ -934,9 +934,9 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	uint64_t cur_threads, delta_msec, delta_pages, i, target_threads;
+	uint64_t delta_msec, delta_pages;
 	uint64_t pgs_evicted_cur, pgs_evicted_persec_cur, time_diff;
-	uint32_t thread_surplus;
+	int32_t cur_threads, i, target_threads, thread_surplus;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -967,8 +967,10 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		conn->evict_tune_workers_best = 0;
 
 		/* Reduce the number of eviction workers to the minimum */
-		thread_surplus = conn->evict_threads.current_threads -
-		    conn->evict_threads_min;
+		thread_surplus =
+		    (int32_t)conn->evict_threads.current_threads -
+		    (int32_t)conn->evict_threads_min;
+
 		for (i = 0; i < thread_surplus; i++) {
 			WT_ERR(__wt_thread_group_stop_one(
 			    session, &conn->evict_threads, false));
@@ -1026,18 +1028,18 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 * settle into a stable state.
 	 */
 	if (conn->evict_tune_num_points >= conn->evict_tune_datapts_needed) {
-		if ((conn->evict_tune_workers_best ==
-		    conn->evict_threads.current_threads) &&
-		    (conn->evict_threads.current_threads <
-		    conn->evict_threads_max)) {
+		if (conn->evict_tune_workers_best ==
+		    conn->evict_threads.current_threads &&
+		    conn->evict_threads.current_threads <
+		    conn->evict_threads_max) {
 			/*
 			 * Keep adding workers. We will check again
 			 * at the next check point.
 			 */
-			conn->evict_tune_datapts_needed +=
-			    WT_MIN(EVICT_TUNE_DATAPT_MIN,
-			    (conn->evict_threads_max
-			    - conn->evict_threads.current_threads) /
+			conn->evict_tune_datapts_needed += WT_MIN(
+			    EVICT_TUNE_DATAPT_MIN,
+			    (conn->evict_threads_max -
+			    conn->evict_threads.current_threads) /
 			    EVICT_TUNE_BATCH);
 		} else {
 			/*
@@ -1046,8 +1048,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			 * settle into a stable state.
 			 */
 			thread_surplus =
-			    conn->evict_threads.current_threads -
-			    conn->evict_tune_workers_best;
+			    (int32_t)conn->evict_threads.current_threads -
+			    (int32_t)conn->evict_tune_workers_best;
 
 			for (i = 0; i < thread_surplus; i++) {
 				/*
@@ -1082,13 +1084,13 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		    conn->evict_threads.current_threads) / EVICT_TUNE_BATCH);
 
 	if (F_ISSET(cache, WT_CACHE_EVICT_ALL)) {
-		cur_threads = conn->evict_threads.current_threads;
+		cur_threads = (int32_t)conn->evict_threads.current_threads;
 		target_threads = WT_MIN(cur_threads + EVICT_TUNE_BATCH,
-		    conn->evict_threads_max);
+		    (int32_t)conn->evict_threads_max);
 		/*
 		 * Start the new threads.
 		 */
-		for (i = 0; i < (target_threads - cur_threads); ++i) {
+		for (i = cur_threads; i < target_threads; ++i) {
 			/*
 			 * If we get an error, it should be because we were
 			 * unable to acquire the thread group lock.  Break out
