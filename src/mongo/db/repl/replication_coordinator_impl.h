@@ -738,6 +738,11 @@ private:
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
 
     /**
+     * Helper that checks if an OpTime has been replicated to a majority of nodes.
+     */
+    bool _isOpTimeMajorityConfirmed(const OpTime& opTime);
+
+    /**
      * Triggers all callbacks that are blocked waiting for new heartbeat data
      * to decide whether or not to finish a step down.
      */

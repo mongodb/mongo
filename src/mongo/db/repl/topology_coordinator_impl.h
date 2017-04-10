@@ -218,10 +218,7 @@ public:
     virtual void processLoseElection();
     virtual Status checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
-    virtual bool stepDown(Date_t until,
-                          bool force,
-                          const OpTime& lastOpApplied,
-                          const OpTime& lastOpCommitted);
+    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
     virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime,

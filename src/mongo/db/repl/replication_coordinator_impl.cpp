@@ -1612,6 +1612,14 @@ bool ReplicationCoordinatorImpl::_haveTaggedNodesReachedOpTime_inlock(
     return false;
 }
 
+bool ReplicationCoordinatorImpl::_isOpTimeMajorityConfirmed(const OpTime& opTime) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto tagStatus = _rsConfig.findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
+    invariant(tagStatus.isOK());
+    auto shouldJournal = _rsConfig.getWriteConcernMajorityShouldJournal();
+    return _haveTaggedNodesReachedOpTime_inlock(opTime, tagStatus.getValue(), shouldJournal);
+}
+
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
     OperationContext* txn, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     Timer timer;
@@ -1785,25 +1793,35 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
                 "specified that we should step down for"};
     }
 
+    PostMemberStateUpdateAction action = kActionNone;
     try {
         stdx::unique_lock<stdx::mutex> topoLock(_topoMutex);
-        bool restartHeartbeats = true;
         txn->checkForInterrupt();
-        while (!_tryToStepDown(waitUntil, stepDownUntil, force)) {
-            if (restartHeartbeats) {
-                // We send out a fresh round of heartbeats because stepping down successfully
-                // without
-                // {force: true} is dependent on timely heartbeat data.
+        if (!_tryToStepDown(waitUntil, stepDownUntil, force)) {
+            // We send out a fresh round of heartbeats because stepping down successfully
+            // without {force: true} is dependent on timely heartbeat data.
+            {
                 stdx::lock_guard<stdx::mutex> lk(_mutex);
                 _restartHeartbeats_inlock();
-                restartHeartbeats = false;
             }
-            txn->waitForConditionOrInterruptUntil(
-                _stepDownWaiters, topoLock, std::min(stepDownUntil, waitUntil));
+            do {
+                txn->waitForConditionOrInterruptUntil(
+                    _stepDownWaiters, topoLock, std::min(stepDownUntil, waitUntil));
+            } while (!_tryToStepDown(waitUntil, stepDownUntil, force));
         }
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        action = _updateMemberStateFromTopologyCoordinator_inlock();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
+
+    _performPostMemberStateUpdateAction(action);
+
+    // Schedule work to (potentially) step back up once the stepdown period has ended.
+    _scheduleWorkAt(
+        stepDownUntil,
+        stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing, this, stdx::placeholders::_1));
+
     return Status::OK();
 }
 
@@ -1814,7 +1832,6 @@ void ReplicationCoordinatorImpl::_signalStepDownWaiter_inlock() {
 bool ReplicationCoordinatorImpl::_tryToStepDown(const Date_t waitUntil,
                                                 const Date_t stepDownUntil,
                                                 const bool force) {
-
     if (_topCoord->getRole() != TopologyCoordinator::Role::leader) {
         uasserted(ErrorCodes::NotMaster,
                   "Already stepped down from primary while processing step down request");
@@ -1826,29 +1843,31 @@ bool ReplicationCoordinatorImpl::_tryToStepDown(const Date_t waitUntil,
                   "time we were supposed to step down until");
     }
 
-    const bool forceNow = now >= waitUntil ? force : false;
-    if (!_topCoord->stepDown(
-            stepDownUntil, forceNow, getMyLastAppliedOpTime(), getLastCommittedOpTime())) {
-        if (now >= waitUntil) {
-            uasserted(ErrorCodes::ExceededTimeLimit,
-                      str::stream() << "No electable secondaries caught up as of "
-                                    << dateToISOStringLocal(now)
-                                    << ". Please use {force: true} to force node to step down.");
-        }
-        return false;
+    const bool forceNow = force && (now >= waitUntil);
+    OpTime lastApplied = getMyLastAppliedOpTime();
+
+    if (forceNow) {
+        return _topCoord->stepDown(stepDownUntil, forceNow, lastApplied);
     }
 
-    const auto action = [&] {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        return _updateMemberStateFromTopologyCoordinator_inlock();
-    }();
-    _performPostMemberStateUpdateAction(action);
+    // Check if a majority of nodes have reached the last applied optime
+    // and there exist an electable node that has my last applied optime.
+    if (_isOpTimeMajorityConfirmed(lastApplied) &&
+        _topCoord->stepDown(stepDownUntil, forceNow, lastApplied)) {
+        return true;
+    }
 
-    // Schedule work to (potentially) step back up once the stepdown period has ended.
-    _scheduleWorkAt(
-        stepDownUntil,
-        stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing, this, stdx::placeholders::_1));
-    return true;
+    // Stepdown attempt failed.
+
+    // Check waitUntil after at least one stepdown attempt, so that stepdown could succeed even if
+    // secondaryCatchUpPeriodSecs == 0.
+    if (now >= waitUntil) {
+        uasserted(ErrorCodes::ExceededTimeLimit,
+                  str::stream() << "No electable secondaries caught up as of "
+                                << dateToISOStringLocal(now)
+                                << ". Please use {force: true} to force node to step down.");
+    }
+    return false;
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(
