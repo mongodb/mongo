@@ -19,7 +19,8 @@ selector:
     - jstests/sharding/view_rewrite.js
     # New feature in v3.6 mongos
     - jstests/sharding/logical_time_metadata.js
-    # New feature in v3.6 mongos and mongods.
+    # New feature in v3.6 mongos and mongod.
+    - jstests/sharding/logical_time_api.js
     - jstests/sharding/operation_time_api.js
 
 executor:
