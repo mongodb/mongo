@@ -43,12 +43,12 @@
         for (let i = 0; i < n; i++) {
             // Write to a capped collection, as that may require a lock for serialization.
             let cappedName = "capped" + n + "-" + i;
-            newDB.createCollection(cappedName, {capped: true, size: 100});
+            assert.commandWorked(newDB.createCollection(cappedName, {capped: true, size: 100}));
             cappedOps.push({op: 'i', ns: newDBName + "." + cappedName, o: {_id: 0}});
 
             // Make an index multi-key, as that may require a lock for updating the catalog.
-            let multiName = "multi" + +n + "-" + i;
-            newDB[multiName].createIndex({x: 1});
+            let multiName = "multi" + n + "-" + i;
+            assert.commandWorked(newDB[multiName].createIndex({x: 1}));
             multiOps.push({op: 'i', ns: newDBName + "." + multiName, o: {_id: 0, x: [0, 1]}});
         }
 
