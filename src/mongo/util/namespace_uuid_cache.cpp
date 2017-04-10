@@ -49,7 +49,15 @@ void NamespaceUUIDCache::ensureNamespaceInCache(const NamespaceString& nss, Coll
                 it->second == uuid);
     }
 }
-void NamespaceUUIDCache::evictNamespace(const NamespaceString& nss) {
+void NamespaceUUIDCache::onDropCollection(const NamespaceString& nss) {
+    _evictNamespace(nss);
+}
+
+void NamespaceUUIDCache::onRenameCollection(const NamespaceString& nss) {
+    _evictNamespace(nss);
+}
+
+void NamespaceUUIDCache::_evictNamespace(const NamespaceString& nss) {
     invariant(_cache.erase(nss.ns()) <= 1);
 }
 }  // namespace mongo

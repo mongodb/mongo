@@ -106,6 +106,7 @@ public:
                           bool fromMigrate) = 0;
     virtual void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) = 0;
     virtual void onCreateCollection(OperationContext* opCtx,
+                                    Collection* coll,
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex) = 0;

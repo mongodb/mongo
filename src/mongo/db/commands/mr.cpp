@@ -425,6 +425,9 @@ void State::prepTempCollection() {
             CollectionOptions options;
             options.setNoIdIndex();
             options.temp = true;
+            if (enableCollectionUUIDs) {
+                options.uuid.emplace(UUID::gen());
+            }
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
             invariant(incColl);
 
@@ -496,6 +499,9 @@ void State::prepTempCollection() {
 
         CollectionOptions options = finalOptions;
         options.temp = true;
+        if (enableCollectionUUIDs) {
+            options.uuid.emplace(UUID::gen());
+        }
         tempColl = tempCtx.db()->createCollection(_opCtx, _config.tempNamespace.ns(), options);
 
         for (vector<BSONObj>::iterator it = indexesToInsert.begin(); it != indexesToInsert.end();

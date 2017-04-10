@@ -66,6 +66,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/namespace_uuid_cache.h"
+#include "mongo/util/uuid_catalog.h"
 
 namespace mongo {
 namespace {
@@ -462,11 +463,6 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
 
-    // Evict namespace entry from the namespace/uuid cache.
-    if (enableCollectionUUIDs) {
-        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-        cache.evictNamespace(fullns);
-    }
     return Status::OK();
 }
 
@@ -548,11 +544,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
     _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNSS);
 
-    // Evict namespace entry from the namespace/uuid cache.
-    if (enableCollectionUUIDs) {
-        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-        cache.evictNamespace(fromNSS);
-    }
     return s;
 }
 
@@ -648,7 +639,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     }
 
     getGlobalServiceContext()->getOpObserver()->onCreateCollection(
-        opCtx, nss, options, fullIdIndexSpec);
+        opCtx, collection, nss, options, fullIdIndexSpec);
 
     return collection;
 }

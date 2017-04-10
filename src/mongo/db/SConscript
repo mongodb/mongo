@@ -602,6 +602,7 @@ env.Library(
         'commands/dcommands',
         'repl/serveronly',
         'views/views_mongod',
+        '$BUILD_DIR/mongo/util/uuid_catalog',
     ],
 )
 

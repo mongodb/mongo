@@ -61,6 +61,7 @@ public:
                   bool fromMigrate) override;
     void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) override;
     void onCreateCollection(OperationContext* opCtx,
+                            Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex) override;

@@ -47,13 +47,13 @@ TEST(NamespaceUUIDCache, ensureNamespaceInCache) {
     ASSERT_THROWS(cache.ensureNamespaceInCache(nss, uuidConflict), UserException);
 }
 
-TEST(NamespaceUUIDCache, evictEntry) {
+TEST(NamespaceUUIDCache, onDropCollection) {
     NamespaceUUIDCache cache;
     CollectionUUID uuid = CollectionUUID::gen();
     CollectionUUID newUuid = CollectionUUID::gen();
     NamespaceString nss("test", "test_collection_ns");
     cache.ensureNamespaceInCache(nss, uuid);
-    cache.evictNamespace(nss);
+    cache.onDropCollection(nss);
     // Add nss to the cache with a different uuid. This should not throw since
     // we evicted the previous entry from the cache.
     cache.ensureNamespaceInCache(nss, newUuid);

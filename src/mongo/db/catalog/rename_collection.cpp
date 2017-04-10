@@ -190,14 +190,16 @@ Status renameCollection(OperationContext* opCtx,
     // write lock acquired at the top.
     NamespaceString tmpName(target.db(), "tmp.renameCollection");
     Collection* tmpColl = nullptr;
-    OptionalCollectionUUID tmpUUID;
+    OptionalCollectionUUID newUUID;
     {
         CollectionOptions options = sourceColl->getCatalogEntry()->getCollectionOptions(opCtx);
         // Renaming across databases will result in a new UUID, as otherwise we'd require
         // two collections with the same uuid (temporarily).
         options.temp = true;
-        if (enableCollectionUUIDs)
-            tmpUUID = UUID::gen();
+        if (enableCollectionUUIDs) {
+            newUUID = UUID::gen();
+            options.uuid = newUUID;
+        }
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             WriteUnitOfWork wunit(opCtx);
@@ -294,7 +296,7 @@ Status renameCollection(OperationContext* opCtx,
             opCtx,
             source,
             target,
-            tmpUUID,
+            newUUID,
             dropTarget,
             dropTargetUUID,
             /*dropSourceUUID*/ sourceUUID,

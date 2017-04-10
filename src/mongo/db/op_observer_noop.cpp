@@ -59,6 +59,7 @@ void OpObserverNoop::onDelete(OperationContext*,
 void OpObserverNoop::onOpMessage(OperationContext*, const BSONObj&) {}
 
 void OpObserverNoop::onCreateCollection(OperationContext*,
+                                        Collection*,
                                         const NamespaceString&,
                                         const CollectionOptions&,
                                         const BSONObj&) {}

@@ -28,58 +28,58 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/string_map.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
 /**
- * This class comprises the NamespaceString to UUID cache that prevents given namespaces
- * from resolving to multiple UUIDs.
+ * This class comprises a UUID to collection catalog, allowing for efficient
+ * collection lookup by UUID.
  */
 using CollectionUUID = UUID;
 
-class NamespaceUUIDCache {
-    MONGO_DISALLOW_COPYING(NamespaceUUIDCache);
+class UUIDCatalog {
+    MONGO_DISALLOW_COPYING(UUIDCatalog);
 
 public:
-    static const OperationContext::Decoration<NamespaceUUIDCache> get;
-    NamespaceUUIDCache() = default;
+    static const ServiceContext::Decoration<UUIDCatalog> get;
+    UUIDCatalog() = default;
 
-    /**
-     * This function adds the pair nss.ns(), uuid to the namespace uuid cache
-     * if it does not yet exist. If nss.ns() already exists in the cache with
-     * a different uuid, a UserException is thrown, so we can guarantee that
-     * an operation will always resolve the same name to the same collection,
-     * even in presence of drops and renames.
+    /* This function inserts the entry for uuid, coll into the UUID
+     * Collection. It is called by the op observer when a collection
+     * is created.
      */
-    void ensureNamespaceInCache(const NamespaceString& nss, CollectionUUID uuid);
+    void onCreateCollection(OperationContext* opCtx, Collection* coll, CollectionUUID uuid);
 
-    /**
-     * This function removes the entry for nss.ns() from the namespace uuid
-     * cache. Does nothing if the entry doesn't exist. It is called via the
-     * op observer when a collection is dropped.
+    /* This function gets the Collection* pointer that corresponds to
+     * CollectionUUID uuid. The required locks should be obtained prior
+     * to calling this function, or else the found Collection pointer
+     * might no longer be valid when the call returns.
      */
-    void onDropCollection(const NamespaceString& nss);
+    Collection* lookupCollectionByUUID(CollectionUUID uuid);
 
-    /**
-     * This function removes the entry for nss.ns() from the namespace uuid
-     * cache. Does nothing if the entry doesn't exist. It is called via the
-     * op observer when a collection is renamed.
+    /* This function gets the NamespaceString from the Collection* pointer that
+     * corresponds to CollectionUUID uuid. If there is no such pointer, an empty
+     * NamespaceString is returned.
      */
-    void onRenameCollection(const NamespaceString& nss);
+    NamespaceString lookupNSSByUUID(CollectionUUID uuid);
+
+    /* This function removes the entry for uuid from the UUID catalog. It
+     * is called by the op observer when a collection is dropped.
+     */
+    void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
 
 private:
-    /**
-     * This function removes the entry for nss.ns() from the namespace uuid
-     * cache. Does nothing if the entry doesn't exist.
-     */
-    void _evictNamespace(const NamespaceString& nss);
-    using CollectionUUIDMap = StringMap<CollectionUUID>;
-    CollectionUUIDMap _cache;
+    mongo::stdx::mutex _catalogLock;
+    mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
+
+    void _registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
+    Collection* _removeUUIDCatalogEntry(CollectionUUID uuid);
 };
 
 }  // namespace mongo

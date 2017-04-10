@@ -340,6 +340,9 @@ public:
         this->_impl().init(opCtx);
     }
 
+    // Use this constructor only for testing/mocks
+    explicit inline Collection(std::unique_ptr<Impl> mock) : _pimpl(std::move(mock)) {}
+
     inline ~Collection() = default;
 
     inline bool ok() const {

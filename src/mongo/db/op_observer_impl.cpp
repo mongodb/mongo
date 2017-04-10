@@ -43,6 +43,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/namespace_uuid_cache.h"
+#include "mongo/util/uuid_catalog.h"
 
 namespace mongo {
 
@@ -185,6 +187,7 @@ void OpObserverImpl::onOpMessage(OperationContext* opCtx, const BSONObj& msgObj)
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
+                                        Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
                                         const BSONObj& idIndex) {
@@ -217,6 +220,11 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName, cmdObj, nullptr);
     logOpForDbHash(opCtx, dbName);
+
+    if (options.uuid) {
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        catalog.onCreateCollection(opCtx, coll, options.uuid.get());
+    }
 }
 
 namespace {
@@ -320,6 +328,16 @@ void OpObserverImpl::onDropCollection(OperationContext* opCtx,
     auto css = CollectionShardingState::get(opCtx, collectionName);
     css->onDropCollection(opCtx, collectionName);
 
+    // Evict namespace entry from the namespace/uuid cache if it exists.
+    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+    cache.onDropCollection(collectionName);
+
+    // Remove collection from the uuid catalog.
+    if (uuid) {
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        catalog.onDropCollection(opCtx, uuid.get());
+    }
+
     logOpForDbHash(opCtx, dbName);
 }
 
@@ -368,6 +386,10 @@ void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
     logOpForDbHash(opCtx, cmdNss);
+
+    // Evict namespace entry from the namespace/uuid cache if it exists.
+    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+    cache.onRenameCollection(fromCollection);
 }
 
 void OpObserverImpl::onApplyOps(OperationContext* opCtx,
