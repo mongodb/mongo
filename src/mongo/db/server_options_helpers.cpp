@@ -184,11 +184,17 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 
     options->addOptionChaining("net.port", "port", moe::Int, portInfoBuilder.str().c_str());
 
-    options->addOptionChaining(
-        "net.bindIp",
-        "bind_ip",
-        moe::String,
-        "comma separated list of ip addresses to listen on - all local ips by default");
+    options
+        ->addOptionChaining(
+            "net.bindIp",
+            "bind_ip",
+            moe::String,
+            "comma separated list of ip addresses to listen on - localhost by default")
+        .incompatibleWith("bind_ip_all");
+
+    options
+        ->addOptionChaining("net.bindIpAll", "bind_ip_all", moe::Switch, "bind to all ip addresses")
+        .incompatibleWith("bind_ip");
 
     options->addOptionChaining(
         "net.ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
@@ -826,10 +832,6 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.port = params["net.port"].as<int>();
     }
 
-    if (params.count("net.bindIp")) {
-        serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
-    }
-
     if (params.count("net.ipv6") && params["net.ipv6"].as<bool>() == true) {
         enableIPv6();
     }
@@ -883,11 +885,18 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
     }
 
-    if (params.count("net.bindIp")) {
-        // passing in wildcard is the same as default behavior; remove for SERVER-3350
-        if (serverGlobalParams.bind_ip == "0.0.0.0") {
-            serverGlobalParams.bind_ip = "";
+    if (params.count("net.bindIpAll") && params["net.bindIpAll"].as<bool>()) {
+        // Bind to all IP addresses
+        serverGlobalParams.bind_ip = "0.0.0.0";
+        if (params.count("net.ipv6") && params["net.ipv6"].as<bool>()) {
+            serverGlobalParams.bind_ip += ",::";
         }
+    } else if (params.count("net.bindIp")) {
+        // Bind to enumerated IP addresses
+        serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
+    } else {
+        // Bind to localhost
+        serverGlobalParams.bind_ip = "";
     }
 
 #ifndef _WIN32

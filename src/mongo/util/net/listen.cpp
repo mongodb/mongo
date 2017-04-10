@@ -96,10 +96,10 @@ using std::vector;
 vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
     vector<SockAddr> out;
     if (*ips == '\0') {
-        out.push_back(SockAddr("0.0.0.0", port));  // IPv4 all
+        out.push_back(SockAddr("127.0.0.1", port));  // IPv4 localhost
 
         if (IPv6Enabled())
-            out.push_back(SockAddr("::", port));  // IPv6 all
+            out.push_back(SockAddr("::1", port));  // IPv6 localhost
 #ifndef _WIN32
         if (useUnixSockets)
             out.push_back(SockAddr(makeUnixSockPath(port), port));  // Unix socket

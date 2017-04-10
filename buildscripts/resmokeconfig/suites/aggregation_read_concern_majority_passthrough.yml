@@ -29,6 +29,7 @@ executor:
     fixture:
       class: ReplicaSetFixture
       mongod_options:
+        bind_ip_all: ''
         enableMajorityReadConcern: ''
         set_parameters:
           enableTestCommands: 1

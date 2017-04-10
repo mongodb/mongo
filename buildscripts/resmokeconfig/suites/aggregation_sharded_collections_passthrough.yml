@@ -46,9 +46,11 @@ executor:
     fixture:
       class: ShardedClusterFixture
       mongos_options:
+        bind_ip_all: ''
         set_parameters:
           enableTestCommands: 1
       mongod_options:
+        bind_ip_all: ''
         nopreallocj: ''
         set_parameters:
           enableTestCommands: 1

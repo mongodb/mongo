@@ -12,10 +12,12 @@ executor:
     fixture:
       class: ShardedClusterFixture
       mongod_options:
+        bind_ip_all: ''
         set_parameters:
           enableTestCommands: 1
           numInitialSyncAttempts: 1
       mongos_options:
+        bind_ip_all: ''
         set_parameters:
           enableTestCommands: 1
       enable_sharding:

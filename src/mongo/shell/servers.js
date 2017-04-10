@@ -468,6 +468,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts.networkMessageCompressors = jsTestOptions().networkMessageCompressors;
         }
 
+        if (!opts.bind_ip) {
+            opts.bind_ip_all = "";
+        }
+
         return opts;
     };
 
