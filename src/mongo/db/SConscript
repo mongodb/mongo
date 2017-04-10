@@ -1032,11 +1032,23 @@ env.Library(
 )
 
 env.Library(
+    target='keys_collection_manager',
+    source=[
+        'keys_collection_cache_reader.cpp',
+    ],
+    LIBDEPS=[
+        'keys_collection_document',
+        'logical_time',
+    ],
+)
+
+env.Library(
     target='logical_clock',
     source=[
         'logical_clock.cpp',
     ],
     LIBDEPS=[
+        'keys_collection_manager',
         'server_parameters',
         'service_context',
         'signed_logical_time',
