@@ -1,5 +1,3 @@
-// collection_info_cache.h
-
 /**
 *    Copyright (C) 2013 10gen Inc.
 *
@@ -108,7 +106,17 @@ public:
     void notifyOfQuery(OperationContext* opCtx, const std::set<std::string>& indexesUsed);
 
 private:
+    void computeIndexKeys(OperationContext* opCtx);
+    void updatePlanCacheIndexEntries(OperationContext* opCtx);
+
+    /**
+     * Rebuilds cached information that is dependent on index composition. Must be called
+     * when index composition changes.
+     */
+    void rebuildIndexData(OperationContext* opCtx);
+
     Collection* _collection;  // not owned
+    const NamespaceString _ns;
 
     // ---  index keys cache
     bool _keysComputed;
@@ -123,15 +131,6 @@ private:
 
     // Tracks index usage statistics for this collection.
     CollectionIndexUsageTracker _indexUsageTracker;
-
-    void computeIndexKeys(OperationContext* opCtx);
-    void updatePlanCacheIndexEntries(OperationContext* opCtx);
-
-    /**
-     * Rebuilds cached information that is dependent on index composition. Must be called
-     * when index composition changes.
-     */
-    void rebuildIndexData(OperationContext* opCtx);
 
     bool _hasTTLIndex = false;
 };

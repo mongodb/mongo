@@ -1,5 +1,3 @@
-// collection_info_cache.cpp
-
 /**
 *    Copyright (C) 2013 10gen Inc.
 *
@@ -51,6 +49,7 @@ namespace mongo {
 
 CollectionInfoCache::CollectionInfoCache(Collection* collection, const NamespaceString& ns)
     : _collection(collection),
+      _ns(ns),
       _keysComputed(false),
       _planCache(new PlanCache(ns.ns())),
       _querySettings(new QuerySettings()),
@@ -60,7 +59,7 @@ CollectionInfoCache::~CollectionInfoCache() {
     // Necessary because the collection cache will not explicitly get updated upon database drop.
     if (_hasTTLIndex) {
         TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
-        ttlCollectionCache.unregisterCollection(_collection->ns());
+        ttlCollectionCache.unregisterCollection(_ns);
     }
 }
 
