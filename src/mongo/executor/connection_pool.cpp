@@ -1,4 +1,5 @@
-/** *    Copyright (C) 2015 MongoDB Inc.
+/**
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -338,6 +339,8 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
 
     if (!conn->getStatus().isOK()) {
         // TODO: alert via some callback if the host is bad
+        log() << "Ending connection to host " << _hostAndPort << " due to bad connection status; "
+              << openConnections(lk) << " connections to that host remain open";
         return;
     }
 
@@ -348,6 +351,9 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
         if (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() >=
             _parent->_options.minConnections) {
             // If we already have minConnections, just let the connection lapse
+            log() << "Ending idle connection to host " << _hostAndPort
+                  << " because the pool meets constraints; " << openConnections(lk)
+                  << " connections to that host remain open";
             return;
         }
 
@@ -382,6 +388,10 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              // failing all operations.  We do this because the various callers have
                              // their own time limit which is unrelated to our internal one.
                              if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+                                 log() << "Pending connection to host " << _hostAndPort
+                                       << " did not complete within the connection timeout,"
+                                       << " retrying with a new connection;" << openConnections(lk)
+                                       << " connections to that host remain open";
                                  spawnConnections(lk);
                                  return;
                              }
@@ -444,6 +454,10 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status,
 
     // Drop ready connections
     _readyPool.clear();
+
+    // Log something helpful
+    log() << "Dropping all pooled connections to " << _hostAndPort
+          << " due to failed operation on a connection";
 
     // Migrate processing connections to the dropped pool
     for (auto&& x : _processingPool) {
