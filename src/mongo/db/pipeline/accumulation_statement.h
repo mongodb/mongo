@@ -60,11 +60,11 @@ namespace mongo {
 class AccumulationStatement {
 public:
     AccumulationStatement(std::string fieldName,
-                          Accumulator::Factory factory,
-                          boost::intrusive_ptr<Expression> expression)
+                          boost::intrusive_ptr<Expression> expression,
+                          Accumulator::Factory factory)
         : fieldName(std::move(fieldName)),
-          factory(std::move(factory)),
-          expression(std::move(expression)) {}
+          expression(std::move(expression)),
+          _factory(std::move(factory)) {}
 
     /**
      * Parses a BSONElement that is an accumulated field, and returns an AccumulationStatement for
@@ -93,9 +93,20 @@ public:
      */
     static Accumulator::Factory getFactory(StringData name);
 
+    // 'fieldName' contains the field names for the result documents.
     std::string fieldName;
-    Accumulator::Factory factory;
+
+    // 'expression' contains the common expressions used by instance of an accumulator in order to
+    // find the right-hand side of what gets added to the accumulator
     boost::intrusive_ptr<Expression> expression;
+
+    // Makes Accumulator with a pointer to a Expression context
+    boost::intrusive_ptr<Accumulator> makeAccumulator(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const;
+
+private:
+    // '_factory'contains the accumulator factories for the result documents
+    Accumulator::Factory _factory;
 };
 
 }  // namespace mongo

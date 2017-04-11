@@ -77,8 +77,8 @@ DocumentSource::GetDepsReturn DocumentSourceBucketAuto::getDependencies(DepsTrac
     _groupByExpression->addDependencies(deps);
 
     // Add the 'output' fields.
-    for (auto&& exp : _expressions) {
-        exp->addDependencies(deps);
+    for (auto&& accumulatedField : _accumalatedFields) {
+        accumulatedField.expression->addDependencies(deps);
     }
 
     // We know exactly which fields will be present in the output document. Future stages cannot
@@ -150,10 +150,11 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
     invariant(pExpCtx->getValueComparator().evaluate(entry.first >= bucket._max));
     bucket._max = entry.first;
 
-    const size_t numAccumulators = _accumulatorFactories.size();
+    const size_t numAccumulators = _accumalatedFields.size();
     _variables->setRoot(entry.second);
     for (size_t k = 0; k < numAccumulators; k++) {
-        bucket._accums[k]->process(_expressions[k]->evaluate(_variables.get()), false);
+        bucket._accums[k]->process(_accumalatedFields[k].expression->evaluate(_variables.get()),
+                                   false);
     }
 }
 
@@ -196,8 +197,7 @@ void DocumentSourceBucketAuto::populateBuckets() {
         }
 
         // Initialize the current bucket.
-        Bucket currentBucket(
-            pExpCtx, currentValue.first, currentValue.first, _accumulatorFactories);
+        Bucket currentBucket(pExpCtx, currentValue.first, currentValue.first, _accumalatedFields);
 
         // Add the first value into the current bucket.
         addDocumentToBucket(currentValue, currentBucket);
@@ -271,11 +271,11 @@ void DocumentSourceBucketAuto::populateBuckets() {
 DocumentSourceBucketAuto::Bucket::Bucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          Value min,
                                          Value max,
-                                         vector<Accumulator::Factory> accumulatorFactories)
+                                         vector<AccumulationStatement> accumulationStatements)
     : _min(min), _max(max) {
-    _accums.reserve(accumulatorFactories.size());
-    for (auto&& factory : accumulatorFactories) {
-        _accums.push_back(factory(expCtx));
+    _accums.reserve(accumulationStatements.size());
+    for (auto&& accumulationStatement : accumulationStatements) {
+        _accums.push_back(accumulationStatement.makeAccumulator(expCtx));
     }
 }
 
@@ -311,7 +311,7 @@ void DocumentSourceBucketAuto::addBucket(Bucket& newBucket) {
 }
 
 Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
-    const size_t nAccumulatedFields = _fieldNames.size();
+    const size_t nAccumulatedFields = _accumalatedFields.size();
     MutableDocument out(1 + nAccumulatedFields);
 
     out.addField("_id", Value{Document{{"min", bucket._min}, {"max", bucket._max}}});
@@ -322,7 +322,8 @@ Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
 
         // To be consistent with the $group stage, we consider "missing" to be equivalent to null
         // when evaluating accumulators.
-        out.addField(_fieldNames[i], val.missing() ? Value(BSONNULL) : std::move(val));
+        out.addField(_accumalatedFields[i].fieldName,
+                     val.missing() ? Value(BSONNULL) : std::move(val));
     }
     return out.freeze();
 }
@@ -344,12 +345,13 @@ Value DocumentSourceBucketAuto::serialize(
         insides["granularity"] = Value(_granularityRounder->getName());
     }
 
-    const size_t nOutputFields = _fieldNames.size();
+    const size_t nOutputFields = _accumalatedFields.size();
     MutableDocument outputSpec(nOutputFields);
     for (size_t i = 0; i < nOutputFields; i++) {
-        intrusive_ptr<Accumulator> accum = _accumulatorFactories[i](pExpCtx);
-        outputSpec[_fieldNames[i]] = Value{
-            Document{{accum->getOpName(), _expressions[i]->serialize(static_cast<bool>(explain))}}};
+        intrusive_ptr<Accumulator> accum = _accumalatedFields[i].makeAccumulator(pExpCtx);
+        outputSpec[_accumalatedFields[i].fieldName] = Value{
+            Document{{accum->getOpName(),
+                      _accumalatedFields[i].expression->serialize(static_cast<bool>(explain))}}};
     }
     insides["output"] = outputSpec.freezeToValue();
 
@@ -371,8 +373,8 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     // If there is no output field specified, then add the default one.
     if (accumulationStatements.empty()) {
         accumulationStatements.emplace_back("count",
-                                            AccumulationStatement::getFactory("$sum"),
-                                            ExpressionConstant::create(pExpCtx, Value(1)));
+                                            ExpressionConstant::create(pExpCtx, Value(1)),
+                                            AccumulationStatement::getFactory("$sum"));
     }
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
@@ -400,9 +402,7 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
 
     invariant(!accumulationStatements.empty());
     for (auto&& accumulationStatement : accumulationStatements) {
-        _fieldNames.push_back(std::move(accumulationStatement.fieldName));
-        _accumulatorFactories.push_back(accumulationStatement.factory);
-        _expressions.push_back(accumulationStatement.expression);
+        _accumalatedFields.push_back(accumulationStatement);
     }
 }
 
