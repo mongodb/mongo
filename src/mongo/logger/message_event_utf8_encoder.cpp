@@ -52,7 +52,7 @@ const auto kEOL = StringData("\r\n", StringData::LiteralTag());
 #else
 const auto kEOL = StringData("\n", StringData::LiteralTag());
 #endif
-} // namespace
+}  // namespace
 
 MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
 std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
