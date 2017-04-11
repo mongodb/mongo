@@ -504,6 +504,23 @@ struct __wt_cursor {
 	 * with the specified key exists, ::WT_NOTFOUND is returned.
 	 */
 	int __F(remove)(WT_CURSOR *cursor);
+
+	/*!
+	 * Reserve an existing record so a subsequent write is less likely to
+	 * fail due to a conflict between concurrent operations.
+	 *
+	 * The key must first be set and the record must already exist.
+	 *
+	 * @snippet ex_all.c Reserve a record
+	 *
+	 * On success, the cursor ends positioned at the specified record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the cursor no longer needs that position.
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(reserve)(WT_CURSOR *cursor);
 	/*! @} */
 
 	/*!

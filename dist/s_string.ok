@@ -515,11 +515,13 @@ change's
 changelog
 chdir
 checkfmt
+checkkey
 checkpointed
 checkpointer
 checkpointing
 checksum
 checksums
+checkvalue
 children's
 chk
 chmod
@@ -938,6 +940,8 @@ nbits
 nchunks
 nclr
 nd
+needkey
+needvalue
 negint
 newbar
 newfile
@@ -957,6 +961,7 @@ noraw
 notfound
 notsup
 notused
+novalue
 nowait
 nset
 nsnap

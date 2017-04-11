@@ -316,7 +316,6 @@ __wt_session_compact(
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	WT_TXN *txn;
 	u_int i;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -332,10 +331,7 @@ __wt_session_compact(
 	 * reason for LSM to allow this, possible or not), and check now so the
 	 * error message isn't confusing.
 	 */
-	txn = &session->txn;
-	if (F_ISSET(txn, WT_TXN_RUNNING))
-		WT_ERR_MSG(session, EINVAL,
-		    "compaction not permitted in a transaction");
+	WT_ERR(__wt_txn_context_check(session, false));
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));

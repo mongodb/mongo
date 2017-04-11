@@ -75,9 +75,7 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 		{ "insert", INSERT, NULL, },
 		{ "search", SEARCH, NULL, },
 		{ "search", SEARCH_NEAR, NULL, },
-#if 0
 		{ "reserve", RESERVE, NULL, },
-#endif
 		{ "update", UPDATE, NULL, },
 		{ "remove", REMOVE, NULL, },
 		{ "remove", REMOVE_POS, NULL, },
@@ -148,9 +146,7 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 			testutil_check(cursor->remove(cursor));
 			break;
 		case RESERVE:
-#if 0
 			testutil_check(cursor->reserve(cursor));
-#endif
 			break;
 		case UPDATE:
 			testutil_check(cursor->update(cursor));

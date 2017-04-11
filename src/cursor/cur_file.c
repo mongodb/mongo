@@ -31,8 +31,8 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_CHECKKEY(a);
-	WT_CURSOR_CHECKKEY(b);
+	WT_ERR(__cursor_checkkey(a));
+	WT_ERR(__cursor_checkkey(b));
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
@@ -63,8 +63,8 @@ __curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *equalp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_CHECKKEY(a);
-	WT_CURSOR_CHECKKEY(b);
+	WT_ERR(__cursor_checkkey(a));
+	WT_ERR(__cursor_checkkey(b));
 
 	ret = __wt_btcur_equals(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, equalp);
@@ -182,9 +182,7 @@ __curfile_search(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
-
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_NOVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
 
 	WT_ERR(__wt_btcur_search(cbt));
 
@@ -209,9 +207,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
-
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_NOVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
 
 	WT_ERR(__wt_btcur_search_near(cbt, exact));
 
@@ -238,8 +234,8 @@ __curfile_insert(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, cbt->btree);
 
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
-		WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_CHECKVALUE(cursor);
+		WT_ERR(__cursor_checkkey(cursor));
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	WT_ERR(__wt_btcur_insert(cbt));
 
@@ -270,9 +266,7 @@ __wt_curfile_insert_check(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
-
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_NOVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
 
 	ret = __wt_btcur_insert_check(cbt);
 
@@ -293,9 +287,8 @@ __curfile_update(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
-
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_CHECKVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
+	WT_ERR(__cursor_checkvalue(cursor));
 
 	WT_ERR(__wt_btcur_update(cbt));
 
@@ -321,9 +314,7 @@ __curfile_remove(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
-
-	WT_CURSOR_CHECKKEY(cursor);
-	WT_CURSOR_NOVALUE(cursor);
+	WT_ERR(__cursor_checkkey(cursor));
 
 	WT_ERR(__wt_btcur_remove(cbt));
 
@@ -340,6 +331,42 @@ __curfile_remove(WT_CURSOR *cursor)
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
+}
+
+/*
+ * __curfile_reserve --
+ *	WT_CURSOR->reserve method for the btree cursor type.
+ */
+static int
+__curfile_reserve(WT_CURSOR *cursor)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cbt = (WT_CURSOR_BTREE *)cursor;
+	CURSOR_UPDATE_API_CALL(cursor, session, reserve, cbt->btree);
+	WT_ERR(__cursor_checkkey(cursor));
+
+	WT_ERR(__wt_txn_context_check(session, true));
+
+	WT_ERR(__wt_btcur_reserve(cbt));
+
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
+	WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
+
+err:	CURSOR_UPDATE_API_END(session, ret);
+
+	/*
+	 * The application might do a WT_CURSOR.get_value call when we return,
+	 * so we need a value and the underlying functions didn't set one up.
+	 * For various reasons, those functions may not have done a search and
+	 * any previous value in the cursor might race with WT_CURSOR.reserve
+	 * (and in cases like LSM, the reserve never encountered the original
+	 * key). For simplicity, repeat the search here.
+	 */
+	return (ret == 0 ? cursor->search(cursor) : ret);
 }
 
 /*
@@ -405,6 +432,7 @@ __curfile_create(WT_SESSION_IMPL *session,
 	    __curfile_insert,			/* insert */
 	    __curfile_update,			/* update */
 	    __curfile_remove,			/* remove */
+	    __curfile_reserve,			/* reserve */
 	    __wt_cursor_reconfigure,		/* reconfigure */
 	    __curfile_close);			/* close */
 	WT_BTREE *btree;

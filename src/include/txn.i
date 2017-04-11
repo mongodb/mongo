@@ -69,7 +69,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	if (F_ISSET(txn, WT_TXN_READONLY))
 		WT_RET_MSG(session, WT_ROLLBACK,
-		    "Attempt to update in a read only transaction");
+		    "Attempt to update in a read-only transaction");
 
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
@@ -233,8 +233,11 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 static inline WT_UPDATE *
 __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	while (upd != NULL && !__wt_txn_visible(session, upd->txnid))
-		upd = upd->next;
+	/* Skip reserved place-holders, they're never visible. */
+	for (; upd != NULL; upd = upd->next)
+		if (!WT_UPDATE_RESERVED_ISSET(upd) &&
+		    __wt_txn_visible(session, upd->txnid))
+			break;
 
 	return (upd);
 }
@@ -449,8 +452,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	 * snapshot here: it will be restored by WT_WITH_TXN_ISOLATION.
 	 */
 	if ((!F_ISSET(txn, WT_TXN_RUNNING) ||
-	    txn->isolation != WT_ISO_SNAPSHOT) &&
-	    txn->forced_iso == 0)
+	    txn->isolation != WT_ISO_SNAPSHOT) && txn->forced_iso == 0)
 		__wt_txn_release_snapshot(session);
 }
 

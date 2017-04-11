@@ -41,6 +41,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,			/* insert */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curconfig_close);
 	WT_CURSOR_CONFIG *cconfig;

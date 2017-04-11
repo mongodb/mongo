@@ -509,10 +509,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	conn = S2C(session);
 	did_update = txn->mod_count != 0;
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
 
-	if (!F_ISSET(txn, WT_TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "No transaction is active");
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
 
 	/*
 	 * The default sync setting is inherited from the connection, but can
@@ -593,9 +592,26 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret);
 	}
 
-	/* Free memory associated with updates. */
-	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
+		switch (op->type) {
+		case WT_TXN_OP_BASIC:
+		case WT_TXN_OP_INMEM:
+			/*
+			 * Switch reserved operations to abort to simplify
+			 * obsolete update list truncation.
+			 */
+			if (WT_UPDATE_RESERVED_ISSET(op->u.upd))
+				op->u.upd->txnid = WT_TXN_ABORTED;
+			break;
+		case WT_TXN_OP_REF:
+		case WT_TXN_OP_TRUNCATE_COL:
+		case WT_TXN_OP_TRUNCATE_ROW:
+			break;
+		}
+
+		/* Free memory associated with updates. */
 		__wt_txn_op_free(session, op);
+	}
 	txn->mod_count = 0;
 
 	__wt_txn_release(session);
@@ -617,8 +633,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-	if (!F_ISSET(txn, WT_TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "No transaction is active");
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
 	/* Rollback notification. */
 	if (txn->notify != NULL)

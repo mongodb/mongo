@@ -136,6 +136,7 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
+	cursor->reserve = __wt_cursor_notsup;
 }
 
 /*
@@ -275,7 +276,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -705,15 +706,17 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0) {
 		cursor->insert = __wt_cursor_notsup;
-		cursor->update = __wt_cursor_notsup;
 		cursor->remove = __wt_cursor_notsup;
+		cursor->reserve = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
 	} else {
 		WT_RET(
 		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
 		if (cval.val != 0 || F_ISSET(S2C(session), WT_CONN_READONLY)) {
 			cursor->insert = __wt_cursor_notsup;
-			cursor->update = __wt_cursor_notsup;
 			cursor->remove = __wt_cursor_notsup;
+			cursor->reserve = __wt_cursor_notsup;
+			cursor->update = __wt_cursor_notsup;
 		}
 	}
 

@@ -371,6 +371,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	    __curdump_insert,			/* insert */
 	    __curdump_update,			/* update */
 	    __curdump_remove,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curdump_close);			/* close */
 	WT_CURSOR *cursor;

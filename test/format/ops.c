@@ -30,6 +30,7 @@
 
 static int   col_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
 static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, bool);
+static int   col_reserve(WT_CURSOR *, uint64_t, bool);
 static int   col_update(
 		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static int   nextprev(WT_CURSOR *, int);
@@ -37,6 +38,7 @@ static void *ops(void *);
 static int   row_insert(
 		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, bool);
+static int   row_reserve(WT_CURSOR *, WT_ITEM *, uint64_t, bool);
 static int   row_update(
 		TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, bool);
 static void  table_append_init(void);
@@ -636,7 +638,7 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 				testutil_assert(ret == WT_NOTFOUND);
 			}
 		}
-#if 0
+
 		/* Optionally reserve a row. */
 		if (!readonly && intxn && mmrand(&tinfo->rnd, 0, 20) == 1) {
 			switch (g.type) {
@@ -659,7 +661,7 @@ skip_checkpoint:	/* Pick the next checkpoint operation. */
 				testutil_assert(ret == WT_NOTFOUND);
 			}
 		}
-#endif
+
 		/* Perform the operation. */
 		switch (op) {
 		case INSERT:
@@ -1103,7 +1105,6 @@ nextprev(WT_CURSOR *cursor, int next)
 	return (ret);
 }
 
-#if 0
 /*
  * row_reserve --
  *	Reserve a row in a row-store file.
@@ -1166,7 +1167,6 @@ col_reserve(WT_CURSOR *cursor, uint64_t keyno, bool positioned)
 	}
 	return (0);
 }
-#endif
 
 /*
  * row_update --

@@ -112,8 +112,6 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 const char *
 __wt_wiredtiger_error(int error)
 {
-\tconst char *p;
-
 \t/*
 \t * Check for WiredTiger specific errors.
 \t */
@@ -125,14 +123,20 @@ for err in errors:
     tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
 tfile.write('''\t}
 
+\t/* Windows strerror doesn't support ENOTSUP. */
+\tif (error == ENOTSUP)
+\t\treturn ("Operation not supported");
+
 \t/*
-\t * POSIX errors are non-negative integers; check for 0 explicitly incase
-\t * the underlying strerror doesn't handle 0, some historically didn't.
+\t * Check for 0 in case the underlying strerror doesn't handle it, some
+\t * historically didn't.
 \t */
 \tif (error == 0)
 \t\treturn ("Successful return: 0");
-\tif (error > 0 && (p = strerror(error)) != NULL)
-\t\treturn (p);
+
+\t/* POSIX errors are non-negative integers. */
+\tif (error > 0)
+\t\treturn (strerror(error));
 
 \treturn (NULL);
 }

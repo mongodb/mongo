@@ -42,7 +42,7 @@ __curds_key_set(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(__cursor_needkey(cursor));
 
 	source->recno = cursor->recno;
 	source->key.data = cursor->key.data;
@@ -63,7 +63,7 @@ __curds_value_set(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(__cursor_needvalue(cursor));
 
 	source->value.data = cursor->value.data;
 	source->value.size = cursor->value.size;
@@ -142,8 +142,8 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_NEEDKEY(a);
-	WT_CURSOR_NEEDKEY(b);
+	WT_ERR(__cursor_needkey(a));
+	WT_ERR(__cursor_needkey(b));
 
 	if (WT_CURSOR_RECNO(a)) {
 		if (a->recno < b->recno)
@@ -460,6 +460,7 @@ __wt_curds_open(
 	    __curds_insert,			/* insert */
 	    __curds_update,			/* update */
 	    __curds_remove,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curds_close);			/* close */
 	WT_CONFIG_ITEM cval, metadata;

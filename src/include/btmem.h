@@ -913,13 +913,17 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	WT_UPDATE *next;		/* forward-linked list */
 
 	/*
-	 * We use the maximum size as an is-deleted flag, which means we can't
-	 * store 4GB objects; I'd rather do that than increase the size of this
-	 * structure for a flag bit.
+	 * Use the maximum size and maximum size-1 as is-deleted and is-reserved
+	 * flags (which means we can't store 4GB objects), instead of increasing
+	 * the size of this structure for a flag bit.
 	 */
 #define	WT_UPDATE_DELETED_VALUE		UINT32_MAX
-#define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = WT_UPDATE_DELETED_VALUE)
-#define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == WT_UPDATE_DELETED_VALUE)
+#define	WT_UPDATE_DELETED_SET(u)	((u)->size = WT_UPDATE_DELETED_VALUE)
+#define	WT_UPDATE_DELETED_ISSET(u)	((u)->size == WT_UPDATE_DELETED_VALUE)
+
+#define	WT_UPDATE_RESERVED_VALUE	(UINT32_MAX - 1)
+#define	WT_UPDATE_RESERVED_SET(u)	((u)->size = WT_UPDATE_RESERVED_VALUE)
+#define	WT_UPDATE_RESERVED_ISSET(u)	((u)->size == WT_UPDATE_RESERVED_VALUE)
 	uint32_t size;			/* update length */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
@@ -932,8 +936,8 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	 * cache overhead calculation.
 	 */
 #define	WT_UPDATE_MEMSIZE(upd)						\
-	WT_ALIGN(sizeof(WT_UPDATE) +					\
-	    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : (upd)->size), 32)
+	WT_ALIGN(sizeof(WT_UPDATE) + (WT_UPDATE_DELETED_ISSET(upd) ||	\
+	    WT_UPDATE_RESERVED_ISSET(upd) ? 0 : (upd)->size), 32)
 };
 
 /*

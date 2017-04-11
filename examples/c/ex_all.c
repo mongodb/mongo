@@ -299,6 +299,16 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	/*! [Reserve a record] */
+	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, key);
+	ret = cursor->reserve(cursor);
+	/*! [Reserve a record] */
+	}
+
+	{
 	/*! [Update an existing record or insert a new record] */
 	const char *key = "some key", *value = "some value";
 	ret = session->open_cursor(

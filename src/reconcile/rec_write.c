@@ -1179,6 +1179,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		}
 	}
 
+	/* Reconciliation should never see a reserved update. */
+	WT_ASSERT(session, *updp == NULL || !WT_UPDATE_RESERVED_ISSET(*updp));
+
 	/*
 	 * If all of the updates were aborted, quit. This test is not strictly
 	 * necessary because the above loop exits with skipped not set and the
@@ -1351,13 +1354,13 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 */
 		if (vpack == NULL || vpack->type == WT_CELL_DEL)
 			WT_RET(__wt_update_alloc(
-			    session, NULL, &append, &notused));
+			    session, NULL, &append, &notused, true, false));
 		else {
 			WT_RET(__wt_scr_alloc(session, 0, &tmp));
 			if ((ret = __wt_page_cell_data_ref(
 			    session, page, vpack, tmp)) == 0)
-				ret = __wt_update_alloc(
-				    session, tmp, &append, &notused);
+				ret = __wt_update_alloc(session,
+				    tmp, &append, &notused, false, false);
 			__wt_scr_free(session, &tmp);
 			WT_RET(ret);
 		}

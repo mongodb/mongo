@@ -119,6 +119,11 @@ class SimpleDataSet(BaseDataSet):
     def __init__(self, testcase, uri, rows, **kwargs):
         super(SimpleDataSet, self).__init__(testcase, uri, rows, **kwargs)
 
+    # A value suitable for checking the value returned by a cursor.
+    def comparable_value(self, i):
+        return BaseDataSet.value_by_format(i, self.value_format)
+
+    # A value suitable for assigning to a cursor.
     def value(self, i):
         return BaseDataSet.value_by_format(i, self.value_format)
 
@@ -260,9 +265,8 @@ class ComplexDataSet(BaseDataSet):
                 str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
                 str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
 
-    # A value suitable for assigning to a cursor, as
-    # cursor.set_value() expects a tuple when there it is used with
-    # a single argument and the value is composite.
+    # A value suitable for assigning to a cursor, as cursor.set_value() expects
+    # a tuple when it is used with a single argument and the value is composite.
     def value(self, i):
         return tuple(self.comparable_value(i))
 

@@ -178,6 +178,8 @@ __stat_page_col_var(
 		 */
 		WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip)) {
 			upd = ins->upd;
+			if (WT_UPDATE_RESERVED_ISSET(upd))
+				continue;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (!orig_deleted) {
 					++deleted_cnt;
@@ -192,11 +194,14 @@ __stat_page_col_var(
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
+		if (WT_UPDATE_RESERVED_ISSET(ins->upd))
+			continue;
 		if (WT_UPDATE_DELETED_ISSET(ins->upd))
 			++deleted_cnt;
 		else
 			++entry_cnt;
+	}
 
 	WT_STAT_INCRV(session, stats, btree_column_deleted, deleted_cnt);
 	WT_STAT_INCRV(session, stats, btree_column_rle, rle_cnt);
@@ -263,7 +268,8 @@ __stat_page_row_leaf(
 	 * key on the page.
 	 */
 	WT_SKIP_FOREACH(ins, WT_ROW_INSERT_SMALLEST(page))
-		if (!WT_UPDATE_DELETED_ISSET(ins->upd))
+		if (!WT_UPDATE_DELETED_ISSET(ins->upd) &&
+		    !WT_UPDATE_RESERVED_ISSET(ins->upd))
 			++entry_cnt;
 
 	/*
@@ -272,16 +278,19 @@ __stat_page_row_leaf(
 	 */
 	WT_ROW_FOREACH(page, rip, i) {
 		upd = WT_ROW_UPDATE(page, rip);
-		if (upd == NULL || !WT_UPDATE_DELETED_ISSET(upd))
+		if (upd == NULL ||
+		    (!WT_UPDATE_DELETED_ISSET(upd) &&
+		    !WT_UPDATE_RESERVED_ISSET(upd)))
 			++entry_cnt;
 		if (upd == NULL && (cell =
 		    __wt_row_leaf_value_cell(page, rip, NULL)) != NULL &&
 		    __wt_cell_type(cell) == WT_CELL_VALUE_OVFL)
-				++ovfl_cnt;
+			++ovfl_cnt;
 
 		/* Walk K/V pairs inserted after the on-page K/V pair. */
 		WT_SKIP_FOREACH(ins, WT_ROW_INSERT(page, rip))
-			if (!WT_UPDATE_DELETED_ISSET(ins->upd))
+			if (!WT_UPDATE_DELETED_ISSET(ins->upd) &&
+			    !WT_UPDATE_RESERVED_ISSET(ins->upd))
 				++entry_cnt;
 	}
 
