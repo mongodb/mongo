@@ -8,8 +8,15 @@
     var st = new ShardingTest({
         shards: 2,
         rs: {oplogSize: 10, useHostname: false},
-        other:
-            {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2, enableAutoSplit: true},
+        other: {
+            // Temporarily increasing mongos/config verbosity for BF insight (SERVER-28519)
+            mongosOptions: {verbose: 1},
+            configOptions: {verbose: 1},
+            keyFile: 'jstests/libs/key1',
+            useHostname: false,
+            chunkSize: 2,
+            enableAutoSplit: true
+        },
     });
 
     var mongos = st.s;
