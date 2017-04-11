@@ -427,7 +427,7 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "ycsb"
+        test: "ycsb.noise_test"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -449,7 +449,7 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "ycsb"
+        test: "ycsb.noise_test"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
