@@ -46,6 +46,14 @@ MessageEventDetailsEncoder::DateFormatter MessageEventDetailsEncoder::getDateFor
     return _dateFormatter;
 }
 
+namespace {
+#ifdef _WIN32
+const auto kEOL = StringData("\r\n", StringData::LiteralTag());
+#else
+const auto kEOL = StringData("\n", StringData::LiteralTag());
+#endif
+} // namespace
+
 MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
 std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
                                                  std::ostream& os) {
@@ -67,6 +75,26 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     }
 
     StringData msg = event.getMessage();
+
+#ifdef _WIN32
+    // We need to translate embedded Unix style line endings into Windows style endings.
+    std::string tempstr;
+    size_t embeddedNewLine = msg.find('\n');
+
+    if (embeddedNewLine != std::string::npos) {
+        tempstr = msg.toString().replace(embeddedNewLine, 1, "\r\n");
+
+        embeddedNewLine = tempstr.find('\n', embeddedNewLine + 2);
+        while (embeddedNewLine != std::string::npos) {
+            tempstr = tempstr.replace(embeddedNewLine, 1, "\r\n");
+
+            embeddedNewLine = tempstr.find('\n', embeddedNewLine + 2);
+        }
+
+        msg = tempstr;
+    }
+#endif
+
     if (event.isTruncatable() && msg.size() > maxLogLine) {
         os << "warning: log line attempted (" << msg.size() / 1024 << "kB) over max size ("
            << maxLogLine / 1024 << "kB), printing beginning and end ... ";
@@ -76,8 +104,10 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     } else {
         os << msg;
     }
-    if (!msg.endsWith(StringData("\n", StringData::LiteralTag())))
-        os << '\n';
+
+    if (!msg.endsWith(kEOL))
+        os << kEOL;
+
     return os;
 }
 
