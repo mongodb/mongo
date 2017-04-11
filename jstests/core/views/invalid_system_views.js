@@ -106,15 +106,27 @@
         assert.writeOK(viewsDB.system.views.remove(badViewDefinition));
     }
 
-    let badViews = [
-        {_id: "badViewStringPipeline", pipeline: "bad"},
-        {_id: "badViewEmptyObjectPipeline", pipeline: {}},
-        {_id: "badViewNumericalPipeline", pipeline: 7},
-        {_id: "badViewArrayWithIntegerPipeline", pipeline: [1]},
-        {_id: "badViewArrayWithEmptyObjectPipeline", pipeline: [{}]},
-        {_id: "badViewArrayWithEmptyArrayPipeline", pipeline: [[]]},
-        {_id: 7, pipeline: []},
-        {_id: "invalid_system_views.embedded\0null", viewOn: "collection", pipeline: []}
-    ];
-    badViews.forEach(runTest);
+    runTest(
+        {_id: "invalid_system_views.badViewStringPipeline", viewOn: "collection", pipeline: "bad"});
+    runTest({
+        _id: "invalid_system_views.badViewEmptyObjectPipeline",
+        viewOn: "collection",
+        pipeline: {}
+    });
+    runTest(
+        {_id: "invalid_system_views.badViewNumericalPipeline", viewOn: "collection", pipeline: 7});
+    runTest({
+        _id: "invalid_system_views.badViewArrayWithIntegerPipeline",
+        viewOn: "collection",
+        pipeline: [1]
+    });
+    runTest({
+        _id: "invalid_system_views.badViewArrayWithEmptyArrayPipeline",
+        viewOn: "collection",
+        pipeline: [[]]
+    });
+    runTest({_id: 7, viewOn: "collection", pipeline: []});
+    runTest({_id: "invalid_system_views.embedded\0null", viewOn: "collection", pipeline: []});
+    runTest({_id: "invalidNotFullyQualifiedNs", viewOn: "collection", pipeline: []});
+    runTest({_id: "invalid_system_views.missingViewOnField", pipeline: []});
 }());
