@@ -134,6 +134,16 @@ TEST_F(ViewCatalogFixture, CreateViewOnDifferentDatabase) {
         viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
+TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    auto invalidPipeline = BSON_ARRAY(BSON("INVALID_STAGE_NAME" << 1));
+    ASSERT_THROWS(
+        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation),
+        UserException);
+}
+
 TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.$coll");
