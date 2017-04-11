@@ -5,8 +5,9 @@
     "use strict";
     var defaultWriteConcern = {
         w: "majority",
-        // Use a "signature" value that won't typically match a value assigned in normal use.
-        wtimeout: 60321
+        // Use a "signature" value that won't typically match a value assigned in normal use. This
+        // way the wtimeout set by this override is distinguishable in the server logs.
+        wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
     };
     if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
         throw new Error(
