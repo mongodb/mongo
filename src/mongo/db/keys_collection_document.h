@@ -47,6 +47,8 @@ namespace mongo {
  */
 class KeysCollectionDocument {
 public:
+    static const std::string ConfigNS;
+
     KeysCollectionDocument(long long keyId,
                            std::string purpose,
                            TimeProofService::Key key,
@@ -75,7 +77,7 @@ public:
     const LogicalTime& getExpiresAt() const;
 
 private:
-    long long _keyId;
+    long long _keyId = 0;
     std::string _purpose;
     TimeProofService::Key _key;
     LogicalTime _expiresAt;

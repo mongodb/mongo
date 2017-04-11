@@ -162,6 +162,12 @@ public:
                                               const BSONObj& listDatabasesCmd,
                                               BSONArrayBuilder* builder) override;
 
+    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        repl::ReadConcernLevel readConcernLevel) override;
+
 private:
     std::unique_ptr<DistLockManager> _distLockManager;
 };

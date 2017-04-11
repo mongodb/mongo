@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/keys_collection_document.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -52,6 +53,7 @@ struct ChunkVersion;
 class CollectionType;
 class ConnectionString;
 class DatabaseType;
+class LogicalTime;
 class NamespaceString;
 class OperationContext;
 class ShardKeyPattern;
@@ -355,6 +357,15 @@ public:
      */
     virtual StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                                      repl::ReadConcernLevel readConcern) = 0;
+
+    /**
+     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     */
+    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Directly sends the specified command to the config server and returns the response.

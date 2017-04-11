@@ -47,6 +47,8 @@ const char kExpiresAtFieldName[] = "expiresAt";
 
 }  // namespace
 
+const std::string KeysCollectionDocument::ConfigNS = "admin.system.keys";
+
 StatusWith<KeysCollectionDocument> KeysCollectionDocument::fromBSON(const BSONObj& source) {
     long long keyId;
     Status status = bsonExtractIntegerField(source, kKeyIdFieldName, &keyId);

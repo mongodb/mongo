@@ -1838,4 +1838,42 @@ Status ShardingCatalogClientImpl::appendInfoForConfigServerDatabases(
     return Status::OK();
 }
 
+StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewKeys(
+    OperationContext* opCtx,
+    StringData purpose,
+    const LogicalTime& newerThanThis,
+    repl::ReadConcernLevel readConcernLevel) {
+    auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    BSONObjBuilder queryBuilder;
+    queryBuilder.append("purpose", purpose);
+    queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
+
+    auto findStatus =
+        config->exhaustiveFindOnConfig(opCtx,
+                                       kConfigReadSelector,
+                                       readConcernLevel,
+                                       NamespaceString(KeysCollectionDocument::ConfigNS),
+                                       queryBuilder.obj(),
+                                       BSON("expiresAt" << 1),
+                                       boost::none);
+
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    const auto& keyDocs = findStatus.getValue().docs;
+    std::vector<KeysCollectionDocument> keys;
+    for (auto&& keyDoc : keyDocs) {
+        auto parseStatus = KeysCollectionDocument::fromBSON(keyDoc);
+        if (!parseStatus.isOK()) {
+            return parseStatus.getStatus();
+        }
+
+        keys.push_back(std::move(parseStatus.getValue()));
+    }
+
+    return keys;
+}
+
 }  // namespace mongo
