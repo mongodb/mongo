@@ -79,5 +79,25 @@ private:
     NamespaceString _nss;
 };
 
+/**
+ * Represents a document in the "kCollectionOptionsNamespace" namespace.
+ * Contains information to roll back non-TTL collMod operations.
+ */
+class RollbackFixUpInfo::CollectionOptionsDescription {
+    MONGO_DISALLOW_COPYING(CollectionOptionsDescription);
+
+public:
+    CollectionOptionsDescription(const UUID& collectionUuid, const BSONObj& optionsObj);
+
+    /**
+     * Returns a BSON representation of this object.
+     */
+    BSONObj toBSON() const;
+
+private:
+    UUID _collectionUuid;
+    BSONObj _optionsObj;
+};
+
 }  // namespace repl
 }  // namespace mongo

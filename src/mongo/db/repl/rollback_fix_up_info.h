@@ -78,6 +78,12 @@ public:
     static const NamespaceString kRollbackCollectionUuidNamespace;
 
     /**
+     * Contains mappings of collection UUID -> collection options.
+     * This collection is used to roll back non-TTL collMod changes to collections.
+     */
+    static const NamespaceString kRollbackCollectionOptionsNamespace;
+
+    /**
      * Creates an instance of RollbackFixUpInfo.
      */
     explicit RollbackFixUpInfo(StorageInterface* storageInterface);
@@ -146,6 +152,16 @@ public:
         const UUID& sourceCollectionUuid,
         const NamespaceString& sourceNss,
         boost::optional<CollectionUuidAndNss> targetCollectionUuidAndNss);
+
+    /**
+     * Processes an oplog entry representing a non-TTL collMod command. Stores information about
+     * this operation into "kRollbackCollectionOptionsNamespace" to allow us to roll back this
+     * operation later by restoring the collection options in the catalog.
+     */
+    class CollectionOptionsDescription;
+    Status processCollModOplogEntry(OperationContext* opCtx,
+                                    const UUID& collectionUuid,
+                                    const BSONObj& optionsObj);
 
 private:
     /**

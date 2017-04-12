@@ -95,6 +95,8 @@ void RollbackFixUpInfoTest::setUp() {
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {}));
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {}));
+    ASSERT_OK(_storageInterface->createCollection(
+        opCtx.get(), RollbackFixUpInfo::kRollbackCollectionOptionsNamespace, {}));
 }
 
 void RollbackFixUpInfoTest::tearDown() {
@@ -385,6 +387,46 @@ TEST_F(
     _assertDocumentsInCollectionEquals(opCtx.get(),
                                        RollbackFixUpInfo::kRollbackCollectionUuidNamespace,
                                        {expectedDocument1, expectedDocument2});
+}
+
+TEST_F(RollbackFixUpInfoTest,
+       ProcessCollModOplogEntryInsertsDocumentIntoRollbackCollectionOptionsCollection) {
+    auto operation =
+        BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "mydb.$cmd"
+                  << "ui"
+                  << UUID::gen().toBSON().firstElement()
+                  << "o"
+                  << BSON("collMod"
+                          << "mycoll"
+                          << "validator"
+                          << BSON("y" << BSON("$exists" << true)))
+                  << "o2"
+                  << BSON("validator" << BSON("x" << BSON("$exists" << true)) << "validationLevel"
+                                      << "strict"
+                                      << "validationAction"
+                                      << "error"));
+    auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    auto optionsObj = operation["o2"].Obj();
+
+    ASSERT_TRUE(OplogEntry(operation).isCommand());
+
+    CollectionOptions options;
+    ASSERT_OK(options.parse(optionsObj));
+    ASSERT_OK(options.validate());
+
+    auto opCtx = makeOpCtx();
+
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processCollModOplogEntry(opCtx.get(), collectionUuid, optionsObj));
+
+    auto expectedDocument =
+        BSON("_id" << collectionUuid.toBSON().firstElement() << "options" << optionsObj);
+
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackCollectionOptionsNamespace, {expectedDocument});
 }
 
 }  // namespace

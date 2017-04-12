@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/rollback_fix_up_info_descriptions.h"
@@ -78,6 +79,23 @@ TEST(RollbackFixUpInfoDescriptionsTest, CollectionUuidDescriptionWithEmptyNamesp
 
     auto expectedDocument = BSON("_id" << collectionUuid.toBSON().firstElement() << "ns"
                                        << "");
+
+    ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
+}
+
+TEST(RollbackFixUpInfoDescriptionsTest, CollectionOptionsDescriptionToBson) {
+    auto collectionUuid = UUID::gen();
+    CollectionOptions options;
+    options.collation = BSON("locale"
+                             << "en_US"
+                             << "strength"
+                             << 1);
+    ASSERT_OK(options.validate());
+
+    RollbackFixUpInfo::CollectionOptionsDescription description(collectionUuid, options.toBSON());
+
+    auto expectedDocument =
+        BSON("_id" << collectionUuid.toBSON().firstElement() << "options" << options.toBSON());
 
     ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
 }

@@ -33,6 +33,7 @@
 #include "mongo/db/repl/rollback_fix_up_info.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/rollback_fix_up_info_descriptions.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
@@ -51,6 +52,9 @@ const NamespaceString RollbackFixUpInfo::kRollbackDocsNamespace(kRollbackNamespa
 
 const NamespaceString RollbackFixUpInfo::kRollbackCollectionUuidNamespace(kRollbackNamespacePrefix +
                                                                           "collectionUuid");
+
+const NamespaceString RollbackFixUpInfo::kRollbackCollectionOptionsNamespace(
+    kRollbackNamespacePrefix + "collectionOptions");
 
 RollbackFixUpInfo::RollbackFixUpInfo(StorageInterface* storageInterface)
     : _storageInterface(storageInterface) {
@@ -101,6 +105,21 @@ Status RollbackFixUpInfo::processRenameCollectionOplogEntry(
     CollectionUuidDescription targetDesc(targetCollectionUuidAndNss->first,
                                          targetCollectionUuidAndNss->second);
     return _upsertById(opCtx, kRollbackCollectionUuidNamespace, targetDesc.toBSON());
+}
+
+Status RollbackFixUpInfo::processCollModOplogEntry(OperationContext* opCtx,
+                                                   const UUID& collectionUuid,
+                                                   const BSONObj& optionsObj) {
+    // If validation is enabled for the collection, the collection options document may contain
+    // dollar ($) prefixed field in the "validator" field. Normally, the update operator in the
+    // query execution framework disallows such fields (see validateDollarPrefixElement() in
+    // exec/update.cpp). To disable this check when upserting the collection options document into
+    // the "kRollbackCollectionOptionsNamespace", we have to disable replicated writes in the
+    // OperationContext during the update operation.
+    UnreplicatedWritesBlock uwb(opCtx);
+
+    CollectionOptionsDescription desc(collectionUuid, optionsObj);
+    return _upsertById(opCtx, kRollbackCollectionOptionsNamespace, desc.toBSON());
 }
 
 Status RollbackFixUpInfo::_upsertById(OperationContext* opCtx,
