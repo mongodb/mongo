@@ -56,874 +56,707 @@ namespace Optimizations {
 using namespace mongo;
 
 namespace Local {
-class Base {
-public:
-    // These return json arrays of pipeline operators
-    virtual string inputPipeJson() = 0;
-    virtual string outputPipeJson() = 0;
 
-    // This returns a json array of pipeline operators, and is used to check that each pipeline
-    // stage is serialized correctly (note: this is not the same as being explained correctly.)
-    virtual string serializedPipeJson() {
-        // serializedPipeJson should be equal to outputPipeJson if a stage's explain output is
-        // parseable. An example of a stage that has unparseable explain output would be:
-        // {$lookup: {..., unwinding: {...}}} instead of {$lookup: {...}}, {$unwind: {...}}.
-        return outputPipeJson();
-    }
+BSONObj pipelineFromJsonArray(const std::string& jsonArray) {
+    return fromjson("{pipeline: " + jsonArray + "}");
+}
 
-    BSONObj pipelineFromJsonArray(const string& array) {
-        return fromjson("{pipeline: " + array + "}");
-    }
-    virtual void run() {
-        const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson());
-        const BSONObj outputPipeExpected = pipelineFromJsonArray(outputPipeJson());
-        const BSONObj serializePipeExpected = pipelineFromJsonArray(serializedPipeJson());
+void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
+                                            std::string outputPipeJson,
+                                            std::string serializedPipeJson) {
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
 
-        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
-        vector<BSONObj> rawPipeline;
-        for (auto&& stageElem : inputBson["pipeline"].Array()) {
-            ASSERT_EQUALS(stageElem.type(), BSONType::Object);
-            rawPipeline.push_back(stageElem.embeddedObject());
-        }
-        AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
-        intrusive_ptr<ExpressionContextForTest> ctx =
-            new ExpressionContextForTest(&_opCtx, request);
+    const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson);
+    const BSONObj outputPipeExpected = pipelineFromJsonArray(outputPipeJson);
+    const BSONObj serializePipeExpected = pipelineFromJsonArray(serializedPipeJson);
 
-        // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
-        // operations will be able to have a resolved view definition.
-        NamespaceString lookupCollNs("a", "lookupColl");
-        ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
+    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+    vector<BSONObj> rawPipeline;
+    for (auto&& stageElem : inputBson["pipeline"].Array()) {
+        ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+        rawPipeline.push_back(stageElem.embeddedObject());
+    }
+    AggregationRequest request(NamespaceString("a.collection"), rawPipeline);
+    intrusive_ptr<ExpressionContextForTest> ctx =
+        new ExpressionContextForTest(opCtx.get(), request);
 
-        auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
-        outputPipe->optimizePipeline();
+    // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
+    // operations will be able to have a resolved view definition.
+    NamespaceString lookupCollNs("a", "lookupColl");
+    ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
 
-        ASSERT_VALUE_EQ(
-            Value(outputPipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
-            Value(outputPipeExpected["pipeline"]));
-        ASSERT_VALUE_EQ(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
-    }
+    auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
+    outputPipe->optimizePipeline();
 
-    virtual ~Base() {}
+    ASSERT_VALUE_EQ(Value(outputPipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
+                    Value(outputPipeExpected["pipeline"]));
+    ASSERT_VALUE_EQ(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
+}
 
-private:
-    OperationContextNoop _opCtx;
-};
+void assertPipelineOptimizesTo(std::string inputPipeJson, std::string outputPipeJson) {
+    assertPipelineOptimizesAndSerializesTo(inputPipeJson, outputPipeJson, outputPipeJson);
+}
 
-class MoveSkipBeforeProject : public Base {
-    string inputPipeJson() override {
-        return "[{$project: {a : 1}}, {$skip : 5}]";
-    }
-    string outputPipeJson() override {
-        return "[{$skip : 5}, {$project: {_id: true, a : true}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MoveSkipBeforeProject) {
+    assertPipelineOptimizesTo("[{$project: {a : 1}}, {$skip : 5}]",
+                              "[{$skip : 5}, {$project: {_id: true, a : true}}]");
+}
 
-class MoveLimitBeforeProject : public Base {
-    string inputPipeJson() override {
-        return "[{$project: {a : 1}}, {$limit : 5}]";
-    }
+TEST(PipelineOptimizationTest, MoveLimitBeforeProject) {
+    assertPipelineOptimizesTo("[{$project: {a : 1}}, {$limit : 5}]",
+                              "[{$limit : 5}, {$project: {_id: true, a : true}}]");
+}
 
-    string outputPipeJson() override {
-        return "[{$limit : 5}, {$project: {_id: true, a : true}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MoveMultipleSkipsAndLimitsBeforeProject) {
+    assertPipelineOptimizesTo("[{$project: {a : 1}}, {$limit : 5}, {$skip : 3}]",
+                              "[{$limit : 5}, {$skip : 3}, {$project: {_id: true, a : true}}]");
+}
 
-class MoveMultipleSkipsAndLimitsBeforeProject : public Base {
-    string inputPipeJson() override {
-        return "[{$project: {a : 1}}, {$limit : 5}, {$skip : 3}]";
-    }
+TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated) {
+    assertPipelineOptimizesTo("[{$addFields : {a : 1}}, {$match : {b : 1}}]",
+                              "[{$match : {b : 1}}, {$addFields : {a : {$const : 1}}}]");
+}
 
-    string outputPipeJson() override {
-        return "[{$limit : 5}, {$skip : 3}, {$project: {_id: true, a : true}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated) {
+    assertPipelineOptimizesTo("[{$addFields : {a : 1}}, {$match : {a : 1}}]",
+                              "[{$addFields : {a : {$const : 1}}}, {$match : {a : 1}}]");
+}
 
-class MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated : public Base {
-    string inputPipeJson() override {
-        return "[{$addFields : {a : 1}}, {$match : {b : 1}}]";
-    }
+TEST(PipelineOptimizationTest, MatchOnTopLevelFieldDoesNotMoveBeforeAddFieldsOfNestedPath) {
+    assertPipelineOptimizesTo("[{$addFields : {'a.b' : 1}}, {$match : {a : 1}}]",
+                              "[{$addFields : {a : {b : {$const : 1}}}}, {$match : {a : 1}}]");
+}
 
-    string outputPipeJson() override {
-        return "[{$match : {b : 1}}, {$addFields : {a : {$const : 1}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchOnNestedFieldDoesNotMoveBeforeAddFieldsOfPrefixOfPath) {
+    assertPipelineOptimizesTo("[{$addFields : {a : 1}}, {$match : {'a.b' : 1}}]",
+                              "[{$addFields : {a : {$const : 1}}}, {$match : {'a.b' : 1}}]");
+}
 
-class MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated : public Base {
-    string inputPipeJson() override {
-        return "[{$addFields : {a : 1}}, {$match : {a : 1}}]";
-    }
+TEST(PipelineOptimizationTest, MoveMatchOnNestedFieldBeforeAddFieldsOfDifferentNestedField) {
+    assertPipelineOptimizesTo("[{$addFields : {'a.b' : 1}}, {$match : {'a.c' : 1}}]",
+                              "[{$match : {'a.c' : 1}}, {$addFields : {a : {b : {$const : 1}}}}]");
+}
 
-    string outputPipeJson() override {
-        return "[{$addFields : {a : {$const : 1}}}, {$match : {a : 1}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixOfAddedFieldName) {
+    assertPipelineOptimizesTo("[{$addFields : {abcd : 1}}, {$match : {abc : 1}}]",
+                              "[{$match : {abc : 1}}, {$addFields : {abcd: {$const: 1}}}]");
+}
 
-class MatchOnTopLevelFieldDoesNotMoveBeforeAddFieldsOfNestedPath : public Base {
-    string inputPipeJson() override {
-        return "[{$addFields : {'a.b' : 1}}, {$match : {a : 1}}]";
-    }
+TEST(PipelineOptimizationTest, SkipSkipLimitBecomesLimitSkip) {
+    std::string inputPipe =
+        "[{$skip : 3}"
+        ",{$skip : 5}"
+        ",{$limit: 5}"
+        "]";
+    std::string outputPipe =
+        "[{$limit: 13}"
+        ",{$skip :  8}"
+        "]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-    string outputPipeJson() override {
-        return "[{$addFields : {a : {b : {$const : 1}}}}, {$match : {a : 1}}]";
-    }
-};
+TEST(PipelineOptimizationTest, SortMatchProjSkipLimBecomesMatchTopKSortSkipProj) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$match: {a: 1}}"
+        ",{$project : {a: 1}}"
+        ",{$skip : 3}"
+        ",{$limit: 5}"
+        "]";
 
-class MatchOnNestedFieldDoesNotMoveBeforeAddFieldsOfPrefixOfPath : public Base {
-    string inputPipeJson() override {
-        return "[{$addFields : {a : 1}}, {$match : {'a.b' : 1}}]";
-    }
+    std::string outputPipe =
+        "[{$match: {a: 1}}"
+        ",{$sort: {sortKey: {a: 1}, limit: 8}}"
+        ",{$skip: 3}"
+        ",{$project: {_id: true, a: true}}"
+        "]";
 
-    string outputPipeJson() override {
-        return "[{$addFields : {a : {$const : 1}}}, {$match : {'a.b' : 1}}]";
-    }
-};
+    std::string serializedPipe =
+        "[{$match: {a: 1}}"
+        ",{$sort: {a: 1}}"
+        ",{$limit: 8}"
+        ",{$skip : 3}"
+        ",{$project : {_id: true, a: true}}"
+        "]";
 
-class MoveMatchOnNestedFieldBeforeAddFieldsOfDifferentNestedField : public Base {
-    string inputPipeJson() override {
-        return "[{$addFields : {'a.b' : 1}}, {$match : {'a.c' : 1}}]";
-    }
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-    string outputPipeJson() override {
-        return "[{$match : {'a.c' : 1}}, {$addFields : {a : {b : {$const : 1}}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, RemoveSkipZero) {
+    assertPipelineOptimizesTo("[{$skip: 0}]", "[]");
+}
 
-class MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixOfAddedFieldName : public Base {
-    string inputPipeJson() override {
-        return "[{$addFields : {abcd : 1}}, {$match : {abc : 1}}]";
-    }
+TEST(PipelineOptimizationTest, DoNotRemoveSkipOne) {
+    assertPipelineOptimizesTo("[{$skip: 1}]", "[{$skip: 1}]");
+}
 
-    string outputPipeJson() override {
-        return "[{$match : {abc : 1}}, {$addFields : {abcd: {$const: 1}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, RemoveEmptyMatch) {
+    assertPipelineOptimizesTo("[{$match: {}}]", "[]");
+}
 
-class SkipSkipLimitBecomesLimitSkip : public Base {
-    string inputPipeJson() override {
-        return "[{$skip : 3}"
-               ",{$skip : 5}"
-               ",{$limit: 5}"
-               "]";
-    }
+TEST(PipelineOptimizationTest, RemoveMultipleEmptyMatches) {
+    assertPipelineOptimizesTo("[{$match: {}}, {$match: {}}]", "[{$match: {$and: [{}, {}]}}]");
+}
 
-    string outputPipeJson() override {
-        return "[{$limit: 13}"
-               ",{$skip :  8}"
-               "]";
-    }
-};
+TEST(PipelineOptimizationTest, DoNotRemoveNonEmptyMatch) {
+    assertPipelineOptimizesTo("[{$match: {_id: 1}}]", "[{$match: {_id: 1}}]");
+}
 
-class SortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
-    string inputPipeJson() override {
-        return "[{$sort: {a: 1}}"
-               ",{$match: {a: 1}}"
-               ",{$project : {a: 1}}"
-               ",{$skip : 3}"
-               ",{$limit: 5}"
-               "]";
-    }
+TEST(PipelineOptimizationTest, MoveMatchBeforeSort) {
+    std::string inputPipe = "[{$sort: {b: 1}}, {$match: {a: 2}}]";
+    std::string outputPipe = "[{$match: {a: 2}}, {$sort: {sortKey: {b: 1}}}]";
+    std::string serializedPipe = "[{$match: {a: 2}}, {$sort: {b: 1}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-    string outputPipeJson() override {
-        return "[{$match: {a: 1}}"
-               ",{$sort: {sortKey: {a: 1}, limit: 8}}"
-               ",{$skip: 3}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
+TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAs) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same'}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', unwinding: {preserveNullAndEmptyArrays: false}}}]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-    string serializedPipeJson() override {
-        return "[{$match: {a: 1}}"
-               ",{$sort: {a: 1}}"
-               ",{$limit: 8}"
-               ",{$skip : 3}"
-               ",{$project : {_id: true, a: true}}"
-               "]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', unwinding: {preserveNullAndEmptyArrays: true}}}]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class RemoveSkipZero : public Base {
-    string inputPipeJson() override {
-        return "[{$skip: 0}]";
-    }
+TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same', includeArrayIndex: 'index'}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: "
+        "'index'}}}]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same', includeArrayIndex: 'index'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-    string outputPipeJson() override {
-        return "[]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupShouldNotCoalesceWithUnwindNotOnAs) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$from'}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$from'}}"
+        "]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class DoNotRemoveSkipOne : public Base {
-    string inputPipeJson() override {
-        return "[{$skip: 1}]";
-    }
+TEST(PipelineOptimizationTest, LookupShouldSwapWithMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$match: {'independent': 0}}]";
+    string outputPipe =
+        "[{$match: {independent: 0}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-    string outputPipeJson() override {
-        return "[{$skip: 1}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupShouldSplitMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$match: {'independent': 0, asField: {$eq: 3}}}]";
+    string outputPipe =
+        "[{$match: {independent: {$eq: 0}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$match: {asField: {$eq: 3}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class RemoveEmptyMatch : public Base {
-    string inputPipeJson() override {
-        return "[{$match: {}}]";
-    }
+TEST(PipelineOptimizationTest, LookupShouldNotAbsorbMatchOnAs) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$match: {'asField.subfield': 0}}]";
+    string outputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$match: {'asField.subfield': 0}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-    string outputPipeJson() override {
-        return "[]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        "{$unwind: '$asField'}, "
+        "{$match: {'asField.subfield': {$eq: 1}}}]";
+    string outputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z', "
+        "            unwinding: {preserveNullAndEmptyArrays: false}, "
+        "            matching: {subfield: {$eq: 1}}}}]";
+    string serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        "{$unwind: {path: '$asField'}}, "
+        "{$match: {'asField.subfield': {$eq: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class RemoveMultipleEmptyMatches : public Base {
-    string inputPipeJson() override {
-        return "[{$match: {}}, {$match: {}}]";
-    }
+TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: '$asField'}, "
+        " {$match: {'asField.subfield': {$eq: 1}, independentField: {$gt: 2}}}]";
+    string outputPipe =
+        "[{$match: {independentField: {$gt: 2}}}, "
+        " {$lookup: { "
+        "      from: 'lookupColl', "
+        "      as: 'asField', "
+        "      localField: 'y', "
+        "      foreignField: 'z', "
+        "      unwinding: { "
+        "          preserveNullAndEmptyArrays: false"
+        "      }, "
+        "      matching: { "
+        "          subfield: {$eq: 1} "
+        "      } "
+        " }}]";
+    string serializedPipe =
+        "[{$match: {independentField: {$gt: 2}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: {path: '$asField'}}, "
+        " {$match: {'asField.subfield': {$eq: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-    string outputPipeJson() override {
-        // TODO: The desired behavior here is to end up with an empty array.
-        return "[{$match: {$and: [{}, {}]}}]";
-    }
-};
-
-class DoNotRemoveNonEmptyMatch : public Base {
-    string inputPipeJson() override {
-        return "[{$match: {_id: 1}}]";
-    }
-
-    string outputPipeJson() override {
-        return "[{$match: {_id: 1}}]";
-    }
-};
-
-class MoveMatchBeforeSort : public Base {
-    string inputPipeJson() override {
-        return "[{$sort: {b: 1}}, {$match: {a: 2}}]";
-    }
-
-    string outputPipeJson() override {
-        return "[{$match: {a: 2}}, {$sort: {sortKey: {b: 1}}}]";
-    }
-
-    string serializedPipeJson() override {
-        return "[{$match: {a: 2}}, {$sort: {b: 1}}]";
-    }
-};
-
-class LookupShouldCoalesceWithUnwindOnAs : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same'}}"
-               "]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right', unwinding: {preserveNullAndEmptyArrays: false}}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same'}}"
-               "]";
-    }
-};
-
-class LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}"
-               "]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right', unwinding: {preserveNullAndEmptyArrays: true}}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}"
-               "]";
-    }
-};
-
-class LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same', includeArrayIndex: 'index'}}"
-               "]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right', unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: "
-               "'index'}}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same', includeArrayIndex: 'index'}}"
-               "]";
-    }
-};
-
-class LookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$from'}}"
-               "]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$from'}}"
-               "]";
-    }
-};
-
-class LookupShouldSwapWithMatch : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$match: {'independent': 0}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {independent: 0}}, "
-               " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}]";
-    }
-};
-
-class LookupShouldSplitMatch : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$match: {'independent': 0, asField: {$eq: 3}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {independent: {$eq: 0}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$match: {asField: {$eq: 3}}}]";
-    }
-};
-
-class LookupShouldNotAbsorbMatchOnAs : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$match: {'asField.subfield': 0}}]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$match: {'asField.subfield': 0}}]";
-    }
-};
-
-class LookupShouldAbsorbUnwindMatch : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               "{$unwind: '$asField'}, "
-               "{$match: {'asField.subfield': {$eq: 1}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z', "
-               "            unwinding: {preserveNullAndEmptyArrays: false}, "
-               "            matching: {subfield: {$eq: 1}}}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               "{$unwind: {path: '$asField'}}, "
-               "{$match: {'asField.subfield': {$eq: 1}}}]";
-    }
-};
-
-class LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: '$asField'}, "
-               " {$match: {'asField.subfield': {$eq: 1}, independentField: {$gt: 2}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {independentField: {$gt: 2}}}, "
-               " {$lookup: { "
-               "      from: 'lookupColl', "
-               "      as: 'asField', "
-               "      localField: 'y', "
-               "      foreignField: 'z', "
-               "      unwinding: { "
-               "          preserveNullAndEmptyArrays: false"
-               "      }, "
-               "      matching: { "
-               "          subfield: {$eq: 1} "
-               "      } "
-               " }}]";
-    }
-    string serializedPipeJson() {
-        return "[{$match: {independentField: {$gt: 2}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: {path: '$asField'}}, "
-               " {$match: {'asField.subfield': {$eq: 1}}}]";
-    }
-};
-
-class LookupShouldNotSplitIndependentAndDependentOrClauses : public Base {
+TEST(PipelineOptimizationTest, LookupShouldNotSplitIndependentAndDependentOrClauses) {
     // If any child of the $or is dependent on the 'asField', then the $match cannot be moved above
     // the $lookup, and if any child of the $or is independent of the 'asField', then the $match
     // cannot be absorbed by the $lookup.
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: '$asField'}, "
-               " {$match: {$or: [{'independent': {$gt: 4}}, "
-               "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z', "
-               "            unwinding: {preserveNullAndEmptyArrays: false}}}, "
-               " {$match: {$or: [{'independent': {$gt: 4}}, "
-               "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: {path: '$asField'}}, "
-               " {$match: {$or: [{'independent': {$gt: 4}}, "
-               "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
-    }
-};
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: '$asField'}, "
+        " {$match: {$or: [{'independent': {$gt: 4}}, "
+        "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
+    string outputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: 'z', "
+        "            unwinding: {preserveNullAndEmptyArrays: false}}}, "
+        " {$match: {$or: [{'independent': {$gt: 4}}, "
+        "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
+    string serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: {path: '$asField'}}, "
+        " {$match: {$or: [{'independent': {$gt: 4}}, "
+        "                 {'asField.dependent': {$elemMatch: {a: {$eq: 1}}}}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class LookupWithMatchOnArrayIndexFieldShouldNotCoalesce : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: {path: '$asField', includeArrayIndex: 'index'}}, "
-               " {$match: {index: 0, 'asField.value': {$gt: 0}, independent: 1}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {independent: {$eq: 1}}}, "
-               " {$lookup: { "
-               "      from: 'lookupColl', "
-               "      as: 'asField', "
-               "      localField: 'y', "
-               "      foreignField: 'z', "
-               "      unwinding: { "
-               "          preserveNullAndEmptyArrays: false, "
-               "          includeArrayIndex: 'index' "
-               "      } "
-               " }}, "
-               " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$match: {independent: {$eq: 1}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: {path: '$asField', includeArrayIndex: 'index'}}, "
-               " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupWithMatchOnArrayIndexFieldShouldNotCoalesce) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: {path: '$asField', includeArrayIndex: 'index'}}, "
+        " {$match: {index: 0, 'asField.value': {$gt: 0}, independent: 1}}]";
+    string outputPipe =
+        "[{$match: {independent: {$eq: 1}}}, "
+        " {$lookup: { "
+        "      from: 'lookupColl', "
+        "      as: 'asField', "
+        "      localField: 'y', "
+        "      foreignField: 'z', "
+        "      unwinding: { "
+        "          preserveNullAndEmptyArrays: false, "
+        "          includeArrayIndex: 'index' "
+        "      } "
+        " }}, "
+        " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
+    string serializedPipe =
+        "[{$match: {independent: {$eq: 1}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: {path: '$asField', includeArrayIndex: 'index'}}, "
+        " {$match: {$and: [{index: {$eq: 0}}, {'asField.value': {$gt: 0}}]}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class LookupWithUnwindPreservingNullAndEmptyArraysShouldNotCoalesce : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}, "
-               " {$match: {'asField.value': {$gt: 0}, independent: 1}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {independent: {$eq: 1}}}, "
-               " {$lookup: { "
-               "      from: 'lookupColl', "
-               "      as: 'asField', "
-               "      localField: 'y', "
-               "      foreignField: 'z', "
-               "      unwinding: { "
-               "          preserveNullAndEmptyArrays: true"
-               "      } "
-               " }}, "
-               " {$match: {'asField.value': {$gt: 0}}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$match: {independent: {$eq: 1}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
-               "'z'}}, "
-               " {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}, "
-               " {$match: {'asField.value': {$gt: 0}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupWithUnwindPreservingNullAndEmptyArraysShouldNotCoalesce) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}, "
+        " {$match: {'asField.value': {$gt: 0}, independent: 1}}]";
+    string outputPipe =
+        "[{$match: {independent: {$eq: 1}}}, "
+        " {$lookup: { "
+        "      from: 'lookupColl', "
+        "      as: 'asField', "
+        "      localField: 'y', "
+        "      foreignField: 'z', "
+        "      unwinding: { "
+        "          preserveNullAndEmptyArrays: true"
+        "      } "
+        " }}, "
+        " {$match: {'asField.value': {$gt: 0}}}]";
+    string serializedPipe =
+        "[{$match: {independent: {$eq: 1}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
+        "'z'}}, "
+        " {$unwind: {path: '$asField', preserveNullAndEmptyArrays: true}}, "
+        " {$match: {'asField.value': {$gt: 0}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class LookupDoesNotAbsorbElemMatch : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
-               " {$unwind: '$x'}, "
-               " {$match: {x: {$elemMatch: {a: 1}}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$lookup: { "
-               "             from: 'lookupColl', "
-               "             as: 'x', "
-               "             localField: 'y', "
-               "             foreignField: 'z', "
-               "             unwinding: { "
-               "                          preserveNullAndEmptyArrays: false "
-               "             } "
-               "           } "
-               " }, "
-               " {$match: {x: {$elemMatch: {a: 1}}}}]";
-    }
-    string serializedPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
-               " {$unwind: {path: '$x'}}, "
-               " {$match: {x: {$elemMatch: {a: 1}}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupDoesNotAbsorbElemMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
+        " {$unwind: '$x'}, "
+        " {$match: {x: {$elemMatch: {a: 1}}}}]";
+    string outputPipe =
+        "[{$lookup: { "
+        "             from: 'lookupColl', "
+        "             as: 'x', "
+        "             localField: 'y', "
+        "             foreignField: 'z', "
+        "             unwinding: { "
+        "                          preserveNullAndEmptyArrays: false "
+        "             } "
+        "           } "
+        " }, "
+        " {$match: {x: {$elemMatch: {a: 1}}}}]";
+    string serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
+        " {$unwind: {path: '$x'}}, "
+        " {$match: {x: {$elemMatch: {a: 1}}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class LookupDoesSwapWithMatchOnLocalField : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
-               " {$match: {y: {$eq: 3}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {y: {$eq: 3}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupDoesSwapWithMatchOnLocalField) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
+        " {$match: {y: {$eq: 3}}}]";
+    string outputPipe =
+        "[{$match: {y: {$eq: 3}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class LookupDoesSwapWithMatchOnFieldWithSameNameAsForeignField : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
-               " {$match: {z: {$eq: 3}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {z: {$eq: 3}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupDoesSwapWithMatchOnFieldWithSameNameAsForeignField) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
+        " {$match: {z: {$eq: 3}}}]";
+    string outputPipe =
+        "[{$match: {z: {$eq: 3}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMovesMatch : public Base {
-    string inputPipeJson() {
-        return "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
-               " {$unwind: {path: '$x.subfield'}}, "
-               " {$match: {'independent': 2, 'x.dependent': 2}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {'independent': {$eq: 2}}}, "
-               " {$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
-               " {$match: {'x.dependent': {$eq: 2}}}, "
-               " {$unwind: {path: '$x.subfield'}}]";
-    }
-};
+TEST(PipelineOptimizationTest, LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMovesMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
+        " {$unwind: {path: '$x.subfield'}}, "
+        " {$match: {'independent': 2, 'x.dependent': 2}}]";
+    string outputPipe =
+        "[{$match: {'independent': {$eq: 2}}}, "
+        " {$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z'}}, "
+        " {$match: {'x.dependent': {$eq: 2}}}, "
+        " {$unwind: {path: '$x.subfield'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchShouldDuplicateItselfBeforeRedact : public Base {
-    string inputPipeJson() {
-        return "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {a: 1, b:12}}, {$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldDuplicateItselfBeforeRedact) {
+    string inputPipe = "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
+    string outputPipe = "[{$match: {a: 1, b:12}}, {$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchShouldSwapWithUnwind : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: '$a.b.c'}, "
-               "{$match: {'b': 1}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {'b': 1}}, "
-               "{$unwind: {path: '$a.b.c'}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldSwapWithUnwind) {
+    string inputPipe =
+        "[{$unwind: '$a.b.c'}, "
+        "{$match: {'b': 1}}]";
+    string outputPipe =
+        "[{$match: {'b': 1}}, "
+        "{$unwind: {path: '$a.b.c'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchOnPrefixShouldNotSwapOnUnwind : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: {path: '$a.b.c'}}, "
-               "{$match: {'a.b': 1}}]";
-    }
-    string outputPipeJson() {
-        return "[{$unwind: {path: '$a.b.c'}}, "
-               "{$match: {'a.b': 1}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchOnPrefixShouldNotSwapOnUnwind) {
+    string inputPipe =
+        "[{$unwind: {path: '$a.b.c'}}, "
+        "{$match: {'a.b': 1}}]";
+    string outputPipe =
+        "[{$unwind: {path: '$a.b.c'}}, "
+        "{$match: {'a.b': 1}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchShouldSplitOnUnwind : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: '$a.b'}, "
-               "{$match: {$and: [{f: {$eq: 5}}, "
-               "                 {$nor: [{'a.d': 1, c: 5}, {'a.b': 3, c: 5}]}]}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {$and: [{f: {$eq: 5}},"
-               "                  {$nor: [{$and: [{'a.d': {$eq: 1}}, {c: {$eq: 5}}]}]}]}},"
-               "{$unwind: {path: '$a.b'}}, "
-               "{$match: {$nor: [{$and: [{'a.b': {$eq: 3}}, {c: {$eq: 5}}]}]}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldSplitOnUnwind) {
+    string inputPipe =
+        "[{$unwind: '$a.b'}, "
+        "{$match: {$and: [{f: {$eq: 5}}, "
+        "                 {$nor: [{'a.d': 1, c: 5}, {'a.b': 3, c: 5}]}]}}]";
+    string outputPipe =
+        "[{$match: {$and: [{f: {$eq: 5}},"
+        "                  {$nor: [{$and: [{'a.d': {$eq: 1}}, {c: {$eq: 5}}]}]}]}},"
+        "{$unwind: {path: '$a.b'}}, "
+        "{$match: {$nor: [{$and: [{'a.b': {$eq: 3}}, {c: {$eq: 5}}]}]}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchShouldNotOptimizeWithElemMatch : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: {path: '$a.b'}}, "
-               "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
-    }
-    string outputPipeJson() {
-        return "[{$unwind: {path: '$a.b'}}, "
-               "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWithElemMatch) {
+    string inputPipe =
+        "[{$unwind: {path: '$a.b'}}, "
+        "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
+    string outputPipe =
+        "[{$unwind: {path: '$a.b'}}, "
+        "{$match: {a: {$elemMatch: {b: {d: 1}}}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchShouldNotOptimizeWhenMatchingOnIndexField : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: {path: '$a', includeArrayIndex: 'foo'}}, "
-               " {$match: {foo: 0, b: 1}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {b: {$eq: 1}}}, "
-               " {$unwind: {path: '$a', includeArrayIndex: 'foo'}}, "
-               " {$match: {foo: {$eq: 0}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldNotOptimizeWhenMatchingOnIndexField) {
+    string inputPipe =
+        "[{$unwind: {path: '$a', includeArrayIndex: 'foo'}}, "
+        " {$match: {foo: 0, b: 1}}]";
+    string outputPipe =
+        "[{$match: {b: {$eq: 1}}}, "
+        " {$unwind: {path: '$a', includeArrayIndex: 'foo'}}, "
+        " {$match: {foo: {$eq: 0}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchWithNorOnlySplitsIndependentChildren : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, "
-               "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}, {b: {$eq: 2}} ]}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {$nor: [{b: {$eq: 2}}]}}, "
-               "{$unwind: {path: '$a'}}, "
-               "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}]}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchWithNorOnlySplitsIndependentChildren) {
+    string inputPipe =
+        "[{$unwind: {path: '$a'}}, "
+        "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}, {b: {$eq: 2}} ]}}]";
+    string outputPipe =
+        "[{$match: {$nor: [{b: {$eq: 2}}]}}, "
+        "{$unwind: {path: '$a'}}, "
+        "{$match: {$nor: [{$and: [{a: {$eq: 1}}, {b: {$eq: 1}}]}]}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchWithOrDoesNotSplit : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, "
-               "{$match: {$or: [{a: {$eq: 'dependent'}}, {b: {$eq: 'independent'}}]}}]";
-    }
-    string outputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, "
-               "{$match: {$or: [{a: {$eq: 'dependent'}}, {b: {$eq: 'independent'}}]}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchWithOrDoesNotSplit) {
+    string inputPipe =
+        "[{$unwind: {path: '$a'}}, "
+        "{$match: {$or: [{a: {$eq: 'dependent'}}, {b: {$eq: 'independent'}}]}}]";
+    string outputPipe =
+        "[{$unwind: {path: '$a'}}, "
+        "{$match: {$or: [{a: {$eq: 'dependent'}}, {b: {$eq: 'independent'}}]}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class UnwindBeforeDoubleMatchShouldRepeatedlyOptimize : public Base {
-    string inputPipeJson() {
-        return "[{$unwind: '$a'}, "
-               "{$match: {b: {$gt: 0}}}, "
-               "{$match: {a: 1, c: 1}}]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {$and: [{b: {$gt: 0}}, {c: {$eq: 1}}]}},"
-               "{$unwind: {path: '$a'}}, "
-               "{$match: {a: {$eq: 1}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, UnwindBeforeDoubleMatchShouldRepeatedlyOptimize) {
+    string inputPipe =
+        "[{$unwind: '$a'}, "
+        "{$match: {b: {$gt: 0}}}, "
+        "{$match: {a: 1, c: 1}}]";
+    string outputPipe =
+        "[{$match: {$and: [{b: {$gt: 0}}, {c: {$eq: 1}}]}},"
+        "{$unwind: {path: '$a'}}, "
+        "{$match: {a: {$eq: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class GraphLookupShouldCoalesceWithUnwindOnAs : public Base {
-    string inputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: '$out'}]";
-    }
+TEST(PipelineOptimizationTest, GraphLookupShouldCoalesceWithUnwindOnAs) {
+    string inputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: '$out'}]";
 
-    string outputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d', "
-               "                 unwinding: {preserveNullAndEmptyArrays: false}}}]";
-    }
+    string outputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d', "
+        "                 unwinding: {preserveNullAndEmptyArrays: false}}}]";
 
-    string serializedPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: {path: '$out'}}]";
-    }
-};
+    string serializedPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: {path: '$out'}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty : public Base {
-    string inputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
-    }
+TEST(PipelineOptimizationTest, GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty) {
+    string inputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
 
-    string outputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d', "
-               "                 unwinding: {preserveNullAndEmptyArrays: true}}}]";
-    }
+    string outputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d', "
+        "                 unwinding: {preserveNullAndEmptyArrays: true}}}]";
 
-    string serializedPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
-    }
-};
+    string serializedPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: {path: '$out', preserveNullAndEmptyArrays: true}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex : public Base {
-    string inputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
-    }
+TEST(PipelineOptimizationTest, GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex) {
+    string inputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
 
-    string outputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d', "
-               "                 unwinding: {preserveNullAndEmptyArrays: false, "
-               "                             includeArrayIndex: 'index'}}}]";
-    }
+    string outputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d', "
+        "                 unwinding: {preserveNullAndEmptyArrays: false, "
+        "                             includeArrayIndex: 'index'}}}]";
 
-    string serializedPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', "
-               "                 startWith: '$d'}}, "
-               " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
-    }
-};
+    string serializedPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', "
+        "                 startWith: '$d'}}, "
+        " {$unwind: {path: '$out', includeArrayIndex: 'index'}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 
-class GraphLookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
-    string inputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: '$nottherightthing'}]";
-    }
+TEST(PipelineOptimizationTest, GraphLookupShouldNotCoalesceWithUnwindNotOnAs) {
+    string inputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: '$nottherightthing'}]";
 
-    string outputPipeJson() final {
-        return "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
-               "                 connectFromField: 'c', startWith: '$d'}}, "
-               " {$unwind: {path: '$nottherightthing'}}]";
-    }
-};
+    string outputPipe =
+        "[{$graphLookup: {from: 'lookupColl', as: 'out', connectToField: 'b', "
+        "                 connectFromField: 'c', startWith: '$d'}}, "
+        " {$unwind: {path: '$nottherightthing'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class GraphLookupShouldSwapWithMatch : public Base {
-    string inputPipeJson() {
-        return "[{$graphLookup: {"
-               "    from: 'lookupColl',"
-               "    as: 'results',"
-               "    connectToField: 'to',"
-               "    connectFromField: 'from',"
-               "    startWith: '$startVal'"
-               " }},"
-               " {$match: {independent: 'x'}}"
-               "]";
-    }
-    string outputPipeJson() {
-        return "[{$match: {independent: 'x'}},"
-               " {$graphLookup: {"
-               "    from: 'lookupColl',"
-               "    as: 'results',"
-               "    connectToField: 'to',"
-               "    connectFromField: 'from',"
-               "    startWith: '$startVal'"
-               " }}]";
-    }
-};
+TEST(PipelineOptimizationTest, GraphLookupShouldSwapWithMatch) {
+    string inputPipe =
+        "[{$graphLookup: {"
+        "    from: 'lookupColl',"
+        "    as: 'results',"
+        "    connectToField: 'to',"
+        "    connectFromField: 'from',"
+        "    startWith: '$startVal'"
+        " }},"
+        " {$match: {independent: 'x'}}"
+        "]";
+    string outputPipe =
+        "[{$match: {independent: 'x'}},"
+        " {$graphLookup: {"
+        "    from: 'lookupColl',"
+        "    as: 'results',"
+        "    connectToField: 'to',"
+        "    connectFromField: 'from',"
+        "    startWith: '$startVal'"
+        " }}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class ExclusionProjectShouldSwapWithIndependentMatch : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {redacted: 0}}, {$match: {unrelated: 4}}]";
-    }
-    string outputPipeJson() final {
-        return "[{$match: {unrelated: 4}}, {$project: {redacted: false}}]";
-    }
-};
+TEST(PipelineOptimizationTest, ExclusionProjectShouldSwapWithIndependentMatch) {
+    string inputPipe = "[{$project: {redacted: 0}}, {$match: {unrelated: 4}}]";
+    string outputPipe = "[{$match: {unrelated: 4}}, {$project: {redacted: false}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class ExclusionProjectShouldNotSwapWithMatchOnExcludedFields : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {subdoc: {redacted: false}}}, {$match: {'subdoc.redacted': 4}}]";
-    }
-    string outputPipeJson() final {
-        return inputPipeJson();
-    }
-};
+TEST(PipelineOptimizationTest, ExclusionProjectShouldNotSwapWithMatchOnExcludedFields) {
+    std::string pipeline =
+        "[{$project: {subdoc: {redacted: false}}}, {$match: {'subdoc.redacted': 4}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
 
-class MatchShouldSplitIfPartIsIndependentOfExclusionProjection : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {redacted: 0}},"
-               " {$match: {redacted: 'x', unrelated: 4}}]";
-    }
-    string outputPipeJson() final {
-        return "[{$match: {unrelated: {$eq: 4}}},"
-               " {$project: {redacted: false}},"
-               " {$match: {redacted: {$eq: 'x'}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldSplitIfPartIsIndependentOfExclusionProjection) {
+    string inputPipe =
+        "[{$project: {redacted: 0}},"
+        " {$match: {redacted: 'x', unrelated: 4}}]";
+    string outputPipe =
+        "[{$match: {unrelated: {$eq: 4}}},"
+        " {$project: {redacted: false}},"
+        " {$match: {redacted: {$eq: 'x'}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class InclusionProjectShouldSwapWithIndependentMatch : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {included: 1}}, {$match: {included: 4}}]";
-    }
-    string outputPipeJson() final {
-        return "[{$match: {included: 4}}, {$project: {_id: true, included: true}}]";
-    }
-};
+TEST(PipelineOptimizationTest, InclusionProjectShouldSwapWithIndependentMatch) {
+    string inputPipe = "[{$project: {included: 1}}, {$match: {included: 4}}]";
+    string outputPipe = "[{$match: {included: 4}}, {$project: {_id: true, included: true}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class InclusionProjectShouldNotSwapWithMatchOnFieldsNotIncluded : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {_id: true, included: true, subdoc: {included: true}}},"
-               " {$match: {notIncluded: 'x', unrelated: 4}}]";
-    }
-    string outputPipeJson() final {
-        return inputPipeJson();
-    }
-};
+TEST(PipelineOptimizationTest, InclusionProjectShouldNotSwapWithMatchOnFieldsNotIncluded) {
+    string pipeline =
+        "[{$project: {_id: true, included: true, subdoc: {included: true}}},"
+        " {$match: {notIncluded: 'x', unrelated: 4}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
 
-class MatchShouldSplitIfPartIsIndependentOfInclusionProjection : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {_id: true, included: true}},"
-               " {$match: {included: 'x', unrelated: 4}}]";
-    }
-    string outputPipeJson() final {
-        return "[{$match: {included: {$eq: 'x'}}},"
-               " {$project: {_id: true, included: true}},"
-               " {$match: {unrelated: {$eq: 4}}}]";
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldSplitIfPartIsIndependentOfInclusionProjection) {
+    string inputPipe =
+        "[{$project: {_id: true, included: true}},"
+        " {$match: {included: 'x', unrelated: 4}}]";
+    string outputPipe =
+        "[{$match: {included: {$eq: 'x'}}},"
+        " {$project: {_id: true, included: true}},"
+        " {$match: {unrelated: {$eq: 4}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class TwoMatchStagesShouldBothPushIndependentPartsBeforeProjection : public Base {
-    string inputPipeJson() final {
-        return "[{$project: {_id: true, included: true}},"
-               " {$match: {included: 'x', unrelated: 4}},"
-               " {$match: {included: 'y', unrelated: 5}}]";
-    }
-    string outputPipeJson() final {
-        return "[{$match: {$and: [{included: {$eq: 'x'}}, {included: {$eq: 'y'}}]}},"
-               " {$project: {_id: true, included: true}},"
-               " {$match: {$and: [{unrelated: {$eq: 4}}, {unrelated: {$eq: 5}}]}}]";
-    }
-};
+TEST(PipelineOptimizationTest, TwoMatchStagesShouldBothPushIndependentPartsBeforeProjection) {
+    string inputPipe =
+        "[{$project: {_id: true, included: true}},"
+        " {$match: {included: 'x', unrelated: 4}},"
+        " {$match: {included: 'y', unrelated: 5}}]";
+    string outputPipe =
+        "[{$match: {$and: [{included: {$eq: 'x'}}, {included: {$eq: 'y'}}]}},"
+        " {$project: {_id: true, included: true}},"
+        " {$match: {$and: [{unrelated: {$eq: 4}}, {unrelated: {$eq: 5}}]}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class NeighboringMatchesShouldCoalesce : public Base {
-    string inputPipeJson() final {
-        return "[{$match: {x: 'x'}},"
-               " {$match: {y: 'y'}}]";
-    }
-    string outputPipeJson() final {
-        return "[{$match: {$and: [{x: 'x'}, {y: 'y'}]}}]";
-    }
-};
+TEST(PipelineOptimizationTest, NeighboringMatchesShouldCoalesce) {
+    string inputPipe =
+        "[{$match: {x: 'x'}},"
+        " {$match: {y: 'y'}}]";
+    string outputPipe = "[{$match: {$and: [{x: 'x'}, {y: 'y'}]}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
 
-class MatchShouldNotSwapBeforeLimit : public Base {
-    string inputPipeJson() final {
-        return "[{$limit: 3},"
-               " {$match: {y: 'y'}}]";
-    }
-    string outputPipeJson() final {
-        return inputPipeJson();
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldNotSwapBeforeLimit) {
+    string pipeline = "[{$limit: 3}, {$match: {y: 'y'}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
 
-class MatchShouldNotSwapBeforeSkip : public Base {
-    string inputPipeJson() final {
-        return "[{$skip: 3},"
-               " {$match: {y: 'y'}}]";
-    }
-    string outputPipeJson() final {
-        return inputPipeJson();
-    }
-};
+TEST(PipelineOptimizationTest, MatchShouldNotSwapBeforeSkip) {
+    string pipeline = "[{$skip: 3}, {$match: {y: 'y'}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
 
 }  // namespace Local
 
@@ -1498,65 +1331,6 @@ class All : public Suite {
 public:
     All() : Suite("PipelineOptimizations") {}
     void setupTests() {
-        add<Optimizations::Local::RemoveSkipZero>();
-        add<Optimizations::Local::MoveLimitBeforeProject>();
-        add<Optimizations::Local::MoveSkipBeforeProject>();
-        add<Optimizations::Local::MoveMultipleSkipsAndLimitsBeforeProject>();
-        add<Optimizations::Local::MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated>();
-        add<Optimizations::Local::MatchOnNestedFieldDoesNotMoveBeforeAddFieldsOfPrefixOfPath>();
-        add<Optimizations::Local::MatchOnTopLevelFieldDoesNotMoveBeforeAddFieldsOfNestedPath>();
-        add<Optimizations::Local::MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated>();
-        add<Optimizations::Local::
-                MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixOfAddedFieldName>();
-        add<Optimizations::Local::MoveMatchOnNestedFieldBeforeAddFieldsOfDifferentNestedField>();
-        add<Optimizations::Local::MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated>();
-        add<Optimizations::Local::SkipSkipLimitBecomesLimitSkip>();
-        add<Optimizations::Local::SortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
-        add<Optimizations::Local::DoNotRemoveSkipOne>();
-        add<Optimizations::Local::RemoveEmptyMatch>();
-        add<Optimizations::Local::RemoveMultipleEmptyMatches>();
-        add<Optimizations::Local::MoveMatchBeforeSort>();
-        add<Optimizations::Local::DoNotRemoveNonEmptyMatch>();
-        add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAs>();
-        add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty>();
-        add<Optimizations::Local::LookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
-        add<Optimizations::Local::LookupShouldNotCoalesceWithUnwindNotOnAs>();
-        add<Optimizations::Local::LookupShouldSwapWithMatch>();
-        add<Optimizations::Local::LookupShouldSplitMatch>();
-        add<Optimizations::Local::LookupShouldNotAbsorbMatchOnAs>();
-        add<Optimizations::Local::LookupShouldAbsorbUnwindMatch>();
-        add<Optimizations::Local::LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch>();
-        add<Optimizations::Local::LookupShouldNotSplitIndependentAndDependentOrClauses>();
-        add<Optimizations::Local::LookupWithMatchOnArrayIndexFieldShouldNotCoalesce>();
-        add<Optimizations::Local::LookupWithUnwindPreservingNullAndEmptyArraysShouldNotCoalesce>();
-        add<Optimizations::Local::LookupDoesNotAbsorbElemMatch>();
-        add<Optimizations::Local::LookupDoesSwapWithMatchOnLocalField>();
-        add<Optimizations::Local::LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMovesMatch>();
-        add<Optimizations::Local::LookupDoesSwapWithMatchOnFieldWithSameNameAsForeignField>();
-        add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAs>();
-        add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty>();
-        add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
-        add<Optimizations::Local::GraphLookupShouldNotCoalesceWithUnwindNotOnAs>();
-        add<Optimizations::Local::GraphLookupShouldSwapWithMatch>();
-        add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
-        add<Optimizations::Local::MatchShouldSwapWithUnwind>();
-        add<Optimizations::Local::MatchShouldNotOptimizeWhenMatchingOnIndexField>();
-        add<Optimizations::Local::MatchOnPrefixShouldNotSwapOnUnwind>();
-        add<Optimizations::Local::MatchShouldNotOptimizeWithElemMatch>();
-        add<Optimizations::Local::MatchWithNorOnlySplitsIndependentChildren>();
-        add<Optimizations::Local::MatchWithOrDoesNotSplit>();
-        add<Optimizations::Local::MatchShouldSplitOnUnwind>();
-        add<Optimizations::Local::UnwindBeforeDoubleMatchShouldRepeatedlyOptimize>();
-        add<Optimizations::Local::ExclusionProjectShouldSwapWithIndependentMatch>();
-        add<Optimizations::Local::ExclusionProjectShouldNotSwapWithMatchOnExcludedFields>();
-        add<Optimizations::Local::MatchShouldSplitIfPartIsIndependentOfExclusionProjection>();
-        add<Optimizations::Local::InclusionProjectShouldSwapWithIndependentMatch>();
-        add<Optimizations::Local::InclusionProjectShouldNotSwapWithMatchOnFieldsNotIncluded>();
-        add<Optimizations::Local::MatchShouldSplitIfPartIsIndependentOfInclusionProjection>();
-        add<Optimizations::Local::TwoMatchStagesShouldBothPushIndependentPartsBeforeProjection>();
-        add<Optimizations::Local::NeighboringMatchesShouldCoalesce>();
-        add<Optimizations::Local::MatchShouldNotSwapBeforeLimit>();
-        add<Optimizations::Local::MatchShouldNotSwapBeforeSkip>();
         add<Optimizations::Sharded::Empty>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::
