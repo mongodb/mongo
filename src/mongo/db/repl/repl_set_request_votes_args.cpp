@@ -63,7 +63,14 @@ const std::string kLegalArgsFieldNames[] = {
 };
 
 const std::string kLegalResponseFieldNames[] = {
-    kOkFieldName, kReasonFieldName, kTermFieldName, kVoteGrantedFieldName, kOperationTime,
+    kOkFieldName,
+    kReasonFieldName,
+    kTermFieldName,
+    kVoteGrantedFieldName,
+    kOperationTime,
+    "$gleStats",
+    "logicalTime",
+    "$configServerState",
 };
 
 }  // namespace

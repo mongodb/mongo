@@ -421,7 +421,9 @@ void CurOp::reportState(BSONObjBuilder* builder) {
 
 namespace {
 StringData getProtoString(int op) {
-    if (op == dbQuery) {
+    if (op == dbMsg) {
+        return "op_msg";
+    } else if (op == dbQuery) {
         return "op_query";
     } else if (op == dbCommand) {
         return "op_command";

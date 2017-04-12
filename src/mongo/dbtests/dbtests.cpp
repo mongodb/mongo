@@ -73,10 +73,10 @@ void initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
     spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incoming.maxWireVersion = LATEST_WIRE_VERSION;
     // connect to any version
     spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 }
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {

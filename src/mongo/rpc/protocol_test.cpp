@@ -49,7 +49,8 @@ const auto assert_negotiated = [](ProtocolSet fst, ProtocolSet snd, Protocol pro
 };
 
 TEST(Protocol, SuccessfulNegotiation) {
-    assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpCommandV1);
+    assert_negotiated(supports::kAll, supports::kAll, Protocol::kOpMsg);
+    assert_negotiated(supports::kAll, supports::kOpMsgOnly, Protocol::kOpMsg);
     assert_negotiated(supports::kAll, supports::kOpCommandOnly, Protocol::kOpCommandV1);
     assert_negotiated(supports::kAll, supports::kOpQueryOnly, Protocol::kOpQuery);
 }
@@ -70,6 +71,16 @@ TEST(Protocol, FailedNegotiation) {
 
 TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
+        // MongoDB 3.6
+        auto mongod36 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::SUPPORTS_OP_MSG)  //
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod36)).protocolSet,
+                  supports::kAll);
+    }
+    {
         // MongoDB 3.2 (mongod)
         auto mongod32 =
             BSON("maxWireVersion" << static_cast<int>(WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN)
@@ -77,7 +88,7 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
                                   << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod32)).protocolSet,
-                  supports::kAll);
+                  supports::kOpQueryOnly | supports::kOpCommandOnly);
     }
     {
         // MongoDB 3.2 (mongos)

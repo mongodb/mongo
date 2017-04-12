@@ -47,12 +47,25 @@ namespace {
 /**
  * Protocols supported by order of preference.
  */
-const Protocol kPreferredProtos[] = {Protocol::kOpCommandV1, Protocol::kOpQuery};
+const Protocol kPreferredProtos[] = {Protocol::kOpMsg, Protocol::kOpCommandV1, Protocol::kOpQuery};
 
-const char kNone[] = "none";
-const char kOpQueryOnly[] = "opQueryOnly";
-const char kOpCommandOnly[] = "opCommandOnly";
-const char kAll[] = "all";
+struct ProtocolSetAndName {
+    StringData name;
+    ProtocolSet protocols;
+};
+
+constexpr ProtocolSetAndName protocolSetNames[] = {
+    // Most common ones go first.
+    {"all"_sd, supports::kAll},                                                     // new mongod.
+    {"opQueryAndOpMsg"_sd, supports::kOpQueryOnly | supports::kOpMsgOnly},          // new mongos.
+    {"opQueryAndOpCommand"_sd, supports::kOpQueryOnly | supports::kOpCommandOnly},  // old mongod.
+    {"opQueryOnly"_sd, supports::kOpQueryOnly},  // old mongos or very old client or mongod.
+
+    // Then the rest (these should never happen in production).
+    {"none"_sd, supports::kNone},
+    {"opCommandOnly"_sd, supports::kOpCommandOnly},
+    {"opMsgOnly"_sd, supports::kOpMsgOnly},
+};
 
 }  // namespace
 
@@ -73,39 +86,22 @@ StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
 }
 
 StatusWith<StringData> toString(ProtocolSet protocols) {
-    switch (protocols) {
-        case supports::kNone:
-            return StringData(kNone);
-        case supports::kOpQueryOnly:
-            return StringData(kOpQueryOnly);
-        case supports::kOpCommandOnly:
-            return StringData(kOpCommandOnly);
-        case supports::kAll:
-            return StringData(kAll);
-        default:
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Can not convert ProtocolSet " << protocols
-                                        << " to a string, only the predefined ProtocolSet "
-                                        << "constants 'none' (0x0), 'opQueryOnly' (0x1), "
-                                        << "'opCommandOnly' (0x2), and 'all' (0x3) are supported.");
-    }
-}
-
-StatusWith<ProtocolSet> parseProtocolSet(StringData repr) {
-    if (repr == kNone) {
-        return supports::kNone;
-    } else if (repr == kOpQueryOnly) {
-        return supports::kOpQueryOnly;
-    } else if (repr == kOpCommandOnly) {
-        return supports::kOpCommandOnly;
-    } else if (repr == kAll) {
-        return supports::kAll;
+    for (auto& elem : protocolSetNames) {
+        if (elem.protocols == protocols)
+            return elem.name;
     }
     return Status(ErrorCodes::BadValue,
-                  str::stream() << "Can not parse a ProtocolSet from " << repr
-                                << " only the predefined ProtocolSet constants "
-                                << "'none' (0x0), 'opQueryOnly' (0x1), 'opCommandOnly' (0x2), "
-                                << "and 'all' (0x3) are supported.");
+                  str::stream() << "ProtocolSet " << protocols
+                                << " does not match any well-known value.");
+}
+
+StatusWith<ProtocolSet> parseProtocolSet(StringData name) {
+    for (auto& elem : protocolSetNames) {
+        if (elem.name == name)
+            return elem.protocols;
+    }
+    return Status(ErrorCodes::BadValue,
+                  str::stream() << name << " is not a valid name for a ProtocolSet.");
 }
 
 StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
@@ -154,10 +150,14 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
 
     WireVersionInfo version{static_cast<int>(minWireVersion), static_cast<int>(maxWireVersion)};
 
-    return {{(!isMongos && supportsWireVersionForOpCommandInMongod(version))
-                 ? supports::kAll
-                 : supports::kOpQueryOnly,
-             version}};
+    auto protos = computeProtocolSet(version);
+    if (isMongos) {
+        // Remove support for protocols that mongos doesn't support.
+        protos &= ~supports::kOpCommandOnly;
+        protos &= ~supports::kOpMsgOnly;  // TODO remove this line once mongos supports OP_MSG.
+    }
+
+    return {{protos, version}};
 }
 
 bool supportsWireVersionForOpCommandInMongod(const WireVersionInfo version) {
@@ -169,7 +169,12 @@ bool supportsWireVersionForOpCommandInMongod(const WireVersionInfo version) {
 ProtocolSet computeProtocolSet(const WireVersionInfo version) {
     ProtocolSet result = supports::kNone;
     if (version.minWireVersion <= version.maxWireVersion) {
-        if (version.maxWireVersion >= WireVersion::FIND_COMMAND) {
+        if (version.maxWireVersion >= WireVersion::SUPPORTS_OP_MSG) {
+            result |= supports::kOpMsgOnly;
+        }
+        if (version.maxWireVersion >= WireVersion::FIND_COMMAND &&
+            version.maxWireVersion <= WireVersion::SUPPORTS_OP_MSG) {
+            // Future versions may remove support for OP_COMMAND.
             result |= supports::kOpCommandOnly;
         }
         if (version.minWireVersion <= WireVersion::RELEASE_2_4_AND_BEFORE) {

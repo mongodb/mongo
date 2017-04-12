@@ -41,6 +41,7 @@ networkEnv.Library(
         "message.cpp",
         "message_port.cpp",
         "message_port_startup_param.cpp",
+        "op_msg.cpp",
         "sock.cpp",
         "sockaddr.cpp",
         'socket_exception.cpp',
@@ -52,6 +53,7 @@ networkEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/background_job',

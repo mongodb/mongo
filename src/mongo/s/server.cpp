@@ -231,7 +231,7 @@ static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // connect to version supporting Write Concern only
     spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     spec.isInternalClient = true;
 }

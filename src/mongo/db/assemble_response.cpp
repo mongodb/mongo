@@ -55,10 +55,12 @@
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -186,6 +188,48 @@ DbResponse receivedCommand(OperationContext* opCtx,
     op->debug().responseLength = response.header().dataLen();
 
     return {std::move(response)};
+}
+
+DbResponse receivedMsg(OperationContext* opCtx, Client& client, const Message& message) {
+    invariant(message.operation() == dbMsg);
+
+    OpMsg requestOpMsg;
+    rpc::OpMsgReplyBuilder replyBuilder;
+    auto curOp = CurOp::get(opCtx);
+    try {
+        // Request is validated here.
+        // TODO If this fails we reply to an invalid request which isn't always safe. Unfortunately
+        // tests currently rely on this. Figure out what to do.
+        requestOpMsg = OpMsg::parse(message);
+        rpc::OpMsgRequest request(requestOpMsg);
+
+        // We construct a legacy $cmd namespace so we can fill in curOp using
+        // the existing logic that existed for OP_QUERY commands
+        NamespaceString nss(request.getDatabase(), "$cmd");
+        beginCommandOp(opCtx, nss, request.getCommandArgs());
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curOp->markCommand_inlock();
+        }
+
+        runCommands(opCtx, request, &replyBuilder);
+
+        curOp->debug().iscommand = true;
+    } catch (const DBException& exception) {
+        replyBuilder.reset();
+        Command::generateErrorResponse(opCtx, &replyBuilder, exception);
+    }
+
+    auto response = replyBuilder.done();
+
+    curOp->debug().responseLength = response.header().dataLen();
+
+    // TODO exhaust
+    if (requestOpMsg.isFlagSet(OpMsg::kMoreToCome)) {
+        return {};
+    }
+
+    return DbResponse{std::move(response)};
 }
 
 DbResponse receivedRpc(OperationContext* opCtx, Client& client, const Message& message) {
@@ -510,7 +554,7 @@ DbResponse assembleResponse(OperationContext* opCtx, const Message& m, const Hos
         }
     } else if (op == dbGetMore) {
         opread(m);
-    } else if (op == dbCommand) {
+    } else if (op == dbCommand || op == dbMsg) {
         isCommand = true;
         opwrite(m);
     } else {
@@ -535,6 +579,8 @@ DbResponse assembleResponse(OperationContext* opCtx, const Message& m, const Hos
     if (op == dbQuery) {
         dbresponse = isCommand ? receivedCommand(opCtx, nsString, c, m)
                                : receivedQuery(opCtx, nsString, c, m);
+    } else if (op == dbMsg) {
+        dbresponse = receivedMsg(opCtx, c, m);
     } else if (op == dbCommand) {
         dbresponse = receivedRpc(opCtx, c, m);
     } else if (op == dbGetMore) {

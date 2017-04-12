@@ -225,7 +225,7 @@ void DBClientCursor::exhaustReceiveMore() {
 
 void DBClientCursor::commandDataReceived() {
     int op = batch.m.operation();
-    invariant(op == opReply || op == dbCommandReply);
+    invariant(op == opReply || op == dbCommandReply || op == dbMsg);
 
     batch.nReturned = 1;
     batch.pos = 0;
@@ -248,7 +248,7 @@ void DBClientCursor::commandDataReceived() {
 
     // HACK: If we got an OP_COMMANDREPLY, take the reply object
     // and shove it in to an OP_REPLY message.
-    if (op == dbCommandReply) {
+    if (op == dbCommandReply || op == dbMsg) {
         BSONObj reply = commandReply->getCommandReply();
         batch.m = replyToQuery(reply).response;
     }

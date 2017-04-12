@@ -788,6 +788,11 @@ public:
                                   BSONObj& info,
                                   int options = 0);
 
+    /**
+     * Reconnect if needed and allowed.
+     */
+    virtual void checkConnection() {}
+
 protected:
     /** if the result of a command is ok*/
     bool isOk(const BSONObj&);
@@ -1138,6 +1143,12 @@ public:
         return _compressorManager;
     }
 
+    // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
+    void checkConnection() override {
+        if (_failed)
+            _checkConnection();
+    }
+
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
@@ -1155,12 +1166,6 @@ protected:
     std::string _applicationName;
 
     void _checkConnection();
-
-    // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
-    void checkConnection() {
-        if (_failed)
-            _checkConnection();
-    }
 
     std::map<std::string, BSONObj> authCache;
     double _so_timeout;

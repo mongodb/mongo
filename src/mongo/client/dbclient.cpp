@@ -178,6 +178,10 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
             str::stream() << "Database name '" << database << "' is not valid.",
             NamespaceString::validDBName(database, NamespaceString::DollarInDbNameBehavior::Allow));
 
+    // Make sure to reconnect if needed before building our request, since the request depends on
+    // the negotiated protocol which can change due to a reconnect.
+    checkConnection();
+
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
