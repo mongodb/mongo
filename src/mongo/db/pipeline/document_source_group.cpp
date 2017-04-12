@@ -191,8 +191,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
         _idExpressions[i] = _idExpressions[i]->optimize();
     }
 
-    for (size_t i = 0; i < _accumulatedFields.size(); i++) {
-        _accumulatedFields[i].expression = _accumulatedFields[i].expression->optimize();
+    for (auto&& accumulatedField : _accumulatedFields) {
+        accumulatedField.expression = accumulatedField.expression->optimize();
     }
 
     return this;
@@ -216,12 +216,11 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
     }
 
     // Add the remaining fields.
-    const size_t n = _accumulatedFields.size();
-    for (size_t i = 0; i < n; ++i) {
-        intrusive_ptr<Accumulator> accum = _accumulatedFields[i].makeAccumulator(pExpCtx);
-        insides[_accumulatedFields[i].fieldName] =
+    for (auto&& accumulatedField : _accumulatedFields) {
+        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator(pExpCtx);
+        insides[accumulatedField.fieldName] =
             Value(DOC(accum->getOpName()
-                      << _accumulatedFields[i].expression->serialize(static_cast<bool>(explain))));
+                      << accumulatedField.expression->serialize(static_cast<bool>(explain))));
     }
 
     if (_doingMerge) {
@@ -243,9 +242,8 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
     }
 
     // add the rest
-    const size_t n = _accumulatedFields.size();
-    for (size_t i = 0; i < n; ++i) {
-        _accumulatedFields[i].expression->addDependencies(deps);
+    for (auto&& accumulatedField : _accumulatedFields) {
+        accumulatedField.expression->addDependencies(deps);
     }
 
     return EXHAUSTIVE_ALL;
@@ -319,7 +317,7 @@ void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression>
     if (auto object = dynamic_cast<ExpressionObject*>(idExpression.get())) {
         auto& childExpressions = object->getChildExpressions();
         invariant(!childExpressions.empty());  // We expect to have converted an empty object into a
-        // constant expression.
+                                               // constant expression.
 
         // grouping on an "artificial" object. Rather than create the object for each input
         // in initialize(), instead group on the output of the raw expressions. The artificial
@@ -474,8 +472,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
         // Set up accumulators.
         _currentAccumulators.reserve(numAccumulators);
-        for (size_t i = 0; i < numAccumulators; i++) {
-            _currentAccumulators.push_back(_accumulatedFields[i].makeAccumulator(pExpCtx));
+        for (auto&& accumulatedField : _accumulatedFields) {
+            _currentAccumulators.push_back(accumulatedField.makeAccumulator(pExpCtx));
         }
 
         // We only need to load the first document.
@@ -858,9 +856,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
     /* the merger will use the same grouping key */
     pMerger->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
 
-    const size_t n = _accumulatedFields.size();
-    for (size_t i = 0; i < n; ++i) {
-        StringData factoryName(_accumulatedFields[i].fieldName);
+    for (auto&& accumulatedField : _accumulatedFields) {
+        StringData factoryName(accumulatedField.fieldName);
 
         /*
           The merger's output field names will be the same, as will the
@@ -871,9 +868,9 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
           same name from the prior group.
         */
         pMerger->addAccumulator(
-            {_accumulatedFields[i].fieldName,
-             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + _accumulatedFields[i].fieldName, vps),
-             _accumulatedFields[i].getFactory(factoryName)});
+            {accumulatedField.fieldName,
+             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + accumulatedField.fieldName, vps),
+             accumulatedField.getFactory(factoryName)});
     }
 
     pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));

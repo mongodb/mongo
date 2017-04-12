@@ -268,10 +268,11 @@ void DocumentSourceBucketAuto::populateBuckets() {
     }
 }
 
-DocumentSourceBucketAuto::Bucket::Bucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         Value min,
-                                         Value max,
-                                         vector<AccumulationStatement> accumulationStatements)
+DocumentSourceBucketAuto::Bucket::Bucket(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Value min,
+    Value max,
+    const vector<AccumulationStatement>& accumulationStatements)
     : _min(min), _max(max) {
     _accums.reserve(accumulationStatements.size());
     for (auto&& accumulationStatement : accumulationStatements) {
@@ -345,13 +346,12 @@ Value DocumentSourceBucketAuto::serialize(
         insides["granularity"] = Value(_granularityRounder->getName());
     }
 
-    const size_t nOutputFields = _accumulatedFields.size();
-    MutableDocument outputSpec(nOutputFields);
-    for (size_t i = 0; i < nOutputFields; i++) {
-        intrusive_ptr<Accumulator> accum = _accumulatedFields[i].makeAccumulator(pExpCtx);
-        outputSpec[_accumulatedFields[i].fieldName] = Value{
-            Document{{accum->getOpName(),
-                      _accumulatedFields[i].expression->serialize(static_cast<bool>(explain))}}};
+    MutableDocument outputSpec(_accumulatedFields.size());
+    for (auto&& accumulatedField : _accumulatedFields) {
+        intrusive_ptr<Accumulator> accum = accumulatedField.makeAccumulator(pExpCtx);
+        outputSpec[accumulatedField.fieldName] =
+            Value{Document{{accum->getOpName(),
+                            accumulatedField.expression->serialize(static_cast<bool>(explain))}}};
     }
     insides["output"] = outputSpec.freezeToValue();
 

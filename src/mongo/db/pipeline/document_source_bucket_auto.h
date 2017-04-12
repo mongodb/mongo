@@ -96,7 +96,7 @@ private:
         Bucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                Value min,
                Value max,
-               std::vector<AccumulationStatement> accumulationStatements);
+               const std::vector<AccumulationStatement>& accumulationStatements);
         Value _min;
         Value _max;
         std::vector<boost::intrusive_ptr<Accumulator>> _accums;

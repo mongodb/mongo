@@ -54,8 +54,6 @@ namespace mongo {
  * A class representing a user-specified accummulation, including the field name to put the
  * accumulated result in, which accumulator to use, and the expression used to obtain the input to
  * the Accumulator.
- *
- * TODO SERVER-25980: Do not expose 'factory', instead add a makeAccumulator() method.
  */
 class AccumulationStatement {
 public:
@@ -93,19 +91,17 @@ public:
      */
     static Accumulator::Factory getFactory(StringData name);
 
-    // 'fieldName' contains the field names for the result documents.
+    // The field name is use to store the results of the accumulation in a result document.
     std::string fieldName;
 
-    // 'expression' contains the common expressions used by instance of an accumulator in order to
-    // find the right-hand side of what gets added to the accumulator
+    // The expression to use to obtain the input to the accumulator.
     boost::intrusive_ptr<Expression> expression;
 
-    // Makes Accumulator with a pointer to a Expression context
+    // Constructs an Accumulator to do actual accumulation.
     boost::intrusive_ptr<Accumulator> makeAccumulator(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const;
 
 private:
-    // '_factory'contains the accumulator factories for the result documents
     Accumulator::Factory _factory;
 };
 
