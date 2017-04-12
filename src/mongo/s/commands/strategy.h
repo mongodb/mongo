@@ -38,6 +38,7 @@ namespace mongo {
 
 class DbMessage;
 struct DbResponse;
+class Message;
 class NamespaceString;
 class OperationContext;
 class QueryRequest;
@@ -75,15 +76,15 @@ public:
     static void writeOp(OperationContext* opCtx, DbMessage* dbm);
 
     /**
-     * Executes a legacy-style ($cmd namespace) command. Does not throw and returns the response
-     * regardless of success or error.
+     * Executes a command from either OP_QUERY or OP_MSG wire protocols.
      *
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static DbResponse clientCommandOp(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      DbMessage* dbm);
+    static DbResponse clientOpMsgCommand(OperationContext* opCtx, const Message& message);
+    static DbResponse clientOpQueryCommand(OperationContext* opCtx,
+                                           NamespaceString nss,
+                                           DbMessage* dbm);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of

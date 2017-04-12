@@ -471,7 +471,8 @@ public:
      */
     static bool isGenericArgument(StringData arg) {
         // Not including "help" since we don't pass help requests through to the command parser.
-        // If that changes, it should be added.
+        // If that changes, it should be added. When you add to this list, consider whether you
+        // should also change the filterCommandRequestForPassthrough() function in sharding.
         return arg == "$audit" ||           //
             arg == "$client" ||             //
             arg == "$configServerState" ||  //
@@ -526,7 +527,6 @@ private:
 
     friend void mongo::execCommandClient(OperationContext* opCtx,
                                          Command* c,
-                                         int queryOptions,
                                          StringData dbname,
                                          BSONObj& cmdObj,
                                          BSONObjBuilder& result);

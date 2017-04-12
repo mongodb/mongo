@@ -154,7 +154,6 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     if (isMongos) {
         // Remove support for protocols that mongos doesn't support.
         protos &= ~supports::kOpCommandOnly;
-        protos &= ~supports::kOpMsgOnly;  // TODO remove this line once mongos supports OP_MSG.
     }
 
     return {{protos, version}};

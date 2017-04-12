@@ -33,6 +33,7 @@
 #include "mongo/s/service_entry_point_mongos.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
@@ -74,7 +75,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
     // connection
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Message type " << op << " is not supported.",
-            isSupportedNetworkOp(op));
+            isSupportedNetworkOp(op) && op != dbCommand && op != dbCommandReply);
 
     // Start a new LastError session. Any exceptions thrown from here onwards will be returned
     // to the caller (if the type of the message permits it).
@@ -108,9 +109,18 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
                << " op: " << networkOpToString(op);
 
         switch (op) {
+            case dbMsg:
+                dbResponse = Strategy::clientOpMsgCommand(opCtx, message);
+                break;
             case dbQuery:
                 if (nss.isCommand() || nss.isSpecialCommand()) {
-                    dbResponse = Strategy::clientCommandOp(opCtx, nss, &dbm);
+                    try {
+                        dbResponse = Strategy::clientOpQueryCommand(opCtx, nss, &dbm);
+                    } catch (const DBException& ex) {
+                        BSONObjBuilder bob;
+                        Command::appendCommandStatus(bob, ex.toStatus());
+                        dbResponse = replyToQuery(bob.done());
+                    }
                 } else {
                     dbResponse = Strategy::queryOp(opCtx, nss, &dbm);
                 }

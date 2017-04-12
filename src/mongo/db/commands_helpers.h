@@ -33,6 +33,7 @@ class OperationContext;
 class Command;
 class BSONObj;
 class BSONObjBuilder;
+class StringData;
 
 namespace rpc {
 class RequestInterface;
@@ -47,7 +48,6 @@ class ReplyBuilderInterface;
 // Implemented in `src/mongo/s/s_only.cpp`.
 void execCommandClient(OperationContext* opCtx,
                        Command* c,
-                       int queryOptions,
                        StringData dbname,
                        BSONObj& cmdObj,
                        BSONObjBuilder& result);
