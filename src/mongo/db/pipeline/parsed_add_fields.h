@@ -95,8 +95,11 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> computedPaths;
-        _root->addComputedPaths(&computedPaths);
-        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(computedPaths)};
+        StringMap<std::string> renamedPaths;
+        _root->addComputedPaths(&computedPaths, &renamedPaths);
+        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet,
+                std::move(computedPaths),
+                std::move(renamedPaths)};
     }
 
     /**

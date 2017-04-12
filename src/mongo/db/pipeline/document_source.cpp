@@ -147,10 +147,15 @@ splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& matc
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             DepsTracker depsTracker;
             match->getDependencies(&depsTracker);
-            modifiedPaths = extractModifiedDependencies(depsTracker.fields, modifiedPathsRet.paths);
+
+            auto preservedPaths = modifiedPathsRet.paths;
+            for (auto&& rename : modifiedPathsRet.renames) {
+                preservedPaths.insert(rename.first);
+            }
+            modifiedPaths = extractModifiedDependencies(depsTracker.fields, preservedPaths);
         }
     }
-    return match->splitSourceBy(modifiedPaths);
+    return match->splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
 }
 
 }  // namespace

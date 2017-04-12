@@ -371,37 +371,49 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
+DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields,
+                                   const StringMap<std::string>& renames) {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
-        expression::splitMatchExpressionBy(std::move(_expression), fields));
+        expression::splitMatchExpressionBy(std::move(_expression), fields, renames));
 
     invariant(newExpr.first || newExpr.second);
 
     if (!newExpr.first) {
-        // The entire $match depends on 'fields'.
+        // The entire $match depends on 'fields'. It cannot be split or moved, so we return this
+        // stage without modification as the second stage in the pair.
         _expression = std::move(newExpr.second);
         return {nullptr, this};
-    } else if (!newExpr.second) {
-        // This $match is entirely independent of 'fields'.
+    }
+
+    if (!newExpr.second && renames.empty()) {
+        // This $match is entirely independent of 'fields' and there were no renames to apply. In
+        // this case, the current stage can swap with its predecessor without modification. We
+        // simply return this as the first stage in the pair.
         _expression = std::move(newExpr.first);
         return {this, nullptr};
     }
 
-    // A MatchExpression requires that it is outlived by the BSONObj it is parsed from. Since the
-    // original BSONObj this $match was created from is no longer equivalent to either of the
-    // MatchExpressions we return, we instead take each of these expressions, serialize them, and
-    // then re-parse them, constructing new BSON that is owned by the DocumentSourceMatch.
-
-    // Build an expression for a new $match stage.
+    // If we're here, then either:
+    //  - this stage has split into two, or
+    //  - this stage can swap with its predecessor, but potentially had renames applied.
+    //
+    // In any of these cases, we have created new expression(s). A MatchExpression requires that it
+    // is outlived by the BSONObj it is parsed from. But since the MatchExpressions were modified,
+    // the corresponding BSONObj may not exist. Therefore, we take each of these expressions,
+    // serialize them, and then re-parse them, constructing new BSON that is owned by the
+    // DocumentSourceMatch.
     BSONObjBuilder firstBob;
     newExpr.first->serialize(&firstBob);
+    auto firstMatch = DocumentSourceMatch::create(firstBob.obj(), pExpCtx);
 
-    // This $match stage is still needed, so update the MatchExpression as needed.
-    BSONObjBuilder secondBob;
-    newExpr.second->serialize(&secondBob);
+    intrusive_ptr<DocumentSourceMatch> secondMatch;
+    if (newExpr.second) {
+        BSONObjBuilder secondBob;
+        newExpr.second->serialize(&secondBob);
+        secondMatch = DocumentSourceMatch::create(secondBob.obj(), pExpCtx);
+    }
 
-    return {DocumentSourceMatch::create(firstBob.obj(), pExpCtx),
-            DocumentSourceMatch::create(secondBob.obj(), pExpCtx)};
+    return {std::move(firstMatch), std::move(secondMatch)};
 }
 
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(

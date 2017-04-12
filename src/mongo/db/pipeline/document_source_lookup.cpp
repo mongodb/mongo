@@ -174,7 +174,7 @@ DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const
         modifiedPaths.insert(pathsModifiedByUnwind.paths.begin(),
                              pathsModifiedByUnwind.paths.end());
     }
-    return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths)};
+    return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(

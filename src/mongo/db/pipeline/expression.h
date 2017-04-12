@@ -769,6 +769,10 @@ public:
         return _fieldPath;
     }
 
+    Variables::Id getVariableId() const {
+        return _variable;
+    }
+
 private:
     ExpressionFieldPath(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                         const std::string& fieldPath,

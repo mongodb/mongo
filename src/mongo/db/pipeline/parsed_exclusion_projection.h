@@ -124,7 +124,7 @@ public:
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> modifiedPaths;
         _root->addModifiedPaths(&modifiedPaths);
-        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths)};
+        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths), {}};
     }
 
 private:

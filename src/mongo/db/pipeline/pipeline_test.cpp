@@ -758,6 +758,85 @@ TEST(PipelineOptimizationTest, MatchShouldNotSwapBeforeSkip) {
     assertPipelineOptimizesTo(pipeline, pipeline);
 }
 
+TEST(PipelineOptimizationTest, MatchShouldMoveAcrossProjectRename) {
+    string inputPipe = "[{$project: {_id: true, a: '$b'}}, {$match: {a: {$eq: 1}}}]";
+    string outputPipe = "[{$match: {b: {$eq: 1}}}, {$project: {_id: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchShouldMoveAcrossAddFieldsRename) {
+    string inputPipe = "[{$addFields: {a: '$b'}}, {$match: {a: {$eq: 1}}}]";
+    string outputPipe = "[{$match: {b: {$eq: 1}}}, {$addFields: {a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchShouldMoveAcrossProjectRenameWithExplicitROOT) {
+    string inputPipe = "[{$project: {_id: true, a: '$$ROOT.b'}}, {$match: {a: {$eq: 1}}}]";
+    string outputPipe = "[{$match: {b: {$eq: 1}}}, {$project: {_id: true, a: '$$ROOT.b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchShouldMoveAcrossAddFieldsRenameWithExplicitCURRENT) {
+    string inputPipe = "[{$addFields: {a: '$$CURRENT.b'}}, {$match: {a: {$eq: 1}}}]";
+    string outputPipe = "[{$match: {b: {$eq: 1}}}, {$addFields: {a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, PartiallyDependentMatchWithRenameShouldSplitAcrossAddFields) {
+    string inputPipe =
+        "[{$addFields: {'a.b': '$c', d: {$add: ['$e', '$f']}}},"
+        "{$match: {$and: [{$or: [{'a.b': 1}, {x: 2}]}, {d: 3}]}}]";
+    string outputPipe =
+        "[{$match: {$or: [{c: {$eq: 1}}, {x: {$eq: 2}}]}},"
+        "{$addFields: {a: {b: '$c'}, d: {$add: ['$e', '$f']}}},"
+        "{$match: {d: {$eq: 3}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, NorCanSplitAcrossProjectWithRename) {
+    string inputPipe =
+        "[{$project: {_id: false, x: true, y: '$z'}},"
+        "{$match: {$nor: [{w: {$eq: 1}}, {y: {$eq: 1}}]}}]";
+    string outputPipe =
+        "[{$match: {$nor: [{z: {$eq: 1}}]}},"
+        "{$project: {_id: false, x: true, y: '$z'}},"
+        "{$match: {$nor: [{w: {$eq: 1}}]}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MatchCanMoveAcrossSeveralRenames) {
+    string inputPipe =
+        "[{$project: {_id: false, c: '$d'}},"
+        "{$addFields: {b: '$c'}},"
+        "{$project: {a: '$b', z: 1}},"
+        "{$match: {a: 1, z: 2}}]";
+    string outputPipe =
+        "[{$match: {d: {$eq: 1}}},"
+        "{$project: {_id: false, c: '$d'}},"
+        "{$match: {z: {$eq: 2}}},"
+        "{$addFields: {b: '$c'}},"
+        "{$project: {_id: true, z: true, a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, RenameShouldNotBeAppliedToDependentMatch) {
+    string pipeline =
+        "[{$project: {_id: false, x: {$add: ['$foo', '$bar']}, y: '$z'}},"
+        "{$match: {$or: [{x: {$eq: 1}}, {y: {$eq: 1}}]}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchCannotMoveAcrossAddFieldsRenameOfDottedPath) {
+    string pipeline = "[{$addFields: {a: '$b.c'}}, {$match: {a: {$eq: 1}}}]";
+    assertPipelineOptimizesTo(pipeline, pipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchCannotMoveAcrossProjectRenameOfDottedPath) {
+    string inputPipe = "[{$project: {_id: false, a: '$$CURRENT.b.c'}}, {$match: {a: {$eq: 1}}}]";
+    string outputPipe = "[{$project: {_id: false, a: '$b.c'}}, {$match: {a: {$eq: 1}}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
 }  // namespace Local
 
 namespace Sharded {

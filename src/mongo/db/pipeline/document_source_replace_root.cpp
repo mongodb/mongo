@@ -89,7 +89,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         // Replaces the entire root, so all paths are modified.
-        return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}};
+        return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
     }
 
     // Create the replaceRoot transformer. Uasserts on invalid input.

@@ -49,7 +49,7 @@ public:
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}};
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
     bool canSwapWithMatch() const final {

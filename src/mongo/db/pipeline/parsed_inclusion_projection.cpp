@@ -239,12 +239,33 @@ void InclusionNode::addPreservedPaths(std::set<std::string>* preservedPaths) con
     }
 }
 
-void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths) const {
+void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths,
+                                     StringMap<std::string>* renamedPaths) const {
     for (auto&& computedPair : _expressions) {
+        auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(computedPair.second.get());
+        if (exprFieldPath) {
+            const auto& fieldPath = exprFieldPath->getFieldPath();
+            // Make sure that the first path component is CURRENT/ROOT. If this is not explicitly
+            // provided by the user, we expect the system to have filled it in as the first path
+            // component.
+            //
+            // TODO SERVER-27115: Support field paths that have multiple components.
+            if (exprFieldPath->getVariableId() == Variables::kRootId &&
+                fieldPath.getPathLength() == 2u) {
+                // Found a renamed path. Record it and continue, since we don't want to also put
+                // renamed paths inside the 'computedPaths' set.
+                std::string oldPath = fieldPath.tail().fullPath();
+                std::string newPath =
+                    FieldPath::getFullyQualifiedPath(_pathToNode, computedPair.first);
+                (*renamedPaths)[std::move(newPath)] = std::move(oldPath);
+                continue;
+            }
+        }
+
         computedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, computedPair.first));
     }
     for (auto&& childPair : _children) {
-        childPair.second->addComputedPaths(computedPaths);
+        childPair.second->addComputedPaths(computedPaths, renamedPaths);
     }
 }
 

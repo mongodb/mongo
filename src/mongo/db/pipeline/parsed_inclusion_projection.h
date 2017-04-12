@@ -126,9 +126,15 @@ public:
     void addPreservedPaths(std::set<std::string>* preservedPaths) const;
 
     /**
-     * Recursively adds all paths that are purely computed in this inclusion projection.
+     * Recursively adds all paths that are purely computed in this inclusion projection to
+     * 'computedPaths'.
+     *
+     * Computed paths that are identified as the result of a simple rename are instead filled out in
+     * 'renamedPaths'. Each entry in 'renamedPaths' maps from the path's new name to its old name
+     * prior to application of this inclusion projection.
      */
-    void addComputedPaths(std::set<std::string>* computedPaths) const;
+    void addComputedPaths(std::set<std::string>* computedPaths,
+                          StringMap<std::string>* renamedPaths) const;
 
 private:
     // Helpers for the Document versions above. These will apply the transformation recursively to
@@ -222,7 +228,14 @@ public:
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> preservedPaths;
         _root->addPreservedPaths(&preservedPaths);
-        return {DocumentSource::GetModPathsReturn::Type::kAllExcept, std::move(preservedPaths)};
+
+        std::set<std::string> computedPaths;
+        StringMap<std::string> renamedPaths;
+        _root->addComputedPaths(&computedPaths, &renamedPaths);
+
+        return {DocumentSource::GetModPathsReturn::Type::kAllExcept,
+                std::move(preservedPaths),
+                std::move(renamedPaths)};
     }
 
     /**

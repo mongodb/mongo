@@ -366,11 +366,25 @@ public:
             kAllExcept,
         };
 
-        GetModPathsReturn(Type type, std::set<std::string>&& paths)
-            : type(type), paths(std::move(paths)) {}
+        GetModPathsReturn(Type type,
+                          std::set<std::string>&& paths,
+                          StringMap<std::string>&& renames)
+            : type(type), paths(std::move(paths)), renames(std::move(renames)) {}
 
         Type type;
         std::set<std::string> paths;
+
+        // Stages may fill out 'renames' to contain information about path renames. Each entry in
+        // 'renames' maps from the new name of the path (valid in documents flowing *out* of this
+        // stage) to the old name of the path (valid in documents flowing *into* this stage).
+        //
+        // For example, consider the stage
+        //
+        //   {$project: {_id: 0, a: 1, b: "$c"}}
+        //
+        // This stage should return kAllExcept, since it modifies all paths other than "a". It can
+        // also fill out 'renames' with the mapping "b" => "c".
+        StringMap<std::string> renames;
     };
 
     /**
@@ -381,7 +395,7 @@ public:
      * See GetModPathsReturn above for the possible return values and what they mean.
      */
     virtual GetModPathsReturn getModifiedPaths() const {
-        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}};
+        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
     }
 
     /**
