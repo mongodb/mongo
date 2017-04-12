@@ -292,5 +292,27 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
     return cursorResponse.getValue().getBatch();
 }
 
+std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationContext* opCtx) {
+    auto config = getConfigShard();
+    auto findStatus =
+        config->exhaustiveFindOnConfig(opCtx,
+                                       kReadPref,
+                                       repl::ReadConcernLevel::kMajorityReadConcern,
+                                       NamespaceString(KeysCollectionDocument::ConfigNS),
+                                       BSONObj(),
+                                       BSON("expiresAt" << 1),
+                                       boost::none);
+    ASSERT_OK(findStatus.getStatus());
+
+    std::vector<KeysCollectionDocument> keys;
+    const auto& docs = findStatus.getValue().docs;
+    for (const auto& doc : docs) {
+        auto keyStatus = KeysCollectionDocument::fromBSON(doc);
+        ASSERT_OK(keyStatus.getStatus());
+        keys.push_back(keyStatus.getValue());
+    }
+
+    return keys;
+}
 
 }  // namespace mongo
