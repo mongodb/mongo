@@ -348,16 +348,19 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	/* If no page is active, begin a walk from the start/end of the tree. */
 	if (ref == NULL) {
 restart:	/*
-		 * We can reach here with a NULL or root reference; the release
+		 * We can be here with a NULL or root WT_REF; the page release
 		 * function handles them internally, don't complicate this code
 		 * by calling them out.
 		 */
 		WT_ERR(__wt_page_release(session, couple, flags));
 
-		couple = couple_orig = ref = &btree->root;
-		if (ref->page == NULL)
-			goto done;
+		/*
+		 * We're not supposed to walk trees without root pages. As this
+		 * has not always been the case, assert to debug that change.
+		 */
+		WT_ASSERT(session, btree->root.page != NULL);
 
+		couple = couple_orig = ref = &btree->root;
 		initial_descent = true;
 		goto descend;
 	}

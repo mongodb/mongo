@@ -10,8 +10,8 @@
 
 #define	WT_MEM_TRANSFER(from_decr, to_incr, len) do {			\
 	size_t __len = (len);						\
-	from_decr += __len;						\
-	to_incr += __len;						\
+	(from_decr) += __len;						\
+	(to_incr) += __len;						\
 } while (0)
 
 /*
@@ -119,7 +119,7 @@ __wt_split_stash_discard(WT_SESSION_IMPL *session)
 	    ++i, ++stash) {
 		if (stash->p == NULL)
 			continue;
-		else if (stash->split_gen >= oldest)
+		if (stash->split_gen >= oldest)
 			break;
 		/*
 		 * It's a bad thing if another thread is in this memory after
@@ -2274,7 +2274,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	 * reconciliation, do it now.
 	 */
 	__wt_page_modify_clear(session, page);
-	__wt_ref_out(session, ref);
+	__wt_ref_out_int(session, ref, true);
 
 	/* Swap the new page into place. */
 	ref->page = new->page;

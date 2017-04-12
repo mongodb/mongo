@@ -15,15 +15,27 @@
 int
 __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
 
+	btree = S2BT(session);
+
 	/*
-	 * We need exclusive access to the file -- disable ordinary eviction
-	 * and drain any blocks already queued.
+	 * We need exclusive access to the file, we're about to discard the root
+	 * page. Assert eviction has been locked out.
 	 */
-	WT_RET(__wt_evict_file_exclusive_on(session));
+	WT_ASSERT(session,
+	    btree->evict_disabled > 0 ||
+	    !F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
+
+	/*
+	 * We do discard objects without pages in memory. If that's the case,
+	 * we're done.
+	 */
+	if (btree->root.page == NULL)
+		return (0);
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	WT_RET(__wt_txn_update_oldest(
@@ -101,8 +113,6 @@ err:		/* On error, clear any left-over tree walk. */
 			WT_TRET(__wt_page_release(
 			    session, next_ref, WT_READ_NO_EVICT));
 	}
-
-	__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }

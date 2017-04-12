@@ -376,7 +376,6 @@ examples = [
     "ex_pack",
     "ex_process",
     "ex_schema",
-    "ex_scope",
     "ex_stat",
     "ex_thread",
     ]

@@ -14,6 +14,18 @@
  * of instructions.
  */
 
+/*
+ * __spin_init_internal --
+ *      Initialize the WT portion of a spinlock.
+ */
+static inline void
+__spin_init_internal(WT_SPINLOCK *t, const char *name)
+{
+	t->name = name;
+	t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
+	t->initialized = 1;
+}
+
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
 /* Default to spinning 1000 times before yielding. */
@@ -29,10 +41,9 @@ static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
 	WT_UNUSED(session);
-	WT_UNUSED(name);
 
 	t->lock = 0;
-	t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
+	__spin_init_internal(t, name);
 	return (0);
 }
 
@@ -110,10 +121,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 #else
 	WT_RET(pthread_mutex_init(&t->lock, NULL));
 #endif
-
-	t->name = name;
-	t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
-	t->initialized = 1;
+	__spin_init_internal(t, name);
 
 	WT_UNUSED(session);
 	return (0);
@@ -195,8 +203,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 		return (__wt_map_windows_error(windows_error));
 	}
 
-	t->name = name;
-	t->initialized = 1;
+	__spin_init_internal(t, name);
 	return (0);
 }
 
@@ -316,6 +323,6 @@ __wt_spin_trylock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 		stats = (int64_t **)S2C(session)->stats;
 		stats[session->stat_bucket][t->stat_count_off]++;
 		return (0);
-	} else
-		return (__wt_spin_trylock(session, t));
+	}
+	return (__wt_spin_trylock(session, t));
 }

@@ -66,7 +66,8 @@ rw_start(u_int readers, u_int writers)
 	for (i = 0; i < writers; ++i) {
 		if (i == 0 || multiple_files) {
 			run_info[i].name = dmalloc(64);
-			snprintf(run_info[i].name, 64, FNAME, i);
+			testutil_check(__wt_snprintf(
+			    run_info[i].name, 64, FNAME, i));
 
 			/* Vary by orders of magnitude */
 			if (vary_nops)
@@ -88,8 +89,8 @@ rw_start(u_int readers, u_int writers)
 			run_info[offset].name = dmalloc(64);
 			/* Have readers read from tables with writes. */
 			name_index = i % writers;
-			snprintf(
-			    run_info[offset].name, 64, FNAME, name_index);
+			testutil_check(__wt_snprintf(
+			    run_info[offset].name, 64, FNAME, name_index));
 
 			/* Vary by orders of magnitude */
 			if (vary_nops)
@@ -158,7 +159,8 @@ static inline void
 reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key;
-	u_int keyno;
+	size_t len;
+	uint64_t keyno;
 	int ret;
 	char keybuf[64];
 
@@ -166,17 +168,18 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 
 	keyno = __wt_random(&s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
+		testutil_check(__wt_snprintf_len_set(
+		    keybuf, sizeof(keybuf), &len, "%017" PRIu64, keyno));
 		key->data = keybuf;
-		key->size = (uint32_t)
-		    snprintf(keybuf, sizeof(keybuf), "%017u", keyno);
+		key->size = (uint32_t)len;
 		cursor->set_key(cursor, key);
 	} else
-		cursor->set_key(cursor, (uint32_t)keyno);
+		cursor->set_key(cursor, keyno);
 	if ((ret = cursor->search(cursor)) != 0 && ret != WT_NOTFOUND)
 		testutil_die(ret, "cursor.search");
 	if (log_print)
 		testutil_check(session->log_printf(session,
-		    "Reader Thread %p key %017u", pthread_self(), keyno));
+		    "Reader Thread %p key %017" PRIu64, pthread_self(), keyno));
 }
 
 /*
@@ -195,7 +198,7 @@ reader(void *arg)
 
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];
-	__wt_thread_id(tid, sizeof(tid));
+	testutil_check(__wt_thread_id(tid, sizeof(tid)));
 	__wt_random_init(&s->rnd);
 
 	printf(" read thread %2d starting: tid: %s, file: %s\n",
@@ -242,7 +245,8 @@ static inline void
 writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key, *value, _value;
-	u_int keyno;
+	uint64_t keyno;
+	size_t len;
 	int ret;
 	char keybuf[64], valuebuf[64];
 
@@ -251,12 +255,13 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 
 	keyno = __wt_random(&s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
+		testutil_check(__wt_snprintf_len_set(
+		    keybuf, sizeof(keybuf), &len, "%017" PRIu64, keyno));
 		key->data = keybuf;
-		key->size = (uint32_t)
-		    snprintf(keybuf, sizeof(keybuf), "%017u", keyno);
+		key->size = (uint32_t)len;
 		cursor->set_key(cursor, key);
 	} else
-		cursor->set_key(cursor, (uint32_t)keyno);
+		cursor->set_key(cursor, keyno);
 	if (keyno % 5 == 0) {
 		++s->remove;
 		if ((ret =
@@ -268,8 +273,10 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 		if (ftype == FIX)
 			cursor->set_value(cursor, 0x10);
 		else {
-			value->size = (uint32_t)snprintf(
-			    valuebuf, sizeof(valuebuf), "XXX %37u", keyno);
+			testutil_check(__wt_snprintf_len_set(
+			    valuebuf, sizeof(valuebuf),
+			    &len, "XXX %37" PRIu64, keyno));
+			value->size = (uint32_t)len;
 			cursor->set_value(cursor, value);
 		}
 		if ((ret = cursor->update(cursor)) != 0)
@@ -277,7 +284,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 	}
 	if (log_print)
 		testutil_check(session->log_printf(session,
-		    "Writer Thread %p key %017u", pthread_self(), keyno));
+		    "Writer Thread %p key %017" PRIu64, pthread_self(), keyno));
 }
 
 /*
@@ -296,7 +303,7 @@ writer(void *arg)
 
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];
-	__wt_thread_id(tid, sizeof(tid));
+	testutil_check(__wt_thread_id(tid, sizeof(tid)));
 	__wt_random_init(&s->rnd);
 
 	printf("write thread %2d starting: tid: %s, file: %s\n",

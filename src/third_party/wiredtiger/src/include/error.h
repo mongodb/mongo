@@ -67,14 +67,16 @@
 	int __ret;							\
 	if ((__ret = (a)) != 0 &&					\
 	    (__ret == WT_PANIC ||					\
-	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
+	    ret == 0 || ret == WT_DUPLICATE_KEY ||			\
+	    ret == WT_NOTFOUND || ret == WT_RESTART))			\
 		ret = __ret;						\
 } while (0)
 #define	WT_TRET_ERROR_OK(a, e) do {					\
 	int __ret;							\
 	if ((__ret = (a)) != 0 && __ret != (e) &&			\
 	    (__ret == WT_PANIC ||					\
-	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
+	    ret == 0 || ret == WT_DUPLICATE_KEY ||			\
+	    ret == WT_NOTFOUND || ret == WT_RESTART))			\
 		ret = __ret;						\
 } while (0)
 #define	WT_TRET_NOTFOUND_OK(a)	WT_TRET_ERROR_OK(a, WT_NOTFOUND)

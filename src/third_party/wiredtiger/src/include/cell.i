@@ -361,14 +361,12 @@ __wt_cell_pack_leaf_key(WT_CELL *cell, uint8_t prefix, size_t size)
 			cell->__chunk[0] = (uint8_t)
 			    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT);
 			return (1);
-		} else {
-			byte = (uint8_t)size;		/* Type + length */
-			cell->__chunk[0] = (uint8_t)
-			    ((byte << WT_CELL_SHORT_SHIFT) |
-			    WT_CELL_KEY_SHORT_PFX);
-			cell->__chunk[1] = prefix;	/* Prefix */
-			return (2);
 		}
+		byte = (uint8_t)size;		/* Type + length */
+		cell->__chunk[0] = (uint8_t)
+		    ((byte << WT_CELL_SHORT_SHIFT) | WT_CELL_KEY_SHORT_PFX);
+		cell->__chunk[1] = prefix;	/* Prefix */
+		return (2);
 	}
 
 	if (prefix == 0) {
@@ -569,8 +567,8 @@ __wt_cell_unpack_safe(
 	 */
 #define	WT_CELL_LEN_CHK(t, len) do {					\
 	if (start != NULL &&						\
-	    ((uint8_t *)t < (uint8_t *)start ||				\
-	    (((uint8_t *)t) + (len)) > (uint8_t *)end))			\
+	    ((uint8_t *)(t) < (uint8_t *)start ||			\
+	    (((uint8_t *)(t)) + (len)) > (uint8_t *)end))		\
 		return (WT_ERROR);					\
 } while (0)
 

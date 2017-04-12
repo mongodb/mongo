@@ -230,7 +230,7 @@ __bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
 #define	__BIT_GET(len, mask)						\
 	case len:							\
 		if (__bit_test(bitf, bit))				\
-			value |= mask;					\
+			value |= (mask);				\
 		++bit							\
 		/* FALLTHROUGH */
 

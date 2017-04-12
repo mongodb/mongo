@@ -195,103 +195,12 @@ retry:
 }
 
 /*
- * __log_slot_switch_internal --
- *	Switch out the current slot and set up a new one.
- */
-static int
-__log_slot_switch_internal(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced)
-{
-	WT_DECL_RET;
-	WT_LOG *log;
-	WT_LOGSLOT *slot;
-	bool free_slot, release;
-
-	log = S2C(session)->log;
-	release = false;
-	slot = myslot->slot;
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-
-	/*
-	 * If someone else raced us to closing this specific slot, we're
-	 * done here.
-	 */
-	if (slot != log->active_slot)
-		return (0);
-
-	WT_RET(WT_SESSION_CHECK_PANIC(session));
-	/*
-	 * We may come through here multiple times if we were able to close
-	 * a slot but could not set up a new one.  If we closed it already,
-	 * don't try to do it again but still set up the new slot.
-	 */
-	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
-		ret = __log_slot_close(session, slot, &release, forced);
-		/*
-		 * If close returns WT_NOTFOUND it means that someone else
-		 * is processing the slot change.
-		 */
-		if (ret == WT_NOTFOUND)
-			return (0);
-		WT_RET(ret);
-		if (release) {
-			WT_RET(__wt_log_release(session, slot, &free_slot));
-			if (free_slot)
-				__wt_log_slot_free(session, slot);
-		}
-	}
-	/*
-	 * Set that we have closed this slot because we may call in here
-	 * multiple times if we retry creating a new slot.
-	 */
-	F_SET(myslot, WT_MYSLOT_CLOSE);
-	WT_RET(__wt_log_slot_new(session));
-	F_CLR(myslot, WT_MYSLOT_CLOSE);
-	return (0);
-}
-
-/*
- * __wt_log_slot_switch --
- *	Switch out the current slot and set up a new one.
- */
-int
-__wt_log_slot_switch(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool retry, bool forced)
-{
-	WT_DECL_RET;
-	WT_LOG *log;
-
-	log = S2C(session)->log;
-	/*
-	 * !!! Since the WT_WITH_SLOT_LOCK macro is a do-while loop, the
-	 * compiler does not like it combined directly with the while loop
-	 * here.
-	 *
-	 * The loop conditional is a bit complex.  We have to retry if we
-	 * closed the slot but were unable to set up a new slot.  In that
-	 * case the flag indicating we have closed the slot will still be set.
-	 * We have to retry in that case regardless of the retry setting
-	 * because we are responsible for setting up the new slot.
-	 */
-	do {
-		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __log_slot_switch_internal(session, myslot, forced));
-		if (ret == EBUSY) {
-			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
-			__wt_yield();
-		}
-	} while (F_ISSET(myslot, WT_MYSLOT_CLOSE) || (retry && ret == EBUSY));
-	return (ret);
-}
-
-/*
- * __wt_log_slot_new --
+ * __log_slot_new --
  *	Find a free slot and switch it as the new active slot.
  *	Must be called holding the slot lock.
  */
-int
-__wt_log_slot_new(WT_SESSION_IMPL *session)
+static int
+__log_slot_new(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -351,6 +260,7 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 		/*
 		 * If we didn't find any free slots signal the worker thread.
 		 */
+		WT_STAT_CONN_INCR(session, log_slot_no_free_slots);
 		__wt_cond_signal(session, conn->log_wrlsn_cond);
 		__wt_yield();
 #ifdef	HAVE_DIAGNOSTIC
@@ -368,6 +278,122 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 #endif
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __log_slot_switch_internal --
+ *	Switch out the current slot and set up a new one.
+ */
+static int
+__log_slot_switch_internal(
+    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced, bool *did_work)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	bool free_slot, release;
+	uint32_t joined;
+
+	log = S2C(session)->log;
+	release = false;
+	slot = myslot->slot;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+
+	/*
+	 * If someone else raced us to closing this specific slot, we're
+	 * done here.
+	 */
+	if (slot != log->active_slot)
+		return (0);
+	/*
+	 * If the current active slot is unused and this is a forced switch,
+	 * we're done.  If this is a non-forced switch we always switch
+	 * because the slot could be part of an unbuffered operation.
+	 */
+	joined = WT_LOG_SLOT_JOINED(slot->slot_state);
+	if (joined == 0 && forced) {
+		WT_STAT_CONN_INCR(session, log_force_write_skip);
+		if (did_work != NULL)
+			*did_work = false;
+		return (0);
+	}
+	WT_RET(WT_SESSION_CHECK_PANIC(session));
+
+	/*
+	 * We may come through here multiple times if we were not able to
+	 * set up a new one.  If we closed it already,
+	 * don't try to do it again but still set up the new slot.
+	 */
+	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
+		ret = __log_slot_close(session, slot, &release, forced);
+		/*
+		 * If close returns WT_NOTFOUND it means that someone else
+		 * is processing the slot change.
+		 */
+		if (ret == WT_NOTFOUND)
+			return (0);
+		WT_RET(ret);
+		/*
+		 * Set that we have closed this slot because we may call in here
+		 * multiple times if we retry creating a new slot.  Similarly
+		 * set retain whether this slot needs releasing so that we don't
+		 * lose that information if we retry.
+		 */
+		F_SET(myslot, WT_MYSLOT_CLOSE);
+		if (release)
+			F_SET(myslot, WT_MYSLOT_NEEDS_RELEASE);
+	}
+	/*
+	 * Now that the slot is closed, set up a new one so that joining
+	 * threads don't have to wait on writing the previous slot if we
+	 * release it.  Release after setting a new one.
+	 */
+	WT_RET(__log_slot_new(session));
+	F_CLR(myslot, WT_MYSLOT_CLOSE);
+	if (F_ISSET(myslot, WT_MYSLOT_NEEDS_RELEASE)) {
+		WT_RET(__wt_log_release(session, slot, &free_slot));
+		F_CLR(myslot, WT_MYSLOT_NEEDS_RELEASE);
+		if (free_slot)
+			__wt_log_slot_free(session, slot);
+	}
+	return (ret);
+}
+
+/*
+ * __wt_log_slot_switch --
+ *	Switch out the current slot and set up a new one.
+ */
+int
+__wt_log_slot_switch(WT_SESSION_IMPL *session,
+    WT_MYSLOT *myslot, bool retry, bool forced, bool *did_work)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+
+	log = S2C(session)->log;
+
+	/*
+	 * !!! Since the WT_WITH_SLOT_LOCK macro is a do-while loop, the
+	 * compiler does not like it combined directly with the while loop
+	 * here.
+	 *
+	 * The loop conditional is a bit complex.  We have to retry if we
+	 * closed the slot but were unable to set up a new slot.  In that
+	 * case the flag indicating we have closed the slot will still be set.
+	 * We have to retry in that case regardless of the retry setting
+	 * because we are responsible for setting up the new slot.
+	 */
+	do {
+		WT_WITH_SLOT_LOCK(session, log,
+		    ret = __log_slot_switch_internal(
+		    session, myslot, forced, did_work));
+		if (ret == EBUSY) {
+			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
+			__wt_yield();
+		}
+	} while (F_ISSET(myslot, WT_MYSLOT_CLOSE) || (retry && ret == EBUSY));
+	return (ret);
 }
 
 /*
@@ -531,12 +557,13 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 			if (__wt_atomic_casiv64(
 			    &slot->slot_state, old_state, new_state))
 				break;
-		}
+			WT_STAT_CONN_INCR(session, log_slot_races);
+		} else
+			WT_STAT_CONN_INCR(session, log_slot_active_closed);
 		/*
 		 * The slot is no longer open or we lost the race to
 		 * update it.  Yield and try again.
 		 */
-		WT_STAT_CONN_INCR(session, log_slot_races);
 		__wt_yield();
 	}
 	/*
@@ -574,7 +601,6 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 	wt_off_t cur_offset, my_start;
 	int64_t my_size, rel_size;
 
-	WT_UNUSED(session);
 	slot = myslot->slot;
 	my_start = slot->slot_start_offset + myslot->offset;
 	/*

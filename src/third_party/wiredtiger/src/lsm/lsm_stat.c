@@ -29,8 +29,8 @@ __curstat_lsm_init(
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
-	   WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
-	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
+	    "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = false;
 	WT_RET(__wt_lsm_tree_get(session, uri, false, &lsm_tree));
@@ -38,13 +38,13 @@ __curstat_lsm_init(
 
 	/* Propagate all, fast and/or clear to the cursors we open. */
 	if (cst->flags != 0) {
-		(void)snprintf(config, sizeof(config),
+		WT_ERR(__wt_snprintf(config, sizeof(config),
 		    "statistics=(%s%s%s%s)",
 		    F_ISSET(cst, WT_STAT_TYPE_ALL) ? "all," : "",
 		    F_ISSET(cst, WT_STAT_CLEAR) ? "clear," : "",
 		    !F_ISSET(cst, WT_STAT_TYPE_ALL) &&
 		    F_ISSET(cst, WT_STAT_TYPE_FAST) ? "fast," : "",
-		    F_ISSET(cst, WT_STAT_TYPE_SIZE) ? "size," : "");
+		    F_ISSET(cst, WT_STAT_TYPE_SIZE) ? "size," : ""));
 		cfg[1] = disk_cfg[1] = config;
 	}
 
