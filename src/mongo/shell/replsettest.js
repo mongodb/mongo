@@ -781,6 +781,8 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             jsTest.authenticateNodes(this.nodes);
         }
+
+        this.awaitSecondaryNodes();
     };
 
     /**
@@ -813,7 +815,6 @@ var ReplSetTest = function(opts) {
      * Calls awaitReplication() which requires all connections in 'nodes' to be authenticated.
      */
     this.stepUp = function(node) {
-        this.awaitSecondaryNodes();
         this.awaitReplication();
         this.awaitNodesAgreeOnPrimary();
         if (this.getPrimary() === node) {
