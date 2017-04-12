@@ -85,7 +85,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextSpilled() {
         return GetNextResult::makeEOF();
 
     _currentId = _firstPartOfNextGroup.first;
-    const size_t numAccumulators = _accumalatedFields.size();
+    const size_t numAccumulators = _accumulatedFields.size();
     while (pExpCtx->getValueComparator().evaluate(_currentId == _firstPartOfNextGroup.first)) {
         // Inside of this loop, _firstPartOfNextGroup is the current data being processed.
         // At loop exit, it is the first value to be processed in the next group.
@@ -141,7 +141,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
         // Add to the current accumulator(s).
         for (size_t i = 0; i < _currentAccumulators.size(); i++) {
             _currentAccumulators[i]->process(
-                _accumalatedFields[i].expression->evaluate(_variables.get()), _doingMerge);
+                _accumulatedFields[i].expression->evaluate(_variables.get()), _doingMerge);
         }
 
         // Release our references to the previous input document before asking for the next. This
@@ -191,8 +191,8 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
         _idExpressions[i] = _idExpressions[i]->optimize();
     }
 
-    for (size_t i = 0; i < _accumalatedFields.size(); i++) {
-        _accumalatedFields[i].expression = _accumalatedFields[i].expression->optimize();
+    for (size_t i = 0; i < _accumulatedFields.size(); i++) {
+        _accumulatedFields[i].expression = _accumulatedFields[i].expression->optimize();
     }
 
     return this;
@@ -216,12 +216,12 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
     }
 
     // Add the remaining fields.
-    const size_t n = _accumalatedFields.size();
+    const size_t n = _accumulatedFields.size();
     for (size_t i = 0; i < n; ++i) {
-        intrusive_ptr<Accumulator> accum = _accumalatedFields[i].makeAccumulator(pExpCtx);
-        insides[_accumalatedFields[i].fieldName] =
+        intrusive_ptr<Accumulator> accum = _accumulatedFields[i].makeAccumulator(pExpCtx);
+        insides[_accumulatedFields[i].fieldName] =
             Value(DOC(accum->getOpName()
-                      << _accumalatedFields[i].expression->serialize(static_cast<bool>(explain))));
+                      << _accumulatedFields[i].expression->serialize(static_cast<bool>(explain))));
     }
 
     if (_doingMerge) {
@@ -243,9 +243,9 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
     }
 
     // add the rest
-    const size_t n = _accumalatedFields.size();
+    const size_t n = _accumulatedFields.size();
     for (size_t i = 0; i < n; ++i) {
-        _accumalatedFields[i].expression->addDependencies(deps);
+        _accumulatedFields[i].expression->addDependencies(deps);
     }
 
     return EXHAUSTIVE_ALL;
@@ -280,7 +280,7 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {}
 
 void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationStatement) {
-    _accumalatedFields.push_back(accumulationStatement);
+    _accumulatedFields.push_back(accumulationStatement);
 }
 
 namespace {
@@ -464,7 +464,7 @@ void getFieldPathListForSpilled(ExpressionObject* expressionObj,
 }  // namespace
 
 DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
-    const size_t numAccumulators = _accumalatedFields.size();
+    const size_t numAccumulators = _accumulatedFields.size();
 
     boost::optional<BSONObj> inputSort = findRelevantInputSort();
     if (inputSort) {
@@ -475,7 +475,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         // Set up accumulators.
         _currentAccumulators.reserve(numAccumulators);
         for (size_t i = 0; i < numAccumulators; i++) {
-            _currentAccumulators.push_back(_accumalatedFields[i].makeAccumulator(pExpCtx));
+            _currentAccumulators.push_back(_accumulatedFields[i].makeAccumulator(pExpCtx));
         }
 
         // We only need to load the first document.
@@ -493,7 +493,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
-    dassert(numAccumulators == _accumalatedFields.size());
+    dassert(numAccumulators == _accumulatedFields.size());
 
     // Barring any pausing, this loop exhausts 'pSource' and populates '_groups'.
     GetNextResult input = pSource->getNext();
@@ -524,7 +524,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             // Add the accumulators
             group.reserve(numAccumulators);
             for (size_t i = 0; i < numAccumulators; i++) {
-                group.push_back(_accumalatedFields[i].makeAccumulator(pExpCtx));
+                group.push_back(_accumulatedFields[i].makeAccumulator(pExpCtx));
             }
         } else {
             for (size_t i = 0; i < numAccumulators; i++) {
@@ -536,7 +536,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         /* tickle all the accumulators for the group we found */
         dassert(numAccumulators == group.size());
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(_accumalatedFields[i].expression->evaluate(_variables.get()),
+            group[i]->process(_accumulatedFields[i].expression->evaluate(_variables.get()),
                               _doingMerge);
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
@@ -580,7 +580,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
                 for (size_t i = 0; i < numAccumulators; i++) {
-                    _currentAccumulators.push_back(_accumalatedFields[i].makeAccumulator(pExpCtx));
+                    _currentAccumulators.push_back(_accumulatedFields[i].makeAccumulator(pExpCtx));
                 }
 
                 verify(_sorterIterator->more());  // we put data in, we should get something out.
@@ -609,7 +609,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(pExpCtx->getValueComparator()));
 
     SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir));
-    switch (_accumalatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
+    switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                           // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
                 writer.addAlreadySorted(ptrs[i]->first, Value());
@@ -825,7 +825,7 @@ Value DocumentSourceGroup::expandId(const Value& val) {
 Document DocumentSourceGroup::makeDocument(const Value& id,
                                            const Accumulators& accums,
                                            bool mergeableOutput) {
-    const size_t n = _accumalatedFields.size();
+    const size_t n = _accumulatedFields.size();
     MutableDocument out(1 + n);
 
     /* add the _id field */
@@ -836,9 +836,9 @@ Document DocumentSourceGroup::makeDocument(const Value& id,
         Value val = accums[i]->getValue(mergeableOutput);
         if (val.missing()) {
             // we return null in this case so return objects are predictable
-            out.addField(_accumalatedFields[i].fieldName, Value(BSONNULL));
+            out.addField(_accumulatedFields[i].fieldName, Value(BSONNULL));
         } else {
-            out.addField(_accumalatedFields[i].fieldName, val);
+            out.addField(_accumulatedFields[i].fieldName, val);
         }
     }
 
@@ -858,9 +858,9 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
     /* the merger will use the same grouping key */
     pMerger->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
 
-    const size_t n = _accumalatedFields.size();
+    const size_t n = _accumulatedFields.size();
     for (size_t i = 0; i < n; ++i) {
-        StringData factoryName(_accumalatedFields[i].fieldName);
+        StringData factoryName(_accumulatedFields[i].fieldName);
 
         /*
           The merger's output field names will be the same, as will the
@@ -871,9 +871,9 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
           same name from the prior group.
         */
         pMerger->addAccumulator(
-            {_accumalatedFields[i].fieldName,
-             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + _accumalatedFields[i].fieldName, vps),
-             _accumalatedFields[i].getFactory(factoryName)});
+            {_accumulatedFields[i].fieldName,
+             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + _accumulatedFields[i].fieldName, vps),
+             _accumulatedFields[i].getFactory(factoryName)});
     }
 
     pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));

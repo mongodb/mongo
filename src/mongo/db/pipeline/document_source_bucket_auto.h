@@ -139,7 +139,7 @@ private:
     std::unique_ptr<Sorter<Value, Document>> _sorter;
     std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
 
-    std::vector<AccumulationStatement> _accumalatedFields;
+    std::vector<AccumulationStatement> _accumulatedFields;
 
     int _nBuckets;
     uint64_t _maxMemoryUsageBytes;

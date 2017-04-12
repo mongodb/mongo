@@ -147,7 +147,7 @@ private:
      */
     Value expandId(const Value& val);
 
-    std::vector<AccumulationStatement> _accumalatedFields;
+    std::vector<AccumulationStatement> _accumulatedFields;
 
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
