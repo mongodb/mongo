@@ -584,7 +584,9 @@ public:
         const char* data = nullptr;
         if (type() == BinData && binDataType() == BinDataType::newUUID)
             data = binData(len);
-        uassert(00000, "uuid must be a 16-byte binary field with UUID (4) subtype", len == 16);
+        uassert(ErrorCodes::InvalidUUID,
+                "uuid must be a 16-byte binary field with UUID (4) subtype",
+                len == 16);
         std::array<unsigned char, 16> result;
         memcpy(&result, data, len);
         return result;

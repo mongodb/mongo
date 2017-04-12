@@ -332,7 +332,7 @@ TEST_F(
                                        << false));
     auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
     NamespaceString sourceNss(operation["o"].Obj().firstElement().String());
-    ASSERT_EQUALS(ErrorCodes::UnknownError, UUID::parse(operation["o"].Obj()["dropTarget"]));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(operation["o"].Obj()["dropTarget"]));
 
     ASSERT_TRUE(OplogEntry(operation).isCommand());
 
