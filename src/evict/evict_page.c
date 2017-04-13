@@ -113,6 +113,9 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	/* Checkpoints should never do eviction. */
 	WT_ASSERT(session, !WT_SESSION_IS_CHECKPOINT(session));
 
+	/* Enter the eviction generation. */
+	__wt_session_gen_enter(session, WT_GEN_EVICT);
+
 	page = ref->page;
 	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 
@@ -133,7 +136,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 * we want: there is nothing more to do.
 	 */
 	if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
-		return (0);
+		goto done;
 
 	/* Count evictions of internal pages during normal operation. */
 	if (!closing && WT_PAGE_IS_INTERNAL(page)) {
@@ -181,6 +184,9 @@ err:		if (!closing)
 		WT_STAT_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_DATA_INCR(session, cache_eviction_fail);
 	}
+
+done:	/* Leave the eviction generation. */
+	__wt_session_gen_leave(session, WT_GEN_EVICT);
 
 	return (ret);
 }
@@ -479,10 +485,6 @@ __evict_review(
 		 */
 		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 			return (__wt_split_insert(session, ref));
-
-		/* If splits are the only permitted operation, we're done. */
-		if (F_ISSET(S2BT(session), WT_BTREE_ALLOW_SPLITS))
-			return (EBUSY);
 	}
 
 	/* If the page is clean, we're done and we can evict. */

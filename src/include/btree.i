@@ -1286,6 +1286,16 @@ __wt_page_can_evict(
 		return (true);
 
 	/*
+	 * We can't split or evict multiblock row-store pages where the parent's
+	 * key for the page is an overflow item, because the split into the
+	 * parent frees the backing blocks for any no-longer-used overflow keys,
+	 * which will corrupt the checkpoint's block management.
+	 */
+	if (btree->checkpointing != WT_CKPT_OFF &&
+	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
+		return (false);
+
+	/*
 	 * Check for in-memory splits before other eviction tests. If the page
 	 * should split in-memory, return success immediately and skip more
 	 * detailed eviction tests. We don't need further tests since the page
@@ -1310,16 +1320,6 @@ __wt_page_can_evict(
 		WT_STAT_DATA_INCR(session, cache_eviction_checkpoint);
 		return (false);
 	}
-
-	/*
-	 * We can't evict clean, multiblock row-store pages where the parent's
-	 * key for the page is an overflow item, because the split into the
-	 * parent frees the backing blocks for any no-longer-used overflow keys,
-	 * which will corrupt the checkpoint's block management.
-	 */
-	if (btree->checkpointing != WT_CKPT_OFF &&
-	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
-		return (false);
 
 	/*
 	 * If a split created new internal pages, those newly created internal

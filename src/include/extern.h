@@ -649,6 +649,8 @@ extern int __wt_unexpected_object_type( WT_SESSION_IMPL *session, const char *ur
 extern void __wt_gen_init(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern uint64_t __wt_gen(WT_SESSION_IMPL *session, int which) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern uint64_t __wt_gen_next(WT_SESSION_IMPL *session, int which) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern uint64_t __wt_gen_next_drain(WT_SESSION_IMPL *session, int which) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern void __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern uint64_t __wt_gen_oldest(WT_SESSION_IMPL *session, int which) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern uint64_t __wt_session_gen(WT_SESSION_IMPL *session, int which) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_session_gen_enter(WT_SESSION_IMPL *session, int which) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
