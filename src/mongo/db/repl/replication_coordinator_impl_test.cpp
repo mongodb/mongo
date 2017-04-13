@@ -1532,11 +1532,8 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 
     // Prevent _stepDownFinish() from running and becoming secondary by blocking in this
     // exclusive task.
-    unittest::Barrier barrier(2U);
-    auto stepDownFinishBlocker = [&barrier](const executor::TaskExecutor::CallbackArgs& args) {
-        barrier.countDownAndWait();
-    };
-    replExec->scheduleWorkWithGlobalExclusiveLock(stepDownFinishBlocker);
+    const auto opCtx = makeOperationContext();
+    boost::optional<Lock::GlobalWrite> globalExclusiveLock(opCtx.get());
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
@@ -1546,8 +1543,8 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
     ASSERT(updateTermEvh3.isValid());
 
-    // Unblock 'stepDownFinishBlocker'. Tasks for updateTerm and _stepDownFinish should proceed.
-    barrier.countDownAndWait();
+    // Unblock the tasks for updateTerm and _stepDownFinish.
+    globalExclusiveLock.reset();
 
     // Both _updateTerm_incallback tasks should be scheduled.
     replExec->waitForEvent(updateTermEvh2);
@@ -5001,11 +4998,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     }
     getNet()->exitNetwork();
 
-    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
-    auto exec = getReplExec();
-    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
-    exec->wait(unittest::assertGet(exec->scheduleWorkWithGlobalExclusiveLock(work)));
-    ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Hours{1}));
 }
 
 TEST_F(ReplCoordTest, WaitForMemberState) {

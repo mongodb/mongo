@@ -498,25 +498,27 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
         ReplSetHeartbeatArgs hbArgs;
         if (hbArgs.initialize(request.cmdObj).isOK()) {
             ReplSetHeartbeatResponse hbResp;
+            Date_t responseDate = net->now();
             hbResp.setSetName(config.getReplSetName());
             if (request.target == HostAndPort("node2", 12345)) {
                 hbResp.setState(MemberState::RS_PRIMARY);
             } else {
                 hbResp.setState(MemberState::RS_SECONDARY);
+                responseDate += Milliseconds{1};
             }
             hbResp.setConfigVersion(config.getConfigVersion());
             auto response = makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
-            net->scheduleResponse(noi, net->now(), response);
+            net->scheduleResponse(noi, responseDate, response);
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
             net->blackHole(noi);
         }
     }
-    net->runReadyNetworkOperations();
-    net->exitNetwork();
+    const auto afterHeartbeatsProcessed = net->now() + Milliseconds{1};
+    net->runUntil(afterHeartbeatsProcessed);
+    ASSERT_EQ(afterHeartbeatsProcessed, net->now());
 
-    net->enterNetwork();
     ASSERT_TRUE(net->hasReadyRequests());
     auto noi = net->getNextReadyRequest();
     auto&& request = noi->getRequest();
