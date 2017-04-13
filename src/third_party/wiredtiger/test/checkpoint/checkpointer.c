@@ -74,7 +74,7 @@ checkpointer(void *arg)
 
 	WT_UNUSED(arg);
 
-	__wt_thread_id(tid, sizeof(tid));
+	testutil_check(__wt_thread_id(tid, sizeof(tid)));
 	printf("checkpointer thread starting: tid: %s\n", tid);
 
 	(void)real_checkpointer();
@@ -107,8 +107,9 @@ real_checkpointer(void)
 	    "WiredTigerCheckpoint", strlen("WiredTigerCheckpoint")) == 0)
 		checkpoint_config = NULL;
 	else {
+		testutil_check(__wt_snprintf(
+		    _buf, sizeof(_buf), "name=%s", g.checkpoint_name));
 		checkpoint_config = _buf;
-		snprintf(checkpoint_config, 128, "name=%s", g.checkpoint_name);
 	}
 	while (g.running) {
 		/* Execute a checkpoint */
@@ -147,7 +148,8 @@ verify_checkpoint(WT_SESSION *session)
 
 	ret = t_ret = 0;
 	key_count = 0;
-	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
+	testutil_check(__wt_snprintf(
+	    ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name));
 	cursors = calloc((size_t)g.ntables, sizeof(*cursors));
 	if (cursors == NULL)
 		return (log_print_err("verify_checkpoint", ENOMEM, 1));
@@ -159,7 +161,8 @@ verify_checkpoint(WT_SESSION *session)
 		 */
 		if (g.cookies[i].type == LSM)
 			continue;
-		snprintf(next_uri, 128, "table:__wt%04d", i);
+		testutil_check(__wt_snprintf(
+		    next_uri, sizeof(next_uri), "table:__wt%04d", i));
 		if ((ret = session->open_cursor(
 		    session, next_uri, NULL, ckpt, &cursors[i])) != 0) {
 			(void)log_print_err(
@@ -296,7 +299,8 @@ diagnose_key_error(
 	session = cursor1->session;
 	key1_orig = key2_orig = 0;
 
-	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
+	testutil_check(__wt_snprintf(
+	    ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name));
 
 	/* Save the failed keys. */
 	if (cursor1->get_key(cursor1, &key1_orig) != 0 ||
@@ -338,7 +342,8 @@ diagnose_key_error(
 	 * Now try opening new cursors on the checkpoints and see if we
 	 * get the same missing key via searching.
 	 */
-	snprintf(next_uri, 128, "table:__wt%04d", index1);
+	testutil_check(__wt_snprintf(
+	    next_uri, sizeof(next_uri), "table:__wt%04d", index1));
 	if (session->open_cursor(session, next_uri, NULL, ckpt, &c) != 0)
 		return (1);
 	c->set_key(c, key1_orig);
@@ -350,7 +355,8 @@ diagnose_key_error(
 	if (c->close(c) != 0)
 		return (1);
 
-	snprintf(next_uri, 128, "table:__wt%04d", index2);
+	testutil_check(__wt_snprintf(
+	    next_uri, sizeof(next_uri), "table:__wt%04d", index2));
 	if (session->open_cursor(session, next_uri, NULL, ckpt, &c) != 0)
 		return (1);
 	c->set_key(c, key1_orig);
@@ -367,7 +373,8 @@ live_check:
 	 * Now try opening cursors on the live checkpoint to see if we get the
 	 * same missing key via searching.
 	 */
-	snprintf(next_uri, 128, "table:__wt%04d", index1);
+	testutil_check(__wt_snprintf(
+	    next_uri, sizeof(next_uri), "table:__wt%04d", index1));
 	if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
 		return (1);
 	c->set_key(c, key1_orig);
@@ -376,7 +383,8 @@ live_check:
 	if (c->close(c) != 0)
 		return (1);
 
-	snprintf(next_uri, 128, "table:__wt%04d", index2);
+	testutil_check(__wt_snprintf(
+	    next_uri, sizeof(next_uri), "table:__wt%04d", index2));
 	if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
 		return (1);
 	c->set_key(c, key2_orig);

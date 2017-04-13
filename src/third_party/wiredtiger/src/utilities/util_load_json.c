@@ -145,6 +145,7 @@ static int
 json_kvraw_append(WT_SESSION *session,
     JSON_INPUT_STATE *ins, const char *str, size_t len)
 {
+	WT_DECL_RET;
 	size_t needsize;
 	char *tmp;
 
@@ -152,11 +153,15 @@ json_kvraw_append(WT_SESSION *session,
 		needsize = strlen(ins->kvraw) + len + 2;
 		if ((tmp = malloc(needsize)) == NULL)
 			return (util_err(session, errno, NULL));
-		snprintf(tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str);
+		WT_ERR(__wt_snprintf(
+		    tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str));
 		free(ins->kvraw);
 		ins->kvraw = tmp;
 	}
 	return (0);
+
+err:	free(tmp);
+	return (util_err(session, ret, NULL));
 }
 
 /*
@@ -181,7 +186,7 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 		goto err;
 	}
 	resultlen += 1;
-	if ((result = (char *)malloc((size_t)resultlen)) == NULL) {
+	if ((result = malloc((size_t)resultlen)) == NULL) {
 		ret = util_err(session, errno, NULL);
 		goto err;
 	}
@@ -236,13 +241,16 @@ json_data(WT_SESSION *session,
 		goto err;
 
 	uri = clp->list[0];
-	(void)snprintf(config, sizeof(config),
+	if ((ret = __wt_snprintf(config, sizeof(config),
 	    "dump=json%s%s",
 	    LF_ISSET(LOAD_JSON_APPEND) ? ",append" : "",
-	    LF_ISSET(LOAD_JSON_NO_OVERWRITE) ? ",overwrite=false" : "");
+	    LF_ISSET(LOAD_JSON_NO_OVERWRITE) ? ",overwrite=false" : "")) != 0) {
+		ret = util_err(session, ret, NULL);
+		goto err;
+	}
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0) {
-		ret = util_err(session, ret, "%s: session.open", uri);
+		ret = util_err(session, ret, "%s: session.open_cursor", uri);
 		goto err;
 	}
 	keyformat = cursor->key_format;
@@ -256,7 +264,7 @@ json_data(WT_SESSION *session,
 		nfield = 0;
 		JSON_EXPECT(session, ins, '{');
 		if (ins->kvraw == NULL) {
-			if ((ins->kvraw = (char *)malloc(1)) == NULL) {
+			if ((ins->kvraw = malloc(1)) == NULL) {
 				ret = util_err(session, errno, NULL);
 				goto err;
 			}
@@ -358,8 +366,11 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 	while (json_peek(session, ins) == 's') {
 		JSON_EXPECT(session, ins, 's');
 		tableuri = realloc(tableuri, ins->toklen);
-		snprintf(tableuri, ins->toklen, "%.*s",
-		    (int)(ins->toklen - 2), ins->tokstart + 1);
+		if ((ret = __wt_snprintf(tableuri, ins->toklen,
+		    "%.*s", (int)(ins->toklen - 2), ins->tokstart + 1)) != 0) {
+			ret = util_err(session, ret, NULL);
+			goto err;
+		}
 		JSON_EXPECT(session, ins, ':');
 		if (!hasversion) {
 			if (strcmp(tableuri, DUMP_JSON_VERSION_MARKER) != 0) {

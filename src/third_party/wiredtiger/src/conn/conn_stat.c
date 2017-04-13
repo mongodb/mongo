@@ -409,7 +409,6 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	struct timespec ts;
 	struct tm *tm, _tm;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_FSTREAM *log_stream;
 
 	conn = S2C(session);
@@ -446,12 +445,9 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 * Lock the schema and walk the list of open handles, dumping
 	 * any that match the list of object sources.
 	 */
-	if (conn->stat_sources != NULL) {
-		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __wt_conn_btree_apply(
+	if (conn->stat_sources != NULL)
+		WT_RET(__wt_conn_btree_apply(
 		    session, NULL, __statlog_apply, NULL, NULL));
-		WT_RET(ret);
-	}
 
 	/*
 	 * Walk the list of open LSM trees, dumping any that match the
@@ -485,8 +481,7 @@ __statlog_on_close(WT_SESSION_IMPL *session)
 	if (!FLD_ISSET(conn->stat_flags, WT_STAT_ON_CLOSE))
 		return (0);
 
-	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
-	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS))
+	if (F_ISSET(conn, WT_CONN_SERVER_STATISTICS))
 		WT_RET_MSG(session, EINVAL,
 		    "Attempt to log statistics while a server is running");
 
@@ -495,6 +490,16 @@ __statlog_on_close(WT_SESSION_IMPL *session)
 
 err:	__wt_scr_free(session, &tmp);
 	return (ret);
+}
+
+/*
+ * __statlog_server_run_chk --
+ *	Check to decide if the statistics log server should continue running.
+ */
+static bool
+__statlog_server_run_chk(WT_SESSION_IMPL *session)
+{
+	return (F_ISSET(S2C(session), WT_CONN_SERVER_STATISTICS));
 }
 
 /*
@@ -525,10 +530,14 @@ __statlog_server(void *arg)
 	WT_ERR(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
 	WT_ERR(__wt_buf_init(session, &tmp, strlen(conn->stat_path) + 128));
 
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
-	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS)) {
+	for (;;) {
 		/* Wait until the next event. */
-		__wt_cond_wait(session, conn->stat_cond, conn->stat_usecs);
+		__wt_cond_wait(session, conn->stat_cond,
+		    conn->stat_usecs, __statlog_server_run_chk);
+
+		/* Check if we're quitting or being reconfigured. */
+		if (!__statlog_server_run_chk(session))
+			break;
 
 		if (WT_STAT_ENABLED(session))
 			WT_ERR(__statlog_log_one(session, &path, &tmp));
@@ -563,7 +572,7 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	session = conn->stat_session;
 
 	WT_RET(__wt_cond_alloc(
-	    session, "statistics log server", false, &conn->stat_cond));
+	    session, "statistics log server", &conn->stat_cond));
 
 	/*
 	 * Start the thread.

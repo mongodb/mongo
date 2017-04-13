@@ -53,19 +53,18 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Spinlocks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
 	WT_SPIN_INIT_TRACKED(session, &conn->checkpoint_lock, checkpoint);
-	WT_SPIN_INIT_TRACKED(session, &conn->dhandle_lock, handle_list);
 	WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
 	WT_RET(__wt_spin_init(session, &conn->las_lock, "lookaside table"));
 	WT_SPIN_INIT_TRACKED(session, &conn->metadata_lock, metadata);
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_SPIN_INIT_TRACKED(session, &conn->schema_lock, schema);
-	WT_SPIN_INIT_TRACKED(session, &conn->table_lock, table);
 	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
 	/* Read-write locks */
-	WT_RET(__wt_rwlock_alloc(
-	    session, &conn->hot_backup_lock, "hot backup"));
+	__wt_rwlock_init(session, &conn->dhandle_lock);
+	__wt_rwlock_init(session, &conn->hot_backup_lock);
+	__wt_rwlock_init(session, &conn->table_lock);
 
 	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
 	for (i = 0; i < WT_PAGE_LOCKS; ++i)
@@ -80,7 +79,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(
 	    session, &conn->lsm_manager.switch_lock, "LSM switch queue lock"));
 	WT_RET(__wt_cond_alloc(
-	    session, "LSM worker cond", false, &conn->lsm_manager.work_cond));
+	    session, "LSM worker cond", &conn->lsm_manager.work_cond));
 
 	/*
 	 * Generation numbers.
@@ -110,16 +109,15 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
  * __wt_connection_destroy --
  *	Destroy the connection's underlying WT_CONNECTION_IMPL structure.
  */
-int
+void
 __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
-		return (0);
+		return;
 
 	session = conn->default_session;
 
@@ -136,7 +134,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->block_lock);
 	__wt_spin_destroy(session, &conn->checkpoint_lock);
-	__wt_spin_destroy(session, &conn->dhandle_lock);
+	__wt_rwlock_destroy(session, &conn->dhandle_lock);
 	__wt_spin_destroy(session, &conn->encryptor_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_rwlock_destroy(session, &conn->hot_backup_lock);
@@ -144,16 +142,11 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
-	__wt_spin_destroy(session, &conn->table_lock);
+	__wt_rwlock_destroy(session, &conn->table_lock);
 	__wt_spin_destroy(session, &conn->turtle_lock);
 	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		__wt_spin_destroy(session, &conn->page_lock[i]);
 	__wt_free(session, conn->page_lock);
-
-	/* Destroy the file-system configuration. */
-	if (conn->file_system != NULL && conn->file_system->terminate != NULL)
-		WT_TRET(conn->file_system->terminate(
-		    conn->file_system, (WT_SESSION *)session));
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->cfg);
@@ -163,5 +156,4 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_stat_connection_discard(session, conn);
 
 	__wt_free(NULL, conn);
-	return (ret);
 }

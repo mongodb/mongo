@@ -31,9 +31,13 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-static char home[512];			/* Program working dir */
-static const char *progname;		/* Program name */
+static char home[1024];			/* Program working dir */
+
+/*
+ * These two names for the URI and file system must be maintained in tandem.
+ */
 static const char * const uri = "table:main";
+static const char * const fs_main = "main.wt";
 static bool inmem;
 
 #define	MAX_TH	12
@@ -90,14 +94,16 @@ thread_run(void *arg)
 	/*
 	 * The value is the name of the record file with our id appended.
 	 */
-	snprintf(buf, sizeof(buf), RECORDS_FILE, td->id);
+	testutil_check(__wt_snprintf(buf, sizeof(buf), RECORDS_FILE, td->id));
 	/*
 	 * Set up a large value putting our id in it.  Write it in there a
 	 * bunch of times, but the rest of the buffer can just be zero.
 	 */
-	snprintf(lgbuf, sizeof(lgbuf), "th-%" PRIu32, td->id);
+	testutil_check(__wt_snprintf(
+	    lgbuf, sizeof(lgbuf), "th-%" PRIu32, td->id));
 	for (i = 0; i < 128; i += strlen(lgbuf))
-		snprintf(&large[i], lsize - i, "%s", lgbuf);
+		testutil_check(__wt_snprintf(
+		    &large[i], lsize - i, "%s", lgbuf));
 	/*
 	 * Keep a separate file with the records we wrote for checking.
 	 */
@@ -120,7 +126,8 @@ thread_run(void *arg)
 	 * Write our portion of the key space until we're killed.
 	 */
 	for (i = td->start; ; ++i) {
-		snprintf(kname, sizeof(kname), "%" PRIu64, i);
+		testutil_check(__wt_snprintf(
+		    kname, sizeof(kname), "%" PRIu64, i));
 		cursor->set_key(cursor, kname);
 		/*
 		 * Every 30th record write a very large record that exceeds the
@@ -211,6 +218,7 @@ extern char *__wt_optarg;
 int
 main(int argc, char *argv[])
 {
+	struct stat sb;
 	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
@@ -222,12 +230,9 @@ main(int argc, char *argv[])
 	pid_t pid;
 	bool fatal, rand_th, rand_time, verify_only;
 	const char *working_dir;
-	char fname[64], kname[64];
+	char fname[64], kname[64], statname[1024];
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	inmem = false;
 	nth = MIN_TH;
@@ -263,7 +268,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	testutil_work_dir_from_path(home, 512, working_dir);
+	testutil_work_dir_from_path(home, sizeof(home), working_dir);
 	/*
 	 * If the user wants to verify they need to tell us how many threads
 	 * there were so we can find the old record files.
@@ -305,8 +310,16 @@ main(int argc, char *argv[])
 		/* parent */
 		/*
 		 * Sleep for the configured amount of time before killing
-		 * the child.
+		 * the child.  Start the timeout from the time we notice that
+		 * the table has been created.  That allows the test to run
+		 * correctly on really slow machines.  Verify the process ID
+		 * still exists in case the child aborts for some reason we
+		 * don't stay in this loop forever.
 		 */
+		testutil_check(__wt_snprintf(
+		    statname, sizeof(statname), "%s/%s", home, fs_main));
+		while (stat(statname, &sb) != 0 && kill(pid, 0) == 0)
+			sleep(1);
 		sleep(timeout);
 
 		/*
@@ -339,12 +352,10 @@ main(int argc, char *argv[])
 	fatal = false;
 	for (i = 0; i < nth; ++i) {
 		middle = 0;
-		snprintf(fname, sizeof(fname), RECORDS_FILE, i);
-		if ((fp = fopen(fname, "r")) == NULL) {
-			fprintf(stderr,
-			    "Failed to open %s. i %" PRIu32 "\n", fname, i);
-			testutil_die(errno, "fopen");
-		}
+		testutil_check(__wt_snprintf(
+		    fname, sizeof(fname), RECORDS_FILE, i));
+		if ((fp = fopen(fname, "r")) == NULL)
+			testutil_die(errno, "fopen: %s", fname);
 
 		/*
 		 * For every key in the saved file, verify that the key exists
@@ -370,7 +381,8 @@ main(int argc, char *argv[])
 				    fname, key, last_key);
 				break;
 			}
-			snprintf(kname, sizeof(kname), "%" PRIu64, key);
+			testutil_check(__wt_snprintf(
+			    kname, sizeof(kname), "%" PRIu64, key));
 			cursor->set_key(cursor, kname);
 			if ((ret = cursor->search(cursor)) != 0) {
 				if (ret != WT_NOTFOUND)

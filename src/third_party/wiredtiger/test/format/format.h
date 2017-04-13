@@ -79,8 +79,6 @@
 #define	FORMAT_OPERATION_REPS	3		/* 3 thread operations sets */
 
 typedef struct {
-	char *progname;				/* Program name */
-
 	char *home;				/* Home directory */
 	char *home_backup;			/* Hot-backup directory */
 	char *home_backup_init;			/* Initialize backup command */
@@ -192,6 +190,7 @@ typedef struct {
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_read_pct;
 	uint32_t c_rebalance;
 	uint32_t c_salvage;
 	uint32_t c_split_pct;

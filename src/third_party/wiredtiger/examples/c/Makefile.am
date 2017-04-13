@@ -20,7 +20,6 @@ noinst_PROGRAMS = \
 	ex_pack \
 	ex_process \
 	ex_schema \
-	ex_scope \
 	ex_stat \
 	ex_sync \
 	ex_thread

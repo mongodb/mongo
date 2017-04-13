@@ -187,7 +187,7 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 			continue;
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) || chunk->generation > 0)
 			break;
-		else if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
+		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			break;
 	}
@@ -625,7 +625,7 @@ err:	if (locked)
 		else
 			__wt_verbose(session, WT_VERB_LSM,
 			    "Merge failed with %s",
-			   __wt_strerror(session, ret, NULL, 0));
+			    __wt_strerror(session, ret, NULL, 0));
 	}
 	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	return (ret);

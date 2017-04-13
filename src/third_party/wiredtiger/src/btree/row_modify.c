@@ -85,9 +85,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	if (cbt->compare == 0) {
 		if (cbt->ins == NULL) {
 			/* Allocate an update array as necessary. */
-			WT_PAGE_ALLOC_AND_SWAP(session,
-			    page, mod->mod_row_update,
-			    upd_entry, page->pg_row_entries);
+			WT_PAGE_ALLOC_AND_SWAP(session, page,
+			    mod->mod_row_update, upd_entry, page->entries);
 
 			/* Set the WT_UPDATE array reference. */
 			upd_entry = &mod->mod_row_update[cbt->slot];
@@ -147,10 +146,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * slot.  That's hard, so we set a flag.
 		 */
 		WT_PAGE_ALLOC_AND_SWAP(session, page,
-		    mod->mod_row_insert, ins_headp, page->pg_row_entries + 1);
+		    mod->mod_row_insert, ins_headp, page->entries + 1);
 
 		ins_slot = F_ISSET(cbt, WT_CBT_SEARCH_SMALLEST) ?
-		    page->pg_row_entries: cbt->slot;
+		    page->entries: cbt->slot;
 		ins_headp = &mod->mod_row_insert[ins_slot];
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */

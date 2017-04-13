@@ -16,6 +16,13 @@ int
 __wt_thread_create(WT_SESSION_IMPL *session,
     wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg)
 {
+	/*
+	 * Creating a thread isn't a memory barrier, but WiredTiger commonly
+	 * sets flags and or state and then expects worker threads to start.
+	 * Include a barrier to ensure safety in those cases.
+	 */
+	WT_FULL_BARRIER();
+
 	/* Spawn a new thread of control. */
 	*tidret = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL);
 	if (*tidret != 0)
@@ -32,6 +39,13 @@ int
 __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 {
 	DWORD windows_error;
+
+	/*
+	 * Joining a thread isn't a memory barrier, but WiredTiger commonly
+	 * sets flags and or state and then expects worker threads to halt.
+	 * Include a barrier to ensure safety in those cases.
+	 */
+	WT_FULL_BARRIER();
 
 	if ((windows_error =
 	    WaitForSingleObject(tid, INFINITE)) != WAIT_OBJECT_0) {
@@ -58,10 +72,10 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
  * __wt_thread_id --
  *	Fill in a printable version of the process and thread IDs.
  */
-void
+int
 __wt_thread_id(char *buf, size_t buflen)
 {
-	(void)snprintf(buf, buflen,
+	return (__wt_snprintf(buf, buflen,
 	    "%" PRIu64 ":%" PRIu64,
-	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId);
+	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId));
 }

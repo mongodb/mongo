@@ -82,11 +82,11 @@ main(int argc, char *argv[])
 	int i, nfail;
 	const char *tablename;
 
+	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+		return (EXIT_SUCCESS);
+
 	opts = &_opts;
 	sharedopts = &_sharedopts;
-
-	if (testutil_disable_long_tests())
-		return (0);
 	memset(opts, 0, sizeof(*opts));
 	memset(sharedopts, 0, sizeof(*sharedopts));
 	memset(insert_args, 0, sizeof(insert_args));
@@ -114,12 +114,15 @@ main(int argc, char *argv[])
 	tablename = strchr(opts->uri, ':');
 	testutil_assert(tablename != NULL);
 	tablename++;
-	snprintf(sharedopts->posturi, sizeof(sharedopts->posturi),
-	    "index:%s:post", tablename);
-	snprintf(sharedopts->baluri, sizeof(sharedopts->baluri),
-	    "index:%s:bal", tablename);
-	snprintf(sharedopts->flaguri, sizeof(sharedopts->flaguri),
-	    "index:%s:flag", tablename);
+	testutil_check(__wt_snprintf(
+	    sharedopts->posturi, sizeof(sharedopts->posturi),
+	    "index:%s:post", tablename));
+	testutil_check(__wt_snprintf(
+	    sharedopts->baluri, sizeof(sharedopts->baluri),
+	    "index:%s:bal", tablename));
+	testutil_check(__wt_snprintf(
+	    sharedopts->flaguri, sizeof(sharedopts->flaguri),
+	    "index:%s:flag", tablename));
 
 	testutil_check(session->create(session, sharedopts->posturi,
 	    "columns=(post)"));

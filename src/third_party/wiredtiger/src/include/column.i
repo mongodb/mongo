@@ -108,7 +108,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 	/* Fast path the check for values at the end of the skiplist. */
 	if (recno > WT_INSERT_RECNO(ret_ins))
 		return (NULL);
-	else if (recno == WT_INSERT_RECNO(ret_ins))
+	if (recno == WT_INSERT_RECNO(ret_ins))
 		return (ret_ins);
 
 	/*
@@ -127,7 +127,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 
 		if (cmp == 0)			/* Exact match: return */
 			return (*insp);
-		else if (cmp > 0)		/* Keep going at this level */
+		if (cmp > 0)			/* Keep going at this level */
 			insp = &(*insp)->next[i];
 		else {				/* Drop down a level */
 			--i;
@@ -221,13 +221,13 @@ __col_var_last_recno(WT_REF *ref)
 	 * This function ignores those records, our callers must handle that
 	 * explicitly, if they care.
 	 */
-	if (page->pg_var_nrepeats == 0)
-		return (page->pg_var_entries == 0 ? 0 :
-		    ref->ref_recno + (page->pg_var_entries - 1));
+	if (!WT_COL_VAR_REPEAT_SET(page))
+		return (page->entries == 0 ? 0 :
+		    ref->ref_recno + (page->entries - 1));
 
 	repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
 	return ((repeat->recno + repeat->rle) - 1 +
-	    (page->pg_var_entries - (repeat->indx + 1)));
+	    (page->entries - (repeat->indx + 1)));
 }
 
 /*
@@ -246,8 +246,7 @@ __col_fix_last_recno(WT_REF *ref)
 	 * This function ignores those records, our callers must handle that
 	 * explicitly, if they care.
 	 */
-	return (page->pg_fix_entries == 0 ?
-	    0 : ref->ref_recno + (page->pg_fix_entries - 1));
+	return (page->entries == 0 ? 0 : ref->ref_recno + (page->entries - 1));
 }
 
 /*
@@ -273,7 +272,9 @@ __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
 	 * slot for this record number, because we know any intervening records
 	 * have repeat counts of 1.
 	 */
-	for (base = 0, limit = page->pg_var_nrepeats; limit != 0; limit >>= 1) {
+	for (base = 0,
+	    limit = WT_COL_VAR_REPEAT_SET(page) ? page->pg_var_nrepeats : 0;
+	    limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 
 		repeat = page->pg_var_repeats + indx;
@@ -281,7 +282,7 @@ __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
 		    recno < repeat->recno + repeat->rle) {
 			if (start_recnop != NULL)
 				*start_recnop = repeat->recno;
-			return (page->pg_var_d + repeat->indx);
+			return (page->pg_var + repeat->indx);
 		}
 		if (recno < repeat->recno)
 			continue;
@@ -306,14 +307,14 @@ __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
 	 * !!!
 	 * The test could be written more simply as:
 	 *
-	 * 	(recno >= start_recno + (page->pg_var_entries - start_indx))
+	 * 	(recno >= start_recno + (page->entries - start_indx))
 	 *
 	 * It's split into two parts because the simpler test will overflow if
 	 * searching for large record numbers.
 	 */
 	if (recno >= start_recno &&
-	    recno - start_recno >= page->pg_var_entries - start_indx)
+	    recno - start_recno >= page->entries - start_indx)
 		return (NULL);
 
-	return (page->pg_var_d + start_indx + (uint32_t)(recno - start_recno));
+	return (page->pg_var + start_indx + (uint32_t)(recno - start_recno));
 }

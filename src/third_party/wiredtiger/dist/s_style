@@ -93,6 +93,14 @@ else
 		cat $t
 	fi
 
+	if ! expr "$f" : 'examples/c/*' > /dev/null &&
+	   ! expr "$f" : 'ext/*' > /dev/null &&
+	   ! expr "$f" : 'src/os_posix/os_snprintf.c' > /dev/null &&
+	    egrep '[^a-z_]snprintf\(|[^a-z_]vsnprintf\(' $f > $t; then
+		echo "$f: snprintf call, use WiredTiger library replacements"
+		cat $t
+	fi
+
 	# Alignment directive before "struct".
 	egrep 'WT_COMPILER_TYPE_ALIGN.*struct' $f > $t
 	test -s $t && {

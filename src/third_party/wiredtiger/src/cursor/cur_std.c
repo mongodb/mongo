@@ -144,6 +144,7 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
  */
 int
 __wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
 {
 	WT_SESSION_IMPL *session;
 
@@ -632,6 +633,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 int
 __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 {
+	WT_DECL_RET;
 	WT_ITEM key;
 
 	/*
@@ -661,9 +663,11 @@ __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 	 * cursors cannot reference application memory after cursor operations
 	 * and that requirement will save the day.
 	 */
-	WT_RET(cursor->search(cursor));
+	F_SET(cursor, WT_CURSTD_RAW_SEARCH);
+	ret = cursor->search(cursor);
+	F_CLR(cursor, WT_CURSTD_RAW_SEARCH);
 
-	return (0);
+	return (ret);
 }
 
 /*

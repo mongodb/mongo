@@ -72,7 +72,7 @@
  * and the session ID is a small, monotonically increasing number.
  */
 #define	WT_STATS_SLOT_ID(session)					\
-	((session)->id) % WT_COUNTER_SLOTS
+	(((session)->id) % WT_COUNTER_SLOTS)
 
 /*
  * Statistic structures are arrays of int64_t's. We have functions to read/write
@@ -310,10 +310,15 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_slow;
 	int64_t cache_eviction_state;
 	int64_t cache_eviction_walks_abandoned;
+	int64_t cache_eviction_active_workers;
+	int64_t cache_eviction_worker_created;
 	int64_t cache_eviction_worker_evicting;
+	int64_t cache_eviction_worker_removed;
+	int64_t cache_eviction_stable_state_workers;
 	int64_t cache_eviction_force_fail;
 	int64_t cache_eviction_walks_active;
 	int64_t cache_eviction_walks_started;
+	int64_t cache_eviction_force_retune;
 	int64_t cache_eviction_hazard;
 	int64_t cache_hazard_checks;
 	int64_t cache_hazard_walks;
@@ -388,9 +393,7 @@ struct __wt_connection_stats {
 	int64_t lock_checkpoint_count;
 	int64_t lock_checkpoint_wait_application;
 	int64_t lock_checkpoint_wait_internal;
-	int64_t lock_handle_list_count;
-	int64_t lock_handle_list_wait_application;
-	int64_t lock_handle_list_wait_internal;
+	int64_t lock_handle_list_wait_eviction;
 	int64_t lock_metadata_count;
 	int64_t lock_metadata_wait_application;
 	int64_t lock_metadata_wait_internal;
@@ -402,9 +405,11 @@ struct __wt_connection_stats {
 	int64_t lock_table_wait_internal;
 	int64_t log_slot_switch_busy;
 	int64_t log_slot_closes;
+	int64_t log_slot_active_closed;
 	int64_t log_slot_races;
 	int64_t log_slot_transitions;
 	int64_t log_slot_joins;
+	int64_t log_slot_no_free_slots;
 	int64_t log_slot_unbuffered;
 	int64_t log_bytes_payload;
 	int64_t log_bytes_written;
@@ -564,6 +569,7 @@ struct __wt_dsrc_stats {
 	int64_t cache_pages_requested;
 	int64_t cache_write;
 	int64_t cache_write_restore;
+	int64_t cache_bytes_dirty;
 	int64_t cache_eviction_clean;
 	int64_t cache_state_gen_avg_gap;
 	int64_t cache_state_avg_written_size;

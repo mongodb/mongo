@@ -9,29 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * WT_BTREE_CURSOR_SAVE_AND_RESTORE
- *	Save the cursor's key/value data/size fields, call an underlying btree
- *	function, and then consistently handle failure and success.
- */
-#define	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, f, ret) do {		\
-	WT_ITEM __key_copy = (cursor)->key;				\
-	uint64_t __recno = (cursor)->recno;				\
-	WT_ITEM __value_copy = (cursor)->value;				\
-	if (((ret) = (f)) == 0) {					\
-		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);	\
-		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
-	} else {							\
-		if (F_ISSET(cursor, WT_CURSTD_KEY_EXT)) {		\
-			(cursor)->recno = __recno;			\
-			WT_ITEM_SET((cursor)->key, __key_copy);		\
-		}							\
-		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT))		\
-			WT_ITEM_SET((cursor)->value, __value_copy);	\
-		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
-	}								\
-} while (0)
-
-/*
  * __curfile_compare --
  *	WT_CURSOR->compare method for the btree cursor type.
  */
@@ -109,9 +86,12 @@ __curfile_next(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if ((ret = __wt_btcur_next(cbt, false)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	WT_ERR(__wt_btcur_next(cbt, false));
+
+	/* Next maintains a position, key and value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
 }
@@ -131,9 +111,12 @@ __wt_curfile_next_random(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if ((ret = __wt_btcur_next_random(cbt)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	WT_ERR(__wt_btcur_next_random(cbt));
+
+	/* Next-random maintains a position, key and value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
 }
@@ -152,9 +135,12 @@ __curfile_prev(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if ((ret = __wt_btcur_prev(cbt, false)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	WT_ERR(__wt_btcur_prev(cbt, false));
+
+	/* Prev maintains a position, key and value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
 }
@@ -175,7 +161,10 @@ __curfile_reset(WT_CURSOR *cursor)
 
 	ret = __wt_btcur_reset(cbt);
 
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	/* Reset maintains no position, key or value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == 0 &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
 
 err:	API_END_RET(session, ret);
 }
@@ -194,10 +183,15 @@ __curfile_search(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_search(cbt), ret);
+	WT_ERR(__wt_btcur_search(cbt));
+
+	/* Search maintains a position, key and value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
 }
@@ -216,11 +210,15 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
-	    cursor, __wt_btcur_search_near(cbt, exact), ret);
+	WT_ERR(__wt_btcur_search_near(cbt, exact));
+
+	/* Search-near maintains a position, key and value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
 }
@@ -238,27 +236,45 @@ __curfile_insert(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, cbt->btree);
-	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
-		WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_insert(cbt), ret);
+	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
+		WT_CURSOR_CHECKKEY(cursor);
+	WT_CURSOR_CHECKVALUE(cursor);
+
+	WT_ERR(__wt_btcur_insert(cbt));
 
 	/*
-	 * Insert is the one cursor operation that doesn't end with the cursor
-	 * pointing to an on-page item (except for column-store appends, where
-	 * we are returning a key). That is, the application's cursor continues
-	 * to reference the application's memory after a successful cursor call,
-	 * which isn't true anywhere else. We don't want to have to explain that
-	 * scoping corner case, so we reset the application's cursor so it can
-	 * free the referenced memory and continue on without risking subsequent
-	 * core dumps.
+	 * Insert maintains no position, key or value (except for column-store
+	 * appends, where we are returning a key).
 	 */
-	if (ret == 0) {
-		if (!F_ISSET(cursor, WT_CURSTD_APPEND))
-			F_CLR(cursor, WT_CURSTD_KEY_INT);
-		F_CLR(cursor, WT_CURSTD_VALUE_INT);
-	}
+	WT_ASSERT(session,
+	    (F_ISSET(cursor, WT_CURSTD_APPEND) &&
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT) ||
+	    (!F_ISSET(cursor, WT_CURSTD_APPEND) &&
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == 0));
+
+err:	CURSOR_UPDATE_API_END(session, ret);
+	return (ret);
+}
+
+/*
+ * __wt_curfile_insert_check --
+ *	WT_CURSOR->insert_check method for the btree cursor type.
+ */
+int
+__wt_curfile_insert_check(WT_CURSOR *cursor)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cbt = (WT_CURSOR_BTREE *)cursor;
+	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
+
+	WT_CURSOR_CHECKKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
+
+	ret = __wt_btcur_insert_check(cbt);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -278,34 +294,15 @@ __curfile_update(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
+	WT_CURSOR_CHECKVALUE(cursor);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_update(cbt), ret);
+	WT_ERR(__wt_btcur_update(cbt));
 
-err:	CURSOR_UPDATE_API_END(session, ret);
-	return (ret);
-}
-
-/*
- * __wt_curfile_update_check --
- *	WT_CURSOR->update_check method for the btree cursor type.
- */
-int
-__wt_curfile_update_check(WT_CURSOR *cursor)
-{
-	WT_CURSOR_BTREE *cbt;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
-
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NOVALUE(cursor);
-
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
-	    cursor, __wt_btcur_update_check(cbt), ret);
+	/* Update maintains a position, key and value. */
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+	    F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -325,24 +322,21 @@ __curfile_remove(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_remove(cbt), ret);
+	WT_ERR(__wt_btcur_remove(cbt));
 
 	/*
-	 * After a successful remove, copy the key: the value is not available.
+	 * Remove with a search-key is fire-and-forget, no position and no key.
+	 * Remove starting from a position maintains the position and a key.
+	 * We don't know which it was at this layer, so can only assert the key
+	 * is not set at all, or internal. There's never a value.
 	 */
-	if (ret == 0) {
-		if (F_ISSET(cursor, WT_CURSTD_KEY_INT) &&
-		    !WT_DATA_IN_ITEM(&(cursor)->key)) {
-			WT_ERR(__wt_buf_set(session, &cursor->key,
-			    cursor->key.data, cursor->key.size));
-			F_CLR(cursor, WT_CURSTD_KEY_INT);
-			F_SET(cursor, WT_CURSTD_KEY_EXT);
-		}
-		F_CLR(cursor, WT_CURSTD_VALUE_SET);
-	}
+	WT_ASSERT(session,
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == 0 ||
+	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
+	WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);

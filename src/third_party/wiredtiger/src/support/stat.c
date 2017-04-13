@@ -64,6 +64,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: pages requested from the cache",
 	"cache: pages written from cache",
 	"cache: pages written requiring in-memory restoration",
+	"cache: tracked dirty bytes in the cache",
 	"cache: unmodified pages evicted",
 	"cache_walk: Average difference between current eviction generation when the page was last considered",
 	"cache_walk: Average on-disk page image size seen",
@@ -225,6 +226,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_pages_requested = 0;
 	stats->cache_write = 0;
 	stats->cache_write_restore = 0;
+		/* not clearing cache_bytes_dirty */
 	stats->cache_eviction_clean = 0;
 		/* not clearing cache_state_gen_avg_gap */
 		/* not clearing cache_state_avg_written_size */
@@ -372,6 +374,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_pages_requested += from->cache_pages_requested;
 	to->cache_write += from->cache_write;
 	to->cache_write_restore += from->cache_write_restore;
+	to->cache_bytes_dirty += from->cache_bytes_dirty;
 	to->cache_eviction_clean += from->cache_eviction_clean;
 	to->cache_state_gen_avg_gap += from->cache_state_gen_avg_gap;
 	to->cache_state_avg_written_size +=
@@ -535,6 +538,7 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_write += WT_STAT_READ(from, cache_write);
 	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
+	to->cache_bytes_dirty += WT_STAT_READ(from, cache_bytes_dirty);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
 	to->cache_state_gen_avg_gap +=
 	    WT_STAT_READ(from, cache_state_gen_avg_gap);
@@ -673,10 +677,15 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction server unable to reach eviction goal",
 	"cache: eviction state",
 	"cache: eviction walks abandoned",
+	"cache: eviction worker thread active",
+	"cache: eviction worker thread created",
 	"cache: eviction worker thread evicting pages",
+	"cache: eviction worker thread removed",
+	"cache: eviction worker thread stable number",
 	"cache: failed eviction of pages that exceeded the in-memory maximum",
 	"cache: files with active eviction walks",
 	"cache: files with new eviction walks started",
+	"cache: force re-tuning of eviction workers once in a while",
 	"cache: hazard pointer blocked page eviction",
 	"cache: hazard pointer check calls",
 	"cache: hazard pointer check entries walked",
@@ -751,9 +760,7 @@ static const char * const __stats_connection_desc[] = {
 	"lock: checkpoint lock acquisitions",
 	"lock: checkpoint lock application thread wait time (usecs)",
 	"lock: checkpoint lock internal thread wait time (usecs)",
-	"lock: handle-list lock acquisitions",
-	"lock: handle-list lock application thread wait time (usecs)",
-	"lock: handle-list lock internal thread wait time (usecs)",
+	"lock: handle-list lock eviction thread wait time (usecs)",
 	"lock: metadata lock acquisitions",
 	"lock: metadata lock application thread wait time (usecs)",
 	"lock: metadata lock internal thread wait time (usecs)",
@@ -765,9 +772,11 @@ static const char * const __stats_connection_desc[] = {
 	"lock: table lock internal thread time waiting for the table lock (usecs)",
 	"log: busy returns attempting to switch slots",
 	"log: consolidated slot closures",
+	"log: consolidated slot join active slot closed",
 	"log: consolidated slot join races",
 	"log: consolidated slot join transitions",
 	"log: consolidated slot joins",
+	"log: consolidated slot transitions unable to find free slot",
 	"log: consolidated slot unbuffered writes",
 	"log: log bytes of payload data",
 	"log: log bytes written",
@@ -954,10 +963,15 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_slow = 0;
 		/* not clearing cache_eviction_state */
 	stats->cache_eviction_walks_abandoned = 0;
+		/* not clearing cache_eviction_active_workers */
+	stats->cache_eviction_worker_created = 0;
 	stats->cache_eviction_worker_evicting = 0;
+	stats->cache_eviction_worker_removed = 0;
+		/* not clearing cache_eviction_stable_state_workers */
 	stats->cache_eviction_force_fail = 0;
 		/* not clearing cache_eviction_walks_active */
 	stats->cache_eviction_walks_started = 0;
+	stats->cache_eviction_force_retune = 0;
 	stats->cache_eviction_hazard = 0;
 	stats->cache_hazard_checks = 0;
 	stats->cache_hazard_walks = 0;
@@ -1032,9 +1046,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lock_checkpoint_count = 0;
 	stats->lock_checkpoint_wait_application = 0;
 	stats->lock_checkpoint_wait_internal = 0;
-	stats->lock_handle_list_count = 0;
-	stats->lock_handle_list_wait_application = 0;
-	stats->lock_handle_list_wait_internal = 0;
+	stats->lock_handle_list_wait_eviction = 0;
 	stats->lock_metadata_count = 0;
 	stats->lock_metadata_wait_application = 0;
 	stats->lock_metadata_wait_internal = 0;
@@ -1046,9 +1058,11 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lock_table_wait_internal = 0;
 	stats->log_slot_switch_busy = 0;
 	stats->log_slot_closes = 0;
+	stats->log_slot_active_closed = 0;
 	stats->log_slot_races = 0;
 	stats->log_slot_transitions = 0;
 	stats->log_slot_joins = 0;
+	stats->log_slot_no_free_slots = 0;
 	stats->log_slot_unbuffered = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
@@ -1228,14 +1242,24 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_state += WT_STAT_READ(from, cache_eviction_state);
 	to->cache_eviction_walks_abandoned +=
 	    WT_STAT_READ(from, cache_eviction_walks_abandoned);
+	to->cache_eviction_active_workers +=
+	    WT_STAT_READ(from, cache_eviction_active_workers);
+	to->cache_eviction_worker_created +=
+	    WT_STAT_READ(from, cache_eviction_worker_created);
 	to->cache_eviction_worker_evicting +=
 	    WT_STAT_READ(from, cache_eviction_worker_evicting);
+	to->cache_eviction_worker_removed +=
+	    WT_STAT_READ(from, cache_eviction_worker_removed);
+	to->cache_eviction_stable_state_workers +=
+	    WT_STAT_READ(from, cache_eviction_stable_state_workers);
 	to->cache_eviction_force_fail +=
 	    WT_STAT_READ(from, cache_eviction_force_fail);
 	to->cache_eviction_walks_active +=
 	    WT_STAT_READ(from, cache_eviction_walks_active);
 	to->cache_eviction_walks_started +=
 	    WT_STAT_READ(from, cache_eviction_walks_started);
+	to->cache_eviction_force_retune +=
+	    WT_STAT_READ(from, cache_eviction_force_retune);
 	to->cache_eviction_hazard +=
 	    WT_STAT_READ(from, cache_eviction_hazard);
 	to->cache_hazard_checks += WT_STAT_READ(from, cache_hazard_checks);
@@ -1331,12 +1355,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, lock_checkpoint_wait_application);
 	to->lock_checkpoint_wait_internal +=
 	    WT_STAT_READ(from, lock_checkpoint_wait_internal);
-	to->lock_handle_list_count +=
-	    WT_STAT_READ(from, lock_handle_list_count);
-	to->lock_handle_list_wait_application +=
-	    WT_STAT_READ(from, lock_handle_list_wait_application);
-	to->lock_handle_list_wait_internal +=
-	    WT_STAT_READ(from, lock_handle_list_wait_internal);
+	to->lock_handle_list_wait_eviction +=
+	    WT_STAT_READ(from, lock_handle_list_wait_eviction);
 	to->lock_metadata_count += WT_STAT_READ(from, lock_metadata_count);
 	to->lock_metadata_wait_application +=
 	    WT_STAT_READ(from, lock_metadata_wait_application);
@@ -1354,9 +1374,13 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, lock_table_wait_internal);
 	to->log_slot_switch_busy += WT_STAT_READ(from, log_slot_switch_busy);
 	to->log_slot_closes += WT_STAT_READ(from, log_slot_closes);
+	to->log_slot_active_closed +=
+	    WT_STAT_READ(from, log_slot_active_closed);
 	to->log_slot_races += WT_STAT_READ(from, log_slot_races);
 	to->log_slot_transitions += WT_STAT_READ(from, log_slot_transitions);
 	to->log_slot_joins += WT_STAT_READ(from, log_slot_joins);
+	to->log_slot_no_free_slots +=
+	    WT_STAT_READ(from, log_slot_no_free_slots);
 	to->log_slot_unbuffered += WT_STAT_READ(from, log_slot_unbuffered);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);

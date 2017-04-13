@@ -40,7 +40,7 @@ struct __wt_thread_group {
 
 	const char	*name;		/* Name */
 
-	WT_RWLOCK	*lock;		/* Protects group changes */
+	WT_RWLOCK	lock;		/* Protects group changes */
 
 	/*
 	 * Condition signalled when wanting to wake up threads that are

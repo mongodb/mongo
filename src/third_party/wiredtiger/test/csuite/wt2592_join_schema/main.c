@@ -82,9 +82,12 @@ main(int argc, char *argv[])
 	tablename = strchr(opts->uri, ':');
 	testutil_assert(tablename != NULL);
 	tablename++;
-	snprintf(countryuri, sizeof(countryuri), "index:%s:country", tablename);
-	snprintf(yearuri, sizeof(yearuri), "index:%s:year", tablename);
-	snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri);
+	testutil_check(__wt_snprintf(
+	    countryuri, sizeof(countryuri), "index:%s:country", tablename));
+	testutil_check(__wt_snprintf(
+	    yearuri, sizeof(yearuri), "index:%s:year", tablename));
+	testutil_check(__wt_snprintf(
+	    joinuri, sizeof(joinuri), "join:%s", opts->uri));
 
 	testutil_check(wiredtiger_open(opts->home, NULL,
 	    "create,cache_size=200M", &opts->conn));

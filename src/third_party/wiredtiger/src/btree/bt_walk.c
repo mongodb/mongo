@@ -340,9 +340,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	 * Take a copy of any held page and clear the return value.  Remember
 	 * the hazard pointer we're currently holding.
 	 *
-	 * We may be passed a pointer to btree->evict_page that we are clearing
-	 * here.  We check when discarding pages that we're not discarding that
-	 * page, so this clear must be done before the page is released.
+	 * Clear the returned value, it makes future error handling easier.
 	 */
 	couple = couple_orig = ref = *refp;
 	*refp = NULL;
@@ -350,16 +348,19 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	/* If no page is active, begin a walk from the start/end of the tree. */
 	if (ref == NULL) {
 restart:	/*
-		 * We can reach here with a NULL or root reference; the release
+		 * We can be here with a NULL or root WT_REF; the page release
 		 * function handles them internally, don't complicate this code
 		 * by calling them out.
 		 */
 		WT_ERR(__wt_page_release(session, couple, flags));
 
-		couple = couple_orig = ref = &btree->root;
-		if (ref->page == NULL)
-			goto done;
+		/*
+		 * We're not supposed to walk trees without root pages. As this
+		 * has not always been the case, assert to debug that change.
+		 */
+		WT_ASSERT(session, btree->root.page != NULL);
 
+		couple = couple_orig = ref = &btree->root;
 		initial_descent = true;
 		goto descend;
 	}

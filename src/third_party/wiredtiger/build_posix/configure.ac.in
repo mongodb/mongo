@@ -91,6 +91,9 @@ fi
 # Linux requires _GNU_SOURCE to be defined
 AS_CASE([$host_os], [linux*], [AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"])
 
+# Configure options.
+AM_OPTIONS
+
 # If enable-strict is configured, turn on as much error checking as we can for
 # this compiler. Intended for developers, and only works for gcc/clang, but it
 # fills a need.
@@ -108,9 +111,6 @@ if test "$wt_cv_enable_strict" = "yes"; then
 
 	AM_CFLAGS="$AM_CFLAGS $wt_cv_strict_warnings"
 fi
-
-# Configure options.
-AM_OPTIONS
 
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
@@ -133,7 +133,7 @@ if test "$wt_cv_enable_java" = "yes"; then
 fi
 
 if test "$wt_cv_enable_python" = "yes"; then
-	AM_PATH_PYTHON([2.7])
+	AM_PATH_PYTHON([2.6])
 	if test -n "$with_python_prefix" ; then
 		PYTHON_INSTALL_ARG="-d $with_python_prefix"
 	fi

@@ -145,9 +145,5 @@ that may not be modified or freed by the application.  If a longer scope
 is required, the application must make a copy of the memory before the
 cursor is re-used, closed or reset.
 
-The comments in this example code explain when the application can safely
-modify memory passed to WT_CURSOR::set_key or WT_CURSOR::set_value:
-
-@snippet ex_scope.c cursor scope operation
 @m_endif
  */

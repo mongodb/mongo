@@ -1,6 +1,6 @@
-WiredTiger 2.9.1: (December  7, 2016)
+WiredTiger 2.9.2: (December 23, 2016)
 
-This is version 2.9.1 of WiredTiger.
+This is version 2.9.2 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
@@ -8,7 +8,7 @@ WiredTiger release packages and documentation can be found at:
 
 The documentation for this specific release can be found at:
 
-	http://source.wiredtiger.com/2.9.1/index.html
+	http://source.wiredtiger.com/2.9.2/index.html
 
 The WiredTiger source code can be found at:
 

@@ -58,6 +58,12 @@
 #define	WT_BTREE_DELETE_THRESHOLD	1000
 
 /*
+ * Minimum size of the chunks (in percentage of the page size) a page gets split
+ * into during reconciliation.
+ */
+#define	WT_BTREE_MIN_SPLIT_PCT		50
+
+/*
  * WT_BTREE --
  *	A btree handle.
  */
@@ -114,23 +120,26 @@ struct __wt_btree {
 	int   split_pct;		/* Split page percent */
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
-	WT_RWLOCK *ovfl_lock;		/* Overflow lock */
+	WT_RWLOCK ovfl_lock;		/* Overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 
-	WT_REF root;			/* Root page reference */
-	bool modified;			/* If the tree ever modified */
-	bool bulk_load_ok;		/* Bulk-load is a possibility */
+	WT_REF	root;			/* Root page reference */
+	bool	modified;		/* If the tree ever modified */
+	uint8_t	original;		/* Newly created: bulk-load possible
+					   (want a bool but needs atomic cas) */
+
+	bool lsm_primary;		/* Handle is/was the LSM primary */
 
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
 	uint64_t checkpoint_gen;	/* Checkpoint generation */
-	bool     include_checkpoint_txn;/* ID checks include checkpoint */
 	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
 
 	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
 	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
 	WT_REF	   *evict_ref;		/* Eviction thread's location */
@@ -138,10 +147,10 @@ struct __wt_btree {
 	u_int	    evict_walk_period;	/* Skip this many LRU walks */
 	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
-	u_int	    evict_disabled;	/* Eviction disabled count */
+	int	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	bool	    evict_walk_reverse;	/* Walk direction */
-
+	int	    evict_start_type;	/* Start position for eviction walk
+					   (see WT_EVICT_WALK_START). */
 	enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
 	} checkpointing;		/* Checkpoint in progress */
@@ -154,15 +163,14 @@ struct __wt_btree {
 	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
-#define	WT_BTREE_BULK		0x000100 /* Bulk-load handle */
-#define	WT_BTREE_IGNORE_CACHE	0x000200 /* Cache-resident object */
-#define	WT_BTREE_IN_MEMORY	0x000400 /* Cache-resident object */
-#define	WT_BTREE_LOOKASIDE	0x000800 /* Look-aside table */
-#define	WT_BTREE_LSM_PRIMARY	0x001000 /* Handle is current LSM primary */
-#define	WT_BTREE_NO_CHECKPOINT	0x002000 /* Disable checkpoints */
-#define	WT_BTREE_NO_EVICTION	0x004000 /* Disable eviction */
+#define	WT_BTREE_ALLOW_SPLITS	0x000100 /* Allow splits, even with no evict */
+#define	WT_BTREE_BULK		0x000200 /* Bulk-load handle */
+#define	WT_BTREE_CLOSED		0x000400 /* Handle closed */
+#define	WT_BTREE_IGNORE_CACHE	0x000800 /* Cache-resident object */
+#define	WT_BTREE_IN_MEMORY	0x001000 /* Cache-resident object */
+#define	WT_BTREE_LOOKASIDE	0x002000 /* Look-aside table */
+#define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
 #define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
-#define	WT_BTREE_NO_RECONCILE	0x010000 /* Allow splits, even with no evict */
 #define	WT_BTREE_REBALANCE	0x020000 /* Handle is for rebalance */
 #define	WT_BTREE_SALVAGE	0x040000 /* Handle is for salvage */
 #define	WT_BTREE_SKIP_CKPT	0x080000 /* Handle skipped checkpoint */

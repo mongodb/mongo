@@ -86,8 +86,8 @@ union __wt_lsn {
  * The high bit is reserved for the special states.  If the high bit is
  * set (WT_LOG_SLOT_RESERVED) then we are guaranteed to be in a special state.
  */
-#define	WT_LOG_SLOT_FREE	-1	/* Not in use */
-#define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
+#define	WT_LOG_SLOT_FREE	(-1)	/* Not in use */
+#define	WT_LOG_SLOT_WRITTEN	(-2)	/* Slot data written, not processed */
 
 /*
  * We allocate the buffer size, but trigger a slot switch when we cross
@@ -144,8 +144,8 @@ union __wt_lsn {
 /* Slot is in use, but closed to new joins */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
-    (FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_CLOSE) &&			\
-    !FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_RESERVED)))
+    (FLD64_ISSET((uint64_t)(state), WT_LOG_SLOT_CLOSE) &&		\
+    !FLD64_ISSET((uint64_t)(state), WT_LOG_SLOT_RESERVED)))
 /* Slot is in use, all data copied into buffer */
 #define	WT_LOG_SLOT_INPROGRESS(state)					\
     (WT_LOG_SLOT_RELEASED(state) != WT_LOG_SLOT_JOINED(state))
@@ -163,7 +163,7 @@ struct __wt_logslot {
 	WT_CACHE_LINE_PAD_BEGIN
 	volatile int64_t slot_state;	/* Slot state */
 	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
-	int32_t	 slot_error;		/* Error value */
+	int	 slot_error;		/* Error value */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	wt_off_t slot_last_offset;	/* Last record offset */
 	WT_LSN	 slot_release_lsn;	/* Slot release LSN */
@@ -185,7 +185,7 @@ struct __wt_logslot {
 #define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
 	WT_WITH_LOCK_WAIT(session,					\
-	    &log->log_slot_lock, WT_SESSION_LOCKED_SLOT, op);		\
+	    &(log)->log_slot_lock, WT_SESSION_LOCKED_SLOT, op);		\
 } while (0)
 
 struct __wt_myslot {
@@ -193,7 +193,8 @@ struct __wt_myslot {
 	wt_off_t	 end_offset;	/* My end offset in buffer */
 	wt_off_t	 offset;	/* Slot buffer offset */
 #define	WT_MYSLOT_CLOSE		0x01	/* This thread is closing the slot */
-#define	WT_MYSLOT_UNBUFFERED	0x02	/* Write directly */
+#define	WT_MYSLOT_NEEDS_RELEASE	0x02	/* This thread is releasing the slot */
+#define	WT_MYSLOT_UNBUFFERED	0x04	/* Write directly */
 	uint32_t flags;			/* Flags */
 };
 
@@ -235,7 +236,7 @@ struct __wt_log {
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
 	WT_SPINLOCK      log_writelsn_lock; /* Locked: write LSN */
 
-	WT_RWLOCK	 *log_archive_lock;	/* Archive and log cursors */
+	WT_RWLOCK	 log_archive_lock;/* Archive and log cursors */
 
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;
@@ -254,6 +255,7 @@ struct __wt_log {
 #define	WT_SLOT_POOL	128
 	WT_LOGSLOT	*active_slot;			/* Active slot */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
+	int32_t		 pool_index;		/* Index into slot pool */
 	size_t		 slot_buf_size;		/* Buffer size for slots */
 #ifdef HAVE_DIAGNOSTIC
 	uint64_t	 write_calls;		/* Calls to log_write */

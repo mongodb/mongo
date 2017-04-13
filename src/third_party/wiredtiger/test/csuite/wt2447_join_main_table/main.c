@@ -102,9 +102,12 @@ main(int argc, char *argv[])
 	tablename = strchr(opts->uri, ':');
 	testutil_assert(tablename != NULL);
 	tablename++;
-	snprintf(index1uri, sizeof(index1uri), "index:%s:index1", tablename);
-	snprintf(index2uri, sizeof(index2uri), "index:%s:index2", tablename);
-	snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri);
+	testutil_check(__wt_snprintf(
+	    index1uri, sizeof(index1uri), "index:%s:index1", tablename));
+	testutil_check(__wt_snprintf(
+	    index2uri, sizeof(index2uri), "index:%s:index2", tablename));
+	testutil_check(__wt_snprintf(
+	    joinuri, sizeof(joinuri), "join:%s", opts->uri));
 
 	testutil_check(wiredtiger_open(opts->home, NULL,
 	    "statistics=(all),create", &opts->conn));
@@ -150,7 +153,8 @@ main(int argc, char *argv[])
 	cursor2->set_key(cursor2, half + 1);
 	testutil_check(cursor2->search(cursor2));
 
-	sprintf(bloom_cfg, "compare=lt,strategy=bloom,count=%d", half);
+	testutil_check(__wt_snprintf(bloom_cfg, sizeof(bloom_cfg),
+	    "compare=lt,strategy=bloom,count=%d", half));
 
 	testutil_check(session->open_cursor(session, joinuri, NULL, NULL,
 	    &jcursor));
