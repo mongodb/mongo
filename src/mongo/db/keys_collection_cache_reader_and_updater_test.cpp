@@ -42,6 +42,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -92,6 +93,18 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
     ASSERT_EQ(Timestamp(110, 0), key2.getExpiresAt().asTimestamp());
 
     ASSERT_NE(key1.getKey(), key2.getKey());
+}
+
+TEST_F(CacheUpdaterTest, ShouldPropagateWriteError) {
+    KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
+
+    const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
+    LogicalClock::get(operationContext())->initClusterTimeFromTrustedSource(currentTime);
+
+    FailPointEnableBlock failWriteBlock("failCollectionInserts");
+
+    auto keyStatus = updater.refresh(operationContext());
+    ASSERT_EQ(ErrorCodes::FailPointEnabled, keyStatus.getStatus());
 }
 
 TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
