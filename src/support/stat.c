@@ -771,13 +771,6 @@ static const char * const __stats_connection_desc[] = {
 	"lock: table lock application thread time waiting for the table lock (usecs)",
 	"lock: table lock internal thread time waiting for the table lock (usecs)",
 	"log: busy returns attempting to switch slots",
-	"log: consolidated slot closures",
-	"log: consolidated slot join active slot closed",
-	"log: consolidated slot join races",
-	"log: consolidated slot join transitions",
-	"log: consolidated slot joins",
-	"log: consolidated slot transitions unable to find free slot",
-	"log: consolidated slot unbuffered writes",
 	"log: log bytes of payload data",
 	"log: log bytes written",
 	"log: log files manually zero-filled",
@@ -804,6 +797,19 @@ static const char * const __stats_connection_desc[] = {
 	"log: pre-allocated log files prepared",
 	"log: pre-allocated log files used",
 	"log: records processed by log scan",
+	"log: slot close lost race",
+	"log: slot close unbuffered waits",
+	"log: slot closures",
+	"log: slot join atomic update races",
+	"log: slot join calls atomic updates raced",
+	"log: slot join calls did not yield",
+	"log: slot join calls found active slot closed",
+	"log: slot join calls slept",
+	"log: slot join calls yielded",
+	"log: slot join found active slot closed",
+	"log: slot joins yield time (usecs)",
+	"log: slot transitions unable to find free slot",
+	"log: slot unbuffered writes",
 	"log: total in-memory size of compressed records",
 	"log: total log buffer size",
 	"log: total size of compressed records",
@@ -1057,13 +1063,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lock_table_wait_application = 0;
 	stats->lock_table_wait_internal = 0;
 	stats->log_slot_switch_busy = 0;
-	stats->log_slot_closes = 0;
-	stats->log_slot_active_closed = 0;
-	stats->log_slot_races = 0;
-	stats->log_slot_transitions = 0;
-	stats->log_slot_joins = 0;
-	stats->log_slot_no_free_slots = 0;
-	stats->log_slot_unbuffered = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
 	stats->log_zero_fills = 0;
@@ -1090,6 +1089,19 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_prealloc_files = 0;
 	stats->log_prealloc_used = 0;
 	stats->log_scan_records = 0;
+	stats->log_slot_close_race = 0;
+	stats->log_slot_close_unbuf = 0;
+	stats->log_slot_closes = 0;
+	stats->log_slot_races = 0;
+	stats->log_slot_yield_race = 0;
+	stats->log_slot_immediate = 0;
+	stats->log_slot_yield_close = 0;
+	stats->log_slot_yield_sleep = 0;
+	stats->log_slot_yield = 0;
+	stats->log_slot_active_closed = 0;
+		/* not clearing log_slot_yield_duration */
+	stats->log_slot_no_free_slots = 0;
+	stats->log_slot_unbuffered = 0;
 	stats->log_compress_mem = 0;
 		/* not clearing log_buffer_size */
 	stats->log_compress_len = 0;
@@ -1373,15 +1385,6 @@ __wt_stat_connection_aggregate(
 	to->lock_table_wait_internal +=
 	    WT_STAT_READ(from, lock_table_wait_internal);
 	to->log_slot_switch_busy += WT_STAT_READ(from, log_slot_switch_busy);
-	to->log_slot_closes += WT_STAT_READ(from, log_slot_closes);
-	to->log_slot_active_closed +=
-	    WT_STAT_READ(from, log_slot_active_closed);
-	to->log_slot_races += WT_STAT_READ(from, log_slot_races);
-	to->log_slot_transitions += WT_STAT_READ(from, log_slot_transitions);
-	to->log_slot_joins += WT_STAT_READ(from, log_slot_joins);
-	to->log_slot_no_free_slots +=
-	    WT_STAT_READ(from, log_slot_no_free_slots);
-	to->log_slot_unbuffered += WT_STAT_READ(from, log_slot_unbuffered);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
 	to->log_zero_fills += WT_STAT_READ(from, log_zero_fills);
@@ -1412,6 +1415,22 @@ __wt_stat_connection_aggregate(
 	to->log_prealloc_files += WT_STAT_READ(from, log_prealloc_files);
 	to->log_prealloc_used += WT_STAT_READ(from, log_prealloc_used);
 	to->log_scan_records += WT_STAT_READ(from, log_scan_records);
+	to->log_slot_close_race += WT_STAT_READ(from, log_slot_close_race);
+	to->log_slot_close_unbuf += WT_STAT_READ(from, log_slot_close_unbuf);
+	to->log_slot_closes += WT_STAT_READ(from, log_slot_closes);
+	to->log_slot_races += WT_STAT_READ(from, log_slot_races);
+	to->log_slot_yield_race += WT_STAT_READ(from, log_slot_yield_race);
+	to->log_slot_immediate += WT_STAT_READ(from, log_slot_immediate);
+	to->log_slot_yield_close += WT_STAT_READ(from, log_slot_yield_close);
+	to->log_slot_yield_sleep += WT_STAT_READ(from, log_slot_yield_sleep);
+	to->log_slot_yield += WT_STAT_READ(from, log_slot_yield);
+	to->log_slot_active_closed +=
+	    WT_STAT_READ(from, log_slot_active_closed);
+	to->log_slot_yield_duration +=
+	    WT_STAT_READ(from, log_slot_yield_duration);
+	to->log_slot_no_free_slots +=
+	    WT_STAT_READ(from, log_slot_no_free_slots);
+	to->log_slot_unbuffered += WT_STAT_READ(from, log_slot_unbuffered);
 	to->log_compress_mem += WT_STAT_READ(from, log_compress_mem);
 	to->log_buffer_size += WT_STAT_READ(from, log_buffer_size);
 	to->log_compress_len += WT_STAT_READ(from, log_compress_len);
