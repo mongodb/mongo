@@ -25,9 +25,6 @@ cat << UNUSED_STAT_FIELDS
 lock_checkpoint_count
 lock_checkpoint_wait_application
 lock_checkpoint_wait_internal
-lock_handle_list_count
-lock_handle_list_wait_application
-lock_handle_list_wait_internal
 lock_metadata_count
 lock_metadata_wait_application
 lock_metadata_wait_internal

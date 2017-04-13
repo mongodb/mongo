@@ -75,8 +75,7 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
 
     scenarios = make_scenarios(basecfg_list, dir_list, log_list, types)
 
-    def conn_config(self, dir):
-        self.home = dir
+    def conn_config(self):
         params = \
             'error_prefix="%s",' % self.shortid() + \
             '%s' % self.logcfg + \

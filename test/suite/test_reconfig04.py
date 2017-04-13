@@ -26,9 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, time
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet
 
 # test_reconfig04.py
 #    Test WT_SESSION::reconfigure

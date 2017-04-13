@@ -39,14 +39,12 @@ static int
 create_table(WT_SESSION *session, COOKIE *cookie)
 {
 	int ret;
-	char *p, *end, config[128];
+	char config[128];
 
-	p = config;
-	end = config + sizeof(config);
-	p += snprintf(p, (size_t)(end - p),
-	    "key_format=%s,value_format=S", cookie->type == COL ? "r" : "q");
-	if (cookie->type == LSM)
-		(void)snprintf(p, (size_t)(end - p), ",type=lsm");
+	testutil_check(__wt_snprintf(config, sizeof(config),
+	    "key_format=%s,value_format=S,%s",
+	    cookie->type == COL ? "r" : "q",
+	    cookie->type == LSM ? ",type=lsm" : ""));
 
 	if ((ret = session->create(session, cookie->uri, config)) != 0)
 		if (ret != EEXIST)
@@ -88,8 +86,9 @@ start_workers(table_type type)
 			    (table_type)((i % MAX_TABLE_TYPE) + 1);
 		else
 			g.cookies[i].type = type;
-		(void)snprintf(g.cookies[i].uri, 128,
-		    "%s%04d", URI_BASE, g.cookies[i].id);
+		testutil_check(__wt_snprintf(
+		    g.cookies[i].uri, sizeof(g.cookies[i].uri),
+		    "%s%04d", URI_BASE, g.cookies[i].id));
 
 		/* Should probably be atomic to avoid races. */
 		if ((ret = create_table(session, &g.cookies[i])) != 0)
@@ -132,7 +131,8 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 	char valuebuf[64];
 
 	cursor->set_key(cursor, keyno);
-	(void)snprintf(valuebuf, sizeof(valuebuf), "%037u", new_val);
+	testutil_check(__wt_snprintf(
+	    valuebuf, sizeof(valuebuf), "%037u", new_val));
 	cursor->set_value(cursor, valuebuf);
 	if ((ret = cursor->insert(cursor)) != 0) {
 		if (ret == WT_ROLLBACK)
@@ -153,7 +153,7 @@ worker(void *arg)
 
 	WT_UNUSED(arg);
 
-	__wt_thread_id(tid, sizeof(tid));
+	testutil_check(__wt_thread_id(tid, sizeof(tid)));
 	printf("worker thread starting: tid: %s\n", tid);
 
 	(void)real_worker();

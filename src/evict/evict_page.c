@@ -480,8 +480,8 @@ __evict_review(
 		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 			return (__wt_split_insert(session, ref));
 
-		/* We are done if reconciliation is disabled. */
-		if (F_ISSET(S2BT(session), WT_BTREE_NO_RECONCILE))
+		/* If splits are the only permitted operation, we're done. */
+		if (F_ISSET(S2BT(session), WT_BTREE_ALLOW_SPLITS))
 			return (EBUSY);
 	}
 

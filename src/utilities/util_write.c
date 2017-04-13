@@ -18,10 +18,10 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	uint64_t recno;
 	int ch;
 	bool append, overwrite, rkey;
-	const char *uri;
-	char config[100];
+	char *uri, config[100];
 
 	append = overwrite = false;
+	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "ao")) != EOF)
 		switch (ch) {
 		case 'a':
@@ -47,15 +47,25 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	} else
 		if (argc < 3 || ((argc - 1) % 2 != 0))
 			return (usage());
-	if ((uri = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
-	/* Open the object. */
-	(void)snprintf(config, sizeof(config), "%s,%s",
-	    append ? "append=true" : "", overwrite ? "overwrite=true" : "");
-	if ((ret = session->open_cursor(
-	    session, uri, NULL, config, &cursor)) != 0)
-		return (util_err(session, ret, "%s: session.open", uri));
+	/*
+	 * Open the object; free allocated memory immediately to simplify
+	 * future error handling.
+	 */
+	if ((ret = __wt_snprintf(config, sizeof(config), "%s,%s",
+	    append ? "append=true" : "",
+	    overwrite ? "overwrite=true" : "")) != 0) {
+		free(uri);
+		return (util_err(session, ret, NULL));
+	}
+	if ((ret =
+	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0)
+		(void)util_err(session, ret, "%s: session.open_cursor", uri);
+	free(uri);
+	if (ret != 0)
+		return (ret);
 
 	/*
 	 * A simple search only makes sense if the key format is a string or a

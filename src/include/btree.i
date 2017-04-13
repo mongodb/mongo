@@ -71,6 +71,47 @@ __wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_bytes_evictable --
+ *	Return the number of bytes that can be evicted (i.e. bytes apart from
+ *	the pinned root page).
+ */
+static inline uint64_t
+__wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	WT_PAGE *root_page;
+	uint64_t bytes_inmem, bytes_root;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+	root_page = btree->root.page;
+
+	bytes_inmem = btree->bytes_inmem;
+	bytes_root = root_page == NULL ? 0 : root_page->memory_footprint;
+
+	return (bytes_inmem <= bytes_root ? 0 :
+	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_root));
+}
+
+/*
+ * __wt_btree_dirty_inuse --
+ *	Return the number of dirty bytes in use.
+ */
+static inline uint64_t
+__wt_btree_dirty_inuse(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	return (__wt_cache_bytes_plus_overhead(cache,
+	    btree->bytes_dirty_intl + btree->bytes_dirty_leaf));
+}
+
+/*
  * __wt_btree_dirty_leaf_inuse --
  *	Return the number of bytes in use by dirty leaf pages.
  */
@@ -105,11 +146,12 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	(void)__wt_atomic_addsize(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
-		if (WT_PAGE_IS_INTERNAL(page))
+		if (WT_PAGE_IS_INTERNAL(page)) {
+			(void)__wt_atomic_add64(&btree->bytes_dirty_intl, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
-		else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
-			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
+		} else if (!btree->lsm_primary) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
+			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
 	}
 	/* Track internal size in cache. */
@@ -238,10 +280,12 @@ __wt_cache_page_byte_dirty_decr(
 	if (i == 5)
 		return;
 
-	if (WT_PAGE_IS_INTERNAL(page))
+	if (WT_PAGE_IS_INTERNAL(page)) {
+		__wt_cache_decr_check_uint64(session, &btree->bytes_dirty_intl,
+		    decr, "WT_BTREE.bytes_dirty_intl");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl,
 		    decr, "WT_CACHE.bytes_dirty_intl");
-	else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
+	} else if (!btree->lsm_primary) {
 		__wt_cache_decr_check_uint64(session, &btree->bytes_dirty_leaf,
 		    decr, "WT_BTREE.bytes_dirty_leaf");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf,
@@ -297,10 +341,11 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	size = page->memory_footprint;
 	if (WT_PAGE_IS_INTERNAL(page)) {
+		(void)__wt_atomic_add64(&btree->bytes_dirty_intl, size);
 		(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
 		(void)__wt_atomic_add64(&cache->pages_dirty_intl, 1);
 	} else {
-		if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
+		if (!btree->lsm_primary) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
@@ -368,7 +413,7 @@ __wt_cache_page_image_incr(WT_SESSION_IMPL *session, uint32_t size)
  *	Evict pages from the cache.
  */
 static inline void
-__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -392,23 +437,34 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
-		if (WT_PAGE_IS_INTERNAL(page))
+		if (WT_PAGE_IS_INTERNAL(page)) {
+			__wt_cache_decr_zero_uint64(session,
+			    &btree->bytes_dirty_intl,
+			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_intl");
 			__wt_cache_decr_zero_uint64(session,
 			    &cache->bytes_dirty_intl,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
-		else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
-			__wt_cache_decr_zero_uint64(session,
-			    &cache->bytes_dirty_leaf,
-			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
+		} else if (!btree->lsm_primary) {
 			__wt_cache_decr_zero_uint64(session,
 			    &btree->bytes_dirty_leaf,
 			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
+			__wt_cache_decr_zero_uint64(session,
+			    &cache->bytes_dirty_leaf,
+			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
 		}
 	}
 
 	/* Update pages and bytes evicted. */
 	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
-	(void)__wt_atomic_addv64(&cache->pages_evict, 1);
+
+	/*
+	 * Don't count rewrites as eviction: there's no guarantee we are making
+	 * real progress.
+	 */
+	if (rewrite)
+		(void)__wt_atomic_subv64(&cache->pages_inmem, 1);
+	else
+		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
 }
 
 /*
@@ -984,7 +1040,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 	if (cbt->ins == NULL) {
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
-		rip = &page->u.row.d[cbt->slot];
+		rip = &page->pg_row[cbt->slot];
 		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
@@ -1181,11 +1237,10 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * data in the last skiplist on the page.  Split if there are enough
 	 * items and the skiplist does not fit within a single disk page.
 	 */
-
 	ins_head = page->type == WT_PAGE_ROW_LEAF ?
-	    (page->pg_row_entries == 0 ?
+	    (page->entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_ROW_INSERT_SLOT(page, page->entries - 1)) :
 	    WT_COL_APPEND(page);
 	if (ins_head == NULL)
 		return (false);
@@ -1299,9 +1354,14 @@ __wt_page_can_evict(
 	 * the original parent page's index, because evicting an internal page
 	 * discards its WT_REF array, and a thread traversing the original
 	 * parent page index might see a freed WT_REF.
+	 *
+	 * One special case where we know this is safe is if the handle is
+	 * locked exclusive (e.g., when the whole tree is being evicted).  In
+	 * that case, no readers can be looking at an old index.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) &&
-	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
+	if (!F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	    WT_PAGE_IS_INTERNAL(page) && !__wt_split_obsolete(
+	    session, page->pg_intl_split_gen))
 		return (false);
 
 	/*
@@ -1353,7 +1413,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	if (page->read_gen != WT_READGEN_OLDEST ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    btree->evict_disabled > 0 ||
 	    !__wt_page_can_evict(session, ref, NULL))
 		return (__wt_hazard_clear(session, ref));
 
@@ -1473,7 +1533,7 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 		return (false);
 
 	/* A tree that can be evicted always requires a switch. */
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	if (btree->evict_disabled == 0)
 		return (true);
 
 	/* Check for a tree with a single leaf page. */
@@ -1495,55 +1555,6 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 		return (true);
 
 	return (child->memory_footprint > maxsize);
-}
-
-/*
- * __wt_btree_lsm_switch_primary --
- *      Switch a btree handle to/from the current primary chunk of an LSM tree.
- */
-static inline void
-__wt_btree_lsm_switch_primary(WT_SESSION_IMPL *session, bool on)
-{
-	WT_BTREE *btree;
-	WT_CACHE *cache;
-	WT_PAGE *child, *root;
-	WT_PAGE_INDEX *pindex;
-	WT_REF *first;
-	size_t size;
-
-	btree = S2BT(session);
-	cache = S2C(session)->cache;
-	root = btree->root.page;
-
-	if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY))
-		F_SET(btree, WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION);
-	if (!on && F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
-		pindex = WT_INTL_INDEX_GET_SAFE(root);
-		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-		    pindex->entries != 1)
-			return;
-		first = pindex->index[0];
-
-		/*
-		 * We're reaching down into the page without a hazard pointer,
-		 * but that's OK because we know that no-eviction is set so the
-		 * page can't disappear.
-		 *
-		 * While this tree was the primary, its dirty bytes were not
-		 * included in the cache accounting.  Fix that now before we
-		 * open it up for eviction.
-		 */
-		child = first->page;
-		if (first->state == WT_REF_MEM &&
-		    child->type == WT_PAGE_ROW_LEAF &&
-		    __wt_page_is_modified(child)) {
-			size = child->modify->bytes_dirty;
-			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
-			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
-		}
-
-		F_CLR(btree, WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION);
-	}
 }
 
 /*

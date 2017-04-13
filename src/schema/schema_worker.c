@@ -49,7 +49,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			 * any open file handles, including checkpoints.
 			 */
 			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
-				WT_WITH_HANDLE_LIST_LOCK(session,
+				WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
 				    ret = __wt_conn_dhandle_close_all(
 				    session, uri, false));
 				WT_ERR(ret);
@@ -112,10 +112,10 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		wt_session = (WT_SESSION *)session;
 		if (file_func == __wt_salvage && dsrc->salvage != NULL)
 			WT_ERR(dsrc->salvage(
-			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
+			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (file_func == __wt_verify && dsrc->verify != NULL)
 			WT_ERR(dsrc->verify(
-			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
+			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (file_func == __wt_checkpoint)
 			;
 		else if (file_func == __wt_checkpoint_get_handles)

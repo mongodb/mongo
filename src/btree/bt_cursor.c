@@ -9,6 +9,84 @@
 #include "wt_internal.h"
 
 /*
+ * When returning an error, we need to restore the cursor to a valid state, the
+ * upper-level cursor code is likely to retry. This structure and the associated
+ * functions are used save and restore the cursor state.
+ */
+typedef struct {
+	WT_ITEM key;
+	WT_ITEM value;
+	uint64_t recno;
+	uint32_t flags;
+} WT_CURFILE_STATE;
+
+/*
+ * __cursor_state_save --
+ *	Save the cursor's external state.
+ */
+static inline void
+__cursor_state_save(WT_CURSOR *cursor, WT_CURFILE_STATE *state)
+{
+	WT_ITEM_SET(state->key, cursor->key);
+	WT_ITEM_SET(state->value, cursor->value);
+	state->recno = cursor->recno;
+	state->flags = cursor->flags;
+}
+
+/*
+ * __cursor_state_restore --
+ *	Restore the cursor's external state.
+ */
+static inline void
+__cursor_state_restore(WT_CURSOR *cursor, WT_CURFILE_STATE *state)
+{
+	if (F_ISSET(state, WT_CURSTD_KEY_EXT))
+		WT_ITEM_SET(cursor->key, state->key);
+	if (F_ISSET(state, WT_CURSTD_VALUE_EXT))
+		WT_ITEM_SET(cursor->value, state->value);
+	cursor->recno = state->recno;
+	F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	F_SET(cursor, F_MASK(state, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT));
+
+}
+
+/*
+ * __cursor_page_pinned --
+ *	Return if we have a page pinned and it's not been flagged for forced
+ * eviction (the forced eviction test is so we periodically release pages
+ * grown too large).
+ */
+static inline bool
+__cursor_page_pinned(WT_CURSOR_BTREE *cbt)
+{
+	return (F_ISSET(cbt, WT_CBT_ACTIVE) &&
+	    cbt->ref->page->read_gen != WT_READGEN_OLDEST);
+}
+
+/*
+ * __cursor_copy_int_key --
+ *	If we're pointing into the tree, save the key into local memory.
+ */
+static inline int
+__cursor_copy_int_key(WT_CURSOR *cursor)
+{
+	/*
+	 * We're about to discard the cursor's position and the cursor layer
+	 * might retry the operation. We discard pinned pages on error, which
+	 * will invalidate pinned keys. Clear WT_CURSTD_KEY_INT in all cases,
+	 * the underlying page is gone whether we can allocate memory or not.
+	 */
+	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+		F_CLR(cursor, WT_CURSTD_KEY_INT);
+		if (!WT_DATA_IN_ITEM(&cursor->key))
+			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
+			    &cursor->key, cursor->key.data, cursor->key.size));
+		F_SET(cursor, WT_CURSTD_KEY_EXT);
+	}
+	return (0);
+}
+
+/*
  * __cursor_size_chk --
  *	Return if an inserted item is too large.
  */
@@ -55,6 +133,34 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 }
 
 /*
+ * __cursor_disable_bulk --
+ *	Disable bulk loads into a tree.
+ */
+static inline void
+__cursor_disable_bulk(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+	/*
+	 * Once a tree (other than the LSM primary) is no longer empty, eviction
+	 * should pay attention to it, and it's no longer possible to bulk-load
+	 * into it.
+	 */
+	if (!btree->original)
+		return;
+	if (btree->lsm_primary) {
+		btree->original = 0;		/* Make the next test faster. */
+		return;
+	}
+
+	/*
+	 * We use a compare-and-swap here to avoid races among the first inserts
+	 * into a tree.  Eviction is disabled when an empty tree is opened, and
+	 * it must only be enabled once.
+	 */
+	if (__wt_atomic_cas8(&btree->original, 1, 0))
+		__wt_evict_file_exclusive_off(session);
+}
+
+/*
  * __cursor_fix_implicit --
  *	Return if search went past the end of the tree.
  */
@@ -76,11 +182,11 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __cursor_valid --
+ * __wt_cursor_valid --
  *	Return if the cursor references an valid key/value pair.
  */
-static inline bool
-__cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
+bool
+__wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -163,7 +269,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * column-store pages don't have slots, but map one-to-one to
 		 * keys, check for retrieval past the end of the page.
 		 */
-		if (cbt->recno >= cbt->ref->ref_recno + page->pg_fix_entries)
+		if (cbt->recno >= cbt->ref->ref_recno + page->entries)
 			return (false);
 
 		/*
@@ -173,9 +279,9 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		break;
 	case BTREE_COL_VAR:
 		/* The search function doesn't check for empty pages. */
-		if (page->pg_var_entries == 0)
+		if (page->entries == 0)
 			return (false);
-		WT_ASSERT(session, cbt->slot < page->pg_var_entries);
+		WT_ASSERT(session, cbt->slot < page->entries);
 
 		/*
 		 * Column-store updates are stored as "insert" objects. If
@@ -191,16 +297,16 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * backing store; check the cell for a record already deleted
 		 * when read.
 		 */
-		cip = &page->pg_var_d[cbt->slot];
+		cip = &page->pg_var[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
 		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (false);
 		break;
 	case BTREE_ROW:
 		/* The search function doesn't check for empty pages. */
-		if (page->pg_row_entries == 0)
+		if (page->entries == 0)
 			return (false);
-		WT_ASSERT(session, cbt->slot < page->pg_row_entries);
+		WT_ASSERT(session, cbt->slot < page->entries);
 
 		/*
 		 * See above: for row-store, no insert object can have the same
@@ -285,12 +391,16 @@ __cursor_row_modify(
 int
 __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 {
+	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 
+	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	WT_STAT_CONN_INCR(session, cursor_reset);
 	WT_STAT_DATA_INCR(session, cursor_reset);
+
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (__cursor_reset(cbt));
 }
@@ -303,6 +413,7 @@ int
 __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_CURFILE_STATE state;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -317,20 +428,28 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_STAT_CONN_INCR(session, cursor_search);
 	WT_STAT_DATA_INCR(session, cursor_search);
 
+	__cursor_state_save(cursor, &state);
+
+	/*
+	 * The pinned page goes away if we do a search, make sure there's a
+	 * local copy of any key, then re-save the cursor state.
+	 */
+	WT_ERR(__cursor_copy_int_key(cursor));
+	__cursor_state_save(cursor, &state);
+
 	/*
 	 * If we have a page pinned, search it; if we don't have a page pinned,
 	 * or the search of the pinned page doesn't find an exact match, search
 	 * from the root.
 	 */
 	valid = false;
-	if (F_ISSET(cbt, WT_CBT_ACTIVE) &&
-	    cbt->ref->page->read_gen != WT_READGEN_OLDEST) {
+	if (__cursor_page_pinned(cbt)) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, cbt->ref, false) :
 		    __cursor_col_search(session, cbt, cbt->ref));
-		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
+		valid = cbt->compare == 0 && __wt_cursor_valid(cbt, &upd);
 	}
 	if (!valid) {
 		WT_ERR(__cursor_func_init(cbt, true));
@@ -338,7 +457,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, false) :
 		    __cursor_col_search(session, cbt, NULL));
-		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
+		valid = cbt->compare == 0 && __wt_cursor_valid(cbt, &upd);
 	}
 
 	if (valid)
@@ -352,6 +471,8 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		cbt->v = 0;
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else
 		ret = WT_NOTFOUND;
 
@@ -360,8 +481,10 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		WT_ERR(__wt_cursor_key_order_init(session, cbt));
 #endif
 
-err:	if (ret != 0)
+err:	if (ret != 0) {
 		WT_TRET(__cursor_reset(cbt));
+		__cursor_state_restore(cursor, &state);
+	}
 	return (ret);
 }
 
@@ -373,6 +496,7 @@ int
 __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 {
 	WT_BTREE *btree;
+	WT_CURFILE_STATE state;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -389,6 +513,15 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	WT_STAT_CONN_INCR(session, cursor_search_near);
 	WT_STAT_DATA_INCR(session, cursor_search_near);
 
+	__cursor_state_save(cursor, &state);
+
+	/*
+	 * The pinned page goes away if we do a search, make sure there's a
+	 * local copy of any key, then re-save the cursor state.
+	 */
+	WT_ERR(__cursor_copy_int_key(cursor));
+	__cursor_state_save(cursor, &state);
+
 	/*
 	 * If we have a row-store page pinned, search it; if we don't have a
 	 * page pinned, or the search of the pinned page doesn't find an exact
@@ -402,9 +535,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	 * existing record.
 	 */
 	valid = false;
-	if (btree->type == BTREE_ROW &&
-	    F_ISSET(cbt, WT_CBT_ACTIVE) &&
-	    cbt->ref->page->read_gen != WT_READGEN_OLDEST) {
+	if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt)) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(__cursor_row_search(session, cbt, cbt->ref, true));
@@ -418,16 +549,15 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		 * might be legitimately positioned after the last page slot).
 		 * Ignore those cases, it makes things too complicated.
 		 */
-		if (cbt->slot != 0 &&
-		    cbt->slot != cbt->ref->page->pg_row_entries - 1)
-			valid = __cursor_valid(cbt, &upd);
+		if (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)
+			valid = __wt_cursor_valid(cbt, &upd);
 	}
 	if (!valid) {
 		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
-		valid = __cursor_valid(cbt, &upd);
+		valid = __wt_cursor_valid(cbt, &upd);
 	}
 
 	/*
@@ -456,6 +586,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
 		exact = 0;
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else if ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND)
 		exact = 1;
 	else {
@@ -463,22 +595,25 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
-		if (__cursor_valid(cbt, &upd)) {
+		if (__wt_cursor_valid(cbt, &upd)) {
 			exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt, upd);
 		} else if ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND)
 			exact = -1;
 	}
 
+err:	if (ret == 0 && exactp != NULL)
+		*exactp = exact;
+
 #ifdef HAVE_DIAGNOSTIC
 	if (ret == 0)
-		WT_ERR(__wt_cursor_key_order_init(session, cbt));
+		WT_TRET(__wt_cursor_key_order_init(session, cbt));
 #endif
 
-err:	if (ret != 0)
+	if (ret != 0) {
 		WT_TRET(__cursor_reset(cbt));
-	if (exactp != NULL && (ret == 0 || ret == WT_NOTFOUND))
-		*exactp = exact;
+		__cursor_state_restore(cursor, &state);
+	}
 	return (ret);
 }
 
@@ -490,9 +625,11 @@ int
 __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_CURFILE_STATE state;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	bool append_key;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -503,30 +640,86 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	WT_STAT_DATA_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
+	__cursor_state_save(cursor, &state);
+
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
 
+	/* It's no longer possible to bulk-load into the tree. */
+	__cursor_disable_bulk(session, btree);
+
 	/*
-	 * The tree is no longer empty: eviction should pay attention to it,
-	 * and it's no longer possible to bulk-load into it.
+	 * Insert a new record if WT_CURSTD_APPEND configured, (ignoring any
+	 * application set record number). Although append can't be configured
+	 * for a row-store, this code would break if it were, and that's owned
+	 * by the upper cursor layer, be cautious.
 	 */
-	if (btree->bulk_load_ok) {
-		btree->bulk_load_ok = false;
-		__wt_btree_evictable(session, true);
+	append_key =
+	    F_ISSET(cursor, WT_CURSTD_APPEND) && btree->type != BTREE_ROW;
+
+	/*
+	 * If inserting with overwrite configured, and positioned to an on-page
+	 * key, the update doesn't require another search. The cursor won't be
+	 * positioned on a page with an external key set, but be sure. Cursors
+	 * configured for append aren't included, regardless of whether or not
+	 * they meet all other criteria.
+	 */
+	if (__cursor_page_pinned(cbt) &&
+	    F_ISSET_ALL(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_OVERWRITE) &&
+	    !append_key) {
+		WT_ERR(__wt_txn_autocommit_check(session));
+		/*
+		 * The cursor position may not be exact (the cursor's comparison
+		 * value not equal to zero). Correct to an exact match so we can
+		 * update whatever we're pointing at.
+		 */
+		cbt->compare = 0;
+		ret = btree->type == BTREE_ROW ?
+		    __cursor_row_modify(session, cbt, false) :
+		    __cursor_col_modify(session, cbt, false);
+		if (ret == 0)
+			goto done;
+
+		/*
+		 * The pinned page goes away if we fail for any reason, make
+		 * sure there's a local copy of any key. (Restart could still
+		 * use the pinned page, but that's an unlikely path.) Re-save
+		 * the cursor state: we may retry but eventually fail.
+		 */
+		WT_TRET(__cursor_copy_int_key(cursor));
+		__cursor_state_save(cursor, &state);
+		goto err;
 	}
 
-retry:	WT_RET(__cursor_func_init(cbt, true));
+	/*
+	 * The pinned page goes away if we do a search, make sure there's a
+	 * local copy of any key. Re-save the cursor state: we may retry but
+	 * eventually fail.
+	 */
+	WT_ERR(__cursor_copy_int_key(cursor));
+	__cursor_state_save(cursor, &state);
 
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-	case BTREE_COL_VAR:
+retry:	WT_ERR(__cursor_func_init(cbt, true));
+
+	if (btree->type == BTREE_ROW) {
+		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
 		/*
-		 * If WT_CURSTD_APPEND is set, insert a new record (ignoring
-		 * the application's record number). The real record number
-		 * is assigned by the serialized append operation.
+		 * If not overwriting, fail if the key exists, else insert the
+		 * key/value pair.
 		 */
-		if (F_ISSET(cursor, WT_CURSTD_APPEND))
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
+		    cbt->compare == 0 && __wt_cursor_valid(cbt, NULL))
+			WT_ERR(WT_DUPLICATE_KEY);
+
+		ret = __cursor_row_modify(session, cbt, false);
+	} else {
+		/*
+		 * Optionally insert a new record (ignoring the application's
+		 * record number). The real record number is allocated by the
+		 * serialized append operation.
+		 */
+		if (append_key)
 			cbt->iface.recno = WT_RECNO_OOB;
 
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
@@ -538,26 +731,14 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		 * Fail in that case, the record exists.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    ((cbt->compare == 0 && __cursor_valid(cbt, NULL)) ||
+		    ((cbt->compare == 0 && __wt_cursor_valid(cbt, NULL)) ||
 		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt))))
 			WT_ERR(WT_DUPLICATE_KEY);
 
 		WT_ERR(__cursor_col_modify(session, cbt, false));
-		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = cbt->recno;
-		break;
-	case BTREE_ROW:
-		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
-		/*
-		 * If not overwriting, fail if the key exists, else insert the
-		 * key/value pair.
-		 */
-		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    cbt->compare == 0 && __cursor_valid(cbt, NULL))
-			WT_ERR(WT_DUPLICATE_KEY);
 
-		ret = __cursor_row_modify(session, cbt, false);
-		break;
+		if (append_key)
+			cbt->iface.recno = cbt->recno;
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -565,11 +746,17 @@ err:	if (ret == WT_RESTART) {
 		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
-	/* Insert doesn't maintain a position across calls, clear resources. */
-	if (ret == 0)
-		WT_TRET(__curfile_leave(cbt));
+
+done:	/* Insert doesn't maintain a position across calls, clear resources. */
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		if (append_key)
+			F_SET(cursor, WT_CURSTD_KEY_INT);
+	}
+	WT_TRET(__cursor_reset(cbt));
 	if (ret != 0)
-		WT_TRET(__cursor_reset(cbt));
+		__cursor_state_restore(cursor, &state);
+
 	return (ret);
 }
 
@@ -605,16 +792,15 @@ __curfile_update_check(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_btcur_update_check --
+ * __wt_btcur_insert_check --
  *	Check whether an update would conflict.
  *
- *	This can be used to replace WT_CURSOR::insert or WT_CURSOR::update, so
- *	they only check for conflicts without updating the tree.  It is used to
- *	maintain snapshot isolation for transactions that span multiple chunks
- *	in an LSM tree.
+ * This can replace WT_CURSOR::insert, so it only checks for conflicts without
+ * updating the tree. It is used to maintain snapshot isolation for transactions
+ * that span multiple chunks in an LSM tree.
  */
 int
-__wt_btcur_update_check(WT_CURSOR_BTREE *cbt)
+__wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
@@ -625,31 +811,35 @@ __wt_btcur_update_check(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-retry:	WT_RET(__cursor_func_init(cbt, true));
+	/*
+	 * The pinned page goes away if we do a search, make sure there's a
+	 * local copy of any key. Unlike most of the btree cursor routines,
+	 * we don't have to save/restore the cursor key state, none of the
+	 * work done here changes the key state.
+	 */
+	WT_ERR(__cursor_copy_int_key(cursor));
 
-	switch (btree->type) {
-	case BTREE_ROW:
+retry:	WT_ERR(__cursor_func_init(cbt, true));
+
+	if (btree->type == BTREE_ROW) {
 		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
 
-		/*
-		 * Just check for conflicts.
-		 */
+		/* Just check for conflicts. */
 		ret = __curfile_update_check(cbt);
-		break;
-	case BTREE_COL_FIX:
-	case BTREE_COL_VAR:
+	} else
 		WT_ERR(__wt_illegal_value(session, NULL));
-		break;
-	}
 
 err:	if (ret == WT_RESTART) {
 		WT_STAT_CONN_INCR(session, cursor_restart);
 		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
-	WT_TRET(__curfile_leave(cbt));
-	if (ret != 0)
-		WT_TRET(__cursor_reset(cbt));
+
+	/* Insert doesn't maintain a position across calls, clear resources. */
+	if (ret == 0)
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	WT_TRET(__cursor_reset(cbt));
+
 	return (ret);
 }
 
@@ -661,9 +851,11 @@ int
 __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_CURFILE_STATE state;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	bool positioned;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -673,22 +865,80 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	WT_STAT_DATA_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
-retry:	WT_RET(__cursor_func_init(cbt, true));
+	__cursor_state_save(cursor, &state);
 
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-	case BTREE_COL_VAR:
+	/*
+	 * WT_CURSOR.remove has a unique semantic, the cursor stays positioned
+	 * if it starts positioned, otherwise clear the cursor on completion.
+	 */
+	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
+
+	/*
+	 * If remove positioned to an on-page key, the remove doesn't require
+	 * another search. We don't care about the "overwrite" configuration
+	 * because regardless of the overwrite setting, any existing record is
+	 * removed, and the record must exist with a positioned cursor. The
+	 * cursor won't be positioned on a page with an external key set, but
+	 * be sure.
+	 */
+	if (__cursor_page_pinned(cbt) && F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+		WT_ERR(__wt_txn_autocommit_check(session));
+
+		/*
+		 * The cursor position may not be exact (the cursor's comparison
+		 * value not equal to zero). Correct to an exact match so we can
+		 * remove whatever we're pointing at.
+		 */
+		cbt->compare = 0;
+		ret = btree->type == BTREE_ROW ?
+		    __cursor_row_modify(session, cbt, true) :
+		    __cursor_col_modify(session, cbt, true);
+		if (ret == 0)
+			goto done;
+
+		/*
+		 * The pinned page goes away if we fail for any reason, make
+		 * sure there's a local copy of any key. (Restart could still
+		 * use the pinned page, but that's an unlikely path.) Re-save
+		 * the cursor state: we may retry but eventually fail.
+		 */
+		WT_TRET(__cursor_copy_int_key(cursor));
+		__cursor_state_save(cursor, &state);
+		goto err;
+	}
+
+	/*
+	 * The pinned page goes away if we do a search, make sure there's a
+	 * local copy of any key. Re-save the cursor state: we may retry but
+	 * eventually fail.
+	 */
+	WT_ERR(__cursor_copy_int_key(cursor));
+	__cursor_state_save(cursor, &state);
+
+retry:	WT_ERR(__cursor_func_init(cbt, true));
+
+	if (btree->type == BTREE_ROW) {
+		WT_ERR(__cursor_row_search(session, cbt, NULL, false));
+
+		/* Check whether an update would conflict. */
+		WT_ERR(__curfile_update_check(cbt));
+
+		if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL))
+			WT_ERR(WT_NOTFOUND);
+
+		ret = __cursor_row_modify(session, cbt, true);
+	} else {
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
 
 		/*
 		 * If we find a matching record, check whether an update would
 		 * conflict.  Do this before checking if the update is visible
-		 * in __cursor_valid, or we can miss conflict.
+		 * in __wt_cursor_valid, or we can miss conflict.
 		 */
 		WT_ERR(__curfile_update_check(cbt));
 
 		/* Remove the record if it exists. */
-		if (cbt->compare != 0 || !__cursor_valid(cbt, NULL)) {
+		if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL)) {
 			if (!__cursor_fix_implicit(btree, cbt))
 				WT_ERR(WT_NOTFOUND);
 			/*
@@ -704,19 +954,6 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 			cbt->recno = cursor->recno;
 		} else
 			ret = __cursor_col_modify(session, cbt, true);
-		break;
-	case BTREE_ROW:
-		/* Remove the record if it exists. */
-		WT_ERR(__cursor_row_search(session, cbt, NULL, false));
-
-		/* Check whether an update would conflict. */
-		WT_ERR(__curfile_update_check(cbt));
-
-		if (cbt->compare != 0 || !__cursor_valid(cbt, NULL))
-			WT_ERR(WT_NOTFOUND);
-
-		ret = __cursor_row_modify(session, cbt, true);
-		break;
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -724,15 +961,27 @@ err:	if (ret == WT_RESTART) {
 		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
 	}
+
 	/*
-	 * If the cursor is configured to overwrite and the record is not
-	 * found, that is exactly what we want.
+	 * If the cursor is configured to overwrite and the record is not found,
+	 * that is exactly what we want, return success.
 	 */
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) && ret == WT_NOTFOUND)
 		ret = 0;
 
-	if (ret != 0)
+done:	/*
+	 * If the cursor was positioned, it stays positioned, point the cursor
+	 * at an internal copy of the key. Otherwise, there's no position or
+	 * key/value.
+	 */
+	if (ret == 0)
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if (ret == 0 && positioned)
+		WT_TRET(__wt_key_return(session, cbt));
+	else
 		WT_TRET(__cursor_reset(cbt));
+	if (ret != 0)
+		__cursor_state_restore(cursor, &state);
 
 	return (ret);
 }
@@ -745,6 +994,7 @@ int
 __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_CURFILE_STATE state;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -757,24 +1007,71 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	WT_STAT_DATA_INCR(session, cursor_update);
 	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
+	__cursor_state_save(cursor, &state);
+
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
 
+	/* It's no longer possible to bulk-load into the tree. */
+	__cursor_disable_bulk(session, btree);
+
 	/*
-	 * The tree is no longer empty: eviction should pay attention to it,
-	 * and it's no longer possible to bulk-load into it.
+	 * If update positioned to an on-page key, the update doesn't require
+	 * another search. We don't care about the "overwrite" configuration
+	 * because regardless of the overwrite setting, any existing record is
+	 * updated, and the record must exist with a positioned cursor. The
+	 * cursor won't be positioned on a page with an external key set, but
+	 * be sure.
 	 */
-	if (btree->bulk_load_ok) {
-		btree->bulk_load_ok = false;
-		__wt_btree_evictable(session, true);
+	if (__cursor_page_pinned(cbt) && F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+		WT_ERR(__wt_txn_autocommit_check(session));
+		/*
+		 * The cursor position may not be exact (the cursor's comparison
+		 * value not equal to zero). Correct to an exact match so we can
+		 * update whatever we're pointing at.
+		 */
+		cbt->compare = 0;
+		ret = btree->type == BTREE_ROW ?
+		    __cursor_row_modify(session, cbt, false) :
+		    __cursor_col_modify(session, cbt, false);
+		if (ret == 0)
+			goto done;
+
+		/*
+		 * The pinned page goes away if we fail for any reason, make
+		 * sure there's a local copy of any key. (Restart could still
+		 * use the pinned page, but that's an unlikely path.) Re-save
+		 * the cursor state: we may retry but eventually fail.
+		 */
+		WT_TRET(__cursor_copy_int_key(cursor));
+		__cursor_state_save(cursor, &state);
+		goto err;
 	}
 
-retry:	WT_RET(__cursor_func_init(cbt, true));
+	/*
+	 * The pinned page goes away if we do a search, make sure there's a
+	 * local copy of any key. Re-save the cursor state: we may retry but
+	 * eventually fail.
+	 */
+	WT_ERR(__cursor_copy_int_key(cursor));
+	__cursor_state_save(cursor, &state);
 
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-	case BTREE_COL_VAR:
+retry:	WT_ERR(__cursor_func_init(cbt, true));
+
+	if (btree->type == BTREE_ROW) {
+		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
+		/*
+		 * If not overwriting, check for conflicts and fail if the key
+		 * does not exist.
+		 */
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+			WT_ERR(__curfile_update_check(cbt));
+			if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL))
+				WT_ERR(WT_NOTFOUND);
+		}
+		ret = __cursor_row_modify(session, cbt, false);
+	} else {
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
 
 		/*
@@ -787,25 +1084,12 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 			WT_ERR(__curfile_update_check(cbt));
-			if ((cbt->compare != 0 || !__cursor_valid(cbt, NULL)) &&
+			if ((cbt->compare != 0 ||
+			    !__wt_cursor_valid(cbt, NULL)) &&
 			    !__cursor_fix_implicit(btree, cbt))
 				WT_ERR(WT_NOTFOUND);
 		}
 		ret = __cursor_col_modify(session, cbt, false);
-		break;
-	case BTREE_ROW:
-		WT_ERR(__cursor_row_search(session, cbt, NULL, true));
-		/*
-		 * If not overwriting, check for conflicts and fail if the key
-		 * does not exist.
-		 */
-		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-			WT_ERR(__curfile_update_check(cbt));
-			if (cbt->compare != 0 || !__cursor_valid(cbt, NULL))
-				WT_ERR(WT_NOTFOUND);
-		}
-		ret = __cursor_row_modify(session, cbt, false);
-		break;
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -822,116 +1106,14 @@ err:	if (ret == WT_RESTART) {
 	 * To make this work, we add a field to the btree cursor to pass back a
 	 * pointer to the modify function's allocated update structure.
 	 */
-	if (ret == 0)
+done:	if (ret == 0)
 		WT_TRET(__wt_kv_return(session, cbt, cbt->modify_update));
 
-	if (ret != 0)
+	if (ret != 0) {
 		WT_TRET(__cursor_reset(cbt));
-	return (ret);
-}
-
-/*
- * __wt_btcur_next_random --
- *	Move to a random record in the tree. There are two algorithms, one
- *	where we select a record at random from the whole tree on each
- *	retrieval and one where we first select a record at random from the
- *	whole tree, and then subsequently sample forward from that location.
- *	The sampling approach allows us to select reasonably uniform random
- *	points from unbalanced trees.
- */
-int
-__wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
-{
-	WT_BTREE *btree;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
-	wt_off_t size;
-	uint64_t skip;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = cbt->btree;
-
-	/*
-	 * Only supports row-store: applications can trivially select a random
-	 * value from a column-store, if there were any reason to do so.
-	 */
-	if (btree->type != BTREE_ROW)
-		WT_RET_MSG(session, ENOTSUP,
-		    "WT_CURSOR.next_random only supported by row-store tables");
-
-	WT_STAT_CONN_INCR(session, cursor_next);
-	WT_STAT_DATA_INCR(session, cursor_next);
-
-	/*
-	 * If retrieving random values without sampling, or we don't have a
-	 * page reference, pick a roughly random leaf page in the tree.
-	 */
-	if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
-		/*
-		 * Skip past the sample size of the leaf pages in the tree
-		 * between each random key return to compensate for unbalanced
-		 * trees.
-		 *
-		 * Use the underlying file size divided by its block allocation
-		 * size as our guess of leaf pages in the file (this can be
-		 * entirely wrong, as it depends on how many pages are in this
-		 * particular checkpoint, how large the leaf and internal pages
-		 * really are, and other factors). Then, divide that value by
-		 * the configured sample size and increment the final result to
-		 * make sure tiny files don't leave us with a skip value of 0.
-		 *
-		 * !!!
-		 * Ideally, the number would be prime to avoid restart issues.
-		 */
-		if (cbt->next_random_sample_size != 0) {
-			WT_ERR(btree->bm->size(btree->bm, session, &size));
-			cbt->next_random_leaf_skip = (uint64_t)
-			    ((size / btree->allocsize) /
-			    cbt->next_random_sample_size) + 1;
-		}
-
-		/*
-		 * Choose a leaf page from the tree.
-		 */
-		WT_ERR(__cursor_func_init(cbt, true));
-		WT_WITH_PAGE_INDEX(
-		    session, ret = __wt_row_random_descent(session, cbt));
-		WT_ERR(ret);
-	} else {
-		/*
-		 * Read through the tree, skipping leaf pages. Be cautious about
-		 * the skip count: if the last leaf page skipped was also the
-		 * last leaf page in the tree, it may be set to zero on return
-		 * with the end-of-walk condition.
-		 *
-		 * Pages read for data sampling aren't "useful"; don't update
-		 * the read generation of pages already in memory, and if a page
-		 * is read, set its generation to a low value so it is evicted
-		 * quickly.
-		 */
-		for (skip =
-		    cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;)
-			WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip,
-			    WT_READ_NO_GEN |
-			    WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
+		__cursor_state_restore(cursor, &state);
 	}
 
-	/*
-	 * Select a random entry from the leaf page. If it's not valid, move to
-	 * the next entry, if that doesn't work, move to the previous entry.
-	 */
-	WT_ERR(__wt_row_random_leaf(session, cbt));
-	if (__cursor_valid(cbt, &upd))
-		WT_ERR(__wt_kv_return(session, cbt, upd));
-	else {
-		if ((ret = __wt_btcur_next(cbt, false)) == WT_NOTFOUND)
-			ret = __wt_btcur_prev(cbt, false);
-		WT_ERR(ret);
-	}
-	return (0);
-
-err:	WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 
@@ -1060,9 +1242,12 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	/*
-	 * First, call the standard cursor remove method to do a full search and
-	 * re-position the cursor because we don't have a saved copy of the
-	 * page's write generation information, which we need to remove records.
+	 * First, call the cursor search method to re-position the cursor: we
+	 * may not have a cursor position (if the higher-level truncate code
+	 * switched the cursors to have an "external" cursor key, and because
+	 * we don't save a copy of the page's write generation information,
+	 * which we need to remove records.
+	 *
 	 * Once that's done, we can delete records without a full search, unless
 	 * we encounter a restart error because the page was modified by some
 	 * other thread of control; in that case, repeat the full search to
@@ -1075,20 +1260,19 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * instantiated the end cursor, so we know that page is pinned in memory
 	 * and we can proceed without concern.
 	 */
-retry:	WT_RET(__wt_btcur_remove(start));
+retry:	WT_RET(__wt_btcur_search(start));
+	WT_ASSERT(session,
+	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
-	/*
-	 * Reset ret each time through so that we don't loop forever in
-	 * the cursor equals case.
-	 */
-	for (ret = 0;;) {
+	for (;;) {
+		if ((ret = rmfunc(session, start, 1)) != 0)
+			break;
+
 		if (stop != NULL && __cursor_equals(start, stop))
 			break;
 		if ((ret = __wt_btcur_next(start, true)) != 0)
 			break;
-		start->compare = 0;	/* Exact match */
-		if ((ret = rmfunc(session, start, 1)) != 0)
-			break;
+		start->compare = 0;		/* Exact match */
 	}
 
 	if (ret == WT_RESTART) {
@@ -1121,29 +1305,32 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	 * record 37, records 1-36 magically appear.  Those records can't be
 	 * deleted, which means we have to ignore already "deleted" records.
 	 *
-	 * First, call the standard cursor remove method to do a full search and
-	 * re-position the cursor because we don't have a saved copy of the
-	 * page's write generation information, which we need to remove records.
+	 * First, call the cursor search method to re-position the cursor: we
+	 * may not have a cursor position (if the higher-level truncate code
+	 * switched the cursors to have an "external" cursor key, and because
+	 * we don't save a copy of the page's write generation information,
+	 * which we need to remove records.
+	 *
 	 * Once that's done, we can delete records without a full search, unless
 	 * we encounter a restart error because the page was modified by some
 	 * other thread of control; in that case, repeat the full search to
 	 * refresh the page's modification information.
 	 */
-retry:	WT_RET(__wt_btcur_remove(start));
-	/*
-	 * Reset ret each time through so that we don't loop forever in
-	 * the cursor equals case.
-	 */
-	for (ret = 0;;) {
+retry:	WT_RET(__wt_btcur_search(start));
+	WT_ASSERT(session,
+	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
+
+	for (;;) {
+		value = (const uint8_t *)start->iface.value.data;
+		if (*value != 0 &&
+		    (ret = rmfunc(session, start, 1)) != 0)
+			break;
+
 		if (stop != NULL && __cursor_equals(start, stop))
 			break;
 		if ((ret = __wt_btcur_next(start, true)) != 0)
 			break;
 		start->compare = 0;	/* Exact match */
-		value = (const uint8_t *)start->iface.value.data;
-		if (*value != 0 &&
-		    (ret = rmfunc(session, start, 1)) != 0)
-			break;
 	}
 
 	if (ret == WT_RESTART) {
@@ -1263,7 +1450,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, bool lowlevel)
 	 * Skip the usual cursor tear-down in that case.
 	 */
 	if (!lowlevel)
-		ret = __curfile_leave(cbt);
+		ret = __cursor_reset(cbt);
 
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);

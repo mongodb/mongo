@@ -34,7 +34,6 @@ u_int nops;					/* Operations */
 const char *uri;				/* Object */
 const char *config;				/* Object config */
 
-static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
 static char home[512];
@@ -71,22 +70,15 @@ main(int argc, char *argv[])
 	int ch, cnt, ret, runs;
 	char *config_open, *working_dir;
 
-	working_dir = NULL;
-
-	/* Remove directories */
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	if ((ret = pthread_rwlock_init(&single, NULL)) != 0)
 		testutil_die(ret, "pthread_rwlock_init: single");
 
-	config_open = NULL;
 	nops = 1000;
 	nthreads = 10;
 	runs = 1;
-
+	config_open = working_dir = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "C:h:l:n:r:t:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
@@ -165,11 +157,11 @@ wt_startup(char *config_open)
 
 	testutil_make_work_dir(home);
 
-	snprintf(config_buf, sizeof(config_buf),
+	testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
-	    config_open == NULL ? "" : config_open);
+	    config_open == NULL ? "" : config_open));
 	if ((ret = wiredtiger_open(
 	    home, &event_handler, config_buf, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
@@ -224,6 +216,11 @@ handle_message(WT_EVENT_HANDLER *handler,
 {
 	(void)(handler);
 	(void)(session);
+
+	/* Ignore messages about failing to create forced checkpoints. */
+	if (strstr(
+	    message, "forced or named checkpoint") != NULL)
+		return (0);
 
 	if (logfp != NULL)
 		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);

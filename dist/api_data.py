@@ -295,12 +295,12 @@ file_config = format_meta + file_runtime_config + [
     Config('split_deepen_per_child', '0', r'''
         entries allocated per child when deepening the tree''',
         type='int', undoc=True),
-    Config('split_pct', '75', r'''
+    Config('split_pct', '90', r'''
         the Btree page split size as a percentage of the maximum Btree
         page size, that is, when a Btree page is split, it will be
         split into smaller pages, where each page is the specified
         percentage of the maximum Btree page size''',
-        min='25', max='100'),
+        min='50', max='100'),
 ]
 
 # File metadata, including both configurable and non-configurable (internal)
@@ -406,7 +406,7 @@ connection_runtime_config = [
     Config('eviction', '', r'''
         eviction configuration options''',
         type='category', subconfig=[
-            Config('threads_max', '1', r'''
+            Config('threads_max', '8', r'''
                 maximum number of threads WiredTiger will start to help evict
                 pages from cache. The number of threads started will vary
                 depending on the current eviction load. Each eviction worker
@@ -524,6 +524,7 @@ connection_runtime_config = [
             'checkpoint',
             'compact',
             'evict',
+            'evict_stuck',
             'evictserver',
             'fileops',
             'handleops',
@@ -537,6 +538,7 @@ connection_runtime_config = [
             'rebalance',
             'reconcile',
             'recovery',
+            'recovery_progress',
             'salvage',
             'shared_cache',
             'split',
@@ -716,7 +718,7 @@ wiredtiger_open_common =\
         ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).
-        Any values specified to an library extension are passed to
+        Any values specified to a library extension are passed to
         WT_CONNECTION::load_extension as the \c config parameter
         (for example,
         <code>extensions=(/path/ext.so={entry=my_entry})</code>)''',

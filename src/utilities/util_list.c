@@ -19,10 +19,10 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	int ch;
 	bool cflag, vflag;
-	char *name;
+	char *uri;
 
 	cflag = vflag = false;
-	name = NULL;
+	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "cv")) != EOF)
 		switch (ch) {
 		case 'c':
@@ -42,17 +42,16 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	case 0:
 		break;
 	case 1:
-		if ((name = util_name(session, *argv, "table")) == NULL)
+		if ((uri = util_uri(session, *argv, "table")) == NULL)
 			return (1);
 		break;
 	default:
 		return (usage());
 	}
 
-	ret = list_print(session, name, cflag, vflag);
+	ret = list_print(session, uri, cflag, vflag);
 
-	free(name);
-
+	free(uri);
 	return (ret);
 }
 
@@ -99,7 +98,7 @@ list_get_allocsize(WT_SESSION *session, const char *key, size_t *allocsize)
  *	List the high-level objects in the database.
  */
 static int
-list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
+list_print(WT_SESSION *session, const char *uri, bool cflag, bool vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -120,7 +119,7 @@ list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
 		    ret, "%s: WT_SESSION.open_cursor", WT_METADATA_URI));
 	}
 
-	found = name == NULL;
+	found = uri == NULL;
 	while ((ret = cursor->next(cursor)) == 0) {
 		/* Get the key. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
@@ -129,8 +128,8 @@ list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
 		/*
 		 * If a name is specified, only show objects that match.
 		 */
-		if (name != NULL) {
-			if (!WT_PREFIX_MATCH(key, name))
+		if (uri != NULL) {
+			if (!WT_PREFIX_MATCH(key, uri))
 				continue;
 			found = true;
 		}
@@ -161,7 +160,7 @@ list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
 	if (ret != WT_NOTFOUND)
 		return (util_cerr(cursor, "next", ret));
 	if (!found) {
-		fprintf(stderr, "%s: %s: not found\n", progname, name);
+		fprintf(stderr, "%s: %s: not found\n", progname, uri);
 		return (1);
 	}
 

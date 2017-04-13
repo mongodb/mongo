@@ -1,4 +1,6 @@
 #if defined(__powerpc64__)
+#include "wt_internal.h"
+
 #define CRC_TABLE
 #include "crc32_constants.h"
 
@@ -67,8 +69,6 @@ out:
 	return crc;
 }
 #endif
-
-#include "wt_internal.h"
 
 /*
  * __wt_checksum_hw --

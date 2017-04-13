@@ -50,6 +50,7 @@ LDFLAGS
 LIBS
 LLVM
 LOGREC
+LRU
 LRVv
 LSB
 LSM
@@ -167,6 +168,7 @@ dNLen
 dNOff
 dT
 dataN
+database's
 dataitem
 dataset
 datasets

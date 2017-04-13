@@ -43,7 +43,7 @@ class test_bug011(wttest.WiredTigerTestCase):
     nrows = 10000
     nops = 10000
     # Add connection configuration for this test.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'cache_size=1GB'
 
     @wttest.longtest("Eviction copes with lots of files")

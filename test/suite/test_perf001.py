@@ -40,7 +40,8 @@ class test_perf001(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios([
         #('file-file', dict(tabletype='file',indextype='file')),
-        ('file-lsm', dict(tabletype='file',indextype='lsm')),
+        ('file-lsm', dict(tabletype='file',indextype='lsm', cfg='',
+            conn_config="statistics=(fast),statistics_log=(wait=1)")),
         #('lsm-file', dict(tabletype='lsm',indextype='file')),
         #('lsm-lsm', dict(tabletype='lsm',indextype='lsm')),
     ])

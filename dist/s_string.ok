@@ -21,6 +21,7 @@ Alakuijala
 Alexandrescu's
 Alloc
 Async
+AsyncOp
 Athanassoulis
 Athlon
 BBBBB
@@ -62,10 +63,12 @@ CPUs
 CRC
 CSV
 CStream
+CURFILE
 CURSORs
 CURSTD
 CallsCustDate
 Castagnoli
+CentOS
 Checkpointing
 Checksum
 Checksums
@@ -222,8 +225,10 @@ MEMALIGN
 MERCHANTABILITY
 METADATA
 MONGODB
+MOVEFILE
 MRXB
 MRXBOPC
+MSDN
 MSVC
 MULTI
 MULTIBLOCK
@@ -237,8 +242,7 @@ Metadata
 Mewhort
 Mitzenmacher
 MongoDB
-MoveFile
-MoveFileW
+MoveFileExW
 Multi
 MultiByteToWideChar
 Multithreaded
@@ -276,6 +280,7 @@ PRNG
 PTHREAD
 PTR
 PackInputStream
+PackOutputStream
 Pandis
 Phong
 PlatformSDK
@@ -339,6 +344,7 @@ Split's
 Stoica
 StoreLoad
 StoreStore
+Syscall
 TAILQ
 TCMalloc
 TESTUTIL
@@ -767,6 +773,7 @@ idx
 ifdef
 ifdef's
 iiSii
+iiiS
 iiii
 iiu
 ikey
@@ -1135,6 +1142,7 @@ subgetraw
 subgets
 subinit
 sublicense
+subtest
 subtree
 sunique
 superset
@@ -1142,6 +1150,7 @@ sw
 sx
 sy
 sys
+syscall
 sz
 t's
 tV
@@ -1179,6 +1188,7 @@ txt
 typedef
 uB
 uS
+ui
 uint
 uintmax
 unbare
@@ -1214,6 +1224,7 @@ upg
 uri
 uri's
 uris
+usec
 usecs
 usedp
 userbad
@@ -1244,6 +1255,9 @@ vunpack
 vw
 vxr
 waitpid
+waker
+wakeup
+wakeups
 walk's
 warmup
 wb

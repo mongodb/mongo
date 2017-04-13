@@ -21,8 +21,8 @@ struct __wt_condvar {
 	int waiters;			/* Numbers of waiters, or
 					   -1 if signalled with no waiters. */
 	/*
-	 * The following fields are only used for automatically adjusting
-	 * condition variables. They could be in a separate structure.
+	 * The following fields are used for automatically adjusting condition
+	 * variable wait times.
 	 */
 	uint64_t	min_wait;	/* Minimum wait duration */
 	uint64_t	max_wait;	/* Maximum wait duration */
@@ -30,11 +30,14 @@ struct __wt_condvar {
 };
 
 /*
+ * Read/write locks:
+ *
+ * WiredTiger uses read/write locks for shared/exclusive access to resources.
  * !!!
  * Don't modify this structure without understanding the read/write locking
  * functions.
  */
-typedef union {				/* Read/write lock */
+union __wt_rwlock {			/* Read/write lock */
 	uint64_t u;
 	struct {
 		uint32_t wr;		/* Writers and readers */
@@ -45,19 +48,6 @@ typedef union {				/* Read/write lock */
 		uint16_t next;		/* Next available ticket number */
 		uint16_t writers_active;/* Count of active writers */
 	} s;
-} wt_rwlock_t;
-
-/*
- * Read/write locks:
- *
- * WiredTiger uses read/write locks for shared/exclusive access to resources.
- */
-struct __wt_rwlock {
-	WT_CACHE_LINE_PAD_BEGIN
-	const char *name;		/* Lock name for debugging */
-
-	wt_rwlock_t rwlock;		/* Read/write lock */
-	WT_CACHE_LINE_PAD_END
 };
 
 /*
@@ -72,31 +62,17 @@ struct __wt_rwlock {
 #define	SPINLOCK_PTHREAD_MUTEX		2
 #define	SPINLOCK_PTHREAD_MUTEX_ADAPTIVE	3
 
-#if SPINLOCK_TYPE == SPINLOCK_GCC
-
 struct __wt_spinlock {
 	WT_CACHE_LINE_PAD_BEGIN
+#if SPINLOCK_TYPE == SPINLOCK_GCC
 	volatile int lock;
-
-	/*
-	 * We track acquisitions and time spent waiting for some locks. For
-	 * performance reasons and to make it possible to write generic code
-	 * that tracks statistics for different locks, we store the offset
-	 * of the statistics fields to be updated during lock acquisition.
-	 */
-	int16_t stat_count_off;		/* acquisitions offset */
-	int16_t stat_app_usecs_off;	/* waiting application threads offset */
-	int16_t stat_int_usecs_off;	/* waiting server threads offset */
-	WT_CACHE_LINE_PAD_END
-};
-
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
 	SPINLOCK_TYPE == SPINLOCK_MSVC
-
-struct __wt_spinlock {
-	WT_CACHE_LINE_PAD_BEGIN
 	wt_mutex_t lock;
+#else
+#error Unknown spinlock type
+#endif
 
 	const char *name;		/* Mutex name */
 
@@ -113,9 +89,3 @@ struct __wt_spinlock {
 	int8_t initialized;		/* Lock initialized, for cleanup */
 	WT_CACHE_LINE_PAD_END
 };
-
-#else
-
-#error Unknown spinlock type
-
-#endif

@@ -54,24 +54,14 @@ class test_cursor08(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     scenarios = make_scenarios(reopens, compress)
     # Load the compression extension, and enable it for logging.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
             'compressor=%s),' % self.compress + \
-            'transaction_sync="(method=dsync,enabled)",' + \
-            self.extensionArg(self.compress)
+            'transaction_sync="(method=dsync,enabled)"'
 
-    # Return the wiredtiger_open extension argument for a shared library.
-    def extensionArg(self, name):
-        if name == None or name == 'none':
-            return ''
-
-        testdir = os.path.dirname(__file__)
-        extdir = os.path.join(run.wt_builddir, 'ext/compressors')
-        extfile = os.path.join(
-            extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
-        if not os.path.exists(extfile):
-            self.skipTest('compression extension "' + extfile + '" not built')
-        return ',extensions=["' + extfile + '"]'
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('compressors', self.compress)
 
     def test_log_cursor(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)

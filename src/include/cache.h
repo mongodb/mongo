@@ -18,6 +18,15 @@
 
 #define	WT_EVICT_MAX_TREES	1000	/* Maximum walk points */
 
+/* Ways to position when starting an eviction walk. */
+typedef enum {
+	WT_EVICT_WALK_NEXT,
+	WT_EVICT_WALK_PREV,
+	WT_EVICT_WALK_RAND_NEXT,
+	WT_EVICT_WALK_RAND_PREV
+} WT_EVICT_WALK_START;
+#define	WT_EVICT_WALK_START_NUM	(WT_EVICT_WALK_RAND_PREV + 1)
+
 /*
  * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
@@ -83,7 +92,7 @@ struct __wt_cache {
 	uint64_t worker_evicts;		/* Pages evicted by worker threads */
 
 	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
-#ifdef	HAVE_DIAGNOSTIC
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 	struct timespec stuck_ts;	/* Stuck timestamp */
 #endif
 

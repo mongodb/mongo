@@ -125,7 +125,8 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 * minimum of it with the oldest ID, which is what we want.
 	 */
 	oldest_id = txn_global->oldest_id;
-	include_checkpoint_txn = btree == NULL || btree->include_checkpoint_txn;
+	include_checkpoint_txn = btree == NULL ||
+	    btree->checkpoint_gen != txn_global->checkpoint_gen;
 	WT_READ_BARRIER();
 	checkpoint_pinned = txn_global->checkpoint_pinned;
 

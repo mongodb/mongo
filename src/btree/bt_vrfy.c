@@ -216,13 +216,11 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		    ckpt->raw.data, ckpt->raw.size,
 		    root_addr, &root_addr_size, true));
 
-		/*
-		 * Ignore trees with no root page.
-		 * Verify, then discard the checkpoint from the cache.
-		 */
-		if (root_addr_size != 0 &&
-		    (ret = __wt_btree_tree_open(
-		    session, root_addr, root_addr_size)) == 0) {
+		/* Skip trees with no root page. */
+		if (root_addr_size != 0) {
+			WT_ERR(__wt_btree_tree_open(
+			    session, root_addr, root_addr_size));
+
 			if (WT_VRFY_DUMP(vs))
 				WT_ERR(__wt_msg(session, "Root: %s %s",
 				    __wt_addr_string(session,
@@ -230,14 +228,38 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 				    __wt_page_type_string(
 				    btree->root.page->type)));
 
+			__wt_evict_file_exclusive_off(session);
+
+			/* Verify the tree. */
 			WT_WITH_PAGE_INDEX(session,
 			    ret = __verify_tree(session, &btree->root, vs));
 
+			/*
+			 * We have an exclusive lock on the handle, but we're
+			 * swapping root pages in-and-out of that handle, and
+			 * there's a race with eviction entering the tree and
+			 * seeing an invalid root page. Eviction must work on
+			 * trees being verified (else we'd have to do our own
+			 * eviction), lock eviction out whenever we're loading
+			 * a new root page. This loops works because we are
+			 * called with eviction locked out, so we release the
+			 * lock at the top of the loop and re-acquire it here.
+			 */
+			WT_TRET(__wt_evict_file_exclusive_on(session));
 			WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
 		}
 
 		/* Unload the checkpoint. */
 		WT_TRET(bm->checkpoint_unload(bm, session));
+
+		/*
+		 * We've finished one checkpoint's verification (verification,
+		 * then cache eviction and checkpoint unload): if any errors
+		 * occurred, quit. Done this way because otherwise we'd need
+		 * at least two more state variables on error, one to know if
+		 * we need to discard the tree from the cache and one to know
+		 * if we need to unload the checkpoint.
+		 */
 		WT_ERR(ret);
 
 		/* Display the tree shape. */
@@ -252,7 +274,7 @@ err:	/* Inform the underlying block manager we're done. */
 
 	/* Discard the list of checkpoints. */
 	if (ckptbase != NULL)
-		__wt_meta_ckptlist_free(session, ckptbase);
+		__wt_meta_ckptlist_free(session, &ckptbase);
 
 	/* Free allocated memory. */
 	__wt_scr_free(session, &vs->max_key);
@@ -386,7 +408,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		vs->record_total += page->pg_fix_entries;
+		vs->record_total += page->entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		recno = 0;
@@ -614,7 +636,7 @@ __verify_row_leaf_key_order(
 	 * If a tree is empty (just created), it won't have keys; if there
 	 * are no keys, we're done.
 	 */
-	if (page->pg_row_entries == 0)
+	if (page->entries == 0)
 		return (0);
 
 	/*
@@ -624,7 +646,7 @@ __verify_row_leaf_key_order(
 	 */
 	if (vs->max_addr->size != 0) {
 		WT_RET(__wt_row_leaf_key_copy(
-		    session, page, page->pg_row_d, vs->tmp1));
+		    session, page, page->pg_row, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -653,7 +675,7 @@ __verify_row_leaf_key_order(
 
 	/* Update the largest key we've seen to the last key on this page. */
 	WT_RET(__wt_row_leaf_key_copy(session, page,
-	    page->pg_row_d + (page->pg_row_entries - 1), vs->max_key));
+	    page->pg_row + (page->entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, ref, vs->max_addr);
 
 	return (0);

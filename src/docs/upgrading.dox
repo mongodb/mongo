@@ -1,22 +1,66 @@
 /*! @page upgrading Upgrading WiredTiger applications
+
+@section version_292 Upgrading to Version 2.9.2
+<dl>
+
+<dt>WiredTiger utility now supports truncate</dt>
+<dd>
+The WiredTiger utility \c wt can now \c truncate objects, removing all
+contents from the specified object.
+</dd>
+
+<dt>Handle list lock statistics</dt>
+<dd>
+In the 2.9.1 release we added statistics tracking handle list lock timing, we
+have switched that lock from a spin lock to a read-write lock, and consequently
+changed the statistics tracking lock related wait time.
+</dd>
+
+<dt>Forced and named checkpoint error conditions changed</dt>
+<dd>
+There are new cases where checkpoints created with an explicit name or the
+"force" configuration option can return an EBUSY error. This can happen if
+the checkpoint overlaps with other schema operations, for example table create.
+</dd>
+
+<dt>WT_CURSOR::remove may not return a positioned cursor</dt>
+<dd>
+The WT_CURSOR::remove method was previously documented to always return a
+positioned cursor on success, which is not possible when \c overwrite=true
+and the record does not exist.
+
+The documentation has been updated, and the method has been changed to
+never return a cursor position unless called with an existing cursor
+position. In other words, if the cursor is positioned and the
+WT_CURSOR::remove is called, the cursor will remain positioned; if the
+cursor is not positioned and the WT_CURSOR::remove method is called, the
+cursor will not be positioned on return.
+</dd>
+
+</dl><hr>
 @section version_291 Upgrading to Version 2.9.1
 <dl>
-<dt>WiredTiger now requires Python 2.7 at minimum</dt>
-<dd>
-The minimum version of Python supported by WiredTiger is now 2.7 up from the
-previous version of 2.6. This is due to extra unit tests added in this release
-that depend on 2.7. This is not due to a change in the Python API.
-</dd>
 
 <dt>Changes to hazard pointer configuration</dt>
 <dd>
 The \c hazard_max parameter to ::wiredtiger_open is now ignored.  Memory is
 allocated for hazard pointers as required by each session.
 </dd>
-</dl><hr>
 
+<dt>Change to the default fadvise behavior for data files</dt>
+<dd>
+The old default behavior was to advise the file system that access would be
+random for data files, and there was no way to alter that. We no longer
+call advise the file system of expected access patterns by default, and
+have added a new \c access_pattern_hint configuration option available for
+WT_SESSION::create that can be used to restore the old default by setting
+the value to "random".
+</dd>
+
+</dl><hr>
 @section version_290 Upgrading to Version 2.9.0
 <dl>
+
 <dt>Changes to cursor behavior after WT_CURSOR::insert</dt>
 <dd>
 After a successful call to WT_CURSOR::insert, unless a cursor has record
@@ -314,7 +358,7 @@ be updated.
 The WT_SESSION::create \c internal_item_max and \c leaf_item_max
 configuration strings are now deprecated in favor of the
 \c internal_key_max, \c leaf_key_max, and \c leaf_value_max
-configuration strings. See @ref tune_page_sizes for more information.
+configuration strings. See @ref tune_page_size_and_comp for more information.
 </dd>
 
 </dl><hr>

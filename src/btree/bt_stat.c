@@ -40,6 +40,8 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_STAT_SET(session, stats, btree_maxleafpage, btree->maxleafpage);
 	WT_STAT_SET(session, stats, btree_maxleafvalue, btree->maxleafvalue);
 
+	WT_STAT_SET(session, stats, cache_bytes_dirty,
+	    __wt_btree_dirty_inuse(session));
 	WT_STAT_SET(session, stats, cache_bytes_inuse,
 	    __wt_btree_bytes_inuse(session));
 
@@ -104,8 +106,7 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		WT_STAT_INCR(session, stats, btree_column_fix);
-		WT_STAT_INCRV(
-		    session, stats, btree_entries, page->pg_fix_entries);
+		WT_STAT_INCRV(session, stats, btree_entries, page->entries);
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(session, stats, btree_column_internal);

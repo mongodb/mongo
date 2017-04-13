@@ -141,7 +141,7 @@ as if the transaction started at the time of the WT_SESSION::snapshot
 call that created the snapshot.
 
 Named snapshots keep data pinned in cache as if a real transaction were
-running for the time that the named transaction is active.  The resources
+running for the time that the named snapshot is active.  The resources
 associated with named snapshots should be released by calling
 WT_SESSION::snapshot with a configuration that includes
 <code>"drop="</code>. See WT_SESSION::snapshot documentation for details of

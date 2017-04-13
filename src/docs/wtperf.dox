@@ -167,6 +167,8 @@ do population phase; false to use existing database
 number of WiredTiger databases to use. Each database will execute the  workload using a separate home directory and complete set of worker  threads
 @par drop_tables (boolean, default=false)
 Whether to drop all tables at the end of the run, and report time taken  to do the drop.
+@par in_memory (boolean, default=false)
+Whether to create the database in-memory.
 @par icount (unsigned int, default=5000)
 number of records to initially populate. If multiple tables are  configured the count is spread evenly across all tables.
 @par idle_table_cycle (unsigned int, default=0)
@@ -195,14 +197,14 @@ use pareto distribution for random numbers. Zero  to disable, otherwise a percen
 number of operations to group into each transaction in the populate  phase, zero for auto-commit
 @par populate_threads (unsigned int, default=1)
 number of populate threads, 1 for bulk load
+@par pre_load_data (boolean, default=false)
+Scan all data prior to starting the workload phase to warm the cache
 @par random_range (unsigned int, default=0)
 if non zero choose a value from within this range as the key for  insert operations
 @par random_value (boolean, default=false)
 generate random content for the value
 @par range_partition (boolean, default=false)
 partition data by range (vs hash)
-@par read_range (unsigned int, default=0)
-scan a range of keys after each search
 @par readonly (boolean, default=false)
 reopen the connection between populate and workload phases in readonly  mode.  Requires reopen_connection turned on (default).  Requires that  read be the only workload specified
 @par reopen_connection (boolean, default=true)
@@ -228,7 +230,7 @@ number of tables to run operations over. Keys are divided evenly  over the table
 @par table_count_idle (unsigned int, default=0)
 number of tables to create, that won't be populated. Default 0.
 @par threads (string, default="")
-workload configuration: each 'count'  entry is the total number of threads, and the 'insert', 'read' and  'update' entries are the ratios of insert, read and update operations  done by each worker thread; If a throttle value is provided each thread  will do a maximum of that number of operations per second; multiple  workload configurations may be specified per threads configuration;  for example, a more complex threads configuration might be  'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'  which would create 2 threads doing nothing but reads and 8 threads  each doing 50% inserts and 25% reads and updates.  Allowed configuration  values are 'count', 'throttle', 'update_delta', 'reads', 'inserts',  'updates', 'truncate', 'truncate_pct' and 'truncate_count'. There are  also behavior modifiers, supported modifiers are 'ops_per_txn'
+workload configuration: each 'count'  entry is the total number of threads, and the 'insert', 'read' and  'update' entries are the ratios of insert, read and update operations  done by each worker thread; If a throttle value is provided each thread  will do a maximum of that number of operations per second; multiple  workload configurations may be specified per threads configuration;  for example, a more complex threads configuration might be  'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'  which would create 2 threads doing nothing but reads and 8 threads  each doing 50% inserts and 25% reads and updates.  Allowed configuration  values are 'count', 'throttle', 'update_delta', 'reads', 'read_range',  'inserts', 'updates', 'truncate', 'truncate_pct' and 'truncate_count'.  There are also behavior modifiers, supported modifiers are  'ops_per_txn'
 @par transaction_config (string, default="")
 WT_SESSION.begin_transaction configuration string, applied during the  populate phase when populate_ops_per_txn is nonzero
 @par table_name (string, default="test")

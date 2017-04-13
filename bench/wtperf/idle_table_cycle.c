@@ -80,8 +80,8 @@ cycle_idle_tables(void *arg)
 	}
 
 	for (cycle_count = 0; wtperf->idle_cycle_run; ++cycle_count) {
-		snprintf(uri, sizeof(uri),
-		    "%s_cycle%07d", wtperf->uris[0], cycle_count);
+		testutil_check(__wt_snprintf(uri, sizeof(uri),
+		    "%s_cycle%07d", wtperf->uris[0], cycle_count));
 		/* Don't busy cycle in this loop. */
 		__wt_sleep(1, 0);
 
@@ -120,6 +120,7 @@ cycle_idle_tables(void *arg)
 			return (NULL);
 		start = stop;
 
+#if 1
 		/*
 		 * Drop the table. Keep retrying on EBUSY failure - it is an
 		 * expected return when checkpoints are happening.
@@ -136,6 +137,7 @@ cycle_idle_tables(void *arg)
 		}
 		if (check_timing(wtperf, "drop", start, &stop) != 0)
 			return (NULL);
+#endif
 	}
 
 	return (NULL);

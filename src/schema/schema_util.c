@@ -26,7 +26,7 @@ __wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
 	conn = S2C(session);
 	if (!conn->hot_backup)
 		return (0);
-	__wt_readlock(session, conn->hot_backup_lock);
+	__wt_readlock(session, &conn->hot_backup_lock);
 	/*
 	 * There is a window at the end of a backup where the list has been
 	 * cleared from the connection but the flag is still set.  It is safe
@@ -34,7 +34,7 @@ __wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
 	 */
 	if (!conn->hot_backup ||
 	    (backup_list = conn->hot_backup_list) == NULL) {
-		__wt_readunlock(session, conn->hot_backup_lock);
+		__wt_readunlock(session, &conn->hot_backup_lock);
 		return (0);
 	}
 	for (i = 0; backup_list[i] != NULL; ++i) {
@@ -43,7 +43,7 @@ __wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
 			break;
 		}
 	}
-	__wt_readunlock(session, conn->hot_backup_lock);
+	__wt_readunlock(session, &conn->hot_backup_lock);
 	return (ret);
 }
 

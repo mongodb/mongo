@@ -370,6 +370,19 @@ Include only "fast" statistics in the output (equivalent to passing
 <code>statistics=(fast)</code>) to WT_SESSION::open_cursor.
 
 <hr>
+@section util_truncate wt truncate
+Truncate a table, removing all data.
+
+The \c truncate command truncates the specified \c uri.  It is equivalent to a
+call to WT_SESSION::truncate with no start or stop specified.
+
+@subsection util_truncate_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] truncate uri</code>
+
+@subsection util_truncate_options Options
+The \c truncate command has no command-specific options.
+
+<hr>
 @section util_upgrade wt upgrade
 Upgrade a table.
 
