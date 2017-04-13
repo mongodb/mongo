@@ -79,6 +79,22 @@ public:
                            ServiceContext* serviceContext,
                            transport::SessionHandle session);
 
+    /**
+     * Moves client into the thread_local for this thread. After this call, Client::getCurrent
+     * and cc() will return client.get(). The client will be destroyed with the thread exits
+     * or Client::destroy() is called.
+     */
+    static void setCurrent(ServiceContext::UniqueClient client);
+
+    /**
+     * Releases the client being managed by the thread_local for this thread. After this call
+     * cc() will crash the server and Client::getCurrent() will return nullptr until either
+     * Client::initThread() or Client::setCurrent() is called.
+     *
+     * The client will be released to the caller.
+     */
+    static ServiceContext::UniqueClient releaseCurrent();
+
     static Client* getCurrent();
 
     bool getIsLocalHostConnection() {

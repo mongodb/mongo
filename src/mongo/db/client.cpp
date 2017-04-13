@@ -70,7 +70,7 @@ void Client::initThread(StringData desc, transport::SessionHandle session) {
 void Client::initThread(StringData desc,
                         ServiceContext* service,
                         transport::SessionHandle session) {
-    invariant(currentClient.getMake()->get() == nullptr);
+    invariant(!haveClient());
 
     std::string fullDesc;
     if (session) {
@@ -82,12 +82,11 @@ void Client::initThread(StringData desc,
     setThreadName(fullDesc);
 
     // Create the client obj, attach to thread
-    *currentClient.get() = service->makeClient(fullDesc, std::move(session));
+    *currentClient.getMake() = service->makeClient(fullDesc, std::move(session));
 }
 
 void Client::destroy() {
-    invariant(currentClient.get());
-    invariant(currentClient.get()->get());
+    invariant(haveClient());
     currentClient.reset(nullptr);
 }
 
@@ -155,13 +154,22 @@ Client* Client::getCurrent() {
 }
 
 Client& cc() {
-    Client* c = currentClient.getMake()->get();
-    invariant(c);
-    return *c;
+    invariant(haveClient());
+    return *Client::getCurrent();
 }
 
 bool haveClient() {
-    return currentClient.getMake()->get();
+    return currentClient.get() && currentClient.get()->get();
+}
+
+ServiceContext::UniqueClient Client::releaseCurrent() {
+    invariant(haveClient());
+    return ServiceContext::UniqueClient(currentClient.get()->release());
+}
+
+void Client::setCurrent(ServiceContext::UniqueClient client) {
+    invariant(!haveClient());
+    *currentClient.getMake() = std::move(client);
 }
 
 }  // namespace mongo
