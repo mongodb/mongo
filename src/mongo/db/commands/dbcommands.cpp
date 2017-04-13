@@ -1850,8 +1850,10 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
             auto sce = dynamic_cast<const StaleConfigException*>(&e);
             invariant(sce);  // do not upcasts from DBException created by uassert variants.
 
-            ShardingState::get(opCtx)->onStaleShardVersion(
-                opCtx, NamespaceString(sce->getns()), sce->getVersionReceived());
+            if (!opCtx->getClient()->isInDirectClient()) {
+                ShardingState::get(opCtx)->onStaleShardVersion(
+                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived());
+            }
         }
 
         BSONObjBuilder metadataBob;

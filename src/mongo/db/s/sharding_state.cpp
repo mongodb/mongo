@@ -63,7 +63,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/local_sharding_info.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -109,30 +108,6 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
         warning() << "error encountered while trying to update config connection string to "
                   << newConnectionString << causedBy(redact(status));
     }
-}
-
-bool haveLocalShardingInfo(OperationContext* opCtx, const string& ns) {
-    if (!ShardingState::get(opCtx)->enabled()) {
-        return false;
-    }
-
-    const auto& oss = OperationShardingState::get(opCtx);
-    if (oss.hasShardVersion()) {
-        return true;
-    }
-
-    const auto& sci = ShardedConnectionInfo::get(opCtx->getClient(), false);
-    if (sci && !sci->getVersion(ns).isStrictlyEqualTo(ChunkVersion::UNSHARDED())) {
-        return true;
-    }
-
-    return false;
-}
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(MongoDLocalShardingInfo, ("SetGlobalEnvironment"))
-(InitializerContext* context) {
-    enableLocalShardingInfo(getGlobalServiceContext(), &haveLocalShardingInfo);
-    return Status::OK();
 }
 
 }  // namespace
@@ -248,6 +223,7 @@ void ShardingState::scheduleCleanup(const NamespaceString& nss) {
 Status ShardingState::onStaleShardVersion(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const ChunkVersion& expectedVersion) {
+    invariant(!opCtx->getClient()->isInDirectClient());
     invariant(!opCtx->lockState()->isLocked());
     invariant(enabled());
 

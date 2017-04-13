@@ -330,13 +330,3 @@ env.CppUnitTest(
         'sharding_test_fixture',
     ]
 )
-
-env.Library(
-    target='local_sharding_info',
-    source=[
-        'local_sharding_info.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
-)

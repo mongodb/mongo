@@ -296,11 +296,6 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
                                                    ChunkVersion* actualShardVersion) {
     Client* client = opCtx->getClient();
 
-    // Operations using the DBDirectClient are unversioned.
-    if (client->isInDirectClient()) {
-        return true;
-    }
-
     if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, _nss.db())) {
         // Right now connections to secondaries aren't versioned at all.
         return true;

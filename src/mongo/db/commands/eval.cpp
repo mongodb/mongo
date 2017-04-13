@@ -43,6 +43,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
 
@@ -176,15 +178,40 @@ public:
              BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        if (cmdObj["nolock"].trueValue()) {
-            return dbEval(opCtx, dbname, cmdObj, result, errmsg);
+        // Note: 'eval' is not allowed to touch sharded namespaces, but we can't check the
+        // shardVersions of the namespaces accessed in the script until the script is evaluated.
+        // Instead, we enforce that the script does not access sharded namespaces by ensuring the
+        // shardVersion is set to UNSHARDED on the OperationContext here. If a shardVersion is set
+        // on the OperationContext, a check for a different namespace will default to UNSHARDED.
+        auto& oss = OperationShardingState::get(opCtx);
+        if (oss.hasShardVersion()) {
+            // Can't set the shardVersion if it's already been set, so just verify it.
+            invariant(oss.getShardVersion(NamespaceString(dbname))
+                          .isStrictlyEqualTo(ChunkVersion::UNSHARDED()));
+        } else {
+            // Set the shardVersion to UNSHARDED. The "namespace" used does not matter.
+            oss.setShardVersion(NamespaceString(dbname), ChunkVersion::UNSHARDED());
         }
 
-        Lock::GlobalWrite lk(opCtx);
+        try {
+            if (cmdObj["nolock"].trueValue()) {
+                return dbEval(opCtx, dbname, cmdObj, result, errmsg);
+            }
 
-        OldClientContext ctx(opCtx, dbname, false /* no shard version checking */);
+            Lock::GlobalWrite lk(opCtx);
 
-        return dbEval(opCtx, dbname, cmdObj, result, errmsg);
+            OldClientContext ctx(opCtx, dbname, false /* no shard version checking here */);
+
+            return dbEval(opCtx, dbname, cmdObj, result, errmsg);
+        } catch (const UserException& ex) {
+            // Convert a stale shardVersion error to a stronger error to prevent this node or the
+            // sending node from believing it needs to refresh its routing table.
+            if (ex.getCode() == ErrorCodes::RecvStaleConfig) {
+                uasserted(ErrorCodes::BadValue,
+                          str::stream() << "can't use sharded collection from db.eval");
+            }
+            throw ex;
+        }
     }
 
 } cmdeval;

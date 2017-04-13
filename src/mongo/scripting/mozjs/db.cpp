@@ -32,7 +32,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/local_sharding_info.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
@@ -56,12 +55,6 @@ void DBInfo::getProperty(JSContext* cx,
 
         if (opContext && vp.isObject()) {
             ObjectWrapper o(cx, vp);
-
-            if (o.hasOwnField(InternedString::_fullName)) {
-                // need to check every time that the collection did not get sharded
-                if (haveLocalShardingInfo(opContext, o.getString(InternedString::_fullName)))
-                    uasserted(ErrorCodes::BadValue, "can't use sharded collection from db.eval");
-            }
         }
 
         return;

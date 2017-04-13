@@ -34,6 +34,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -55,9 +57,17 @@ public:
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         _client = _service.makeClient("ShardingStateTest");
-        // This skips version checking to avoid accessing a null ReplicationCoordinator.
-        _client->setInDirectClient(true);
         _opCtx = _client->makeOperationContext();
+
+        // Set a ReplicationCoordinator, since it is accessed as part of shardVersion checks.
+        // TODO(esha): remove once the Safe Secondary Reads (PM-256) project is complete.
+        auto svCtx = getServiceContext();
+        repl::ReplSettings replSettings;
+        replSettings.setReplSetString(
+            ConnectionString::forReplicaSet(_setName, _servers).toString());
+        replSettings.setMaster(true);
+        repl::ReplicationCoordinator::set(
+            svCtx, stdx::make_unique<repl::ReplicationCoordinatorMock>(svCtx, replSettings));
 
         // Note: this assumes that globalInit will always be called on the same thread as the main
         // test thread.
@@ -90,6 +100,9 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 
     int _initCallCount = 0;
+    const HostAndPort _host{"node1:12345"};
+    const std::string _setName = "mySet";
+    const std::vector<HostAndPort> _servers{_host};
 };
 
 TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
