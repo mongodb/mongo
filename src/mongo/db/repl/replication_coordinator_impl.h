@@ -107,7 +107,7 @@ public:
     virtual void shutdown(OperationContext* opCtx) override;
 
     ReplicationExecutor* getExecutor() {
-        return &_replExecutor;
+        return _replExecutor.get();
     }
 
     virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override;
@@ -1238,7 +1238,7 @@ private:
     std::unique_ptr<TopologyCoordinator> _topCoord;  // (M)
 
     // Executor that drives the topology coordinator.
-    ReplicationExecutor _replExecutor;  // (S)
+    std::unique_ptr<ReplicationExecutor> _replExecutor;  // (S)
 
     // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
     std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;  // (PS)

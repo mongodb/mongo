@@ -57,10 +57,10 @@ public:
         _replCoord->_topCoord->processLoseElection();
         _replCoord->_voteRequester.reset(nullptr);
         if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {
-            _replCoord->_replExecutor.signalEvent(_replCoord->_electionDryRunFinishedEvent);
+            _replCoord->_replExecutor->signalEvent(_replCoord->_electionDryRunFinishedEvent);
         }
         if (_replCoord->_electionFinishedEvent.isValid()) {
-            _replCoord->_replExecutor.signalEvent(_replCoord->_electionFinishedEvent);
+            _replCoord->_replExecutor->signalEvent(_replCoord->_electionFinishedEvent);
         }
     }
 
@@ -139,7 +139,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
 
     long long term = _topCoord->getTerm();
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
-        _voteRequester->start(&_replExecutor,
+        _voteRequester->start(_replExecutor.get(),
                               _rsConfig,
                               _selfIndex,
                               _topCoord->getTerm(),
@@ -149,8 +149,8 @@ void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
         return;
     }
     fassert(28685, nextPhaseEvh.getStatus());
-    _replExecutor.onEvent(nextPhaseEvh.getValue(),
-                          stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
+    _replExecutor->onEvent(nextPhaseEvh.getValue(),
+                           stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
     lossGuard.dismiss();
 }
 
@@ -189,7 +189,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     // Store the vote in persistent storage.
     LastVote lastVote{originalTerm + 1, _selfIndex};
 
-    auto cbStatus = _replExecutor.scheduleDBWork(
+    auto cbStatus = _replExecutor->scheduleDBWork(
         [this, lastVote](const executor::TaskExecutor::CallbackArgs& cbData) {
             _writeLastVoteForMyElection(lastVote, cbData);
         });
@@ -225,7 +225,7 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     }
 
     _startVoteRequester_inlock(lastVote.getTerm());
-    _replExecutor.signalEvent(_electionDryRunFinishedEvent);
+    _replExecutor->signalEvent(_electionDryRunFinishedEvent);
 
     lossGuard.dismiss();
 }
@@ -237,12 +237,12 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
 
     _voteRequester.reset(new VoteRequester);
     StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
-        &_replExecutor, _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime);
+        _replExecutor.get(), _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
     fassert(28643, nextPhaseEvh.getStatus());
-    _replExecutor.onEvent(
+    _replExecutor->onEvent(
         nextPhaseEvh.getValue(),
         stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm));
 }
@@ -274,7 +274,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
 
     // Mark all nodes that responded to our vote request as up to avoid immediately
     // relinquishing primary.
-    Date_t now = _replExecutor.now();
+    Date_t now = _replExecutor->now();
     const unordered_set<HostAndPort> liveNodes = _voteRequester->getResponders();
     for (auto& nodeInfo : _slaveInfo) {
         if (liveNodes.count(nodeInfo.hostAndPort)) {
@@ -293,7 +293,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     lk.unlock();
     _performPostMemberStateUpdateAction(kActionWinElection);
 
-    _replExecutor.signalEvent(electionFinishedEvent);
+    _replExecutor->signalEvent(electionFinishedEvent);
     lossGuard.dismiss();
 }
 
