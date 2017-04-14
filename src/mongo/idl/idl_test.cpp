@@ -71,7 +71,7 @@ void TestLoopback(TestT test_value) {
         BSONObjBuilder builder;
         ParserT one_new;
         one_new.setValue(test_value);
-        testStruct.serialize(&builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
@@ -121,7 +121,7 @@ TEST(IDLOneTypeTests, TestObjectLoopbackTest) {
         BSONObjBuilder builder;
         One_plain_object one_new;
         one_new.setValue(testValue);
-        testStruct.serialize(&builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
@@ -210,7 +210,7 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
         BSONObjBuilder builder;
         One_namespacestring one_new;
         one_new.setValue(NamespaceString("foo.bar"));
-        testStruct.serialize(&builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
@@ -506,15 +506,15 @@ TEST(IDLNestedStruct, TestDuplicatTypes) {
         NestedWithDuplicateTypes nested_structs;
         RequiredStrictField3 f1;
         f1.setField1(1);
-        f1.setField1(2);
-        f1.setField1(3);
+        f1.setField2(2);
+        f1.setField3(3);
         nested_structs.setField1(f1);
         RequiredStrictField3 f3;
         f3.setField1(4);
-        f3.setField1(5);
-        f3.setField1(6);
+        f3.setField2(5);
+        f3.setField3(6);
         nested_structs.setField3(f3);
-        testStruct.serialize(&builder);
+        nested_structs.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
@@ -564,7 +564,7 @@ TEST(IDLArrayTests, TestSimpleArrays) {
         array_fields.setField1(field1);
         array_fields.setField2(field2);
         array_fields.setField3(field3);
-        testStruct.serialize(&builder);
+        array_fields.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
@@ -617,7 +617,7 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
         array_fields.setField1(field1);
         array_fields.setField2(field2);
         array_fields.setField3(field3);
-        testStruct.serialize(&builder);
+        array_fields.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
@@ -806,7 +806,7 @@ TEST(IDLCustomType, TestDerivedParser) {
         ClassDerivedFromStruct one_new;
         one_new.setField1(3);
         one_new.setField2(5);
-        testStruct.serialize(&builder);
+        one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);

@@ -27,96 +27,8 @@ from typing import List, Mapping, Union
 from . import ast
 from . import bson
 from . import common
+from . import cpp_types
 from . import writer
-
-
-def _is_primitive_type(cpp_type):
-    # type: (unicode) -> bool
-    """Return True if a cpp_type is a primitive type and should not be returned as reference."""
-    return cpp_type in [
-        'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t'
-    ]
-
-
-def _is_view_type(cpp_type):
-    # type: (unicode) -> bool
-    """Return True if a cpp_type should be returned as a view type from an IDL class."""
-    if cpp_type == 'std::string':
-        return True
-
-    return False
-
-
-def _get_view_type(cpp_type):
-    # type: (unicode) -> unicode
-    """Map a C++ type to its C++ view type if needed."""
-    if cpp_type == 'std::string':
-        cpp_type = 'StringData'
-
-    return cpp_type
-
-
-def _get_view_type_to_base_method(cpp_type):
-    # type: (unicode) -> unicode
-    """Map a C++ View type to its C++ base type."""
-    assert _is_view_type(cpp_type)
-
-    return "toString"
-
-
-def _get_field_cpp_type(field):
-    # type: (ast.Field) -> unicode
-    """Get the C++ type name for a field."""
-    assert field.cpp_type is not None or field.struct_type is not None
-
-    if field.struct_type:
-        cpp_type = common.title_case(field.struct_type)
-    else:
-        cpp_type = field.cpp_type
-
-    return cpp_type
-
-
-def _qualify_optional_type(cpp_type, field):
-    # type: (unicode, ast.Field) -> unicode
-    """Qualify the type if the field is optional."""
-    if field.optional:
-        return 'boost::optional<%s>' % (cpp_type)
-
-    return cpp_type
-
-
-def _qualify_array_type(cpp_type, field):
-    # type: (unicode, ast.Field) -> unicode
-    """Qualify the type if the field is an array."""
-    if field.array:
-        cpp_type = "std::vector<%s>" % (cpp_type)
-
-    return cpp_type
-
-
-def _get_field_getter_setter_type(field):
-    # type: (ast.Field) -> unicode
-    """Get the C++ type name for the getter/setter parameter for a field."""
-    assert field.cpp_type is not None or field.struct_type is not None
-
-    cpp_type = _get_field_cpp_type(field)
-
-    cpp_type = _get_view_type(cpp_type)
-
-    cpp_type = _qualify_array_type(cpp_type, field)
-
-    return _qualify_optional_type(cpp_type, field)
-
-
-def _get_field_storage_type(field):
-    # type: (ast.Field) -> unicode
-    """Get the C++ type name for the storage of class member for a field."""
-    cpp_type = _get_field_cpp_type(field)
-
-    cpp_type = _qualify_array_type(cpp_type, field)
-
-    return _qualify_optional_type(cpp_type, field)
 
 
 def _get_field_member_name(field):
@@ -125,33 +37,16 @@ def _get_field_member_name(field):
     return '_%s' % (common.camel_case(field.cpp_name))
 
 
-def _get_return_by_reference(field):
-    # type: (ast.Field) -> bool
-    """Return True if the type should be returned by reference."""
-    # For non-view types, return a reference for types:
-    #  1. arrays
-    #  2. nested structs
-    # But do not return a reference for:
-    #  1. std::int32_t and other primitive types
-    #  2. optional types
-    cpp_type = _get_field_cpp_type(field)
+def _access_member(field):
+    # type: (ast.Field) -> unicode
+    """Get the declaration to access a member for a field."""
+    member_name = _get_field_member_name(field)
 
-    if not _is_view_type(cpp_type) and (not field.optional and
-                                        (not _is_primitive_type(cpp_type) or field.array)):
-        return True
+    if not field.optional:
+        return '%s' % (member_name)
 
-    return False
-
-
-def _get_disable_xvalue(field):
-    # type: (ast.Field) -> bool
-    """Return True if the type should have the xvalue getter disabled."""
-    # Any we return references or view types, we should disable the xvalue.
-    # For view types like StringData, the return type and member storage types are different
-    # so returning a reference is not supported.
-    cpp_type = _get_field_cpp_type(field)
-
-    return _is_view_type(cpp_type) or _get_return_by_reference(field)
+    # optional types need a method call to access their values
+    return '%s.get()' % (member_name)
 
 
 def _get_bson_type_check(bson_element, ctxt_name, field):
@@ -172,18 +67,6 @@ def _get_bson_type_check(bson_element, ctxt_name, field):
     else:
         type_list = '{%s}' % (', '.join([bson.cpp_bson_type_name(b) for b in bson_types]))
         return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
-
-
-def _access_member(field):
-    # type: (ast.Field) -> unicode
-    """Get the declaration to access a member for a field."""
-    member_name = _get_field_member_name(field)
-
-    if not field.optional:
-        return '%s' % (member_name)
-
-    # optional types need a method call to access their values
-    return '%s.get()' % (member_name)
 
 
 class _NamespaceScopeBlock(object):
@@ -375,128 +258,55 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def gen_getter(self, field):
         # type: (ast.Field) -> None
         """Generate the C++ getter definition for a field."""
-        cpp_type = _get_field_cpp_type(field)
-        param_type = _get_field_getter_setter_type(field)
+        cpp_type_info = cpp_types.get_cpp_type(field)
+        param_type = cpp_type_info.get_getter_setter_type()
         member_name = _get_field_member_name(field)
 
-        optional_ampersand = ""
-        if _get_return_by_reference(field):
-            optional_ampersand = "&"
-
-        disable_xvalue = _get_disable_xvalue(field)
-
-        if not _is_view_type(cpp_type):
-            body_template = 'return $member_name;'
-        else:
-            if field.array:
-                # Delegate to a function to the do the transformation between vectors.
-                if field.optional:
-                    body_template = """\
-                    if (${member_name}.is_initialized()) {
-                        return transformVector(${member_name}.get());
-                    } else {
-                        return boost::none;
-                    }
-                    """
-                else:
-                    body_template = 'return transformVector(${member_name});'
-            else:
-                body_template = 'return ${param_type}{${member_name}};'
+        if cpp_type_info.return_by_reference():
+            param_type += "&"
 
         template_params = {
             'method_name': common.title_case(field.cpp_name),
-            'member_name': member_name,
-            'optional_ampersand': optional_ampersand,
             'param_type': param_type,
+            'body': cpp_type_info.get_getter_body(member_name),
         }
-
-        body = common.template_format(body_template, template_params)
 
         # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
         # optional types, and non-primitive types.
-        template_params['body'] = body
-
         with self._with_template(template_params):
 
-            if disable_xvalue:
+            if cpp_type_info.disable_xvalue():
                 self._writer.write_template(
-                    'const ${param_type}${optional_ampersand} get${method_name}() const& { ${body} }'
-                )
-                self._writer.write_template(
-                    'const ${param_type}${optional_ampersand} get${method_name}() && = delete;')
+                    'const ${param_type} get${method_name}() const& { ${body} }')
+                self._writer.write_template('const ${param_type} get${method_name}() && = delete;')
             else:
                 self._writer.write_template(
-                    'const ${param_type}${optional_ampersand} get${method_name}() const { ${body} }')
+                    'const ${param_type} get${method_name}() const { ${body} }')
 
     def gen_setter(self, field):
         # type: (ast.Field) -> None
         """Generate the C++ setter definition for a field."""
-        cpp_type = _get_field_cpp_type(field)
-        param_type = _get_field_getter_setter_type(field)
+        cpp_type_info = cpp_types.get_cpp_type(field)
+        param_type = cpp_type_info.get_getter_setter_type()
         member_name = _get_field_member_name(field)
 
         template_params = {
             'method_name': common.title_case(field.cpp_name),
             'member_name': member_name,
             'param_type': param_type,
+            'body': cpp_type_info.get_setter_body(member_name)
         }
 
-        if _is_view_type(cpp_type):
-            template_params['view_to_base_method'] = _get_view_type_to_base_method(cpp_type)
-
-            with self._with_template(template_params):
-
-                if field.array:
-                    if not field.optional:
-                        self._writer.write_template(
-                            'void set${method_name}(${param_type} value) & { ${member_name} = transformVector(value); }'
-                        )
-
-                    else:
-                        # We need to convert between two different types of optional<T> and yet provide
-                        # the ability for the user to specific an uninitialized optional. This occurs
-                        # for vector<mongo::StringData> and vector<std::string> paired together.
-                        with self._block('void set${method_name}(${param_type} value) & {', "}"):
-                            self._writer.write_template(
-                                textwrap.dedent("""\
-                            if (value.is_initialized()) {
-                                ${member_name} = transformVector(value.get());
-                            } else {
-                                ${member_name} = boost::none;
-                            }
-                            """))
-                else:
-                    if not field.optional:
-                        self._writer.write_template(
-                            'void set${method_name}(${param_type} value) & { ${member_name} = value.${view_to_base_method}(); }'
-                        )
-
-                    else:
-                        # We need to convert between two different types of optional<T> and yet provide
-                        # the ability for the user to specific an uninitialized optional. This occurs
-                        # for mongo::StringData and std::string paired together.
-                        with self._block('void set${method_name}(${param_type} value) & {', "}"):
-                            self._writer.write_template(
-                                textwrap.dedent("""\
-                            if (value.is_initialized()) {
-                                ${member_name} = value.get().${view_to_base_method}();
-                            } else {
-                                ${member_name} = boost::none;
-                            }
-                            """))
-
-        else:
-            with self._with_template(template_params):
-                self._writer.write_template(
-                    'void set${method_name}(${param_type} value) & { ${member_name} = std::move(value); }'
-                )
+        with self._with_template(template_params):
+            self._writer.write_template('void set${method_name}(${param_type} value) & { ${body} }')
 
         self._writer.write_empty_line()
 
     def gen_member(self, field):
         # type: (ast.Field) -> None
         """Generate the C++ class member definition for a field."""
-        member_type = _get_field_storage_type(field)
+        cpp_type_info = cpp_types.get_cpp_type(field)
+        member_type = cpp_type_info.get_storage_type()
         member_name = _get_field_member_name(field)
 
         self._writer.write_line('%s %s;' % (member_type, member_name))
@@ -529,6 +339,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         header_list = [
             'mongo/base/string_data.h',
             'mongo/bson/bsonobj.h',
+            'mongo/bson/bsonobjbuilder.h',
             'mongo/idl/idl_parser.h',
         ] + spec.globals.cpp_includes
 
@@ -600,28 +411,26 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             return '%s.%s()' % (element_name, method_name)
         else:
             # Custom method, call the method on object.
-            # TODO: avoid this string hack in the future
-            if len(field.bson_serialization_type) == 1 and field.bson_serialization_type[
-                    0] == 'string':
-                assert field.deserializer
+            bson_cpp_type = cpp_types.get_bson_cpp_type(field)
+
+            if bson_cpp_type:
                 # Call a method like: Class::method(StringData value)
-                self._writer.write_line('auto tempValue = %s.valueStringData();' % (element_name))
-
-                method_name = writer.get_method_name(field.deserializer)
-
-                return '%s(tempValue)' % (method_name)
-            elif len(field.bson_serialization_type) == 1 and field.bson_serialization_type[
-                    0] == 'object':
+                # or
+                # Call a method like: Class::method(const BSONObj& value)
+                expression = bson_cpp_type.gen_deserializer_expression(self._writer, element_name)
                 if field.deserializer:
-                    # Call a method like: Class::method(const BSONObj& value)
                     method_name = writer.get_method_name_from_qualified_method_name(
                         field.deserializer)
-                    self._writer.write_line('const BSONObj localObject = %s.Obj();' %
-                                            (element_name))
-                    return '%s(localObject)' % (method_name)
+                    return common.template_args(
+                        "$method_name(${expression})",
+                        method_name=method_name,
+                        expression=expression)
                 else:
-                    # Just pass the BSONObj through without trying to parse it.
-                    return '%s.Obj()' % (element_name)
+                    # BSONObjects are allowed to be pass through without deserialization
+                    assert len(
+                        field.bson_serialization_type) == 1 and field.bson_serialization_type[
+                            0] == 'object'
+                    return expression
             else:
                 # Call a method like: Class::method(const BSONElement& value)
                 method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
@@ -631,7 +440,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_array_deserializer(self, field):
         # type: (ast.Field) -> None
         """Generate the C++ deserializer piece for an array field."""
-        cpp_type = _get_field_cpp_type(field)
+        cpp_type_info = cpp_types.get_cpp_type(field)
+        cpp_type = cpp_type_info.get_type_name()
 
         self._writer.write_line('std::uint32_t expectedFieldNumber{0};')
         self._writer.write_line('const IDLParserErrorContext arrayCtxt("%s", &ctxt);' %
@@ -742,32 +552,34 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the serialize method definition for a custom type."""
 
         # Generate custom serialization
-        method_name = writer.get_method_name(field.serializer)
-
         template_params = {
             'field_name': field.name,
-            'method_name': method_name,
             'access_member': _access_member(field),
         }
 
         with self._with_template(template_params):
+            # Is this a scalar bson C++ type?
+            bson_cpp_type = cpp_types.get_bson_cpp_type(field)
 
-            if len(field.bson_serialization_type) == 1 and \
-                field.bson_serialization_type[0] == 'string':
-                # TODO: expand this out to be less then a string only hack
-
+            # Object types need to go through the generic custom serialization code below
+            if bson_cpp_type and bson_cpp_type.has_serializer():
                 if field.array:
                     self._writer.write_template(
                         'BSONArrayBuilder arrayBuilder(builder->subarrayStart("${field_name}"));')
                     with self._block('for (const auto& item : ${access_member}) {', '}'):
-                        # self._writer.write_template('auto tempValue = ;')
-                        self._writer.write_template('arrayBuilder.append(item.${method_name}());')
+                        expression = bson_cpp_type.gen_serializer_expression(self._writer, 'item')
+                        template_params['expression'] = expression
+                        self._writer.write_template('arrayBuilder.append(${expression});')
                 else:
-                    # self._writer.write_template(
-                    #     'auto tempValue = ;')
-                    self._writer.write_template(
-                        'builder->append("${field_name}", ${access_member}.${method_name}());')
+                    expression = bson_cpp_type.gen_serializer_expression(self._writer,
+                                                                         _access_member(field))
+                    template_params['expression'] = expression
+                    self._writer.write_template('builder->append("${field_name}", ${expression});')
+
             else:
+                method_name = writer.get_method_name(field.serializer)
+                template_params['method_name'] = method_name
+
                 if field.array:
                     self._writer.write_template(
                         'BSONArrayBuilder arrayBuilder(builder->subarrayStart("${field_name}"));')
@@ -815,17 +627,29 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 member_name = _get_field_member_name(field)
 
+                # Is this a scalar bson C++ type?
+                bson_cpp_type = cpp_types.get_bson_cpp_type(field)
+
+                needs_custom_serializer = field.serializer or (bson_cpp_type and
+                                                               bson_cpp_type.has_serializer())
+
                 optional_block_start = None
                 if field.optional:
                     optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
-                elif field.struct_type or field.serializer:
+                elif field.struct_type or needs_custom_serializer or field.array:
                     # Introduce a new scope for required nested object serialization.
                     optional_block_start = '{'
 
                 with self._block(optional_block_start, '}'):
 
                     if not field.struct_type:
-                        if field.serializer:
+                        # Is this a scalar bson C++ type?
+                        bson_cpp_type = cpp_types.get_bson_cpp_type(field)
+
+                        needs_custom_serializer = field.serializer or (
+                            bson_cpp_type and bson_cpp_type.has_serializer())
+
+                        if needs_custom_serializer:
                             self._gen_serializer_method_custom(field)
                         else:
                             # Generate default serialization using BSONObjBuilder::append
