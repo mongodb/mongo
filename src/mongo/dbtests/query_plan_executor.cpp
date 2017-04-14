@@ -412,31 +412,44 @@ using mongo::ClientCursor;
 class Invalidate : public PlanExecutorBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        insert(BSON("a" << 1 << "b" << 1));
+        {
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX);
+            insert(BSON("a" << 1 << "b" << 1));
+        }
 
-        BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
+        CursorId cursorId;
+        Collection* coll;
+        {
+            AutoGetCollectionForRead autoColl(&_opCtx, nss);
+            BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
+            coll = autoColl.getCollection();
+            auto exec = makeCollScanExec(coll, filterObj);
 
-        Collection* coll = ctx.getCollection();
-        auto exec = makeCollScanExec(coll, filterObj);
+            // Make a client cursor from the plan executor.
+            auto cursorPin = coll->getCursorManager()->registerCursor(
+                &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
 
-        // Make a client cursor from the plan executor.
-        auto cursorPin = coll->getCursorManager()->registerCursor(
-            &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
-
-        auto cursorId = cursorPin.getCursor()->cursorid();
-        cursorPin.release();
+            cursorId = cursorPin.getCursor()->cursorid();
+            cursorPin.release();
+        }
 
         ASSERT_EQUALS(1U, numCursors());
-        auto invalidateReason = "Invalidate Test";
-        const bool collectionGoingAway = false;
-        coll->getCursorManager()->invalidateAll(&_opCtx, collectionGoingAway, invalidateReason);
+        {
+            // The collection must be locked exclusively in order to call invalidateAll().
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX, MODE_X);
+            auto invalidateReason = "Invalidate Test";
+            const bool collectionGoingAway = false;
+            coll->getCursorManager()->invalidateAll(&_opCtx, collectionGoingAway, invalidateReason);
+        }
         // Since the collection is not going away, the cursor should remain open, but be killed.
         ASSERT_EQUALS(1U, numCursors());
 
         // Pinning a killed cursor should result in an error and clean up the cursor.
-        ASSERT_EQ(ErrorCodes::QueryPlanKilled,
-                  coll->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
+        {
+            AutoGetCollectionForRead autoColl(&_opCtx, nss);
+            ASSERT_EQ(ErrorCodes::QueryPlanKilled,
+                      coll->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
+        }
         ASSERT_EQUALS(0U, numCursors());
     }
 };
@@ -448,28 +461,42 @@ public:
 class InvalidateWithDrop : public PlanExecutorBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        insert(BSON("a" << 1 << "b" << 1));
+        {
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX);
+            insert(BSON("a" << 1 << "b" << 1));
+        }
 
-        BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
+        CursorId cursorId;
+        Collection* coll;
+        {
+            AutoGetCollectionForRead autoColl(&_opCtx, nss);
+            BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
+            coll = autoColl.getCollection();
+            auto exec = makeCollScanExec(coll, filterObj);
 
-        Collection* coll = ctx.getCollection();
-        auto exec = makeCollScanExec(coll, filterObj);
+            // Make a client cursor from the plan executor.
+            auto cursorPin = coll->getCursorManager()->registerCursor(
+                &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
 
-        // Make a client cursor from the plan executor.
-        auto cursorPin = coll->getCursorManager()->registerCursor(
-            &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
-
-        auto cursorId = cursorPin.getCursor()->cursorid();
-        cursorPin.release();
+            cursorId = cursorPin.getCursor()->cursorid();
+            cursorPin.release();
+        }
 
         ASSERT_EQUALS(1U, numCursors());
-        auto invalidateReason = "Invalidate Test";
-        const bool collectionGoingAway = true;
-        coll->getCursorManager()->invalidateAll(&_opCtx, collectionGoingAway, invalidateReason);
+        {
+            // The collection must be locked exclusively in order to call invalidateAll().
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX, MODE_X);
+            auto invalidateReason = "Invalidate Test";
+            const bool collectionGoingAway = true;
+            coll->getCursorManager()->invalidateAll(&_opCtx, collectionGoingAway, invalidateReason);
+        }
+
         // Since the collection is going away, the cursor should not remain open.
-        ASSERT_EQ(ErrorCodes::CursorNotFound,
-                  coll->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
+        {
+            AutoGetCollectionForRead autoColl(&_opCtx, nss);
+            ASSERT_EQ(ErrorCodes::CursorNotFound,
+                      coll->getCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
+        }
         ASSERT_EQUALS(0U, numCursors());
     }
 };
@@ -481,11 +508,16 @@ public:
 class InvalidatePinned : public PlanExecutorBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_opCtx, nss.ns());
-        insert(BSON("a" << 1 << "b" << 1));
+        {
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX);
+            insert(BSON("a" << 1 << "b" << 1));
+        }
 
-        Collection* collection = ctx.getCollection();
+        boost::optional<AutoGetCollection> writeLock;
+        boost::optional<AutoGetCollectionForRead> readLock;
 
+        readLock.emplace(&_opCtx, nss);
+        Collection* collection = readLock->getCollection();
         BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
         auto exec = makeCollScanExec(collection, filterObj);
 
@@ -494,9 +526,14 @@ public:
             &_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
 
         // If the cursor is pinned, it sticks around, even after invalidation.
+        readLock.reset();
         ASSERT_EQUALS(1U, numCursors());
+        // The collection must be locked exclusively in order to call invalidateAll().
+        writeLock.emplace(&_opCtx, nss, MODE_IX, MODE_X);
         const std::string invalidateReason("InvalidatePinned Test");
         collection->getCursorManager()->invalidateAll(&_opCtx, false, invalidateReason);
+        writeLock.reset();
+        readLock.emplace(&_opCtx, nss);
         ASSERT_EQUALS(0U, numCursors());
 
         // The invalidation should have killed the plan executor.
@@ -509,6 +546,7 @@ public:
         // Deleting the underlying cursor should cause the
         // number of cursors to return to 0.
         ccPin.deleteUnderlying();
+        readLock.reset();
         ASSERT_EQUALS(0U, numCursors());
     }
 };
@@ -520,7 +558,7 @@ class ShouldTimeout : public PlanExecutorBase {
 public:
     void run() {
         {
-            OldClientWriteContext ctx(&_opCtx, nss.ns());
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX);
             insert(BSON("a" << 1 << "b" << 1));
         }
 
@@ -565,6 +603,12 @@ public:
             // Make a client cursor from the plan executor, and immediately kill it.
             auto* cursorManager = collection->getCursorManager();
             cursorManager->registerCursor(&_opCtx, {std::move(exec), nss, {}, false, BSONObj()});
+        }
+
+        {
+            // The collection must be locked exclusively in order to call invalidateAll().
+            AutoGetCollection autoColl(&_opCtx, nss, MODE_IX, MODE_X);
+            auto* cursorManager = autoColl.getCollection()->getCursorManager();
             const bool collectionGoingAway = false;
             cursorManager->invalidateAll(
                 &_opCtx, collectionGoingAway, "KilledCursorsShouldTimeoutTest");

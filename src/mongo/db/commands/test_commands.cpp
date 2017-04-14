@@ -218,6 +218,13 @@ public:
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString fullNs = parseNsCollectionRequired(dbname, cmdObj);
+        if (!fullNs.isValid()) {
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidNamespace,
+                 str::stream() << "collection name " << fullNs.ns() << " is not valid"});
+        }
+
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
@@ -226,16 +233,10 @@ public:
                                        {ErrorCodes::BadValue, "n must be a positive integer"});
         }
 
-        OldClientWriteContext ctx(opCtx, fullNs.ns());
-        Collection* collection = ctx.getCollection();
-
+        // Lock the database in mode IX and lock the collection exclusively.
+        AutoGetCollection autoColl(opCtx, fullNs, MODE_IX, MODE_X);
+        Collection* collection = autoColl.getCollection();
         if (!collection) {
-            if (ctx.db()->getViewCatalog()->lookup(opCtx, fullNs.ns())) {
-                return appendCommandStatus(
-                    result,
-                    {ErrorCodes::CommandNotSupportedOnView,
-                     str::stream() << "captrunc not supported on views: " << fullNs.ns()});
-            }
             return appendCommandStatus(
                 result,
                 {ErrorCodes::NamespaceNotFound,

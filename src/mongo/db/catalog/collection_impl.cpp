@@ -942,7 +942,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
 }
 
 void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
     invariant(isCapped());
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
     invariant(_indexCatalog.numIndexesInProgress(opCtx) == 0);

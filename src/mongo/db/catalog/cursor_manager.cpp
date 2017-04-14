@@ -311,6 +311,8 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
                                   bool collectionGoingAway,
                                   const std::string& reason) {
     invariant(!isGlobalManager());  // The global cursor manager should never need to kill cursors.
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+
     stdx::lock_guard<SimpleMutex> lk(_mutex);
     fassert(28819, !BackgroundOperation::inProgForNs(_nss));
 

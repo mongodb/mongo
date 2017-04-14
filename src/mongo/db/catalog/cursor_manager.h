@@ -82,12 +82,11 @@ public:
     ~CursorManager();
 
     /**
-     * Kills all managed query executors and ClientCursors.
+     * Kills all managed query executors and ClientCursors. Callers must have exclusive access to
+     * the collection (i.e. must have the collection, databse, or global resource locked in MODE_X).
      *
      * 'collectionGoingAway' indicates whether the Collection instance is being deleted.  This could
-     * be because the db is being closed, or the collection/db is being dropped. When passing
-     * a 'collectionGoingAway' value of true, callers must have exclusive access to the collection
-     * (i.e. must have the collection, database, or global resource locked in MODE_X).
+     * be because the db is being closed, or the collection/db is being dropped.
      *
      * The 'reason' is the motivation for invalidating all cursors. This will be used for error
      * reporting and logging when an operation finds that the cursor it was operating on has been
