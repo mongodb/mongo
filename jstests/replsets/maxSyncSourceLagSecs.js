@@ -28,13 +28,13 @@
     master.getDB("foo").bar.save({a: 1});
     replTest.awaitReplication();
 
-    // need to put at least maxSyncSourceLagSecs b/w first op and subsequent ops
-    // so that the shouldChangeSyncSource logic goes into effect
-    sleep(4000);
-
     jsTestLog("Setting sync target of slave 2 to slave 1");
     syncFrom(slaves[1], slaves[0], replTest);
     printjson(replTest.status());
+
+    // need to put at least maxSyncSourceLagSecs b/w first op and subsequent ops
+    // so that the shouldChangeSyncSource logic goes into effect
+    sleep(4000);
 
     jsTestLog("Lock slave 1 and add some docs. Force sync target for slave 2 to change to primary");
     assert.commandWorked(slaves[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
