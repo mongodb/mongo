@@ -62,6 +62,9 @@ PoolForHost::~PoolForHost() {
 }
 
 void PoolForHost::clear() {
+    log() << "Dropping all pooled connections to " << _hostName
+          << "(with timeout of " << _socketTimeout << " seconds)";
+
     while (!_pool.empty()) {
         StoredConnection sc = _pool.top();
         delete sc.conn;
@@ -80,9 +83,19 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
 
     if (isFailed ||
         // Another (later) connection was reported as broken to this host
-        (c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec) ||
+        (c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec)) {
+        log() << "Ending connection to host " << _hostName
+              << "(with timeout of " << _socketTimeout << " seconds)"
+              << " due to bad connection status; "
+              << openConnections() << " connections to that host remain open";
+        pool->onDestroy(c);
+        delete c;
+    } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
-        (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize)) {
+        log() << "Ending idle connection to host " << _hostName
+              << "(with timeout of " << _socketTimeout << " seconds)"
+              << " because the pool meets constraints; " << openConnections()
+              << " connections to that host remain open";
         pool->onDestroy(c);
         delete c;
     } else {
@@ -96,7 +109,7 @@ void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
         microSec > _minValidCreationTimeMicroSec) {
         _minValidCreationTimeMicroSec = microSec;
         log() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
-              << " microSec, clearing pool for " << _hostName << " of " << _pool.size()
+              << " microSec, clearing pool for " << _hostName << " of " << openConnections()
               << " connections" << endl;
         clear();
     }
@@ -130,6 +143,9 @@ DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
 }
 
 void PoolForHost::flush() {
+    log() << "Dropping all pooled connections to " << _hostName
+          << "(with timeout of " << _socketTimeout << " seconds)";
+
     while (!_pool.empty()) {
         StoredConnection c = _pool.top();
         _pool.pop();
@@ -196,8 +212,15 @@ DBClientBase* DBConnectionPool::_get(const string& ident, double socketTimeout) 
     stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     p.setMaxPoolSize(_maxPoolSize);
+    p.setSocketTimeout(socketTimeout);
     p.initializeHostName(ident);
     return p.get(this, socketTimeout);
+}
+
+int DBConnectionPool::openConnections(const string& ident, double socketTimeout) {
+    stdx::lock_guard<stdx::mutex> L(_mutex);
+    PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
+    return p.openConnections();
 }
 
 DBClientBase* DBConnectionPool::_finishCreate(const string& host,
@@ -219,11 +242,18 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& host,
         throw;
     }
 
+    log() << "Successfully connected to " << host
+          << " (" << openConnections(host, socketTimeout)
+          << " connections now open to " << host << " with a "
+          << socketTimeout << " second timeout)";
+
     return conn;
 }
 
 DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTimeout) {
-    DBClientBase* c = _get(url.toString(), socketTimeout);
+    auto host = url.toString();
+
+    DBClientBase* c = _get(host, socketTimeout);
     if (c) {
         try {
             onHandedOut(c);
@@ -236,7 +266,7 @@ DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTi
 
     string errmsg;
     c = url.connect(errmsg, socketTimeout);
-    uassert(13328, _name + ": connect failed " + url.toString() + " : " + errmsg, c);
+    uassert(13328, _name + ": connect failed " + host + " : " + errmsg, c);
 
     return _finishCreate(url.toString(), socketTimeout, c);
 }
@@ -262,6 +292,7 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
                               host,
                               11002,
                               str::stream() << _name << " error: " << errmsg);
+
     return _finishCreate(host, socketTimeout, c);
 }
 
