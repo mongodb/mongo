@@ -65,7 +65,7 @@ bool isHashedPatternEl(const BSONElement& el) {
  * ii) a compound list of ascending, potentially-nested field paths, e.g. { a : 1 , b.c : 1 }
  */
 std::vector<FieldRef*> parseShardKeyPattern(const BSONObj& keyPattern) {
-    std::vector<FieldRef*> parsedPaths;
+    OwnedPointerVector<FieldRef> parsedPaths;
 
     for (const auto& patternEl : keyPattern) {
         auto newFieldRef(stdx::make_unique<FieldRef>(patternEl.fieldNameStringData()));
@@ -92,10 +92,10 @@ std::vector<FieldRef*> parseShardKeyPattern(const BSONObj& keyPattern) {
             return {};
         }
 
-        parsedPaths.emplace_back(newFieldRef.release());
+        parsedPaths.push_back(newFieldRef.release());
     }
 
-    return parsedPaths;
+    return parsedPaths.release();
 }
 
 bool isShardKeyElement(const BSONElement& element, bool allowRegex) {
