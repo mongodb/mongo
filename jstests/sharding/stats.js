@@ -43,6 +43,10 @@
         bulk.insert({_id: i});
     assert.writeOK(bulk.execute());
 
+    // Flush all writes to disk since some of the stats are dependent on state in disk (like
+    // totalIndexSize).
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+
     x = db.foo.stats();
     assert.eq(N, x.count, "coll total count expected");
     assert.eq(db.foo.count(), x.count, "coll total count match");
