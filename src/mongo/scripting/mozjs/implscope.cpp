@@ -258,7 +258,6 @@ MozJSImplScope::ASANHandles::ASANHandles() {
 }
 
 MozJSImplScope::ASANHandles::~ASANHandles() {
-    invariant(_handles.empty());
     invariant(kCurrentASANHandles == this);
     kCurrentASANHandles = nullptr;
 }
