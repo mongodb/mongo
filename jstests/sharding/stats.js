@@ -40,6 +40,10 @@
         bulk.insert({_id: i});
     assert.writeOK(bulk.execute());
 
+    // Flush all writes to disk since some of the stats are dependent on state in disk (like
+    // totalIndexSize).
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+
     a = s.shard0.getDB("test");
     b = s.shard1.getDB("test");
 
