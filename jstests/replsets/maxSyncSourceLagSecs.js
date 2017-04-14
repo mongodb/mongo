@@ -25,6 +25,12 @@
     });
     replTest.awaitNodesAgreeOnPrimary();
 
+    // Disable maxSyncSourceLagSecs behavior until we've established the spanning tree we want.
+    replTest.nodes.forEach(function(node) {
+        assert.commandWorked(node.getDB('admin').runCommand(
+            {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'alwaysOn'}));
+    });
+
     var master = replTest.getPrimary();
     var slaves = replTest.liveNodes.slaves;
     syncFrom(slaves[0], master, replTest);
@@ -32,13 +38,20 @@
     master.getDB("foo").bar.save({a: 1});
     replTest.awaitReplication();
 
+    jsTestLog("Setting sync target of slave 2 to slave 1");
+    syncFrom(slaves[1], slaves[0], replTest);
+    printjson(replTest.status());
+
     // need to put at least maxSyncSourceLagSecs b/w first op and subsequent ops
     // so that the shouldChangeSyncSource logic goes into effect
     sleep(4000);
 
-    jsTestLog("Setting sync target of slave 2 to slave 1");
-    syncFrom(slaves[1], slaves[0], replTest);
-    printjson(replTest.status());
+    // Re-enable maxSyncSourceLagSecs behavior now that we have the spanning tree we want and are
+    // ready to test that behavior.
+    replTest.nodes.forEach(function(node) {
+        assert.commandWorked(node.getDB('admin').runCommand(
+            {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'off'}));
+    });
 
     jsTestLog("Lock slave 1 and add some docs. Force sync target for slave 2 to change to primary");
     assert.commandWorked(slaves[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
