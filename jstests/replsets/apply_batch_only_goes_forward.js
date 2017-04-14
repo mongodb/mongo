@@ -69,6 +69,7 @@
     printjson(sLocal.adminCommand("isMaster"));
     replTest.waitForState(master, ReplSetTest.State.RECOVERING);
 
+    replTest.awaitNodesAgreeOnPrimary();
     // Slave is now master... Do a write to advance the optime on the primary so that it will be
     // considered as a sync source -  this is more relevant to PV0 because we do not write a new
     // entry to the oplog on becoming primary.
