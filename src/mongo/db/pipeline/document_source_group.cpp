@@ -491,7 +491,6 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
-    dassert(numAccumulators == _accumulatedFields.size());
 
     // Barring any pausing, this loop exhausts 'pSource' and populates '_groups'.
     GetNextResult input = pSource->getNext();
@@ -521,13 +520,13 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
             // Add the accumulators
             group.reserve(numAccumulators);
-            for (size_t i = 0; i < numAccumulators; i++) {
-                group.push_back(_accumulatedFields[i].makeAccumulator(pExpCtx));
+            for (auto&& accumulatedField : _accumulatedFields) {
+                group.push_back(accumulatedField.makeAccumulator(pExpCtx));
             }
         } else {
-            for (size_t i = 0; i < numAccumulators; i++) {
+            for (auto&& groupObj : group) {
                 // subtract old mem usage. New usage added back after processing.
-                _memoryUsageBytes -= group[i]->memUsageForSorter();
+                _memoryUsageBytes -= groupObj->memUsageForSorter();
             }
         }
 
@@ -577,8 +576,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
-                for (size_t i = 0; i < numAccumulators; i++) {
-                    _currentAccumulators.push_back(_accumulatedFields[i].makeAccumulator(pExpCtx));
+                for (auto&& accumulatedField : _accumulatedFields) {
+                    _currentAccumulators.push_back(accumulatedField.makeAccumulator(pExpCtx));
                 }
 
                 verify(_sorterIterator->more());  // we put data in, we should get something out.
@@ -659,7 +658,7 @@ boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
     // $group contained only FieldPaths or constants. Determine if this is the case, and extract
     // those FieldPaths if it is.
     DepsTracker deps(DepsTracker::MetadataAvailable::kNoMetadata);  // We don't support streaming
-    // based off a text score.
+                                                                    // based off a text score.
     for (auto&& exp : _idExpressions) {
         if (dynamic_cast<ExpressionConstant*>(exp.get())) {
             continue;
@@ -706,8 +705,8 @@ boost::optional<BSONObj> DocumentSourceGroup::findRelevantInputSort() const {
 BSONObjSet DocumentSourceGroup::getOutputSorts() {
     if (!_initialized) {
         initialize();  // Note this might not finish initializing, but that's OK. We just want to
-        // do some initialization to try to determine if we are streaming or spilled.
-        // False negatives are OK.
+                       // do some initialization to try to determine if we are streaming or spilled.
+                       // False negatives are OK.
     }
 
     if (!(_streaming || _spilled)) {

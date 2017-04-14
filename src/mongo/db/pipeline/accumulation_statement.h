@@ -91,7 +91,7 @@ public:
      */
     static Accumulator::Factory getFactory(StringData name);
 
-    // The field name is use to store the results of the accumulation in a result document.
+    // The field name is used to store the results of the accumulation in a result document.
     std::string fieldName;
 
     // The expression to use to obtain the input to the accumulator.
