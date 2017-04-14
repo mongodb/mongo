@@ -145,6 +145,10 @@ def main():
         resmoke_logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
         sys.exit(0)
 
+    # Log the command line arguments specified to resmoke.py to make it easier to re-run the
+    # resmoke.py invocation used by an Evergreen task.
+    resmoke_logger.info("resmoke.py invocation: %s", " ".join(sys.argv))
+
     interrupted = False
     suites = resmokelib.parser.get_suites(values, args)
 
