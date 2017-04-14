@@ -593,6 +593,49 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Steps up 'node' as primary.
+     * Waits for all nodes to reach the same optime before each election.
+     * Calls awaitReplication() which requires all connections in 'nodes' to be authenticated.
+     */
+    this.stepUp = function(node) {
+        this.awaitReplication();
+        this.awaitNodesAgreeOnPrimary();
+        if (this.getPrimary() === node) {
+            print("Node " + node.host + " is already primary, no need to step it up.");
+            return;
+        }
+        print("Stepping up node " + node.host);
+
+        // Ensure the specified node is primary.
+        for (var i = 0; i < this.nodes.length; i++) {
+            var primary = this.getPrimary();
+            if (primary === node) {
+                break;
+            }
+            try {
+                // Make sure the nodes do not step back up for 10 minutes.
+                assert.commandWorked(primary.adminCommand({replSetStepDown: 10 * 60, force: true}));
+            } catch (ex) {
+                print("Caught exception while stepping down node '" + tojson(node.host) + "': " +
+                      tojson(ex));
+            }
+            this.awaitReplication();
+            this.awaitNodesAgreeOnPrimary();
+        }
+
+        // Reset the rest of the nodes so they can run for election during the test.
+        for (var i = 0; i < this.nodes.length; i++) {
+            // Cannot call replSetFreeze on the primary.
+            if (this.nodes[i] === node) {
+                continue;
+            }
+            assert.commandWorked(this.nodes[i].adminCommand({replSetFreeze: 0}));
+        }
+
+        assert.eq(this.getPrimary(), node, node.host + " was not primary after stepUp");
+    };
+
+    /**
      * Gets the current replica set config from the specified node index. If no nodeId is specified,
      * uses the primary node.
      */

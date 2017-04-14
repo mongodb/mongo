@@ -26,21 +26,8 @@
     var nodes = rst.startSet();
     rst.initiate();
 
-    function stepUp(rst, node) {
-        var primary = rst.getPrimary();
-        if (primary != node) {
-            try {
-                assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
-            } catch (ex) {
-                print("Caught exception while stepping down from node '" + tojson(node.host) +
-                      "': " + tojson(ex));
-            }
-        }
-        waitForState(node, ReplSetTest.State.PRIMARY);
-    }
-
     jsTestLog("Make sure node 0 is primary.");
-    stepUp(rst, nodes[0]);
+    rst.stepUp(nodes[0]);
     assert.eq(nodes[0], rst.getPrimary());
     // Wait for all data bearing nodes to get up to date.
     assert.writeOK(nodes[0].getCollection(collName).insert(
