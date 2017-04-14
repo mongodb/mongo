@@ -47,11 +47,11 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
 

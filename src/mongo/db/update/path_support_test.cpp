@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/update/path_support.h"
 
 #include <cstdint>
 #include <memory>

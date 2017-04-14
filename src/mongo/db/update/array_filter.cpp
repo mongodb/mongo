@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/ops/array_filter.h"
+#include "mongo/db/update/array_filter.h"
 
 #include "mongo/db/matcher/expression_parser.h"
 

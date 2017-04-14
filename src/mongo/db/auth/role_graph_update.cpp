@@ -35,7 +35,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/ops/update_driver.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

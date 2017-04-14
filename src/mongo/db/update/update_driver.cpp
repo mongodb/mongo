@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/update_driver.h"
+#include "mongo/db/update/update_driver.h"
 
 
 #include "mongo/base/error_codes.h"
@@ -36,10 +36,10 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/modifier_object_replace.h"
-#include "mongo/db/ops/modifier_table.h"
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/modifier_table.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/mongoutils/str.h"
 

@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/path_support.h"
+#include "mongo/db/update/path_support.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"

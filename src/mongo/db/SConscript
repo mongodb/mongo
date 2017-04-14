@@ -33,6 +33,7 @@ env.SConscript(
         'sorter',
         'stats',
         'storage',
+        'update',
         'views',
     ],
     exports=[
@@ -873,7 +874,6 @@ env.Library(
         "matcher/expressions_mongod_only",
         "op_observer_d",
         "ops/write_ops",
-        "ops/update_driver",
         "ops/write_ops_parsers",
         "pipeline/aggregation",
         "pipeline/serveronly",
@@ -913,6 +913,7 @@ env.Library(
         "storage/storage_options",
         "storage/wiredtiger/storage_wiredtiger" if wiredtiger else [],
         "ttl_d",
+        "update/update_driver",
         "update_index_data",
         "views/views_mongod",
     ],

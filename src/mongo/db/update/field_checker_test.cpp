@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/ops/field_checker.h"
+#include "mongo/db/update/field_checker.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

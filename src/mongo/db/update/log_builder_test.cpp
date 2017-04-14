@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/ops/log_builder.h"
+#include "mongo/db/update/log_builder.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"

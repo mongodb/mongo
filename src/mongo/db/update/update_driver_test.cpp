@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/update_driver.h"
+#include "mongo/db/update/update_driver.h"
 
 
 #include <map>

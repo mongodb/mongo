@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/modifier_table.h"
+#include "mongo/db/update/modifier_table.h"
 
 #include <memory>
 

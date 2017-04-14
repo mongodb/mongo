@@ -34,10 +34,10 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/ops/field_checker.h"
-#include "mongo/db/ops/log_builder.h"
-#include "mongo/db/ops/path_support.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/field_checker.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

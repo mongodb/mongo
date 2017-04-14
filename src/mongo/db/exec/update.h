@@ -32,9 +32,9 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
+#include "mongo/db/update/update_driver.h"
 
 namespace mongo {
 

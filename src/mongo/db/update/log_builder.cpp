@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/log_builder.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

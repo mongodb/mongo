@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/ops/modifier_interface.h"
+#include "mongo/db/update/update_leaf_node.h"
 
 namespace mongo {
 namespace modifiertable {
@@ -65,6 +66,11 @@ ModifierType getType(StringData typeStr);
  * valid. The ownership of the new object is the caller's.
  */
 ModifierInterface* makeUpdateMod(ModifierType modType);
+
+/**
+ * Instantiate an UpdateLeafNode that corresponds to 'modType' or nullptr if 'modType' is not valid.
+ */
+std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType);
 
 }  // namespace modifiertable
 }  // namespace mongo

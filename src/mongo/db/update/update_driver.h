@@ -37,8 +37,8 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
-#include "mongo/db/ops/modifier_table.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update_index_data.h"
 
 namespace mongo {
