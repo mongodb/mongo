@@ -727,6 +727,17 @@ functions:
         content_type: ${content_type|application/x-gzip}
         display_name: Generated Tests - Execution ${execution}
 
+  "run idl tests" :
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
+
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/idl/run_tests.py
+
   "do multiversion setup" :
     command: shell.exec
     params:
@@ -917,6 +928,9 @@ post:
   - command: attach.results
     params:
       file_location: src/report.json
+  - command: attach.xunit_results
+    params:
+      file: "src/results/*.xml"
   - func: "kill processes"
   # Print out any Out of Memory killed process messages.
   - command: shell.exec
@@ -2975,6 +2989,13 @@ tasks:
     vars:
       resmoke_args: --suites=read_only_sharded --storageEngine=wiredTiger
       run_multiple_jobs: true
+
+- name: idl_tests
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "run idl tests"
 
 - name: package
   depends_on:
@@ -5587,6 +5608,7 @@ buildvariants:
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
+  - name: idl_tests
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
