@@ -21,19 +21,19 @@
 
     // Primary should step down long enough for election to occur on secondary.
     var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
-    var electionTimeoutMillis = config.settings.electionTimeoutMillis;
-    var stepDownGuardMillis = electionTimeoutMillis * 2;
     var stepDownException = assert.throws(function() {
-        primary.adminCommand({replSetStepDown: stepDownGuardMillis / 1000});
+        primary.adminCommand({replSetStepDown: replSet.kDefaultTimeoutMS / 1000});
     });
     assert.neq(-1,
                tojson(stepDownException).indexOf('error doing query'),
                'replSetStepDown did not disconnect client');
 
     // Step down primary and wait for node 1 to be promoted to primary.
-    replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY);
+
+    // Unfreeze node 0 so it can seek election.
+    assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 
     // Eventually node 0 will stand for election again because it has a higher priorty.
-    replSet.waitForState(
-        replSet.nodes[0], ReplSetTest.State.PRIMARY, stepDownGuardMillis + 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 })();
