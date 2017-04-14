@@ -282,9 +282,6 @@ public:
         if (cursor->isReadCommitted())
             uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
-        // Reset timeout timer on the cursor since the cursor is still in use.
-        cursor->resetIdleTime();
-
         const bool hasOwnMaxTime = opCtx->hasDeadline();
 
         if (!hasOwnMaxTime) {

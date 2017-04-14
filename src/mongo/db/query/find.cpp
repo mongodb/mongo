@@ -350,9 +350,6 @@ Message getMore(OperationContext* opCtx,
         if (cc->isReadCommitted())
             uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
-        // Reset timeout timer on the cursor since the cursor is still in use.
-        cc->resetIdleTime();
-
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
         if (cc->getLeftoverMaxTimeMicros() < Microseconds::max()) {

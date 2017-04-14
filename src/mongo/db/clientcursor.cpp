@@ -71,7 +71,6 @@ static ServerStatusMetricField<Counter64> dCursorStatsOpenNoTimeout("cursor.open
 static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut",
                                                                 &cursorStatsTimedOut);
 
-MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis, int, 10 * 60 * 1000 /* 10 minutes */);
 MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, int, 4);
 
 long long ClientCursor::totalOpen() {
@@ -80,7 +79,8 @@ long long ClientCursor::totalOpen() {
 
 ClientCursor::ClientCursor(ClientCursorParams&& params,
                            CursorManager* cursorManager,
-                           CursorId cursorId)
+                           CursorId cursorId,
+                           Date_t now)
     : _cursorid(cursorId),
       _nss(std::move(params.nss)),
       _authenticatedUsers(std::move(params.authenticatedUsers)),
@@ -88,11 +88,8 @@ ClientCursor::ClientCursor(ClientCursorParams&& params,
       _cursorManager(cursorManager),
       _originatingCommand(params.originatingCommandObj),
       _queryOptions(params.queryOptions),
-      _exec(std::move(params.exec)) {
-    init();
-}
-
-void ClientCursor::init() {
+      _exec(std::move(params.exec)),
+      _lastUseDate(now) {
     invariant(_cursorManager);
     invariant(_exec);
 
@@ -127,22 +124,6 @@ void ClientCursor::dispose(OperationContext* opCtx) {
 
     _exec->dispose(opCtx, _cursorManager);
     _disposed = true;
-}
-
-//
-// Timing and timeouts
-//
-
-bool ClientCursor::shouldTimeout(int millis) {
-    _idleAgeMillis += millis;
-    if (isNoTimeout() || _isPinned) {
-        return false;
-    }
-    return _idleAgeMillis > cursorTimeoutMillis.load();
-}
-
-void ClientCursor::resetIdleTime() {
-    _idleAgeMillis = 0;
 }
 
 void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
@@ -221,6 +202,13 @@ void ClientCursorPin::release() {
     if (!_cursor)
         return;
 
+    // Note it's not safe to dereference _cursor->_cursorManager unless we know we haven't been
+    // killed. If we're not locked we assume we haven't been killed because we're working with the
+    // global cursor manager which never kills cursors.
+    const bool isLocked =
+        _opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS);
+    dassert(isLocked || _cursor->_cursorManager->isGlobalManager());
+
     invariant(_cursor->_isPinned);
 
     if (_cursor->getExecutor()->isMarkedAsKilled()) {
@@ -229,7 +217,7 @@ void ClientCursorPin::release() {
         deleteUnderlying();
     } else {
         // Unpin the cursor under the collection cursor manager lock.
-        _cursor->_cursorManager->unpin(_cursor);
+        _cursor->_cursorManager->unpin(_opCtx, _cursor);
         cursorStatsOpenPinned.decrement();
     }
 
@@ -246,6 +234,13 @@ void ClientCursorPin::deleteUnderlying() {
     //   error to unpin a registered cursor without holding the cursor manager lock (note that
     //   we can't simply unpin with the cursor manager lock here, since we need to guarantee
     //   exclusive ownership of the cursor when we are deleting it).
+
+    // Note it's not safe to dereference _cursor->_cursorManager unless we know we haven't been
+    // killed. If we're not locked we assume we haven't been killed because we're working with the
+    // global cursor manager which never kills cursors.
+    const bool isLocked =
+        _opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS);
+    dassert(isLocked || _cursor->_cursorManager->isGlobalManager());
 
     if (!_cursor->getExecutor()->isMarkedAsKilled()) {
         _cursor->_cursorManager->deregisterCursor(_cursor);
@@ -269,7 +264,7 @@ ClientCursor* ClientCursorPin::getCursor() const {
 //
 
 /**
- * Thread for timing out old cursors
+ * Thread for timing out inactive cursors.
  */
 class ClientCursorMonitor : public BackgroundJob {
 public:
@@ -279,13 +274,12 @@ public:
 
     void run() {
         Client::initThread("clientcursormon");
-        Timer t;
         while (!globalInShutdownDeprecated()) {
             {
-                const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-                OperationContext& opCtx = *opCtxPtr;
+                const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
+                auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
                 cursorStatsTimedOut.increment(
-                    CursorManager::timeoutCursorsGlobal(&opCtx, t.millisReset()));
+                    CursorManager::timeoutCursorsGlobal(opCtx.get(), now));
             }
             MONGO_IDLE_THREAD_BLOCK;
             sleepsecs(clientCursorMonitorFrequencySecs.load());

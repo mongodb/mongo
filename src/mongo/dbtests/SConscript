@@ -83,6 +83,7 @@ dbtest = env.Program(
         'plan_ranking.cpp',
         'query_stage_multiplan.cpp',
         'query_plan_executor.cpp',
+        'cursor_manager_test.cpp',
         'query_stage_and.cpp',
         'query_stage_cached_plan.cpp',
         'query_stage_collscan.cpp',

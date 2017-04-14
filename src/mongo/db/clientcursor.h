@@ -150,29 +150,8 @@ public:
     }
 
     //
-    // Timing and timeouts.
+    // Timing.
     //
-
-    /**
-     * Increments the amount of time for which this cursor believes it has been idle by 'millis'.
-     *
-     * After factoring in this additional idle time, returns whether or not this cursor now exceeds
-     * its idleness timeout and should be deleted.
-     */
-    bool shouldTimeout(int millis);
-
-    /**
-     * Resets this cursor's idle time to zero. Only cursors whose idle time is sufficiently high
-     * will be deleted by the cursor manager's reaper thread.
-     */
-    void resetIdleTime();
-
-    /**
-     * Returns the number of milliseconds for which this cursor believes it has been idle.
-     */
-    int idleTime() const {
-        return _idleAgeMillis;
-    }
 
     /**
      * Returns the amount of time execution time available to this cursor. Only valid at the
@@ -235,7 +214,10 @@ private:
      * Constructs a ClientCursor. Since cursors must come into being registered and pinned, this is
      * private. See cursor_manager.h for more details.
      */
-    ClientCursor(ClientCursorParams&& params, CursorManager* cursorManager, CursorId cursorId);
+    ClientCursor(ClientCursorParams&& params,
+                 CursorManager* cursorManager,
+                 CursorId cursorId,
+                 Date_t now);
 
     /**
      * Destroys a ClientCursor. This is private, since only the CursorManager or the ClientCursorPin
@@ -245,8 +227,6 @@ private:
      * destroyed.
      */
     ~ClientCursor();
-
-    void init();
 
     /**
      * Marks this cursor as killed, so any future uses will return an error status including
@@ -268,7 +248,6 @@ private:
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
     CursorId _cursorid = 0;
 
-    // The namespace we're operating on.
     const NamespaceString _nss;
 
     // The set of authenticated users when this cursor was created.
@@ -276,9 +255,7 @@ private:
 
     const bool _isReadCommitted = false;
 
-    // A pointer to the CursorManager which owns this cursor. This must be filled out when the
-    // cursor is constructed via the CursorManager.
-    CursorManager* _cursorManager = nullptr;
+    CursorManager* _cursorManager;
 
     // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
     // an error to use a ClientCursor once it has been disposed.
@@ -293,23 +270,37 @@ private:
     // See the QueryOptions enum in dbclientinterface.h.
     const int _queryOptions = 0;
 
-    // While a cursor is being used by a client, it is marked as "pinned". See ClientCursorPin
-    // below.
-    //
-    // Cursors always come into existence in a pinned state.
-    bool _isPinned = true;
-
     // The replication position only used in master-slave.
     Timestamp _slaveReadTill;
-
-    // How long has the cursor been idle?
-    int _idleAgeMillis = 0;
 
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
     // The underlying query execution machinery. Must be non-null.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
+
+    //
+    // The following fields are used by the CursorManager and the ClientCursorPin. In most
+    // conditions, they can only be used while holding the CursorManager's mutex. Exceptions
+    // include:
+    //   - If the ClientCursor is pinned, the CursorManager will never change '_isPinned' until
+    //     asked to by the ClientCursorPin.
+    //   - It is safe to read '_killed' while holding a collection lock, which must be held when
+    //     interacting with a ClientCursorPin.
+    //   - A ClientCursorPin can access these members after deregistering the cursor from the
+    //     CursorManager, at which point it has sole ownership of the ClientCursor.
+    //
+
+    // TODO SERVER-28309 Remove this field and instead use _exec->markedAsKilled().
+    bool _killed = false;
+
+    // While a cursor is being used by a client, it is marked as "pinned". See ClientCursorPin
+    // below.
+    //
+    // Cursors always come into existence in a pinned state.
+    bool _isPinned = true;
+
+    Date_t _lastUseDate;
 };
 
 /**

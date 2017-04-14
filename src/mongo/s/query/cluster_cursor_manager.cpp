@@ -252,9 +252,6 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor(
     const NamespaceString& nss, CursorId cursorId, OperationContext* opCtx) {
-    // Read the clock out of the lock.
-    const auto now = _clockSource->now();
-
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_inShutdown) {
@@ -274,8 +271,6 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorInUseStatus(nss, cursorId);
     }
 
-    entry->setLastActive(now);
-
     // Note that pinning a cursor transfers ownership of the underlying ClusterClientCursor object
     // to the pin; the CursorEntry is left with a null ClusterClientCursor.
     return PinnedCursor(this, std::move(cursor), nss, cursorId);
@@ -285,6 +280,9 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
                                          const NamespaceString& nss,
                                          CursorId cursorId,
                                          CursorState cursorState) {
+    // Read the clock out of the lock.
+    const auto now = _clockSource->now();
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     invariant(cursor);
@@ -294,7 +292,7 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     CursorEntry* entry = getEntry_inlock(nss, cursorId);
     invariant(entry);
 
-
+    entry->setLastActive(now);
     entry->returnCursor(std::move(cursor));
 
     if (cursorState == CursorState::NotExhausted || entry->getKillPending()) {
@@ -337,7 +335,7 @@ void ClusterCursorManager::killMortalCursorsInactiveSince(Date_t cutoff) {
     for (auto& nsContainerPair : _namespaceToContainerMap) {
         for (auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
             CursorEntry& entry = cursorIdEntryPair.second;
-            if (entry.getLifetimeType() == CursorLifetime::Mortal &&
+            if (entry.getLifetimeType() == CursorLifetime::Mortal && entry.isCursorOwned() &&
                 entry.getLastActive() <= cutoff) {
                 entry.setInactive();
                 log() << "Marking cursor id " << cursorIdEntryPair.first

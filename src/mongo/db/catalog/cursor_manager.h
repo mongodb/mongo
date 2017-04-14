@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -73,6 +74,9 @@ class PlanExecutor;
  */
 class CursorManager {
 public:
+    // The number of minutes a cursor is allowed to be idle before timing out.
+    static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
+
     CursorManager(NamespaceString nss);
 
     /**
@@ -107,7 +111,7 @@ public:
      *
      * Returns the number of cursors that were timed out.
      */
-    std::size_t timeoutCursors(OperationContext* opCtx, int millisSinceLastCall);
+    std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
      * Register an executor so that it can be notified of deletion/invalidation during yields.
@@ -181,7 +185,7 @@ public:
      * Deletes inactive cursors from the global cursor manager and from all per-collection cursor
      * managers. Returns the number of cursors that were timed out.
      */
-    static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, int millisSinceLastCall);
+    static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
 
 private:
     friend class ClientCursorPin;
@@ -191,7 +195,9 @@ private:
 
     void deregisterCursor(ClientCursor* cc);
 
-    void unpin(ClientCursor* cursor);
+    void unpin(OperationContext* opCtx, ClientCursor* cursor);
+
+    bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
 
     bool isGlobalManager() const {
         return _nss.isEmpty();
