@@ -10,13 +10,9 @@
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
-					   pages by this many increments of the
-					   read generation. */
+#define	WT_EVICT_MAX_TREES	1000	/* Maximum walk points */
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
-
-#define	WT_EVICT_MAX_TREES	1000	/* Maximum walk points */
 
 /* Ways to position when starting an eviction walk. */
 typedef enum {

@@ -62,9 +62,10 @@ __wt_metadata_cursor_open(
 	 * first update is safe because it's single-threaded from
 	 * wiredtiger_open).
 	 */
+#define	WT_EVICT_META_SKEW	10000
 	if (btree->evict_priority == 0)
 		WT_WITH_BTREE(session, btree,
-		    __wt_evict_priority_set(session, WT_EVICT_INT_SKEW));
+		    __wt_evict_priority_set(session, WT_EVICT_META_SKEW));
 	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
 

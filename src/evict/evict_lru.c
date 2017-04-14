@@ -95,12 +95,8 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (page->read_gen == WT_READGEN_OLDEST)
 		return (WT_READGEN_OLDEST);
 
-	/*
-	 * Any leaf page from a dead tree is a great choice (not internal pages,
-	 * they may have children and are not yet evictable).
-	 */
-	if (!WT_PAGE_IS_INTERNAL(page) &&
-	    F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
+	/* Any page from a dead tree is a great choice. */
+	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
 		return (WT_READGEN_OLDEST);
 
 	/* Any empty page (leaf or internal), is a good choice. */
@@ -123,8 +119,10 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 		read_gen = page->read_gen;
 
 	read_gen += btree->evict_priority;
+
+#define	WT_EVICT_INTL_SKEW 1000
 	if (WT_PAGE_IS_INTERNAL(page))
-		read_gen += WT_EVICT_INT_SKEW;
+		read_gen += WT_EVICT_INTL_SKEW;
 
 	return (read_gen);
 }
@@ -1580,7 +1578,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
-	WT_PAGE *page;
+	WT_PAGE *last_parent, *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	WT_TXN_GLOBAL *txn_global;
@@ -1588,14 +1586,15 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	uint64_t pages_seen, pages_queued, refs_walked;
 	uint32_t remaining_slots, total_slots, walk_flags;
 	uint32_t target_pages_clean, target_pages_dirty, target_pages;
-	int internal_pages, restarts;
+	int restarts;
 	bool give_up, modified, urgent_queued;
 
 	conn = S2C(session);
 	btree = S2BT(session);
 	cache = conn->cache;
 	txn_global = &conn->txn_global;
-	internal_pages = restarts = 0;
+	last_parent = NULL;
+	restarts = 0;
 	give_up = urgent_queued = false;
 
 	/*
@@ -1750,6 +1749,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 */
 	for (evict = start, pages_queued = pages_seen = refs_walked = 0;
 	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
+	    last_parent = ref == NULL ? NULL : ref->home,
 	    ret = __wt_tree_walk_count(
 	    session, &ref, &refs_walked, walk_flags)) {
 		/*
@@ -1830,10 +1830,23 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		if (modified && !F_ISSET(cache, WT_CACHE_EVICT_DIRTY))
 			continue;
 
-		/* Limit internal pages to 50% of the total. */
-		if (WT_PAGE_IS_INTERNAL(page) &&
-		    internal_pages > (int)(evict - start) / 2)
-			continue;
+		/*
+		 * Don't attempt eviction of internal pages with children in
+		 * cache (indicated by seeing an internal page that is the
+		 * parent of the last page we saw).
+		 *
+		 * Also skip internal page unless we get aggressive or the tree
+		 * is idle (indicated by the tree being skipped for walks).
+		 * The goal here is that if trees become completely idle, we
+		 * eventually push them out of cache completely.
+		 */
+		if (WT_PAGE_IS_INTERNAL(page)) {
+			if (page == last_parent)
+				continue;
+			if (btree->evict_walk_period == 0 &&
+			    !__wt_cache_aggressive(session))
+				continue;
+		}
 
 		/* If eviction gets aggressive, anything else is fair game. */
 		if (__wt_cache_aggressive(session))
@@ -1861,9 +1874,6 @@ fast:		/* If the page can't be evicted, give up. */
 			continue;
 		++evict;
 		++pages_queued;
-
-		if (WT_PAGE_IS_INTERNAL(page))
-			++internal_pages;
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" WT_SIZET_FMT,
