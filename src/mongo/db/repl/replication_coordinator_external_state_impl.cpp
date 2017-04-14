@@ -319,32 +319,37 @@ void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext*
     repl::startMasterSlave(txn);
 }
 
-void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* txn) {
+void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
     UniqueLock lk(_threadMutex);
-    if (_startedThreads) {
-        _stopDataReplication_inlock(txn, &lk);
+    if (!_startedThreads) {
+        return;
+    }
 
-        if (_snapshotThread) {
-            log() << "Stopping replication snapshot thread";
-            _snapshotThread->shutdown();
-        }
+    _stopDataReplication_inlock(opCtx, &lk);
 
-        if (_storageInterface->getOplogDeleteFromPoint(txn).isNull() &&
-            loadLastOpTime(txn) == _storageInterface->getAppliedThrough(txn)) {
-            // Clear the appliedThrough marker to indicate we are consistent with the top of the
-            // oplog.
-            _storageInterface->setAppliedThrough(txn, {});
-        }
+    if (_snapshotThread) {
+        log() << "Stopping replication snapshot thread";
+        _snapshotThread->shutdown();
+    }
 
-        if (_noopWriter) {
-            LOG(1) << "Stopping noop writer";
-            _noopWriter->stopWritingPeriodicNoops();
-        }
+    if (_noopWriter) {
+        LOG(1) << "Stopping noop writer";
+        _noopWriter->stopWritingPeriodicNoops();
+    }
 
-        log() << "Stopping replication storage threads";
-        _taskExecutor->shutdown();
-        _taskExecutor->join();
-        _storageInterface->shutdown();
+    log() << "Stopping replication storage threads";
+    _taskExecutor->shutdown();
+    _taskExecutor->join();
+    _storageInterface->shutdown();
+    lk.unlock();
+
+    // Perform additional shutdown steps below that must be done outside _threadMutex.
+
+    if (_storageInterface->getOplogDeleteFromPoint(opCtx).isNull() &&
+        loadLastOpTime(opCtx) == _storageInterface->getAppliedThrough(opCtx)) {
+        // Clear the appliedThrough marker to indicate we are consistent with the top of the
+        // oplog.
+        _storageInterface->setAppliedThrough(opCtx, {});
     }
 }
 
