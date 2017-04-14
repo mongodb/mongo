@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/stdx/memory.h"
 
@@ -51,27 +52,52 @@ std::vector<AsyncRequestsSender::Request> buildRequestsForAllShards(OperationCon
                                                                     const BSONObj& cmdObj);
 
 /**
- * Utility function to get the set of shards to target for a request on a specific namespace.
+ * Utility function to target all shards that own data for a collection.
  *
  * Selects shards to target based on 'routingInfo', and constructs a vector of requests, one per
  * targeted shard, where the cmdObj to send to each shard has been modified to include the shard's
  * shardVersion.
  */
-std::vector<AsyncRequestsSender::Request> buildRequestsForTargetedShards(
+std::vector<AsyncRequestsSender::Request> buildRequestsForShardsThatHaveCollection(
     OperationContext* opCtx, const CachedCollectionRoutingInfo& routingInfo, const BSONObj& cmdObj);
 
 /**
- * Utility function to scatter 'requests' to shards and fold the responses into a single response.
+ * Utility function to target all shards that own chunks that match a query on a collection.
  *
- * Places the raw responses from shards into a field 'raw' in 'output', and also returns the raw
- * responses as a vector so that additional aggregate logic can be applied to them.
+ * Selects shards to target based on the ChunkManager in 'routingInfo', and constructs a vector of
+ * requests, one per targeted shard, where the cmdObj to send to each shard has been modified to
+ * include the shard's shardVersion.
+ */
+std::vector<AsyncRequestsSender::Request> buildRequestsForShardsForQuery(
+    OperationContext* opCtx,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const BSONObj& filter,
+    const BSONObj& collation);
+
+/**
+ * Utility function to scatter 'requests' to shards and gather the responses.
+ *
+ * Returns an error status if any shard returns a stale shardVersion error or if a shard is not
+ * found.
+ *
+ * @output: if non-null:
+ * -- places the raw responses from the shards into a field called 'raw' in 'output'
+ * -- appends the writeConcern element for the first writeConcern error encountered to 'output'
+ * -- appends an error code and message to 'output'. If all shards had the same error, the error
+ *    code is the common error code, otherwise '0'
+ * -- *Warning* resets 'output' to empty if an error status is returned.
+ *
+ * @viewDefinition: if non-null and a shard returns an error saying that the command was on a view,
+ * the view definition is stored in 'viewDefinition'.
  */
 StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponsesFromShards(
     OperationContext* opCtx,
     const std::string& dbName,
     const BSONObj& cmdObj,
     const std::vector<AsyncRequestsSender::Request>& requests,
-    BSONObjBuilder* output);
+    BSONObjBuilder* output,
+    BSONObj* viewDefinition);
 
 /**
  * Utility function to compute a single error code from a vector of command results.

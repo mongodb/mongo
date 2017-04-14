@@ -65,7 +65,8 @@ public:
              std::string& errmsg,
              BSONObjBuilder& output) override {
         auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-        auto swResponses = gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output);
+        auto swResponses =
+            gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output, nullptr);
         return appendCommandStatus(output, swResponses.getStatus());
     }
 

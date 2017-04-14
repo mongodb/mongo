@@ -203,13 +203,6 @@ protected:
         return false;
     }
 
-    BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
-        BSONObjBuilder cmdWithVersionBob;
-        cmdWithVersionBob.appendElements(cmdObj);
-        version.appendForCommands(&cmdWithVersionBob);
-        return cmdWithVersionBob.obj();
-    }
-
     bool run(OperationContext* opCtx,
              const string& dbName,
              BSONObj& cmdObj,
@@ -222,25 +215,22 @@ protected:
             uassertStatusOK(createShardDatabase(opCtx, dbName));
         }
 
-        Status status = Status::OK();
         int numAttempts = 0;
-        while (numAttempts < kMaxNumStaleVersionRetries) {
-            status = Status::OK();
-            output.resetToEmpty();
-
+        Status status = Status::OK();
+        do {
             auto routingInfo = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-            auto requests = buildRequestsForTargetedShards(opCtx, routingInfo, cmdObj);
+            auto requests = buildRequestsForShardsThatHaveCollection(opCtx, routingInfo, cmdObj);
 
-            auto swResponses = gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output);
-            if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
+            status = gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output, nullptr)
+                         .getStatus();
+
+            if (ErrorCodes::isStaleShardingError(status.code())) {
                 Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
-                ++numAttempts;
-                continue;
             }
-            status = swResponses.getStatus();
-            break;
-        }
+
+            ++numAttempts;
+        } while (numAttempts < kMaxNumStaleVersionRetries && !status.isOK());
 
         // We don't uassertStatusOK(), because that causes 'output' to be cleared, but we want to
         // report the raw results even if there was an error.

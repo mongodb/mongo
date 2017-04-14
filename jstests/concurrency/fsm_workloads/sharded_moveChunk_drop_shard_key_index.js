@@ -39,7 +39,14 @@ var $config = (function() {
         dropIndex: function dropIndex(db, collName) {
             // We don't assert that the command succeeded when dropping an index because it's
             // possible another thread has already dropped this index.
-            db[collName].dropIndex(this.shardKey);
+            try {
+                db[collName].dropIndex(this.shardKey);
+            } catch (e) {
+                // Ignore stale shardVersion errors.
+                if (e.message.indexOf("stale config") < 0) {
+                    throw e;
+                }
+            }
 
             // Re-create the index that was dropped.
             assertAlways.commandWorked(db[collName].createIndex(this.shardKey));

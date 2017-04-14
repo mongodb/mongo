@@ -86,7 +86,8 @@ public:
              std::string& errmsg,
              BSONObjBuilder& output) override {
         auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-        auto swResponses = gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output);
+        auto swResponses =
+            gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output, nullptr);
         if (!swResponses.isOK()) {
             // We failed to obtain a response or error from all shards.
             return appendCommandStatus(output, swResponses.getStatus());
