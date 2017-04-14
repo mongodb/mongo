@@ -351,9 +351,11 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
 
     if (_state != STEADY) {
         return {ErrorCodes::CommandFailed,
-                str::stream() << "Migration start attempted when not in STEADY state."
-                              << " Current session is "
-                              << _sessionId->toString()};
+                str::stream() << "Migration startCommit attempted when not in STEADY state."
+                              << " Sender's session is "
+                              << sessionId.toString()
+                              << (_sessionId ? (". Current session is " + _sessionId->toString())
+                                             : ". No active session on this shard.")};
     }
 
     // In STEADY state we must have active migration
