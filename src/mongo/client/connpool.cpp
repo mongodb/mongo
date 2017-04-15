@@ -62,8 +62,8 @@ PoolForHost::~PoolForHost() {
 }
 
 void PoolForHost::clear() {
-    log() << "Dropping all pooled connections to " << _hostName
-          << "(with timeout of " << _socketTimeout << " seconds)";
+    log() << "Dropping all pooled connections to " << _hostName << "(with timeout of "
+          << _socketTimeout << " seconds)";
 
     while (!_pool.empty()) {
         StoredConnection sc = _pool.top();
@@ -84,16 +84,16 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
     if (isFailed ||
         // Another (later) connection was reported as broken to this host
         (c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec)) {
-        log() << "Ending connection to host " << _hostName
-              << "(with timeout of " << _socketTimeout << " seconds)"
-              << " due to bad connection status; "
-              << openConnections() << " connections to that host remain open";
+        log() << "Ending connection to host " << _hostName << "(with timeout of " << _socketTimeout
+              << " seconds)"
+              << " due to bad connection status; " << openConnections()
+              << " connections to that host remain open";
         pool->onDestroy(c);
         delete c;
     } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
-        log() << "Ending idle connection to host " << _hostName
-              << "(with timeout of " << _socketTimeout << " seconds)"
+        log() << "Ending idle connection to host " << _hostName << "(with timeout of "
+              << _socketTimeout << " seconds)"
               << " because the pool meets constraints; " << openConnections()
               << " connections to that host remain open";
         pool->onDestroy(c);
@@ -143,8 +143,8 @@ DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
 }
 
 void PoolForHost::flush() {
-    log() << "Dropping all pooled connections to " << _hostName
-          << "(with timeout of " << _socketTimeout << " seconds)";
+    log() << "Dropping all pooled connections to " << _hostName << "(with timeout of "
+          << _socketTimeout << " seconds)";
 
     while (!_pool.empty()) {
         StoredConnection c = _pool.top();
@@ -242,10 +242,9 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& host,
         throw;
     }
 
-    log() << "Successfully connected to " << host
-          << " (" << openConnections(host, socketTimeout)
-          << " connections now open to " << host << " with a "
-          << socketTimeout << " second timeout)";
+    log() << "Successfully connected to " << host << " (" << openConnections(host, socketTimeout)
+          << " connections now open to " << host << " with a " << socketTimeout
+          << " second timeout)";
 
     return conn;
 }
