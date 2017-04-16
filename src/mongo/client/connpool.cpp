@@ -62,9 +62,6 @@ PoolForHost::~PoolForHost() {
 }
 
 void PoolForHost::clear() {
-    log() << "Dropping all pooled connections to " << _hostName << "(with timeout of "
-          << _socketTimeout << " seconds)";
-
     _pool = decltype(_pool){};
 }
 
@@ -83,17 +80,11 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c_raw) {
     bool isBroken = c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec;
     if (isFailed || isBroken) {
         _badConns++;
-        log() << "Ending connection to host " << _hostName << "(with timeout of " << _socketTimeout
-              << " seconds)"
-              << " due to bad connection status; " << openConnections()
-              << " connections to that host remain open";
-        pool->onDestroy(c.get());
-    } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
+    }
+
+    if (isFailed || isBroken ||
         // We have a pool size that we need to enforce
-        log() << "Ending idle connection to host " << _hostName << "(with timeout of "
-              << _socketTimeout << " seconds)"
-              << " because the pool meets constraints; " << openConnections()
-              << " connections to that host remain open";
+        (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize)) {
         pool->onDestroy(c.get());
     } else {
         // The connection is probably fine, save for later
@@ -106,7 +97,7 @@ void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
         microSec > _minValidCreationTimeMicroSec) {
         _minValidCreationTimeMicroSec = microSec;
         log() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
-              << " microSec, clearing pool for " << _hostName << " of " << openConnections()
+              << " microSec, clearing pool for " << _hostName << " of " << _pool.size()
               << " connections" << endl;
         clear();
     }
@@ -198,15 +189,8 @@ DBClientBase* DBConnectionPool::_get(const string& ident, double socketTimeout) 
     stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     p.setMaxPoolSize(_maxPoolSize);
-    p.setSocketTimeout(socketTimeout);
     p.initializeHostName(ident);
     return p.get(this, socketTimeout);
-}
-
-int DBConnectionPool::openConnections(const string& ident, double socketTimeout) {
-    stdx::lock_guard<stdx::mutex> L(_mutex);
-    PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
-    return p.openConnections();
 }
 
 DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
@@ -227,10 +211,6 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
         delete conn;
         throw;
     }
-
-    log() << "Successfully connected to " << ident << " (" << openConnections(ident, socketTimeout)
-          << " connections now open to " << ident << " with a " << socketTimeout
-          << " second timeout)";
 
     return conn;
 }
@@ -279,7 +259,6 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
                               host,
                               11002,
                               str::stream() << _name << " error: " << errmsg);
-
     return _finishCreate(host, socketTimeout, c);
 }
 
