@@ -80,26 +80,12 @@ public:
         _maxPoolSize = maxPoolSize;
     }
 
-    /**
-     * Sets the socket timeout on this host, for reporting purposes only.
-     */
-    void setSocketTimeout(double socketTimeout) {
-        _socketTimeout = socketTimeout;
-    }
-
     int numAvailable() const {
         return (int)_pool.size();
     }
 
     int numInUse() const {
         return _checkedOut;
-    }
-
-    /**
-     * Returns the number of open connections in this pool.
-     */
-    int openConnections() const {
-        return _checkedOut + (int)_pool.size();
     }
 
     void createdOne(DBClientBase* base);
@@ -154,7 +140,6 @@ private:
     };
 
     std::string _hostName;
-    double _socketTimeout;
     std::stack<StoredConnection> _pool;
 
     int64_t _created;
@@ -211,11 +196,6 @@ public:
     int getMaxPoolSize() {
         return _maxPoolSize;
     }
-
-    /**
-     * Returns the number of connections to the given host pool.
-     */
-    int openConnections(const std::string& ident, double socketTimeout);
 
     /**
      * Sets the maximum number of connections pooled per-host.
