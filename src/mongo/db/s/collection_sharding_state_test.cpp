@@ -63,8 +63,6 @@ public:
         // TODO(esha): remove once the Safe Secondary Reads (PM-256) project is complete.
         auto svCtx = getServiceContext();
         repl::ReplSettings replSettings;
-        replSettings.setReplSetString(
-            ConnectionString::forReplicaSet(_setName, _servers).toString());
         replSettings.setMaster(true);
         repl::ReplicationCoordinator::set(
             svCtx, stdx::make_unique<repl::ReplicationCoordinatorMock>(svCtx, replSettings));
