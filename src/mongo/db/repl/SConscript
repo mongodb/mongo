@@ -156,6 +156,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/exec/exec',
         '$BUILD_DIR/mongo/db/query/internal_plans',
+        '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
     ],
 )

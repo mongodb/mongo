@@ -218,6 +218,12 @@ public:
         return Status{ErrorCodes::IllegalOperation, "upsertbyId not implemented."};
     }
 
+    Status deleteByFilter(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& filter) override {
+        return Status{ErrorCodes::IllegalOperation, "deleteByFilter not implemented."};
+    }
+
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
         OperationContext* opCtx, const NamespaceString& nss) override {
         return 0;

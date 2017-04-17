@@ -60,8 +60,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/db/repl/oplog.h"
@@ -744,6 +746,53 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         return planExecutor->executePlan();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "StorageInterfaceImpl::upsertById", nss.ns());
+
+    MONGO_UNREACHABLE;
+}
+
+Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const BSONObj& filter) {
+    DeleteRequest request(nss);
+    request.setQuery(filter);
+    request.setMulti(true);
+    request.setYieldPolicy(PlanExecutor::NO_YIELD);
+
+    // This disables the legalClientSystemNS() check in getExecutorDelete() which is used to
+    // disallow client deletes from unrecognized system collections.
+    request.setGod();
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        // ParsedDelete needs to be inside the write conflict retry loop because it may create a
+        // CanonicalQuery whose ownership will be transferred to the plan executor in
+        // getExecutorDelete().
+        ParsedDelete parsedDelete(opCtx, &request);
+        auto parsedDeleteStatus = parsedDelete.parseRequest();
+        if (!parsedDeleteStatus.isOK()) {
+            return parsedDeleteStatus;
+        }
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        auto collectionResult = getCollection(
+            autoColl,
+            nss,
+            str::stream() << "Unable to delete documents in " << nss.ns() << " using filter "
+                          << filter);
+        if (!collectionResult.isOK()) {
+            return collectionResult.getStatus();
+        }
+        auto collection = collectionResult.getValue();
+
+        auto planExecutorResult =
+            mongo::getExecutorDelete(opCtx, nullptr, collection, &parsedDelete);
+        if (!planExecutorResult.isOK()) {
+            return planExecutorResult.getStatus();
+        }
+        auto planExecutor = std::move(planExecutorResult.getValue());
+
+        return planExecutor->executePlan();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "StorageInterfaceImpl::deleteByFilter", nss.ns());
 
     MONGO_UNREACHABLE;
 }

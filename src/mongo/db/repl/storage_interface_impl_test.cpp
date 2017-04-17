@@ -172,13 +172,22 @@ protected:
         return _opCtx.get();
     }
 
+    ReplicationCoordinatorMock* getReplicationCoordinatorMock() {
+        return _replicationCoordinatorMock;
+    }
+
+    void resetUnreplicatedWritesBlock() {
+        _uwb.reset(nullptr);
+    }
+
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         _createOpCtx();
-        ReplicationCoordinator::set(getServiceContext(),
-                                    stdx::make_unique<ReplicationCoordinatorMock>(
-                                        getServiceContext(), createReplSettings()));
+        auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(getServiceContext(),
+                                                                       createReplSettings());
+        _replicationCoordinatorMock = replCoord.get();
+        ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
     }
 
     void tearDown() override {
@@ -199,6 +208,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<UnreplicatedWritesBlock> _uwb;
     std::unique_ptr<DisableDocumentValidation> _ddv;
+    ReplicationCoordinatorMock* _replicationCoordinatorMock = nullptr;
 };
 
 /**
@@ -1704,6 +1714,232 @@ TEST_F(StorageInterfaceImplTest,
         opCtx, nss, BSON("" << 1).firstElement(), BSON("$unknownUpdateOp" << BSON("x" << 1000)));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
     ASSERT_STRING_CONTAINS(status.reason(), "Unknown modifier: $unknownUpdateOp");
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto filter = BSON("x" << 1);
+    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS(str::stream() << "Database [nosuchdb] not found. Unable to delete documents in "
+                                << nss.ns()
+                                << " using filter "
+                                << filter,
+                  status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsBadValueWhenFilterContainsUnknownOperator) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto filter = BSON("x" << BSON("$unknownFilterOp" << 1));
+    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "unknown operator: $unknownFilterOp");
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsIllegalOperationOnCappedCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = 1024 * 1024;
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+
+    auto filter = BSON("x" << 1);
+    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           str::stream() << "cannot remove from a capped collection: " << nss.ns());
+}
+
+TEST_F(
+    StorageInterfaceImplTest,
+    DeleteByFilterReturnsPrimarySteppedDownWhenCurrentMemberStateIsRollbackAndReplicatedWritesAreEnabled) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.mycoll");
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc}));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc});
+
+    // This test fixture disables replicated writes by default. We want to re-enable this setting
+    // for this test.
+    resetUnreplicatedWritesBlock();
+    ASSERT_TRUE(opCtx->writesAreReplicated());
+
+    // deleteByFilter() checks the current member state indirectly through
+    // ReplicationCoordinator::canAcceptWrites() if replicated writes are enabled.
+    ASSERT_TRUE(getReplicationCoordinatorMock()->setFollowerMode(MemberState::RS_ROLLBACK));
+
+    auto filter = BSON("x" << 0);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, storage.deleteByFilter(opCtx, nss, filter));
+}
+
+TEST_F(
+    StorageInterfaceImplTest,
+    DeleteByFilterReturnsPrimarySteppedDownWhenReplicationCoordinatorCannotAcceptWritesAndReplicatedWritesAreEnabled) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.mycoll");
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc}));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc});
+
+    // This test fixture disables replicated writes by default. We want to re-enable this setting
+    // for this test.
+    resetUnreplicatedWritesBlock();
+    ASSERT_TRUE(opCtx->writesAreReplicated());
+
+    // deleteByFilter() checks ReplicationCoordinator::canAcceptWritesFor() if replicated writes are
+    // enabled on the OperationContext.
+    getReplicationCoordinatorMock()->alwaysAllowWrites(false);
+
+    auto filter = BSON("x" << 0);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, storage.deleteByFilter(opCtx, nss, filter));
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.coll");
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto filter = BSON("x" << 1);
+    auto status = storage.deleteByFilter(opCtx, wrongColl, filter);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS(
+        str::stream() << "Collection [mydb.wrongColl] not found. Unable to delete documents in "
+                      << wrongColl.ns()
+                      << " using filter "
+                      << filter,
+        status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsSuccessIfCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, {}));
+
+    _assertDocumentsInCollectionEquals(opCtx, nss, {});
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterLeavesCollectionUnchangedIfNoDocumentsMatchFilter) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0), BSON("_id" << 2 << "x" << 2)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("x" << 1);
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    _assertDocumentsInCollectionEquals(opCtx, nss, docs);
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterRemoveDocumentsThatMatchFilter) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0),
+                 BSON("_id" << 1 << "x" << 1),
+                 BSON("_id" << 2 << "x" << 2),
+                 BSON("_id" << 3 << "x" << 3)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("x" << BSON("$in" << BSON_ARRAY(1 << 2)));
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 0 << "x" << 0), BSON("_id" << 3 << "x" << 3)};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterUsesIdHackIfFilterContainsIdFieldOnly) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0), BSON("_id" << 1 << "x" << 1)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("_id" << 1);
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 0 << "x" << 0)};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterRemovesDocumentsInIllegalClientSystemNamespace) {
+    // Checks that we can remove documents from collections with namespaces not considered "legal
+    // client system" namespaces.
+    NamespaceString nss("local.system.rollback.docs");
+    ASSERT_FALSE(legalClientSystemNS(nss.ns()));
+
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0),
+                 BSON("_id" << 1 << "x" << 1),
+                 BSON("_id" << 2 << "x" << 2),
+                 BSON("_id" << 3 << "x" << 3)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("$or" << BSON_ARRAY(BSON("x" << 0) << BSON("_id" << 2)));
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 1 << "x" << 1), BSON("_id" << 3 << "x" << 3)};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
+TEST_F(StorageInterfaceImplTest,
+       DeleteByFilterRespectsCollectionsDefaultCollationWhenRemovingDocuments) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+
+    // Create a collection using a case-insensitive collation.
+    CollectionOptions options;
+    options.collation = BSON("locale"
+                             << "en_US"
+                             << "strength"
+                             << 2);
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+
+    auto doc1 = BSON("_id" << 1 << "x"
+                           << "ABC");
+    auto doc2 = BSON("_id" << 2 << "x"
+                           << "abc");
+    auto doc3 = BSON("_id" << 3 << "x"
+                           << "DEF");
+    auto doc4 = BSON("_id" << 4 << "x"
+                           << "def");
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2, doc3, doc4}));
+
+    // This filter should remove doc1 and doc2 because the values of the field "x"
+    // are equivalent to "aBc" under the case-insensive collation.
+    auto filter = BSON("x"
+                       << "aBc");
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc3, doc4});
 }
 
 TEST_F(StorageInterfaceImplTest,
