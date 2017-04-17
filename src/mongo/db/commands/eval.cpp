@@ -47,6 +47,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -181,17 +182,20 @@ public:
         // Note: 'eval' is not allowed to touch sharded namespaces, but we can't check the
         // shardVersions of the namespaces accessed in the script until the script is evaluated.
         // Instead, we enforce that the script does not access sharded namespaces by ensuring the
-        // shardVersion is set to UNSHARDED on the OperationContext here. If a shardVersion is set
-        // on the OperationContext, a check for a different namespace will default to UNSHARDED.
+        // shardVersion is set to UNSHARDED on the OperationContext before sending the script to be
+        // evaluated.
         auto& oss = OperationShardingState::get(opCtx);
-        if (oss.hasShardVersion()) {
-            // Can't set the shardVersion if it's already been set, so just verify it.
-            invariant(oss.getShardVersion(NamespaceString(dbname))
-                          .isStrictlyEqualTo(ChunkVersion::UNSHARDED()));
-        } else {
-            // Set the shardVersion to UNSHARDED. The "namespace" used does not matter.
-            oss.setShardVersion(NamespaceString(dbname), ChunkVersion::UNSHARDED());
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                "can't send a shardVersion with the 'eval' command, since you can't use sharded "
+                "collections from 'eval'",
+                !oss.hasShardVersion());
+
+        // Set the shardVersion to UNSHARDED. The "namespace" used does not matter, because if a
+        // shardVersion is set on the OperationContext, a check for a different namespace will
+        // default to UNSHARDED.
+        oss.setShardVersion(NamespaceString(dbname), ChunkVersion::UNSHARDED());
+        const auto shardVersionGuard =
+            MakeGuard([&]() { oss.unsetShardVersion(NamespaceString(dbname)); });
 
         try {
             if (cmdObj["nolock"].trueValue()) {
