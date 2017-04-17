@@ -127,8 +127,8 @@
     checkDocNotCommitted(nodes[0], {a: 2});
 
     jsTest.log("Allow the original primary to roll back its write and catch up to the new primary");
-    assert.commandWorked(
-        nodes[0].adminCommand({configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'}));
+    assert.adminCommandWorkedAllowingNetworkError(
+        nodes[0], {configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'});
 
     assert.soonNoExcept(function() {
         return null == nodes[0].getDB(dbName).getCollection(collName).findOne({a: 2});
