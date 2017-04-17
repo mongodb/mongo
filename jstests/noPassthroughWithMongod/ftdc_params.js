@@ -19,7 +19,7 @@
     // Verify the defaults are as we documented them
     assert.eq(getparam("diagnosticDataCollectionEnabled"), true);
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 1000);
-    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 100);
+    assert.eq(getparam("diagnosticDataCollectionDirectorySizeMB"), 200);
     assert.eq(getparam("diagnosticDataCollectionFileSizeMB"), 10);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerChunk"), 300);
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
@@ -53,7 +53,7 @@
 
     // Reset
     assert.commandWorked(setparam({"diagnosticDataCollectionFileSizeMB": 10}));
-    assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMB": 100}));
+    assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMB": 200}));
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 1000}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 300}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));
