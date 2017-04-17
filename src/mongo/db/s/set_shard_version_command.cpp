@@ -93,10 +93,6 @@ public:
              BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        uassert(ErrorCodes::IllegalOperation,
-                "can't issue setShardVersion from 'eval'",
-                !opCtx->getClient()->isInDirectClient());
-
         auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
