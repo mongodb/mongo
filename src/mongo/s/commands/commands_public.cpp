@@ -1409,10 +1409,10 @@ public:
         cm->getShardIdsForQuery(opCtx, query, collation.getValue(), &shardIds);
 
         // We support both "num" and "limit" options to control limit
-        int limit = 100;
+        long long limit = 100;
         const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
         if (cmdObj[limitName].isNumber())
-            limit = cmdObj[limitName].numberInt();
+            limit = cmdObj[limitName].safeNumberLong();
 
         // Construct the requests.
         vector<AsyncRequestsSender::Request> requests;
@@ -1481,7 +1481,7 @@ public:
         result.append("ns", nss.ns());
         result.append("near", nearStr);
 
-        int outCount = 0;
+        long long outCount = 0;
         double totalDistance = 0;
         double maxDistance = 0;
         {
