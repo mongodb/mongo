@@ -1433,6 +1433,7 @@ elif env.TargetOSIs('windows'):
             'crypt32.lib',
             'kernel32.lib',
             'shell32.lib',
+            'pdh.lib',
             'version.lib',
             'winmm.lib',
             'ws2_32.lib',

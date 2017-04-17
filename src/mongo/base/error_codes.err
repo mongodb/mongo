@@ -156,6 +156,10 @@ error_code("CanRepairToDowngrade", 157)
 error_code("MustUpgrade", 158)
 error_code("QueryPlanKilled", 173)
 error_code("FileOpenFailed", 174)
+error_code("ZoneNotFound", 175)
+error_code("RangeOverlapConflict", 176)
+error_code("WindowsPdhError", 177)
+error_code("BadPerfCounterPath", 178)
 error_code("ReceivedOpReplyMessage", 198);
 
 # Non-sequential error codes (for compatibility only)
