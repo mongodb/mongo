@@ -107,15 +107,7 @@ master = replTest.getPrimary();
 var firstMaster = master;
 print("\nmaster is now " + firstMaster);
 
-try {
-    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 100, force: true}));
-} catch (e) {
-    // ignore errors due to connection failures as we expect the master to close connections
-    // on stepdown
-    if (!isNetworkError(e)) {
-        throw e;
-    }
-}
+assert.adminCommandWorkedAllowingNetworkError(master, {replSetStepDown: 100, force: true});
 
 print("\nget a master");
 replTest.getPrimary();

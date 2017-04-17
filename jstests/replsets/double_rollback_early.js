@@ -130,8 +130,8 @@
     // It should fail with a rbid error and get stuck.
     jsTestLog("Repartition to: [0,3,4] and [1,2].");
     nodes[1].reconnect(nodes[2]);
-    assert.commandWorked(
-        nodes[2].adminCommand({configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'}));
+    assert.adminCommandWorkedAllowingNetworkError(
+        nodes[2], {configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'});
 
     jsTestLog("Wait for node 2 exit ROLLBACK state and go into RECOVERING");
     waitForState(nodes[2], ReplSetTest.State.RECOVERING);

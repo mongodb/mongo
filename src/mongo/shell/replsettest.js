@@ -910,13 +910,7 @@ var ReplSetTest = function(opts) {
 
         this._setDefaultConfigOptions(config);
 
-        try {
-            assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
-        } catch (e) {
-            if (!isNetworkError(e)) {
-                throw e;
-            }
-        }
+        assert.adminCommandWorkedAllowingNetworkError(this.getPrimary(), {replSetReconfig: config});
     };
 
     /**
