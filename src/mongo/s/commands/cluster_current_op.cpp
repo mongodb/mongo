@@ -85,7 +85,8 @@ public:
              BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& output) override {
-        auto shardResponses = uassertStatusOK(scatterGather(opCtx, dbName, cmdObj));
+        auto shardResponses =
+            uassertStatusOK(scatterGather(opCtx, dbName, cmdObj, getReadPref(cmdObj)));
         if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
             return false;
         }

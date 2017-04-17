@@ -60,6 +60,7 @@
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -636,37 +637,47 @@ Status Strategy::explainFind(OperationContext* opCtx,
                              const BSONObj& findCommand,
                              const QueryRequest& qr,
                              ExplainOptions::Verbosity verbosity,
-                             const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                             const rpc::ServerSelectionMetadata& ssm,
                              BSONObjBuilder* out) {
     BSONObjBuilder explainCmdBob;
-    int options = 0;
-    ClusterExplain::wrapAsExplain(
-        findCommand, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+    ClusterExplain::wrapAsExplain(findCommand, verbosity, &explainCmdBob);
 
     // We will time how long it takes to run the commands on the shards.
     Timer timer;
 
-    std::vector<Strategy::CommandResult> shardResults;
-    Strategy::commandOp(opCtx,
-                        qr.nss().db().toString(),
-                        explainCmdBob.obj(),
-                        qr.nss().toString(),
-                        qr.getFilter(),
-                        qr.getCollation(),
-                        &shardResults);
+    BSONObj viewDefinition;
+    auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                      qr.nss(),
+                                                      explainCmdBob.obj(),
+                                                      getReadPref(ssm),
+                                                      qr.getFilter(),
+                                                      qr.getCollation(),
+                                                      true,  // do shard versioning
+                                                      &viewDefinition);
 
     long long millisElapsed = timer.millis();
 
-    if (shardResults.size() == 1 &&
-        ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
-        out->append("resolvedView", shardResults[0].result.getObjectField("resolvedView"));
-        return getStatusFromCommandResult(shardResults[0].result);
+    if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
+        uassert(ErrorCodes::InternalError,
+                str::stream() << "Missing resolved view definition, but remote returned "
+                              << ErrorCodes::errorString(swShardResponses.getStatus().code()),
+                !viewDefinition.isEmpty());
+
+        out->appendElements(viewDefinition);
+        return swShardResponses.getStatus();
     }
 
-    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, findCommand);
+    uassertStatusOK(swShardResponses.getStatus());
+    auto shardResponses = std::move(swShardResponses.getValue());
 
-    return ClusterExplain::buildExplainResult(
-        opCtx, shardResults, mongosStageName, millisElapsed, out);
+    const char* mongosStageName =
+        ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);
+
+    return ClusterExplain::buildExplainResult(opCtx,
+                                              ClusterExplain::downconvert(opCtx, shardResponses),
+                                              mongosStageName,
+                                              millisElapsed,
+                                              out);
 }
 
 /**

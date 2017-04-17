@@ -46,15 +46,36 @@ class CachedDatabaseInfo;
 class OperationContext;
 
 /**
+ * Returns the read preference from the $queryOptions.$readPreference field in the cmdObj if set or
+ * defaults to PrimaryOnly and an empty TagSet.
+ */
+ReadPreferenceSetting getReadPref(const BSONObj& cmdObj);
+
+/**
+ * Returns the read preference from the ServerSelectionMetadata if set or defaults to PrimaryOnly
+ * and an empty TagSet.
+ *
+ * This is used by explain commands, where the read preference is extracted and placed into
+ * ServerSelectionMetadata before the explain command is run.
+ *
+ * This is because only the value of the 'explain' field in the cmdObj is passed to the Command's
+ * explain() method, and the readPreference is at the same level as the 'explain' field:
+ * { explain: { find: "foo" }, $queryOptions: { $readPreference: { ... } } }
+ */
+ReadPreferenceSetting getReadPref(const rpc::ServerSelectionMetadata& ssm);
+
+/**
  * Broadcasts 'cmdObj' to all shards and returns the responses as a vector.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution.
  * Otherwise, returns success and a list of responses from shards (including errors from the shards
  * or errors reaching the shards).
  */
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(OperationContext* opCtx,
-                                                                     const std::string& dbName,
-                                                                     const BSONObj& cmdObj);
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref);
 
 /**
  * Uses the routing table cache to broadcast a command on a namespace. By default, attaches
@@ -79,6 +100,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
     const boost::optional<BSONObj> query,
     const boost::optional<BSONObj> collation,
     const bool appendShardVersion = true,

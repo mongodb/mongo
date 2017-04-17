@@ -56,7 +56,6 @@ class CmdExplain : public Command {
 public:
     CmdExplain() : Command("explain") {}
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -82,6 +81,20 @@ public:
 
     virtual void help(std::stringstream& help) const {
         help << "explain database reads and writes";
+    }
+
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+        uassert(ErrorCodes::BadValue,
+                "explain command requires a nested object",
+                Object == cmdObj.firstElement().type());
+        auto explainObj = cmdObj.firstElement().Obj();
+
+        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+        uassert(ErrorCodes::CommandNotFound,
+                str::stream() << "explain failed due to unknown command: "
+                              << explainObj.firstElementFieldName(),
+                commToExplain);
+        return commToExplain->parseNs(dbname, explainObj);
     }
 
     /**

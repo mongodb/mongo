@@ -124,14 +124,9 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
     OperationContext* opCtx,
     const std::string& dbName,
     const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
     const std::vector<AsyncRequestsSender::Request>& requests,
     BSONObj* viewDefinition) {
-    // Extract the readPreference from the command.
-    const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
-    const auto readPrefObj = queryOptionsObj.getObjectField(QueryRequest::kWrappedReadPrefField);
-    const auto readPref = readPrefObj.isEmpty()
-        ? ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet())
-        : uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefObj));
 
     // Send the requests.
     LOG(0) << "Dispatching command " << redact(cmdObj) << " to " << requests.size()
@@ -201,7 +196,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
 
         // Either we failed to get a response, or the command had a non-OK status that we can store
         // as an individual shard response.
-        LOG(2) << "Got error " << response.swResponse.getStatus() << " from shard "
+        LOG(2) << "Received error " << response.swResponse.getStatus() << " from shard "
                << response.shardId;
         responses.push_back(std::move(response));
     }
@@ -211,17 +206,34 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
 
 }  // namespace
 
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(OperationContext* opCtx,
-                                                                     const std::string& dbName,
-                                                                     const BSONObj& cmdObj) {
+ReadPreferenceSetting getReadPref(const BSONObj& cmdObj) {
+    const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
+    const auto readPrefObj = queryOptionsObj.getObjectField(QueryRequest::kWrappedReadPrefField);
+    return readPrefObj.isEmpty() ? ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet())
+                                 : uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefObj));
+}
+
+ReadPreferenceSetting getReadPref(const rpc::ServerSelectionMetadata& ssm) {
+    return ssm.getReadPreference()
+        ? *ssm.getReadPreference()
+        : (ssm.isSecondaryOk() ? ReadPreferenceSetting(ReadPreference::SecondaryPreferred, TagSet())
+                               : ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet()));
+}
+
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref) {
     auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-    return gatherResponses(opCtx, dbName, cmdObj, requests, nullptr /* viewDefinition */);
+    return gatherResponses(opCtx, dbName, cmdObj, readPref, requests, nullptr /* viewDefinition */);
 }
 
 StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
     const boost::optional<BSONObj> query,
     const boost::optional<BSONObj> collation,
     const bool appendShardVersion,
@@ -243,15 +255,18 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace
             opCtx, routingInfo, cmdObj, query, collation, appendShardVersion);
 
         // Retrieve the responses from the shards.
-        swResponses = gatherResponses(opCtx, nss.db().toString(), cmdObj, requests, viewDefinition);
+        swResponses =
+            gatherResponses(opCtx, nss.db().toString(), cmdObj, readPref, requests, viewDefinition);
+        ++numAttempts;
 
         // If any shard returned a stale shardVersion error, invalidate the routing table cache.
         // This will cause the cache to be refreshed the next time it is accessed.
         if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
             Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+            LOG(1) << "got stale shardVersion error " << swResponses.getStatus()
+                   << " while dispatching " << redact(cmdObj) << " after " << numAttempts
+                   << " dispatch attempts";
         }
-
-        ++numAttempts;
     } while (numAttempts < kMaxNumStaleVersionRetries && !swResponses.getStatus().isOK());
     return swResponses;
 }

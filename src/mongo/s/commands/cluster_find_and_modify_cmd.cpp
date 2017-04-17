@@ -129,7 +129,7 @@ public:
 
         BSONObjBuilder explainCmd;
         int options = 0;
-        ClusterExplain::wrapAsExplain(
+        ClusterExplain::wrapAsExplainDeprecated(
             cmdObj, verbosity, serverSelectionMetadata, &explainCmd, &options);
 
         // Time how long it takes to run the explain command on the shard.

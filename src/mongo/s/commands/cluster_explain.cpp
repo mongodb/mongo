@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/commands.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_explain.h"
@@ -100,9 +102,37 @@ bool appendElementsIfRoom(BSONObjBuilder* bob, const BSONObj& toAppend) {
 }  // namespace
 
 // static
-void ClusterExplain::wrapAsExplainForOP_COMMAND(const BSONObj& cmdObj,
-                                                ExplainOptions::Verbosity verbosity,
-                                                BSONObjBuilder* explainBuilder) {
+std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
+    OperationContext* opCtx, const std::vector<AsyncRequestsSender::Response>& responses) {
+    std::vector<Strategy::CommandResult> results;
+    for (auto& response : responses) {
+        Status status = Status::OK();
+        if (response.swResponse.isOK()) {
+            auto& result = response.swResponse.getValue().data;
+            status = getStatusFromCommandResult(result);
+            if (status.isOK()) {
+                invariant(response.shardHostAndPort);
+                results.emplace_back(
+                    response.shardId, ConnectionString(*response.shardHostAndPort), result);
+                continue;
+            }
+        }
+        // Convert the error status back into the format of a command result.
+        BSONObjBuilder statusObjBob;
+        Command::appendCommandStatus(statusObjBob, status);
+
+        // Get the Shard object in order to get the ConnectionString.
+        auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, response.shardId));
+        results.emplace_back(response.shardId, shard->getConnString(), statusObjBob.obj());
+    }
+    return results;
+}
+
+// static
+void ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
+                                   ExplainOptions::Verbosity verbosity,
+                                   BSONObjBuilder* explainBuilder) {
     explainBuilder->append("explain", cmdObj);
     explainBuilder->append("verbosity", ExplainOptions::verbosityString(verbosity));
 
@@ -113,20 +143,14 @@ void ClusterExplain::wrapAsExplainForOP_COMMAND(const BSONObj& cmdObj,
 }
 
 // static
-void ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
-                                   ExplainOptions::Verbosity verbosity,
-                                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
-                                   BSONObjBuilder* out,
-                                   int* optionsOut) {
+void ClusterExplain::wrapAsExplainDeprecated(
+    const BSONObj& cmdObj,
+    ExplainOptions::Verbosity verbosity,
+    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+    BSONObjBuilder* out,
+    int* optionsOut) {
     BSONObjBuilder explainBuilder;
-    explainBuilder.append("explain", cmdObj);
-    explainBuilder.append("verbosity", ExplainOptions::verbosityString(verbosity));
-
-    // Propagate readConcern
-    if (auto readConcern = cmdObj["readConcern"]) {
-        explainBuilder.append(readConcern);
-    }
-
+    wrapAsExplain(cmdObj, verbosity, &explainBuilder);
     const BSONObj explainCmdObj = explainBuilder.done();
 
     // Attach metadata to the explain command in legacy format.
@@ -202,9 +226,8 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
 }
 
 // static
-const char* ClusterExplain::getStageNameForReadOp(
-    const vector<Strategy::CommandResult>& shardResults, const BSONObj& explainObj) {
-    if (shardResults.size() == 1) {
+const char* ClusterExplain::getStageNameForReadOp(size_t numShards, const BSONObj& explainObj) {
+    if (numShards == 1) {
         return kSingleShard;
     } else if (explainObj.hasField("sort")) {
         return kMergeSortFromShards;
@@ -372,5 +395,6 @@ Status ClusterExplain::buildExplainResult(OperationContext* opCtx,
 
     return Status::OK();
 }
+
 
 }  // namespace mongo

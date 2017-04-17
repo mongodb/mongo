@@ -111,7 +111,7 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplainForOP_COMMAND(cmdObj, verbosity, &explainCmdBob);
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;

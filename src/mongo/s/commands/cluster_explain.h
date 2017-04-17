@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/query/explain_options.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
@@ -49,6 +50,17 @@ class ServerSelectionMetadata;
 class ClusterExplain {
 public:
     /**
+     * Temporary crutch to allow a single implementation of the methods in this file. Since
+     * AsyncRequestsSender::Response is a strict superset of Strategy::CommandResult, we leave the
+     * implementations in terms of Strategy::CommandResult and convert down.
+     *
+     * TODO(esha): remove once Strategy::commandOp is removed, and make these methods take
+     * vector<AsyncRequestsSender::Response>.
+     */
+    static std::vector<Strategy::CommandResult> downconvert(
+        OperationContext* opCtx, const std::vector<AsyncRequestsSender::Response>& responses);
+
+    /**
      * Given the BSON specification for a command, 'cmdObj', wraps the object in order to produce
      * the BSON for an explain of that command, at the given verbosity level 'verbosity.'
      *
@@ -57,9 +69,9 @@ public:
      * Unlike wrapAsExplain, does not downconvert the command to OP_QUERY. Should be used for paths
      * that send the command over the NetworkInterfaceASIO rather than DBClient.
      */
-    static void wrapAsExplainForOP_COMMAND(const BSONObj& cmdObj,
-                                           ExplainOptions::Verbosity verbosity,
-                                           BSONObjBuilder* explainBuilder);
+    static void wrapAsExplain(const BSONObj& cmdObj,
+                              ExplainOptions::Verbosity verbosity,
+                              BSONObjBuilder* explainBuilder);
 
     /**
      * Given the BSON specification for a command, 'cmdObj', wraps the object in order to
@@ -71,19 +83,18 @@ public:
      * Also uses 'serverSelectionMetdata' to set 'optionsOut' to the options bit vector that should
      * be forwarded to the shards.
      */
-    static void wrapAsExplain(const BSONObj& cmdObj,
-                              ExplainOptions::Verbosity verbosity,
-                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
-                              BSONObjBuilder* out,
-                              int* optionsOut);
+    static void wrapAsExplainDeprecated(const BSONObj& cmdObj,
+                                        ExplainOptions::Verbosity verbosity,
+                                        const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                                        BSONObjBuilder* out,
+                                        int* optionsOut);
 
     /**
      * Determines the kind of "execution stage" that mongos would use in order to collect
      * the results from the shards, assuming that the command being explained is a read
      * operation such as find or count.
      */
-    static const char* getStageNameForReadOp(
-        const std::vector<Strategy::CommandResult>& shardResults, const BSONObj& explainObj);
+    static const char* getStageNameForReadOp(size_t numShards, const BSONObj& explainObj);
 
     /**
      * Command implementations on mongos use this method to construct the sharded explain
@@ -96,6 +107,7 @@ public:
                                      const char* mongosStageName,
                                      long long millisElapsed,
                                      BSONObjBuilder* out);
+
 
     //
     // Names of mock mongos execution stages.

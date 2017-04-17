@@ -104,6 +104,11 @@ public:
                               BSONObjBuilder* out);
 
     struct CommandResult {
+        CommandResult() = default;
+        CommandResult(ShardId shardId, ConnectionString target, BSONObj result)
+            : shardTargetId(std::move(shardId)),
+              target(std::move(target)),
+              result(std::move(result)) {}
         ShardId shardTargetId;
         ConnectionString target;
         BSONObj result;

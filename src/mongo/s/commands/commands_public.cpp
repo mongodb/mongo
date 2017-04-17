@@ -225,6 +225,7 @@ protected:
         auto shardResponses = uassertStatusOK(scatterGatherForNamespace(opCtx,
                                                                         nss,
                                                                         cmdObj,
+                                                                        getReadPref(cmdObj),
                                                                         boost::none,  // filter
                                                                         boost::none,  // collation
                                                                         _appendShardVersion));
@@ -897,7 +898,7 @@ public:
 
         {
             BSONObjBuilder explainCmdBob;
-            ClusterExplain::wrapAsExplain(
+            ClusterExplain::wrapAsExplainDeprecated(
                 cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
             command = explainCmdBob.obj();
         }
@@ -1125,7 +1126,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                   const rpc::ServerSelectionMetadata& ssm,
                    BSONObjBuilder* out) const {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
@@ -1146,33 +1147,33 @@ public:
         }
 
         // Extract the targeting collation.
-        auto targetingCollation = getCollation(cmdObj);
-        if (!targetingCollation.isOK()) {
-            return targetingCollation.getStatus();
-        }
+        auto targetingCollation = uassertStatusOK(getCollation(cmdObj));
 
         BSONObjBuilder explainCmdBob;
-        int options = 0;
-        ClusterExplain::wrapAsExplain(
-            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
 
-        vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(opCtx,
-                            dbname,
-                            explainCmdBob.obj(),
-                            nss.ns(),
-                            targetingQuery,
-                            targetingCollation.getValue(),
-                            &shardResults);
+        BSONObj viewDefinition;
+        auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                          nss,
+                                                          explainCmdBob.obj(),
+                                                          getReadPref(ssm),
+                                                          targetingQuery,
+                                                          targetingCollation,
+                                                          true,  // do shard versioning
+                                                          &viewDefinition);
 
         long long millisElapsed = timer.millis();
 
-        if (shardResults.size() == 1 &&
-            ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
-            auto resolvedView = ResolvedView::fromBSON(shardResults[0].result);
+        if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
+            uassert(ErrorCodes::InternalError,
+                    str::stream() << "Missing resolved view definition, but remote returned "
+                                  << ErrorCodes::errorString(swShardResponses.getStatus().code()),
+                    !viewDefinition.isEmpty());
+
+            auto resolvedView = ResolvedView::fromBSON(viewDefinition);
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, resolvedView.getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
             if (!parsedDistinct.isOK()) {
@@ -1202,10 +1203,18 @@ public:
                 opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
         }
 
-        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
+        uassertStatusOK(swShardResponses.getStatus());
+        auto shardResponses = std::move(swShardResponses.getValue());
+
+        const char* mongosStageName =
+            ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResults, mongosStageName, millisElapsed, out);
+            opCtx,
+            ClusterExplain::downconvert(opCtx, shardResponses),
+            mongosStageName,
+            millisElapsed,
+            out);
     }
 
 } disinctCmd;
@@ -1422,20 +1431,12 @@ public:
             shardArray.append(shardId.toString());
         }
 
-        // Extract the readPreference from the command.
-        const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
-        const auto readPrefObj =
-            queryOptionsObj.getObjectField(QueryRequest::kWrappedReadPrefField);
-        const auto readPref = readPrefObj.isEmpty()
-            ? ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet())
-            : uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefObj));
-
         // Send the requests.
         AsyncRequestsSender ars(opCtx,
                                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                 dbName,
                                 requests,
-                                readPref);
+                                getReadPref(cmdObj));
 
         // Receive the responses.
         multimap<double, BSONObj> results;  // TODO: maybe use merge-sort instead
