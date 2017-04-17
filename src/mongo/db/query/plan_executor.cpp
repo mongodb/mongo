@@ -238,7 +238,7 @@ Status PlanExecutor::pickBestPlan(const Collection* collection) {
 }
 
 PlanExecutor::~PlanExecutor() {
-    invariant(_currentState = kDisposed);
+    invariant(_currentState == kDisposed);
 }
 
 // static
