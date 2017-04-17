@@ -30,10 +30,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/operation_context.h"
+
 #include "mongo/platform/strnlen.h"
 #include "mongo/rpc/object_check.h"
-#include "mongo/transport/session.h"
 
 namespace mongo {
 
@@ -177,28 +176,10 @@ OpQueryReplyBuilder::OpQueryReplyBuilder() : _buffer(32768) {
     _buffer.skip(sizeof(QueryResult::Value));
 }
 
-void OpQueryReplyBuilder::send(const transport::SessionHandle& session,
-                               int queryResultFlags,
-                               const Message& requestMsg,
-                               int nReturned,
-                               int startingFrom,
-                               long long cursorId) {
-    Message response;
-    putInMessage(&response, queryResultFlags, nReturned, startingFrom, cursorId);
-
-    response.header().setId(nextMessageId());
-    response.header().setResponseToMsgId(requestMsg.header().getId());
-
-    uassertStatusOK(session->sinkMessage(response).wait());
-}
-
-void OpQueryReplyBuilder::sendCommandReply(const transport::SessionHandle& session,
-                                           const Message& requestMsg) {
-    send(session, /*queryFlags*/ 0, requestMsg, /*nReturned*/ 1);
-}
-
-void OpQueryReplyBuilder::putInMessage(
-    Message* out, int queryResultFlags, int nReturned, int startingFrom, long long cursorId) {
+Message OpQueryReplyBuilder::toQueryReply(int queryResultFlags,
+                                          int nReturned,
+                                          int startingFrom,
+                                          long long cursorId) {
     QueryResult::View qr = _buffer.buf();
     qr.setResultFlags(queryResultFlags);
     qr.msgdata().setLen(_buffer.len());
@@ -206,44 +187,17 @@ void OpQueryReplyBuilder::putInMessage(
     qr.setCursorId(cursorId);
     qr.setStartingFrom(startingFrom);
     qr.setNReturned(nReturned);
-    out->setData(_buffer.release());  // transport will free
+    return Message(_buffer.release());
 }
 
-void replyToQuery(int queryResultFlags,
-                  const transport::SessionHandle& session,
-                  const Message& requestMsg,
-                  const void* data,
-                  int size,
-                  int nReturned,
-                  int startingFrom,
-                  long long cursorId) {
+DbResponse replyToQuery(int queryResultFlags,
+                        const void* data,
+                        int size,
+                        int nReturned,
+                        int startingFrom,
+                        long long cursorId) {
     OpQueryReplyBuilder reply;
     reply.bufBuilderForResults().appendBuf(data, size);
-    reply.send(session, queryResultFlags, requestMsg, nReturned, startingFrom, cursorId);
-}
-
-void replyToQuery(int queryResultFlags,
-                  const transport::SessionHandle& session,
-                  const Message& requestMsg,
-                  const BSONObj& responseObj) {
-    replyToQuery(queryResultFlags,
-                 session,
-                 requestMsg,
-                 (void*)responseObj.objdata(),
-                 responseObj.objsize(),
-                 1);
-}
-
-void replyToQuery(int queryResultFlags, const Message& m, DbResponse& dbresponse, BSONObj obj) {
-    Message resp;
-    replyToQuery(queryResultFlags, resp, obj);
-    dbresponse.response = std::move(resp);
-    dbresponse.responseToMsgId = m.header().getId();
-}
-
-void replyToQuery(int queryResultFlags, Message& response, const BSONObj& resultObj) {
-    OpQueryReplyBuilder reply;
-    resultObj.appendSelfToBufBuilder(reply.bufBuilderForResults());
-    reply.putInMessage(&response, queryResultFlags, /*nReturned*/ 1);
+    return DbResponse{reply.toQueryReply(queryResultFlags, nReturned, startingFrom, cursorId)};
 }
 }

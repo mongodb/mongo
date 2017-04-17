@@ -38,13 +38,19 @@ namespace {
 
 class ServiceEntryPointUtil : public ServiceEntryPoint {
 public:
-    void startSession(transport::SessionHandle session) {
+    void startSession(transport::SessionHandle session) override {
         Message m;
         Status s = session->sourceMessage(&m).wait();
 
         ASSERT_NOT_OK(s);
 
         tll->end(session);
+    }
+
+    DbResponse handleRequest(OperationContext* opCtx,
+                             const Message& request,
+                             const HostAndPort& client) override {
+        MONGO_UNREACHABLE;
     }
 
     transport::TransportLayerLegacy* tll = nullptr;

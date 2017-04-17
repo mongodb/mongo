@@ -249,10 +249,8 @@ void DBClientCursor::commandDataReceived() {
     // HACK: If we got an OP_COMMANDREPLY, take the reply object
     // and shove it in to an OP_REPLY message.
     if (op == dbCommandReply) {
-        // Need to take ownership here as we destroy the underlying message.
-        BSONObj reply = commandReply->getCommandReply().getOwned();
-        batch.m.reset();
-        replyToQuery(0, batch.m, reply);
+        BSONObj reply = commandReply->getCommandReply();
+        batch.m = replyToQuery(reply).response;
     }
 
     QueryResult::View qr = batch.m.singleData().view2ptr();

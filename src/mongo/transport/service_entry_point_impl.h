@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,53 +31,43 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 
+struct DbResponse;
+class OperationContext;
+
 namespace transport {
-
+class Session;
 class TransportLayer;
-
 }  // namespace transport
 
-class ServiceEntryPointMock : public ServiceEntryPoint {
-    MONGO_DISALLOW_COPYING(ServiceEntryPointMock);
+/**
+ * A basic entry point from the TransportLayer into a server.
+ *
+ * The server logic is implemented inside of handleRequest() by a subclass.
+ * startSession() spawns and detaches a new thread for each incoming connection
+ * (transport::Session).
+ */
+class ServiceEntryPointImpl : public ServiceEntryPoint {
+    MONGO_DISALLOW_COPYING(ServiceEntryPointImpl);
 
 public:
-    ServiceEntryPointMock(transport::TransportLayer* tl);
+    explicit ServiceEntryPointImpl(transport::TransportLayer* tl) : _tl(tl) {}
 
-    virtual ~ServiceEntryPointMock();
+    void startSession(transport::SessionHandle session) final;
 
-    /**
-     * This method will spawn a thread that will do the following:
-     *
-     * - call tl->sourceMessage()
-     * - call tl->wait()
-     * - call tl->sinkMessage() with { ok : 1 }
-     * - call tl->wait()
-     *
-     * ...repeat until wait() returns an error.
-     */
-    void startSession(transport::SessionHandle session) override;
-
-    DbResponse handleRequest(OperationContext* opCtx,
-                             const Message& request,
-                             const HostAndPort& client) override;
+    std::size_t getNumberOfActiveWorkerThreads() const {
+        return _nWorkers.load();
+    }
 
 private:
-    void run(transport::SessionHandle session);
+    void _sessionLoop(const transport::SessionHandle& session);
 
     transport::TransportLayer* _tl;
-
-    stdx::mutex _shutdownLock;
-    bool _inShutdown;
-
-    std::vector<stdx::thread> _threads;
+    AtomicWord<std::size_t> _nWorkers;
 };
 
 }  // namespace mongo

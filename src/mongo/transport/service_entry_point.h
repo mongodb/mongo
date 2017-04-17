@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/transport/session.h"
 
 namespace mongo {
@@ -50,6 +51,13 @@ public:
      * Begin running a new Session. This method returns immediately.
      */
     virtual void startSession(transport::SessionHandle session) = 0;
+
+    /**
+     * Processes a request and fills out a DbResponse.
+     */
+    virtual DbResponse handleRequest(OperationContext* opCtx,
+                                     const Message& request,
+                                     const HostAndPort& client) = 0;
 
 protected:
     ServiceEntryPoint() = default;

@@ -28,42 +28,22 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/disallow_copying.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_entry_point_impl.h"
 
 namespace mongo {
 
-namespace transport {
-class Session;
-class TransportLayer;
-}  // namespace transport
-
 /**
- * The entry point from the TransportLayer into Mongod. startSession() spawns and
- * detaches a new thread for each incoming connection (transport::Session).
+ * The entry point into mongod. Just a wrapper around assembleResponse.
  */
-class ServiceEntryPointMongod final : public ServiceEntryPoint {
+class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
     MONGO_DISALLOW_COPYING(ServiceEntryPointMongod);
 
 public:
-    explicit ServiceEntryPointMongod(transport::TransportLayer* tl);
-
-    virtual ~ServiceEntryPointMongod() = default;
-
-    void startSession(transport::SessionHandle session) override;
-
-    std::size_t getNumberOfActiveWorkerThreads() const {
-        return _nWorkers.load();
-    }
-
-private:
-    void _sessionLoop(const transport::SessionHandle& session);
-
-    transport::TransportLayer* _tl;
-    AtomicWord<std::size_t> _nWorkers;
+    using ServiceEntryPointImpl::ServiceEntryPointImpl;
+    DbResponse handleRequest(OperationContext* opCtx,
+                             const Message& request,
+                             const HostAndPort& client) override;
 };
 
 }  // namespace mongo

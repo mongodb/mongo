@@ -40,18 +40,11 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/transport/service_entry_point_utils.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/net/thread_idle_callback.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using transport::TransportLayer;
 
 namespace {
 
@@ -67,126 +60,89 @@ BSONObj buildErrReply(const DBException& ex) {
 
 }  // namespace
 
-ServiceEntryPointMongos::ServiceEntryPointMongos(TransportLayer* tl) : _tl(tl) {}
 
-void ServiceEntryPointMongos::startSession(transport::SessionHandle session) {
-    launchWrappedServiceEntryWorkerThread(
-        std::move(session),
-        [this](const transport::SessionHandle& session) { _sessionLoop(session); });
-}
+DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
+                                                  const Message& message,
+                                                  const HostAndPort& remote) {
+    // Release any cached egress connections for client back to pool before destroying
+    auto guard = MakeGuard(ShardConnection::releaseMyConnections);
 
-void ServiceEntryPointMongos::_sessionLoop(const transport::SessionHandle& session) {
-    int64_t counter = 0;
+    const int32_t msgId = message.header().getId();
+    const NetworkOp op = message.operation();
 
-    while (true) {
-        // Release any cached egress connections for client back to pool before destroying
-        auto guard = MakeGuard(ShardConnection::releaseMyConnections);
+    // This exception will not be returned to the caller, but will be logged and will close the
+    // connection
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Message type " << op << " is not supported.",
+            isSupportedNetworkOp(op));
 
-        Message message;
-
-        // Source a Message from the client
-        {
-            auto status = [&] {
-                MONGO_IDLE_THREAD_BLOCK;
-                return session->sourceMessage(&message).wait();
-            }();
-
-            if (ErrorCodes::isInterruption(status.code()) ||
-                ErrorCodes::isNetworkError(status.code())) {
-                break;
-            }
-
-            // Our session may have been closed internally.
-            if (status == TransportLayer::TicketSessionClosedStatus) {
-                break;
-            }
-
-            uassertStatusOK(status);
-        }
-
-        auto opCtx = cc().makeOperationContext();
-
-        const int32_t msgId = message.header().getId();
-
-        const NetworkOp op = message.operation();
-
-        // This exception will not be returned to the caller, but will be logged and will close the
-        // connection
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Message type " << op << " is not supported.",
-                isSupportedNetworkOp(op));
-
-        // Start a new LastError session. Any exceptions thrown from here onwards will be returned
-        // to the caller (if the type of the message permits it).
-        auto client = opCtx->getClient();
-        if (!ClusterLastErrorInfo::get(client)) {
-            ClusterLastErrorInfo::get(client) = std::make_shared<ClusterLastErrorInfo>();
-        }
-        ClusterLastErrorInfo::get(client)->newRequest();
-        LastError::get(client).startRequest();
-
-        DbMessage dbm(message);
-
-        NamespaceString nss;
-
-        try {
-
-            if (dbm.messageShouldHaveNs()) {
-                nss = NamespaceString(StringData(dbm.getns()));
-
-                uassert(ErrorCodes::InvalidNamespace,
-                        str::stream() << "Invalid ns [" << nss.ns() << "]",
-                        nss.isValid());
-
-                uassert(ErrorCodes::IllegalOperation,
-                        "Can't use 'local' database through mongos",
-                        nss.db() != NamespaceString::kLocalDb);
-            }
-
-            AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx.get());
-
-            LOG(3) << "Request::process begin ns: " << nss << " msg id: " << msgId
-                   << " op: " << networkOpToString(op);
-
-            switch (op) {
-                case dbQuery:
-                    if (nss.isCommand() || nss.isSpecialCommand()) {
-                        Strategy::clientCommandOp(opCtx.get(), nss, &dbm);
-                    } else {
-                        Strategy::queryOp(opCtx.get(), nss, &dbm);
-                    }
-                    break;
-                case dbGetMore:
-                    Strategy::getMore(opCtx.get(), nss, &dbm);
-                    break;
-                case dbKillCursors:
-                    Strategy::killCursors(opCtx.get(), &dbm);
-                    break;
-                default:
-                    Strategy::writeOp(opCtx.get(), &dbm);
-                    break;
-            }
-
-            LOG(3) << "Request::process end ns: " << nss << " msg id: " << msgId
-                   << " op: " << networkOpToString(op);
-
-        } catch (const DBException& ex) {
-            LOG(1) << "Exception thrown"
-                   << " while processing " << networkOpToString(op) << " op"
-                   << " for " << nss.ns() << causedBy(ex);
-
-            if (op == dbQuery || op == dbGetMore) {
-                replyToQuery(ResultFlag_ErrSet, session, message, buildErrReply(ex));
-            }
-
-            // We *always* populate the last error for now
-            LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.what());
-        }
-
-        if ((counter++ & 0xf) == 0) {
-            markThreadIdle();
-        }
+    // Start a new LastError session. Any exceptions thrown from here onwards will be returned
+    // to the caller (if the type of the message permits it).
+    auto client = opCtx->getClient();
+    if (!ClusterLastErrorInfo::get(client)) {
+        ClusterLastErrorInfo::get(client) = std::make_shared<ClusterLastErrorInfo>();
     }
+    ClusterLastErrorInfo::get(client)->newRequest();
+    LastError::get(client).startRequest();
+
+    DbMessage dbm(message);
+
+    NamespaceString nss;
+    DbResponse dbResponse;
+    try {
+        if (dbm.messageShouldHaveNs()) {
+            nss = NamespaceString(StringData(dbm.getns()));
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid ns [" << nss.ns() << "]",
+                    nss.isValid());
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't use 'local' database through mongos",
+                    nss.db() != NamespaceString::kLocalDb);
+        }
+
+        AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
+
+        LOG(3) << "Request::process begin ns: " << nss << " msg id: " << msgId
+               << " op: " << networkOpToString(op);
+
+        switch (op) {
+            case dbQuery:
+                if (nss.isCommand() || nss.isSpecialCommand()) {
+                    dbResponse = Strategy::clientCommandOp(opCtx, nss, &dbm);
+                } else {
+                    dbResponse = Strategy::queryOp(opCtx, nss, &dbm);
+                }
+                break;
+            case dbGetMore:
+                dbResponse = Strategy::getMore(opCtx, nss, &dbm);
+                break;
+            case dbKillCursors:
+                Strategy::killCursors(opCtx, &dbm);  // No Response.
+                break;
+            default:
+                Strategy::writeOp(opCtx, &dbm);  // No Response.
+                break;
+        }
+
+        LOG(3) << "Request::process end ns: " << nss << " msg id: " << msgId
+               << " op: " << networkOpToString(op);
+
+    } catch (const DBException& ex) {
+        LOG(1) << "Exception thrown while processing " << networkOpToString(op) << " op for "
+               << nss.ns() << causedBy(ex);
+
+        if (op == dbQuery || op == dbGetMore) {
+            dbResponse = replyToQuery(buildErrReply(ex), ResultFlag_ErrSet);
+        } else {
+            // No Response.
+        }
+
+        // We *always* populate the last error for now
+        LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.what());
+    }
+    return dbResponse;
 }
 
 }  // namespace mongo

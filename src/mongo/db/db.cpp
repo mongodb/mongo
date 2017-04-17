@@ -436,7 +436,7 @@ ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     _initWireSpec();
-    auto globalServiceContext = getGlobalServiceContext();
+    auto globalServiceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
 
     globalServiceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     globalServiceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
@@ -470,20 +470,18 @@ ExitCode _initAndListen(int listenPort) {
 
     logProcessDetails();
 
-    checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
+    globalServiceContext->createLockFile();
 
     transport::TransportLayerLegacy::Options options;
     options.port = listenPort;
     options.ipList = serverGlobalParams.bind_ip;
 
-    auto sep =
-        stdx::make_unique<ServiceEntryPointMongod>(getGlobalServiceContext()->getTransportLayer());
-    auto sepPtr = sep.get();
-
-    getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
+    globalServiceContext->setServiceEntryPoint(
+        stdx::make_unique<ServiceEntryPointMongod>(globalServiceContext->getTransportLayer()));
 
     // Create, start, and attach the TL
-    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(options, sepPtr);
+    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(
+        options, globalServiceContext->getServiceEntryPoint());
     auto res = transportLayer->setup();
     if (!res.isOK()) {
         error() << "Failed to set up listener: " << res;
@@ -494,7 +492,7 @@ ExitCode _initAndListen(int listenPort) {
     if (serverGlobalParams.isHttpInterfaceEnabled) {
         dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
                                           serverGlobalParams.port + 1000,
-                                          getGlobalServiceContext(),
+                                          globalServiceContext,
                                           new RestAdminAccess()));
         if (!dbWebServer->setupSockets()) {
             error() << "Failed to set up sockets for HTTP interface during startup.";
@@ -502,7 +500,7 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
-    getGlobalServiceContext()->initializeGlobalStorageEngine();
+    globalServiceContext->initializeGlobalStorageEngine();
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (EncryptionHooks::get(getGlobalServiceContext())->restartRequired()) {
@@ -525,7 +523,7 @@ ExitCode _initAndListen(int listenPort) {
             }
 
             // Warn if field name matches non-active registered storage engine.
-            if (getGlobalServiceContext()->isRegisteredStorageEngine(e.fieldName())) {
+            if (globalServiceContext->isRegisteredStorageEngine(e.fieldName())) {
                 warning() << "Detected configuration for non-active storage engine "
                           << e.fieldName() << " when current storage engine is "
                           << storageGlobalParams.engine;
@@ -533,7 +531,7 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
-    if (!getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager()) {
+    if (!globalServiceContext->getGlobalStorageEngine()->getSnapshotManager()) {
         if (moe::startupOptionsParsed.count("replication.enableMajorityReadConcern") &&
             moe::startupOptionsParsed["replication.enableMajorityReadConcern"].as<bool>()) {
             // Note: we are intentionally only erroring if the user explicitly requested that we
@@ -580,7 +578,7 @@ ExitCode _initAndListen(int listenPort) {
         ScriptEngine::setup();
     }
 
-    auto startupOpCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    auto startupOpCtx = globalServiceContext->makeOperationContext(&cc());
 
     repairDatabasesAndCheckVersion(startupOpCtx.get());
 
@@ -697,7 +695,7 @@ ExitCode _initAndListen(int listenPort) {
             storageGlobalParams.engine != "devnull") {
             Lock::GlobalWrite lk(startupOpCtx.get());
             FeatureCompatibilityVersion::setIfCleanStartup(
-                startupOpCtx.get(), repl::StorageInterface::get(getGlobalServiceContext()));
+                startupOpCtx.get(), repl::StorageInterface::get(globalServiceContext));
         }
 
         if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||
@@ -714,7 +712,7 @@ ExitCode _initAndListen(int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
+    auto start = globalServiceContext->addAndStartTransportLayer(std::move(transportLayer));
     if (!start.isOK()) {
         error() << "Failed to start the listener: " << start.toString();
         return EXIT_NET_ERROR;
@@ -960,10 +958,9 @@ static void shutdownTask() {
     if (auto sr = grid.shardRegistry()) {  // TODO: race: sr is a naked pointer
         sr->shutdown();
     }
-#if __has_feature(address_sanitizer)
-    auto sep = static_cast<ServiceEntryPointMongod*>(serviceContext->getServiceEntryPoint());
 
-    if (sep) {
+#if __has_feature(address_sanitizer)
+    if (auto sep = checked_cast<ServiceEntryPointImpl*>(serviceContext->getServiceEntryPoint())) {
         // When running under address sanitizer, we get false positive leaks due to disorder around
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
         // harder to dry up the server from active connections before going on to really shut down.
@@ -1001,7 +998,6 @@ static void shutdownTask() {
                                         << " active workers to drain; continuing with shutdown... ";
         }
     }
-
 #endif
 
     // Shutdown Full-Time Data Capture
