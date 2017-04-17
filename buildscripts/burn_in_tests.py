@@ -107,7 +107,7 @@ def find_last_activated_task(revisions, variant, branch_name):
     build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
 
     evg_cfg = read_evg_config()
-    if "api_server_host" in evg_cfg:
+    if evg_cfg is not None and "api_server_host" in evg_cfg:
         api_server = "{url.scheme}://{url.netloc}".format(
             url=urlparse.urlparse(evg_cfg["api_server_host"]))
     else:
@@ -426,6 +426,7 @@ def main():
         _write_report_file(test_results, values.report_file)
 
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
