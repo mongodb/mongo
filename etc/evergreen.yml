@@ -1726,6 +1726,7 @@ tasks:
 
 - <<: *task_template
   name: sharding
+  exec_timeout_secs: 28800 # 8 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1735,6 +1736,7 @@ tasks:
 
 - <<: *task_template
   name: sharding_WT
+  exec_timeout_secs: 28800 # 8 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1769,6 +1771,7 @@ tasks:
 
 - <<: *task_template
   name: sharding_WT_ese
+  exec_timeout_secs: 28800 # 8 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1787,6 +1790,7 @@ tasks:
 
 - <<: *task_template
   name: sharding_auth
+  exec_timeout_secs: 28800 # 8 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1798,6 +1802,7 @@ tasks:
   name: sharding_auth_audit_WT
   depends_on:
   - name: sharding_auth
+  exec_timeout_secs: 28800 # 8 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"

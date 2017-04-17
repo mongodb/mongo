@@ -742,6 +742,8 @@ void _initAndListen(int listenPort) {
                      "data." << startupWarningsLog;
         }
 
+        logStartup(startupOpCtx.get());
+
         getDeleter()->startWorkers();
 
         restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
@@ -777,8 +779,6 @@ void _initAndListen(int listenPort) {
     if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
         uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
     }
-
-    logStartup(startupOpCtx.get());
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
