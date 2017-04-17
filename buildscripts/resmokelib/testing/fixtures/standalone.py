@@ -127,9 +127,10 @@ class MongoDFixture(interface.Fixture):
         # be established.
         while True:
             # Check whether the mongod exited for some reason.
-            if self.mongod.poll() is not None:
+            exit_code = self.mongod.poll()
+            if exit_code is not None:
                 raise errors.ServerFailure("Could not connect to mongod on port %d, process ended"
-                                           " unexpectedly." % (self.port))
+                                           " unexpectedly with code %d." % (self.port, exit_code))
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
