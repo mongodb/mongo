@@ -83,12 +83,8 @@ const std::vector<StringData> kMemoryCounters = {
 const std::vector<StringData> kDiskCounters = {
     "\\PhysicalDisk(*)\\% Disk Read Time",
     "\\PhysicalDisk(*)\\% Disk Write Time",
-    "\\PhysicalDisk(*)\\Avg. Disk Bytes/Read",
-    "\\PhysicalDisk(*)\\Avg. Disk Bytes/Write",
     "\\PhysicalDisk(*)\\Avg. Disk Read Queue Length",
     "\\PhysicalDisk(*)\\Avg. Disk Write Queue Length",
-    "\\PhysicalDisk(*)\\Avg. Disk sec/Read",
-    "\\PhysicalDisk(*)\\Avg. Disk sec/Write",
     "\\PhysicalDisk(*)\\Disk Read Bytes/sec",
     "\\PhysicalDisk(*)\\Disk Write Bytes/sec",
     "\\PhysicalDisk(*)\\Disk Reads/sec",
