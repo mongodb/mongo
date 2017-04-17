@@ -136,6 +136,8 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
                 "Compression algorithm specified in message is not available"};
     }
 
+    LOG(3) << "Decompressing message with " << compressor->getName();
+
     auto bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
     auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);
     MsgData::View outMessage(outputMessageBuffer.get());
