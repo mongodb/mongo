@@ -58,6 +58,12 @@ static const std::vector<StringData> kMemKeys{};
  */
 class LinuxSystemMetricsCollector final : public FTDCCollectorInterface {
 public:
+    LinuxSystemMetricsCollector() : _disks(procparser::findPhysicalDisks("/sys/block")) {
+        for (const auto& disk : _disks) {
+            _disksStringData.emplace_back(disk);
+        }
+    }
+
     void collect(OperationContext* txn, BSONObjBuilder& builder) override {
         {
             BSONObjBuilder subObjBuilder(builder.subobjStart("cpu"));
@@ -72,6 +78,16 @@ public:
             processStatusErrors(
                 procparser::parseProcMemInfoFile("/proc/meminfo", kMemKeys, &subObjBuilder),
                 &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
+
+        // Skip the disks section if we could not find any disks.
+        // This can happen when we do not have permission to /sys/block for instance.
+        if (!_disksStringData.empty()) {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("disks"));
+            processStatusErrors(procparser::parseProcDiskStatsFile(
+                                    "/proc/diskstats", _disksStringData, &subObjBuilder),
+                                &subObjBuilder);
             subObjBuilder.doneFast();
         }
     }
@@ -92,6 +108,13 @@ private:
             builder->append("error", s.toString());
         }
     }
+
+private:
+    // List of physical disks to collect stats from as string from findPhysicalDisks.
+    std::vector<std::string> _disks;
+
+    // List of physical disks to collect stats from as StringData to pass to parseProcDiskStatsFile.
+    std::vector<StringData> _disksStringData;
 };
 
 void installSystemMetricsCollector(FTDCController* controller) {
