@@ -57,12 +57,15 @@ public:
     // Sentinel value indicating pool has no cleanup limit
     static const int kPoolSizeUnlimited;
 
+    friend class DBConnectionPool;
+
     PoolForHost()
         : _created(0),
           _minValidCreationTimeMicroSec(0),
           _type(ConnectionString::INVALID),
           _maxPoolSize(kPoolSizeUnlimited),
-          _checkedOut(0) {}
+          _checkedOut(0),
+          _parentDestroyed(false) {}
 
     ~PoolForHost();
 
@@ -80,12 +83,26 @@ public:
         _maxPoolSize = maxPoolSize;
     }
 
+    /**
+     * Sets the socket timeout on this host, for reporting purposes only.
+     */
+    void setSocketTimeout(double socketTimeout) {
+        _socketTimeout = socketTimeout;
+    }
+
     int numAvailable() const {
         return (int)_pool.size();
     }
 
     int numInUse() const {
         return _checkedOut;
+    }
+
+    /**
+     * Returns the number of open connections in this pool.
+     */
+    int openConnections() const {
+        return _checkedOut + (int)_pool.size();
     }
 
     void createdOne(DBClientBase* base);
@@ -140,6 +157,7 @@ private:
     };
 
     std::string _hostName;
+    double _socketTimeout;
     std::stack<StoredConnection> _pool;
 
     int64_t _created;
@@ -151,6 +169,9 @@ private:
 
     // The number of currently active connections from this pool
     int _checkedOut;
+
+    // Whether our parent DBConnectionPool object is in destruction
+    bool _parentDestroyed;
 };
 
 class DBConnectionHook {
@@ -196,6 +217,11 @@ public:
     int getMaxPoolSize() {
         return _maxPoolSize;
     }
+
+    /**
+     * Returns the number of connections to the given host pool.
+     */
+    int openConnections(const std::string& ident, double socketTimeout);
 
     /**
      * Sets the maximum number of connections pooled per-host.
