@@ -32,21 +32,24 @@ ftdcEnv.Library(
     ],
 )
 
+platform_libs = []
+
+if env.TargetOSIs('linux'):
+    platform_libs = [
+        '$BUILD_DIR/mongo/util/procparser'
+    ]
+
 env.Library(
     target='ftdc_mongod',
     source=[
         'ftdc_mongod.cpp',
+        'ftdc_system_stats.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_parameters',
         'ftdc'
-    ],
-    LIBDEPS_TAGS=[
-        # Needs 'mongo::storageGlobalParams' in storage_options.cpp which is in serveronly
-        # And this library is already part of serveronly
-        'incomplete',
-    ],
+    ] + platform_libs,
 )
 
 env.CppUnitTest(
