@@ -58,6 +58,8 @@ void ValidateDocumentList(const boost::filesystem::path& p, const std::vector<BS
         sw = reader.hasNext();
     }
 
+    ASSERT_OK(sw);
+
     ValidateDocumentList(list, docs);
 }
 
