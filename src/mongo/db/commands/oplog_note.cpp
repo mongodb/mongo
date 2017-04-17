@@ -118,15 +118,6 @@ public:
                      BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        BSONElement dataElement;
-        auto dataStatus = bsonExtractTypedField(cmdObj, "data", Object, &dataElement);
-        if (!dataStatus.isOK()) {
-            return appendCommandStatus(result, dataStatus);
-        }
-
-        Timestamp clusterTime;
-        auto clusterTimeStatus = bsonExtractTimestampField(cmdObj, "clusterTime", &clusterTime);
-
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (!replCoord->isReplEnabled()) {
             return appendCommandStatus(result,
@@ -134,22 +125,33 @@ public:
                                         "Must have replication set up to run \"appendOplogNote\""});
         }
 
-        if (!clusterTimeStatus.isOK()) {
-            if (clusterTimeStatus == ErrorCodes::NoSuchKey) {  // no need to use clusterTime
+        BSONElement dataElement;
+        auto dataStatus = bsonExtractTypedField(cmdObj, "data", Object, &dataElement);
+        if (!dataStatus.isOK()) {
+            return appendCommandStatus(result, dataStatus);
+        }
+
+        Timestamp maxClusterTime;
+        auto maxClusterTimeStatus =
+            bsonExtractTimestampField(cmdObj, "maxClusterTime", &maxClusterTime);
+
+        if (!maxClusterTimeStatus.isOK()) {
+            if (maxClusterTimeStatus == ErrorCodes::NoSuchKey) {  // no need to use maxClusterTime
                 return appendCommandStatus(
                     result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
             }
-            return appendCommandStatus(result, clusterTimeStatus);
+            return appendCommandStatus(result, maxClusterTimeStatus);
         }
 
         auto lastAppliedOpTime = replCoord->getMyLastAppliedOpTime().getTimestamp();
-        if (clusterTime > lastAppliedOpTime) {
+        if (maxClusterTime > lastAppliedOpTime) {
             return appendCommandStatus(
                 result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
         } else {
-            LOG(1) << "Not scheduling a noop write. Requested clusterTime" << clusterTime
-                   << " is less or equal to the last primary OpTime: " << lastAppliedOpTime;
-            return appendCommandStatus(result, Status::OK());
+            std::stringstream ss;
+            ss << "Requested maxClusterTime" << maxClusterTime.toString()
+               << " is less or equal to the last primary OpTime: " << lastAppliedOpTime.toString();
+            return appendCommandStatus(result, {ErrorCodes::StaleClusterTime, ss.str()});
         }
     }
 };
