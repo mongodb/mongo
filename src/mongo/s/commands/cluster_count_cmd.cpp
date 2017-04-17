@@ -140,40 +140,23 @@ public:
 
         auto countCmdObj = countCmdBuilder.done();
 
-        int numAttempts = 0;
-        StatusWith<std::vector<AsyncRequestsSender::Response>> swResponses(
-            (std::vector<AsyncRequestsSender::Response>()));
         BSONObj viewDefinition;
-        do {
-            auto routingInfoStatus =
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
-            if (ErrorCodes::NamespaceNotFound == routingInfoStatus) {
-                // If there's no collection with this name, the count aggregation behavior below
-                // will produce a total count of 0.
-                break;
-            }
-            auto routingInfo = uassertStatusOK(routingInfoStatus);
+        auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                          nss,
+                                                          countCmdObj,
+                                                          filter,
+                                                          collation,
+                                                          true /* do shard versioning */,
+                                                          &viewDefinition);
 
-            auto requests =
-                buildRequestsForShardsForQuery(opCtx, routingInfo, countCmdObj, filter, collation);
-
-            swResponses = gatherResponsesFromShards(
-                opCtx, dbname, countCmdObj, requests, nullptr, &viewDefinition);
-
-            if (ErrorCodes::isStaleShardingError(swResponses.getStatus().code())) {
-                Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
-            }
-
-            ++numAttempts;
-        } while (numAttempts < kMaxNumStaleVersionRetries && !swResponses.getStatus().isOK());
-
-        if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swResponses.getStatus()) {
+        if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
             if (viewDefinition.isEmpty()) {
                 return appendCommandStatus(
                     result,
                     {ErrorCodes::InternalError,
-                     str::stream() << "Missing resolved view definition, but remote returned "
-                                   << ErrorCodes::errorString(swResponses.getStatus().code())});
+                     str::stream()
+                         << "Missing resolved view definition, but remote returned "
+                         << ErrorCodes::errorString(swShardResponses.getStatus().code())});
             }
 
             // Rewrite the count command as an aggregation.
@@ -212,33 +195,43 @@ public:
             return true;
         }
 
-        uassertStatusOK(swResponses.getStatus());
-        auto responses = std::move(swResponses.getValue());
+        std::vector<AsyncRequestsSender::Response> shardResponses;
+        if (ErrorCodes::NamespaceNotFound == swShardResponses.getStatus().code()) {
+            // If there's no collection with this name, the count aggregation behavior below
+            // will produce a total count of 0.
+            shardResponses = {};
+        } else {
+            uassertStatusOK(swShardResponses.getStatus());
+            shardResponses = std::move(swShardResponses.getValue());
+        }
 
         long long total = 0;
         BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
 
-        for (const auto& response : responses) {
-            if (!response.swResponse.isOK()) {
-                shardSubTotal.doneFast();
-
-                // Add error context so that you can see on which shard failed as well as details
-                // about that error.
-                auto errorWithContext =
-                    Status(response.swResponse.getStatus().code(),
-                           str::stream() << "failed on: " << response.shardId
-                                         << causedBy(response.swResponse.getStatus().reason()));
-                return appendCommandStatus(result, errorWithContext);
+        for (const auto& response : shardResponses) {
+            auto status = response.swResponse.getStatus();
+            if (status.isOK()) {
+                status = getStatusFromCommandResult(response.swResponse.getValue().data);
+                if (status.isOK()) {
+                    long long shardCount = response.swResponse.getValue().data["n"].numberLong();
+                    shardSubTotal.appendNumber(response.shardId.toString(), shardCount);
+                    total += shardCount;
+                    continue;
+                }
             }
-            long long shardCount = response.swResponse.getValue().data["n"].numberLong();
-            shardSubTotal.appendNumber(response.shardId.toString(), shardCount);
-            total += shardCount;
+
+            shardSubTotal.doneFast();
+            // Add error context so that you can see on which shard failed as well as details
+            // about that error.
+            auto errorWithContext = Status(status.code(),
+                                           str::stream() << "failed on: " << response.shardId
+                                                         << causedBy(status.reason()));
+            return appendCommandStatus(result, errorWithContext);
         }
 
         shardSubTotal.doneFast();
         total = applySkipLimit(total, cmdObj);
         result.appendNumber("n", total);
-
         return true;
     }
 

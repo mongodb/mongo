@@ -46,58 +46,57 @@ class CachedDatabaseInfo;
 class OperationContext;
 
 /**
- * Utility function to target all shards for a request that does not have a specific namespace.
+ * Broadcasts 'cmdObj' to all shards and returns the responses as a vector.
+ *
+ * Returns a non-OK status if a failure occurs on *this* node during execution.
+ * Otherwise, returns success and a list of responses from shards (including errors from the shards
+ * or errors reaching the shards).
  */
-std::vector<AsyncRequestsSender::Request> buildRequestsForAllShards(OperationContext* opCtx,
-                                                                    const BSONObj& cmdObj);
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(OperationContext* opCtx,
+                                                                     const std::string& dbName,
+                                                                     const BSONObj& cmdObj);
 
 /**
- * Utility function to target all shards that own data for a collection.
+ * Uses the routing table cache to broadcast a command on a namespace. By default, attaches
+ * shardVersions to the outgoing requests to shards, and retargets and retries if it receives a
+ * stale shardVersion error from any shard.
  *
- * Selects shards to target based on 'routingInfo', and constructs a vector of requests, one per
- * targeted shard, where the cmdObj to send to each shard has been modified to include the shard's
- * shardVersion.
- */
-std::vector<AsyncRequestsSender::Request> buildRequestsForShardsThatHaveCollection(
-    OperationContext* opCtx, const CachedCollectionRoutingInfo& routingInfo, const BSONObj& cmdObj);
-
-/**
- * Utility function to target all shards that own chunks that match a query on a collection.
+ * If 'query' is specified, only shards that own data for the namespace are targeted. Otherwise,
+ * all shards are targeted.
  *
- * Selects shards to target based on the ChunkManager in 'routingInfo', and constructs a vector of
- * requests, one per targeted shard, where the cmdObj to send to each shard has been modified to
- * include the shard's shardVersion.
+ * Returns a non-OK status if a failure occurs on *this* node during execution or on seeing an error
+ * from a shard that means the operation as a whole should fail, such as a exceeding retries for
+ * stale shardVersion errors.
+ * Otherwise, returns success and a list of responses from shards (including errors from the shards
+ * or errors reaching the shards).
+ *
+ * @appendShardVersion: if false, does not attach shardVersions to the outgoing requests.
+ * @viewDefinition: if a shard returns an error saying that the request was on a view, the shard
+ *                  will also return a view definition. The returned viewDefinition is stored in
+ *                  this parameter, so that the caller can re-run the operation as an aggregation.
  */
-std::vector<AsyncRequestsSender::Request> buildRequestsForShardsForQuery(
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace(
     OperationContext* opCtx,
-    const CachedCollectionRoutingInfo& routingInfo,
+    const NamespaceString& nss,
     const BSONObj& cmdObj,
-    const BSONObj& filter,
-    const BSONObj& collation);
+    const boost::optional<BSONObj> query,
+    const boost::optional<BSONObj> collation,
+    const bool appendShardVersion = true,
+    BSONObj* viewDefinition = nullptr);
 
 /**
- * Utility function to scatter 'requests' to shards and gather the responses.
+ * Attaches each shard's response or error status by the shard's connection string in a top-level
+ * field called 'raw' in 'output'.
  *
- * Returns an error status if any shard returns a stale shardVersion error or if a shard is not
- * found.
+ * If all shards that errored had the same error, writes the common error code to 'output'. Writes a
+ * string representation of all errors to 'errmsg.'
  *
- * @output: if non-null:
- * -- places the raw responses from the shards into a field called 'raw' in 'output'
- * -- appends the writeConcern element for the first writeConcern error encountered to 'output'
- * -- appends an error code and message to 'output'. If all shards had the same error, the error
- *    code is the common error code, otherwise '0'
- * -- *Warning* resets 'output' to empty if an error status is returned.
- *
- * @viewDefinition: if non-null and a shard returns an error saying that the command was on a view,
- * the view definition is stored in 'viewDefinition'.
+ * Returns true if all the shards reported success.
  */
-StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponsesFromShards(
-    OperationContext* opCtx,
-    const std::string& dbName,
-    const BSONObj& cmdObj,
-    const std::vector<AsyncRequestsSender::Request>& requests,
-    BSONObjBuilder* output,
-    BSONObj* viewDefinition);
+bool appendRawResponses(OperationContext* opCtx,
+                        std::string* errmsg,
+                        BSONObjBuilder* output,
+                        std::vector<AsyncRequestsSender::Response> shardResponses);
 
 /**
  * Utility function to compute a single error code from a vector of command results.

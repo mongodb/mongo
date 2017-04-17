@@ -68,22 +68,11 @@ public:
              BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& output) override {
-        auto requests = buildRequestsForAllShards(opCtx, cmdObj);
-        auto swResponses =
-            gatherResponsesFromShards(opCtx, dbName, cmdObj, requests, &output, nullptr);
-        if (!swResponses.isOK()) {
-            // We failed to obtain a response or error from all shards.
-            return appendCommandStatus(output, swResponses.getStatus());
+        auto shardResponses = uassertStatusOK(scatterGather(opCtx, dbName, cmdObj));
+        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
+            return false;
         }
-
-        // Only aggregate results if we got a success response from every shard.
-        auto responses = std::move(swResponses.getValue());
-        if (std::all_of(
-                responses.begin(), responses.end(), [](AsyncRequestsSender::Response response) {
-                    return response.swResponse.getStatus().isOK();
-                })) {
-            aggregateResults(std::move(responses), output);
-        }
+        aggregateResults(shardResponses, output);
         return true;
     }
 
