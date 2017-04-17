@@ -78,7 +78,10 @@ class TestGroupExecutor(object):
             num_repeats = _config.REPEAT
             while num_repeats > 0:
                 test_queue = self._make_test_queue()
-                self._test_group.record_start()
+
+                partial_reports = [job.report for job in self._jobs]
+                self._test_group.record_start(partial_reports)
+
                 (report, interrupted) = self._run_tests(test_queue)
                 self._test_group.record_end(report)
 
