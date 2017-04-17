@@ -127,8 +127,7 @@ StatusWith<std::vector<std::string>> PerfCounterCollection::checkCounters(
     StringData name, const std::vector<StringData>& paths) {
     if (_counters.find(name.toString()) != _counters.end() ||
         _nestedCounters.find(name.toString()) != _nestedCounters.end()) {
-        return Status(ErrorCodes::DuplicateKeyValue,
-                      str::stream() << "Duplicate group name for " << name);
+        return Status(ErrorCodes::BadValue, str::stream() << "Duplicate group name for " << name);
     }
 
     std::vector<std::string> stringPaths;
@@ -138,7 +137,7 @@ StatusWith<std::vector<std::string>> PerfCounterCollection::checkCounters(
     std::sort(stringPaths.begin(), stringPaths.end());
 
     if (std::unique(stringPaths.begin(), stringPaths.end()) != stringPaths.end()) {
-        return Status(ErrorCodes::DuplicateKeyValue,
+        return Status(ErrorCodes::BadValue,
                       str::stream() << "Duplicate counters in paths specified");
     }
 
