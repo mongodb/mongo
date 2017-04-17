@@ -238,7 +238,7 @@ StatusWith<PerfCounterCollector::CounterInfo> PerfCounterCollector::addCounter(S
         return {ErrorCodes::WindowsPdhError, formatFunctionCallError("PdhGetCounterInfoW", status)};
     }
 
-    auto buf = std::make_unique<char[]>(bufferSize);
+    auto buf = stdx::make_unique<char[]>(bufferSize);
     auto counterInfo = reinterpret_cast<PPDH_COUNTER_INFO>(buf.get());
 
     status = PdhGetCounterInfoW(counter, false, &bufferSize, counterInfo);
@@ -298,7 +298,7 @@ StatusWith<std::vector<PerfCounterCollector::CounterInfo>> PerfCounterCollector:
                               << " for counter '" << path << "'"};
     }
 
-    auto buf = std::make_unique<wchar_t[]>(pathListLength);
+    auto buf = stdx::make_unique<wchar_t[]>(pathListLength);
 
     status = PdhExpandCounterPathW(pathWide.c_str(), buf.get(), &pathListLength);
 
