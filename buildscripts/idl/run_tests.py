@@ -14,10 +14,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 """
-IDL Unit Test runner
+IDL Unit Test runner.
 
 Generates a file called results.xml in the XUnit format.
 """
+from __future__ import absolute_import, print_function
 
 import sys
 import unittest
@@ -32,10 +33,8 @@ def run_tests():
     # my-py type information.
     all_tests = unittest.defaultTestLoader.discover(start_dir="tests")  # type: ignore
 
-    with open("results.xml", "wb") as output:
-
-        runner = XMLTestRunner(verbosity=2, failfast=False, output=output)
-        result = runner.run(all_tests)
+    runner = XMLTestRunner(verbosity=2, failfast=False, output='results')
+    result = runner.run(all_tests)
 
     sys.exit(not result.wasSuccessful())
 
