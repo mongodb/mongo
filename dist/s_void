@@ -88,8 +88,8 @@ func_ok()
 	    -e '/int handle_progress$/d' \
 	    -e '/int helium_cursor_reset$/d' \
 	    -e '/int helium_session_verify$/d' \
-	    -e '/int index_compare_primary$/d' \
 	    -e '/int index_compare_S$/d' \
+	    -e '/int index_compare_primary$/d' \
 	    -e '/int index_compare_u$/d' \
 	    -e '/int index_extractor_u$/d' \
 	    -e '/int log_print_err$/d' \
@@ -103,7 +103,6 @@ func_ok()
 	    -e '/int nop_pre_size$/d' \
 	    -e '/int nop_sizing$/d' \
 	    -e '/int nop_terminate$/d' \
-	    -e '/int nop_terminate$/d' \
 	    -e '/int os_errno$/d' \
 	    -e '/int revint_terminate$/d' \
 	    -e '/int rotn_error$/d' \
@@ -111,6 +110,7 @@ func_ok()
 	    -e '/int rotn_terminate$/d' \
 	    -e '/int snappy_pre_size$/d' \
 	    -e '/int snappy_terminate$/d' \
+	    -e '/int subtest_error_handler$/d' \
 	    -e '/int uri2name$/d' \
 	    -e '/int usage$/d' \
 	    -e '/int util_err$/d' \

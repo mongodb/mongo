@@ -57,7 +57,6 @@ retry:
 			return (0);
 		if (!F_ISSET(conn, WT_CONN_SERVER_ASYNC))
 			return (0);
-		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		WT_ORDERED_READ(last_consume, async->alloc_tail);
 	}
 	if (async->flush_state == WT_ASYNC_FLUSHING)
