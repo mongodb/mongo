@@ -2983,6 +2983,9 @@ def doLint( env , target , source ):
     if not buildscripts.clang_format.lint_all(None):
         raise Exception("clang-format lint errors")
 
+    import buildscripts.pylinters
+    buildscripts.pylinters.lint_all(None, {}, [])
+
     import buildscripts.lint
     if not buildscripts.lint.run_lint( [ "src/mongo/" ] ):
         raise Exception( "lint errors" )

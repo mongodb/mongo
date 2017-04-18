@@ -241,7 +241,7 @@ class TestBinder(testcase.IDLTestcase):
                         description: foo
                         cpp_type: %s
                         bson_serialization_type: int
-                    """ % (cpp_type)), idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE)
+                    """ % (std_cpp_type)), idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE)
 
         # Test bindata_subtype missing
         self.assert_bind_fail(

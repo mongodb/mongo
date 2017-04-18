@@ -20,7 +20,7 @@ Only validates the document is syntatically correct, not semantically.
 """
 from __future__ import absolute_import, print_function, unicode_literals
 
-# from typing import Any, Callable, Dict, List, Set, Union
+from typing import Any, Callable, Dict, List, Set, Union
 from yaml import nodes
 import yaml
 

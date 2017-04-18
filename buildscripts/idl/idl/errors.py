@@ -23,7 +23,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import inspect
 import sys
-# from typing import List, Union, Any
+from typing import List, Union, Any
 from yaml import nodes
 import yaml
 

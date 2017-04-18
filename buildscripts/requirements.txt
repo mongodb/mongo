@@ -1,3 +1,11 @@
 pyyaml == 3.11
-typing == 3.5
 unittest-xml-reporting == 2.1.0
+# Linters
+yapf == 0.16.0
+mypy == 0.501 ; python_version > "3"
+# typing in Python 2 for mypy
+typing == 3.6.1; python_version < "3"
+pylint == 1.6.5
+pydocstyle == 1.1.1
+# resmoke.py
+-r resmokelib/requirements.txt

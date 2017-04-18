@@ -17,7 +17,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import re
-# from typing import Union
+from typing import Union
 
 from . import ast
 from . import bson

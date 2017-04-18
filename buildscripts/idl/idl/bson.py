@@ -20,7 +20,7 @@ Utilities for validating bson types, etc.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-# from typing import Dict, List
+from typing import Dict, List
 
 # Dictionary of BSON type Information
 # scalar: True if the type is not an array or object

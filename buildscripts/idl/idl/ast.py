@@ -23,7 +23,7 @@ the structs that need code generated for them, and just enough information to do
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-#from typing import List, Union, Any, Optional, Tuple
+from typing import List, Union, Any, Optional, Tuple
 
 from . import common
 from . import errors
