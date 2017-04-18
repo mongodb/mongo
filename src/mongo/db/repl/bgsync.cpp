@@ -284,6 +284,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         const OpTime minValidSaved = storageInterface->getMinValid(opCtx);
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_state != ProducerState::Running) {
+            return;
+        }
         const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
         lastOpTimeFetched = _lastOpTimeFetched;
         _syncSourceHost = HostAndPort();
@@ -347,10 +350,11 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         }
         return;
     } else if (syncSourceResp.isOK() && !syncSourceResp.getSyncSource().empty()) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _syncSourceHost = syncSourceResp.getSyncSource();
-        source = _syncSourceHost;
-
+        {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            _syncSourceHost = syncSourceResp.getSyncSource();
+            source = _syncSourceHost;
+        }
         // If our sync source has not changed, it is likely caused by our heartbeat data map being
         // out of date. In that case we sleep for 1 second to reduce the amount we spin waiting
         // for our map to update.
@@ -433,6 +437,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
                        stdx::placeholders::_3),
             onOplogFetcherShutdownCallbackFn);
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_state != ProducerState::Running) {
+            return;
+        }
         _oplogFetcher = std::move(oplogFetcherPtr);
         oplogFetcher = _oplogFetcher.get();
     } catch (const mongo::DBException& ex) {
@@ -635,6 +642,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             };
 
             stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (_state != ProducerState::Running) {
+                return;
+            }
             _rollback = stdx::make_unique<RollbackImpl>(executor,
                                                         &localOplog,
                                                         source,
