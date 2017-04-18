@@ -167,18 +167,25 @@ TEST_F(RollbackFixUpInfoTest,
                                        << 1));
 
     auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString nss(operation["ns"].String());
     auto docId = operation["o"].Obj()["_id"];
 
     auto opCtx = makeOpCtx();
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
     ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
-        opCtx.get(), collectionUuid, docId, RollbackFixUpInfo::SingleDocumentOpType::kInsert));
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        nss.db().toString()));
 
     auto expectedDocument = BSON(
         "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
                                        << docId)
               << "operationType"
               << "insert"
+              << "db"
+              << "test"
               << "documentToRestore"
               << BSONNULL);
     _assertDocumentsInCollectionEquals(
@@ -198,18 +205,25 @@ TEST_F(RollbackFixUpInfoTest,
                                        << "mydocid"));
 
     auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString nss(operation["ns"].String());
     auto docId = operation["o"].Obj()["_id"];
 
     auto opCtx = makeOpCtx();
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
     ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
-        opCtx.get(), collectionUuid, docId, RollbackFixUpInfo::SingleDocumentOpType::kDelete));
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kDelete,
+        nss.db().toString()));
 
     auto expectedDocument = BSON(
         "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
                                        << docId)
               << "operationType"
               << "delete"
+              << "db"
+              << "test"
               << "documentToRestore"
               << BSONNULL);
 
@@ -232,18 +246,25 @@ TEST_F(RollbackFixUpInfoTest,
                                << BSON("$set" << BSON("x" << 2)));
 
     auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
+    NamespaceString nss(operation["ns"].String());
     auto docId = operation["o2"].Obj()["_id"];
 
     auto opCtx = makeOpCtx();
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
     ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
-        opCtx.get(), collectionUuid, docId, RollbackFixUpInfo::SingleDocumentOpType::kUpdate));
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kUpdate,
+        nss.db().toString()));
 
     auto expectedDocument = BSON(
         "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
                                        << docId)
               << "operationType"
               << "update"
+              << "db"
+              << "test"
               << "documentToRestore"
               << BSONNULL);
 

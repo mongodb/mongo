@@ -69,8 +69,9 @@ RollbackFixUpInfo::RollbackFixUpInfo(StorageInterface* storageInterface)
 Status RollbackFixUpInfo::processSingleDocumentOplogEntry(OperationContext* opCtx,
                                                           const UUID& collectionUuid,
                                                           const BSONElement& docId,
-                                                          SingleDocumentOpType opType) {
-    SingleDocumentOperationDescription desc(collectionUuid, docId, opType);
+                                                          SingleDocumentOpType opType,
+                                                          const std::string& dbName) {
+    SingleDocumentOperationDescription desc(collectionUuid, docId, opType, dbName);
     return _upsertById(opCtx, kRollbackDocsNamespace, desc.toBSON());
 }
 

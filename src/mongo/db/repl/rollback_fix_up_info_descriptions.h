@@ -50,7 +50,8 @@ class RollbackFixUpInfo::SingleDocumentOperationDescription {
 public:
     SingleDocumentOperationDescription(const UUID& collectionUuid,
                                        const BSONElement& docId,
-                                       RollbackFixUpInfo::SingleDocumentOpType opType);
+                                       RollbackFixUpInfo::SingleDocumentOpType opType,
+                                       const std::string& dbName);
 
     /**
      * Returns a BSON representation of this object.
@@ -61,6 +62,7 @@ private:
     UUID _collectionUuid;
     BSONObj _wrappedDocId;
     RollbackFixUpInfo::SingleDocumentOpType _opType;
+    std::string _dbName;
 };
 
 /**

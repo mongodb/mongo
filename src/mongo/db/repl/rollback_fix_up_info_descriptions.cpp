@@ -85,8 +85,12 @@ void appendOpTypeToBuilder(RollbackFixUpInfo::IndexOpType opType, BSONObjBuilder
 RollbackFixUpInfo::SingleDocumentOperationDescription::SingleDocumentOperationDescription(
     const UUID& collectionUuid,
     const BSONElement& docId,
-    RollbackFixUpInfo::SingleDocumentOpType opType)
-    : _collectionUuid(collectionUuid), _wrappedDocId(docId.wrap("documentId")), _opType(opType) {}
+    RollbackFixUpInfo::SingleDocumentOpType opType,
+    const std::string& dbName)
+    : _collectionUuid(collectionUuid),
+      _wrappedDocId(docId.wrap("documentId")),
+      _opType(opType),
+      _dbName(dbName) {}
 
 BSONObj RollbackFixUpInfo::SingleDocumentOperationDescription::toBSON() const {
     // For non-insert operations, we will use the collection UUID and document id to query the sync
@@ -103,6 +107,10 @@ BSONObj RollbackFixUpInfo::SingleDocumentOperationDescription::toBSON() const {
 
     // This matches the "op" field in the oplog entry.
     appendOpTypeToBuilder(_opType, &bob);
+
+    // The database name is used in the find command request when fetching the document from the
+    // sync source.
+    bob.append("db", _dbName);
 
     // This will be replaced by the most recent copy of the affected document from the sync
     // source. If the document is not found on the sync source, this will remain null.

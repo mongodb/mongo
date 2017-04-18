@@ -104,6 +104,9 @@ public:
      *
      * "docId" is the _id field of the modified document.
      *
+     * "dbName" is required for the find command request used to fetch the document from the sync
+     * source.
+     *
      * For index creation operations, which are represented in the oplog as insert operations in
      * "*.system.indexes", use processCreateIndexOplogEntry() instead.
      */
@@ -112,7 +115,8 @@ public:
     Status processSingleDocumentOplogEntry(OperationContext* opCtx,
                                            const UUID& collectionUuid,
                                            const BSONElement& docId,
-                                           SingleDocumentOpType opType);
+                                           SingleDocumentOpType opType,
+                                           const std::string& dbName);
 
     /**
      * Processes an oplog entry representing a create collection command. Stores information about

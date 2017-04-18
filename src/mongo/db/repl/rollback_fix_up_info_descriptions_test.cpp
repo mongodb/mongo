@@ -46,13 +46,18 @@ TEST(RollbackFixUpInfoDescriptionsTest, SingleDocumentDescriptionToBson) {
                       << "mydocid");
 
     RollbackFixUpInfo::SingleDocumentOperationDescription description(
-        collectionUuid, docId.firstElement(), RollbackFixUpInfo::SingleDocumentOpType::kInsert);
+        collectionUuid,
+        docId.firstElement(),
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        "mydb");
 
     auto expectedDocument = BSON(
         "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
                                        << docId.firstElement())
               << "operationType"
               << "insert"
+              << "db"
+              << "mydb"
               << "documentToRestore"
               << BSONNULL);
 
