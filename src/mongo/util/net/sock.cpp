@@ -570,15 +570,7 @@ void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
         }
 
         if (ret == -1) {
-            if (errno != EAGAIN || _timeout == 0) {
-                LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription()
-                               << ' ' << remoteString();
-                throw SocketException(SocketException::SEND_ERROR, remoteString());
-            } else {
-                LOG(_logLevel) << "Socket " << context << " send() remote timeout "
-                               << remoteString();
-                throw SocketException(SocketException::SEND_TIMEOUT, remoteString());
-            }
+            handleSendError(ret, context);
         } else {
             struct iovec*& i = meta.msg_iov;
             while (ret > 0) {
