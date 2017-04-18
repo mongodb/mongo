@@ -208,6 +208,7 @@ error_code("InvalidUUID", 207)
 error_code("TooManyLocks", 208)
 error_code("StaleClusterTime", 209)
 error_code("CannotVerifyAndSignLogicalTime", 210)
+error_code("KeyNotFound", 211)
 
 # Error codes 4000-8999 are reserved.
 

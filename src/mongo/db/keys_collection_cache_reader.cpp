@@ -30,21 +30,59 @@
 
 #include "mongo/db/keys_collection_cache_reader.h"
 
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 
 KeysCollectionCacheReader::KeysCollectionCacheReader(std::string purpose)
     : _purpose(std::move(purpose)) {}
 
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationContext* opCtx) {
-    // forThisTime = latest keyDoc.expiresAt or LogicalTime.MIN if _cache is empty
-    // read must be { level: 'majority' }.
-    // admin.system.keys.find({purpose: 'signLogicalTime', expiresAt: {$gt: <forThisTime>});
-    return {ErrorCodes::InternalError, "Not yet implemented"};
+    LogicalTime newerThanThis;
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+        auto iter = _cache.crbegin();
+        if (iter != _cache.crend()) {
+            newerThanThis = iter->second.getExpiresAt();
+        }
+    }
+
+    auto refreshStatus = Grid::get(opCtx)->catalogClient(opCtx)->getNewKeys(
+        opCtx, _purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    if (!refreshStatus.isOK()) {
+        return refreshStatus.getStatus();
+    }
+
+    auto& newKeys = refreshStatus.getValue();
+
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    for (auto&& key : newKeys) {
+        _cache.emplace(std::make_pair(key.getExpiresAt(), std::move(key)));
+    }
+
+    if (_cache.empty()) {
+        return {ErrorCodes::KeyNotFound, "No keys found after refresh"};
+    }
+
+    return _cache.crbegin()->second;
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKey(
     const LogicalTime& forThisTime) {
-    return {ErrorCodes::InternalError, "Not yet implemented"};
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+
+    auto iter = _cache.upper_bound(forThisTime);
+
+    if (iter == _cache.cend()) {
+        return {ErrorCodes::KeyNotFound,
+                str::stream() << "No key found that is valid for " << forThisTime.toString()};
+    }
+
+    return iter->second;
 }
 
 }  // namespace mongo

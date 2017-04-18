@@ -67,8 +67,15 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
     LogicalClock::get(operationContext())->initClusterTimeFromTrustedSource(currentTime);
 
-    auto keyStatus = updater.refresh(operationContext());
-    // TODO: Inspect keyStatus once SERVER-28435 is implemented
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_OK(keyStatus.getStatus());
+
+        const auto key = keyStatus.getValue();
+        ASSERT_EQ(currentTime.asTimestamp().asLL() + 1, key.getKeyId());
+        ASSERT_EQ("dummy", key.getPurpose());
+        ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
+    }
 
     auto allKeys = getKeys(operationContext());
 
@@ -110,8 +117,16 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
     }
 
     auto currentTime = LogicalClock::get(operationContext())->getClusterTime().getTime();
-    auto keyStatus = updater.refresh(operationContext());
-    // TODO: Inspect keyStatus once SERVER-28435 is implemented
+
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_OK(keyStatus.getStatus());
+
+        const auto key = keyStatus.getValue();
+        ASSERT_EQ(currentTime.asTimestamp().asLL(), key.getKeyId());
+        ASSERT_EQ("dummy", key.getPurpose());
+        ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
+    }
 
     {
         auto allKeys = getKeys(operationContext());
@@ -166,8 +181,17 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
     }
 
     auto currentTime = LogicalClock::get(operationContext())->getClusterTime().getTime();
-    auto keyStatus = updater.refresh(operationContext());
-    // TODO: Inspect keyStatus once SERVER-28435 is implemented
+
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_OK(keyStatus.getStatus());
+
+        const auto key = keyStatus.getValue();
+        ASSERT_EQ(currentTime.asTimestamp().asLL(), key.getKeyId());
+        ASSERT_EQ("dummy", key.getPurpose());
+        ASSERT_EQ(Timestamp(115, 0), key.getExpiresAt().asTimestamp());
+    }
+
 
     auto allKeys = getKeys(operationContext());
 
@@ -248,8 +272,16 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
     }
 
     auto currentTime = LogicalClock::get(operationContext())->getClusterTime().getTime();
-    auto keyStatus = updater.refresh(operationContext());
-    // TODO: Inspect keyStatus once SERVER-28435 is implemented
+
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_OK(keyStatus.getStatus());
+
+        const auto key = keyStatus.getValue();
+        ASSERT_EQ(currentTime.asTimestamp().asLL() + 1, key.getKeyId());
+        ASSERT_EQ("dummy", key.getPurpose());
+        ASSERT_EQ(Timestamp(130, 0), key.getExpiresAt().asTimestamp());
+    }
 
     auto allKeys = getKeys(operationContext());
 
@@ -343,8 +375,15 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
         ASSERT_EQ(Timestamp(110, 0), key2.getExpiresAt().asTimestamp());
     }
 
-    auto keyStatus = updater.refresh(operationContext());
-    // TODO: Inspect keyStatus once SERVER-28435 is implemented
+    {
+        auto keyStatus = updater.refresh(operationContext());
+        ASSERT_OK(keyStatus.getStatus());
+
+        const auto key = keyStatus.getValue();
+        ASSERT_EQ(2, key.getKeyId());
+        ASSERT_EQ("dummy", key.getPurpose());
+        ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
+    }
 
     auto allKeys = getKeys(operationContext());
 
