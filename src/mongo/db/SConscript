@@ -1038,10 +1038,12 @@ env.Library(
     target='keys_collection_manager',
     source=[
         'keys_collection_cache_reader.cpp',
+        'keys_collection_cache_reader_and_updater.cpp',
     ],
     LIBDEPS=[
         'keys_collection_document',
         'logical_time',
+        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 
@@ -1051,7 +1053,6 @@ env.Library(
         'logical_clock.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager',
         'server_parameters',
         'service_context',
         'signed_logical_time',
@@ -1135,6 +1136,17 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'time_proof_service',
+    ],
+)
+
+env.CppUnitTest(
+    target='keys_collection_cache_reader_and_updater_test',
+    source=[
+        'keys_collection_cache_reader_and_updater_test.cpp',
+    ],
+    LIBDEPS=[
+        'keys_collection_manager',
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
     ],
 )
 

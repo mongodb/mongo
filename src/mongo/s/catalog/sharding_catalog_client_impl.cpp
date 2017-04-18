@@ -1518,7 +1518,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
                                                        const BSONObj& doc,
                                                        const WriteConcernOptions& writeConcern) {
     const NamespaceString nss(ns);
-    invariant(nss.db() == "config");
+    invariant(nss.db() == "config" || nss.db() == "admin");
 
     const BSONElement idField = doc.getField("_id");
     invariant(!idField.eoo());

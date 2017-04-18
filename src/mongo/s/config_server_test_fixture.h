@@ -34,6 +34,7 @@ namespace mongo {
 
 class BSONObj;
 class ChunkType;
+class KeysCollectionDocument;
 class NamespaceString;
 class Shard;
 class ShardingCatalogClient;
@@ -108,6 +109,11 @@ public:
      * Same as ShardingMongodTestFixture::onCommand but run against _addShardNetworkTestEnv.
      */
     void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
+
+    /**
+     * Returns all the keys in admin.system.keys
+     */
+    std::vector<KeysCollectionDocument> getKeys(OperationContext* opCtx);
 
 protected:
     /**
