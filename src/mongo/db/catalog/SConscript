@@ -58,6 +58,15 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='index_catalog',
+    source=[
+        "index_catalog.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
     target='index_catalog_entry',
     source=[
         "index_catalog_entry.cpp",
@@ -100,7 +109,7 @@ env.Library(
         "drop_collection.cpp",
         "drop_database.cpp",
         "drop_indexes.cpp",
-        "index_catalog.cpp",
+        "index_catalog_impl.cpp",
         "index_catalog_entry_impl.cpp",
         "index_create.cpp",
         "rename_collection.cpp",
@@ -109,6 +118,7 @@ env.Library(
         'collection',
         'collection_options',
         'database',
+        'index_catalog',
         'index_catalog_entry',
         'index_key_validate',
         '$BUILD_DIR/mongo/base',

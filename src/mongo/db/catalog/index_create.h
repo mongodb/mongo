@@ -37,6 +37,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
 
@@ -191,7 +193,7 @@ private:
     class CleanupIndexesVectorOnRollback;
 
     struct IndexToBuild {
-        std::unique_ptr<IndexCatalog::IndexBuildBlock> block;
+        std::unique_ptr<IndexCatalogImpl::IndexBuildBlock> block;
 
         IndexAccessMethod* real = NULL;           // owned elsewhere
         const MatchExpression* filterExpression;  // might be NULL, owned elsewhere

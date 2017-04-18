@@ -228,7 +228,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
         indexInfoObjs.push_back(info);
 
         IndexToBuild index;
-        index.block.reset(new IndexCatalog::IndexBuildBlock(_opCtx, _collection, info));
+        index.block.reset(new IndexCatalogImpl::IndexBuildBlock(_opCtx, _collection, info));
         status = index.block->init();
         if (!status.isOK())
             return status;

@@ -735,6 +735,6 @@ private:
     }
 
     friend class DatabaseImpl;
-    friend class IndexCatalog;
+    friend class IndexCatalogImpl;
 };
 }  // namespace mongo
