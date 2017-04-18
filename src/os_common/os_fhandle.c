@@ -281,6 +281,41 @@ err:		if (open_called)
 }
 
 /*
+ * __handle_close --
+ *	Final close of a handle.
+ */
+static int
+__handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	uint64_t bucket;
+
+	conn = S2C(session);
+
+	if (fh->ref != 0) {
+		__wt_errx(session,
+		    "Closing a file handle with open references: %s", fh->name);
+		WT_TRET(EBUSY);
+	}
+
+	/* Remove from the list. */
+	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
+	WT_FILE_HANDLE_REMOVE(conn, fh, bucket);
+	(void)__wt_atomic_sub32(&conn->open_file_count, 1);
+
+	__wt_spin_unlock(session, &conn->fh_lock);
+
+	/* Discard underlying resources. */
+	WT_TRET(fh->handle->close(fh->handle, (WT_SESSION *)session));
+
+	__wt_free(session, fh->name);
+	__wt_free(session, fh);
+
+	return (ret);
+}
+
+/*
  * __wt_close --
  *	Close a file handle.
  */
@@ -288,9 +323,7 @@ int
 __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_FH *fh;
-	uint64_t bucket;
 
 	conn = S2C(session);
 
@@ -315,20 +348,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 		return (0);
 	}
 
-	/* Remove from the list. */
-	bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
-	WT_FILE_HANDLE_REMOVE(conn, fh, bucket);
-	(void)__wt_atomic_sub32(&conn->open_file_count, 1);
-
-	__wt_spin_unlock(session, &conn->fh_lock);
-
-	/* Discard underlying resources. */
-	ret = fh->handle->close(fh->handle, (WT_SESSION *)session);
-
-	__wt_free(session, fh->name);
-	__wt_free(session, fh);
-
-	return (ret);
+	return (__handle_close(session, fh));
 }
 
 /*
@@ -339,21 +359,10 @@ int
 __wt_close_connection_close(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	WT_FH *fh;
-	WT_CONNECTION_IMPL *conn;
+	WT_FH *fh, *fh_tmp;
 
-	conn = S2C(session);
-
-	while ((fh = TAILQ_FIRST(&conn->fhqh)) != NULL) {
-		if (fh->ref != 0) {
-			ret = EBUSY;
-			__wt_errx(session,
-			    "Connection has open file handles: %s", fh->name);
-		}
-
-		fh->ref = 1;
-
-		WT_TRET(__wt_close(session, &fh));
-	}
+	WT_TAILQ_SAFE_REMOVE_BEGIN(fh, &S2C(session)->fhqh, q, fh_tmp) {
+		WT_TRET(__handle_close(session, fh));
+	} WT_TAILQ_SAFE_REMOVE_END
 	return (ret);
 }

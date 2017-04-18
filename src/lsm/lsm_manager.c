@@ -500,7 +500,7 @@ void
 __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORK_UNIT *current, *next;
+	WT_LSM_WORK_UNIT *current, *tmp;
 	uint64_t removed;
 
 	manager = &S2C(session)->lsm_manager;
@@ -508,11 +508,7 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	/* Clear out the tree from the switch queue */
 	__wt_spin_lock(session, &manager->switch_lock);
-
-	/* Structure the loop so that it's safe to free as we iterate */
-	for (current = TAILQ_FIRST(&manager->switchqh);
-	    current != NULL; current = next) {
-		next = TAILQ_NEXT(current, q);
+	TAILQ_FOREACH_SAFE(current, &manager->switchqh, q, tmp) {
 		if (current->lsm_tree != lsm_tree)
 			continue;
 		++removed;
@@ -522,9 +518,7 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_spin_unlock(session, &manager->switch_lock);
 	/* Clear out the tree from the application queue */
 	__wt_spin_lock(session, &manager->app_lock);
-	for (current = TAILQ_FIRST(&manager->appqh);
-	    current != NULL; current = next) {
-		next = TAILQ_NEXT(current, q);
+	TAILQ_FOREACH_SAFE(current, &manager->appqh, q, tmp) {
 		if (current->lsm_tree != lsm_tree)
 			continue;
 		++removed;
@@ -534,9 +528,7 @@ __wt_lsm_manager_clear_tree(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_spin_unlock(session, &manager->app_lock);
 	/* Clear out the tree from the manager queue */
 	__wt_spin_lock(session, &manager->manager_lock);
-	for (current = TAILQ_FIRST(&manager->managerqh);
-	    current != NULL; current = next) {
-		next = TAILQ_NEXT(current, q);
+	TAILQ_FOREACH_SAFE(current, &manager->managerqh, q, tmp) {
 		if (current->lsm_tree != lsm_tree)
 			continue;
 		++removed;

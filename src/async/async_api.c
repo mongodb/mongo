@@ -420,7 +420,7 @@ int
 __wt_async_destroy(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
-	WT_ASYNC_FORMAT *af, *afnext;
+	WT_ASYNC_FORMAT *af;
 	WT_ASYNC_OP *op;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -459,15 +459,13 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 	}
 
 	/* Free format resources */
-	af = TAILQ_FIRST(&async->formatqh);
-	while (af != NULL) {
-		afnext = TAILQ_NEXT(af, q);
+	while ((af = TAILQ_FIRST(&async->formatqh)) != NULL) {
+		TAILQ_REMOVE(&async->formatqh, af, q);
 		__wt_free(session, af->uri);
 		__wt_free(session, af->config);
 		__wt_free(session, af->key_format);
 		__wt_free(session, af->value_format);
 		__wt_free(session, af);
-		af = afnext;
 	}
 	__wt_free(session, async->async_queue);
 	__wt_free(session, async->async_ops);

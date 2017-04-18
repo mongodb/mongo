@@ -369,10 +369,12 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 void
 __wt_session_close_cache(WT_SESSION_IMPL *session)
 {
-	WT_DATA_HANDLE_CACHE *dhandle_cache;
+	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_tmp;
 
-	while ((dhandle_cache = TAILQ_FIRST(&session->dhandles)) != NULL)
+	WT_TAILQ_SAFE_REMOVE_BEGIN(dhandle_cache,
+	    &session->dhandles, q, dhandle_cache_tmp) {
 		__session_discard_dhandle(session, dhandle_cache);
+	} WT_TAILQ_SAFE_REMOVE_END
 }
 
 /*
@@ -384,7 +386,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
+	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_tmp;
 	time_t now;
 
 	conn = S2C(session);
@@ -400,9 +402,8 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 
 	WT_STAT_CONN_INCR(session, dh_session_sweeps);
 
-	dhandle_cache = TAILQ_FIRST(&session->dhandles);
-	while (dhandle_cache != NULL) {
-		dhandle_cache_next = TAILQ_NEXT(dhandle_cache, q);
+	TAILQ_FOREACH_SAFE(dhandle_cache,
+	    &session->dhandles, q, dhandle_cache_tmp) {
 		dhandle = dhandle_cache->dhandle;
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
@@ -414,7 +415,6 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 			WT_ASSERT(session, !WT_IS_METADATA(dhandle));
 			__session_discard_dhandle(session, dhandle_cache);
 		}
-		dhandle_cache = dhandle_cache_next;
 	}
 }
 

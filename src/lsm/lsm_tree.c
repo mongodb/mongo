@@ -134,11 +134,12 @@ int
 __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	WT_LSM_TREE *lsm_tree;
+	WT_LSM_TREE *lsm_tree, *lsm_tree_tmp;
 
 	/* We are shutting down: the handle list lock isn't required. */
 
-	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
+	WT_TAILQ_SAFE_REMOVE_BEGIN(lsm_tree,
+	    &S2C(session)->lsmqh, q, lsm_tree_tmp) {
 		/*
 		 * Tree close assumes that we have a reference to the tree
 		 * so it can tell when it's safe to do the close. We could
@@ -149,7 +150,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
 		__lsm_tree_close(session, lsm_tree, true);
 		WT_TRET(__lsm_tree_discard(session, lsm_tree, true));
-	}
+	} WT_TAILQ_SAFE_REMOVE_END
 
 	return (ret);
 }

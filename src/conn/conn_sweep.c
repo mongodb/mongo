@@ -219,15 +219,12 @@ static int
 __sweep_remove_handles(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *dhandle_next;
+	WT_DATA_HANDLE *dhandle, *dhandle_tmp;
 	WT_DECL_RET;
 
 	conn = S2C(session);
 
-	for (dhandle = TAILQ_FIRST(&conn->dhqh);
-	    dhandle != NULL;
-	    dhandle = dhandle_next) {
-		dhandle_next = TAILQ_NEXT(dhandle, q);
+	TAILQ_FOREACH_SAFE(dhandle, &conn->dhqh, q, dhandle_tmp) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
 		if (!WT_DHANDLE_CAN_DISCARD(dhandle))

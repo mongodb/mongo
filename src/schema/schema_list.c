@@ -244,9 +244,11 @@ int
 __wt_schema_close_tables(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	WT_TABLE *table;
+	WT_TABLE *table, *table_tmp;
 
-	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
+	WT_TAILQ_SAFE_REMOVE_BEGIN(table, &session->tables, q, table_tmp) {
 		WT_TRET(__wt_schema_remove_table(session, table));
+	} WT_TAILQ_SAFE_REMOVE_END
+
 	return (ret);
 }
