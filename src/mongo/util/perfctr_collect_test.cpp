@@ -310,12 +310,8 @@ TEST(FTDCPerfCollector, TestMultipleNestedCounterGroups) {
         COLLECT_COUNTERS;
         ASSERT_TIMEBASE
 
-        // We boldly assume that machines we test on have at least two processors
         ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "0", "\\Processor\\% Idle Time");
         ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "0", "\\Processor\\% Processor Time");
-
-        ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "1", "\\Processor\\% Idle Time");
-        ASSERT_NESTED_GROUP_AND_RAW_COUNTER("cpu", "1", "\\Processor\\% Processor Time");
 
         ASSERT_NO_NESTED_GROUP_AND_RAW_COUNTER("cpu", "_Total", "\\Processor\\% Idle Time");
         ASSERT_NO_NESTED_GROUP_AND_RAW_COUNTER("cpu", "_Total", "\\Processor\\% Processor Time");
