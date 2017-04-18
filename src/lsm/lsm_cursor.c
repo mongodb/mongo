@@ -1530,6 +1530,11 @@ __clsm_insert(WT_CURSOR *cursor)
 	WT_ERR(__cursor_needvalue(cursor));
 	WT_ERR(__clsm_enter(clsm, false, true));
 
+	/*
+	 * It isn't necessary to copy the key out after the lookup in this
+	 * case because any non-failed lookup results in an error, and a
+	 * failed lookup leaves the original key intact.
+	 */
 	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
 	    (ret = __clsm_lookup(clsm, &value)) != WT_NOTFOUND) {
 		if (ret == 0)
@@ -1574,8 +1579,14 @@ __clsm_update(WT_CURSOR *cursor)
 	WT_ERR(__cursor_needvalue(cursor));
 	WT_ERR(__clsm_enter(clsm, false, true));
 
-	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 		WT_ERR(__clsm_lookup(clsm, &value));
+		/*
+		 * Copy the key out, since the insert resets non-primary chunk
+		 * cursors which our lookup may have landed on.
+		 */
+		WT_ERR(__cursor_needkey(cursor));
+	}
 	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
 	WT_ERR(__clsm_put(session, clsm, &cursor->key, &value, true, false));
 
@@ -1621,8 +1632,14 @@ __clsm_remove(WT_CURSOR *cursor)
 	__cursor_novalue(cursor);
 	WT_ERR(__clsm_enter(clsm, false, true));
 
-	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 		WT_ERR(__clsm_lookup(clsm, &value));
+		/*
+		 * Copy the key out, since the insert resets non-primary chunk
+		 * cursors which our lookup may have landed on.
+		 */
+		WT_ERR(__cursor_needkey(cursor));
+	}
 	WT_ERR(__clsm_put(
 	    session, clsm, &cursor->key, &__tombstone, positioned, false));
 
@@ -1663,8 +1680,13 @@ __clsm_reserve(WT_CURSOR *cursor)
 	WT_ERR(__wt_txn_context_check(session, true));
 	WT_ERR(__clsm_enter(clsm, false, true));
 
-	if ((ret = __clsm_lookup(clsm, &value)) == 0)
-		ret = __clsm_put(session, clsm, &cursor->key, NULL, true, true);
+	WT_ERR(__clsm_lookup(clsm, &value));
+	/*
+	 * Copy the key out, since the insert resets non-primary chunk cursors
+	 * which our lookup may have landed on.
+	 */
+	WT_ERR(__cursor_needkey(cursor));
+	ret = __clsm_put(session, clsm, &cursor->key, NULL, true, true);
 
 err:	__clsm_leave(clsm);
 	CURSOR_UPDATE_API_END(session, ret);
