@@ -77,7 +77,7 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
     var node = this.nodes[nodeId];
 
     try {
-        node.getDB("admin").runCommand({replSetStepDown: 50, force: true});
+        node.getDB("admin").runCommand({replSetStepDown: 300, secondaryCatchUpPeriodSecs: 60});
         assert(false);
     } catch (ex) {
         print('Caught exception after stepDown cmd: ' + tojson(ex));
