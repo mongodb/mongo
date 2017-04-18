@@ -49,27 +49,9 @@
 namespace mongo {
 namespace {
 Status wrappedRun(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  Database* const db,
+                  Collection* collection,
                   const BSONObj& jsobj,
                   BSONObjBuilder* anObjBuilder) {
-    if (!serverGlobalParams.quiet.load()) {
-        LOG(0) << "CMD: dropIndexes " << nss;
-    }
-    Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
-
-    // If db/collection does not exist, short circuit and return.
-    if (!db || !collection) {
-        if (db && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
-            return {ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Cannot drop indexes on view " << nss.ns()};
-        }
-
-        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
-    }
-
-    OldClientContext ctx(opCtx, nss.ns());
-    BackgroundOperation::assertNoBgOpInProgForNs(nss);
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
     anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(opCtx));
@@ -88,7 +70,7 @@ Status wrappedRun(OperationContext* opCtx,
             // We log one op for every dropped index so that we can roll them back if necessary.
             for (auto const& idx : droppedIndexes) {
                 opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-                    opCtx, nss, idx.first, idx.second);
+                    opCtx, collection->ns(), collection->uuid(opCtx), idx.first, idx.second);
             }
 
             anObjBuilder->append("msg", "non-_id indexes dropped for collection");
@@ -112,7 +94,7 @@ Status wrappedRun(OperationContext* opCtx,
         }
 
         opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, nss, desc->indexName(), desc->infoObj());
+            opCtx, collection->ns(), collection->uuid(opCtx), desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }
@@ -146,7 +128,7 @@ Status wrappedRun(OperationContext* opCtx,
         }
 
         opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, nss, desc->indexName(), desc->infoObj());
+            opCtx, collection->ns(), collection->uuid(opCtx), desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }
@@ -157,7 +139,7 @@ Status wrappedRun(OperationContext* opCtx,
 
 Status dropIndexes(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const BSONObj& cmdObj,
+                   const BSONObj& idxDescriptor,
                    BSONObjBuilder* result) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
@@ -170,8 +152,27 @@ Status dropIndexes(OperationContext* opCtx,
                     str::stream() << "Not primary while dropping indexes in " << nss.ns()};
         }
 
+        if (!serverGlobalParams.quiet.load()) {
+            LOG(0) << "CMD: dropIndexes " << nss;
+        }
+
+        // If db/collection does not exist, short circuit and return.
+        Database* db = autoDb.getDb();
+        Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
+        if (!db || !collection) {
+            if (db && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
+                return {ErrorCodes::CommandNotSupportedOnView,
+                        str::stream() << "Cannot drop indexes on view " << nss.ns()};
+            }
+
+            return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+        }
+
         WriteUnitOfWork wunit(opCtx);
-        Status status = wrappedRun(opCtx, nss, autoDb.getDb(), cmdObj, result);
+        OldClientContext ctx(opCtx, nss.ns());
+        BackgroundOperation::assertNoBgOpInProgForNs(nss);
+
+        Status status = wrappedRun(opCtx, collection, idxDescriptor, result);
         if (!status.isOK()) {
             return status;
         }

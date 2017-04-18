@@ -49,6 +49,8 @@ extern bool enableCollectionUUIDs;  // TODO(SERVER-27993) Replace based on upgra
  */
 using CollectionUUID = UUID;
 
+using OptionalCollectionUUID = boost::optional<CollectionUUID>;
+
 struct CollectionOptions {
     /**
      * Returns true if the options indicate the namespace is a view.
@@ -83,7 +85,7 @@ struct CollectionOptions {
     // ----
 
     // Collection UUID. Will exist if featureCompatibilityVersion >= 3.6.
-    boost::optional<CollectionUUID> uuid;
+    OptionalCollectionUUID uuid;
 
     bool capped = false;
     long long cappedSize = 0;

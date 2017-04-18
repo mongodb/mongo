@@ -438,6 +438,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // We want to destroy the Collection object before telling the StorageEngine to destroy the
     // RecordStore.
+    auto uuid = collection->uuid(opCtx);
     _clearCollectionCache(opCtx, fullns.toString(), "collection dropped");
 
     s = _dbEntry->dropCollection(opCtx, fullns.toString());
@@ -459,7 +460,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         }
     }
 
-    getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns);
+    getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
 
     // Evict namespace entry from the namespace/uuid cache.
     if (enableCollectionUUIDs) {

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 
 namespace mongo {
 class CollectionImpl final : virtual public Collection::Impl,
@@ -71,6 +72,10 @@ public:
 
     const NamespaceString& ns() const final {
         return _ns;
+    }
+
+    OptionalCollectionUUID uuid(OperationContext* opCtx) const {
+        return getCatalogEntry()->getCollectionOptions(opCtx).uuid;
     }
 
     const IndexCatalog* getIndexCatalog() const final {

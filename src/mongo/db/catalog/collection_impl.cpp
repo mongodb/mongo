@@ -443,7 +443,8 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
         return status;
     invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
 
-    getGlobalServiceContext()->getOpObserver()->onInserts(opCtx, ns(), begin, end, fromMigrate);
+    getGlobalServiceContext()->getOpObserver()->onInserts(
+        opCtx, ns(), uuid(opCtx), begin, end, fromMigrate);
 
     opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -506,7 +507,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     docs.push_back(doc);
 
     getGlobalServiceContext()->getOpObserver()->onInserts(
-        opCtx, ns(), docs.begin(), docs.end(), false);
+        opCtx, ns(), uuid(opCtx), docs.begin(), docs.end(), false);
 
     opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -621,7 +622,7 @@ void CollectionImpl::deleteDocument(
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), std::move(deleteState), fromMigrate);
+        opCtx, ns(), uuid(opCtx), std::move(deleteState), fromMigrate);
 }
 
 Counter64 moveCounter;

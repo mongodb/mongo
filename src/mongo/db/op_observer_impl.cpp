@@ -30,6 +30,7 @@
 
 #include "mongo/db/op_observer_impl.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/dbhash.h"
@@ -46,26 +47,41 @@
 namespace mongo {
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
-                                   const NamespaceString& ns,
+                                   const NamespaceString& nss,
+                                   OptionalCollectionUUID uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
-    repl::logOp(opCtx, "i", ns, indexDoc, nullptr, fromMigrate);
-    AuthorizationManager::get(opCtx->getServiceContext())->logOp(opCtx, "i", ns, indexDoc, nullptr);
+    NamespaceString systemIndexes{nss.getSystemIndexesCollection()};
+    if (uuid) {
+        BSONObjBuilder builder;
+        builder.append("createIndex", nss.coll());
 
-    auto css = CollectionShardingState::get(opCtx, ns);
+        for (const auto& e : indexDoc) {
+            if (e.fieldNameStringData() != "ns"_sd)
+                builder.append(e);
+        }
+        repl::logOp(opCtx, "c", nss.getCommandNS(), uuid, builder.done(), nullptr, fromMigrate);
+    } else {
+        repl::logOp(opCtx, "i", systemIndexes, {}, indexDoc, nullptr, fromMigrate);
+    }
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "i", systemIndexes, indexDoc, nullptr);
+
+    auto css = CollectionShardingState::get(opCtx, systemIndexes);
     if (!fromMigrate) {
         css->onInsertOp(opCtx, indexDoc);
     }
 
-    logOpForDbHash(opCtx, ns);
+    logOpForDbHash(opCtx, systemIndexes);
 }
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const NamespaceString& nss,
+                               OptionalCollectionUUID uuid,
                                std::vector<BSONObj>::const_iterator begin,
                                std::vector<BSONObj>::const_iterator end,
                                bool fromMigrate) {
-    repl::logOps(opCtx, "i", nss, begin, end, fromMigrate);
+    repl::logOps(opCtx, "i", nss, uuid, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(opCtx, nss.ns());
 
@@ -97,7 +113,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         return;
     }
 
-    repl::logOp(opCtx, "u", args.nss, args.update, &args.criteria, args.fromMigrate);
+    repl::logOp(opCtx, "u", args.nss, args.uuid, args.update, &args.criteria, args.fromMigrate);
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "u", args.nss, args.update, &args.criteria);
 
@@ -121,7 +137,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 }
 
 CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationContext* opCtx,
-                                                                   const NamespaceString& ns,
+                                                                   const NamespaceString& nss,
                                                                    const BSONObj& doc) {
     CollectionShardingState::DeleteState deleteState;
     BSONElement idElement = doc["_id"];
@@ -129,7 +145,7 @@ CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationCont
         deleteState.idDoc = idElement.wrap();
     }
 
-    auto css = CollectionShardingState::get(opCtx, ns.ns());
+    auto css = CollectionShardingState::get(opCtx, nss.ns());
     deleteState.isMigrating = css->isDocumentInMigratingChunk(opCtx, doc);
 
     return deleteState;
@@ -137,12 +153,13 @@ CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationCont
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
+                              OptionalCollectionUUID uuid,
                               CollectionShardingState::DeleteState deleteState,
                               bool fromMigrate) {
     if (deleteState.idDoc.isEmpty())
         return;
 
-    repl::logOp(opCtx, "d", nss, deleteState.idDoc, nullptr, fromMigrate);
+    repl::logOp(opCtx, "d", nss, uuid, deleteState.idDoc, nullptr, fromMigrate);
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", nss, deleteState.idDoc, nullptr);
 
@@ -164,7 +181,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) {
-    repl::logOp(opCtx, "n", {}, msgObj, nullptr, false);
+    repl::logOp(opCtx, "n", {}, {}, msgObj, nullptr, false);
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
@@ -174,7 +191,12 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     const NamespaceString dbName = collectionName.getCommandNS();
     BSONObjBuilder b;
     b.append("create", collectionName.coll().toString());
-    b.appendElements(options.toBSON());
+    {
+        // Don't store the UUID as part of the options, but instead only at the top level
+        CollectionOptions optionsToStore = options;
+        optionsToStore.uuid.reset();
+        b.appendElements(optionsToStore.toBSON());
+    }
 
     // Include the full _id index spec in the oplog for index versions >= 2.
     if (!idIndex.isEmpty()) {
@@ -190,7 +212,7 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", dbName, cmdObj, nullptr, false);
+        repl::logOp(opCtx, "c", dbName, options.uuid, cmdObj, nullptr, false);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", dbName, cmdObj, nullptr);
@@ -199,12 +221,13 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
 
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const NamespaceString& nss,
+                               OptionalCollectionUUID uuid,
                                const BSONObj& collModCmd) {
     const NamespaceString cmdNss = nss.getCommandNS();
 
     if (!nss.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, collModCmd, nullptr, false);
+        repl::logOp(opCtx, "c", cmdNss, uuid, collModCmd, nullptr, false);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, collModCmd, nullptr);
@@ -215,7 +238,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     BSONObj cmdObj = BSON("dropDatabase" << 1);
     const NamespaceString cmdNss{dbName, "$cmd"};
 
-    repl::logOp(opCtx, "c", cmdNss, cmdObj, nullptr, false);
+    repl::logOp(opCtx, "c", cmdNss, {}, cmdObj, nullptr, false);
 
     if (dbName == FeatureCompatibilityVersion::kDatabase) {
         FeatureCompatibilityVersion::onDropCollection();
@@ -226,13 +249,14 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
 }
 
 void OpObserverImpl::onDropCollection(OperationContext* opCtx,
-                                      const NamespaceString& collectionName) {
+                                      const NamespaceString& collectionName,
+                                      OptionalCollectionUUID uuid) {
     const NamespaceString dbName = collectionName.getCommandNS();
     BSONObj cmdObj = BSON("drop" << collectionName.coll().toString());
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", dbName, cmdObj, nullptr, false);
+        repl::logOp(opCtx, "c", dbName, uuid, cmdObj, nullptr, false);
     }
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -252,12 +276,13 @@ void OpObserverImpl::onDropCollection(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onDropIndex(OperationContext* opCtx,
-                                 const NamespaceString& ns,
+                                 const NamespaceString& nss,
+                                 OptionalCollectionUUID uuid,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo) {
-    BSONObj cmdObj = BSON("dropIndexes" << ns.coll() << "index" << indexName);
-    auto commandNS = ns.getCommandNS();
-    repl::logOp(opCtx, "c", commandNS, cmdObj, &indexInfo, false);
+    BSONObj cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
+    auto commandNS = nss.getCommandNS();
+    repl::logOp(opCtx, "c", commandNS, uuid, cmdObj, &indexInfo, false);
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", commandNS, cmdObj, &indexInfo);
     logOpForDbHash(opCtx, commandNS);
@@ -266,16 +291,27 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
 void OpObserverImpl::onRenameCollection(OperationContext* opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
+                                        OptionalCollectionUUID uuid,
                                         bool dropTarget,
+                                        OptionalCollectionUUID dropTargetUUID,
+                                        OptionalCollectionUUID dropSourceUUID,
                                         bool stayTemp) {
     const NamespaceString cmdNss = fromCollection.getCommandNS();
-    BSONObj cmdObj =
-        BSON("renameCollection" << fromCollection.ns() << "to" << toCollection.ns() << "stayTemp"
-                                << stayTemp
-                                << "dropTarget"
-                                << dropTarget);
+    BSONObjBuilder builder;
+    builder.append("renameCollection", fromCollection.ns());
+    builder.append("to", toCollection.ns());
+    builder.append("stayTemp", stayTemp);
+    if (dropTargetUUID && enableCollectionUUIDs) {
+        dropTargetUUID->appendToBuilder(&builder, "dropTarget");
+    } else {
+        builder.append("dropTarget", dropTarget);
+    }
+    if (dropSourceUUID && enableCollectionUUIDs) {
+        dropSourceUUID->appendToBuilder(&builder, "dropSource");
+    }
+    BSONObj cmdObj = builder.done();
 
-    repl::logOp(opCtx, "c", cmdNss, cmdObj, nullptr, false);
+    repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false);
     if (fromCollection.coll() == DurableViewCatalog::viewsCollectionName() ||
         toCollection.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(
@@ -290,7 +326,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
     const NamespaceString cmdNss{dbName, "$cmd"};
-    repl::logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr, false);
+    repl::logOp(opCtx, "c", cmdNss, {}, applyOpCmd, nullptr, false);
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
     logOpForDbHash(opCtx, cmdNss);
@@ -298,26 +334,29 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
 
 void OpObserverImpl::onConvertToCapped(OperationContext* opCtx,
                                        const NamespaceString& collectionName,
+                                       OptionalCollectionUUID uuid,
                                        double size) {
     const NamespaceString cmdNss = collectionName.getCommandNS();
     BSONObj cmdObj = BSON("convertToCapped" << collectionName.coll() << "size" << size);
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, cmdObj, nullptr, false);
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
     logOpForDbHash(opCtx, cmdNss);
 }
 
-void OpObserverImpl::onEmptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
+void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
+                                   const NamespaceString& collectionName,
+                                   OptionalCollectionUUID uuid) {
     const NamespaceString cmdNss = collectionName.getCommandNS();
     BSONObj cmdObj = BSON("emptycapped" << collectionName.coll());
 
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, cmdObj, nullptr, false);
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, nullptr, false);
     }
 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);

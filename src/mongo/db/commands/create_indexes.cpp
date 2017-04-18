@@ -389,9 +389,8 @@ public:
             indexer.commit();
 
             for (auto&& infoObj : indexInfoObjs) {
-                NamespaceString systemIndexes{ns.getSystemIndexesCollection()};
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, systemIndexes, infoObj, false);
+                    opCtx, ns, collection->uuid(opCtx), infoObj, false);
             }
 
             wunit.commit();

@@ -510,8 +510,9 @@ void State::prepTempCollection() {
                 uassertStatusOK(status);
             }
             // Log the createIndex operation.
-            NamespaceString logNs{_config.tempNamespace.db(), "system.indexes"};
-            getGlobalServiceContext()->getOpObserver()->onCreateIndex(_opCtx, logNs, *it, false);
+            auto uuid = tempColl->uuid(_opCtx);
+            getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                _opCtx, _config.tempNamespace, uuid, *it, false);
         }
         wuow.commit();
     }

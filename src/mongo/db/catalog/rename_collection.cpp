@@ -126,77 +126,98 @@ Status renameCollection(OperationContext* opCtx,
 
     Database* const targetDB = dbHolder().openDb(opCtx, target.db());
 
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        WriteUnitOfWork wunit(opCtx);
-
-        // Check if the target namespace exists and if dropTarget is true.
-        // Return a non-OK status if target exists and dropTarget is not true or if the collection
-        // is sharded.
-        if (targetDB->getCollection(opCtx, target)) {
-            if (CollectionShardingState::get(opCtx, target)->getMetadata()) {
-                return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
-            }
-
-            if (!dropTarget) {
-                return Status(ErrorCodes::NamespaceExists, "target namespace exists");
-            }
-
-            Status s = targetDB->dropCollection(opCtx, target.ns());
-            if (!s.isOK()) {
-                return s;
-            }
-        } else if (targetDB->getViewCatalog()->lookup(opCtx, target.ns())) {
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << "a view already exists with that name: " << target.ns());
+    // Check if the target namespace exists and if dropTarget is true.
+    // Return a non-OK status if target exists and dropTarget is not true or if the collection
+    // is sharded.
+    Collection* targetColl = targetDB->getCollection(opCtx, target);
+    if (targetColl) {
+        if (CollectionShardingState::get(opCtx, target)->getMetadata()) {
+            return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
         }
 
-        // If we are renaming in the same database, just
-        // rename the namespace and we're done.
-        if (sourceDB == targetDB) {
+        if (!dropTarget) {
+            return Status(ErrorCodes::NamespaceExists, "target namespace exists");
+        }
+
+    } else if (targetDB->getViewCatalog()->lookup(opCtx, target.ns())) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "a view already exists with that name: " << target.ns());
+    }
+
+    auto sourceUUID = sourceColl->uuid(opCtx);
+    // If we are renaming in the same database, just rename the namespace and we're done.
+    if (sourceDB == targetDB) {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(opCtx);
+            OptionalCollectionUUID dropTargetUUID;
+            if (targetColl) {
+                // No logOp necessary because the entire renameCollection command is one logOp.
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                dropTargetUUID = targetColl->uuid(opCtx);
+                Status s = targetDB->dropCollection(opCtx, target.ns());
+                if (!s.isOK()) {
+                    return s;
+                }
+            }
+
             Status s = targetDB->renameCollection(opCtx, source.ns(), target.ns(), stayTemp);
             if (!s.isOK()) {
                 return s;
             }
 
-            getGlobalServiceContext()->getOpObserver()->onRenameCollection(
-                opCtx, NamespaceString(source), NamespaceString(target), dropTarget, stayTemp);
+            getGlobalServiceContext()->getOpObserver()->onRenameCollection(opCtx,
+                                                                           NamespaceString(source),
+                                                                           NamespaceString(target),
+                                                                           sourceUUID,
+                                                                           dropTarget,
+                                                                           dropTargetUUID,
+                                                                           /*dropSourceUUID*/ {},
+                                                                           stayTemp);
 
             wunit.commit();
-            return Status::OK();
         }
-
-        wunit.commit();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", target.ns());
+        return Status::OK();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", target.ns());
+
 
     // If we get here, we are renaming across databases, so we must copy all the data and
     // indexes, then remove the source collection.
 
-    // Create the target collection. It will be removed if we fail to copy the collection.
-    // TODO use a temp collection and unset the temp flag on success.
-    Collection* targetColl = nullptr;
+    // Create a temporary collection in the target database. It will be removed if we fail to copy
+    // the collection, or on restart, so there is no need to replicate these writes.
+    // A fixed name is not ideal, but there can never be more than one of these due to the global
+    // write lock acquired at the top.
+    NamespaceString tmpName(target.db(), "tmp.renameCollection");
+    Collection* tmpColl = nullptr;
+    OptionalCollectionUUID tmpUUID;
     {
         CollectionOptions options = sourceColl->getCatalogEntry()->getCollectionOptions(opCtx);
+        // Renaming across databases will result in a new UUID, as otherwise we'd require
+        // two collections with the same uuid (temporarily).
+        options.temp = true;
+        if (enableCollectionUUIDs)
+            tmpUUID = UUID::gen();
 
-        WriteUnitOfWork wunit(opCtx);
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(opCtx);
 
-        // No logOp necessary because the entire renameCollection command is one logOp.
-        repl::UnreplicatedWritesBlock uwb(opCtx);
-        targetColl = targetDB->createCollection(opCtx,
-                                                target.ns(),
-                                                options,
-                                                false);  // _id index build with others later.
-        if (!targetColl) {
-            return Status(ErrorCodes::OutOfDiskSpace, "Failed to create target collection.");
+            // No logOp necessary because the entire renameCollection command is one logOp.
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            tmpColl = targetDB->createCollection(opCtx,
+                                                 tmpName.ns(),
+                                                 options,
+                                                 false);  // _id index build with others later.
+
+            wunit.commit();
         }
-
-        wunit.commit();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", tmpName.ns());
     }
 
     // Dismissed on success
-    ScopeGuard targetCollectionDropper = MakeGuard(dropCollection, opCtx, targetDB, target.ns());
+    ScopeGuard tmpCollectionDropper = MakeGuard(dropCollection, opCtx, targetDB, tmpName.ns());
 
-    MultiIndexBlock indexer(opCtx, targetColl);
+    MultiIndexBlock indexer(opCtx, tmpColl);
     indexer.allowInterruption();
     std::vector<MultiIndexBlock*> indexers{&indexer};
 
@@ -212,7 +233,7 @@ Status renameCollection(OperationContext* opCtx,
             BSONObjBuilder newIndex;
             for (auto&& elem : currIndex) {
                 if (elem.fieldNameStringData() == "ns") {
-                    newIndex.append("ns", target.ns());
+                    newIndex.append("ns", tmpName.ns());
                 } else {
                     newIndex.append(elem);
                 }
@@ -230,13 +251,16 @@ Status renameCollection(OperationContext* opCtx,
 
             const auto obj = record->data.releaseToBson();
 
-            WriteUnitOfWork wunit(opCtx);
-            // No logOp necessary because the entire renameCollection command is one logOp.
-            repl::UnreplicatedWritesBlock uwb(opCtx);
-            Status status = targetColl->insertDocument(opCtx, obj, indexers, true);
-            if (!status.isOK())
-                return status;
-            wunit.commit();
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(opCtx);
+                // No logOp necessary because the entire renameCollection command is one logOp.
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                Status status = tmpColl->insertDocument(opCtx, obj, indexers, true);
+                if (!status.isOK())
+                    return status;
+                wunit.commit();
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", tmpName.ns());
         }
     }
 
@@ -244,28 +268,43 @@ Status renameCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    {
-        // Getting here means we successfully built the target copy. We now remove the
-        // source collection and finalize the rename.
+    // Getting here means we successfully built the target copy. We now do the final
+    // in-place rename and remove the source collection.
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         WriteUnitOfWork wunit(opCtx);
-
+        indexer.commit();
+        OptionalCollectionUUID dropTargetUUID;
         {
             repl::UnreplicatedWritesBlock uwb(opCtx);
-            Status status = sourceDB->dropCollection(opCtx, source.ns());
+            Status status = Status::OK();
+            if (targetColl) {
+                dropTargetUUID = targetColl->uuid(opCtx);
+                status = targetDB->dropCollection(opCtx, target.ns());
+            }
+            if (status.isOK())
+                status = targetDB->renameCollection(opCtx, tmpName.ns(), target.ns(), stayTemp);
+            if (status.isOK())
+                status = sourceDB->dropCollection(opCtx, source.ns());
+
             if (!status.isOK())
                 return status;
         }
 
-        indexer.commit();
-
         getGlobalServiceContext()->getOpObserver()->onRenameCollection(
-            opCtx, NamespaceString(source), NamespaceString(target), dropTarget, stayTemp);
+            opCtx,
+            source,
+            target,
+            tmpUUID,
+            dropTarget,
+            dropTargetUUID,
+            /*dropSourceUUID*/ sourceUUID,
+            stayTemp);
 
         wunit.commit();
     }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "renameCollection", tmpName.ns());
 
-    targetCollectionDropper.Dismiss();
+    tmpCollectionDropper.Dismiss();
     return Status::OK();
 }
-
 }  // namespace mongo

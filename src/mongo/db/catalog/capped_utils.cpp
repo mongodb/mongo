@@ -102,7 +102,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
         return status;
     }
 
-    getGlobalServiceContext()->getOpObserver()->onEmptyCapped(opCtx, collection->ns());
+    getGlobalServiceContext()->getOpObserver()->onEmptyCapped(
+        opCtx, collection->ns(), collection->uuid(opCtx));
 
     wuow.commit();
 
@@ -271,7 +272,6 @@ Status convertToCapped(OperationContext* opCtx,
             return status;
     }
 
-
     {
         repl::UnreplicatedWritesBlock uwb(opCtx);
         Status status =
@@ -280,9 +280,9 @@ Status convertToCapped(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-
-        verify(db->getCollection(opCtx, longTmpName));
     }
+
+    OptionalCollectionUUID uuid = db->getCollection(opCtx, longTmpName)->uuid(opCtx);
 
     {
         WriteUnitOfWork wunit(opCtx);
@@ -298,7 +298,7 @@ Status convertToCapped(OperationContext* opCtx,
             return status;
 
         getGlobalServiceContext()->getOpObserver()->onConvertToCapped(
-            opCtx, NamespaceString(collectionName), size);
+            opCtx, collectionName, uuid, size);
 
         wunit.commit();
     }

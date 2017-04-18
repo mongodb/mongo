@@ -409,11 +409,9 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
     indexer.commit();
     if (opCtx->writesAreReplicated()) {
-        const string targetSystemIndexesCollectionName = to_collection.getSystemIndexesCollection();
-        const NamespaceString createIndexNs{targetSystemIndexesCollectionName};
         for (auto&& infoObj : indexInfoObjs) {
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                opCtx, createIndexNs, infoObj, false);
+                opCtx, collection->ns(), collection->uuid(opCtx), infoObj, false);
         }
     }
     wunit.commit();

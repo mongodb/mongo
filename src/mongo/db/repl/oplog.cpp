@@ -273,6 +273,7 @@ bool oplogDisabled(OperationContext* opCtx,
 OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             const char* opstr,
                             const NamespaceString& nss,
+                            OptionalCollectionUUID uuid,
                             const BSONObj& obj,
                             const BSONObj* o2,
                             bool fromMigrate,
@@ -287,6 +288,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.append("v", OplogEntry::kOplogVersion);
     b.append("op", opstr);
     b.append("ns", nss.ns());
+    if (uuid)
+        uuid->appendToBuilder(&b, "ui");
     if (fromMigrate)
         b.appendBool("fromMigrate", true);
     if (o2)
@@ -391,6 +394,7 @@ void _logOpsInner(OperationContext* opCtx,
 void logOp(OperationContext* opCtx,
            const char* opstr,
            const NamespaceString& nss,
+           OptionalCollectionUUID uuid,
            const BSONObj& obj,
            const BSONObj* o2,
            bool fromMigrate) {
@@ -405,7 +409,8 @@ void logOp(OperationContext* opCtx,
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
-    auto writer = _logOpWriter(opCtx, opstr, nss, obj, o2, fromMigrate, slot.opTime, slot.hash);
+    auto writer =
+        _logOpWriter(opCtx, opstr, nss, uuid, obj, o2, fromMigrate, slot.opTime, slot.hash);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
 }
@@ -413,6 +418,7 @@ void logOp(OperationContext* opCtx,
 void logOps(OperationContext* opCtx,
             const char* opstr,
             const NamespaceString& nss,
+            OptionalCollectionUUID uuid,
             std::vector<BSONObj>::const_iterator begin,
             std::vector<BSONObj>::const_iterator end,
             bool fromMigrate) {
@@ -433,7 +439,7 @@ void logOps(OperationContext* opCtx,
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
     for (size_t i = 0; i < count; i++) {
         writers.emplace_back(_logOpWriter(
-            opCtx, opstr, nss, begin[i], NULL, fromMigrate, slots[i].opTime, slots[i].hash));
+            opCtx, opstr, nss, uuid, begin[i], NULL, fromMigrate, slots[i].opTime, slots[i].hash));
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);

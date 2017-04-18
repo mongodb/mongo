@@ -39,7 +39,7 @@ class OperationContext;
  * "result" with some statistics about the dropped index.
  */
 Status dropIndexes(OperationContext* opCtx,
-                   const NamespaceString& ns,
+                   const NamespaceString& nss,
                    const BSONObj& idxDescriptor,
                    BSONObjBuilder* result);
 
