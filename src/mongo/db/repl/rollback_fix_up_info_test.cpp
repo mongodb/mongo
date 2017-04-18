@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/rollback_fix_up_info.h"
+#include "mongo/db/repl/rollback_fix_up_info_descriptions.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -193,6 +194,75 @@ TEST_F(RollbackFixUpInfoTest,
 }
 
 TEST_F(RollbackFixUpInfoTest,
+       ProcessInsertDocumentOplogEntryWhenExistingDocumentHasDeleteOpTypeRemovesDocument) {
+    auto collectionUuid = UUID::gen();
+    NamespaceString nss("test.t");
+    auto doc = BSON("_id"
+                    << "mydocid"
+                    << "x"
+                    << 1);
+    auto docId = doc["_id"];
+
+    // State of oplog:
+    // {op: 'i'}, ...., {op: 'd'}, ....
+    // (earliest optime) ---> (latest optime)
+    //
+    // Oplog entries are processed in reverse optime order.
+
+    // First, process document delete oplog entry.
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kDelete,
+        nss.db().toString()));
+
+    RollbackFixUpInfo::SingleDocumentOperationDescription desc(
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kDelete,
+        nss.db().toString());
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {desc.toBSON()});
+
+    // Next, process an unrelated document insert oplog entry with a different _id in the same
+    // collection. This is to ensure we do not remove unrelated documents from the
+    // "kRollbackDocsNamespace" collection.
+    auto doc2 = BSON("_id"
+                     << "mydocid2"
+                     << "x"
+                     << 2);
+    auto docId2 = doc2["_id"];
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId2,
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        nss.db().toString()));
+
+    RollbackFixUpInfo::SingleDocumentOperationDescription desc2(
+        collectionUuid,
+        docId2,
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        nss.db().toString());
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {desc.toBSON(), desc2.toBSON()});
+
+    // Lastly, process document insert oplog entry. This should cancel out the existing delete oplog
+    // entry with the same _id.
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        nss.db().toString()));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {desc2.toBSON()});
+}
+
+TEST_F(RollbackFixUpInfoTest,
        ProcessDeleteDocumentOplogEntryInsertsDocumentIntoRollbackDocsCollectionWithDeleteOpType) {
     auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
                                << "d"
@@ -270,6 +340,82 @@ TEST_F(RollbackFixUpInfoTest,
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {expectedDocument});
+
+    // Processing another 'update' oplog entry on the same document should not change the document
+    // in the rollback collection.
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kUpdate,
+        nss.db().toString()));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {expectedDocument});
+
+
+    // Processing an 'insert' oplog entry when the existing document has an 'update' op type should
+    // replace the existing document in the rollback collection with a new one with an 'insert' op
+    // type.
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        nss.db().toString()));
+    RollbackFixUpInfo::SingleDocumentOperationDescription insertDesc(
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        nss.db().toString());
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {insertDesc.toBSON()});
+}
+
+TEST_F(
+    RollbackFixUpInfoTest,
+    ProcessUpdateDocumentOplogEntryWhenExistingDocumentHasDeleteOpTypeLeavesExistingDocumentIntact) {
+    auto collectionUuid = UUID::gen();
+    NamespaceString nss("test.t");
+    auto doc = BSON("_id"
+                    << "mydocid"
+                    << "x"
+                    << 1);
+    auto docId = doc["_id"];
+
+    // State of oplog:
+    // {op: 'u'}, ...., {op: 'd'}, ....
+    // (earliest optime) ---> (latest optime)
+    //
+    // Oplog entries are processed in reverse optime order.
+
+    // First, process document delete oplog entry.
+    auto opCtx = makeOpCtx();
+    RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kDelete,
+        nss.db().toString()));
+
+    RollbackFixUpInfo::SingleDocumentOperationDescription desc(
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kDelete,
+        nss.db().toString());
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {desc.toBSON()});
+
+    // Next, process document update oplog entry. This should be ignored since the existing entry
+    // has a delete op type.
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        docId,
+        RollbackFixUpInfo::SingleDocumentOpType::kUpdate,
+        nss.db().toString()));
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {desc.toBSON()});
 }
 
 TEST_F(

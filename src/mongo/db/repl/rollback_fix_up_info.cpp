@@ -33,6 +33,7 @@
 #include "mongo/db/repl/rollback_fix_up_info.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/rollback_fix_up_info_descriptions.h"
@@ -72,7 +73,39 @@ Status RollbackFixUpInfo::processSingleDocumentOplogEntry(OperationContext* opCt
                                                           SingleDocumentOpType opType,
                                                           const std::string& dbName) {
     SingleDocumentOperationDescription desc(collectionUuid, docId, opType, dbName);
-    return _upsertById(opCtx, kRollbackDocsNamespace, desc.toBSON());
+    auto doc = desc.toBSON();
+    if (SingleDocumentOpType::kInsert == opType) {
+        // If the existing document (that may or may not exist in the "kRollbackDocsNamespace"
+        // collection) has a 'delete' op type, this oplog entry will cancel out the previously
+        // processed 'delete" oplog entry. We should remove the existing document from the
+        // collection and not insert a new document.
+        auto deleteResult =
+            _storageInterface->deleteById(opCtx, kRollbackDocsNamespace, doc["_id"]);
+        if (deleteResult.isOK()) {
+            auto existingDoc = deleteResult.getValue();
+            if ("delete" == existingDoc["operationType"].String()) {
+                return Status::OK();
+            }
+            // Fall through and replace the 'update' op type in the existing document with 'insert'
+            // so that the document will be dropped when we actually do the rollback.
+        }
+    } else if (SingleDocumentOpType::kUpdate == opType) {
+        // If there is an existing document in the "kRollbackDocsNamespace" collection, it must
+        // have either a 'delete' or 'update' op type.
+        //
+        // For a 'delete' entry, we should not replace it with 'update' so that if we process an
+        // oplog entry with an 'insert' op type later, we can cancel out the existing entry with the
+        // 'delete' op type.
+        //
+        // For an 'update' entry, there is nothing further to do because this matches the current op
+        // type passed to this function.
+        auto findResult = _storageInterface->findById(opCtx, kRollbackDocsNamespace, doc["_id"]);
+        if (findResult.isOK()) {
+            return Status::OK();
+        }
+        // No existing document. Insert a new document with 'update' op type.
+    }
+    return _upsertById(opCtx, kRollbackDocsNamespace, doc);
 }
 
 Status RollbackFixUpInfo::processCreateCollectionOplogEntry(OperationContext* opCtx,
@@ -140,16 +173,9 @@ Status RollbackFixUpInfo::processCreateIndexOplogEntry(OperationContext* opCtx,
     BSONObjBuilder bob;
     bob.append("_id", desc.makeIdKey());
     auto key = bob.obj();
-    auto deleteResult =
-        _storageInterface->deleteDocuments(opCtx,
-                                           kRollbackIndexNamespace,
-                                           "_id_"_sd,
-                                           StorageInterface::ScanDirection::kForward,
-                                           key,
-                                           BoundInclusion::kIncludeStartKeyOnly,
-                                           1U);
-    if (deleteResult.isOK() && !deleteResult.getValue().empty()) {
-        auto doc = deleteResult.getValue().front();
+    auto deleteResult = _storageInterface->deleteById(opCtx, kRollbackIndexNamespace, key["_id"]);
+    if (deleteResult.isOK()) {
+        auto doc = deleteResult.getValue();
         auto opTypeResult = IndexDescription::parseOpType(doc);
         if (!opTypeResult.isOK()) {
             invariant(ErrorCodes::FailedToParse == opTypeResult.getStatus());
