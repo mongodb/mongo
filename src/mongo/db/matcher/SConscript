@@ -146,11 +146,7 @@ env.Library(
         'expressions',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/database',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
     ],
 )
 

@@ -544,6 +544,7 @@ env.Library(
         'views/views',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/db/catalog/database',
         #'catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[
@@ -589,11 +590,6 @@ env.Library(
         'db_raii',
         'index/index_access_methods',
         'ops/write_ops',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -692,6 +688,7 @@ env.Library(
     LIBDEPS=[
         "db_raii",
         "index/index_access_methods",
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         #"catalog/catalog", # CYCLE
     ],
     LIBDEPS_TAGS=[
@@ -752,6 +749,8 @@ env.Library(
     LIBDEPS=[
         "background",
         "catalog/index_key_validate",
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/database',
         "$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1",
         #"catalog/catalog", # CYCLE
     ],

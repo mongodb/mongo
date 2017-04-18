@@ -85,12 +85,7 @@ if wiredtiger:
                  '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
                  '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
                  '$BUILD_DIR/mongo/db/commands/dcommands',
-                 #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
                  ],
-        LIBDEPS_TAGS=[
-            # TODO(ADAM, 2017-03-28): See `CYCLE` tags above
-            'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-        ],
         )
 
     wtEnv.Library(

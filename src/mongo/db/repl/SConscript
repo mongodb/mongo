@@ -282,10 +282,10 @@ env.Library(
         'oplog_interface_local.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/database',
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/catalog/database',
     ],
 )
 

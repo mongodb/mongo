@@ -53,6 +53,8 @@ env.Library(
         'compress',
         'paths',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

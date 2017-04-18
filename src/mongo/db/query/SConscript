@@ -75,6 +75,8 @@ env.Library(
         "query_planner",
         "query_planner_test_lib",
         '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
         "$BUILD_DIR/mongo/db/curop",
         "$BUILD_DIR/mongo/db/exec/exec",

@@ -147,11 +147,6 @@ env.Library('authmongod',
                 '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 '$BUILD_DIR/mongo/db/server_parameters',
                 '$BUILD_DIR/mongo/db/commands/core',
-                #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-            ],
-            LIBDEPS_TAGS=[
-                # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
-                'illegal_cyclic_or_unresolved_dependencies_whitelisted',
             ],
 )
 
