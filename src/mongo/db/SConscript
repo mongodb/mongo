@@ -369,35 +369,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target='range_deleter',
-    source=[
-        'range_deleter.cpp',
-        'range_deleter_mock_env.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-        '$BUILD_DIR/mongo/db/service_context',
-        'range_arithmetic',
-    ],
-)
-
-env.CppUnitTest(
-    target='range_deleter_test',
-    source=[
-        'range_deleter_test.cpp',
-    ],
-    LIBDEPS=[
-        'common',
-        'range_deleter',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-    ],
-)
-
 # This library is linked into mongos and mongod only, not into the shell or any tools.
 env.Library(
     target="mongodandmongos",
@@ -755,24 +726,6 @@ env.Library(
 )
 
 env.Library(
-    target="range_deleter_d",
-    source=[
-        "range_deleter_db_env.cpp",
-        "range_deleter_service.cpp",
-    ],
-    LIBDEPS=[
-        "dbhelpers",
-        "db_raii",
-        "range_deleter",
-        #"catalog/catalog", # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-    ],
-)
-
-env.Library(
     target="rw_concern_d",
     source=[
         "read_concern.cpp",
@@ -926,8 +879,6 @@ env.Library(
         "pipeline/serveronly",
         "prefetch",
         "query/query",
-        "range_deleter",
-        "range_deleter_d",
         "repair_database",
         "repl/bgsync",
         "repl/oplog_buffer_collection",

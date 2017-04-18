@@ -36,9 +36,12 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
@@ -123,7 +126,7 @@ public:
 
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.
-        grid.shardRegistry()->reload(opCtx);
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
         auto scopedRegisterMigration =
             uassertStatusOK(shardingState->registerDonateChunk(moveChunkRequest));
@@ -222,43 +225,21 @@ private:
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
 
             uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
-            moveTimingHelper.done(6);
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
         }
+        moveTimingHelper.done(6);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
 
-        // Schedule the range deleter
-        RangeDeleterOptions deleterOptions(KeyRange(moveChunkRequest.getNss().ns(),
-                                                    moveChunkRequest.getMinKey().getOwned(),
-                                                    moveChunkRequest.getMaxKey().getOwned(),
-                                                    shardKeyPattern));
-        deleterOptions.writeConcern = writeConcernForRangeDeleter;
-        deleterOptions.waitForOpenCursors = true;
-        deleterOptions.fromMigrate = true;
-        deleterOptions.onlyRemoveOrphanedDocs = true;
-        deleterOptions.removeSaverReason = "post-cleanup";
-
+        auto range = ChunkRange(moveChunkRequest.getMinKey(), moveChunkRequest.getMaxKey());
         if (moveChunkRequest.getWaitForDelete()) {
-            log() << "doing delete inline for cleanup of chunk data";
-
-            string errMsg;
-
-            // This is an immediate delete, and as a consequence, there could be more
-            // deletes happening simultaneously than there are deleter worker threads.
-            if (!getDeleter()->deleteNow(opCtx, deleterOptions, &errMsg)) {
-                log() << "Error occured while performing cleanup: " << redact(errMsg);
-            }
+            CollectionShardingState::waitForClean(
+                opCtx, moveChunkRequest.getNss(), moveChunkRequest.getVersionEpoch(), range);
+            // Ensure that wait for write concern for the chunk cleanup will include
+            // the deletes performed by the range deleter thread.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         } else {
-            log() << "forking for cleanup of chunk data";
-
-            string errMsg;
-            if (!getDeleter()->queueDelete(opCtx,
-                                           deleterOptions,
-                                           NULL,  // Don't want to be notified
-                                           &errMsg)) {
-                log() << "could not queue migration cleanup: " << redact(errMsg);
-            }
+            log() << "Leaving cleanup of " << moveChunkRequest.getNss().ns() << " range "
+                  << redact(range.toString()) << " to complete in background";
         }
-
         moveTimingHelper.done(7);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep7);
     }

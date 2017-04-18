@@ -29,14 +29,16 @@ load('./jstests/libs/cleanup_orphaned_util.js');
         {moveChunk: ns, find: {_id: 20}, to: st.shard1.shardName, _waitForDelete: true}));
 
     jsTest.log('Inserting 20 docs into shard 0....');
-    for (var i = -20; i < 20; i += 2)
+    for (var i = -20; i < 20; i += 2) {
         coll.insert({_id: i});
+    }
     assert.eq(null, coll.getDB().getLastError());
     assert.eq(20, donorColl.count());
 
     jsTest.log('Inserting 10 docs into shard 1....');
-    for (i = 20; i < 40; i += 2)
+    for (i = 20; i < 40; i += 2) {
         coll.insert({_id: i});
+    }
     assert.eq(null, coll.getDB().getLastError());
     assert.eq(10, recipientColl.count());
 

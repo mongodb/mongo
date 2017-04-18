@@ -289,7 +289,6 @@ mongodLibDeps = [
     'db/op_observer_d',
     'db/mongodwebserver',
     'db/repl/repl_set_commands',
-    'db/range_deleter_d',
     'db/repair_database',
     'db/repl/storage_interface_impl',
     'db/repl/topology_coordinator_impl',

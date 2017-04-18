@@ -117,9 +117,9 @@
             print("Checking read operations, should work");
             assert.eq(expectedDocs, testDB.foo.find().itcount());
             assert.eq(expectedDocs, testDB.foo.count());
+
             // NOTE: This is an explicit check that GLE can be run with read prefs, not the result
-            // of
-            // above.
+            // of above.
             assert.eq(null, testDB.runCommand({getlasterror: 1}).err);
             checkCommandSucceeded(testDB, {dbstats: 1});
             checkCommandSucceeded(testDB, {collstats: 'foo'});

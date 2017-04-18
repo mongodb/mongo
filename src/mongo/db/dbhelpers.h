@@ -139,29 +139,6 @@ struct Helpers {
     static BSONObj inferKeyPattern(const BSONObj& o);
 
     /**
-     * Takes a namespace range, specified by a min and max and qualified by an index pattern,
-     * and removes all the documents in that range found by iterating
-     * over the given index. Caller is responsible for insuring that min/max are
-     * compatible with the given keyPattern (e.g min={a:100} is compatible with
-     * keyPattern={a:1,b:1} since it can be extended to {a:100,b:minKey}, but
-     * min={b:100} is not compatible).
-     *
-     * Caller must hold a write lock on 'ns'
-     *
-     * Returns -1 when no usable index exists
-     *
-     * Does oplog the individual document deletions.
-     * // TODO: Refactor this mechanism, it is growing too large
-     */
-    static long long removeRange(OperationContext* opCtx,
-                                 const KeyRange& range,
-                                 BoundInclusion boundInclusion,
-                                 const WriteConcernOptions& secondaryThrottle,
-                                 RemoveSaver* callback = NULL,
-                                 bool fromMigrate = false,
-                                 bool onlyRemoveOrphanedDocs = false);
-
-    /**
      * Remove all documents from a collection.
      * You do not need to set the database before calling.
      * Does not oplog the operation.

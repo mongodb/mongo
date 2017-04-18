@@ -34,6 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -84,7 +85,8 @@ private:
 }  // unnamed namespace
 
 CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceString nss)
-    : _nss(std::move(nss)), _metadataManager{sc, _nss} {}
+    : _nss(std::move(nss)),
+      _metadataManager{sc, _nss, ShardingState::get(sc)->getRangeDeleterTaskExecutor()} {}
 
 CollectionShardingState::~CollectionShardingState() {
     invariant(!_sourceMgr);
@@ -119,12 +121,16 @@ void CollectionShardingState::markNotShardedAtStepdown() {
     _metadataManager.refreshActiveMetadata(nullptr);
 }
 
-void CollectionShardingState::beginReceive(const ChunkRange& range) {
-    _metadataManager.beginReceive(range);
+bool CollectionShardingState::beginReceive(ChunkRange const& range) {
+    return _metadataManager.beginReceive(range);
 }
 
 void CollectionShardingState::forgetReceive(const ChunkRange& range) {
     _metadataManager.forgetReceive(range);
+}
+
+Status CollectionShardingState::cleanUpRange(ChunkRange const& range) {
+    return _metadataManager.cleanUpRange(range);
 }
 
 MigrationSourceManager* CollectionShardingState::getMigrationSourceManager() {
@@ -170,6 +176,52 @@ bool CollectionShardingState::collectionIsSharded() {
     // this scenario we will assume this collection is sharded. We will know sharding state
     // definitively once SERVER-24960 has been fixed.
     return true;
+}
+
+// Call with collection unlocked.  Note that the CollectionShardingState object involved might not
+// exist anymore at the time of the call, or indeed anytime outside the AutoGetCollection block, so
+// anything that might alias something in it must be copied first.
+
+/* static */
+Status CollectionShardingState::waitForClean(OperationContext* opCtx,
+                                             NamespaceString nss,
+                                             OID const& epoch,
+                                             ChunkRange orphanRange) {
+    do {
+        auto stillScheduled = CollectionShardingState::CleanupNotification(nullptr);
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+            // First, see if collection was dropped.
+            auto css = CollectionShardingState::get(opCtx, nss);
+            {
+                auto metadata = css->_metadataManager.getActiveMetadata();
+                if (!metadata || metadata->getCollVersion().epoch() != epoch) {
+                    return {ErrorCodes::StaleShardVersion, "Collection being migrated was dropped"};
+                }
+            }  // drop metadata
+            stillScheduled = css->_metadataManager.trackOrphanedDataCleanup(orphanRange);
+            if (stillScheduled == nullptr) {
+                log() << "Finished deleting " << nss.ns() << " range "
+                      << redact(orphanRange.toString());
+                return Status::OK();
+            }
+        }  // drop collection lock
+
+        log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
+        Status result = stillScheduled->get(opCtx);
+        if (!result.isOK()) {
+            return {result.code(),
+                    str::stream() << "Failed to delete orphaned " << nss.ns() << " range "
+                                  << redact(orphanRange.toString())
+                                  << ": "
+                                  << redact(result.reason())};
+        }
+    } while (true);
+    MONGO_UNREACHABLE;
+}
+
+boost::optional<KeyRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
+    return _metadataManager.getNextOrphanRange(from);
 }
 
 bool CollectionShardingState::isDocumentInMigratingChunk(OperationContext* opCtx,
@@ -312,8 +364,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
         if (!info) {
             // There is no shard version information on either 'opCtx' or 'client'. This means that
             // the operation represented by 'opCtx' is unversioned, and the shard version is always
-            // OK
-            // for unversioned operations.
+            // OK for unversioned operations.
             return true;
         }
 

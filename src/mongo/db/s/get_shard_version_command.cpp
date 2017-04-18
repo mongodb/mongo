@@ -131,7 +131,7 @@ public:
                 chunksArr.doneFast();
 
                 BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));
-                metadata->toBSONPending(pendingArr);
+                css->toBSONPending(pendingArr);
                 pendingArr.doneFast();
             }
             metadataBuilder.doneFast();

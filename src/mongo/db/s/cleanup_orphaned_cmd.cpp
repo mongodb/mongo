@@ -53,6 +53,8 @@
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 using std::string;
@@ -78,65 +80,60 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   const WriteConcernOptions& secondaryThrottle,
                                   BSONObj* stoppedAtKey,
                                   string* errMsg) {
+
     BSONObj startingFromKey = startingFromKeyConst;
-
-    ScopedCollectionMetadata metadata;
+    boost::optional<ChunkRange> targetRange;
+    OID epoch;
     {
-        AutoGetCollection autoColl(opCtx, ns, MODE_IS);
-        metadata = CollectionShardingState::get(opCtx, ns.toString())->getMetadata();
-    }
-
-    if (!metadata) {
-        warning() << "skipping orphaned data cleanup for " << ns.toString()
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        auto css = CollectionShardingState::get(opCtx, ns.toString());
+        auto metadata = css->getMetadata();
+        if (!metadata) {
+            log() << "skipping orphaned data cleanup for " << ns.toString()
                   << ", collection is not sharded";
+            return CleanupResult_Done;
+        }
+        epoch = metadata->getCollVersion().epoch();
 
-        return CleanupResult_Done;
+        BSONObj keyPattern = metadata->getKeyPattern();
+        if (!startingFromKey.isEmpty()) {
+            if (!metadata->isValidKey(startingFromKey)) {
+                *errMsg = stream() << "could not cleanup orphaned data, start key "
+                                   << startingFromKey << " does not match shard key pattern "
+                                   << keyPattern;
+
+                log() << *errMsg;
+                return CleanupResult_Error;
+            }
+        } else {
+            startingFromKey = metadata->getMinKey();
+        }
+
+        boost::optional<KeyRange> orphanRange = css->getNextOrphanRange(startingFromKey);
+        if (!orphanRange) {
+            LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
+                   << redact(startingFromKey) << ", no orphan ranges remain";
+
+            return CleanupResult_Done;
+        }
+        orphanRange->ns = ns.ns();
+        *stoppedAtKey = orphanRange->maxKey;
+
+        LOG(0) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
+               << redact(startingFromKey) << ", removing next orphan range"
+               << " [" << redact(orphanRange->minKey) << "," << redact(orphanRange->maxKey) << ")";
+
+        targetRange.emplace(
+            ChunkRange(orphanRange->minKey.getOwned(), orphanRange->maxKey.getOwned()));
+        uassertStatusOK(css->cleanUpRange(*targetRange));
     }
-
-    BSONObj keyPattern = metadata->getKeyPattern();
-    if (!startingFromKey.isEmpty()) {
-        if (!metadata->isValidKey(startingFromKey)) {
-            *errMsg = stream() << "could not cleanup orphaned data, start key "
-                               << redact(startingFromKey) << " does not match shard key pattern "
-                               << keyPattern;
-
-            warning() << *errMsg;
+    if (targetRange) {
+        auto result = CollectionShardingState::waitForClean(opCtx, ns, epoch, *targetRange);
+        if (!result.isOK()) {
+            warning() << redact(result.reason());
             return CleanupResult_Error;
         }
-    } else {
-        startingFromKey = metadata->getMinKey();
     }
-
-    KeyRange orphanRange;
-    if (!metadata->getNextOrphanRange(startingFromKey, &orphanRange)) {
-        LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-               << redact(startingFromKey) << ", no orphan ranges remain";
-
-        return CleanupResult_Done;
-    }
-    orphanRange.ns = ns.ns();
-    *stoppedAtKey = orphanRange.maxKey;
-
-    LOG(0) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-           << redact(startingFromKey) << ", removing next orphan range"
-           << " [" << redact(orphanRange.minKey) << "," << redact(orphanRange.maxKey) << ")";
-
-    // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
-    // before delete.
-    RangeDeleterOptions deleterOptions(orphanRange);
-    deleterOptions.writeConcern = secondaryThrottle;
-    deleterOptions.onlyRemoveOrphanedDocs = true;
-    deleterOptions.fromMigrate = true;
-    // Must wait for cursors since there can be existing cursors with an older
-    // CollectionMetadata.
-    deleterOptions.waitForOpenCursors = true;
-    deleterOptions.removeSaverReason = "cleanup-cmd";
-
-    if (!getDeleter()->deleteNow(opCtx, deleterOptions, errMsg)) {
-        warning() << redact(*errMsg);
-        return CleanupResult_Error;
-    }
-
     return CleanupResult_Continue;
 }
 

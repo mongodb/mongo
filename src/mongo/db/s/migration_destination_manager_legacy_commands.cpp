@@ -138,19 +138,6 @@ public:
         auto scopedRegisterReceiveChunk(
             uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
 
-        // Even if this shard is not currently donating any chunks, it may still have pending
-        // deletes from a previous migration, particularly if there are still open cursors on the
-        // range pending deletion.
-        const size_t numDeletes = getDeleter()->getTotalDeletes();
-        if (numDeletes > 0) {
-            errmsg = str::stream() << "can't accept new chunks because "
-                                   << " there are still " << numDeletes
-                                   << " deletes from previous migration";
-
-            warning() << errmsg;
-            return appendCommandStatus(result, {ErrorCodes::ChunkRangeCleanupPending, errmsg});
-        }
-
         uassertStatusOK(shardingState->migrationDestinationManager()->start(
             nss,
             std::move(scopedRegisterReceiveChunk),

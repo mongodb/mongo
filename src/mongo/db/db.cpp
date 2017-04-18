@@ -659,8 +659,6 @@ ExitCode _initAndListen(int listenPort) {
 
         startFTDC();
 
-        getDeleter()->startWorkers();
-
         restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
