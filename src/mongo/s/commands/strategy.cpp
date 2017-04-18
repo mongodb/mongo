@@ -326,9 +326,9 @@ void Strategy::clientCommandOp(OperationContext* opCtx,
 
             ShardConnection::checkMyConnectionVersions(opCtx, staleNS);
             if (loops < 4) {
-                const NamespaceString nss(staleNS);
-                if (nss.isValid()) {
-                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+                const NamespaceString staleNSS(staleNS);
+                if (staleNSS.isValid()) {
+                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
                 }
             }
         } catch (const DBException& e) {
