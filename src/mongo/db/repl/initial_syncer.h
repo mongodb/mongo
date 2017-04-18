@@ -389,7 +389,6 @@ private:
      * Callback for oplog fetcher.
      */
     void _oplogFetcherCallback(const Status& status,
-                               const OpTimeWithHash& lastFetched,
                                std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**

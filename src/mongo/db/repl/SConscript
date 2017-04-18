@@ -809,14 +809,24 @@ env.Library(
 )
 
 env.Library(
-    target='oplog_fetcher',
+    target='abstract_oplog_fetcher_test_fixture',
     source=[
-        'oplog_fetcher.cpp',
+        'abstract_oplog_fetcher_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'abstract_oplog_fetcher',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.Library(
+    target='abstract_oplog_fetcher',
+    source=[
+        'abstract_oplog_fetcher.cpp',
     ],
     LIBDEPS=[
         'abstract_async_component',
-        'repl_coordinator_interface',
-        'replica_set_messages',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
@@ -828,13 +838,63 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='abstract_oplog_fetcher_test',
+    source='abstract_oplog_fetcher_test.cpp',
+    LIBDEPS=[
+        'abstract_oplog_fetcher',
+        'abstract_oplog_fetcher_test_fixture',
+        'oplog_entry',
+        'task_executor_mock',
+    ],
+)
+
+env.Library(
+    target='oplog_fetcher',
+    source=[
+        'oplog_fetcher.cpp',
+    ],
+    LIBDEPS=[
+        'abstract_oplog_fetcher',
+        'repl_coordinator_interface',
+        'replica_set_messages',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/db/stats/timer_stats',
+    ],
+)
+
+env.CppUnitTest(
     target='oplog_fetcher_test',
     source='oplog_fetcher_test.cpp',
     LIBDEPS=[
         'oplog_fetcher',
         'data_replicator_external_state_mock',
-        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        'abstract_oplog_fetcher_test_fixture',
+    ],
+)
+
+env.Library(
+    target='rollback_common_point_resolver',
+    source=[
+        'rollback_common_point_resolver.cpp',
+    ],
+    LIBDEPS=[
+        'abstract_oplog_fetcher',
+        'replica_set_messages',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+    ],
+)
+
+env.CppUnitTest(
+    target='rollback_common_point_resolver_test',
+    source='rollback_common_point_resolver_test.cpp',
+    LIBDEPS=[
+        'rollback_common_point_resolver',
+        'oplog_interface_mock',
+        'abstract_oplog_fetcher_test_fixture',
     ],
 )
 

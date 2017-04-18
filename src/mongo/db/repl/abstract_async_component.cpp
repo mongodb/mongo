@@ -46,6 +46,10 @@ executor::TaskExecutor* AbstractAsyncComponent::_getExecutor() {
     return _executor;
 }
 
+std::string AbstractAsyncComponent::_getComponentName() const {
+    return _componentName;
+}
+
 bool AbstractAsyncComponent::isActive() noexcept {
     stdx::lock_guard<stdx::mutex> lock(*_getMutex());
     return _isActive_inlock();
@@ -129,6 +133,18 @@ void AbstractAsyncComponent::_transitionToComplete_inlock() noexcept {
     invariant(State::kComplete != _state);
     _state = State::kComplete;
     _stateCondition.notify_all();
+}
+
+Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus(
+    const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message) {
+    stdx::unique_lock<stdx::mutex> lk(*_getMutex());
+    return _checkForShutdownAndConvertStatus_inlock(callbackArgs, message);
+}
+
+Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus(const Status& status,
+                                                                 const std::string& message) {
+    stdx::unique_lock<stdx::mutex> lk(*_getMutex());
+    return _checkForShutdownAndConvertStatus_inlock(status, message);
 }
 
 Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus_inlock(

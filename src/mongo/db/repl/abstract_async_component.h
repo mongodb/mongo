@@ -101,6 +101,11 @@ protected:
     executor::TaskExecutor* _getExecutor();
 
     /**
+     * Returns the name of the component passed in at construction.
+     */
+    std::string _getComponentName() const;
+
+    /**
      * Returns true if this component is currently running or in the process of shutting down.
      */
     bool _isActive_inlock() noexcept;
@@ -129,6 +134,9 @@ protected:
         const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
     Status _checkForShutdownAndConvertStatus_inlock(const Status& status,
                                                     const std::string& message);
+    Status _checkForShutdownAndConvertStatus(
+        const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
+    Status _checkForShutdownAndConvertStatus(const Status& status, const std::string& message);
 
     /**
      * Schedules work to be run by the task executor.

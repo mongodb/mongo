@@ -412,10 +412,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
-        auto onOplogFetcherShutdownCallbackFn =
-            [&fetcherReturnStatus](const Status& status, const OpTimeWithHash& lastFetched) {
-                fetcherReturnStatus = status;
-            };
+        auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus](const Status& status) {
+            fetcherReturnStatus = status;
+        };
         // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
         // replication coordinator.
         auto oplogFetcherPtr = stdx::make_unique<OplogFetcher>(
@@ -443,7 +442,7 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
 
     const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
     LOG(logLevel) << "scheduling fetcher to read remote oplog on " << _syncSourceHost
-                  << " starting at " << oplogFetcher->getCommandObject_forTest()["filter"];
+                  << " starting at " << oplogFetcher->getFindQuery_forTest()["filter"];
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
