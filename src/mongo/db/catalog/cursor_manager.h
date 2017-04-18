@@ -30,11 +30,13 @@
 
 #pragma once
 
-
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
@@ -76,6 +78,7 @@ class CursorManager {
 public:
     // The number of minutes a cursor is allowed to be idle before timing out.
     static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
+    using RegistrationToken = Partitioned<unordered_set<PlanExecutor*>>::PartitionId;
 
     CursorManager(NamespaceString nss);
 
@@ -114,11 +117,12 @@ public:
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
-     * Register an executor so that it can be notified of deletion/invalidation during yields.
-     * Must be called before an executor yields.  If an executor is registered inside a
-     * ClientCursor it must not be itself registered; the two are mutually exclusive.
+     * Register an executor so that it can be notified of deletions, invalidations, collection
+     * drops, or the like during yields. Must be called before an executor yields. Registration
+     * happens automatically for yielding PlanExecutors, so this should only be called by a
+     * PlanExecutor itself. Returns a token that must be stored for use during deregistration.
      */
-    void registerExecutor(PlanExecutor* exec);
+    Partitioned<unordered_set<PlanExecutor*>>::PartitionId registerExecutor(PlanExecutor* exec);
 
     /**
      * Remove an executor from the registry. It is legal to call this even if 'exec' is not
@@ -188,10 +192,16 @@ public:
     static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
 
 private:
+    static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
 
-    CursorId _allocateCursorId_inlock();
-    void _deregisterCursor_inlock(ClientCursor* cc);
+    struct PlanExecutorPartitioner {
+        std::size_t operator()(const PlanExecutor* exec, std::size_t nPartitions);
+    };
+    CursorId allocateCursorId_inlock();
+
+    ClientCursorPin _registerCursor(
+        OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
     void deregisterCursor(ClientCursor* cc);
 
@@ -203,16 +213,33 @@ private:
         return _nss.isEmpty();
     }
 
-    NamespaceString _nss;
-    uint32_t _collectionCacheRuntimeId;
+    // No locks are needed to consult these data members.
+    const NamespaceString _nss;
+    const uint32_t _collectionCacheRuntimeId;
+
+    // A CursorManager holds a pointer to all open PlanExecutors and all open ClientCursors. All
+    // pointers to PlanExecutors are unowned, and a PlanExecutor will notify the CursorManager when
+    // it is being destroyed. ClientCursors are owned by the CursorManager, except when they are in
+    // use by a ClientCursorPin. When in use by a pin, an unowned pointer remains to ensure they
+    // still receive invalidations while in use.
+    //
+    // There are several mutexes at work to protect concurrent access to data structures managed by
+    // this cursor manager. The two registration data structures '_registeredPlanExecutors' and
+    // '_cursorMap' are partitioned to decrease contention, and each partition of the structure is
+    // protected by its own mutex. Separately, there is a '_registrationLock' which protects
+    // concurrent access to '_random' for cursor id generation, and must be held from cursor id
+    // generation until insertion into '_cursorMap'. If you ever need to acquire more than one of
+    // these mutexes at once, you must follow the following rules:
+    // - '_registrationLock' must be acquired first, if at all.
+    // - Mutex(es) for '_registeredPlanExecutors' must be acquired next.
+    // - Mutex(es) for '_cursorMap' must be acquired next.
+    // - If you need to access multiple partitions within '_registeredPlanExecutors' or '_cursorMap'
+    //   at once, you must acquire the mutexes for those partitions in ascending order, or use the
+    //   partition helpers to acquire mutexes for all partitions.
+    mutable SimpleMutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
-
-    mutable SimpleMutex _mutex;
-
-    typedef unordered_set<PlanExecutor*> ExecSet;
-    ExecSet _nonCachedExecutors;
-
-    typedef std::map<CursorId, ClientCursor*> CursorMap;
-    CursorMap _cursors;
+    Partitioned<unordered_set<PlanExecutor*>, kNumPartitions, PlanExecutorPartitioner>
+        _registeredPlanExecutors;
+    std::unique_ptr<Partitioned<unordered_map<CursorId, ClientCursor*>, kNumPartitions>> _cursorMap;
 };
 }  // namespace mongo

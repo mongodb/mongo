@@ -32,9 +32,11 @@
 #include <queue>
 
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -399,12 +401,23 @@ public:
      * 'non-cached PlanExecutor'.
      */
     void unsetRegistered() {
-        _registered = false;
+        _registrationToken.reset();
+    }
+
+    boost::optional<Partitioned<unordered_set<PlanExecutor*>>::PartitionId> getRegistrationToken()
+        const& {
+        return _registrationToken;
+    }
+    void getRegistrationToken() && = delete;
+
+    void setRegistrationToken(Partitioned<unordered_set<PlanExecutor*>>::PartitionId token) & {
+        invariant(!_registrationToken);
+        _registrationToken = token;
     }
 
     bool isMarkedAsKilled() const {
         return static_cast<bool>(_killReason);
-    };
+    }
 
     const std::string& getKillReason() {
         invariant(isMarkedAsKilled());
@@ -490,9 +503,8 @@ private:
 
     enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
 
-    // Set to true if this PlanExecutor is registered with the CursorManager as a 'non-cached
-    // PlanExecutor' to receive invalidations.
-    bool _registered = false;
+    // Set if this PlanExecutor is registered with the CursorManager.
+    boost::optional<Partitioned<unordered_set<PlanExecutor*>>::PartitionId> _registrationToken;
 
     bool _everDetachedFromOperationContext = false;
 };

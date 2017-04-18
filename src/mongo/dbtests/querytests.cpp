@@ -50,10 +50,10 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
+namespace {
 namespace QueryTests {
 
 using std::unique_ptr;
-using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
@@ -1188,7 +1188,6 @@ public:
         while (cursor->more()) {
             BSONObj o = cursor->next();
             verify(o.valid(BSONVersion::kLatest));
-            // cout << " foo " << o << endl;
         }
     }
     void run() {
@@ -1406,7 +1405,7 @@ public:
             fast = t.micros();
         }
 
-        cout << "HelperTest  slow:" << slow << " fast:" << fast << endl;
+        std::cout << "HelperTest  slow:" << slow << " fast:" << fast << endl;
     }
 };
 
@@ -1449,7 +1448,6 @@ public:
     FindingStart() : CollectionBase("findingstart") {}
 
     void run() {
-        cout << "1 SFDSDF" << endl;
         BSONObj info;
         ASSERT(_client.runCommand("unittests",
                                   BSON("create"
@@ -1488,7 +1486,6 @@ public:
                 ASSERT(!next["ts"].eoo());
                 ASSERT_EQUALS((j > min ? j : min), next["ts"].numberInt());
             }
-            cout << k << endl;
         }
     }
 };
@@ -1498,7 +1495,6 @@ public:
     FindingStartPartiallyFull() : CollectionBase("findingstart") {}
 
     void run() {
-        cout << "2 ;kljsdf" << endl;
         size_t startNumCursors = numCursorsOpen();
 
         BSONObj info;
@@ -1529,7 +1525,6 @@ public:
                 ASSERT(!next["ts"].eoo());
                 ASSERT_EQUALS((j > min ? j : min), next["ts"].numberInt());
             }
-            cout << k << endl;
         }
 
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
@@ -1545,7 +1540,6 @@ public:
     FindingStartStale() : CollectionBase("findingstart") {}
 
     void run() {
-        cout << "3 xcxcv" << endl;
         size_t startNumCursors = numCursorsOpen();
 
         // Check OplogReplay mode with missing collection.
@@ -1763,3 +1757,4 @@ public:
 SuiteInstance<All> myall;
 
 }  // namespace QueryTests
+}  // namespace

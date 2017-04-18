@@ -4,6 +4,15 @@ Import("env")
 
 env = env.Clone()
 
+env.SConscript(
+    dirs=[
+        'util',
+    ],
+    exports=[
+        'env',
+    ],
+)
+
 env.Library(
     target='collection_options',
     source=[

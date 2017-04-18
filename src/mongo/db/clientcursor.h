@@ -196,6 +196,10 @@ public:
      */
     static long long totalOpen();
 
+    friend std::size_t partitionOf(const ClientCursor* cursor) {
+        return cursor->cursorid();
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;
