@@ -774,50 +774,6 @@ tasks:
     - func: "make test log artifact"
     - func: "analyze"
 
-- name: initialsync_WT_dr
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  commands:
-    - func: "prepare environment"
-      vars:
-        storageEngine: "wiredTiger"
-        setup: "replica-2node.dr"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
-        setup: "replica-2node.dr"
-    - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "initialSync"
-    - func: "make test log artifact"
-    - func: "analyze"
-
-- name: initialsync_MMAPv1_dr
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  commands:
-    - func: "prepare environment"
-      vars:
-        storageEngine: "mmapv1"
-        setup: "replica-2node.dr"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
-        setup: "replica-2node.dr"
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "initialSync"
-    - func: "make test log artifact"
-    - func: "analyze"
-
 - name: initialsync-logkeeper_WT
   depends_on:
     - name: compile
@@ -977,8 +933,6 @@ buildvariants:
   tasks:
     - name: initialsync_WT
     - name: initialsync_MMAPv1
-    - name: initialsync_WT_dr
-    - name: initialsync_MMAPv1_dr
 
 - name: linux-replSet-initialsync-logkeeper
   display_name: Linux ReplSet Initial Sync LogKeeper
