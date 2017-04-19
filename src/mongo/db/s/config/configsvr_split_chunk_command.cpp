@@ -115,9 +115,7 @@ public:
                                                                  parsedRequest.getChunkRange(),
                                                                  parsedRequest.getSplitPoints(),
                                                                  parsedRequest.getShardName());
-        if (!splitChunkResult.isOK()) {
-            return appendCommandStatus(result, splitChunkResult);
-        }
+        uassertStatusOK(splitChunkResult);
 
         return true;
     }

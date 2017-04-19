@@ -1370,6 +1370,27 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const BSONObj& cmdObj,
     return readConcernArgs;
 }
 
+void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
+                                                 const std::string& commandName,
+                                                 BSONObjBuilder* commandResponseBuilder) {
+    WriteConcernResult res;
+    auto waitForWCStatus =
+        waitForWriteConcern(opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            opCtx->getWriteConcern(),
+                            &res);
+    Command::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
+
+    // SERVER-22421: This code is to ensure error response backwards compatibility with the
+    // user management commands. This can be removed in 3.6.
+    if (!waitForWCStatus.isOK() && Command::isUserManagementCommand(commandName)) {
+        BSONObj temp = commandResponseBuilder->asTempObj().copy();
+        commandResponseBuilder->resetToEmpty();
+        Command::appendCommandStatus(*commandResponseBuilder, waitForWCStatus);
+        commandResponseBuilder->appendElementsUnique(temp);
+    }
+}
+
 }  // namespace
 
 // This really belongs in commands.cpp, but we need to move it here so we can
@@ -1449,29 +1470,15 @@ bool Command::run(OperationContext* opCtx,
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
         opCtx->setWriteConcern(wcResult.getValue());
+        ON_BLOCK_EXIT([&] {
+            _waitForWriteConcernAndAddToCommandResponse(opCtx, getName(), &inPlaceReplyBob);
+        });
 
         result = run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
                                                             wcResult.getValue().toBSON()));
-
-        WriteConcernResult res;
-        auto waitForWCStatus =
-            waitForWriteConcern(opCtx,
-                                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                                wcResult.getValue(),
-                                &res);
-        appendCommandWCStatus(inPlaceReplyBob, waitForWCStatus, res);
-
-        // SERVER-22421: This code is to ensure error response backwards compatibility with the
-        // user management commands. This can be removed in 3.6.
-        if (!waitForWCStatus.isOK() && isUserManagementCommand(getName())) {
-            BSONObj temp = inPlaceReplyBob.asTempObj().copy();
-            inPlaceReplyBob.resetToEmpty();
-            appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
-            inPlaceReplyBob.appendElementsUnique(temp);
-        }
     }
 
     // When a linearizable read command is passed in, check to make sure we're reading
