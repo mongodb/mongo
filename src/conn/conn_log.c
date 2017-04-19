@@ -391,13 +391,11 @@ __log_file_server(void *arg)
 			WT_ERR(__wt_log_extract_lognum(session, close_fh->name,
 			    &filenum));
 			/*
-			 * We update the close file handle before updating the
-			 * close LSN when changing files.  It is possible we
-			 * could see mismatched settings.  If we do, yield
-			 * until it is set.  This should rarely happen.
+			 * The closing file handle should have a correct close
+			 * LSN.
 			 */
-			while (log->log_close_lsn.l.file < filenum)
-				__wt_yield();
+			WT_ASSERT(session,
+			    log->log_close_lsn.l.file == filenum);
 
 			if (__wt_log_cmp(
 			    &log->write_lsn, &log->log_close_lsn) >= 0) {

@@ -876,18 +876,16 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 		__wt_yield();
 	}
 	/*
-	 * Note, the file server worker thread has code that knows that
-	 * the file handle is set before the LSN.  Do not reorder without
-	 * also reviewing that code.
+	 * Note, the file server worker thread requires the LSN be set once the
+	 * close file handle is set, force that ordering.
 	 */
-	log->log_close_fh = log->log_fh;
-	if (log->log_close_fh != NULL)
+	if (log->log_fh == NULL)
+		log->log_close_fh = NULL;
+	else {
 		log->log_close_lsn = log->alloc_lsn;
+		WT_PUBLISH(log->log_close_fh, log->log_fh);
+	}
 	log->fileid++;
-	/*
-	 * Make sure everything we set above is visible.
-	 */
-	WT_FULL_BARRIER();
 
 	/*
 	 * If pre-allocating log files look for one; otherwise, or if we don't

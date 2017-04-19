@@ -768,13 +768,13 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree, NULL));
 	lsm_tree->need_switch = false;
-	++lsm_tree->dsk_gen;
-
 	lsm_tree->modified = true;
+
 	/*
 	 * Ensure the updated disk generation is visible to all other threads
 	 * before updating the transaction ID.
 	 */
+	++lsm_tree->dsk_gen;
 	WT_FULL_BARRIER();
 
 	/*

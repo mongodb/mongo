@@ -284,12 +284,8 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	manager = &conn->lsm_manager;
 	removed = 0;
 
-	/*
-	 * Clear the LSM server flag and flush to ensure running threads see
-	 * the state change.
-	 */
+	/* Clear the LSM server flag. */
 	F_CLR(conn, WT_CONN_SERVER_LSM);
-	WT_FULL_BARRIER();
 
 	WT_ASSERT(session, !F_ISSET(conn, WT_CONN_READONLY) ||
 	    manager->lsm_workers == 0);

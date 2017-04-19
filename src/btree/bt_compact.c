@@ -228,12 +228,8 @@ __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 		    bm, session, addr, addr_size, skipp);
 	}
 
-	/*
-	 * Reset the WT_REF state and push the change. The full-barrier isn't
-	 * necessary, but it's better to keep pages in circulation than not.
-	 */
+	/* Reset the WT_REF state. */
 	ref->state = WT_REF_DISK;
-	WT_FULL_BARRIER();
 
 	return (ret);
 }

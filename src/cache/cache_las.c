@@ -140,8 +140,9 @@ __wt_las_set_written(WT_SESSION_IMPL *session)
 		conn->las_written = true;
 
 		/*
-		 * Push the flag: unnecessary, but from now page reads must deal
-		 * with lookaside table records, and we only do the write once.
+		 * Future page reads must deal with lookaside table records.
+		 * No write could be cached until a future read might matter,
+		 * the barrier is more documentation than requirement.
 		 */
 		WT_FULL_BARRIER();
 	}

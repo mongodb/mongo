@@ -226,7 +226,10 @@ __compact_checkpoint(WT_SESSION_IMPL *session)
 	 */
 	txn_global = &S2C(session)->txn_global;
 	for (txn_gen = __wt_gen(session, WT_GEN_CHECKPOINT);;) {
-		WT_READ_BARRIER();
+		/*
+		 * This loop only checks objects that are declared volatile,
+		 * therefore no barriers are needed.
+		 */
 		if (!txn_global->checkpoint_running ||
 		    txn_gen != __wt_gen(session, WT_GEN_CHECKPOINT))
 			break;

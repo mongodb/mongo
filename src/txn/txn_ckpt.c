@@ -943,13 +943,11 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
 	txn_global->checkpoint_running = true;
-	WT_FULL_BARRIER();
 
 	ret = __txn_checkpoint(session, cfg);
 
 	WT_STAT_CONN_SET(session, txn_checkpoint_running, 0);
 	txn_global->checkpoint_running = false;
-	WT_FULL_BARRIER();
 
 	return (ret);
 }
@@ -1446,8 +1444,7 @@ __checkpoint_tree(
 	 * the checkpoint start, which might not be included, will re-set the
 	 * modified flag.  The "unless reconciliation skips updates" problem is
 	 * handled in the reconciliation code: if reconciliation skips updates,
-	 * it sets the modified flag itself.  Use a full barrier so we get the
-	 * store done quickly, this isn't a performance path.
+	 * it sets the modified flag itself.
 	 */
 	btree->modified = false;
 	WT_FULL_BARRIER();
