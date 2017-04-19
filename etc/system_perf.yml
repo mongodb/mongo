@@ -829,7 +829,7 @@ buildvariants:
   modules: *modules
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    setup: replica-2node.dr
+    setup: replica-2node
     cluster: replica
     platform: linux
     project: *project
