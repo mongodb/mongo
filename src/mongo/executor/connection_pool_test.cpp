@@ -813,8 +813,21 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
              });
     ASSERT(reachedB);
 
-    // Now we've timed out
-    PoolImpl::setNow(now + Milliseconds(2000));
+    // Now our timeout should be 1999 ms from 'now' instead of 1000 ms
+    // if we do another 'get' we should still get the original connection
+    PoolImpl::setNow(now + Milliseconds(1500));
+    bool reachedB2 = false;
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 ASSERT_EQ(connId, CONN2ID(swConn));
+                 reachedB2 = true;
+                 doneWith(swConn.getValue());
+             });
+    ASSERT(reachedB2);
+
+    // We should time out when we get to 'now' + 2500 ms
+    PoolImpl::setNow(now + Milliseconds(2500));
 
     bool reachedC = false;
     // Different id
