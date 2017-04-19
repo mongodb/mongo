@@ -110,10 +110,49 @@ Status RollbackFixUpInfo::processSingleDocumentOplogEntry(OperationContext* opCt
 
 Status RollbackFixUpInfo::processCreateCollectionOplogEntry(OperationContext* opCtx,
                                                             const UUID& collectionUuid) {
-    // TODO: Remove references to this collection UUID from other rollback fix up info collections.
-
     CollectionUuidDescription desc(collectionUuid, {});
-    return _upsertById(opCtx, kRollbackCollectionUuidNamespace, desc.toBSON());
+    auto status = _upsertById(opCtx, kRollbackCollectionUuidNamespace, desc.toBSON());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Remove all references to the collection in the create command from the other rollback
+    // fix up collections. The documents to be removed will contain 'collectionUuid' as the _id
+    // field or nested inside the _id field with the dotted field name '_id.collectionUuid'.
+
+    // Generate key for nested _id field {_id: {collectionUuid: <collection uuid>, ...}, ...}.
+    BSONObjBuilder nestedIdFilterBob;
+    collectionUuid.appendToBuilder(&nestedIdFilterBob, "_id.collectionUuid");
+    auto nestedIdFilter = nestedIdFilterBob.obj();
+
+    // Remove documents from the "kRollbackDocsNamespace" collection with _id's containing
+    // 'collectionUuid':
+    //     {_id: {collectionUuid: <collectionUuid>, docId: <modified document _id>}, ...}
+    status = _storageInterface->deleteByFilter(opCtx, kRollbackDocsNamespace, nestedIdFilter);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Generate key for _id field {_id: <collection uuid>, ...}.
+    BSONObjBuilder idFilterBob;
+    collectionUuid.appendToBuilder(&idFilterBob, "_id");
+    auto idFilter = idFilterBob.obj();
+
+    // Remove documents from the "kRollbackCollectionOptionsNamespace" and "kRollbackIndexNamespace"
+    // collections with the _id field set to 'collectionUuid'.
+    //     {_id: <collectionUuid>, ...}
+    status =
+        _storageInterface->deleteByFilter(opCtx, kRollbackCollectionOptionsNamespace, idFilter);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = _storageInterface->deleteByFilter(opCtx, kRollbackIndexNamespace, nestedIdFilter);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 Status RollbackFixUpInfo::processDropCollectionOplogEntry(OperationContext* opCtx,

@@ -421,6 +421,12 @@ TEST_F(
 TEST_F(
     RollbackFixUpInfoTest,
     ProcessCreateCollectionOplogEntryInsertsDocumentIntoRollbackCollectionUuidCollectionWithEmptyNamespace) {
+    // State of oplog:
+    // {create: mynewcoll}, {createIndex: myindex}, {collMod: mynewcoll}, {op: 'i'}, ....
+    // (earliest optime) ---> (latest optime)
+    //
+    // Oplog entries are processed in reverse optime order.
+
     auto operation = BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL << "op"
                                << "c"
                                << "ns"
@@ -443,13 +449,104 @@ TEST_F(
 
     auto opCtx = makeOpCtx();
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
+
+    // Populate "kRollbackDocsNamespace", "kRollbackCollectionOptionsNamespace", and
+    // "kRollbackIndexNamespace" collections. When we process the create collection operation,
+    // any entries in these collections for indexes, docs and collection options that refer to
+    // the collection in the create command should be purged.
+
+    // doc
+    auto doc = BSON("_id" << 0);
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid,
+        doc["_id"],
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        commandNss.db().toString()));
+
+    RollbackFixUpInfo::SingleDocumentOperationDescription docDesc(
+        collectionUuid,
+        doc["_id"],
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        commandNss.db().toString());
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {docDesc.toBSON()});
+
+    // collection options
+    ASSERT_OK(rollbackFixUpInfo.processCollModOplogEntry(opCtx.get(), collectionUuid, {}));
+    RollbackFixUpInfo::CollectionOptionsDescription optionsDesc(collectionUuid, {});
+    _assertDocumentsInCollectionEquals(opCtx.get(),
+                                       RollbackFixUpInfo::kRollbackCollectionOptionsNamespace,
+                                       {optionsDesc.toBSON()});
+
+    // index
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, "myindex"));
+    RollbackFixUpInfo::IndexDescription indexDesc(
+        collectionUuid, "myindex", RollbackFixUpInfo::IndexOpType::kCreate, {});
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {indexDesc.toBSON()});
+
+    // Add entries for a different collection. Processing the create collection command for
+    // 'collectionUuid' should not affect these documents.
+
+    // doc
+    auto collectionUuid2 = UUID::gen();
+    auto doc2 = BSON("_id" << 1);
+    ASSERT_OK(rollbackFixUpInfo.processSingleDocumentOplogEntry(
+        opCtx.get(),
+        collectionUuid2,
+        doc2["_id"],
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        commandNss.db().toString()));
+    RollbackFixUpInfo::SingleDocumentOperationDescription docDesc2(
+        collectionUuid2,
+        doc2["_id"],
+        RollbackFixUpInfo::SingleDocumentOpType::kInsert,
+        commandNss.db().toString());
+    _assertDocumentsInCollectionEquals(opCtx.get(),
+                                       RollbackFixUpInfo::kRollbackDocsNamespace,
+                                       {docDesc.toBSON(), docDesc2.toBSON()});
+
+    // collection options
+    ASSERT_OK(rollbackFixUpInfo.processCollModOplogEntry(opCtx.get(), collectionUuid2, {}));
+    RollbackFixUpInfo::CollectionOptionsDescription optionsDesc2(collectionUuid2, {});
+    _assertDocumentsInCollectionEquals(opCtx.get(),
+                                       RollbackFixUpInfo::kRollbackCollectionOptionsNamespace,
+                                       {optionsDesc.toBSON(), optionsDesc2.toBSON()});
+
+    // index
+    ASSERT_OK(
+        rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid2, "notmyindex"));
+    RollbackFixUpInfo::IndexDescription indexDesc2(
+        collectionUuid2, "notmyindex", RollbackFixUpInfo::IndexOpType::kCreate, {});
+    _assertDocumentsInCollectionEquals(opCtx.get(),
+                                       RollbackFixUpInfo::kRollbackIndexNamespace,
+                                       {indexDesc.toBSON(), indexDesc2.toBSON()});
+
     ASSERT_OK(rollbackFixUpInfo.processCreateCollectionOplogEntry(opCtx.get(), collectionUuid));
 
     auto expectedDocument = BSON("_id" << collectionUuid.toBSON().firstElement() << "ns"
                                        << "");
 
+    // Finally, process create collection oplog entry.
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {expectedDocument});
+
+    // Documents in the "kRollbackDocsNamespace" collection with 'collectionUuid' should be removed.
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {docDesc2.toBSON()});
+
+    // Documents in the "kRollbackCollectionOptionsNamespace" collection with 'collectionUuid'
+    // should be removed.
+    _assertDocumentsInCollectionEquals(opCtx.get(),
+                                       RollbackFixUpInfo::kRollbackCollectionOptionsNamespace,
+                                       {optionsDesc2.toBSON()});
+
+    // Documents in the "kRollbackIndexNamespace" collection with 'collectionUuid' should be
+    // removed.
+    _assertDocumentsInCollectionEquals(
+        opCtx.get(), RollbackFixUpInfo::kRollbackIndexNamespace, {indexDesc2.toBSON()});
 }
 
 TEST_F(RollbackFixUpInfoTest,
