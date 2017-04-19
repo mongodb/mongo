@@ -98,7 +98,7 @@ bool CollectionRangeDeleter::cleanupNextRange(OperationContext* txn) {
         }
 
         CollectionShardingState* shardingState = CollectionShardingState::get(txn, _nss);
-        MetadataManager& metadataManager = shardingState->_metadataManager;
+        MetadataManager& metadataManager = *shardingState->_metadataManager;
 
         if (!_rangeInProgress && !metadataManager.hasRangesToClean()) {
             // Nothing left to do

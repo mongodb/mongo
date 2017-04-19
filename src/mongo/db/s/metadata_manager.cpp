@@ -56,13 +56,14 @@ MetadataManager::~MetadataManager() {
     invariant(!_activeMetadataTracker || _activeMetadataTracker->usageCounter == 0);
 }
 
-ScopedCollectionMetadata MetadataManager::getActiveMetadata() {
+ScopedCollectionMetadata MetadataManager::getActiveMetadata(std::shared_ptr<MetadataManager> self) {
+
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
     if (!_activeMetadataTracker) {
         return ScopedCollectionMetadata();
     }
 
-    return ScopedCollectionMetadata(this, _activeMetadataTracker.get());
+    return ScopedCollectionMetadata(std::move(self), _activeMetadataTracker.get());
 }
 
 void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> remoteMetadata) {
@@ -287,8 +288,8 @@ ScopedCollectionMetadata::ScopedCollectionMetadata() = default;
 
 // called in lock
 ScopedCollectionMetadata::ScopedCollectionMetadata(
-    MetadataManager* manager, MetadataManager::CollectionMetadataTracker* tracker)
-    : _manager(manager), _tracker(tracker) {
+    std::shared_ptr<MetadataManager> manager, MetadataManager::CollectionMetadataTracker* tracker)
+    : _manager(std::move(manager)), _tracker(tracker) {
     _tracker->usageCounter++;
 }
 
