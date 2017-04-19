@@ -6,6 +6,8 @@
  *   - standalone mongod
  */
 (function() {
+    "use strict";
+
     function responseContainsTimestampOperationTime(res) {
         return res.operationTime !== undefined && isTimestamp(res.operationTime);
     }
@@ -16,14 +18,13 @@
 
     // A mongos that talks to a non-sharded collection on a sharded replica set returns an
     // operationTime that is a Timestamp.
-    var name = "operation_time_api";
-    var st = new ShardingTest({name: name, shards: {rs0: {nodes: 1}}});
+    var st = new ShardingTest({name: "operation_time_api", shards: {rs0: {nodes: 1}}});
 
     var testDB = st.s.getDB("test");
-    res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}]}));
+    var res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}]}));
     assert(responseContainsTimestampOperationTime(res),
            "Expected response from a mongos talking to a non-sharded collection on a sharded " +
-               "replica set to contain an operationTime.");
+               "replica set to contain an operationTime, received: " + tojson(res));
 
     // A mongos that talks to a sharded collection on a sharded replica set returns an operationTime
     // that is a Timestamp.
@@ -33,26 +34,27 @@
     res = assert.commandWorked(testDB.runCommand({insert: "bar", documents: [{x: 2}]}));
     assert(responseContainsTimestampOperationTime(res),
            "Expected response from a mongos inserting to a sharded collection on a sharded " +
-               "replica set to contain an operationTime.");
+               "replica set to contain an operationTime, received: " + tojson(res));
 
     // A mongod in a sharded replica set returns an operationTime that is a Timestamp.
     testDB = st.rs0.getPrimary().getDB("test");
     res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 3}]}));
     assert(responseContainsTimestampOperationTime(res),
-           "Expected response from a mongod in a sharded replica set to contain an operationTime");
+           "Expected response from a mongod in a sharded replica set to contain an " +
+               "operationTime, received: " + tojson(res));
 
     st.stop();
 
     // A mongod from a non-sharded replica set returns an operationTime that is a Timestamp.
-    var replSetName = "operation_time_api_non_sharded_replset";
-    var replTest = new ReplSetTest({name: replSetName, nodes: 1});
+    var replTest = new ReplSetTest({name: "operation_time_api_non_sharded_replset", nodes: 1});
     replTest.startSet();
     replTest.initiate();
 
     testDB = replTest.getPrimary().getDB("test");
     res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 4}]}));
     assert(responseContainsTimestampOperationTime(res),
-           "Expected response from a non-sharded replica set to contain an operationTime.");
+           "Expected response from a non-sharded replica set to contain an operationTime, " +
+               "received: " + tojson(res));
 
     replTest.stopSet();
 
@@ -62,7 +64,8 @@
     testDB = standalone.getDB("test");
     res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 5}]}));
     assert(!responseContainsTimestampOperationTime(res),
-           "Expected response from a standalone mongod to not contain an operationTime.");
+           "Expected response from a standalone mongod to not contain an operationTime, " +
+               "received: " + tojson(res));
 
     MongoRunner.stopMongod(standalone);
 })();
