@@ -86,6 +86,9 @@ namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const BSONObj kInitialSyncFlag(BSON(StorageInterfaceImpl::kInitialSyncFlagFieldName << true));
+
+const auto kIdIndexName = "_id_"_sd;
+
 }  // namespace
 
 StorageInterfaceImpl::StorageInterfaceImpl()
@@ -467,7 +470,8 @@ DeleteStageParams makeDeleteStageParamsForDeleteDocuments() {
 }
 
 /**
- * Shared implementation between findDocuments and deleteDocuments.
+ * Shared implementation between findDocuments, deleteDocuments, and _findOrDeleteById.
+ * _findOrDeleteById is used by findById, and deleteById.
  */
 enum class FindDeleteMode { kFind, kDelete };
 StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
@@ -476,11 +480,12 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     boost::optional<StringData> indexName,
     StorageInterface::ScanDirection scanDirection,
     const BSONObj& startKey,
+    const BSONObj& endKey,
     BoundInclusion boundInclusion,
     std::size_t limit,
     FindDeleteMode mode) {
     auto isFind = mode == FindDeleteMode::kFind;
-    auto opStr = isFind ? "StorageInterfaceImpl::findOne" : "StorageInterfaceImpl::deleteOne";
+    auto opStr = isFind ? "StorageInterfaceImpl::find" : "StorageInterfaceImpl::delete";
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
@@ -544,6 +549,9 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             if (!startKey.isEmpty()) {
                 bounds.first = startKey;
             }
+            if (!endKey.isEmpty()) {
+                bounds.second = endKey;
+            }
             planExecutor = isFind
                 ? InternalPlanner::indexScan(opCtx,
                                              collection,
@@ -597,6 +605,7 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::findDocuments(
                                   indexName,
                                   scanDirection,
                                   startKey,
+                                  {},
                                   boundInclusion,
                                   limit,
                                   FindDeleteMode::kFind);
@@ -615,9 +624,34 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
                                   indexName,
                                   scanDirection,
                                   startKey,
+                                  {},
                                   boundInclusion,
                                   limit,
                                   FindDeleteMode::kDelete);
+}
+
+StatusWith<BSONObj> StorageInterfaceImpl::findById(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const BSONElement& idKey) {
+    auto wrappedIdKey = idKey.wrap("");
+    auto result = _findOrDeleteDocuments(opCtx,
+                                         nss,
+                                         kIdIndexName,
+                                         ScanDirection::kForward,
+                                         wrappedIdKey,
+                                         wrappedIdKey,
+                                         BoundInclusion::kIncludeBothStartAndEndKeys,
+                                         1U,
+                                         FindDeleteMode::kFind);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+    const auto& docs = result.getValue();
+    if (docs.empty()) {
+        return {ErrorCodes::NoSuchKey, str::stream() << "No document found with _id: " << idKey};
+    }
+
+    return docs.front();
 }
 
 namespace {

@@ -199,6 +199,12 @@ public:
             opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
     }
 
+    StatusWith<BSONObj> findById(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const BSONElement& idKey) override {
+        return Status{ErrorCodes::IllegalOperation, "findById not implemented."};
+    }
+
     Status upsertById(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const BSONElement& idKey,

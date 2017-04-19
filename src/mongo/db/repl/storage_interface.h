@@ -263,6 +263,15 @@ public:
                                                              std::size_t limit) = 0;
 
     /**
+     * Finds a single document in the collection referenced by the specified _id.
+     *
+     * Not supported on collections with a default collation.
+     */
+    virtual StatusWith<BSONObj> findById(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const BSONElement& idKey) = 0;
+
+    /**
      * Updates a single document in the collection referenced by the specified _id.
      * The document is located by looking up "idKey" in the id index.
      * "update" represents the replacement document or list of requested modifications to be applied
