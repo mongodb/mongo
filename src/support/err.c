@@ -144,6 +144,8 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
 			handler->handle_message = __handle_message_default;
 		if (handler->handle_progress == NULL)
 			handler->handle_progress = __handle_progress_default;
+		if (handler->handle_close == NULL)
+			handler->handle_close = __handle_close_default;
 	}
 
 	session->event_handler = handler;
