@@ -55,6 +55,8 @@ ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_STRUCT = "ID0019"
 ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED = "ID0020"
 ERROR_ID_BAD_ANY_TYPE_USE = "ID0021"
 ERROR_ID_BAD_NUMERIC_CPP_TYPE = "ID0022"
+ERROR_ID_BAD_ARRAY_TYPE_NAME = "ID0023"
+ERROR_ID_ARRAY_NO_DEFAULT = "ID0024"
 
 
 class IDLError(Exception):
@@ -387,6 +389,21 @@ class ParserContext(object):
             "The C++ numeric type '%s' is not allowed for %s '%s'. Only 'std::int32_t'," +
             " 'std::uint32_t', 'std::uint64_t', and 'std::int64_t' are supported.") %
                         (cpp_type, ast_type, ast_parent))
+
+    def add_bad_array_type_name(self, location, field_name, type_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about a field type having a malformed type name."""
+        self._add_error(location, ERROR_ID_BAD_ARRAY_TYPE_NAME,
+                        ("'%s' is not a valid array type for field '%s'. A valid array type" +
+                         " is in the form 'array<type_name>'.") % (type_name, field_name))
+
+    def add_array_no_default(self, location, field_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about an array having a type with a default value."""
+        self._add_error(
+            location, ERROR_ID_ARRAY_NO_DEFAULT,
+            "Field '%s' is not allowed to have both a default value and be an array type" %
+            (field_name))
 
 
 def _assert_unique_error_messages():

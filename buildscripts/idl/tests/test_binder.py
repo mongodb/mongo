@@ -455,7 +455,6 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: string
                 serializer: foo
                 deserializer: foo
-                default: foo
         """)
 
         # Short type
@@ -491,6 +490,35 @@ class TestBinder(testcase.IDLTestcase):
                         default: bar
             """))
 
+        # Test array as field type
+        self.assert_bind(test_preamble + textwrap.dedent("""
+            structs:
+                foo: 
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: array<string>
+            """))
+
+        # Test array as field type
+        self.assert_bind(
+            textwrap.dedent("""
+            types:
+                 arrayfake:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type: string
+                    serializer: foo
+                    deserializer: foo
+
+            structs:
+                foo: 
+                    description: foo
+                    strict: true
+                    fields:
+                        arrayOfString: arrayfake
+            """))
+
     def test_field_negative(self):
         # type: () -> None
         """Negative field tests."""
@@ -516,6 +544,47 @@ class TestBinder(testcase.IDLTestcase):
                     fields:
                         array<foo>: string
             """), idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE)
+
+        # Test recursive array as field type
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+            structs:
+                foo: 
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: array<array<string>>
+            """), idl.errors.ERROR_ID_BAD_ARRAY_TYPE_NAME)
+
+        # Test inherited default with array
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+            structs:
+                foo: 
+                    description: foo
+                    strict: true
+                    fields:
+                        foo: array<string>
+            """), idl.errors.ERROR_ID_ARRAY_NO_DEFAULT)
+
+        # Test non-inherited default with array
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            types:
+                string:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type: string
+                    serializer: foo
+                    deserializer: foo
+
+            structs:
+                foo: 
+                    description: foo
+                    strict: true
+                    fields:
+                        foo:
+                            type: array<string>
+                            default: 123
+            """), idl.errors.ERROR_ID_ARRAY_NO_DEFAULT)
 
     def test_ignored_field_negative(self):
         # type: () -> None

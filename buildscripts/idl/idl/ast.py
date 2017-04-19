@@ -110,7 +110,10 @@ class Field(common.SourceLocation):
         self.bindata_subtype = None  # type: unicode
         self.default = None  # type: unicode
 
-        # Properties specific to fields with are structs.
+        # Properties specific to fields which are structs.
         self.struct_type = None  # type: unicode
+
+        # Properties specific to fields which are arrays.
+        self.array = False  # type: bool
 
         super(Field, self).__init__(file_name, line, column)

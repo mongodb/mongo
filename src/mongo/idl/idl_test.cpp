@@ -38,7 +38,7 @@ namespace mongo {
 // Use a seperate function to get better error messages when types do not match.
 template <typename T1, typename T2>
 void assert_same_types() {
-    static_assert(std::is_same<T1, T2>::value, "expected correct type");
+    MONGO_STATIC_ASSERT(std::is_same<T1, T2>::value);
 }
 
 template <typename ParserT, typename TestT, BSONType Test_bson_type>
@@ -377,12 +377,9 @@ TEST(IDLFieldTests, TestOptionalFields) {
                             << "Foo");
         auto testStruct = Optional_field::parse(ctxt, testDoc);
 
-        static_assert(std::is_same<decltype(testStruct.getField2()),
-                                   const boost::optional<std::int32_t>>::value,
-                      "expected int32");
-        static_assert(std::is_same<decltype(testStruct.getField1()),
-                                   const boost::optional<mongo::StringData>>::value,
-                      "expected StringData");
+        assert_same_types<decltype(testStruct.getField2()), const boost::optional<std::int32_t>>();
+        assert_same_types<decltype(testStruct.getField1()),
+                          const boost::optional<mongo::StringData>>();
 
         ASSERT_EQUALS("Foo", testStruct.getField1().get());
         ASSERT_FALSE(testStruct.getField2().is_initialized());
@@ -423,8 +420,291 @@ TEST(IDLFieldTests, TestOptionalFields) {
     }
 }
 
-/// TODO:  Array tests
-// Validate array parsing
-// Check array vs non-array
+
+// Positive: Test a nested struct
+TEST(IDLNestedStruct, TestDuplicatTypes) {
+    IDLParserErrorContext ctxt("root");
+
+
+    // Positive: Test document
+    auto testDoc = BSON(
+
+        "field1" << BSON("field1" << 1 << "field2" << 2 << "field3" << 3) <<
+
+        "field3" << BSON("field1" << 4 << "field2" << 5 << "field3" << 6));
+    auto testStruct = NestedWithDuplicateTypes::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getField1()), const RequiredStrictField3&>();
+    assert_same_types<decltype(testStruct.getField2()),
+                      const boost::optional<RequiredNonStrictField3>>();
+    assert_same_types<decltype(testStruct.getField3()), const RequiredStrictField3&>();
+
+    ASSERT_EQUALS(1, testStruct.getField1().getField1());
+    ASSERT_EQUALS(2, testStruct.getField1().getField2());
+    ASSERT_EQUALS(3, testStruct.getField1().getField3());
+
+    ASSERT_FALSE(testStruct.getField2());
+
+    ASSERT_EQUALS(4, testStruct.getField3().getField1());
+    ASSERT_EQUALS(5, testStruct.getField3().getField2());
+    ASSERT_EQUALS(6, testStruct.getField3().getField3());
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        NestedWithDuplicateTypes nested_structs;
+        RequiredStrictField3 f1;
+        f1.setField1(1);
+        f1.setField1(2);
+        f1.setField1(3);
+        nested_structs.setField1(f1);
+        RequiredStrictField3 f3;
+        f3.setField1(4);
+        f3.setField1(5);
+        f3.setField1(6);
+        nested_structs.setField3(f3);
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+// Positive: Arrays of simple types
+TEST(IDLArrayTests, TestSimpleArrays) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: Test document
+    auto testDoc = BSON("field1" << BSON_ARRAY("Foo"
+                                               << "Bar"
+                                               << "???")
+                                 << "field2"
+                                 << BSON_ARRAY(1 << 2 << 3)
+                                 << "field3"
+                                 << BSON_ARRAY(1.2 << 3.4 << 5.6)
+
+                            );
+    auto testStruct = Simple_array_fields::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getField1()), const std::vector<mongo::StringData>>();
+    assert_same_types<decltype(testStruct.getField2()), const std::vector<std::int32_t>&>();
+    assert_same_types<decltype(testStruct.getField3()), const std::vector<double>&>();
+
+    std::vector<StringData> field1{"Foo", "Bar", "???"};
+    ASSERT_TRUE(field1 == testStruct.getField1());
+    std::vector<std::int32_t> field2{1, 2, 3};
+    ASSERT_TRUE(field2 == testStruct.getField2());
+    std::vector<double> field3{1.2, 3.4, 5.6};
+    ASSERT_TRUE(field3 == testStruct.getField3());
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        Simple_array_fields array_fields;
+        array_fields.setField1(field1);
+        array_fields.setField2(field2);
+        array_fields.setField3(field3);
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+// Positive: Optional Arrays
+TEST(IDLArrayTests, TestSimpleOptionalArrays) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: Test document
+    auto testDoc = BSON("field1" << BSON_ARRAY("Foo"
+                                               << "Bar"
+                                               << "???")
+                                 << "field2"
+                                 << BSON_ARRAY(1 << 2 << 3)
+                                 << "field3"
+                                 << BSON_ARRAY(1.2 << 3.4 << 5.6)
+
+                            );
+    auto testStruct = Optional_array_fields::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getField1()),
+                      const boost::optional<std::vector<mongo::StringData>>>();
+    assert_same_types<decltype(testStruct.getField2()),
+                      const boost::optional<std::vector<std::int32_t>>>();
+    assert_same_types<decltype(testStruct.getField3()),
+                      const boost::optional<std::vector<double>>>();
+
+    std::vector<StringData> field1{"Foo", "Bar", "???"};
+    ASSERT_TRUE(field1 == testStruct.getField1().get());
+    std::vector<std::int32_t> field2{1, 2, 3};
+    ASSERT_TRUE(field2 == testStruct.getField2().get());
+    std::vector<double> field3{1.2, 3.4, 5.6};
+    ASSERT_TRUE(field3 == testStruct.getField3().get());
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        Optional_array_fields array_fields;
+        array_fields.setField1(field1);
+        array_fields.setField2(field2);
+        array_fields.setField3(field3);
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+// Negative: Test mixed type arrays
+TEST(IDLArrayTests, TestBadArrays) {
+    IDLParserErrorContext ctxt("root");
+
+    // Negative: Test not an array
+    {
+        auto testDoc = BSON("field1" << 123);
+
+        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), UserException);
+    }
+
+    // Negative: Test array with mixed types
+    {
+        auto testDoc = BSON("field1" << BSON_ARRAY(1.2 << 3.4 << 5.6));
+
+        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), UserException);
+    }
+}
+
+// Positive: Test arrays with good field names but made with BSONObjBuilder
+TEST(IDLArrayTests, TestGoodArrays) {
+    IDLParserErrorContext ctxt("root");
+
+    {
+        BSONObjBuilder builder;
+        {
+            BSONObjBuilder subBuilder(builder.subarrayStart("field1"));
+            subBuilder.append("0", 1);
+            subBuilder.append("1", 2);
+        }
+
+        auto testDoc = builder.obj();
+
+        Simple_int_array::parse(ctxt, testDoc);
+    }
+}
+
+// Negative: Test arrays with bad field names
+TEST(IDLArrayTests, TestBadArrayFieldNames) {
+    IDLParserErrorContext ctxt("root");
+
+    // Negative: string fields
+    {
+        BSONObjBuilder builder;
+        {
+            BSONObjBuilder subBuilder(builder.subarrayStart("field1"));
+            subBuilder.append("0", 1);
+            subBuilder.append("foo", 2);
+        }
+        auto testDoc = builder.obj();
+
+        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), UserException);
+    }
+
+    // Negative: bad start
+    {
+        BSONObjBuilder builder;
+        {
+            BSONObjBuilder subBuilder(builder.subarrayStart("field1"));
+            subBuilder.append("1", 1);
+            subBuilder.append("2", 2);
+        }
+        auto testDoc = builder.obj();
+
+        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), UserException);
+    }
+
+    // Negative: non-sequentially increasing
+    {
+        BSONObjBuilder builder;
+        {
+            BSONObjBuilder subBuilder(builder.subarrayStart("field1"));
+            subBuilder.append("0", 1);
+            subBuilder.append("2", 2);
+        }
+        auto testDoc = builder.obj();
+
+        ASSERT_THROWS(Simple_int_array::parse(ctxt, testDoc), UserException);
+    }
+}
+
+// Postitive: Test arrays with complex types
+TEST(IDLArrayTests, TestArraysOfComplexTypes) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: Test document
+    auto testDoc = BSON("field1" << BSON_ARRAY(1 << 2 << 3) << "field2" << BSON_ARRAY("a.b"
+                                                                                      << "c.d")
+                                 << "field3"
+                                 << BSON_ARRAY(1 << "2")
+                                 << "field4"
+                                 << BSON_ARRAY(BSONObj() << BSONObj())
+                                 << "field1o"
+                                 << BSON_ARRAY(1 << 2 << 3)
+                                 << "field2o"
+                                 << BSON_ARRAY("a.b"
+                                               << "c.d")
+                                 << "field3o"
+                                 << BSON_ARRAY(1 << "2")
+                                 << "field4o"
+                                 << BSON_ARRAY(BSONObj() << BSONObj()));
+    auto testStruct = Complex_array_fields::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int64_t>&>();
+    assert_same_types<decltype(testStruct.getField2()),
+                      const std::vector<mongo::NamespaceString>&>();
+    assert_same_types<decltype(testStruct.getField3()), const std::vector<mongo::AnyBasicType>&>();
+    assert_same_types<decltype(testStruct.getField4()),
+                      const std::vector<mongo::ObjectBasicType>&>();
+
+    assert_same_types<decltype(testStruct.getField1o()),
+                      const boost::optional<std::vector<std::int64_t>>>();
+    assert_same_types<decltype(testStruct.getField2o()),
+                      const boost::optional<std::vector<mongo::NamespaceString>>>();
+    assert_same_types<decltype(testStruct.getField3o()),
+                      const boost::optional<std::vector<mongo::AnyBasicType>>>();
+    assert_same_types<decltype(testStruct.getField4o()),
+                      const boost::optional<std::vector<mongo::ObjectBasicType>>>();
+
+    std::vector<std::int64_t> field1{1, 2, 3};
+    ASSERT_TRUE(field1 == testStruct.getField1());
+    std::vector<NamespaceString> field2{{"a", "b"}, {"c", "d"}};
+    ASSERT_TRUE(field2 == testStruct.getField2());
+}
 
 }  // namespace mongo

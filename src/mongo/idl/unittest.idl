@@ -211,6 +211,21 @@ structs:
 
 ##################################################################################################
 #
+# Nested Structs with duplicate types
+#
+##################################################################################################
+    NestedWithDuplicateTypes:
+        description: UnitTest for a non-strict struct with 3 required fields
+        strict: false
+        fields:
+            field1: RequiredStrictField3
+            field2: 
+                type: RequiredNonStrictField3
+                optional: true
+            field3: RequiredStrictField3
+
+##################################################################################################
+#
 # Structs to test various options for fields
 #
 ##################################################################################################
@@ -308,4 +323,68 @@ structs:
                 optional: true
             field2:
                 type: int
+                optional: true
+
+##################################################################################################
+#
+# Test array of simple types
+#
+##################################################################################################
+    simple_int_array:
+        description: UnitTest for arrays of ints
+        fields:
+            field1:
+                type: array<int>
+
+    simple_array_fields:
+        description: UnitTest for arrays of simple types
+        fields:
+            field1:
+                type: array<string>
+            field2:
+                type: array<int>
+            field3:
+                type: array<double>
+
+    optional_array_fields:
+        description: UnitTest for arrays of optional simple types
+        fields:
+            field1:
+                type: array<string>
+                optional: true
+            field2:
+                type: array<int>
+                optional: true
+            field3:
+                type: array<double>
+                optional: true
+
+##################################################################################################
+#
+# Test array of complex types
+#
+##################################################################################################
+
+    complex_array_fields:
+        description: UnitTest for arrays of complex optional and non-optional simple types
+        fields:
+            field1:
+                type: array<safeInt32>
+            field2:
+                type: array<namespacestring>
+            field3:
+                type: array<any_basic_type>
+            field4:
+                type: array<object_basic_type>
+            field1o:
+                type: array<safeInt32>
+                optional: true
+            field2o:
+                type: array<namespacestring>
+                optional: true
+            field3o:
+                type: array<any_basic_type>
+                optional: true
+            field4o:
+                type: array<object_basic_type>
                 optional: true

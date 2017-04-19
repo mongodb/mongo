@@ -77,3 +77,7 @@ structs:
                 type: string
                 optional: true
                 description: "An optional string"
+            vectorField:
+                type: array<int>
+                description: "An example int array field with default value"
+

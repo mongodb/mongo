@@ -55,6 +55,22 @@ class IDLSpec(object):
         #TODO self.imports = None # type: Optional[Imports]
 
 
+def parse_array_type(name):
+    # type: (unicode) -> unicode
+    """Parse a type name of the form 'array<type>' and extract type."""
+    if not name.startswith("array<") and not name.endswith(">"):
+        return None
+
+    name = name[len("array<"):]
+    name = name[:-1]
+
+    # V1 restriction, ban nested array types to reduce scope.
+    if name.startswith("array<") and name.endswith(">"):
+        return None
+
+    return name
+
+
 class SymbolTable(object):
     """
     IDL Symbol Table.
@@ -106,16 +122,28 @@ class SymbolTable(object):
     def resolve_field_type(self, ctxt, field):
         # type: (errors.ParserContext, Field) -> Tuple[Optional[Struct], Optional[Type]]
         """Find the type or struct a field refers to or log an error."""
+        return self._resolve_field_type(ctxt, field, field.type)
+
+    def _resolve_field_type(self, ctxt, field, type_name):
+        # type: (errors.ParserContext, Field, unicode) -> Tuple[Optional[Struct], Optional[Type]]
+        """Find the type or struct a field refers to or log an error."""
         for idltype in self.types:
-            if idltype.name == field.type:
+            if idltype.name == type_name:
                 return (None, idltype)
 
         for struct in self.structs:
-            if struct.name == field.type:
+            if struct.name == type_name:
                 return (struct, None)
 
-        # TODO: handle array
-        ctxt.add_unknown_type_error(field, field.name, field.type)
+        if type_name.startswith('array<'):
+            array_type_name = parse_array_type(type_name)
+            if not array_type_name:
+                ctxt.add_bad_array_type_name(field, field.name, type_name)
+                return (None, None)
+
+            return self._resolve_field_type(ctxt, field, array_type_name)
+
+        ctxt.add_unknown_type_error(field, field.name, type_name)
 
         return (None, None)
 

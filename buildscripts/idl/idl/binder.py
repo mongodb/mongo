@@ -89,7 +89,7 @@ def _validate_type(ctxt, idl_type):
     """Validate each type is correct."""
 
     # Validate naming restrictions
-    if idl_type.name.startswith("array"):
+    if idl_type.name.startswith("array<"):
         ctxt.add_array_not_valid_error(idl_type, "type", idl_type.name)
 
     _validate_type_properties(ctxt, idl_type, 'type')
@@ -196,7 +196,7 @@ def _bind_struct(ctxt, parsed_spec, struct):
     ast_struct.strict = struct.strict
 
     # Validate naming restrictions
-    if ast_struct.name.startswith("array"):
+    if ast_struct.name.startswith("array<"):
         ctxt.add_array_not_valid_error(ast_struct, "struct", ast_struct.name)
 
     for field in struct.fields:
@@ -237,7 +237,7 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.optional = field.optional
 
     # Validate naming restrictions
-    if ast_field.name.startswith("array"):
+    if ast_field.name.startswith("array<"):
         ctxt.add_array_not_valid_error(ast_field, "field", ast_field.name)
 
     if field.ignore:
@@ -245,10 +245,16 @@ def _bind_field(ctxt, parsed_spec, field):
         _validate_ignored_field(ctxt, field)
         return ast_field
 
-    # TODO: support array
     (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, field)
     if not struct and not idltype:
         return None
+
+    # If the field type is an array, mark the AST version as such.
+    if syntax.parse_array_type(field.type):
+        ast_field.array = True
+
+        if field.default or (idltype and idltype.default):
+            ctxt.add_array_no_default(field, field.name)
 
     # Copy over only the needed information if this a struct or a type
     if struct:
