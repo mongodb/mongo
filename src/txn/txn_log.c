@@ -289,6 +289,7 @@ int
 __wt_txn_checkpoint_log(
     WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN *lsnp)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(logrec);
 	WT_DECL_RET;
 	WT_ITEM *ckpt_snapshot, empty;
@@ -300,7 +301,8 @@ __wt_txn_checkpoint_log(
 	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
 	const char *fmt = WT_UNCHECKED_STRING(IIIIu);
 
-	txn_global = &S2C(session)->txn_global;
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
 	txn = &session->txn;
 	ckpt_lsn = &txn->ckpt_lsn;
 
@@ -374,20 +376,20 @@ __wt_txn_checkpoint_log(
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp,
-		    F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) ?
+		    F_ISSET(conn, WT_CONN_CKPT_SYNC) ?
 		    WT_LOG_FSYNC : 0));
 
 		/*
 		 * If this full checkpoint completed successfully and there is
-		 * no hot backup in progress and this is not recovery, tell
-		 * the logging subsystem the checkpoint LSN so that it can
-		 * archive.  Do not update the logging checkpoint LSN if this
-		 * is during a clean connection close, only during a full
-		 * checkpoint.  A clean close may not update any metadata LSN
-		 * and we do not want to archive in that case.
+		 * no hot backup in progress and this is not an unclean
+		 * recovery, tell the logging subsystem the checkpoint LSN so
+		 * that it can archive.  Do not update the logging checkpoint
+		 * LSN if this is during a clean connection close, only during
+		 * a full checkpoint.  A clean close may not update any
+		 * metadata LSN and we do not want to archive in that case.
 		 */
-		if (!S2C(session)->hot_backup &&
-		    !F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+		if (!conn->hot_backup &&
+		    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY) &&
 		    txn->full_ckpt)
 			__wt_log_ckpt(session, ckpt_lsn);
 
