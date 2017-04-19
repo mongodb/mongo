@@ -64,29 +64,6 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __cursor_copy_int_key --
- *	If we're pointing into the tree, save the key into local memory.
- */
-static inline int
-__cursor_copy_int_key(WT_CURSOR *cursor)
-{
-	/*
-	 * We're about to discard the cursor's position and the cursor layer
-	 * might retry the operation. We discard pinned pages on error, which
-	 * will invalidate pinned keys. Clear WT_CURSTD_KEY_INT in all cases,
-	 * the underlying page is gone whether we can allocate memory or not.
-	 */
-	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
-		F_CLR(cursor, WT_CURSTD_KEY_INT);
-		if (!WT_DATA_IN_ITEM(&cursor->key))
-			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
-			    &cursor->key, cursor->key.data, cursor->key.size));
-		F_SET(cursor, WT_CURSTD_KEY_EXT);
-	}
-	return (0);
-}
-
-/*
  * __cursor_size_chk --
  *	Return if an inserted item is too large.
  */
@@ -431,10 +408,14 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	__cursor_state_save(cursor, &state);
 
 	/*
-	 * The pinned page goes away if we do a search, make sure there's a
-	 * local copy of any key, then re-save the cursor state.
+	 * The pinned page goes away if we search the tree, get a local copy of
+	 * any pinned key and discard any pinned value, then re-save the cursor
+	 * state. Done before searching pinned pages (unlike other cursor
+	 * functions), because we don't anticipate applications searching for a
+	 * key they currently have pinned.)
 	 */
-	WT_ERR(__cursor_copy_int_key(cursor));
+	WT_ERR(__cursor_localkey(cursor));
+	__cursor_novalue(cursor);
 	__cursor_state_save(cursor, &state);
 
 	/*
@@ -516,10 +497,14 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	__cursor_state_save(cursor, &state);
 
 	/*
-	 * The pinned page goes away if we do a search, make sure there's a
-	 * local copy of any key, then re-save the cursor state.
+	 * The pinned page goes away if we search the tree, get a local copy of
+	 * any pinned key and discard any pinned value, then re-save the cursor
+	 * state. Done before searching pinned pages (unlike other cursor
+	 * functions), because we don't anticipate applications searching for a
+	 * key they currently have pinned.)
 	 */
-	WT_ERR(__cursor_copy_int_key(cursor));
+	WT_ERR(__cursor_localkey(cursor));
+	__cursor_novalue(cursor);
 	__cursor_state_save(cursor, &state);
 
 	/*
@@ -640,8 +625,6 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	WT_STAT_DATA_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
-	__cursor_state_save(cursor, &state);
-
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
@@ -657,6 +640,9 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	 */
 	append_key =
 	    F_ISSET(cursor, WT_CURSTD_APPEND) && btree->type != BTREE_ROW;
+
+	/* Save the cursor state. */
+	__cursor_state_save(cursor, &state);
 
 	/*
 	 * If inserting with overwrite configured, and positioned to an on-page
@@ -682,22 +668,24 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 			goto done;
 
 		/*
-		 * The pinned page goes away if we fail for any reason, make
-		 * sure there's a local copy of any key. (Restart could still
+		 * The pinned page goes away if we fail for any reason, get a
+		 * local copy of any pinned key or value. (Restart could still
 		 * use the pinned page, but that's an unlikely path.) Re-save
 		 * the cursor state: we may retry but eventually fail.
 		 */
-		WT_TRET(__cursor_copy_int_key(cursor));
+		WT_TRET(__cursor_localkey(cursor));
+		WT_TRET(__cursor_localvalue(cursor));
 		__cursor_state_save(cursor, &state);
 		goto err;
 	}
 
 	/*
-	 * The pinned page goes away if we do a search, make sure there's a
-	 * local copy of any key. Re-save the cursor state: we may retry but
+	 * The pinned page goes away if we do a search, get a local copy of any
+	 * pinned key or value. Re-save the cursor state: we may retry but
 	 * eventually fail.
 	 */
-	WT_ERR(__cursor_copy_int_key(cursor));
+	WT_ERR(__cursor_localkey(cursor));
+	WT_ERR(__cursor_localvalue(cursor));
 	__cursor_state_save(cursor, &state);
 
 retry:	WT_ERR(__cursor_func_init(cbt, true));
@@ -812,12 +800,13 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/*
-	 * The pinned page goes away if we do a search, make sure there's a
-	 * local copy of any key. Unlike most of the btree cursor routines,
-	 * we don't have to save/restore the cursor key state, none of the
-	 * work done here changes the key state.
+	 * The pinned page goes away if we do a search, get a local copy of any
+	 * pinned key and discard any pinned value. Unlike most of the btree
+	 * cursor routines, we don't have to save/restore the cursor key state,
+	 * none of the work done here changes the cursor state.
 	 */
-	WT_ERR(__cursor_copy_int_key(cursor));
+	WT_ERR(__cursor_localkey(cursor));
+	__cursor_novalue(cursor);
 
 retry:	WT_ERR(__cursor_func_init(cbt, true));
 
@@ -865,13 +854,14 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	WT_STAT_DATA_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
-	__cursor_state_save(cursor, &state);
-
 	/*
 	 * WT_CURSOR.remove has a unique semantic, the cursor stays positioned
 	 * if it starts positioned, otherwise clear the cursor on completion.
 	 */
 	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
+
+	/* Save the cursor state. */
+	__cursor_state_save(cursor, &state);
 
 	/*
 	 * If remove positioned to an on-page key, the remove doesn't require
@@ -897,22 +887,27 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 			goto done;
 
 		/*
-		 * The pinned page goes away if we fail for any reason, make
-		 * sure there's a local copy of any key. (Restart could still
-		 * use the pinned page, but that's an unlikely path.) Re-save
-		 * the cursor state: we may retry but eventually fail.
+		 * The pinned page goes away if we fail for any reason, get a
+		 * local copy of any pinned key and discard any value (remove
+		 * discards any previous value on success or failure). (Restart
+		 * could still use the pinned page, but that's an unlikely
+		 * path.) Re-save the cursor state: we may retry but eventually
+		 * fail.
 		 */
-		WT_TRET(__cursor_copy_int_key(cursor));
+		WT_TRET(__cursor_localkey(cursor));
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 		__cursor_state_save(cursor, &state);
 		goto err;
 	}
 
 	/*
-	 * The pinned page goes away if we do a search, make sure there's a
-	 * local copy of any key. Re-save the cursor state: we may retry but
-	 * eventually fail.
+	 * The pinned page goes away if we do a search, get a local copy of any
+	 * pinned key and discard any value (remove discards any previous
+	 * value on success or failure). Re-save the cursor state: we may retry
+	 * but eventually fail.
 	 */
-	WT_ERR(__cursor_copy_int_key(cursor));
+	WT_ERR(__cursor_localkey(cursor));
+	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	__cursor_state_save(cursor, &state);
 
 retry:	WT_ERR(__cursor_func_init(cbt, true));
@@ -1007,8 +1002,6 @@ __btcur_update(WT_CURSOR_BTREE *cbt, bool is_reserve)
 	WT_STAT_DATA_INCR(session, cursor_update);
 	WT_STAT_DATA_INCRV(session, cursor_update_bytes, cursor->value.size);
 
-	__cursor_state_save(cursor, &state);
-
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	if (!is_reserve)
@@ -1016,6 +1009,9 @@ __btcur_update(WT_CURSOR_BTREE *cbt, bool is_reserve)
 
 	/* It's no longer possible to bulk-load into the tree. */
 	__cursor_disable_bulk(session, btree);
+
+	/* Save the cursor state. */
+	__cursor_state_save(cursor, &state);
 
 	/*
 	 * If update positioned to an on-page key, the update doesn't require
@@ -1040,22 +1036,24 @@ __btcur_update(WT_CURSOR_BTREE *cbt, bool is_reserve)
 			goto done;
 
 		/*
-		 * The pinned page goes away if we fail for any reason, make
-		 * sure there's a local copy of any key. (Restart could still
+		 * The pinned page goes away if we fail for any reason, get a
+		 * a local copy of any pinned key or value. (Restart could still
 		 * use the pinned page, but that's an unlikely path.) Re-save
 		 * the cursor state: we may retry but eventually fail.
 		 */
-		WT_TRET(__cursor_copy_int_key(cursor));
+		WT_TRET(__cursor_localkey(cursor));
+		WT_TRET(__cursor_localvalue(cursor));
 		__cursor_state_save(cursor, &state);
 		goto err;
 	}
 
 	/*
-	 * The pinned page goes away if we do a search, make sure there's a
-	 * local copy of any key. Re-save the cursor state: we may retry but
+	 * The pinned page goes away if we do a search, get a local copy of any
+	 * pinned key or value. Re-save the cursor state: we may retry but
 	 * eventually fail.
 	 */
-	WT_ERR(__cursor_copy_int_key(cursor));
+	WT_ERR(__cursor_localkey(cursor));
+	WT_ERR(__cursor_localvalue(cursor));
 	__cursor_state_save(cursor, &state);
 
 retry:	WT_ERR(__cursor_func_init(cbt, true));

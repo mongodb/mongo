@@ -72,11 +72,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 			    (WT_PREFIX_MATCH(cursor->uri, "file:") &&
 			    F_ISSET((WT_CURSOR_BTREE *)cursor, WT_CBT_NO_TXN)));
 #endif
-
-			F_CLR(cursor, WT_CURSTD_VALUE_INT);
-			WT_RET(__wt_buf_set(session, &cursor->value,
-			    cursor->value.data, cursor->value.size));
-			F_SET(cursor, WT_CURSTD_VALUE_EXT);
+			WT_RET(__cursor_localvalue(cursor));
 		}
 
 	return (0);

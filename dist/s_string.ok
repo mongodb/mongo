@@ -866,7 +866,9 @@ llll
 llu
 loadtext
 localTime
+localkey
 localtime
+localvalue
 logf
 logmgr
 lognum

@@ -51,6 +51,41 @@ __cursor_checkvalue(WT_CURSOR *cursor)
 }
 
 /*
+ * __cursor_localkey --
+ *	If the key points into the tree, get a local copy.
+ */
+static inline int
+__cursor_localkey(WT_CURSOR *cursor)
+{
+	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+		if (!WT_DATA_IN_ITEM(&cursor->key))
+			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
+			    &cursor->key, cursor->key.data, cursor->key.size));
+		F_CLR(cursor, WT_CURSTD_KEY_INT);
+		F_SET(cursor, WT_CURSTD_KEY_EXT);
+	}
+	return (0);
+}
+
+/*
+ * __cursor_localvalue --
+ *	If the value points into the tree, get a local copy.
+ */
+static inline int
+__cursor_localvalue(WT_CURSOR *cursor)
+{
+	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
+		if (!WT_DATA_IN_ITEM(&cursor->value))
+			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
+			    &cursor->value,
+			    cursor->value.data, cursor->value.size));
+		F_CLR(cursor, WT_CURSTD_VALUE_INT);
+		F_SET(cursor, WT_CURSTD_VALUE_EXT);
+	}
+	return (0);
+}
+
+/*
  * __cursor_needkey --
  *
  * Check if we have a key set. There's an additional semantic here: if we're
@@ -60,14 +95,7 @@ __cursor_checkvalue(WT_CURSOR *cursor)
 static inline int
 __cursor_needkey(WT_CURSOR *cursor)
 {
-	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
-		if (!WT_DATA_IN_ITEM(&cursor->key))
-			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
-			    &cursor->key, cursor->key.data, cursor->key.size));
-		F_CLR(cursor, WT_CURSTD_KEY_INT);
-		F_SET(cursor, WT_CURSTD_KEY_EXT);
-		return (0);
-	}
+	WT_RET(__cursor_localkey(cursor));
 	return (__cursor_checkkey(cursor));
 }
 
@@ -81,15 +109,7 @@ __cursor_needkey(WT_CURSOR *cursor)
 static inline int
 __cursor_needvalue(WT_CURSOR *cursor)
 {
-	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
-		if (!WT_DATA_IN_ITEM(&cursor->value))
-			WT_RET(__wt_buf_set((WT_SESSION_IMPL *)cursor->session,
-			    &cursor->value,
-			    cursor->value.data, cursor->value.size));
-		F_CLR(cursor, WT_CURSTD_VALUE_INT);
-		F_SET(cursor, WT_CURSTD_VALUE_EXT);
-		return (0);
-	}
+	WT_RET(__cursor_localkey(cursor));
 	return (__cursor_checkvalue(cursor));
 }
 
