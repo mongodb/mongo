@@ -121,6 +121,10 @@ public:
                                  const NamespaceString& nss,
                                  const BSONElement& idKey) override;
 
+    StatusWith<BSONObj> deleteById(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const BSONElement& idKey) override;
+
     Status upsertById(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const BSONElement& idKey,

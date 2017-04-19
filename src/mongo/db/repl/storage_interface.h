@@ -272,6 +272,14 @@ public:
                                          const BSONElement& idKey) = 0;
 
     /**
+     * Deletes a single document in the collection referenced by the specified _id.
+     * Returns deleted document on success.
+     */
+    virtual StatusWith<BSONObj> deleteById(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const BSONElement& idKey) = 0;
+
+    /**
      * Updates a single document in the collection referenced by the specified _id.
      * The document is located by looking up "idKey" in the id index.
      * "update" represents the replacement document or list of requested modifications to be applied

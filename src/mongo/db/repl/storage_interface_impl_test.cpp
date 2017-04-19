@@ -1530,6 +1530,51 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsDocumentWhenDocumentExists) {
     ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.findById(opCtx, nss, doc2["_id"])));
 }
 
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.deleteById(opCtx, nss, doc["_id"]).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNoSuchKeyWhenCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.deleteById(opCtx, nss, doc["_id"]).getStatus());
+    _assertDocumentsInCollectionEquals(opCtx, nss, {});
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNoSuchKeyWhenDocumentIsNotFound) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc3}));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.deleteById(opCtx, nss, doc2["_id"]).getStatus());
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsDocumentWhenDocumentExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2, doc3}));
+    ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.deleteById(opCtx, nss, doc2["_id"])));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
+}
+
 TEST_F(StorageInterfaceImplTest,
        UpsertSingleDocumentReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
     auto opCtx = getOperationContext();

@@ -590,6 +590,31 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     MONGO_UNREACHABLE;
 }
 
+StatusWith<BSONObj> _findOrDeleteById(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const BSONElement& idKey,
+                                      FindDeleteMode mode) {
+    auto wrappedIdKey = idKey.wrap("");
+    auto result = _findOrDeleteDocuments(opCtx,
+                                         nss,
+                                         kIdIndexName,
+                                         StorageInterface::ScanDirection::kForward,
+                                         wrappedIdKey,
+                                         wrappedIdKey,
+                                         BoundInclusion::kIncludeBothStartAndEndKeys,
+                                         1U,
+                                         mode);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+    const auto& docs = result.getValue();
+    if (docs.empty()) {
+        return {ErrorCodes::NoSuchKey, str::stream() << "No document found with _id: " << idKey};
+    }
+
+    return docs.front();
+}
+
 }  // namespace
 
 StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::findDocuments(
@@ -633,25 +658,13 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
 StatusWith<BSONObj> StorageInterfaceImpl::findById(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const BSONElement& idKey) {
-    auto wrappedIdKey = idKey.wrap("");
-    auto result = _findOrDeleteDocuments(opCtx,
-                                         nss,
-                                         kIdIndexName,
-                                         ScanDirection::kForward,
-                                         wrappedIdKey,
-                                         wrappedIdKey,
-                                         BoundInclusion::kIncludeBothStartAndEndKeys,
-                                         1U,
-                                         FindDeleteMode::kFind);
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-    const auto& docs = result.getValue();
-    if (docs.empty()) {
-        return {ErrorCodes::NoSuchKey, str::stream() << "No document found with _id: " << idKey};
-    }
+    return _findOrDeleteById(opCtx, nss, idKey, FindDeleteMode::kFind);
+}
 
-    return docs.front();
+StatusWith<BSONObj> StorageInterfaceImpl::deleteById(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const BSONElement& idKey) {
+    return _findOrDeleteById(opCtx, nss, idKey, FindDeleteMode::kDelete);
 }
 
 namespace {
