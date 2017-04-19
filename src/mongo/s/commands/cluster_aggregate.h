@@ -91,6 +91,7 @@ private:
     // multiple servers such as for replica sets. These also take care of registering
     // returned cursors.
     static BSONObj aggRunCommand(OperationContext* opCtx,
+                                 const ShardId& shardId,
                                  DBClientBase* conn,
                                  const Namespaces& namespaces,
                                  const AggregationRequest& aggRequest,

@@ -244,6 +244,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         auto executorPool = Grid::get(opCtx)->getExecutorPool();
         const BSONObj reply =
             uassertStatusOK(storePossibleCursor(opCtx,
+                                                shardResults[0].shardTargetId,
                                                 shardResults[0].target.getServers()[0],
                                                 shardResults[0].result,
                                                 namespaces.requestedNss,
@@ -295,8 +296,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, mergingShardId));
 
     ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
-    BSONObj mergedResults =
-        aggRunCommand(opCtx, conn.get(), namespaces, request, mergeCmd.freeze().toBson());
+    BSONObj mergedResults = aggRunCommand(
+        opCtx, mergingShardId, conn.get(), namespaces, request, mergeCmd.freeze().toBson());
     conn.done();
 
     if (auto wcErrorElem = mergedResults["writeConcernError"]) {
@@ -414,6 +415,7 @@ void ClusterAggregate::killAllCursors(const std::vector<Strategy::CommandResult>
 }
 
 BSONObj ClusterAggregate::aggRunCommand(OperationContext* opCtx,
+                                        const ShardId& shardId,
                                         DBClientBase* conn,
                                         const Namespaces& namespaces,
                                         const AggregationRequest& aggRequest,
@@ -445,6 +447,7 @@ BSONObj ClusterAggregate::aggRunCommand(OperationContext* opCtx,
     // Transfer ownership of the agg cursor opened on mongod to the mongos cursor manager.
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
     result = uassertStatusOK(storePossibleCursor(opCtx,
+                                                 shardId,
                                                  HostAndPort(cursor->originalHost()),
                                                  result,
                                                  namespaces.requestedNss,
@@ -474,7 +477,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
 
     ShardConnection conn(shardStatus.getValue()->getConnString(), "");
-    BSONObj result = aggRunCommand(opCtx, conn.get(), namespaces, aggRequest, cmdObj);
+    BSONObj result = aggRunCommand(opCtx, shardId, conn.get(), namespaces, aggRequest, cmdObj);
     conn.done();
 
     // First append the properly constructed writeConcernError. It will then be skipped

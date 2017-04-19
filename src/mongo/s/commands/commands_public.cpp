@@ -113,6 +113,7 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
 
     StatusWith<BSONObj> transformedResponse =
         storePossibleCursor(opCtx,
+                            shardId,
                             HostAndPort(cursor->originalHost()),
                             response,
                             nss,

@@ -59,8 +59,13 @@ struct ClusterClientCursorParams {
     static const char kSortKeyField[];
 
     struct RemoteCursor {
-        RemoteCursor(HostAndPort hostAndPort, CursorResponse cursorResponse)
-            : hostAndPort(std::move(hostAndPort)), cursorResponse(std::move(cursorResponse)) {}
+        RemoteCursor(ShardId shardId, HostAndPort hostAndPort, CursorResponse cursorResponse)
+            : shardId(std::move(shardId)),
+              hostAndPort(std::move(hostAndPort)),
+              cursorResponse(std::move(cursorResponse)) {}
+
+        // The shardId of the shard on which the cursor resides.
+        ShardId shardId;
 
         // The exact host (within the shard) on which the cursor resides.
         HostAndPort hostAndPort;
