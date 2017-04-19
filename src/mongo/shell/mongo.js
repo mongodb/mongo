@@ -32,6 +32,22 @@ if (typeof mongoInject == "function") {
     mongoInject(Mongo.prototype);
 }
 
+Mongo.prototype.setCausalConsistency = function(value) {
+    if (arguments.length === 0) {
+        value = true;
+    }
+    this._isCausal = value;
+};
+
+Mongo.prototype.isCausalConsistencyEnabled = function(cmdName) {
+    if (!this._isCausal) {
+        return false;
+    }
+    if (typeof cmdName === "string" && cmdName === "find") {
+        return true;
+    }
+};
+
 Mongo.prototype.setSlaveOk = function(value) {
     if (value == undefined)
         value = true;
@@ -60,6 +76,71 @@ Mongo.prototype.getDBs = function() {
     var res = this.adminCommand({"listDatabases": 1});
     if (!res.ok)
         throw _getErrorWithCode(res, "listDatabases failed:" + tojson(res));
+    return res;
+};
+
+/**
+ *  Adds afterClusterTime to the readConcern.
+ */
+Mongo.prototype._injectAfterClusterTime = function(cmdObj) {
+    cmdObj = Object.assign({}, cmdObj);
+    // The operationTime returned by the current session (i.e. connection) is the
+    // smallest time that is needed for causal consistent read. The clusterTime is >=
+    // the operationTime so it's less efficient to wait on the server for the
+    // clusterTime.
+    const operationTime = this.getOperationTime();
+    if (operationTime) {
+        const readConcern = Object.assign({}, cmdObj.readConcern);
+        // Currently server supports afterClusterTime only with level:majority. Going forward it
+        // will be relaxed for any level of readConcern.
+        if (!readConcern.hasOwnProperty("level") || readConcern.level === "majority") {
+            if (!readConcern.hasOwnProperty("afterClusterTime")) {
+                readConcern.afterClusterTime = operationTime;
+            }
+            readConcern.level = "majority";
+            cmdObj.readConcern = readConcern;
+        }
+    }
+    return cmdObj;
+};
+
+/**
+ * Sets logicalTime and operationTime extracted from command reply.
+ * This is applicable for the protocol starting from version 3.6.
+ */
+Mongo.prototype._setLogicalTimeFromReply = function(res) {
+    if (res.hasOwnProperty("operationTime")) {
+        this.setOperationTime(res["operationTime"]);
+    }
+    if (res.hasOwnProperty("logicalTime")) {
+        this.setClusterTime(res["logicalTime"]);
+    }
+};
+
+/**
+ *  Adds afterClusterTime to the readConcern if its supported and runs the command.
+ */
+Mongo.prototype.runCausalConsistentCommandWithMetadata = function(
+    dbName, cmdName, metadata, cmdObj) {
+    if (this.isCausalConsistencyEnabled(cmdName) && cmdObj) {
+        cmdObj = this._injectAfterClusterTime(cmdObj);
+    }
+    const res = this.runCommandWithMetadata(dbName, cmdName, metadata, cmdObj);
+    this._setLogicalTimeFromReply(res);
+    return res;
+};
+
+/**
+ *  Adds afterClusterTime to the readConcern if its supported and runs the command.
+ */
+Mongo.prototype.runCausalConsistentCommand = function(dbName, cmdObj, options) {
+    const cmdName = Object.keys(cmdObj)[0];
+
+    if (this.isCausalConsistencyEnabled(cmdName) && cmdObj) {
+        cmdObj = this._injectAfterClusterTime(cmdObj);
+    }
+    const res = this.runCommand(dbName, cmdObj, options);
+    this._setLogicalTimeFromReply(res);
     return res;
 };
 
@@ -378,4 +459,46 @@ Mongo.prototype.getWriteConcern = function() {
 
 Mongo.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
+};
+
+/**
+ * Sets the operationTime.
+ */
+Mongo.prototype.setOperationTime = function(operationTime) {
+    if (this._operationTime === undefined || this._operationTime === null ||
+        (typeof operationTime === "object" &&
+         bsonWoCompare(operationTime, this._operationTime) === 1)) {
+        this._operationTime = operationTime;
+    }
+};
+
+/**
+ * Gets the operationTime or null if unset.
+ */
+Mongo.prototype.getOperationTime = function() {
+    if (this._operationTime === undefined) {
+        return null;
+    }
+    return this._operationTime;
+};
+
+/**
+ * Sets the clusterTime.
+ */
+Mongo.prototype.setClusterTime = function(logicalTimeObj) {
+    if (typeof logicalTimeObj === "object" && logicalTimeObj.hasOwnProperty("clusterTime") &&
+        (this._clusterTime === undefined || this._clusterTime === null ||
+         bsonWoCompare(logicalTimeObj.clusterTime, this._clusterTime.clusterTime) === 1)) {
+        this._clusterTime = logicalTimeObj;
+    }
+};
+
+/**
+ * Gets the clusterTime or null if unset.
+ */
+Mongo.prototype.getClusterTime = function() {
+    if (this._clusterTime === undefined) {
+        return null;
+    }
+    return this._clusterTime;
 };
