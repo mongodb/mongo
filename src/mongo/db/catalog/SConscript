@@ -92,6 +92,14 @@ env.Library(
     LIBDEPS=[
     ],
 )
+env.Library(
+    target='collection_info_cache',
+    source=[
+        'collection_info_cache.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
 
 env.Library(
     target='catalog',
@@ -101,7 +109,7 @@ env.Library(
         "coll_mod.cpp",
         "collection_compact.cpp",
         "collection_impl.cpp",
-        "collection_info_cache.cpp",
+        "collection_info_cache_impl.cpp",
         "create_collection.cpp",
         "cursor_manager.cpp",
         "database_impl.cpp",
@@ -116,6 +124,7 @@ env.Library(
     ],
     LIBDEPS=[
         'collection',
+        'collection_info_cache',
         'collection_options',
         'database',
         'index_catalog',
