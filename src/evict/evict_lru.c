@@ -562,7 +562,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	cache = conn->cache;
 
 	/* Clear previous state. */
-	F_CLR(cache, WT_CACHE_EVICT_MASK);
+	cache->flags = 0;
 
 	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 		return (false);
@@ -619,8 +619,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		F_CLR(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 	}
 
-	WT_STAT_CONN_SET(session, cache_eviction_state,
-	    F_MASK(cache, WT_CACHE_EVICT_MASK));
+	WT_STAT_CONN_SET(session, cache_eviction_state, cache->flags);
 
 	return (F_ISSET(cache, WT_CACHE_EVICT_ALL | WT_CACHE_EVICT_URGENT));
 }
