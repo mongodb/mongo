@@ -855,6 +855,12 @@ public:
 
     virtual Status stepUpIfEligible() = 0;
 
+
+    /**
+     * Abort catchup if the node is in catchup mode.
+     */
+    virtual Status abortCatchupIfNeeded() = 0;
+
 protected:
     ReplicationCoordinator();
 };

@@ -473,5 +473,9 @@ void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
     _alwaysAllowWrites = allowWrites;
 }
 
+Status ReplicationCoordinatorMock::abortCatchupIfNeeded() {
+    return Status::OK();
+}
+
 }  // namespace repl
 }  // namespace mongo

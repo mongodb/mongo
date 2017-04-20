@@ -107,11 +107,6 @@ void runSingleNodeElection(ServiceContext::UniqueOperationContext txn,
     replCoord->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
     ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
     replCoord->waitForElectionFinish_forTest();
-    // Wait for primary catch-up
-    net->enterNetwork();
-    net->runReadyNetworkOperations();
-    net->exitNetwork();
-
 
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
@@ -5057,7 +5052,6 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
 
     // Single node cluster - this node should start election on setFollowerMode() completion.
     replCoord->waitForElectionFinish_forTest();
-    simulateCatchUpTimeout();
 
     // Successful dry run election increases term.
     ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());

@@ -273,6 +273,8 @@ public:
      */
     void alwaysAllowWrites(bool allowWrites);
 
+    virtual Status abortCatchupIfNeeded() override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     const ReplSettings _settings;

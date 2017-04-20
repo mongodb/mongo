@@ -864,9 +864,11 @@ var ReplSetTest = function(opts) {
     };
 
     this.reInitiate = function() {
-        var config = this.getReplSetConfig();
-        var newVersion = this.getReplSetConfigFromNode().version + 1;
-        config.version = newVersion;
+        var config = this.getReplSetConfigFromNode();
+        var newConfig = this.getReplSetConfig();
+        // Only reset members.
+        config.members = newConfig.members;
+        config.version += 1;
 
         this._setDefaultConfigOptions(config);
 
