@@ -18,6 +18,7 @@
 from __future__ import absolute_import, print_function
 
 import argparse
+import logging
 import sys
 
 import idl.compiler
@@ -45,7 +46,15 @@ def main():
 
     parser.add_argument('--base_dir', type=str, help="IDL output relative base directory")
 
+    parser.add_argument(
+        '--write-dependencies',
+        action='store_true',
+        help='only print out a list of dependent imports')
+
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
 
     compiler_args = idl.compiler.CompilerArgs()
 
@@ -56,6 +65,7 @@ def main():
     compiler_args.output_header = args.header
     compiler_args.output_base_dir = args.base_dir
     compiler_args.output_suffix = "_gen"
+    compiler_args.write_dependencies = args.write_dependencies
 
     if (args.output is not None and args.header is None) or \
         (args.output is  None and args.header is not None):

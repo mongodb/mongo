@@ -311,7 +311,8 @@ def bind(parsed_spec):
     _validate_types(ctxt, parsed_spec)
 
     for struct in parsed_spec.symbols.structs:
-        bound_spec.structs.append(_bind_struct(ctxt, parsed_spec, struct))
+        if not struct.imported:
+            bound_spec.structs.append(_bind_struct(ctxt, parsed_spec, struct))
 
     if ctxt.errors.has_errors():
         return ast.IDLBoundSpec(None, ctxt.errors)

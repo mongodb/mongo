@@ -20,10 +20,13 @@ Only validates the document is syntatically correct, not semantically.
 """
 from __future__ import absolute_import, print_function, unicode_literals
 
-from typing import Any, Callable, Dict, List, Set, Union
-from yaml import nodes
+from abc import ABCMeta, abstractmethod
+import io
 import yaml
+from yaml import nodes
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
+from . import common
 from . import errors
 from . import syntax
 
@@ -130,6 +133,21 @@ def _parse_global(ctxt, spec, node):
         return
 
     spec.globals = idlglobal
+
+
+def _parse_imports(ctxt, spec, node):
+    # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
+    """Parse an imports section in the IDL file."""
+    if not ctxt.is_sequence_node(node, "imports"):
+        return
+
+    if spec.imports:
+        ctxt.add_duplicate_error(node, "imports")
+        return
+
+    imports = syntax.Import(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+    imports.imports = ctxt.get_list(node)
+    spec.imports = imports
 
 
 def _parse_type(ctxt, spec, name, node):
@@ -255,7 +273,7 @@ def _parse_structs(ctxt, spec, node):
         _parse_struct(ctxt, spec, first_name, second_node)
 
 
-def parse(stream, error_file_name="unknown"):
+def _parse(stream, error_file_name):
     # type: (Any, unicode) -> syntax.IDLParsedSpec
     """
     Parse a YAML document into an idl.syntax tree.
@@ -294,6 +312,8 @@ def parse(stream, error_file_name="unknown"):
 
         if first_name == "global":
             _parse_global(ctxt, spec, second_node)
+        elif first_name == "imports":
+            _parse_imports(ctxt, spec, second_node)
         elif first_name == "types":
             _parse_types(ctxt, spec, second_node)
         elif first_name == "structs":
@@ -307,3 +327,105 @@ def parse(stream, error_file_name="unknown"):
         return syntax.IDLParsedSpec(None, ctxt.errors)
     else:
         return syntax.IDLParsedSpec(spec, None)
+
+
+class ImportResolverBase(object):
+    """Base class for resolving imported files."""
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self):
+        # type: () -> None
+        """Construct a ImportResolver."""
+        pass
+
+    @abstractmethod
+    def resolve(self, base_file, imported_file_name):
+        # type: (unicode, unicode) -> unicode
+        """Return the complete path to an imported file name."""
+        pass
+
+    @abstractmethod
+    def open(self, resolved_file_name):
+        # type: (unicode) -> Any
+        """Return an io.Stream for the requested file."""
+        pass
+
+
+def parse(stream, input_file_name, resolver):
+    # type: (Any, unicode, ImportResolverBase) -> syntax.IDLParsedSpec
+    """
+    Parse a YAML document into an idl.syntax tree.
+
+    stream: is a io.Stream.
+    input_file_name: a file name for error messages to use, and to help resolve imported files.
+    """
+    # pylint: disable=too-many-locals
+
+    root_doc = _parse(stream, input_file_name)
+
+    if root_doc.errors:
+        return root_doc
+
+    imports = []  # type: List[Tuple[common.SourceLocation, unicode, unicode]]
+    needs_include = []  # type: List[unicode]
+    if root_doc.spec.imports:
+        imports = [(root_doc.spec.imports, input_file_name, import_file_name)
+                   for import_file_name in root_doc.spec.imports.imports]
+
+    resolved_file_names = []  # type: List[unicode]
+
+    ctxt = errors.ParserContext(input_file_name, errors.ParserErrorCollection())
+
+    # Process imports in a breadth-first search
+    while imports:
+        file_import_tuple = imports[0]
+        imports = imports[1:]
+
+        import_location = file_import_tuple[0]
+        base_file_name = file_import_tuple[1]
+        imported_file_name = file_import_tuple[2]
+
+        # Check for already resolved file
+        resolved_file_name = resolver.resolve(base_file_name, imported_file_name)
+        if not resolved_file_name:
+            ctxt.add_cannot_find_import(import_location, imported_file_name)
+            return syntax.IDLParsedSpec(None, ctxt.errors)
+
+        if resolved_file_name in resolved_file_names:
+            continue
+
+        resolved_file_names.append(resolved_file_name)
+
+        # Parse imported file
+        with resolver.open(resolved_file_name) as file_stream:
+            parsed_doc = _parse(file_stream, resolved_file_name)
+
+        # Check for errors
+        if parsed_doc.errors:
+            return parsed_doc
+
+        # We need to generate includes for imported IDL files which have structs
+        if base_file_name == input_file_name and len(parsed_doc.spec.symbols.structs):
+            needs_include.append(imported_file_name)
+
+        # Add other imported files to the list of files to parse
+        if parsed_doc.spec.imports:
+            imports += [(parsed_doc.spec.imports, resolved_file_name, import_file_name)
+                        for import_file_name in parsed_doc.spec.imports.imports]
+
+        # Merge symbol tables together
+        root_doc.spec.symbols.add_imported_symbol_table(ctxt, parsed_doc.spec.symbols)
+        if ctxt.errors.has_errors():
+            return syntax.IDLParsedSpec(None, ctxt.errors)
+
+    # Resolve the direct imports which contain structs for root document so they can be translated
+    # into include file paths in generated code.
+    for needs_include_name in needs_include:
+        resolved_file_name = resolver.resolve(base_file_name, needs_include_name)
+        root_doc.spec.imports.resolved_imports.append(resolved_file_name)
+
+    if root_doc.spec.imports:
+        root_doc.spec.imports.dependencies = resolved_file_names
+
+    return root_doc

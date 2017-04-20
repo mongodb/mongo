@@ -22,6 +22,7 @@ Common error handling code for IDL compiler.
 from __future__ import absolute_import, print_function, unicode_literals
 
 import inspect
+import os
 import sys
 from typing import List, Union, Any
 from yaml import nodes
@@ -57,6 +58,7 @@ ERROR_ID_BAD_ANY_TYPE_USE = "ID0021"
 ERROR_ID_BAD_NUMERIC_CPP_TYPE = "ID0022"
 ERROR_ID_BAD_ARRAY_TYPE_NAME = "ID0023"
 ERROR_ID_ARRAY_NO_DEFAULT = "ID0024"
+ERROR_ID_BAD_IMPORT = "ID0025"
 
 
 class IDLError(Exception):
@@ -93,8 +95,8 @@ class ParserError(common.SourceLocation):
         Example error message:
         test.idl: (17, 4): ID0008: Unknown IDL node 'cpp_namespac' for YAML entity 'global'.
         """
-        msg = "%s: (%d, %d): %s: %s" % (self.file_name, self.line, self.column, self.error_id,
-                                        self.msg)
+        msg = "%s: (%d, %d): %s: %s" % (os.path.basename(self.file_name), self.line, self.column,
+                                        self.error_id, self.msg)
         return msg  # type: ignore
 
 
@@ -404,6 +406,12 @@ class ParserContext(object):
             location, ERROR_ID_ARRAY_NO_DEFAULT,
             "Field '%s' is not allowed to have both a default value and be an array type" %
             (field_name))
+
+    def add_cannot_find_import(self, location, imported_file_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about not being able to find an import."""
+        self._add_error(location, ERROR_ID_BAD_IMPORT,
+                        "Could not resolve import '%s', file not found" % (imported_file_name))
 
 
 def _assert_unique_error_messages():

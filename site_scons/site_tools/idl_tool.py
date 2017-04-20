@@ -16,6 +16,7 @@
 """IDL Compiler Scons Tool."""
 
 import os.path
+import subprocess
 import sys
 
 import SCons
@@ -44,15 +45,32 @@ IDLCBuilder = SCons.Builder.Builder(
     suffix=".cpp"
     )
 
+def idl_scanner(node, env, path):
+    # Use the import scanner mode of the IDL compiler to file imported files
+    cmd = [sys.executable, "buildscripts/idl/idlc.py",  '--include','src', str(node), '--write-dependencies']
+    deps_str = subprocess.check_output(cmd)
+
+    deps_list = deps_str.splitlines()
+
+    nodes_deps_list = [ env.File(d) for d in deps_list]
+
+    return nodes_deps_list
+
+idl_scanner = SCons.Scanner.Scanner(function=idl_scanner, skeys=['.idl'])
+
 def generate(env):
     bld = IDLCBuilder
+
+    env.Append(SCANNERS = idl_scanner)
+
     env['BUILDERS']['Idlc'] = bld
 
     env['IDLC'] = sys.executable + " buildscripts/idl/idlc.py"
     env['IDLCFLAGS'] = ''
     base_dir = env.subst('$BUILD_ROOT/$VARIANT_DIR').replace("#", "")
-    env['IDLCCOM'] = '$IDLC --base_dir %s --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES ' % (base_dir)
+    env['IDLCCOM'] = '$IDLC --include src --base_dir %s --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES ' % (base_dir)
     env['IDLCSUFFIX'] = '.idl'
+
 
 def exists(env):
     return True

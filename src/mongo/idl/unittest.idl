@@ -20,67 +20,11 @@ global:
         - "mongo/db/namespace_string.h"
         - "mongo/idl/idl_test_types.h"
 
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/idl/unittest_import.idl"
+
 types:
-    string:
-        bson_serialization_type: string
-        description: "A BSON UTF-8 string"
-        cpp_type: "std::string"
-        deserializer: "mongo::BSONElement::str"
-
-    int:
-        bson_serialization_type: int
-        description: "A BSON 32-bit integer"
-        cpp_type: "std::int32_t"
-        deserializer: "mongo::BSONElement::_numberInt"
-
-    long:
-        bson_serialization_type: long
-        description: "A BSON 64-bit integer"
-        cpp_type: "std::int64_t"
-        deserializer: "mongo::BSONElement::_numberLong"
-
-    double:
-        bson_serialization_type: double
-        description: "A BSON 64-bit floating point number"
-        cpp_type: "double"
-        deserializer: "mongo::BSONElement::_numberDouble"
-
-    decimal:
-        bson_serialization_type: double
-        description: "A BSON 128-bit floating point decimal number"
-        cpp_type: "mongo::Decimal128"
-        deserializer: "mongo::BSONElement::_numberDecimal"
-
-    bool:
-        bson_serialization_type: bool
-        description: "A BSON bool"
-        cpp_type: "bool"
-        deserializer: "mongo::BSONElement::boolean"
-
-    # TODO: support bindata
-    # bindata:
-    #     bson_serialization_type: bindata
-    #     cpp_type: "std:"
-    #     deserializer: "mongo::BSONElement::str"
-
-    objectid:
-        bson_serialization_type: objectid
-        description: "A BSON ObjectID"
-        cpp_type: "mongo::OID"
-        deserializer: "mongo::BSONElement::OID"
-
-    date:
-        bson_serialization_type: date
-        description: "A BSON UTC DateTime"
-        cpp_type: "mongo::Date_t"
-        deserializer: "mongo::BSONElement::date"
-
-    timestamp:
-        bson_serialization_type: timestamp
-        description: "A BSON TimeStamp"
-        cpp_type: "mongo::Timestamp"
-        deserializer: "mongo::BSONElement::timestamp"
-
 ##################################################################################################
 #
 # Test a custom non-BSONElement deserialization and serialization methods for a string type
@@ -137,57 +81,7 @@ types:
         deserializer: "mongo::BSONElement::numberInt"
 
 
-##################################################################################################
-#
-# Unit test structs for a single value to ensure type validation works correctly
-#
-##################################################################################################
-
 structs:
-    one_string:
-        description: UnitTest for a single string
-        fields:
-            value: string
-
-    one_int:
-        description: UnitTest for a single int
-        fields:
-            value: int
-
-    one_long:
-        description: UnitTest for a single long
-        fields:
-            value: long
-
-    one_double:
-        description: UnitTest for a single double
-        fields:
-            value: double
-
-    one_decimal:
-        description: UnitTest for a single decimal
-        fields:
-            value: decimal
-
-    one_bool:
-        description: UnitTest for a single bool
-        fields:
-            value: bool
-
-    one_objectid:
-        description: UnitTest for a single objectid
-        fields:
-            value: objectid
-
-    one_date:
-        description: UnitTest for a single date
-        fields:
-            value: date
-
-    one_timestamp:
-        description: UnitTest for a single timestamp
-        fields:
-            value: timestamp
 
 ##################################################################################################
 #

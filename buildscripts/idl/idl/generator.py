@@ -1070,7 +1070,7 @@ def generate_code(spec, output_base_dir, header_file_name, source_file_name):
         include_h_file_name = os.path.relpath(
             os.path.normpath(header_file_name), os.path.normpath(output_base_dir))
     else:
-        include_h_file_name = header_file_name
+        include_h_file_name = os.path.abspath(os.path.normpath(header_file_name))
 
     # Normalize to POSIX style for consistency across Windows and POSIX.
     include_h_file_name = include_h_file_name.replace("\\", "/")
