@@ -73,16 +73,6 @@ class dependency(object):
             self.target_node = value
             self.dependency_type = dependency.Public
 
-def sorted_by_str(iterable):
-    """Shorthand for sorting an iterable according to its string representation.
-
-    We use this instead of sorted(), below, because SCons.Node objects are
-    compared on object identity, rather than value, so sorts aren't stable
-    across invocations of SCons.  Since dependency order changes force rebuilds,
-    we use this sort to create stable dependency orders.
-    """
-    return sorted(iterable, key=str)
-
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
 
@@ -183,9 +173,9 @@ def update_scanner(builder):
     if old_scanner:
         path_function = old_scanner.path_function
         def new_scanner(node, env, path=()):
-            result = set(old_scanner.function(node, env, path))
-            result.update(__get_libdeps(node))
-            return list(result)
+            result = old_scanner.function(node, env, path)
+            result.extend(__get_libdeps(node))
+            return result
     else:
         path_function = None
         def new_scanner(node, env, path=()):
@@ -204,10 +194,11 @@ def get_libdeps(source, target, env, for_signature):
     return __get_libdeps(target[0])
 
 def get_libdeps_objs(source, target, env, for_signature):
-    objs = set()
+    objs = []
     for lib in get_libdeps(source, target, env, for_signature):
-        objs.update(lib.sources_set)
-    return sorted_by_str(objs)
+        # This relies on Node.sources being order stable build-to-build.
+        objs.extend(lib.sources)
+    return objs
 
 def get_syslibdeps(source, target, env, for_signature):
     deps = __get_syslibdeps(target[0])
