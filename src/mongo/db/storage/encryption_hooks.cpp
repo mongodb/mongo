@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,48 +29,68 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "mongo/db/storage/encryption_hooks.h"
+
+#include <boost/filesystem/path.hpp>
 
 #include "mongo/base/init.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/data_protector.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-/* Make a WiredTigerCustomizationHooks pointer a decoration on the global ServiceContext */
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerCustomizationHooks, ("SetGlobalEnvironment"))
+/* Make a EncryptionHooks pointer a decoration on the global ServiceContext */
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetEncryptionHooks, ("SetGlobalEnvironment"))
 (InitializerContext* context) {
-    auto customizationHooks = stdx::make_unique<WiredTigerCustomizationHooks>();
-    WiredTigerCustomizationHooks::set(getGlobalServiceContext(), std::move(customizationHooks));
+    auto encryptionHooks = stdx::make_unique<EncryptionHooks>();
+    EncryptionHooks::set(getGlobalServiceContext(), std::move(encryptionHooks));
 
     return Status::OK();
 }
 
 namespace {
-const auto getCustomizationHooks =
-    ServiceContext::declareDecoration<std::unique_ptr<WiredTigerCustomizationHooks>>();
+const auto getEncryptionHooks =
+    ServiceContext::declareDecoration<std::unique_ptr<EncryptionHooks>>();
 }  // namespace
 
-void WiredTigerCustomizationHooks::set(ServiceContext* service,
-                                       std::unique_ptr<WiredTigerCustomizationHooks> custHooks) {
-    auto& hooks = getCustomizationHooks(service);
+void EncryptionHooks::set(ServiceContext* service, std::unique_ptr<EncryptionHooks> custHooks) {
+    auto& hooks = getEncryptionHooks(service);
     invariant(custHooks);
     hooks = std::move(custHooks);
 }
 
-WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* service) {
-    return getCustomizationHooks(service).get();
+EncryptionHooks* EncryptionHooks::get(ServiceContext* service) {
+    return getEncryptionHooks(service).get();
 }
 
-WiredTigerCustomizationHooks::~WiredTigerCustomizationHooks() {}
+EncryptionHooks::~EncryptionHooks() {}
 
-bool WiredTigerCustomizationHooks::enabled() const {
+bool EncryptionHooks::enabled() const {
     return false;
 }
 
-std::string WiredTigerCustomizationHooks::getTableCreateConfig(StringData tableName) {
+bool EncryptionHooks::restartRequired() {
+    return false;
+}
+
+std::unique_ptr<DataProtector> EncryptionHooks::getDataProtector() {
+    return std::unique_ptr<DataProtector>();
+}
+
+boost::filesystem::path EncryptionHooks::getProtectedPathSuffix() {
     return "";
 }
 
+Status EncryptionHooks::protectTmpData(
+    const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) {
+    return Status(ErrorCodes::InternalError,
+                  "Encryption hooks must be enabled to use preprocessTmpData.");
+}
+
+Status EncryptionHooks::unprotectTmpData(
+    const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen, size_t* resultLen) {
+    return Status(ErrorCodes::InternalError,
+                  "Encryption hooks must be enabled to use postprocessTmpData.");
+}
 }  // namespace mongo

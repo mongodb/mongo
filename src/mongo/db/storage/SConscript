@@ -11,7 +11,6 @@ env.SConscript(
     ],
 )
 
-
 env.Library(
     target='journal_listener',
     source=[
@@ -40,7 +39,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         ],
     )
-
 
 env.Library(
     target='bson_collection_catalog_entry',
@@ -73,6 +71,19 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+env.Library(
+    target='encryption_hooks',
+    source= [
+        'encryption_hooks.cpp',
+        ],
+    LIBDEPS= ['$BUILD_DIR/mongo/base',
+              '$BUILD_DIR/mongo/db/service_context'],
+    PROGDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongod',
+        '$BUILD_DIR/mongo/mongos',
+        ],
+    )
 
 env.Library(
     target='storage_options',
