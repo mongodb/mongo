@@ -174,47 +174,31 @@ private:
     // A pointer to the replication coordinator external state.
     ReplicationCoordinatorExternalState* _replicationCoordinatorExternalState;
 
-    /**
-      * All member variables are labeled with one of the following codes indicating the
-      * synchronization rules for accessing them:
-      *
-      * (PR) Completely private to BackgroundSync. Can be read or written to from within the main
-      *      BackgroundSync thread without synchronization. Shouldn't be accessed outside of this
-      *      thread.
-      *
-      * (S)  Self-synchronizing; access in any way from any context.
-      *
-      * (M)  Reads and writes guarded by _mutex
-      *
-     */
+    // _mutex protects all of the class variables declared below.
+    //
+    // Never hold bgsync mutex when trying to acquire the ReplicationCoordinator mutex.
+    mutable stdx::mutex _mutex;
 
-    // Protects member data of BackgroundSync.
-    // Never hold the BackgroundSync mutex when trying to acquire the ReplicationCoordinator mutex.
-    mutable stdx::mutex _mutex;  // (S)
+    OpTime _lastOpTimeFetched;
 
-    OpTime _lastOpTimeFetched;  // (M)
-
-    // lastFetchedHash is used to match ops to determine if we need to rollback, when a secondary.
-    long long _lastFetchedHash = 0LL;  // (M)
+    // lastFetchedHash is used to match ops to determine if we need to rollback, when
+    // a secondary.
+    long long _lastFetchedHash = 0LL;
 
     // Thread running producerThread().
-    std::unique_ptr<stdx::thread> _producerThread;  // (M)
+    std::unique_ptr<stdx::thread> _producerThread;
 
     // Set to true if shutdown() has been called.
-    bool _inShutdown = false;  // (M)
+    bool _inShutdown = false;
 
-    // Flag that marks whether a node's oplog has no common point with any
-    // potential sync sources.
-    bool _tooStale = false;  // (PR)
+    ProducerState _state = ProducerState::Starting;
 
-    ProducerState _state = ProducerState::Starting;  // (M)
-
-    HostAndPort _syncSourceHost;  // (M)
+    HostAndPort _syncSourceHost;
 
     // Current sync source resolver validating sync source candidates.
     // Pointer may be read on any thread that locks _mutex or unlocked on the BGSync thread. It can
     // only be written to by the BGSync thread while holding _mutex.
-    std::unique_ptr<SyncSourceResolver> _syncSourceResolver;  // (M)
+    std::unique_ptr<SyncSourceResolver> _syncSourceResolver;
 
     // Current oplog fetcher tailing the oplog on the sync source.
     std::unique_ptr<OplogFetcher> _oplogFetcher;
