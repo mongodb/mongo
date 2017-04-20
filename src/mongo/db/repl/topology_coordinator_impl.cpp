@@ -2648,5 +2648,35 @@ void TopologyCoordinatorImpl::setStorageEngineSupportsReadCommitted(bool support
         supported ? ReadCommittedSupport::kYes : ReadCommittedSupport::kNo;
 }
 
+void TopologyCoordinatorImpl::restartHeartbeats() {
+    for (auto& hb : _hbdata) {
+        hb.restart();
+    }
+}
+
+boost::optional<OpTime> TopologyCoordinatorImpl::latestKnownOpTimeSinceHeartbeatRestart() const {
+    // The smallest OpTime in PV1.
+    OpTime latest(Timestamp(0, 0), 0);
+    for (size_t i = 0; i < _hbdata.size(); i++) {
+        auto& peer = _hbdata[i];
+
+        if (static_cast<int>(i) == _selfIndex) {
+            continue;
+        }
+        // If any heartbeat is not fresh enough, return none.
+        if (!peer.isUpdatedSinceRestart()) {
+            return boost::none;
+        }
+        // Ignore down members
+        if (!peer.up()) {
+            continue;
+        }
+        if (peer.getAppliedOpTime() > latest) {
+            latest = peer.getAppliedOpTime();
+        }
+    }
+    return latest;
+}
+
 }  // namespace repl
 }  // namespace mongo
