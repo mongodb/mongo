@@ -1,5 +1,7 @@
 # -*- mode: python -*-
 
+import libdeps
+
 Import([
     'env',
     'get_option',
@@ -145,7 +147,7 @@ if usemozjs:
         LIBDEPS=[
             'bson_template_evaluator',
             'scripting_common',
-            '$BUILD_DIR/third_party/shim_mozjs',
+            ('$BUILD_DIR/third_party/shim_mozjs', libdeps.dependency.Private),
             '$BUILD_DIR/mongo/shell/mongojs',
             '$BUILD_DIR/mongo/db/service_context',
         ],
