@@ -338,6 +338,10 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
                                                                << request.cmdObj["term"].Long()
                                                                << "voteGranted"
                                                                << true)));
+        } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetGetStatus") {
+            // OpTime part of replSetGetStatus for use by FreshnessScanner during catch-up period.
+            BSONObj response = BSON("optimes" << BSON("appliedOpTime" << OpTime().toBSON()));
+            net->scheduleResponse(noi, net->now(), makeResponseStatus(response));
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
