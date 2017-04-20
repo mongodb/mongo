@@ -1449,8 +1449,14 @@ elif env.TargetOSIs('windows'):
     #  on extremely old versions of MSVC (pre 2k5), default constructing an array member in a
     #  constructor's initialization list would not zero the array members "in some cases".
     #  since we don't target MSVC versions that old, this warning is safe to ignore.
+    # c4373
+    #  Older versions of MSVC would fail to make a function in a derived class override a virtual
+    #  function in the parent, when defined inline and at least one of the parameters is made const.
+    #  The behavior is incorrect under the standard.  MSVC is fixed now, and the warning exists
+    #  merely to alert users who may have relied upon the older, non-compliant behavior.  Our code
+    #  should not have any problems with the older behavior, so we can just disable this warning.
     env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244",
-                         "/wd4290", "/wd4068", "/wd4351"] )
+                         "/wd4290", "/wd4068", "/wd4351", "/wd4373"] )
 
     # some warnings we should treat as errors:
     # c4013
