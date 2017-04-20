@@ -880,11 +880,6 @@ public:
 
     virtual ServiceContext* getServiceContext() = 0;
 
-    /**
-     * Abort catchup if the node is in catchup mode.
-     */
-    virtual Status abortCatchupIfNeeded() = 0;
-
 protected:
     ReplicationCoordinator();
 };

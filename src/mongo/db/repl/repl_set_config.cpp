@@ -44,7 +44,6 @@ namespace repl {
 
 const size_t ReplSetConfig::kMaxMembers;
 const size_t ReplSetConfig::kMaxVotingMembers;
-const Milliseconds ReplSetConfig::kInfiniteCatchUpTimeout(-1);
 
 const std::string ReplSetConfig::kConfigServerFieldName = "configsvr";
 const std::string ReplSetConfig::kVersionFieldName = "version";
@@ -52,7 +51,7 @@ const std::string ReplSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplSetConfig::kDefaultElectionTimeoutPeriod(10000);
-const Milliseconds ReplSetConfig::kDefaultCatchUpTimeoutPeriod(kInfiniteCatchUpTimeout);
+const Milliseconds ReplSetConfig::kDefaultCatchUpTimeoutPeriod(2000);
 const bool ReplSetConfig::kDefaultChainingAllowed(true);
 
 namespace {
@@ -271,14 +270,14 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     //
     // Parse catchUpTimeoutMillis
     //
-    auto validCatchUpTimeout = [](long long timeout) { return timeout >= 0LL || timeout == -1LL; };
+    auto notLessThanZero = stdx::bind(std::greater_equal<long long>(), stdx::placeholders::_1, 0);
     long long catchUpTimeoutMillis;
     Status catchUpTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
         settings,
         kCatchUpTimeoutFieldName,
         durationCount<Milliseconds>(kDefaultCatchUpTimeoutPeriod),
-        validCatchUpTimeout,
-        "catch-up timeout must be positive, 0 (no catch-up) or -1 (infinite catch-up).",
+        notLessThanZero,
+        "catch-up timeout must be greater than or equal to 0",
         &catchUpTimeoutMillis);
     if (!catchUpTimeoutStatus.isOK()) {
         return catchUpTimeoutStatus;

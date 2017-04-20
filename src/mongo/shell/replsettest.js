@@ -681,8 +681,7 @@ var ReplSetTest = function(opts) {
             return config;
         }
 
-        // Check journaling by sending commands through the bridge if it's used.
-        if (_isRunningWithoutJournaling(this.nodes[0])) {
+        if (_isRunningWithoutJournaling(replNode)) {
             config[wcMajorityJournalField] = false;
         }
 
@@ -874,11 +873,9 @@ var ReplSetTest = function(opts) {
     };
 
     this.reInitiate = function() {
-        var config = this.getReplSetConfigFromNode();
-        var newConfig = this.getReplSetConfig();
-        // Only reset members.
-        config.members = newConfig.members;
-        config.version += 1;
+        var config = this.getReplSetConfig();
+        var newVersion = this.getReplSetConfigFromNode().version + 1;
+        config.version = newVersion;
 
         this._setDefaultConfigOptions(config);
 

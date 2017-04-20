@@ -54,8 +54,6 @@ void MemberHeartbeatData::setUpValues(Date_t now,
     }
     _authIssue = false;
     _lastHeartbeat = now;
-    _updatedSinceRestart = true;
-
     if (!hbResponse.hasState()) {
         hbResponse.setState(MemberState::RS_UNKNOWN);
     }
@@ -79,7 +77,6 @@ void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeat
     _upSince = Date_t();
     _lastHeartbeat = now;
     _authIssue = false;
-    _updatedSinceRestart = true;
 
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_DOWN);
@@ -94,7 +91,6 @@ void MemberHeartbeatData::setAuthIssue(Date_t now) {
     _upSince = Date_t();
     _lastHeartbeat = now;
     _authIssue = true;
-    _updatedSinceRestart = true;
 
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_UNKNOWN);

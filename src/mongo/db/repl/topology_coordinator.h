@@ -499,21 +499,6 @@ public:
      */
     virtual void setStorageEngineSupportsReadCommitted(bool supported) = 0;
 
-    /**
-     * Reset the booleans to record the last heartbeat restart.
-     */
-    virtual void restartHeartbeats() = 0;
-
-    /**
-     * Scans through all members that are 'up' and return the latest known optime, if we have
-     * received (successful or failed) heartbeats from all nodes since heartbeat restart.
-     *
-     * Returns boost::none if any node hasn't responded to a heartbeat since we last restarted
-     * heartbeats.
-     * Returns OpTime(Timestamp(0, 0), 0), the smallest OpTime in PV1, if other nodes are all down.
-     */
-    virtual boost::optional<OpTime> latestKnownOpTimeSinceHeartbeatRestart() const = 0;
-
 protected:
     TopologyCoordinator() {}
 };

@@ -497,9 +497,5 @@ void ReplicationCoordinatorMock::setMaster(bool isMaster) {
     _settings.setMaster(isMaster);
 }
 
-Status ReplicationCoordinatorMock::abortCatchupIfNeeded() {
-    return Status::OK();
-}
-
 }  // namespace repl
 }  // namespace mongo

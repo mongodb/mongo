@@ -313,12 +313,13 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
 
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
         // All (accessible) sync sources were too stale.
+        // TODO: End catchup mode early if we are too stale.
         if (_replCoord->getMemberState().primary()) {
             warning() << "Too stale to catch up.";
             log() << "Our newest OpTime : " << lastOpTimeFetched;
             log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen
                   << " from " << syncSourceResp.getSyncSource();
-            _replCoord->abortCatchupIfNeeded();
+            sleepsecs(1);
             return;
         }
 
@@ -567,8 +568,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
                                   int requiredRBID,
                                   StorageInterface* storageInterface) {
     if (_replCoord->getMemberState().primary()) {
-        warning() << "Rollback situation detected in catch-up mode. Aborting catch-up mode.";
-        _replCoord->abortCatchupIfNeeded();
+        // TODO: Abort catchup mode early if rollback detected.
+        warning() << "Rollback situation detected in catch-up mode; catch-up mode will end.";
+        sleepsecs(1);
         return;
     }
 

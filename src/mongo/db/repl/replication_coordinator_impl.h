@@ -333,8 +333,6 @@ public:
 
     virtual Status stepUpIfEligible() override;
 
-    virtual Status abortCatchupIfNeeded() override;
-
     // ================== Test support API ===================
 
     /**
@@ -484,55 +482,16 @@ private:
         kActionStartSingleNodeElection
     };
 
-    // Abstract struct that holds information about clients waiting for replication.
-    // Subclasses need to define how to notify them.
-    struct Waiter {
-        Waiter(OpTime _opTime, const WriteConcernOptions* _writeConcern);
-        virtual ~Waiter() = default;
-
-        BSONObj toBSON() const;
-        std::string toString() const;
-        // It is invalid to call notify_inlock() unless holding ReplicationCoordinatorImpl::_mutex.
-        virtual void notify_inlock() = 0;
-
-        const OpTime opTime;
-        const WriteConcernOptions* writeConcern = nullptr;
-    };
-
-    // When ThreadWaiter gets notified, it will signal the conditional variable.
-    //
-    // This is used when a thread wants to block inline until the opTime is reached with the given
-    // writeConcern.
-    struct ThreadWaiter : public Waiter {
-        ThreadWaiter(OpTime _opTime,
-                     const WriteConcernOptions* _writeConcern,
-                     stdx::condition_variable* _condVar);
-        void notify_inlock() override;
-
-        stdx::condition_variable* condVar = nullptr;
-    };
-
-    // When the waiter is notified, finishCallback will be called while holding replCoord _mutex
-    // since WaiterLists are protected by _mutex.
-    //
-    // This is used when we want to run a callback when the opTime is reached.
-    struct CallbackWaiter : public Waiter {
-        using FinishFunc = stdx::function<void()>;
-
-        CallbackWaiter(OpTime _opTime, FinishFunc _finishCallback);
-        void notify_inlock() override;
-
-        // The callback that will be called when this waiter is notified.
-        FinishFunc finishCallback = nullptr;
-    };
-
-    class WaiterGuard;
+    // Struct that holds information about clients waiting for replication.
+    struct WaiterInfo;
+    struct WaiterInfoGuard;
 
     class WaiterList {
     public:
-        using WaiterType = Waiter*;
+        using WaiterType = WaiterInfo*;
 
-        // Adds waiter into the list.
+        // Adds waiter into the list. Usually, the waiter will be signaled only once and then
+        // removed.
         void add_inlock(WaiterType waiter);
         // Returns whether waiter is found and removed.
         bool remove_inlock(WaiterType waiter);
@@ -568,44 +527,6 @@ private:
     typedef std::vector<SlaveInfo> SlaveInfoVector;
 
     typedef std::vector<executor::TaskExecutor::CallbackHandle> HeartbeatHandles;
-
-    // The state and logic of primary catchup.
-    //
-    // When start() is called, CatchupState will schedule the timeout callback. When we get
-    // responses of the latest heartbeats from all nodes, the target time (opTime of _waiter) is
-    // set.
-    // The primary exits catchup mode when any of the following happens.
-    //   1) My last applied optime reaches the target optime, if we've received a heartbeat from all
-    //      nodes.
-    //   2) Catchup timeout expires.
-    //   3) Primary steps down.
-    //   4) The primary has to roll back to catch up.
-    //   5) The primary is too stale to catch up.
-    //
-    // On abort, the state resets the pointer to itself in ReplCoordImpl. In other words, the
-    // life cycle of the state object aligns with the conceptual state.
-    // In shutdown, the timeout callback will be canceled by the executor and the state is safe to
-    // destroy.
-    //
-    // Any function of the state must be called while holding _mutex.
-    class CatchupState {
-    public:
-        CatchupState(ReplicationCoordinatorImpl* repl) : _repl(repl) {}
-        // start() can only be called once.
-        void start_inlock();
-        // Reset the state itself to destruct the state.
-        void abort_inlock();
-        // Heartbeat calls this function to update the target optime.
-        void signalHeartbeatUpdate_inlock();
-
-    private:
-        ReplicationCoordinatorImpl* _repl;  // Not owned.
-        // Callback handle used to cancel a scheduled catchup timeout callback.
-        ReplicationExecutor::CallbackHandle _timeoutCbh;
-        // Handle to a Waiter that contains the current target optime to reach after which
-        // we can exit catchup mode.
-        std::unique_ptr<CallbackWaiter> _waiter;
-    };
 
     /**
      * Appends a "replicationProgress" section with data for each member in set.
@@ -1247,7 +1168,7 @@ private:
     /**
      * Finish catch-up mode and start drain mode.
      */
-    void _enterDrainMode_inlock();
+    void _finishCatchingUpOplog_inlock();
 
     /**
      * Waits for the config state to leave kConfigStartingUp, which indicates that start() has
@@ -1483,10 +1404,6 @@ private:
     mutable stdx::mutex _indexPrefetchMutex;
     ReplSettings::IndexPrefetchConfig _indexPrefetchConfig =
         ReplSettings::IndexPrefetchConfig::PREFETCH_ALL;  // (I)
-
-    // The catchup state including all catchup logic. The presence of a non-null pointer indicates
-    // that the node is currently in catchup mode.
-    std::unique_ptr<CatchupState> _catchupState;  // (X)
 };
 
 }  // namespace repl

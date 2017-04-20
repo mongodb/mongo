@@ -246,10 +246,6 @@ public:
                                               bool isPriorityTakeover);
     virtual void setStorageEngineSupportsReadCommitted(bool supported);
 
-    virtual void restartHeartbeats();
-
-    virtual boost::optional<OpTime> latestKnownOpTimeSinceHeartbeatRestart() const;
-
     ////////////////////////////////////////////////////////////
     //
     // Test support methods

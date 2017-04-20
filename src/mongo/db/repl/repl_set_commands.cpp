@@ -868,7 +868,7 @@ public:
         status = getGlobalReplicationCoordinator()->stepUpIfEligible();
 
         if (!status.isOK()) {
-            log() << "replSetStepUp request failed" << causedBy(status);
+            log() << "replSetStepUp request failed " << causedBy(status);
         }
 
         return appendCommandStatus(result, status);
@@ -879,39 +879,6 @@ private:
         return ActionSet{ActionType::replSetStateChange};
     }
 } cmdReplSetStepUp;
-
-class CmdReplSetAbortPrimaryCatchUp : public ReplSetCommand {
-public:
-    virtual void help(stringstream& help) const {
-        help << "{ CmdReplSetAbortPrimaryCatchUp : 1 }\n";
-        help << "Abort primary catch-up mode; immediately finish the transition to primary "
-                "without fetching any further unreplicated writes from any other online nodes";
-    }
-
-    CmdReplSetAbortPrimaryCatchUp() : ReplSetCommand("replSetAbortPrimaryCatchUp") {}
-
-    virtual bool run(OperationContext* opCtx,
-                     const string&,
-                     BSONObj& cmdObj,
-                     string& errmsg,
-                     BSONObjBuilder& result) override {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return appendCommandStatus(result, status);
-        log() << "Received replSetAbortPrimaryCatchUp request";
-
-        status = getGlobalReplicationCoordinator()->abortCatchupIfNeeded();
-        if (!status.isOK()) {
-            log() << "replSetAbortPrimaryCatchUp request failed" << causedBy(status);
-        }
-        return appendCommandStatus(result, status);
-    }
-
-private:
-    ActionSet getAuthActionSet() const override {
-        return ActionSet{ActionType::replSetStateChange};
-    }
-} cmdReplSetAbortPrimaryCatchUp;
 
 }  // namespace repl
 }  // namespace mongo

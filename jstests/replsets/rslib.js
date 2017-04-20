@@ -162,7 +162,6 @@ var getLastOpTime;
             if (!isNetworkError(e)) {
                 throw e;
             }
-            print("Calling replSetReconfig failed. " + tojson(e));
         }
 
         var master = rs.getPrimary().getDB("admin");

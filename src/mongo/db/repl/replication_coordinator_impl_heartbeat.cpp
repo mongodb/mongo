@@ -234,11 +234,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
     _signalStepDownWaiter_inlock();
 
-    // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.
-    if (_catchupState) {
-        _catchupState->signalHeartbeatUpdate_inlock();
-    }
-
     _scheduleHeartbeatToTarget_inlock(
         target, targetIndex, std::max(now, action.getNextHeartbeatStartDate()));
 
@@ -670,9 +665,6 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
         }
         _scheduleHeartbeatToTarget_inlock(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
     }
-
-    _topCoord->restartHeartbeats();
-
     if (isV1ElectionProtocol()) {
         for (auto&& slaveInfo : _slaveInfo) {
             slaveInfo.lastUpdate = _replExecutor->now();
