@@ -62,8 +62,8 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/data_protector.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -294,19 +294,19 @@ Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string
     ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
     _file /= ss.str();
 
-    auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-    if (hooks->enabled()) {
-        _protector = hooks->getDataProtector();
-        _file += hooks->getProtectedPathSuffix();
+    auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+    if (encryptionHooks->enabled()) {
+        _protector = encryptionHooks->getDataProtector();
+        _file += encryptionHooks->getProtectedPathSuffix();
     }
 }
 
 Helpers::RemoveSaver::~RemoveSaver() {
     if (_protector && _out) {
-        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-        invariant(hooks->enabled());
+        auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+        invariant(encryptionHooks->enabled());
 
-        size_t protectedSizeMax = hooks->additionalBytesForProtectedBuffer();
+        size_t protectedSizeMax = encryptionHooks->additionalBytesForProtectedBuffer();
         std::unique_ptr<uint8_t[]> protectedBuffer(new uint8_t[protectedSizeMax]);
 
         size_t resultLen;
@@ -369,10 +369,10 @@ Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
 
     std::unique_ptr<uint8_t[]> protectedBuffer;
     if (_protector) {
-        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-        invariant(hooks->enabled());
+        auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+        invariant(encryptionHooks->enabled());
 
-        size_t protectedSizeMax = dataSize + hooks->additionalBytesForProtectedBuffer();
+        size_t protectedSizeMax = dataSize + encryptionHooks->additionalBytesForProtectedBuffer();
         protectedBuffer.reset(new uint8_t[protectedSizeMax]);
 
         size_t resultLen;

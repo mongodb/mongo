@@ -103,10 +103,10 @@
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -505,7 +505,7 @@ ExitCode _initAndListen(int listenPort) {
     getGlobalServiceContext()->initializeGlobalStorageEngine();
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
-    if (WiredTigerCustomizationHooks::get(getGlobalServiceContext())->restartRequired()) {
+    if (EncryptionHooks::get(getGlobalServiceContext())->restartRequired()) {
         exitCleanly(EXIT_CLEAN);
     }
 #endif
