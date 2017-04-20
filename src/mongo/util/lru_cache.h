@@ -131,7 +131,7 @@ public:
      */
     const_iterator cfind(const K& key) const {
         auto it = this->_map.find(key);
-        return (it == this->_map.end()) ? this->end() : it->second;
+        return (it == this->_map.end()) ? this->end() : const_iterator(it->second);
     }
 
     /**
