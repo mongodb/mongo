@@ -58,7 +58,7 @@ class Graph(object):
     # Example graph:
     #   {
     #    'Lock 1': {'node': {1: 'MongoDB lock'}, 'next_nodes': ['Thread 1']},
-    #    'Lock 2': {'node': {1: 'MongoDB lock'}, 'next_nodes': ['Thread 2']},
+    #    'Lock 2': {'node': {2: 'MongoDB lock'}, 'next_nodes': ['Thread 2']},
     #    'Thread 1': {'node': {1: 123}, 'next_nodes': ['Lock 2']},
     #    'Thread 2': {'node': {2: 456}, 'next_nodes': ['Lock 1']}
     #   }
@@ -86,7 +86,7 @@ class Graph(object):
         return None
 
     def remove_nodes_without_edge(self):
-        # Rebuild graph by removing any nodes which do not have any incoming or outgoing any edges.
+        # Rebuild graph by removing any nodes which do not have any incoming or outgoing edges.
         temp_nodes = {}
         for node_key in self.nodes:
             node = self.nodes[node_key]
@@ -116,19 +116,58 @@ class Graph(object):
             for to in self.nodes[node_key]['next_nodes']:
                 print(" ->", to)
 
-    def to_graph(self):
+    def to_graph(self, nodes=None, message=None):
         sb = []
         sb.append('# Legend:')
         sb.append('#    Thread 1 -> Lock 1 indicates Thread 1 is waiting on Lock 1')
         sb.append('#    Lock 2 -> Thread 2 indicates Lock 2 is held by Thread 2')
+        if message is not None:
+            sb.append(message)
         sb.append('digraph "mongod+lock-status" {')
         for node_key in self.nodes:
             for next_node_key in self.nodes[node_key]['next_nodes']:
-                sb.append('    "%s" -> "%s";' % (node_key, next_node_key))
+                sb.append('    "{}" -> "{}";'.format(node_key, next_node_key))
         for node_key in self.nodes:
-            sb.append('    "%s" [label="%s"]' % (node_key, self.nodes[node_key]['node']))
+            color = ""
+            if nodes and node_key in nodes:
+                color = "color = red"
+            sb.append('    "{}" [label="{}" {}]'.format(
+                node_key, self.nodes[node_key]['node'], color))
         sb.append("}")
         return "\n".join(sb)
+
+    def depth_first_search(self, node_key, nodes_visited, nodes_in_cycle=[]):
+        """
+        The nodes_visited is a set of nodes which indicates it has been visited.
+        The node_in_cycle is a list of nodes in the potential cycle.
+        Returns the list of nodes in the cycle or None.
+        """
+        nodes_visited.add(node_key)
+        nodes_in_cycle.append(node_key)
+        for node in self.nodes[node_key]['next_nodes']:
+            if node in nodes_in_cycle:
+                # The graph cycle starts at the index of node in nodes_in_cycle.
+                return nodes_in_cycle[nodes_in_cycle.index(node):]
+            if node in nodes_visited:
+                dfs_nodes = self.depth_first_search(node, nodes_visited, nodes_in_cycle)
+                if dfs_nodes:
+                    return dfs_nodes
+
+        # This node_key is not part of the graph cycle.
+        nodes_in_cycle.pop()
+        return None
+
+    def detect_cycle(self):
+        """
+        If a cycle is detected, returns a list of nodes in the cycle or None.
+        """
+        nodes_visited = set()
+        for node in self.nodes:
+            if node not in nodes_visited:
+                cycle_path = self.depth_first_search(node, nodes_visited)
+                if cycle_path:
+                    return cycle_path
+        return None
 
 
 def find_lwpid(thread_dict, search_thread_id):
@@ -300,12 +339,16 @@ class MongoDBWaitsForGraph(gdb.Command):
             if graph.is_empty():
                 print("Not generating the digraph, since the lock graph is empty")
                 return
+            cycle_message = "# No cycle detected in the graph"
+            cycle_nodes = graph.detect_cycle()
+            if cycle_nodes:
+                cycle_message = "# Cycle detected in the graph nodes %s" % cycle_nodes
             if file:
                 print("Saving digraph to %s" % file)
                 with open(file, 'w') as f:
-                    f.write(graph.to_graph())
+                    f.write(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
             else:
-                print(graph.to_graph())
+                print(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
 
         except gdb.error as err:
             print("Ignoring GDB error '%s' in mongod_deadlock_graph" % str(err))
