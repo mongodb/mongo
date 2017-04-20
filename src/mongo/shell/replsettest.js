@@ -1434,8 +1434,10 @@ var ReplSetTest = function(opts) {
             this.query = function(ts) {
                 var coll = this.getOplogColl();
                 var query = {ts: {$gte: ts ? ts : new Timestamp()}};
-                // Set the cursor to read backwards, from last to first.
-                this.cursor = coll.find(query).sort({$natural: -1});
+                // Set the cursor to read backwards, from last to first. We also set the cursor not
+                // to time out since it may take a while to process each batch and a test may have
+                // changed "cursorTimeoutMillis" to a short time period.
+                this.cursor = coll.find(query).sort({$natural: -1}).noCursorTimeout();
             };
 
             this.getFirstDoc = function() {
