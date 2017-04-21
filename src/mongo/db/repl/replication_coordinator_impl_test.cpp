@@ -2400,13 +2400,9 @@ TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection)
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
 
     // This cancels the actual election.
-    bool success = false;
-    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the vote requester.
-    getReplCoord()->waitForElectionFinish_forTest();
-    getReplExec()->waitForEvent(event);
-    ASSERT_TRUE(success);
+    ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
 }
 
 TEST_F(ReplCoordTest,

@@ -352,14 +352,10 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
 
-    bool success = false;
-    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
+    ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
 
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the freshness checker and election command runner.
-    getReplCoord()->waitForElectionFinish_forTest();
-    getReplExec()->waitForEvent(event);
-    ASSERT_TRUE(success);
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 }
 

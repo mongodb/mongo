@@ -369,15 +369,6 @@ public:
     Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
 
     /**
-     * Non-blocking version of setFollowerMode.
-     * Returns event handle that we can use to wait for the operation to complete.
-     * When the operation is complete (wait() returns), 'success' will be set to true
-     * if the member state has been set successfully.
-     */
-    executor::TaskExecutor::EventHandle setFollowerMode_nonBlocking(const MemberState& newState,
-                                                                    bool* success);
-
-    /**
      * Non-blocking version of updateTerm.
      * Returns event handle that we can use to wait for the operation to complete.
      * When the operation is complete (waitForEvent() returns), 'updateResult' will be set
@@ -763,19 +754,6 @@ private:
 
     OpTime _getMyLastAppliedOpTime_inlock() const;
     OpTime _getMyLastDurableOpTime_inlock() const;
-
-    /**
-     * Bottom half of setFollowerMode.
-     *
-     * May reschedule itself after the current election, so it is not sufficient to
-     * wait for a callback scheduled to execute this method to complete.  Instead,
-     * supply an event, "finishedSettingFollowerMode", and wait for that event to
-     * be signaled.  Do not observe "*success" until after the event is signaled.
-     */
-    void _setFollowerModeFinish(
-        const MemberState& newState,
-        const executor::TaskExecutor::EventHandle& finishedSettingFollowerMode,
-        bool* success);
 
     /**
      * Helper method for updating our tracking of the last optime applied by a given node.

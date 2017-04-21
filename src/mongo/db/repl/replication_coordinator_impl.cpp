@@ -811,56 +811,24 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
     _topCoord->clearSyncSourceBlacklist();
 }
 
-executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::setFollowerMode_nonBlocking(
-    const MemberState& newState, bool* success) {
-
-    auto finishedSettingFollowerMode = _replExecutor->makeEvent();
-    if (finishedSettingFollowerMode.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return {};
-    }
-    fassert(18812, finishedSettingFollowerMode.getStatus());
-    _setFollowerModeFinish(newState, finishedSettingFollowerMode.getValue(), success);
-    return finishedSettingFollowerMode.getValue();
-}
-
 bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
-    bool success = false;
-    if (auto eventHandle = setFollowerMode_nonBlocking(newState, &success)) {
-        _replExecutor->waitForEvent(eventHandle);
-    }
-    return success;
-}
-
-void ReplicationCoordinatorImpl::_setFollowerModeFinish(
-    const MemberState& newState,
-    const executor::TaskExecutor::EventHandle& finishedSettingFollowerMode,
-    bool* success) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (newState == _topCoord->getMemberState()) {
-        *success = true;
-        _replExecutor->signalEvent(finishedSettingFollowerMode);
-        return;
+        return true;
     }
     if (_topCoord->getRole() == TopologyCoordinator::Role::leader) {
-        *success = false;
-        _replExecutor->signalEvent(finishedSettingFollowerMode);
-        return;
+        return false;
     }
 
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
         // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
-        // the old and new state were equal.  So, try again after the election is over to
+        // the old and new state were equal. So, try again after the election is over to
         // finish setting the follower mode.
-        _replExecutor->onEvent(
-            electionFinishedEvent,
-            _wrapAsCallbackFn(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
-                                         this,
-                                         newState,
-                                         finishedSettingFollowerMode,
-                                         success)));
-        return;
+        lk.unlock();
+        _replExecutor->waitForEvent(electionFinishedEvent);
+        return setFollowerMode(newState);
     }
 
     _topCoord->setFollowerMode(newState.s);
@@ -868,8 +836,8 @@ void ReplicationCoordinatorImpl::_setFollowerModeFinish(
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-    *success = true;
-    _replExecutor->signalEvent(finishedSettingFollowerMode);
+
+    return true;
 }
 
 ReplicationCoordinator::ApplierState ReplicationCoordinatorImpl::getApplierState() {
