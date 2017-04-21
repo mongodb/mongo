@@ -198,6 +198,18 @@ TEST_F(SimpleDoc, NotCommonPrefix) {
     ASSERT_EQUALS(root().rightChild().leftSibling().getFieldName(), "a");
 }
 
+TEST_F(SimpleDoc, CreatePathAtFailsIfElemFoundIsNonObjectNonArray) {
+    setField("b");
+
+    auto elemFound = root()["a"];
+    auto newElem = doc().makeElementInt("b", 1);
+    ASSERT_TRUE(newElem.ok());
+    auto result = createPathAt(field(), 0, elemFound, newElem);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::PathNotViable);
+    ASSERT_EQ(result.reason(), "Cannot create field 'b' in element {a: 1}");
+}
+
 class NestedDoc : public mongo::unittest::Test {
 public:
     NestedDoc() : _doc() {}
@@ -518,6 +530,18 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
     ASSERT_TRUE(elemFound.ok());
     ASSERT_EQUALS(idxFound, 0U);
     ASSERT_EQUALS(elemFound.compareWithElement(root()["b"], nullptr), 0);
+}
+
+TEST_F(ArrayDoc, CreatePathAtFailsIfElemFoundIsArrayAndIdxFoundFieldIsNonNumeric) {
+    setField("b");
+
+    auto elemFound = root()["a"];
+    auto newElem = doc().makeElementInt("b", 1);
+    ASSERT_TRUE(newElem.ok());
+    auto result = createPathAt(field(), 0, elemFound, newElem);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::PathNotViable);
+    ASSERT_EQ(result.reason(), "Cannot create field 'b' in element {a: []}");
 }
 
 //

@@ -41,6 +41,16 @@ public:
 
     void setCollator(const CollatorInterface* collator) final {}
 
+    Status apply(mutablebson::Element element,
+                 FieldRef* pathToCreate,
+                 FieldRef* pathTaken,
+                 StringData matchedField,
+                 bool fromReplication,
+                 const UpdateIndexData* indexData,
+                 LogBuilder* logBuilder,
+                 bool* indexesAffected,
+                 bool* noop) final;
+
 private:
     BSONElement _val;
 };

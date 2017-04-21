@@ -162,6 +162,14 @@ Status createPathAt(const FieldRef& prefix,
                     mutablebson::Element newElem) {
     Status status = Status::OK();
 
+    if (elemFound.getType() != BSONType::Object && elemFound.getType() != BSONType::Array) {
+        return Status(ErrorCodes::PathNotViable,
+                      str::stream() << "Cannot create field '" << prefix.getPart(idxFound)
+                                    << "' in element {"
+                                    << elemFound.toString()
+                                    << "}");
+    }
+
     // Sanity check that 'idxField' is an actual part.
     const size_t size = prefix.numParts();
     if (idxFound >= size) {
@@ -177,7 +185,11 @@ Status createPathAt(const FieldRef& prefix,
     if (elemFound.getType() == mongo::Array) {
         size_t newIdx = 0;
         if (!isNumeric(prefix.getPart(idxFound), &newIdx)) {
-            return Status(ErrorCodes::InvalidPath, "Array require numeric fields");
+            return Status(ErrorCodes::PathNotViable,
+                          str::stream() << "Cannot create field '" << prefix.getPart(idxFound)
+                                        << "' in element {"
+                                        << elemFound.toString()
+                                        << "}");
         }
 
         status = maybePadTo(&elemFound, newIdx);
