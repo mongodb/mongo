@@ -52,6 +52,7 @@ public:
     enum class Type { Object, Leaf };
 
     explicit UpdateNode(Type type) : type(type) {}
+    virtual ~UpdateNode() = default;
 
     /**
      * Set the collation on the node and all descendants. This is a noop if no leaf nodes require a
