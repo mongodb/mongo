@@ -63,26 +63,29 @@ AtomicWord<uint64_t> lastResourceMutexHash{0};
 Lock::ResourceMutex::ResourceMutex() : _rid(RESOURCE_MUTEX, lastResourceMutexHash.fetchAndAdd(1)) {}
 
 Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
-    : GlobalLock(locker, lockMode, EnqueueOnly()) {
+    : GlobalLock(locker, lockMode, timeoutMs, EnqueueOnly()) {
     waitForLock(timeoutMs);
 }
 
-Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqueueOnly)
+Lock::GlobalLock::GlobalLock(Locker* locker,
+                             LockMode lockMode,
+                             unsigned timeoutMs,
+                             EnqueueOnly enqueueOnly)
     : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
-    _enqueue(lockMode);
+    _enqueue(lockMode, timeoutMs);
 }
 
-void Lock::GlobalLock::_enqueue(LockMode lockMode) {
+void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
     if (_locker->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
-    _result = _locker->lockGlobalBegin(lockMode);
+    _result = _locker->lockGlobalBegin(lockMode, Milliseconds(timeoutMs));
 }
 
 void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
     if (_result == LOCK_WAITING) {
-        _result = _locker->lockGlobalComplete(timeoutMs);
+        _result = _locker->lockGlobalComplete(Milliseconds(timeoutMs));
     }
 
     if (_result != LOCK_OK && _locker->shouldConflictWithSecondaryBatchApplication()) {

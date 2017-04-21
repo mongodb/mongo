@@ -164,7 +164,7 @@ public:
          * Enqueues lock but does not block on lock acquisition.
          * Call waitForLock() to complete locking process.
          */
-        GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqueueOnly);
+        GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs, EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
             _unlock();
@@ -180,7 +180,7 @@ public:
         }
 
     private:
-        void _enqueue(LockMode lockMode);
+        void _enqueue(LockMode lockMode, unsigned timeoutMs);
         void _unlock();
 
         Locker* const _locker;
