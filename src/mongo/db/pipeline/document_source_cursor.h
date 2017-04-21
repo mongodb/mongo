@@ -33,12 +33,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/range_preserver.h"
 
 namespace mongo {
-
-class PlanExecutor;
 
 /**
  * Constructs and returns Documents from the BSONObj objects produced by a supplied PlanExecutor.
@@ -175,8 +173,8 @@ private:
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement
 
-    // Both '_rangePreserver' and '_exec' must be destroyed while holding the collection lock.
-    RangePreserver _rangePreserver;
+    // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
+    // collection lock.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 
     BSONObjSet _outputSorts;

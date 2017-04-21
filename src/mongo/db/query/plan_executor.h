@@ -402,7 +402,7 @@ public:
         _registered = false;
     }
 
-    bool isMarkedAsKilled() {
+    bool isMarkedAsKilled() const {
         return static_cast<bool>(_killReason);
     };
 

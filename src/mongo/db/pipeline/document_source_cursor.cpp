@@ -237,7 +237,6 @@ void DocumentSourceCursor::cleanupExecutor() {
     auto cursorManager = collection ? collection->getCursorManager() : nullptr;
     _exec->dispose(opCtx, cursorManager);
     _exec.reset();
-    _rangePreserver.release();
 }
 
 DocumentSourceCursor::~DocumentSourceCursor() {
@@ -250,7 +249,6 @@ DocumentSourceCursor::DocumentSourceCursor(
     const intrusive_ptr<ExpressionContext>& pCtx)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
-      _rangePreserver(pExpCtx->opCtx, collection),
       _exec(std::move(exec)),
       _outputSorts(_exec->getOutputSorts()) {
 

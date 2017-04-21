@@ -52,7 +52,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/range_preserver.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
@@ -234,7 +233,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.
-        RangePreserver preserver(opCtx, collection);
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
         auto statusWithPlanExecutor =
             getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);

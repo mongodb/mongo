@@ -129,13 +129,6 @@ public:
     ClientCursorPin registerCursor(OperationContext* opCtx, ClientCursorParams&& cursorParams);
 
     /**
-     * Constructs and pins a special ClientCursor used to track sharding state for the given
-     * collection. See range_preserver.h for more details.
-     */
-    ClientCursorPin registerRangePreserverCursor(OperationContext* opCtx,
-                                                 const Collection* collection);
-
-    /**
      * Pins and returns the cursor with the given id.
      *
      * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
@@ -195,8 +188,6 @@ private:
 
     CursorId _allocateCursorId_inlock();
     void _deregisterCursor_inlock(ClientCursor* cc);
-    ClientCursorPin _registerCursor_inlock(
-        OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
     void deregisterCursor(ClientCursor* cc);
 

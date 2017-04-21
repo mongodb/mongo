@@ -58,7 +58,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -1406,34 +1405,16 @@ public:
         uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
 
         // Prevent sharding state from changing during the MR.
-        unique_ptr<RangePreserver> rangePreserver;
         ScopedCollectionMetadata collMetadata;
         {
-            AutoGetCollectionForReadCommand ctx(opCtx, config.nss);
-
-            Collection* collection = ctx.getCollection();
+            // Get metadata before we check our version, to make sure it doesn't increment in the
+            // meantime.
+            AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
+            auto collection = autoColl.getCollection();
             if (collection) {
-                rangePreserver.reset(new RangePreserver(opCtx, collection));
-            }
-
-            // Get metadata before we check our version, to make sure it doesn't increment
-            // in the meantime.  Need to do this in the same lock scope as the block.
-            if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, config.nss.ns())) {
                 collMetadata = CollectionShardingState::get(opCtx, config.nss)->getMetadata();
             }
         }
-
-        // Ensure that the RangePreserver is freed under the lock. This is necessary since the
-        // RangePreserver's destructor unpins a ClientCursor, and access to the CursorManager must
-        // be done under the lock.
-        ON_BLOCK_EXIT([opCtx, &config, &rangePreserver] {
-            if (rangePreserver) {
-                // Be sure not to use AutoGetCollectionForReadCommand here, since that has
-                // side-effects other than lock acquisition.
-                AutoGetCollection ctx(opCtx, config.nss, MODE_IS);
-                rangePreserver.reset();
-            }
-        });
 
         bool shouldHaveData = false;
 

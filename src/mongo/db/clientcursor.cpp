@@ -92,18 +92,9 @@ ClientCursor::ClientCursor(ClientCursorParams&& params,
     init();
 }
 
-ClientCursor::ClientCursor(const Collection* collection,
-                           CursorManager* cursorManager,
-                           CursorId cursorId)
-    : _cursorid(cursorId),
-      _nss(collection->ns()),
-      _cursorManager(cursorManager),
-      _queryOptions(QueryOption_NoCursorTimeout) {
-    init();
-}
-
 void ClientCursor::init() {
     invariant(_cursorManager);
+    invariant(_exec);
 
     cursorStatsOpen.increment();
 
@@ -126,10 +117,7 @@ ClientCursor::~ClientCursor() {
 }
 
 void ClientCursor::markAsKilled(const std::string& reason) {
-    if (_exec) {
-        _exec->markAsKilled(reason);
-    }
-    _killed = true;
+    _exec->markAsKilled(reason);
 }
 
 void ClientCursor::dispose(OperationContext* opCtx) {
@@ -137,10 +125,7 @@ void ClientCursor::dispose(OperationContext* opCtx) {
         return;
     }
 
-    if (_exec) {
-        _exec->dispose(opCtx, _cursorManager);
-    }
-
+    _exec->dispose(opCtx, _cursorManager);
     _disposed = true;
 }
 
@@ -238,7 +223,7 @@ void ClientCursorPin::release() {
 
     invariant(_cursor->_isPinned);
 
-    if (_cursor->_killed) {
+    if (_cursor->getExecutor()->isMarkedAsKilled()) {
         // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
         // call dispose() and delete it.
         deleteUnderlying();
@@ -262,7 +247,7 @@ void ClientCursorPin::deleteUnderlying() {
     //   we can't simply unpin with the cursor manager lock here, since we need to guarantee
     //   exclusive ownership of the cursor when we are deleting it).
 
-    if (!_cursor->_killed) {
+    if (!_cursor->getExecutor()->isMarkedAsKilled()) {
         _cursor->_cursorManager->deregisterCursor(_cursor);
     }
 

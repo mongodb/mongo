@@ -40,7 +40,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
-#include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -148,7 +147,8 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        RangePreserver preserver(opCtx, collection);
+        auto rangePreserver =
+            CollectionShardingState::get(opCtx, request.getValue().getNs())->getMetadata();
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
@@ -216,7 +216,8 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        RangePreserver preserver(opCtx, collection);
+        auto rangePreserver =
+            CollectionShardingState::get(opCtx, request.getValue().getNs())->getMetadata();
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,

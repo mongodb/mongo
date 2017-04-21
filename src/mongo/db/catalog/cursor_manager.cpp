@@ -360,15 +360,11 @@ void CursorManager::invalidateDocument(OperationContext* opCtx,
 
     for (ExecSet::iterator it = _nonCachedExecutors.begin(); it != _nonCachedExecutors.end();
          ++it) {
-        PlanExecutor* exec = *it;
-        exec->invalidate(opCtx, dl, type);
+        (*it)->invalidate(opCtx, dl, type);
     }
 
     for (CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
-        PlanExecutor* exec = i->second->getExecutor();
-        if (exec) {
-            exec->invalidate(opCtx, dl, type);
-        }
+        i->second->getExecutor()->invalidate(opCtx, dl, type);
     }
 }
 
@@ -415,9 +411,8 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx, Cu
 
     ClientCursor* cursor = it->second;
     uassert(12051, str::stream() << "cursor id " << id << " is already in use", !cursor->_isPinned);
-    if (cursor->_killed) {
+    if (cursor->getExecutor()->isMarkedAsKilled()) {
         // This cursor was killed while it was idle.
-        invariant(cursor->getExecutor());  // We should never unpin RangePreserver cursors.
         Status error{ErrorCodes::QueryPlanKilled,
                      str::stream() << "cursor killed because: "
                                    << cursor->getExecutor()->getKillReason()};
@@ -485,24 +480,9 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     cursorParams.exec->unsetRegistered();
 
     CursorId cursorId = _allocateCursorId_inlock();
+    invariant(cursorId);
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
         new ClientCursor(std::move(cursorParams), this, cursorId));
-    return _registerCursor_inlock(opCtx, std::move(clientCursor));
-}
-
-ClientCursorPin CursorManager::registerRangePreserverCursor(OperationContext* opCtx,
-                                                            const Collection* collection) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    CursorId cursorId = _allocateCursorId_inlock();
-    std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
-        new ClientCursor(collection, this, cursorId));
-    return _registerCursor_inlock(opCtx, std::move(clientCursor));
-}
-
-ClientCursorPin CursorManager::_registerCursor_inlock(
-    OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor) {
-    CursorId cursorId = clientCursor->cursorid();
-    invariant(cursorId);
 
     // Transfer ownership of the cursor to '_cursors'.
     ClientCursor* unownedCursor = clientCursor.release();

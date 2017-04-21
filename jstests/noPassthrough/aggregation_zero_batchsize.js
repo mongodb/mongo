@@ -59,8 +59,7 @@
         cursor: {batchSize: 0}
     }));
     cursor = new DBCommandCursor(conn, res);
-    // SERVER-28309 We should only report 1 open cursor per aggregation.
-    assertNumOpenCursors(2);
+    assertNumOpenCursors(1);
 
     assert.throws(() => cursor.itcount(), [], "expected getMore to fail");
     assertNumOpenCursors(0);
@@ -76,8 +75,7 @@
         cursor: {batchSize: 0}
     }));
     cursor = new DBCommandCursor(conn, res);
-    // SERVER-28309 We should only report 1 open cursor per aggregation.
-    assertNumOpenCursors(2);
+    assertNumOpenCursors(1);
 
     // Add a document validation rule to the $out collection so that insertion will fail.
     assert.commandWorked(testDB.runCommand(

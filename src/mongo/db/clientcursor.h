@@ -112,6 +112,10 @@ public:
         return _isReadCommitted;
     }
 
+    /**
+     * Returns a pointer to the underlying query plan executor. All cursors manage a PlanExecutor,
+     * so this method never returns a null pointer.
+     */
     PlanExecutor* getExecutor() const {
         return _exec.get();
     }
@@ -234,11 +238,6 @@ private:
     ClientCursor(ClientCursorParams&& params, CursorManager* cursorManager, CursorId cursorId);
 
     /**
-     * Constructs a special ClientCursor used to track sharding state for the given collection.
-     */
-    ClientCursor(const Collection* collection, CursorManager* cursorManager, CursorId cursorId);
-
-    /**
      * Destroys a ClientCursor. This is private, since only the CursorManager or the ClientCursorPin
      * is allowed to destroy a cursor.
      *
@@ -285,9 +284,6 @@ private:
     // an error to use a ClientCursor once it has been disposed.
     bool _disposed = false;
 
-    // TODO SERVER-28309 Remove this field and instead use _exec->markedAsKilled().
-    bool _killed = false;
-
     // Tracks the number of results returned by this cursor so far.
     long long _pos = 0;
 
@@ -312,7 +308,7 @@ private:
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
-    // The underlying query execution machinery.
+    // The underlying query execution machinery. Must be non-null.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
