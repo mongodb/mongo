@@ -74,7 +74,6 @@ namespace repl {
 
 class ElectCmdRunner;
 class FreshnessChecker;
-class FreshnessScanner;
 class HandshakeArgs;
 class HeartbeatResponseAction;
 class LastVote;
@@ -1220,30 +1219,11 @@ private:
     EventHandle _makeEvent();
 
     /**
-     * Schedule notification of election win.
-     */
-    void _scheduleElectionWinNotification_inlock();
-
-    /**
      * Wrap a function into executor callback.
      * If the callback is cancelled, the given function won't run.
      */
     executor::TaskExecutor::CallbackFn _wrapAsCallbackFn(const stdx::function<void()>& work);
 
-    /**
-     * Scan all nodes to find out the the latest optime in the replset, thus we know when there's no
-     * more to catch up before the timeout. It also schedules the actual catch-up once we get the
-     * response from the freshness scan.
-     */
-    void _scanOpTimeForCatchUp_inlock();
-    /**
-     * Wait for data replication until we reach the latest optime, or the timeout expires.
-     * "originalTerm" is the term when catch-up work is scheduled and used to detect
-     * the step-down (and potential following step-up) after catch-up gets scheduled.
-     */
-    void _catchUpOplogToLatest_inlock(const FreshnessScanner& scanner,
-                                      Milliseconds timeout,
-                                      long long originalTerm);
     /**
      * Finish catch-up mode and start drain mode.
      */
