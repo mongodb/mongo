@@ -529,6 +529,9 @@ class Repo(object):
         # Get the full file name here
         valid_files = [os.path.normpath(os.path.join(self.root, f)) for f in valid_files]
 
+        # Filter out files that git thinks exist but were removed.
+        valid_files = [f for f in valid_files if os.path.exists(f)]
+
         return valid_files
 
     def is_detached(self):
