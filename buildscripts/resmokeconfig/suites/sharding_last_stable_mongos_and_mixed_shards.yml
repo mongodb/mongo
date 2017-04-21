@@ -21,6 +21,8 @@ selector:
     # New feature in v3.6 mongos and mongod.
     - jstests/sharding/logical_time_api.js
     - jstests/sharding/operation_time_api.js
+    # New feature in v3.6 mongo shell.
+    - jstests/sharding/causal_consistency_shell_support.js
 
 executor:
   js_test:
