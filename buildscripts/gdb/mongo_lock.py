@@ -347,6 +347,7 @@ class MongoDBWaitsForGraph(gdb.Command):
                 print("Saving digraph to %s" % file)
                 with open(file, 'w') as f:
                     f.write(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
+                print(cycle_message.split("# ")[1])
             else:
                 print(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
 
