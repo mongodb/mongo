@@ -44,7 +44,7 @@ load('./jstests/multiVersion/libs/multi_rs.js');
 
     jsTest.log("Stepping down " + n0.host);
     try {
-        n0.adminCommand({replSetStepDown: 1200});
+        n0.adminCommand({replSetStepDown: 1200, secondaryCatchUpPeriodSecs: 120});
     } catch (ex) {
         assert(tojson(ex).includes(
                    "network error while attempting to run command 'replSetStepDown' on host"),
@@ -77,7 +77,7 @@ load('./jstests/multiVersion/libs/multi_rs.js');
     jsTest.log("Confirming that target collection remained after switching primaries");
     jsTest.log("Stepping down " + n0.host);
     try {
-        n1.adminCommand({replSetStepDown: 1200});
+        n1.adminCommand({replSetStepDown: 1200, secondaryCatchUpPeriodSecs: 120});
     } catch (ex) {
         assert(tojson(ex).includes(
                    "network error while attempting to run command 'replSetStepDown' on host"),
