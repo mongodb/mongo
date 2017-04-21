@@ -391,16 +391,38 @@ tasks:
         file: src/compile_expansions.yml
     - command: shell.exec
       params:
+        working_dir: src/src/mongo/gotools
+        script: |
+          set -o verbose
+          set -o errexit
+          # make sure newlines in the scripts are handled correctly by windows
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
+          sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
+          sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+          . ./${set_tools_gopath|set_gopath.sh}
+          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog"
+          if [ "${build_mongoreplay}" = "true" ]; then
+            build_tools="$build_tools mongoreplay"
+          fi
+          for i in $build_tools; do
+            ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
+            "../../mongo-tools/$i${exe|}" --version
+          done
+    - command: shell.exec
+      params:
         working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
           mkdir -p mongodb/jstests/hooks
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
+          mv src/mongo-tools/* mongodb/bin
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests/hooks"
@@ -829,11 +851,9 @@ buildvariants:
     - workloads
     - YCSB
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: single-replica
     cluster: single
     platform: linux
-    use_scons_cache: true
     project: &project dsi
   run_on:
       - "rhel70-perf-single"
@@ -855,6 +875,8 @@ buildvariants:
     cluster: single
     platform: linux
     use_scons_cache: true
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: ""
     project: *project
   run_on:
       - "rhel70-perf-single"
@@ -874,11 +896,9 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: shard
     cluster: shard
     platform: linux
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-shard"
@@ -897,7 +917,6 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: replica
     cluster: replica
     platform: linux
@@ -919,11 +938,9 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: replica-2node
     cluster: replica
     platform: linux
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-replset"
@@ -936,11 +953,9 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: initialsync-logkeeper
     cluster: initialsync-logkeeper
     platform: linux
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-initialsync-logkeeper"
@@ -952,8 +967,6 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-single"
