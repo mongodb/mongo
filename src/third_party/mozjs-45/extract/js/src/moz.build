@@ -236,6 +236,7 @@ UNIFIED_SOURCES += [
     'jit/MoveResolver.cpp',
     'jit/OptimizationTracking.cpp',
     'jit/PerfSpewer.cpp',
+    'jit/ProcessExecutableMemory.cpp',
     'jit/RangeAnalysis.cpp',
     'jit/Recover.cpp',
     'jit/RegisterAllocator.cpp',
@@ -530,15 +531,8 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
             ]
 
 if CONFIG['OS_ARCH'] == 'WINNT':
-    SOURCES += [
-        'jit/ExecutableAllocatorWin.cpp',
-    ]
     # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
     DEFINES['_CRT_RAND_S'] = True
-else:
-    SOURCES += [
-        'jit/ExecutableAllocatorPosix.cpp',
-    ]
 
 if CONFIG['JS_HAS_CTYPES']:
     SOURCES += [

@@ -949,6 +949,15 @@ struct JSRuntime : public JS::shadow::Runtime,
         return interpreterStack_;
     }
 
+  private:
+    // Used to generate random keys for hash tables.
+    mozilla::Maybe<mozilla::non_crypto::XorShift128PlusRNG> randomKeyGenerator_;
+    mozilla::non_crypto::XorShift128PlusRNG& randomKeyGenerator();
+
+  public:
+    mozilla::HashCodeScrambler randomHashCodeScrambler();
+    mozilla::non_crypto::XorShift128PlusRNG forkRandomKeyGenerator();
+
     //-------------------------------------------------------------------------
     // Self-hosting support
     //-------------------------------------------------------------------------

@@ -46,6 +46,7 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     runtime_(zone->runtimeFromMainThread()),
     principals_(nullptr),
     isSystem_(false),
+    isAtomsCompartment_(false),
     isSelfHosting(false),
     marked(true),
     warnedAboutFlagsArgument(false),
@@ -72,6 +73,7 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     gcIncomingGrayPointers(nullptr),
     gcPreserveJitCode(options.preserveJitCode()),
     debugModeBits(0),
+    randomKeyGenerator_(runtime_->forkRandomKeyGenerator()),
     watchpointMap(nullptr),
     scriptCountsMap(nullptr),
     debugScriptMap(nullptr),
@@ -156,6 +158,12 @@ JSRuntime::createJitRuntime(JSContext* cx)
     AutoLockForExclusiveAccess atomsLock(cx);
 
     MOZ_ASSERT(!jitRuntime_);
+
+    if (!CanLikelyAllocateMoreExecutableMemory()) {
+        // Report OOM instead of potentially hitting the MOZ_CRASH below.
+        ReportOutOfMemory(cx);
+        return nullptr;
+    }
 
     jit::JitRuntime* jrt = cx->new_<jit::JitRuntime>();
     if (!jrt)
@@ -1166,6 +1174,20 @@ JSCompartment::addTelemetry(const char* filename, DeprecatedLanguageExtension e)
         return;
 
     sawDeprecatedLanguageExtension[e] = true;
+}
+
+HashNumber
+JSCompartment::randomHashCode()
+{
+    ensureRandomNumberGenerator();
+    return HashNumber(randomNumberGenerator.ref().next());
+}
+
+mozilla::HashCodeScrambler
+JSCompartment::randomHashCodeScrambler()
+{
+    return mozilla::HashCodeScrambler(randomKeyGenerator_.next(),
+                                      randomKeyGenerator_.next());
 }
 
 AutoSetNewObjectMetadata::AutoSetNewObjectMetadata(ExclusiveContext* ecx

@@ -722,13 +722,14 @@ JitCompartment::sweep(FreeOp* fop, JSCompartment* compartment)
     if (!stubCodes_->lookup(ICSetProp_Fallback::Compiler::BASELINE_KEY))
         baselineSetPropReturnAddr_ = nullptr;
 
-    if (stringConcatStub_ && !IsMarkedUnbarriered(&stringConcatStub_))
+    JSRuntime* rt = fop->runtime();
+    if (stringConcatStub_ && !IsMarkedUnbarriered(rt, &stringConcatStub_))
         stringConcatStub_ = nullptr;
 
-    if (regExpExecStub_ && !IsMarkedUnbarriered(&regExpExecStub_))
+    if (regExpExecStub_ && !IsMarkedUnbarriered(rt, &regExpExecStub_))
         regExpExecStub_ = nullptr;
 
-    if (regExpTestStub_ && !IsMarkedUnbarriered(&regExpTestStub_))
+    if (regExpTestStub_ && !IsMarkedUnbarriered(rt, &regExpTestStub_))
         regExpTestStub_ = nullptr;
 
     for (size_t i = 0; i <= SimdTypeDescr::LAST_TYPE; i++) {
@@ -2402,6 +2403,11 @@ Compile(JSContext* cx, HandleScript script, BaselineFrame* osrFrame, jsbytecode*
     OptimizationLevel optimizationLevel = GetOptimizationLevel(script, osrPc);
     if (optimizationLevel == Optimization_DontCompile)
         return Method_Skipped;
+
+    if (!CanLikelyAllocateMoreExecutableMemory()) {
+        script->resetWarmUpCounter();
+        return Method_Skipped;
+    }
 
     if (script->hasIonScript()) {
         IonScript* scriptIon = script->ionScript();

@@ -1233,9 +1233,11 @@ IonBuilder::initScopeChain(MDefinition* callee)
         current->add(scope);
 
         // This reproduce what is done in CallObject::createForFunction. Skip
-        // this for analyses, as the script might not have a baseline script
-        // with template objects yet.
-        if (fun->needsCallObject() && !info().isAnalysis()) {
+        // this for the arguments analysis, as the script might not have a
+        // baseline script with template objects yet.
+        if (fun->needsCallObject() &&
+            info().analysisMode() != Analysis_ArgumentsUsage)
+        {
             if (fun->isNamedLambda()) {
                 scope = createDeclEnvObject(callee, scope);
                 if (!scope)
@@ -6133,6 +6135,9 @@ IonBuilder::getSingletonPrototype(JSFunction* target)
 MDefinition*
 IonBuilder::createThisScriptedSingleton(JSFunction* target, MDefinition* callee)
 {
+    if (!target->hasScript())
+        return nullptr;
+
     // Get the singleton prototype (if exists)
     JSObject* proto = getSingletonPrototype(target);
     if (!proto)
