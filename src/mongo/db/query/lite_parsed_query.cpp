@@ -375,7 +375,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
 
     pq->addMetaProjection();
 
-    Status validateStatus = pq->validateFindCmd();
+    Status validateStatus = pq->validate();
     if (!validateStatus.isOK()) {
         return validateStatus;
     }
@@ -660,6 +660,11 @@ Status LiteParsedQuery::validate() const {
             return Status(ErrorCodes::BadValue,
                           "cannot use tailable option with a sort other than {$natural: 1}");
         }
+    }
+
+    // AwaitData is only valid with a tailable cursor.
+    if (_awaitData && !_tailable) {
+        return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
     }
 
     return Status::OK();
@@ -973,14 +978,6 @@ void LiteParsedQuery::addMetaProjection() {
     if (showRecordId()) {
         addShowRecordIdMetaProj();
     }
-}
-
-Status LiteParsedQuery::validateFindCmd() {
-    if (isAwaitData() && !isTailable()) {
-        return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
-    }
-
-    return validate();
 }
 
 boost::optional<long long> LiteParsedQuery::getEffectiveBatchSize() const {

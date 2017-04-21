@@ -331,11 +331,6 @@ private:
      */
     void addMetaProjection();
 
-    /**
-     * Returns OK if this is valid in the find command context.
-     */
-    Status validateFindCmd();
-
     const NamespaceString _nss;
 
     BSONObj _filter;

@@ -79,4 +79,11 @@
     assert.eq(t.find().addOption(2).itcount(), 0);
     assert.writeOK(t.insert({a: 1}));
     assert.eq(t.find().addOption(2).itcount(), 1);
+
+    // Tests that find with 'awaitData' option but without 'tailable' option results in an
+    // assertion.
+    assert.throws(function() {
+        var cursor = t.find().addOption(DBQuery.Option.awaitData);
+        cursor.next();
+    });
 })();
