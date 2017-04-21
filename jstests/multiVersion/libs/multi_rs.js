@@ -43,6 +43,15 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     }
 
     let oldPrimary = this.stepdown(primary);
+
+    // stepping down the node can close the connection and lose the authentication state, so
+    // re-authenticate here before calling awaitNodesAgreeOnPrimary().
+    if (user != undefined) {
+        oldPrimary.getDB('admin').auth(user, pwd);
+    }
+    jsTest.authenticate(oldPrimary);
+
+    this.awaitNodesAgreeOnPrimary();
     primary = this.getPrimary();
 
     this.upgradeNode(oldPrimary, options, user, pwd);
