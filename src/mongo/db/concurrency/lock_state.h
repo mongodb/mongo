@@ -55,9 +55,9 @@ public:
     /**
      * Uninterruptible blocking method, which waits for the notification to fire.
      *
-     * @param timeoutMs How many milliseconds to wait before returning LOCK_TIMEOUT.
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
      */
-    LockResult wait(unsigned timeoutMs);
+    LockResult wait(Milliseconds timeout);
 
 private:
     virtual void notify(ResourceId resId, LockResult result);
@@ -101,9 +101,11 @@ public:
 
     stdx::thread::id getThreadId() const override;
 
-    virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
-    virtual LockResult lockGlobalBegin(LockMode mode);
-    virtual LockResult lockGlobalComplete(unsigned timeoutMs);
+    virtual LockResult lockGlobal(LockMode mode);
+    virtual LockResult lockGlobalBegin(LockMode mode, Milliseconds timeout) {
+        return _lockGlobalBegin(mode, timeout);
+    }
+    virtual LockResult lockGlobalComplete(Milliseconds timeout);
     virtual void lockMMAPV1Flush();
 
     virtual void downgradeGlobalXtoSForMMAPV1();
@@ -118,7 +120,7 @@ public:
 
     virtual LockResult lock(ResourceId resId,
                             LockMode mode,
-                            unsigned timeoutMs = UINT_MAX,
+                            Milliseconds timeout = Milliseconds::max(),
                             bool checkDeadlock = false);
 
     virtual void downgrade(ResourceId resId, LockMode newMode);
@@ -167,12 +169,12 @@ public:
      *
      * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
-     * @param timeoutMs How long to wait for the lock acquisition to complete.
+     * @param timeout How long to wait for the lock acquisition to complete.
      * @param checkDeadlock whether to perform deadlock detection while waiting.
      */
     LockResult lockComplete(ResourceId resId,
                             LockMode mode,
-                            unsigned timeoutMs,
+                            Milliseconds timeout,
                             bool checkDeadlock);
 
 private:
@@ -180,6 +182,10 @@ private:
 
     typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
 
+    /**
+     * Like lockGlobalBegin, but accepts a timeout for acquiring a ticket.
+     */
+    LockResult _lockGlobalBegin(LockMode, Milliseconds timeout);
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid

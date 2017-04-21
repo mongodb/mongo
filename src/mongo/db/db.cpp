@@ -999,9 +999,9 @@ static void shutdownTask() {
     // of this function to prevent any operations from running that need a lock.
     //
     DefaultLockerImpl* globalLocker = new DefaultLockerImpl();
-    LockResult result = globalLocker->lockGlobalBegin(MODE_X);
+    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Milliseconds::max());
     if (result == LOCK_WAITING) {
-        result = globalLocker->lockGlobalComplete(UINT_MAX);
+        result = globalLocker->lockGlobalComplete(Milliseconds::max());
     }
 
     invariant(LOCK_OK == result);

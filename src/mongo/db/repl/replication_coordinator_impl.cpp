@@ -1770,7 +1770,8 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         return {ErrorCodes::NotMaster, "not primary so can't step down"};
     }
 
-    Lock::GlobalLock globalReadLock(opCtx, MODE_S, Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock globalReadLock(
+        opCtx, MODE_S, durationCount<Milliseconds>(stepdownTime), Lock::GlobalLock::EnqueueOnly());
 
     // We've requested the global shared lock which will stop new writes from coming in,
     // but existing writes could take a long time to finish, so kill all user operations
