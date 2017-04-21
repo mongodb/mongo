@@ -479,8 +479,8 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
 StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesListFromShard(
     OperationContext* txn, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
-    auto swCommandResponse =
-        _runCommandForAddShard(txn, targeter.get(), "admin", BSON("listDatabases" << 1));
+    auto swCommandResponse = _runCommandForAddShard(
+        txn, targeter.get(), "admin", BSON("listDatabases" << 1 << "nameOnly" << true));
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
