@@ -172,13 +172,13 @@ public:
      * Returns a MemberConfig index position corresponding to the member with the given
      * HostAndPort in the config, or -1 if there is no member with that address.
      */
-    const int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
+    int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
 
     /**
      * Returns a MemberConfig index position corresponding to the member with the given
      * _id in the config, or -1 if there is no member with that address.
      */
-    const int findMemberIndexByConfigId(long long configId) const;
+    int findMemberIndexByConfigId(long long configId) const;
 
     /**
      * Gets the default write concern for the replica set described by this configuration.

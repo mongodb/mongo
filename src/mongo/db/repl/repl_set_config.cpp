@@ -629,7 +629,7 @@ const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
     return NULL;
 }
 
-const int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
+int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
          ++it) {
@@ -641,7 +641,7 @@ const int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) co
     return -1;
 }
 
-const int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
+int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
     int x = 0;
     for (const auto& member : _members) {
         if (member.getId() == configId) {
