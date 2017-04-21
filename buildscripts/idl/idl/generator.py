@@ -26,43 +26,8 @@ from typing import List, Mapping, Union
 
 from . import ast
 from . import bson
-
-# Number of spaces to indent code
-_INDENT_SPACE_COUNT = 4
-
-
-def _title_case(name):
-    # type: (unicode) -> unicode
-    """Return a CapitalCased version of a string."""
-    return name[0:1].upper() + name[1:]
-
-
-def _camel_case(name):
-    # type: (unicode) -> unicode
-    """Return a camelCased version of a string."""
-    return name[0:1].lower() + name[1:]
-
-
-def _get_method_name(name):
-    # type: (unicode) -> unicode
-    """Get a method name from a fully qualified method name."""
-    pos = name.rfind('::')
-    if pos == -1:
-        return name
-    return name[pos + 2:]
-
-
-def _get_method_name_from_qualified_method_name(name):
-    # type: (unicode) -> unicode
-    # pylint: disable=invalid-name
-    """Get a method name from a fully qualified method name."""
-    # TODO: in the future, we may want to support full-qualified calls to static methods
-    prefix = 'mongo::'
-    pos = name.find(prefix)
-    if pos == -1:
-        return name
-
-    return name[len(prefix):]
+from . import common
+from . import writer
 
 
 def _is_primitive_type(cpp_type):
@@ -105,7 +70,7 @@ def _get_field_cpp_type(field):
     assert field.cpp_type is not None or field.struct_type is not None
 
     if field.struct_type:
-        cpp_type = _title_case(field.struct_type)
+        cpp_type = common.title_case(field.struct_type)
     else:
         cpp_type = field.cpp_type
 
@@ -157,7 +122,7 @@ def _get_field_storage_type(field):
 def _get_field_member_name(field):
     # type: (ast.Field) -> unicode
     """Get the C++ class member name for a field."""
-    return '_%s' % (_camel_case(field.name))
+    return '_%s' % (common.camel_case(field.name))
 
 
 def _get_return_by_reference(field):
@@ -221,187 +186,13 @@ def _access_member(field):
     return '%s.get()' % (member_name)
 
 
-def fill_spaces(count):
-    # type: (int) -> unicode
-    """Fill a string full of spaces."""
-    fill = ''
-    for _ in range(count * _INDENT_SPACE_COUNT):
-        fill += ' '
-
-    return fill
-
-
-def _template_format(template, template_params):
-    # type: (unicode, Mapping[unicode,unicode]) -> unicode
-    """Write a template to the stream."""
-    # Ignore the types since we use unicode literals and this expects str but works fine with
-    # unicode.
-    # See https://docs.python.org/2/library/string.html#template-strings
-    return string.Template(template).substitute(template_params)  # type: ignore
-
-
-def indent_text(count, unindented_text):
-    # type: (int, unicode) -> unicode
-    """Indent each line of a multi-line string."""
-    lines = unindented_text.splitlines()
-    fill = fill_spaces(count)
-    return '\n'.join(fill + line for line in lines)
-
-
-class _IndentedTextWriter(object):
-    """
-    A simple class to manage writing indented lines of text.
-
-    Supports both writing indented lines, and unindented lines.
-    Use write_empty_line() instead of write_line('') to avoid lines
-    full of blank spaces.
-    """
-
-    def __init__(self, stream):
-        # type: (io.StringIO) -> None
-        """Create an indented text writer."""
-        self._stream = stream
-        self._indent = 0
-        self._template_context = None  # type: Mapping[unicode, unicode]
-
-    def write_unindented_line(self, msg):
-        # type: (unicode) -> None
-        """Write an unindented line to the stream, no template formatting applied."""
-        self._stream.write(msg)
-        self._stream.write("\n")
-
-    def indent(self):
-        # type: () -> None
-        """Indent the text by one level."""
-        self._indent += 1
-
-    def unindent(self):
-        # type: () -> None
-        """Unindent the text by one level."""
-        assert self._indent > 0
-        self._indent -= 1
-
-    def write_line(self, msg):
-        # type: (unicode) -> None
-        """Write a line to the stream, no template formatting applied."""
-        self._stream.write(indent_text(self._indent, msg))
-        self._stream.write("\n")
-
-    def set_template_mapping(self, template_params):
-        # type: (Mapping[unicode,unicode]) -> None
-        """Set the current template mapping parameters for string.Template formatting."""
-        assert not self._template_context
-        self._template_context = template_params
-
-    def clear_template_mapping(self):
-        # type: () -> None
-        """Clear the current template mapping parameters for string.Template formatting."""
-        assert self._template_context
-        self._template_context = None
-
-    def write_template(self, template):
-        # type: (unicode) -> None
-        """Write a template to the stream."""
-        msg = _template_format(template, self._template_context)
-        self._stream.write(indent_text(self._indent, msg))
-        self._stream.write("\n")
-
-    def write_empty_line(self):
-        # type: () -> None
-        """Write a line to the stream."""
-        self._stream.write("\n")
-
-
-class _TemplateContext(object):
-    """Set the template context for the writer."""
-
-    def __init__(self, writer, template_params):
-        # type: (_IndentedTextWriter, Mapping[unicode,unicode]) -> None
-        """Create a template context."""
-        self._writer = writer
-        self._template_context = template_params
-
-    def __enter__(self):
-        # type: () -> None
-        """Set the template mapping for the writer."""
-        self._writer.set_template_mapping(self._template_context)
-
-    def __exit__(self, *args):
-        # type: (*str) -> None
-        """Clear the template mapping for the writer."""
-        self._writer.clear_template_mapping()
-
-
-class _EmptyBlock(object):
-    """Do not generate an indented block."""
-
-    def __init__(self):
-        # type: () -> None
-        """Create an empty block."""
-        pass
-
-    def __enter__(self):
-        # type: () -> None
-        """Do nothing."""
-        pass
-
-    def __exit__(self, *args):
-        # type: (*str) -> None
-        """Do nothing."""
-        pass
-
-
-class _UnindentedScopedBlock(object):
-    """Generate an unindented block, and do not indent the contents."""
-
-    def __init__(self, writer, opening, closing):
-        # type: (_IndentedTextWriter, unicode, unicode) -> None
-        """Create a block."""
-        self._writer = writer
-        self._opening = opening
-        self._closing = closing
-
-    def __enter__(self):
-        # type: () -> None
-        """Write the beginning of the block and do not indent."""
-        self._writer.write_unindented_line(self._opening)
-
-    def __exit__(self, *args):
-        # type: (*str) -> None
-        """Write the end of the block and do not change indentation."""
-        self._writer.write_unindented_line(self._closing)
-
-
-class _IndentedScopedBlock(object):
-    """Generate a block, template the parameters, and indent the contents."""
-
-    def __init__(self, writer, opening, closing):
-        # type: (_IndentedTextWriter, unicode, unicode) -> None
-        """Create a block."""
-        self._writer = writer
-        self._opening = opening
-        self._closing = closing
-
-    def __enter__(self):
-        # type: () -> None
-        """Write the beginning of the block and then indent."""
-        self._writer.write_template(self._opening)
-        self._writer.indent()
-
-    def __exit__(self, *args):
-        # type: (*str) -> None
-        """Unindent the block and print the ending."""
-        self._writer.unindent()
-        self._writer.write_template(self._closing)
-
-
 class _FieldUsageChecker(object):
     """Check for duplicate fields, and required fields as needed."""
 
-    def __init__(self, writer):
-        # type: (_IndentedTextWriter) -> None
+    def __init__(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
         """Create a field usage checker."""
-        self._writer = writer  # type: _IndentedTextWriter
+        self._writer = indented_writer  # type: writer.IndentedTextWriter
         self.fields = []  # type: List[ast.Field]
 
         # TODO: use a more optimal data type
@@ -411,7 +202,7 @@ class _FieldUsageChecker(object):
         # type: () -> None
         """Create the C++ field store initialization code."""
         self._writer.write_line('auto push_result = usedFields.insert(fieldName);')
-        with _IndentedScopedBlock(self._writer, 'if (push_result.second == false) {', '}'):
+        with writer.IndentedScopedBlock(self._writer, 'if (push_result.second == false) {', '}'):
             self._writer.write_line('ctxt.throwDuplicateField(element);')
 
     def add(self, field):
@@ -424,9 +215,9 @@ class _FieldUsageChecker(object):
         """Output the code to check for missing fields."""
         for field in self.fields:
             if (not field.optional) and (not field.ignore):
-                with _IndentedScopedBlock(self._writer,
-                                          'if (usedFields.find("%s") == usedFields.end()) {' %
-                                          (field.name), '}'):
+                with writer.IndentedScopedBlock(self._writer,
+                                                'if (usedFields.find("%s") == usedFields.end()) {' %
+                                                (field.name), '}'):
                     if field.default:
                         self._writer.write_line('object.%s = %s;' %
                                                 (_get_field_member_name(field), field.default))
@@ -442,10 +233,10 @@ class _CppFileWriterBase(object):
     Relies on caller to orchestrate calls correctly though.
     """
 
-    def __init__(self, writer):
-        # type: (_IndentedTextWriter) -> None
+    def __init__(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
         """Create a C++ code writer."""
-        self._writer = writer  # type: _IndentedTextWriter
+        self._writer = indented_writer  # type: writer.IndentedTextWriter
 
     def write_unindented_line(self, msg):
         # type: (unicode) -> None
@@ -480,11 +271,11 @@ class _CppFileWriterBase(object):
         self._writer.write_unindented_line('#include "%s"' % (include))
 
     def gen_namespace_block(self, namespace):
-        # type: (unicode) -> _UnindentedScopedBlock
+        # type: (unicode) -> writer.UnindentedScopedBlock
         """Generate a namespace block."""
         # TODO: support namespace strings which consist of '::' delimited namespaces
-        return _UnindentedScopedBlock(self._writer, 'namespace %s {' % (namespace),
-                                      '}  // namespace %s' % (namespace))
+        return writer.UnindentedScopedBlock(self._writer, 'namespace %s {' % (namespace),
+                                            '}  // namespace %s' % (namespace))
 
     def gen_description_comment(self, description):
         # type: (unicode) -> None
@@ -496,54 +287,55 @@ class _CppFileWriterBase(object):
          */""" % (description)))
 
     def _with_template(self, template_params):
-        # type: (Mapping[unicode,unicode]) -> _TemplateContext
+        # type: (Mapping[unicode,unicode]) -> writer.TemplateContext
         """Generate a template context for the current parameters."""
-        return _TemplateContext(self._writer, template_params)
+        return writer.TemplateContext(self._writer, template_params)
 
     def _block(self, opening, closing):
-        # type: (unicode, unicode) -> Union[_IndentedScopedBlock,_EmptyBlock]
+        # type: (unicode, unicode) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
         """Generate an indented block if opening is not empty."""
         if not opening:
-            return _EmptyBlock()
+            return writer.EmptyBlock()
 
-        return _IndentedScopedBlock(self._writer, opening, closing)
+        return writer.IndentedScopedBlock(self._writer, opening, closing)
 
     def _predicate(self, check_str, use_else_if=False):
-        # type: (unicode, bool) -> Union[_IndentedScopedBlock,_EmptyBlock]
+        # type: (unicode, bool) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
         """
         Generate an if block if the condition is not-empty.
 
         Generate 'else if' instead of use_else_if is True.
         """
         if not check_str:
-            return _EmptyBlock()
+            return writer.EmptyBlock()
 
         conditional = 'if'
         if use_else_if:
             conditional = 'else if'
 
-        return _IndentedScopedBlock(self._writer, '%s (%s) {' % (conditional, check_str), '}')
+        return writer.IndentedScopedBlock(self._writer, '%s (%s) {' % (conditional, check_str), '}')
 
 
 class _CppHeaderFileWriter(_CppFileWriterBase):
     """C++ .h File writer."""
 
-    def __init__(self, writer):
-        # type: (_IndentedTextWriter) -> None
+    def __init__(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
         """Create a C++ .cpp file code writer."""
-        super(_CppHeaderFileWriter, self).__init__(writer)
+        super(_CppHeaderFileWriter, self).__init__(indented_writer)
 
     def gen_class_declaration_block(self, class_name):
-        # type: (unicode) -> _IndentedScopedBlock
+        # type: (unicode) -> writer.IndentedScopedBlock
         """Generate a class declaration block."""
-        return _IndentedScopedBlock(self._writer, 'class %s {' % _title_case(class_name), '};')
+        return writer.IndentedScopedBlock(self._writer,
+                                          'class %s {' % common.title_case(class_name), '};')
 
     def gen_serializer_methods(self, class_name):
         # type: (unicode) -> None
         """Generate a serializer method declarations."""
         self._writer.write_line(
             'static %s parse(const IDLParserErrorContext& ctxt, const BSONObj& object);' %
-            (_title_case(class_name)))
+            (common.title_case(class_name)))
         self._writer.write_line('void serialize(BSONObjBuilder* builder) const;')
         self._writer.write_empty_line()
 
@@ -579,13 +371,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 body_template = 'return ${param_type}{${member_name}};'
 
         template_params = {
-            'method_name': _title_case(field.name),
+            'method_name': common.title_case(field.name),
             'member_name': member_name,
             'optional_ampersand': optional_ampersand,
             'param_type': param_type,
         }
 
-        body = _template_format(body_template, template_params)
+        body = common.template_format(body_template, template_params)
 
         # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
         # optional types, and non-primitive types.
@@ -611,7 +403,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         member_name = _get_field_member_name(field)
 
         template_params = {
-            'method_name': _title_case(field.name),
+            'method_name': common.title_case(field.name),
             'member_name': member_name,
             'param_type': param_type,
         }
@@ -747,10 +539,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 class _CppSourceFileWriter(_CppFileWriterBase):
     """C++ .cpp File writer."""
 
-    def __init__(self, writer):
-        # type: (_IndentedTextWriter) -> None
+    def __init__(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
         """Create a C++ .cpp file code writer."""
-        super(_CppSourceFileWriter, self).__init__(writer)
+        super(_CppSourceFileWriter, self).__init__(indented_writer)
 
     def _gen_field_deserializer_expression(self, element_name, field):
         # type: (unicode, ast.Field) -> unicode
@@ -766,9 +558,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('IDLParserErrorContext tempContext("%s", &ctxt);' %
                                     (field.name))
             self._writer.write_line('const auto localObject = %s.Obj();' % (element_name))
-            return '%s::parse(tempContext, localObject);' % (_title_case(field.struct_type))
+            return '%s::parse(tempContext, localObject);' % (common.title_case(field.struct_type))
         elif 'BSONElement::' in field.deserializer:
-            method_name = _get_method_name(field.deserializer)
+            method_name = writer.get_method_name(field.deserializer)
             return '%s.%s()' % (element_name, method_name)
         else:
             # Custom method, call the method on object.
@@ -778,18 +570,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # Call a method like: Class::method(StringData value)
                 self._writer.write_line('auto tempValue = %s.valueStringData();' % (element_name))
 
-                method_name = _get_method_name(field.deserializer)
+                method_name = writer.get_method_name(field.deserializer)
 
                 return '%s(tempValue)' % (method_name)
             elif len(field.bson_serialization_type) == 1 and field.bson_serialization_type[
                     0] == 'object':
                 # Call a method like: Class::method(const BSONObj& value)
-                method_name = _get_method_name_from_qualified_method_name(field.deserializer)
+                method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
                 self._writer.write_line('const BSONObj localObject = %s.Obj();' % (element_name))
                 return '%s(localObject)' % (method_name)
             else:
                 # Call a method like: Class::method(const BSONElement& value)
-                method_name = _get_method_name_from_qualified_method_name(field.deserializer)
+                method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
 
                 return '%s(%s)' % (method_name, element_name)
 
@@ -822,6 +614,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._predicate('fieldNumber != expectedFieldNumber'):
                     self._writer.write_line('arrayCtxt.throwBadArrayFieldNumberSequence(' +
                                             'fieldNumber, expectedFieldNumber);')
+                self._writer.write_empty_line()
 
                 with self._predicate(_get_bson_type_check('arrayElement', 'arrayCtxt', field)):
                     array_value = self._gen_field_deserializer_expression('arrayElement', field)
@@ -853,10 +646,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the C++ deserializer method definition."""
 
         func_def = '%s %s::parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject)' % (
-            _title_case(struct.name), _title_case(struct.name))
+            common.title_case(struct.name), common.title_case(struct.name))
         with self._block('%s {' % (func_def), '}'):
 
-            self._writer.write_line('%s object;' % _title_case(struct.name))
+            self._writer.write_line('%s object;' % common.title_case(struct.name))
 
             field_usage_check = _FieldUsageChecker(self._writer)
             self._writer.write_empty_line()
@@ -903,7 +696,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the serialize method definition for a custom type."""
 
         # Generate custom serialization
-        method_name = _get_method_name(field.serializer)
+        method_name = writer.get_method_name(field.serializer)
 
         template_params = {
             'field_name': field.name,
@@ -967,7 +760,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the serialize method definition."""
 
         with self._block('void %s::serialize(BSONObjBuilder* builder) const {' %
-                         _title_case(struct.name), '}'):
+                         common.title_case(struct.name), '}'):
 
             for field in struct.fields:
                 # If fields are meant to be ignored during deserialization, there is not need to serialize them
@@ -1034,7 +827,7 @@ def _generate_header(spec, file_name):
     # type: (ast.IDLAST, unicode) -> None
     """Generate a C++ header."""
     stream = io.StringIO()
-    text_writer = _IndentedTextWriter(stream)
+    text_writer = writer.IndentedTextWriter(stream)
 
     header = _CppHeaderFileWriter(text_writer)
 
@@ -1049,7 +842,7 @@ def _generate_source(spec, file_name, header_file_name):
     # type: (ast.IDLAST, unicode, unicode) -> None
     """Generate a C++ source file."""
     stream = io.StringIO()
-    text_writer = _IndentedTextWriter(stream)
+    text_writer = writer.IndentedTextWriter(stream)
 
     source = _CppSourceFileWriter(text_writer)
 
