@@ -266,6 +266,8 @@ __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp)
 
 	WT_RET(__wt_malloc(session, len + 1, &p));
 
+	WT_ASSERT(session, p != NULL);		/* quiet clang scan-build */
+
 	/*
 	 * Don't change this to strncpy, we rely on this function to duplicate
 	 * "strings" that contain nul bytes.

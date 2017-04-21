@@ -471,6 +471,8 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
 {
 	WT_IKEY *ikey;
 
+	WT_ASSERT(session, key != NULL);	/* quiet clang scan-build */
+
 	/*
 	 * Allocate memory for the WT_IKEY structure and the key, then copy
 	 * the key into place.
