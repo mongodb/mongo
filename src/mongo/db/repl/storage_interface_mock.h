@@ -129,6 +129,9 @@ public:
     OpTime getMinValid(OperationContext* opCtx) const override;
     void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
+    StatusWith<int> getRollbackID(OperationContext* opCtx) override;
+    Status initializeRollbackID(OperationContext* opCtx) override;
+    Status incrementRollbackID(OperationContext* opCtx) override;
     void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) override;
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
@@ -215,7 +218,7 @@ public:
                       const NamespaceString& nss,
                       const BSONElement& idKey,
                       const BSONObj& update) override {
-        return Status{ErrorCodes::IllegalOperation, "upsertbyId not implemented."};
+        return Status{ErrorCodes::IllegalOperation, "upsertById not implemented."};
     }
 
     Status deleteByFilter(OperationContext* opCtx,
@@ -298,6 +301,8 @@ private:
     mutable stdx::mutex _minValidBoundariesMutex;
     OpTime _appliedThrough;
     OpTime _minValid;
+    int _rbid;
+    bool _rbidInitialized = false;
     Timestamp _oplogDeleteFromPoint;
 };
 

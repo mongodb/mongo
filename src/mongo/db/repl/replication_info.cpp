@@ -47,6 +47,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
@@ -168,7 +169,11 @@ public:
 
         BSONObjBuilder result;
         appendReplicationInfo(opCtx, result, level);
-        getGlobalReplicationCoordinator()->processReplSetGetRBID(&result);
+
+        auto rbid = StorageInterface::get(opCtx)->getRollbackID(opCtx);
+        if (rbid.isOK()) {
+            result.append("rbid", rbid.getValue());
+        }
 
         return result.obj();
     }

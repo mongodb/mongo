@@ -477,7 +477,6 @@ Status SyncSourceResolver::_finishCallback(StatusWith<HostAndPort> result) {
     SyncSourceResolverResponse response;
     response.syncSourceStatus = std::move(result);
     if (response.isOK() && !response.getSyncSource().empty()) {
-        invariant(_requiredOpTime.isNull() || _rbid);
         response.rbid = _rbid;
     }
     return _finishCallback(response);

@@ -135,6 +135,13 @@ public:
     virtual void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& endOpTime) = 0;
 
     /**
+     * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.
+     */
+    virtual StatusWith<int> getRollbackID(OperationContext* opCtx) = 0;
+    virtual Status initializeRollbackID(OperationContext* opCtx) = 0;
+    virtual Status incrementRollbackID(OperationContext* opCtx) = 0;
+
+    /**
      * On startup all oplog entries with a value >= the oplog delete from point should be deleted.
      * If null, no documents should be deleted.
      */

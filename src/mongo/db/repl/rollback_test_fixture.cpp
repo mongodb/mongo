@@ -76,6 +76,7 @@ void RollbackTest::setUp() {
     setOplogCollectionName();
     _storageInterface.setAppliedThrough(_opCtx.get(), OpTime{});
     _storageInterface.setMinValid(_opCtx.get(), OpTime{});
+    _storageInterface.initializeRollbackID(_opCtx.get());
 
     _threadPoolExecutorTest.launchExecutorThread();
 }
