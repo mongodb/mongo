@@ -126,6 +126,7 @@ class TestImport(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: int
+                    deserializer: BSONElement::fake
             """),
             "recurse2.idl":
                 textwrap.dedent("""
@@ -137,6 +138,7 @@ class TestImport(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: double
+                    deserializer: BSONElement::fake
             """),
             "recurse1b.idl":
                 textwrap.dedent("""
@@ -148,6 +150,7 @@ class TestImport(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: bool
+                    deserializer: BSONElement::fake
             """),
             "cycle1a.idl":
                 textwrap.dedent("""
@@ -187,6 +190,7 @@ class TestImport(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: bool
+                    deserializer: BSONElement::fake
 
             structs:
                 bar2:

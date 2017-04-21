@@ -148,15 +148,17 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
             if idl_type.deserializer is None:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")
-        elif bson_type == "object":
+        elif bson_type == "string":
+            # Strings support custom serialization unlike other non-object scalar types
             if idl_type.deserializer is None:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")
 
-            if idl_type.serializer is None:
+        elif not bson_type in ["object"]:
+            if idl_type.deserializer is None:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
-                                                          "serializer")
-        elif not bson_type == "string":
+                                                          "deserializer")
+
             if idl_type.deserializer is not None and "BSONElement" not in idl_type.deserializer:
                 ctxt.add_not_custom_scalar_serialization_not_supported_error(
                     idl_type, syntax_type, idl_type.name, bson_type)

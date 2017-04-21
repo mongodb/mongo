@@ -84,6 +84,12 @@ types:
 
 structs:
 
+    one_plain_object:
+        description: UnitTest for a single BSONObj
+        fields:
+            value: object
+
+
 ##################################################################################################
 #
 # Structs to test derived parsers
@@ -239,6 +245,9 @@ structs:
             field2:
                 type: int
                 optional: true
+            field3:
+                type: object
+                optional: true
 
 ##################################################################################################
 #
@@ -291,6 +300,8 @@ structs:
                 type: array<any_basic_type>
             field4:
                 type: array<object_basic_type>
+            field5:
+                type: array<object>
             field1o:
                 type: array<safeInt32>
                 optional: true
@@ -302,4 +313,7 @@ structs:
                 optional: true
             field4o:
                 type: array<object_basic_type>
+                optional: true
+            field5o:
+                type: array<object>
                 optional: true

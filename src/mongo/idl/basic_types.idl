@@ -66,6 +66,11 @@ types:
         cpp_type: "mongo::OID"
         deserializer: "mongo::BSONElement::OID"
 
+    object:
+        bson_serialization_type: object
+        description: "A BSONObj without custom deserialization or serialization"
+        cpp_type: "mongo::BSONObj"
+
     date:
         bson_serialization_type: date
         description: "A BSON UTC DateTime"
