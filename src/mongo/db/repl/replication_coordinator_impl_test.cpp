@@ -190,7 +190,7 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     startCapturingLogMessages();
     start();
     stopCapturingLogMessages();
-    ASSERT_EQUALS(2, countLogLinesContaining("Did not find local "));
+    ASSERT_EQUALS(3, countLogLinesContaining("Did not find local "));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
@@ -581,19 +581,6 @@ TEST_F(ReplCoordTest, NodeReturnsOkWhenCheckReplEnabledForCommandAfterReceivingA
     Status status = getReplCoord()->checkReplEnabledForCommand(&result);
     ASSERT_EQUALS(status, Status::OK());
     ASSERT_TRUE(result.obj().isEmpty());
-}
-
-TEST_F(ReplCoordTest, RollBackIDShouldIncreaseByOneWhenIncrementRollbackIDIsCalled) {
-    start();
-    BSONObjBuilder result;
-    getReplCoord()->processReplSetGetRBID(&result);
-    long long initialValue = result.obj()["rbid"].Int();
-    getReplCoord()->incrementRollbackID();
-
-    BSONObjBuilder result2;
-    getReplCoord()->processReplSetGetRBID(&result2);
-    long long incrementedValue = result2.obj()["rbid"].Int();
-    ASSERT_EQUALS(incrementedValue, initialValue + 1);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstAStandaloneNode) {
@@ -4075,13 +4062,11 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     getReplCoord()->advanceCommitPoint(optime1);
     getReplCoord()->setMyLastAppliedOpTime(optime2);
 
-    // Get current rbid to check against.
-    BSONObjBuilder result;
-    getReplCoord()->processReplSetGetRBID(&result);
-    int initialValue = result.obj()["rbid"].Int();
+    auto opCtx = makeOperationContext();
 
     BSONObjBuilder metadataBob;
     getReplCoord()->prepareReplMetadata(
+        opCtx.get(),
         BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
         OpTime(),
         &metadataBob);
@@ -4093,7 +4078,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     ASSERT_OK(oqMetadata.getStatus());
     ASSERT_EQ(oqMetadata.getValue().getLastOpCommitted(), optime1);
     ASSERT_EQ(oqMetadata.getValue().getLastOpApplied(), optime2);
-    ASSERT_EQ(oqMetadata.getValue().getRBID(), initialValue);
+    ASSERT_EQ(oqMetadata.getValue().getRBID(), 100);
     ASSERT_EQ(oqMetadata.getValue().getSyncSourceIndex(), -1);
     ASSERT_EQ(oqMetadata.getValue().getPrimaryIndex(), -1);
 

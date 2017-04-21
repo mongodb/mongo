@@ -69,6 +69,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
@@ -83,6 +84,9 @@ const char StorageInterfaceImpl::kDefaultMinValidNamespace[] = "local.replset.mi
 const char StorageInterfaceImpl::kInitialSyncFlagFieldName[] = "doingInitialSync";
 const char StorageInterfaceImpl::kBeginFieldName[] = "begin";
 const char StorageInterfaceImpl::kOplogDeleteFromPointFieldName[] = "oplogDeleteFromPoint";
+const char StorageInterfaceImpl::kDefaultRollbackIdNamespace[] = "local.system.rollback.id";
+const char StorageInterfaceImpl::kRollbackIdFieldName[] = "rollbackId";
+const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
 
 namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
@@ -97,7 +101,8 @@ StorageInterfaceImpl::StorageInterfaceImpl()
     : StorageInterfaceImpl(NamespaceString(StorageInterfaceImpl::kDefaultMinValidNamespace)) {}
 
 StorageInterfaceImpl::StorageInterfaceImpl(const NamespaceString& minValidNss)
-    : _minValidNss(minValidNss) {}
+    : _minValidNss(minValidNss),
+      _rollbackIdNss(StorageInterfaceImpl::kDefaultRollbackIdNamespace) {}
 
 NamespaceString StorageInterfaceImpl::getMinValidNss() const {
     return _minValidNss;
@@ -127,6 +132,73 @@ void StorageInterfaceImpl::updateMinValidDocument(OperationContext* opCtx,
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
         opCtx, "StorageInterfaceImpl::updateMinValidDocument", _minValidNss.ns());
+}
+
+StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
+    BSONObjBuilder bob;
+    bob.append("_id", kRollbackIdDocumentId);
+    auto id = bob.obj();
+
+    try {
+        auto rbidDoc = findById(opCtx, _rollbackIdNss, id["_id"]);
+        if (!rbidDoc.isOK()) {
+            return rbidDoc.getStatus();
+        }
+
+        auto rbid = RollbackID::parse(IDLParserErrorContext("RollbackID"), rbidDoc.getValue());
+        invariant(rbid.get_id() == kRollbackIdDocumentId);
+        return rbid.getRollbackId();
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+Status StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
+    auto status = createCollection(opCtx, _rollbackIdNss, CollectionOptions());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    RollbackID rbid;
+    rbid.set_id(kRollbackIdDocumentId);
+    rbid.setRollbackId(0);
+
+    BSONObjBuilder bob;
+    rbid.serialize(&bob);
+    return insertDocument(opCtx, _rollbackIdNss, bob.done());
+}
+
+Status StorageInterfaceImpl::incrementRollbackID(OperationContext* opCtx) {
+    // This is safe because this is only called during rollback, and you can not have two
+    // rollbacks at once.
+    auto rbid = getRollbackID(opCtx);
+    if (!rbid.isOK()) {
+        return rbid.getStatus();
+    }
+
+    // If we would go over the integer limit, reset the Rollback ID to 0.
+    BSONObjBuilder updateBob;
+    if (rbid.getValue() == std::numeric_limits<int>::max()) {
+        BSONObjBuilder setBob(updateBob.subobjStart("$set"));
+        setBob.append(kRollbackIdFieldName, 0);
+    } else {
+        BSONObjBuilder incBob(updateBob.subobjStart("$inc"));
+        incBob.append(kRollbackIdFieldName, 1);
+    }
+
+    // Since the Rollback ID is in a singleton collection, we can fix the _id field.
+    BSONObjBuilder bob;
+    bob.append("_id", kRollbackIdDocumentId);
+    auto id = bob.obj();
+    Status status = upsertById(opCtx, _rollbackIdNss, id["_id"], updateBob.obj());
+
+    // We wait until durable so that we are sure the Rollback ID is updated before rollback ends.
+    if (status.isOK()) {
+        opCtx->recoveryUnit()->waitUntilDurable();
+    }
+    return status;
 }
 
 bool StorageInterfaceImpl::getInitialSyncFlag(OperationContext* opCtx) const {

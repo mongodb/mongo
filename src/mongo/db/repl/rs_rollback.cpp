@@ -826,7 +826,10 @@ Status _syncRollback(OperationContext* opCtx,
     log() << "rollback common point is " << how.commonPoint;
     log() << "rollback 3 fixup";
     try {
-        ON_BLOCK_EXIT([&] { replCoord->incrementRollbackID(); });
+        ON_BLOCK_EXIT([&] {
+            auto status = storageInterface->incrementRollbackID(opCtx);
+            fassertStatusOK(40425, status);
+        });
         syncFixUp(opCtx, how, rollbackSource, replCoord, storageInterface);
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what(), 18753);

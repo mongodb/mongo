@@ -134,6 +134,17 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='rollback_idl',
+    source=[
+        env.Idlc('rollback.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='storage_interface',
     source=[
         'storage_interface.cpp',
@@ -152,6 +163,7 @@ env.Library(
         'collection_bulk_loader_impl.cpp',
     ],
     LIBDEPS=[
+        'rollback_idl',
         'storage_interface',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/exec/exec',

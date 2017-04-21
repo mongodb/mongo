@@ -233,10 +233,6 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj) override;
 
-    virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj) override;
-
-    virtual void incrementRollbackID() override;
-
     virtual Status processReplSetFresh(const ReplSetFreshArgs& args,
                                        BSONObjBuilder* resultObj) override;
 
@@ -281,7 +277,8 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response) override;
 
-    virtual void prepareReplMetadata(const BSONObj& metadataRequestObj,
+    virtual void prepareReplMetadata(OperationContext* opCtx,
+                                     const BSONObj& metadataRequestObj,
                                      const OpTime& lastOpTimeFromClient,
                                      BSONObjBuilder* builder) const override;
 
@@ -1112,7 +1109,7 @@ private:
     /**
      * Prepares a metadata object for OplogQueryMetadata.
      */
-    void _prepareOplogQueryMetadata_inlock(BSONObjBuilder* builder) const;
+    void _prepareOplogQueryMetadata_inlock(int rbid, BSONObjBuilder* builder) const;
 
     /**
      * Blesses a snapshot to be used for new committed reads.
@@ -1305,10 +1302,6 @@ private:
     // Our RID, used to identify us to our sync source when sending replication progress
     // updates upstream.  Set once in startReplication() and then never modified again.
     OID _myRID;  // (M)
-
-    // Rollback ID. Used to check if a rollback happened during some interval of time
-    // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
-    int _rbid;  // (M)
 
     // list of information about clients waiting on replication.  Does *not* own the WaiterInfos.
     WaiterList _replicationWaiterList;  // (M)
