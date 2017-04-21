@@ -1,81 +1,86 @@
 // Test update modifier uassert during initial sync. SERVER-4781
 
-load("jstests/replsets/rslib.js");
-basename = "jstests_initsync4";
+(function doTest() {
+    "use strict";
 
-print("1. Bring up set");
-replTest = new ReplSetTest({name: basename, nodes: 1});
-replTest.startSet();
-replTest.initiate();
+    load("jstests/replsets/rslib.js");
+    var basename = "jstests_initsync4";
 
-m = replTest.getPrimary();
-md = m.getDB("d");
-mc = m.getDB("d")["c"];
+    jsTestLog("1. Bring up set");
+    var replTest = new ReplSetTest({name: basename, nodes: 1});
+    replTest.startSet();
+    replTest.initiate();
 
-print("2. Insert some data");
-N = 5000;
-mc.ensureIndex({x: 1});
-var bulk = mc.initializeUnorderedBulkOp();
-for (i = 0; i < N; ++i) {
-    bulk.insert({_id: i, x: i, a: {}});
-}
-assert.writeOK(bulk.execute());
+    var m = replTest.getPrimary();
+    var md = m.getDB("d");
+    var mc = m.getDB("d")["c"];
 
-print("3. Make sure synced");
-replTest.awaitReplication();
+    jsTestLog("2. Insert some data");
+    var N = 5000;
+    mc.ensureIndex({x: 1});
+    var bulk = mc.initializeUnorderedBulkOp();
+    for (var i = 0; i < N; ++i) {
+        bulk.insert({_id: i, x: i, a: {}});
+    }
+    assert.writeOK(bulk.execute());
 
-print("4. Bring up a new node");
-hostname = getHostName();
+    jsTestLog("3. Make sure synced");
+    replTest.awaitReplication();
 
-s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
+    jsTestLog("4. Bring up a new node");
+    var hostname = getHostName();
 
-var config = replTest.getReplSetConfig();
-config.version = replTest.getReplSetConfigFromNode().version + 1;
-config.members.push({_id: 2, host: hostname + ":" + s.port});
-try {
-    m.getDB("admin").runCommand({replSetReconfig: config});
-} catch (e) {
-    print(e);
-}
-reconnect(s);
+    var s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
 
-print("5. Wait for new node to start cloning");
+    var config = replTest.getReplSetConfig();
+    config.version = replTest.getReplSetConfigFromNode().version + 1;
+    config.members.push({_id: 2, host: hostname + ":" + s.port, priority: 0});
+    try {
+        m.getDB("admin").runCommand({replSetReconfig: config});
+    } catch (e) {
+        print(e);
+    }
+    reconnect(s);
+    assert.eq(m, replTest.getPrimary(), "Primary changed after reconfig");
 
-s.setSlaveOk();
-sc = s.getDB("d")["c"];
+    jsTestLog("5. Wait for new node to start cloning");
 
-wait(function() {
-    printjson(sc.stats());
-    return sc.stats().count > 0;
-});
+    s.setSlaveOk();
+    var sc = s.getDB("d")["c"];
 
-print("6. Start updating documents on primary");
-for (i = N - 1; i >= N - 10000; --i) {
-    // If the document is cloned as {a:1}, the {$set:{'a.b':1}} modifier will uassert.
-    mc.update({_id: i}, {$set: {'a.b': 1}});
-    mc.update({_id: i}, {$set: {a: 1}});
-}
+    wait(function() {
+        printjson(sc.stats());
+        return sc.stats().count > 0;
+    });
 
-for (i = N; i < N * 2; i++) {
-    mc.insert({_id: i, x: i});
-}
+    jsTestLog("6. Start updating documents on primary");
+    for (i = N - 1; i >= N - 10000; --i) {
+        // If the document is cloned as {a:1}, the {$set:{'a.b':1}} modifier will uassert.
+        mc.update({_id: i}, {$set: {'a.b': 1}});
+        mc.update({_id: i}, {$set: {a: 1}});
+    }
 
-assert.eq(N * 2, mc.find().itcount());
+    for (i = N; i < N * 2; i++) {
+        mc.insert({_id: i, x: i});
+    }
 
-print("7. Wait for new node to become SECONDARY");
-wait(function() {
-    var status = s.getDB("admin").runCommand({replSetGetStatus: 1});
-    printjson(status);
-    return status.members && (status.members[1].state == 2);
-});
+    assert.eq(N * 2, mc.find().itcount());
 
-print("8. Wait for new node to have all the data");
-wait(function() {
-    return sc.find().itcount() == mc.find().itcount();
-});
+    jsTestLog("7. Wait for new node to become SECONDARY");
+    wait(function() {
+        var status = s.getDB("admin").runCommand({replSetGetStatus: 1});
+        printjson(status);
+        return status.members && (status.members[1].state == 2);
+    });
 
-assert.eq(mc.getIndexKeys().length, sc.getIndexKeys().length);
+    jsTestLog("8. Wait for new node to have all the data");
+    wait(function() {
+        return sc.find().itcount() == mc.find().itcount();
+    });
 
-assert.eq(mc.find().sort({x: 1}).itcount(), sc.find().sort({x: 1}).itcount());
+    assert.eq(mc.getIndexKeys().length, sc.getIndexKeys().length);
 
-replTest.stopSet(15);
+    assert.eq(mc.find().sort({x: 1}).itcount(), sc.find().sort({x: 1}).itcount());
+
+    replTest.stopSet(15);
+}());
