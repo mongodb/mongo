@@ -401,7 +401,6 @@ env.Library('repl_coordinator_impl',
                 'check_quorum_for_config_change.cpp',
                 'elect_cmd_runner.cpp',
                 'freshness_checker.cpp',
-                'freshness_scanner.cpp',
                 'repl_client_info.cpp',
                 'repl_set_config_checks.cpp',
                 'replication_coordinator_impl.cpp',
@@ -1125,22 +1124,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'oplog_interface_mock',
         'roll_back_local_operations',
-    ],
-)
-
-
-env.CppUnitTest(
-    target='freshness_scanner_test',
-    source=[
-        'freshness_scanner_test.cpp',
-    ],
-    LIBDEPS=[
-        'repl_coordinator_impl',
-        'replica_set_messages',
-        'replmocks',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/commands_test_crutch',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )
 
