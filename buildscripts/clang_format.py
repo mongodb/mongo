@@ -579,10 +579,10 @@ def _format_files(clang_format, files):
         print("ERROR: failed to format files")
         sys.exit(1)
 
-def format_func(clang_format, glob):
+def format_func(clang_format):
     """Format files command entry point
     """
-    files = get_files_to_check(glob)
+    files = get_files_to_check()
 
     _format_files(clang_format, files)
 
@@ -609,7 +609,7 @@ def main():
         elif command == "lint-patch":
             lint_patch(options.clang_format, args[2:])
         elif command == "format":
-            format_func(options.clang_format, args[2:])
+            format_func(options.clang_format)
         else:
             usage()
     else:
