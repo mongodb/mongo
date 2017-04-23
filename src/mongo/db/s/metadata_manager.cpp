@@ -224,6 +224,8 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
 
         _receivingChunks.clear();
         _rangesToClean.clear(Status::OK());
+        _metadataInUse.clear();
+        _setActiveMetadata_inlock(std::move(remoteMetadata));
         return;
     }
 
