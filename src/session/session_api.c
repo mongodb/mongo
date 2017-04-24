@@ -1185,8 +1185,11 @@ __wt_session_range_truncate(WT_SESSION_IMPL *session,
 	 * data structures can move through pages faster forward than backward.
 	 * If we don't have a start cursor, create one and position it at the
 	 * first record.
+	 *
+	 * If start is NULL, stop must not be NULL, but static analyzers have
+	 * a hard time with that, test explicitly.
 	 */
-	if (start == NULL) {
+	if (start == NULL && stop != NULL) {
 		WT_ERR(__session_open_cursor(
 		    (WT_SESSION *)session, stop->uri, NULL, NULL, &start));
 		local_start = true;
