@@ -32,6 +32,7 @@
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback.h"
+#include "mongo/db/repl/rollback_common_point_resolver.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
@@ -73,6 +74,11 @@ class StorageInterface;
  */
 class RollbackImpl : public AbstractAsyncComponent, public Rollback {
 public:
+    /**
+     * Implementation of RollbackCommonPointResolver::Listener used by this class.
+     */
+    class Listener;
+
     /**
      * This constructor is used to create a RollbackImpl instance that will run the entire
      * rollback algorithm. This is called during steady state replication when we determine that we

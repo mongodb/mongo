@@ -413,11 +413,13 @@ env.Library(
     target='rollback_impl',
     source=[
         'rollback_impl.cpp',
+        'rollback_impl_listener.cpp',
     ],
     LIBDEPS=[
         'abstract_async_component',
         'optime',
         'repl_coordinator_interface',
+        'rollback_common_point_resolver',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/db/service_context',
@@ -437,6 +439,17 @@ env.CppUnitTest(
         'rollback_test_fixture',
         'task_executor_mock',
         '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='rollback_impl_listener_test',
+    source=[
+        'rollback_impl_listener_test.cpp',
+    ],
+    LIBDEPS=[
+        'rollback_impl',
+        'rollback_test_fixture',
     ],
 )
 
