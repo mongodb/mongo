@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -52,14 +53,16 @@ class RemoteCommandTargeter;
 class Shard {
 public:
     struct CommandResponse {
-        CommandResponse(BSONObj _response,
-                        BSONObj _metadata,
-                        Status _commandStatus,
-                        Status _writeConcernStatus)
-            : response(std::move(_response)),
-              metadata(std::move(_metadata)),
-              commandStatus(std::move(_commandStatus)),
-              writeConcernStatus(std::move(_writeConcernStatus)) {}
+        CommandResponse(boost::optional<HostAndPort> hostAndPort,
+                        BSONObj response,
+                        BSONObj metadata,
+                        Status commandStatus,
+                        Status writeConcernStatus)
+            : hostAndPort(std::move(hostAndPort)),
+              response(std::move(response)),
+              metadata(std::move(metadata)),
+              commandStatus(std::move(commandStatus)),
+              writeConcernStatus(std::move(writeConcernStatus)) {}
 
         /**
          * Takes the response from running a batch write command and writes the appropriate response
@@ -68,6 +71,7 @@ public:
         static Status processBatchWriteResponse(StatusWith<CommandResponse> response,
                                                 BatchedCommandResponse* batchResponse);
 
+        boost::optional<HostAndPort> hostAndPort;
         BSONObj response;
         BSONObj metadata;
         Status commandStatus;
@@ -232,15 +236,6 @@ public:
     static bool shouldErrorBePropagated(ErrorCodes::Error code);
 
 protected:
-    struct HostWithResponse {
-        HostWithResponse(boost::optional<HostAndPort> _host,
-                         StatusWith<CommandResponse> _commandResponse)
-            : host(std::move(_host)), commandResponse(std::move(_commandResponse)) {}
-
-        boost::optional<HostAndPort> host;
-        StatusWith<CommandResponse> commandResponse;
-    };
-
     Shard(const ShardId& id);
 
 private:
@@ -252,11 +247,11 @@ private:
      *
      * NOTE: LocalShard implementation will not return a valid host and so should be ignored.
      */
-    virtual HostWithResponse _runCommand(OperationContext* opCtx,
-                                         const ReadPreferenceSetting& readPref,
-                                         const std::string& dbname,
-                                         Milliseconds maxTimeMSOverride,
-                                         const BSONObj& cmdObj) = 0;
+    virtual StatusWith<CommandResponse> _runCommand(OperationContext* opCtx,
+                                                    const ReadPreferenceSetting& readPref,
+                                                    const std::string& dbname,
+                                                    Milliseconds maxTimeMSOverride,
+                                                    const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

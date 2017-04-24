@@ -115,11 +115,11 @@ repl::OpTime ShardLocal::_getLastOpTime() {
     return _lastOpTime;
 }
 
-Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* opCtx,
-                                                const ReadPreferenceSetting& unused,
-                                                const std::string& dbName,
-                                                Milliseconds maxTimeMSOverrideUnused,
-                                                const BSONObj& cmdObj) {
+StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,
+                                                           const ReadPreferenceSetting& unused,
+                                                           const std::string& dbName,
+                                                           Milliseconds maxTimeMSOverrideUnused,
+                                                           const BSONObj& cmdObj) {
     repl::OpTime currentOpTimeFromClient =
         repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     ON_BLOCK_EXIT([this, &opCtx, &currentOpTimeFromClient] {
@@ -128,21 +128,18 @@ Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* opCtx,
 
     try {
         DBDirectClient client(opCtx);
+
         rpc::UniqueReply commandResponse = client.runCommandWithMetadata(
             dbName, cmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), cmdObj);
-        BSONObj responseReply = commandResponse->getCommandReply().getOwned();
-        BSONObj responseMetadata = commandResponse->getMetadata().getOwned();
 
-        Status commandStatus = getStatusFromCommandResult(responseReply);
-        Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseReply);
-
-        return Shard::HostWithResponse(boost::none,
-                                       Shard::CommandResponse{std::move(responseReply),
-                                                              std::move(responseMetadata),
-                                                              std::move(commandStatus),
-                                                              std::move(writeConcernStatus)});
+        auto result = commandResponse->getCommandReply().getOwned();
+        return Shard::CommandResponse(boost::none,
+                                      result,
+                                      commandResponse->getMetadata().getOwned(),
+                                      getStatusFromCommandResult(result),
+                                      getWriteConcernStatusFromCommandResult(result));
     } catch (const DBException& ex) {
-        return Shard::HostWithResponse(boost::none, ex.toStatus());
+        return ex.toStatus();
     }
 }
 

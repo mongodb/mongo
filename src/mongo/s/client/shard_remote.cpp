@@ -175,69 +175,67 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
     return builder.obj();
 }
 
-Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* opCtx,
-                                                 const ReadPreferenceSetting& readPref,
-                                                 const string& dbName,
-                                                 Milliseconds maxTimeMSOverride,
-                                                 const BSONObj& cmdObj) {
+StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* opCtx,
+                                                            const ReadPreferenceSetting& readPref,
+                                                            const string& dbName,
+                                                            Milliseconds maxTimeMSOverride,
+                                                            const BSONObj& cmdObj) {
 
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
     if (getId() == "config") {
         readPrefWithMinOpTime.minOpTime = grid.configOpTime();
     }
-    const auto host = _targeter->findHost(opCtx, readPrefWithMinOpTime);
-    if (!host.isOK()) {
-        return Shard::HostWithResponse(boost::none, host.getStatus());
+    const auto swHost = _targeter->findHost(opCtx, readPrefWithMinOpTime);
+    if (!swHost.isOK()) {
+        return swHost.getStatus();
     }
+    const auto host = std::move(swHost.getValue());
 
     const Milliseconds requestTimeout =
         std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
 
     const RemoteCommandRequest request(
-        host.getValue(),
+        host,
         dbName,
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
         _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
         opCtx,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 
-    RemoteCommandResponse swResponse =
+    RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
     TaskExecutor* executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto callStatus = executor->scheduleRemoteCommand(
-        request,
-        [&swResponse](const RemoteCommandCallbackArgs& args) { swResponse = args.response; });
-    if (!callStatus.isOK()) {
-        return Shard::HostWithResponse(host.getValue(), callStatus.getStatus());
+    auto swCallbackHandle = executor->scheduleRemoteCommand(
+        request, [&response](const RemoteCommandCallbackArgs& args) { response = args.response; });
+    if (!swCallbackHandle.isOK()) {
+        return swCallbackHandle.getStatus();
     }
 
     // Block until the command is carried out
-    executor->wait(callStatus.getValue());
+    executor->wait(swCallbackHandle.getValue());
 
-    updateReplSetMonitor(host.getValue(), swResponse.status);
+    updateReplSetMonitor(host, response.status);
 
-    if (!swResponse.isOK()) {
-        if (swResponse.status.compareCode(ErrorCodes::ExceededTimeLimit)) {
-            LOG(0) << "Operation timed out with status " << redact(swResponse.status);
+    if (!response.status.isOK()) {
+        if (response.status == ErrorCodes::ExceededTimeLimit) {
+            LOG(0) << "Operation timed out with status " << redact(response.status);
         }
-        return Shard::HostWithResponse(host.getValue(), swResponse.status);
+        return response.status;
     }
 
-    BSONObj responseObj = swResponse.data.getOwned();
-    BSONObj responseMetadata = swResponse.metadata.getOwned();
-    Status commandStatus = getStatusFromCommandResult(responseObj);
-    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
+    auto result = response.data.getOwned();
+    auto commandStatus = getStatusFromCommandResult(result);
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
 
-    // Tell the replica set monitor of any errors
-    updateReplSetMonitor(host.getValue(), commandStatus);
-    updateReplSetMonitor(host.getValue(), writeConcernStatus);
+    updateReplSetMonitor(host, commandStatus);
+    updateReplSetMonitor(host, writeConcernStatus);
 
-    return Shard::HostWithResponse(host.getValue(),
-                                   CommandResponse(std::move(responseObj),
-                                                   std::move(responseMetadata),
-                                                   std::move(commandStatus),
-                                                   std::move(writeConcernStatus)));
+    return Shard::CommandResponse(std::move(host),
+                                  std::move(result),
+                                  response.metadata.getOwned(),
+                                  std::move(commandStatus),
+                                  std::move(writeConcernStatus));
 }
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
