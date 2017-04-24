@@ -87,16 +87,28 @@ BSONElementIterator::BSONElementIterator() {
     _path = NULL;
 }
 
-BSONElementIterator::BSONElementIterator(const ElementPath* path, const BSONObj& context)
-    : _path(path), _context(context) {
-    _state = BEGIN;
+BSONElementIterator::BSONElementIterator(const ElementPath* path,
+                                         size_t suffixIndex,
+                                         BSONElement elementToIterate)
+    : _path(path), _state(BEGIN) {
+    _setTraversalStart(suffixIndex, elementToIterate);
+}
+
+BSONElementIterator::BSONElementIterator(const ElementPath* path, const BSONObj& objectToIterate)
+    : _path(path), _state(BEGIN) {
+    _traversalStart =
+        getFieldDottedOrArray(objectToIterate, _path->fieldRef(), &_traversalStartIndex);
 }
 
 BSONElementIterator::~BSONElementIterator() {}
 
-void BSONElementIterator::reset(const ElementPath* path, const BSONObj& context) {
+void BSONElementIterator::reset(const ElementPath* path,
+                                size_t suffixIndex,
+                                BSONElement elementToIterate) {
     _path = path;
-    _context = context;
+    _traversalStartIndex = 0;
+    _traversalStart = BSONElement();
+    _setTraversalStart(suffixIndex, elementToIterate);
     _state = BEGIN;
     _next.reset();
 
@@ -104,6 +116,32 @@ void BSONElementIterator::reset(const ElementPath* path, const BSONObj& context)
     _subCursorPath.reset();
 }
 
+void BSONElementIterator::reset(const ElementPath* path, const BSONObj& objectToIterate) {
+    _path = path;
+    _traversalStartIndex = 0;
+    _traversalStart =
+        getFieldDottedOrArray(objectToIterate, _path->fieldRef(), &_traversalStartIndex);
+    _state = BEGIN;
+    _next.reset();
+
+    _subCursor.reset();
+    _subCursorPath.reset();
+}
+
+void BSONElementIterator::_setTraversalStart(size_t suffixIndex, BSONElement elementToIterate) {
+    invariant(_path->fieldRef().numParts() >= suffixIndex);
+
+    if (suffixIndex == _path->fieldRef().numParts()) {
+        _traversalStart = elementToIterate;
+    } else {
+        if (elementToIterate.type() == BSONType::Object) {
+            _traversalStart = getFieldDottedOrArray(
+                elementToIterate.Obj(), _path->fieldRef(), &_traversalStartIndex, suffixIndex);
+        } else if (elementToIterate.type() == BSONType::Array) {
+            _traversalStart = elementToIterate;
+        }
+    }
+}
 
 void BSONElementIterator::ArrayIterationState::reset(const FieldRef& ref, int start) {
     restOfPath = ref.dottedField(start).toString();
@@ -190,18 +228,15 @@ bool BSONElementIterator::more() {
     }
 
     if (_state == BEGIN) {
-        size_t idxPath = 0;
-        BSONElement e = getFieldDottedOrArray(_context, _path->fieldRef(), &idxPath);
-
-        if (e.type() != Array) {
-            _next.reset(e, BSONElement(), false);
+        if (_traversalStart.type() != Array) {
+            _next.reset(_traversalStart, BSONElement(), false);
             _state = DONE;
             return true;
         }
 
         // It's an array.
 
-        _arrayIterationState.reset(_path->fieldRef(), idxPath + 1);
+        _arrayIterationState.reset(_path->fieldRef(), _traversalStartIndex + 1);
 
         if (_arrayIterationState.hasMore && !_path->shouldTraverseNonleafArrays()) {
             // Don't allow traversing the array.
@@ -209,12 +244,12 @@ bool BSONElementIterator::more() {
             return false;
         } else if (!_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray()) {
             // Return the leaf array.
-            _next.reset(e, BSONElement(), true);
+            _next.reset(_traversalStart, BSONElement(), true);
             _state = DONE;
             return true;
         }
 
-        _arrayIterationState.startIterator(e);
+        _arrayIterationState.startIterator(_traversalStart);
         _state = IN_ARRAY;
 
         invariant(_next.element().eoo());
