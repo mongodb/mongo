@@ -64,6 +64,8 @@ public:
 
     class Listener {
     public:
+        virtual ~Listener() = default;
+
         /**
          *  Function called to process each local oplog entry. Accepts an oplog entry as
          *  a BSONObj and returns a status on error.
@@ -92,7 +94,7 @@ public:
                                 HostAndPort source,
                                 NamespaceString nss,
                                 std::size_t maxFetcherRestarts,
-                                const OplogInterface& localOplog,
+                                OplogInterface* localOplog,
                                 Listener* listener,
                                 OnShutdownCallbackFn onShutdownCallbackFn);
 
@@ -118,7 +120,7 @@ private:
     const BSONObj _metadataObject;
 
     // An iterator to traverse the local oplog backwards.
-    const OplogInterface& _localOplog;
+    OplogInterface* _localOplog;
     std::unique_ptr<OplogInterface::Iterator> _localOplogIterator;
 
     // A listener with functions to call with each local and each remote oplog entry and

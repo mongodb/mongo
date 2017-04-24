@@ -85,7 +85,7 @@ RollbackCommonPointResolver::RollbackCommonPointResolver(executor::TaskExecutor*
                                                          HostAndPort source,
                                                          NamespaceString nss,
                                                          std::size_t maxFetcherRestarts,
-                                                         const OplogInterface& localOplog,
+                                                         OplogInterface* localOplog,
                                                          Listener* listener,
                                                          OnShutdownCallbackFn onShutdownCallbackFn)
     : AbstractOplogFetcher(
@@ -100,6 +100,7 @@ RollbackCommonPointResolver::RollbackCommonPointResolver(executor::TaskExecutor*
       _localOplog(localOplog),
       _listener(listener) {
 
+    invariant(_localOplog);
     invariant(listener);
 }
 
@@ -111,7 +112,7 @@ RollbackCommonPointResolver::~RollbackCommonPointResolver() {
 Status RollbackCommonPointResolver::_doStartup_inlock() noexcept {
     Status abstractStartupStatus = AbstractOplogFetcher::_doStartup_inlock();
     if (abstractStartupStatus.isOK()) {
-        _localOplogIterator = _localOplog.makeIterator();
+        _localOplogIterator = _localOplog->makeIterator();
     }
     return abstractStartupStatus;
 }

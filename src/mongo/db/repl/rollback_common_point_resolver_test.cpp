@@ -111,12 +111,12 @@ protected:
      */
     std::unique_ptr<ShutdownState> processSingleBatch(
         RemoteCommandResponse response,
-        const OplogInterfaceMock& localOplog,
+        OplogInterfaceMock* localOplog,
         RollbackCommonPointResolver::Listener* listener);
 
     std::unique_ptr<ShutdownState> processSingleBatch(
         const BSONObj& obj,
-        const OplogInterfaceMock& localOplog,
+        OplogInterfaceMock* localOplog,
         RollbackCommonPointResolver::Listener* listener);
 
     /**
@@ -126,12 +126,12 @@ protected:
     std::unique_ptr<ShutdownState> processThreeBatches(RemoteCommandResponse response1,
                                                        RemoteCommandResponse response2,
                                                        RemoteCommandResponse response3,
-                                                       const OplogInterfaceMock& localOplog);
+                                                       OplogInterfaceMock* localOplog);
 
     std::unique_ptr<ShutdownState> processThreeBatches(const BSONObj& response1,
                                                        const BSONObj& response2,
                                                        const BSONObj& response3,
-                                                       const OplogInterfaceMock& localOplog);
+                                                       OplogInterfaceMock* localOplog);
 
     /**
      * Creates a cursor batch using the oplog entries from 'startIdx' to 'endIdx' (exclusive)
@@ -169,7 +169,7 @@ NamespaceString nss("local.oplog.rs");
 
 std::unique_ptr<ShutdownState> RollbackCommonPointResolverTest::processSingleBatch(
     RemoteCommandResponse response,
-    const OplogInterfaceMock& oplog,
+    OplogInterfaceMock* oplog,
     RollbackCommonPointResolver::Listener* listener) {
     auto shutdownState = stdx::make_unique<ShutdownState>();
     RollbackCommonPointResolver rollbackCommonPointResolver(
@@ -196,7 +196,7 @@ std::unique_ptr<ShutdownState> RollbackCommonPointResolverTest::processSingleBat
 
 std::unique_ptr<ShutdownState> RollbackCommonPointResolverTest::processSingleBatch(
     const BSONObj& obj,
-    const OplogInterfaceMock& localOplog,
+    OplogInterfaceMock* localOplog,
     RollbackCommonPointResolver::Listener* listener) {
     return processSingleBatch(
         {obj, rpc::makeEmptyMetadata(), Milliseconds(0)}, localOplog, listener);
@@ -286,7 +286,7 @@ TEST_F(RollbackCommonPointResolverTest, FindQueryContainsCorrectFields) {
                           false);
 
     RollbackCommonPointResolver rollbackCommonPointResolver(
-        &getExecutor(), source, nss, 0, oplog, &listener, [](Status) {});
+        &getExecutor(), source, nss, 0, &oplog, &listener, [](Status) {});
 
     auto cmdObj = rollbackCommonPointResolver.getFindQuery_forTest();
     ASSERT_EQUALS(mongo::BSONType::Object, cmdObj["filter"].type());
@@ -307,7 +307,7 @@ TEST_F(RollbackCommonPointResolverTest,
                           false);
 
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 
     ASSERT(remoteOplogEntriesProcessed.empty());
@@ -326,7 +326,7 @@ TEST_F(RollbackCommonPointResolverTest,
                           false);
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 
     ASSERT(remoteOplogEntriesProcessed.empty());
@@ -347,7 +347,7 @@ TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFindsCommonPointWithI
                           false,
                           false);
 
-    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                   ->getStatus());
     ASSERT_EQUALS(commonPoint.first, time);
     ASSERT_EQUALS(commonPoint.second, commonPointOp.second);
@@ -368,7 +368,7 @@ TEST_F(RollbackCommonPointResolverTest,
                           false);
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 }
 
@@ -384,7 +384,7 @@ TEST_F(RollbackCommonPointResolverTest,
                           false);
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 }
 
@@ -400,7 +400,7 @@ TEST_F(RollbackCommonPointResolverTest,
                           false);
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 }
 
@@ -420,7 +420,7 @@ TEST_F(RollbackCommonPointResolverTest,
                           true);
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 }
 
@@ -443,7 +443,7 @@ TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFindsCommonPointWhenO
                           false,
                           false);
 
-    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                   ->getStatus());
     ASSERT_EQUALS(commonPoint.first, time);
     ASSERT_EQUALS(commonPoint.second, commonPointOp.second);
@@ -468,7 +468,7 @@ TEST_F(
                           false);
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+                  processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                       ->getStatus());
 }
 
@@ -492,7 +492,7 @@ TEST_F(
                           false,
                           false);
 
-    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                   ->getStatus());
     ASSERT_EQUALS(commonPoint.first, commonTime);
     ASSERT_EQUALS(commonPoint.second, commonPointOp.second);
@@ -523,7 +523,7 @@ TEST_F(
                           false,
                           false);
 
-    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, localOplog, &listener)
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, remoteOplog)}, &localOplog, &listener)
                   ->getStatus());
     ASSERT_EQUALS(commonPoint.first, commonTime);
     ASSERT_EQUALS(commonPoint.second, commonPointOp.second);
@@ -536,7 +536,7 @@ std::unique_ptr<ShutdownState> RollbackCommonPointResolverTest::processThreeBatc
     RemoteCommandResponse response1,
     RemoteCommandResponse response2,
     RemoteCommandResponse response3,
-    const OplogInterfaceMock& oplog) {
+    OplogInterfaceMock* oplog) {
     auto shutdownState = stdx::make_unique<ShutdownState>();
     ListenerMock listener(&localOplogEntriesProcessed,
                           &remoteOplogEntriesProcessed,
@@ -587,7 +587,7 @@ std::unique_ptr<ShutdownState> RollbackCommonPointResolverTest::processThreeBatc
     const BSONObj& response1,
     const BSONObj& response2,
     const BSONObj& response3,
-    const OplogInterfaceMock& localOplog) {
+    OplogInterfaceMock* localOplog) {
     return processThreeBatches({response1, rpc::makeEmptyMetadata(), Milliseconds(0)},
                                {response2, rpc::makeEmptyMetadata(), Milliseconds(0)},
                                {response3, rpc::makeEmptyMetadata(), Milliseconds(0)},
@@ -628,7 +628,7 @@ TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFindsCommonPointInThi
     auto batch2 = makeResponseBatch(remoteOplog, false, 1, 3);
     auto batch3 = makeResponseBatch(remoteOplog, false, 3);
 
-    ASSERT_OK(processThreeBatches(batch1, batch2, batch3, localOplog)->getStatus());
+    ASSERT_OK(processThreeBatches(batch1, batch2, batch3, &localOplog)->getStatus());
     ASSERT_EQUALS(commonPoint.first, time);
     ASSERT_EQUALS(commonPoint.second, commonPointOp.second);
 
@@ -648,7 +648,7 @@ TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFinishesLocalOplogInT
     auto batch3 = makeResponseBatch(remoteOplog, false, 3);
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  processThreeBatches(batch1, batch2, batch3, localOplog)->getStatus());
+                  processThreeBatches(batch1, batch2, batch3, &localOplog)->getStatus());
 }
 
 TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFinishesRemoteOplogInThirdBatch) {
@@ -664,7 +664,7 @@ TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFinishesRemoteOplogIn
     auto batch3 = makeResponseBatch(remoteOplog, false, 5);
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  processThreeBatches(batch1, batch2, batch3, localOplog)->getStatus());
+                  processThreeBatches(batch1, batch2, batch3, &localOplog)->getStatus());
 }
 
 TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFindsCommonPointAfterCursorFailure) {
@@ -698,7 +698,7 @@ TEST_F(RollbackCommonPointResolverTest, CommonPointResolverFindsCommonPointAfter
 
     shutdownState.reset(new ShutdownState());
     resolver.reset(new RollbackCommonPointResolver(
-        &getExecutor(), source, nss, 1, localOplog, &listener, stdx::ref(*shutdownState)));
+        &getExecutor(), source, nss, 1, &localOplog, &listener, stdx::ref(*shutdownState)));
 
     ASSERT_FALSE(resolver->isActive());
     ASSERT_EQUALS(AbstractOplogFetcher::State::kPreStart, resolver->getState_forTest());
