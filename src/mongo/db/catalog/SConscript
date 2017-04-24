@@ -92,6 +92,16 @@ env.Library(
     LIBDEPS=[
     ],
 )
+
+env.Library(
+    target='database_holder',
+    source=[
+        "database_holder.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
 env.Library(
     target='collection_info_cache',
     source=[
@@ -113,7 +123,7 @@ env.Library(
         "create_collection.cpp",
         "cursor_manager.cpp",
         "database_impl.cpp",
-        "database_holder.cpp",
+        "database_holder_impl.cpp",
         "drop_collection.cpp",
         "drop_database.cpp",
         "drop_indexes.cpp",
@@ -127,6 +137,7 @@ env.Library(
         'collection_info_cache',
         'collection_options',
         'database',
+        'database_holder',
         'index_catalog',
         'index_catalog_entry',
         'index_key_validate',

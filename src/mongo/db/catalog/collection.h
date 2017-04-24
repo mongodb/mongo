@@ -319,30 +319,6 @@ public:
     };
 
 private:
-    std::unique_ptr<Impl> _pimpl;
-
-    // This structure exists to give us a customization point to decide how to force users of this
-    // class to depend upon the corresponding `index_catalog_entry.cpp` Translation Unit (TU).  All
-    // public forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
-    struct TUHook {
-        static void hook() noexcept;
-
-        explicit inline TUHook() noexcept {
-            if (kDebugBuild)
-                this->hook();
-        }
-    };
-
-    inline const Impl& _impl() const {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
-    inline Impl& _impl() {
-        TUHook{};
-        return *this->_pimpl;
-    }
-
     static std::unique_ptr<Impl> makeImpl(Collection* _this,
                                           OperationContext* opCtx,
                                           StringData fullNS,
@@ -738,6 +714,30 @@ private:
                                                   const RecordId& loc) final {
         return this->_impl().recordStoreGoingToUpdateInPlace(opCtx, loc);
     }
+
+    // This structure exists to give us a customization point to decide how to force users of this
+    // class to depend upon the corresponding `collection.cpp` Translation Unit (TU).  All public
+    // forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
+    struct TUHook {
+        static void hook() noexcept;
+
+        explicit inline TUHook() noexcept {
+            if (kDebugBuild)
+                this->hook();
+        }
+    };
+
+    inline const Impl& _impl() const {
+        TUHook{};
+        return *this->_pimpl;
+    }
+
+    inline Impl& _impl() {
+        TUHook{};
+        return *this->_pimpl;
+    }
+
+    std::unique_ptr<Impl> _pimpl;
 
     friend class DatabaseImpl;
     friend class IndexCatalogImpl;
