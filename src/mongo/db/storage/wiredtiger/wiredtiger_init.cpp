@@ -136,6 +136,19 @@ public:
             return status;
         }
 
+        // If the 'groupCollections' field does not exist in the 'storage.bson' file, the
+        // data-format of existing tables is as if 'groupCollections' is false. Passing this in
+        // prevents validation from accepting 'params.groupCollections' being true when a "group
+        // collections" aware mongod is launched on an 3.4- dbpath.
+        const bool kDefaultGroupCollections = false;
+        status =
+            metadata.validateStorageEngineOption("groupCollections",
+                                                 params.groupCollections,
+                                                 boost::optional<bool>(kDefaultGroupCollections));
+        if (!status.isOK()) {
+            return status;
+        }
+
         return Status::OK();
     }
 
@@ -143,6 +156,7 @@ public:
         BSONObjBuilder builder;
         builder.appendBool("directoryPerDB", params.directoryperdb);
         builder.appendBool("directoryForIndexes", wiredTigerGlobalOptions.directoryForIndexes);
+        builder.appendBool("groupCollections", params.groupCollections);
         return builder.obj();
     }
 

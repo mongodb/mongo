@@ -212,6 +212,11 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAll)
         .hidden();
 
+    storage_options.addOptionChaining("storage.groupCollections",
+                                      "groupCollections",
+                                      moe::Switch,
+                                      "group collections - if true the storage engine may group "
+                                      "collections within a database into a shared record store.");
 
     general_options
         .addOptionChaining("noIndexBuildRetry",
@@ -1074,6 +1079,10 @@ Status storeMongodOptions(const moe::Environment& params) {
         params["storage.queryableBackupMode"].as<bool>()) {
         storageGlobalParams.readOnly = true;
         storageGlobalParams.dur = false;
+    }
+
+    if (params.count("storage.groupCollections")) {
+        storageGlobalParams.groupCollections = params["storage.groupCollections"].as<bool>();
     }
 
     if (params.count("cpu")) {
