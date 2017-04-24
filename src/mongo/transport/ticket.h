@@ -103,6 +103,9 @@ public:
      * Asynchronously wait for this ticket to be filled.
      *
      * This is this-rvalue qualified because it consumes the ticket
+     *
+     * If the ticket has expired or is not valid when asyncWait is called, cb will be called
+     * immediately and inline with the error status.
      */
     void asyncWait(TicketCallback cb) &&;
 
@@ -135,7 +138,7 @@ public:
     }
 
 private:
-    TransportLayer* _tl;
+    TransportLayer* _tl = nullptr;
     Status _status = Status::OK();
     std::unique_ptr<TicketImpl> _ticket;
 };

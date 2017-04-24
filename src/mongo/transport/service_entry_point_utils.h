@@ -33,7 +33,6 @@
 
 namespace mongo {
 
-void launchWrappedServiceEntryWorkerThread(
-    transport::SessionHandle session, stdx::function<void(const transport::SessionHandle&)> task);
+void launchServiceWorkerThread(stdx::function<void()> task);
 
 }  // namespace mongo

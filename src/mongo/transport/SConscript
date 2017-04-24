@@ -17,6 +17,7 @@ env.CppUnitTest(
 env.Library(
     target='transport_layer_common',
     source=[
+        'service_entry_point_utils.cpp',
         'session.cpp',
         'ticket.cpp',
         'transport_layer.cpp',
@@ -71,13 +72,14 @@ env.Library(
 )
 
 env.Library(
-    target='service_entry_point_utils',
+    target='service_entry_point',
     source=[
-        'service_entry_point_utils.cpp',
         'service_entry_point_impl.cpp',
+        'service_state_machine.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/util/processinfo",
         'transport_layer_common',
     ],
 )
@@ -90,6 +92,25 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'service_entry_point_test_suite',
+    ],
+)
+
+env.CppUnitTest(
+    target='service_state_machine_test',
+    source=[
+        'service_state_machine_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_entry_point',
+        'transport_layer_common',
+        'transport_layer_mock',
+        '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/command_reply',
+        '$BUILD_DIR/mongo/rpc/command_request',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/decorable',
     ],
 )
 

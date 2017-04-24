@@ -50,11 +50,11 @@ public:
     MockTicket(const SessionHandle& session,
                Message* message,
                Date_t expiration = Ticket::kNoExpirationDate)
-        : _id(session->id()), _message(message), _expiration(expiration) {}
+        : _session(session), _id(session->id()), _message(message), _expiration(expiration) {}
 
     // Sink constructor
     MockTicket(const SessionHandle& session, Date_t expiration = Ticket::kNoExpirationDate)
-        : _id(session->id()), _expiration(expiration) {}
+        : _session(session), _id(session->id()), _expiration(expiration) {}
 
     SessionId sessionId() const override {
         return _id;
@@ -68,7 +68,12 @@ public:
         return _message;
     }
 
+    SessionHandle session() const {
+        return _session.lock();
+    }
+
 private:
+    std::weak_ptr<Session> _session;
     Session::Id _id;
     boost::optional<Message*> _message;
     Date_t _expiration;

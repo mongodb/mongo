@@ -32,16 +32,12 @@
 
 #include "mongo/transport/service_entry_point_utils.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/server_options.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/quick_exit.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32
 #include <sys/resource.h>
@@ -54,59 +50,16 @@
 namespace mongo {
 
 namespace {
-
-/**
- * This object takes ownership of transport::SessionHandle.
- */
-struct Context {
-    Context(transport::SessionHandle session,
-            stdx::function<void(const transport::SessionHandle&)> task)
-        : session(std::move(session)), task(std::move(task)) {}
-
-    transport::SessionHandle session;
-    stdx::function<void(const transport::SessionHandle&)> task;
-};
-
-void* runFunc(void* ptr) {
-    std::unique_ptr<Context> ctx(static_cast<Context*>(ptr));
-
-    auto client = getGlobalServiceContext()->makeClient("conn", ctx->session);
-    setThreadName(str::stream() << "conn" << ctx->session->id());
-
-    Client::setCurrent(std::move(client));
-
-    auto tl = ctx->session->getTransportLayer();
-
-    try {
-        ctx->task(ctx->session);
-    } catch (const AssertionException& e) {
-        log() << "AssertionException handling request, closing client connection: " << e;
-    } catch (const SocketException& e) {
-        log() << "SocketException handling request, closing client connection: " << e;
-    } catch (const DBException& e) {
-        // must be right above std::exception to avoid catching subclasses
-        log() << "DBException handling request, closing client connection: " << e;
-    } catch (const std::exception& e) {
-        error() << "Uncaught std::exception: " << e.what() << ", terminating";
-        quickExit(EXIT_UNCAUGHT);
-    }
-
-    tl->end(ctx->session);
-
-    if (!serverGlobalParams.quiet.load()) {
-        auto conns = tl->sessionStats().numOpenSessions;
-        const char* word = (conns == 1 ? " connection" : " connections");
-        log() << "end connection " << ctx->session->remote() << " (" << conns << word
-              << " now open)";
-    }
+void* runFunc(void* ctx) {
+    std::unique_ptr<stdx::function<void()>> taskPtr(static_cast<stdx::function<void()>*>(ctx));
+    (*taskPtr)();
 
     return nullptr;
 }
 }  // namespace
 
-void launchWrappedServiceEntryWorkerThread(
-    transport::SessionHandle session, stdx::function<void(const transport::SessionHandle&)> task) {
-    auto ctx = stdx::make_unique<Context>(std::move(session), std::move(task));
+void launchServiceWorkerThread(stdx::function<void()> task) {
+    auto ctx = stdx::make_unique<stdx::function<void()>>(std::move(task));
 
     try {
 #ifndef __linux__  // TODO: consider making this ifdef _WIN32
@@ -152,7 +105,7 @@ void launchWrappedServiceEntryWorkerThread(
 #endif  // __linux__
 
     } catch (...) {
-        log() << "failed to create service entry worker thread for " << ctx->session->remote();
+        log() << "failed to create service entry worker thread";
     }
 }
 

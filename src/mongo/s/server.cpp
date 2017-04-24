@@ -254,8 +254,7 @@ static ExitCode runMongosServer() {
     opts.port = serverGlobalParams.port;
     opts.ipList = serverGlobalParams.bind_ip;
 
-    auto sep =
-        stdx::make_unique<ServiceEntryPointMongos>(getGlobalServiceContext()->getTransportLayer());
+    auto sep = stdx::make_unique<ServiceEntryPointMongos>(getGlobalServiceContext());
     auto sepPtr = sep.get();
 
     getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));

@@ -54,10 +54,22 @@ Ticket::Ticket(Ticket&&) = default;
 Ticket& Ticket::operator=(Ticket&&) = default;
 
 Status Ticket::wait()&& {
+    // If the ticket is invalid then _tl is a nullptr and we should return early.
+    if (!valid())
+        return status();
+
+    invariant(_tl);
     return _tl->wait(std::move(*this));
 }
 
 void Ticket::asyncWait(TicketCallback cb)&& {
+    // If the ticket is invalid then _tl is a nullptr and we should return early.
+    if (!valid()) {
+        cb(status());
+        return;
+    }
+
+    invariant(_tl);
     return _tl->asyncWait(std::move(*this), std::move(cb));
 }
 
