@@ -197,6 +197,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_info_cache',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
         '$BUILD_DIR/mongo/db/query/query',
@@ -206,11 +207,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/db/introspect',
         '$BUILD_DIR/mongo/db/curop_metrics',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
         #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-10): See `CYCLE` tags above.
+        # TODO(ADAM, 2017-04-18): See `CYCLE` tags above.
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )

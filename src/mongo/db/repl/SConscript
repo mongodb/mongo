@@ -16,6 +16,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -328,6 +329,7 @@ env.Library(
     ],
     LIBDEPS=[
         'roll_back_local_operations',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -457,12 +459,7 @@ env.Library(
         'repl_coordinator_global',
         'storage_interface',
         'bgsync',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-    ]
 )
 
 env.CppUnitTest(
@@ -1380,10 +1377,5 @@ env.Library(
         '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repair_database',
-        # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
