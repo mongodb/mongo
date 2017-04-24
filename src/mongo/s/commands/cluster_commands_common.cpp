@@ -54,13 +54,6 @@ namespace mongo {
 
 namespace {
 
-BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version) {
-    BSONObjBuilder cmdWithVersionBob;
-    cmdWithVersionBob.appendElements(cmdObj);
-    version.appendForCommands(&cmdWithVersionBob);
-    return cmdWithVersionBob.obj();
-}
-
 std::vector<AsyncRequestsSender::Request> buildRequestsForAllShards(OperationContext* opCtx,
                                                                     const BSONObj& cmdObj) {
     std::vector<AsyncRequestsSender::Request> requests;
@@ -205,6 +198,13 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
 }
 
 }  // namespace
+
+BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version) {
+    BSONObjBuilder cmdWithVersionBob;
+    cmdWithVersionBob.appendElements(cmdObj);
+    version.appendForCommands(&cmdWithVersionBob);
+    return cmdWithVersionBob.obj();
+}
 
 ReadPreferenceSetting getReadPref(const BSONObj& cmdObj) {
     const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);

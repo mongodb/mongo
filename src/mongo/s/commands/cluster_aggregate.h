@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 
 namespace mongo {
 
@@ -79,9 +80,8 @@ public:
 
 private:
     static std::vector<DocumentSourceMergeCursors::CursorDescriptor> parseCursors(
-        const std::vector<Strategy::CommandResult>& shardResults);
+        const std::vector<ClusterClientCursorParams::RemoteCursor>& cursors);
 
-    static void killAllCursors(const std::vector<Strategy::CommandResult>& shardResults);
     static void uassertAllShardsSupportExplain(
         const std::vector<Strategy::CommandResult>& shardResults);
 

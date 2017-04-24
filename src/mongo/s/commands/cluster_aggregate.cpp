@@ -53,6 +53,7 @@
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_query_knobs.h"
+#include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -80,6 +81,73 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
     }
 
     return explainCommandBuilder.freeze();
+}
+
+StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>>
+establishCursorsRetryOnStaleVersion(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    const BSONObj& cmdObj,
+                                    const ReadPreferenceSetting& readPref,
+                                    const BSONObj& query,
+                                    const BSONObj& collation) {
+    StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> swCursors(
+        (std::vector<ClusterClientCursorParams::RemoteCursor>()));
+
+    LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
+
+    int numAttempts = 0;
+    do {
+        auto routingInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+        // Use the routing table to decide which shards to target, and build versioned requests for
+        // them.
+        std::vector<std::pair<ShardId, BSONObj>> requests;
+        if (routingInfo.cm()) {
+            // The collection is sharded. Target based on the query and collation.
+            std::set<ShardId> shardIds;
+            routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
+            for (auto& shardId : shardIds) {
+                auto versionedCmdObj =
+                    appendShardVersion(cmdObj, routingInfo.cm()->getVersion(shardId));
+                requests.emplace_back(std::move(shardId), std::move(versionedCmdObj));
+            }
+        } else {
+            // The collection is unsharded. Target only the primary shard for the database.
+            // Don't append shard version info when contacting the config servers.
+            requests.emplace_back(routingInfo.primaryId(),
+                                  !routingInfo.primary()->isConfig()
+                                      ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
+                                      : cmdObj);
+        }
+
+        // If we reach this point, we're trying to establish cursors on multiple shards, meaning the
+        // execution namespace is sharded. Since views cannot be sharded, there's no way we can
+        // receive a viewDefinition in a response from a shard.
+        BSONObj* viewDefinitionOut = nullptr;
+        swCursors = establishCursors(opCtx,
+                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                     nss,
+                                     readPref,
+                                     requests,
+                                     false /* do not allow partial results */,
+                                     viewDefinitionOut /* can't receive view definition */);
+        ++numAttempts;
+
+        // If any shard returned a stale shardVersion error, invalidate the routing table cache.
+        // This will cause the cache to be refreshed the next time it is accessed.
+        if (ErrorCodes::isStaleShardingError(swCursors.getStatus().code())) {
+            Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+            LOG(1) << "got stale shardVersion error " << swCursors.getStatus()
+                   << " while dispatching " << redact(cmdObj) << " after " << numAttempts
+                   << " dispatch attempts";
+        }
+    } while (numAttempts < kMaxNumStaleVersionRetries && !swCursors.isOK());
+
+    if (!swCursors.isOK()) {
+        return swCursors.getStatus();
+    }
+    return std::move(swCursors.getValue());
 }
 
 }  // namespace
@@ -123,7 +191,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return aggPassthrough(
             opCtx, namespaces, executionNsRoutingInfo.primary()->getId(), request, cmdObj, result);
     }
-
     const auto chunkMgr = executionNsRoutingInfo.cm();
 
     std::unique_ptr<CollatorInterface> collation;
@@ -203,18 +270,17 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     BSONObj targetedCommand = targetedCommandBuilder.freeze().toBson();
     BSONObj shardQuery = pipelineForTargetedShards->getInitialQuery();
 
-    // Run the command on the shards
-    // TODO need to make sure cursors are killed if a retry is needed
-    std::vector<Strategy::CommandResult> shardResults;
-    Strategy::commandOp(opCtx,
-                        namespaces.executionNss.db().toString(),
-                        targetedCommand,
-                        namespaces.executionNss.ns(),
-                        shardQuery,
-                        request.getCollation(),
-                        &shardResults);
-
     if (mergeCtx->explain) {
+        // TODO(SERVER-28973): convert to using scatterGatherForNamespace()
+        std::vector<Strategy::CommandResult> shardResults;
+        Strategy::commandOp(opCtx,
+                            namespaces.executionNss.db().toString(),
+                            targetedCommand,
+                            namespaces.executionNss.ns(),
+                            shardQuery,
+                            request.getCollation(),
+                            &shardResults);
+
         // This must be checked before we start modifying result.
         uassertAllShardsSupportExplain(shardResults);
 
@@ -238,24 +304,30 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return Status::OK();
     }
 
+    auto cursors = uassertStatusOK(establishCursorsRetryOnStaleVersion(opCtx,
+                                                                       namespaces.executionNss,
+                                                                       targetedCommand,
+                                                                       getReadPref(targetedCommand),
+                                                                       shardQuery,
+                                                                       request.getCollation()));
+
     if (!needSplit) {
-        invariant(shardResults.size() == 1);
-        invariant(shardResults[0].target.getServers().size() == 1);
+        invariant(cursors.size() == 1);
         auto executorPool = Grid::get(opCtx)->getExecutorPool();
-        const BSONObj reply =
-            uassertStatusOK(storePossibleCursor(opCtx,
-                                                shardResults[0].shardTargetId,
-                                                shardResults[0].target.getServers()[0],
-                                                shardResults[0].result,
-                                                namespaces.requestedNss,
-                                                executorPool->getArbitraryExecutor(),
-                                                Grid::get(opCtx)->getCursorManager()));
+        const BSONObj reply = uassertStatusOK(storePossibleCursor(
+            opCtx,
+            cursors[0].shardId,
+            cursors[0].hostAndPort,
+            cursors[0].cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
+            namespaces.requestedNss,
+            executorPool->getArbitraryExecutor(),
+            Grid::get(opCtx)->getCursorManager()));
         result->appendElements(reply);
         return getStatusFromCommandResult(reply);
     }
 
     pipelineForMergingShard->addInitialSource(
-        DocumentSourceMergeCursors::create(parseCursors(shardResults), mergeCtx));
+        DocumentSourceMergeCursors::create(parseCursors(cursors), mergeCtx));
 
     MutableDocument mergeCmd(request.serializeToCommandObj());
     mergeCmd["pipeline"] = Value(pipelineForMergingShard->serialize());
@@ -278,27 +350,41 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                               : Value(Document{CollationSpec::kSimpleSpec}));
     }
 
+    auto mergeCmdObj = mergeCmd.freeze().toBson();
+
     std::string outputNsOrEmpty;
     if (DocumentSourceOut* out =
             dynamic_cast<DocumentSourceOut*>(pipelineForMergingShard->getSources().back().get())) {
         outputNsOrEmpty = out->getOutputNs().ns();
     }
 
-    // Run merging command on random shard, unless a stage needs the primary shard. Need to use
-    // ShardConnection so that the merging mongod is sent the config servers on connection init.
+    // Run merging command on random shard, unless a stage needs the primary shard.
     auto& prng = opCtx->getClient()->getPrng();
     const auto mergingShardId =
         (needPrimaryShardMerger || internalQueryAlwaysMergeOnPrimaryShard.load())
         ? uassertStatusOK(catalogCache->getDatabase(opCtx, namespaces.executionNss.db()))
               .primaryId()
-        : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
+        : cursors[prng.nextInt32(cursors.size())].shardId;
     const auto mergingShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, mergingShardId));
 
-    ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
-    BSONObj mergedResults = aggRunCommand(
-        opCtx, mergingShardId, conn.get(), namespaces, request, mergeCmd.freeze().toBson());
-    conn.done();
+    auto response = uassertStatusOK(
+        mergingShard->runCommandWithFixedRetryAttempts(opCtx,
+                                                       getReadPref(mergeCmdObj),
+                                                       namespaces.executionNss.db().toString(),
+                                                       mergeCmdObj,
+                                                       Shard::RetryPolicy::kNoRetry));
+
+    // The merging shard is remote, so if a response was received, a HostAndPort must have been set.
+    invariant(response.hostAndPort);
+    auto mergedResults = uassertStatusOK(
+        storePossibleCursor(opCtx,
+                            mergingShardId,
+                            *response.hostAndPort,
+                            response.response,
+                            namespaces.requestedNss,
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            Grid::get(opCtx)->getCursorManager()));
 
     if (auto wcErrorElem = mergedResults["writeConcernError"]) {
         appendWriteConcernErrorToCmdResponse(mergingShardId, wcErrorElem, *result);
@@ -312,58 +398,16 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 }
 
 std::vector<DocumentSourceMergeCursors::CursorDescriptor> ClusterAggregate::parseCursors(
-    const std::vector<Strategy::CommandResult>& shardResults) {
-    try {
-        std::vector<DocumentSourceMergeCursors::CursorDescriptor> cursors;
-
-        for (size_t i = 0; i < shardResults.size(); i++) {
-            BSONObj result = shardResults[i].result;
-
-            if (!result["ok"].trueValue()) {
-                // If the failure of the sharded command can be accounted to a single error,
-                // throw a UserException with that error code; otherwise, throw with a
-                // location uassert code.
-                int errCode = getUniqueCodeFromCommandResults(shardResults);
-                if (errCode == 0) {
-                    errCode = 17022;
-                }
-
-                invariant(errCode == result["code"].numberInt() || errCode == 17022);
-                uasserted(errCode,
-                          str::stream() << "sharded pipeline failed on shard "
-                                        << shardResults[i].shardTargetId
-                                        << ": "
-                                        << result.toString());
-            }
-
-            BSONObj cursor = result["cursor"].Obj();
-
-            massert(17023,
-                    str::stream() << "shard " << shardResults[i].shardTargetId
-                                  << " returned non-empty first batch",
-                    cursor["firstBatch"].Obj().isEmpty());
-
-            massert(17024,
-                    str::stream() << "shard " << shardResults[i].shardTargetId
-                                  << " returned cursorId 0",
-                    cursor["id"].Long() != 0);
-
-            massert(17025,
-                    str::stream() << "shard " << shardResults[i].shardTargetId
-                                  << " returned invalid ns: "
-                                  << cursor["ns"],
-                    NamespaceString(cursor["ns"].String()).isValid());
-
-            cursors.emplace_back(
-                shardResults[i].target, cursor["ns"].String(), cursor["id"].Long());
-        }
-
-        return cursors;
-    } catch (...) {
-        // Need to clean up any cursors we successfully created on the shards
-        killAllCursors(shardResults);
-        throw;
+    const std::vector<ClusterClientCursorParams::RemoteCursor>& responses) {
+    std::vector<DocumentSourceMergeCursors::CursorDescriptor> cursors;
+    for (const auto& response : responses) {
+        invariant(0 != response.cursorResponse.getCursorId());
+        invariant(response.cursorResponse.getBatch().empty());
+        cursors.emplace_back(ConnectionString(response.hostAndPort),
+                             response.cursorResponse.getNSS().toString(),
+                             response.cursorResponse.getCursorId());
     }
+    return cursors;
 }
 
 void ClusterAggregate::uassertAllShardsSupportExplain(
@@ -381,81 +425,6 @@ void ClusterAggregate::uassertAllShardsSupportExplain(
     }
 }
 
-void ClusterAggregate::killAllCursors(const std::vector<Strategy::CommandResult>& shardResults) {
-    // This function must ignore and log all errors. Callers expect a best-effort attempt at
-    // cleanup without exceptions. If any cursors aren't cleaned up here, they will be cleaned
-    // up automatically on the shard after 10 minutes anyway.
-
-    for (size_t i = 0; i < shardResults.size(); i++) {
-        try {
-            BSONObj result = shardResults[i].result;
-            if (!result["ok"].trueValue()) {
-                continue;
-            }
-
-            const long long cursor = result["cursor"]["id"].Long();
-            if (!cursor) {
-                continue;
-            }
-
-            ScopedDbConnection conn(shardResults[i].target);
-            conn->killCursor(cursor);
-            conn.done();
-        } catch (const DBException& e) {
-            log() << "Couldn't kill aggregation cursor on shard: " << shardResults[i].target
-                  << " due to DBException: " << redact(e);
-        } catch (const std::exception& e) {
-            log() << "Couldn't kill aggregation cursor on shard: " << shardResults[i].target
-                  << " due to std::exception: " << redact(e.what());
-        } catch (...) {
-            log() << "Couldn't kill aggregation cursor on shard: " << shardResults[i].target
-                  << " due to non-exception";
-        }
-    }
-}
-
-BSONObj ClusterAggregate::aggRunCommand(OperationContext* opCtx,
-                                        const ShardId& shardId,
-                                        DBClientBase* conn,
-                                        const Namespaces& namespaces,
-                                        const AggregationRequest& aggRequest,
-                                        BSONObj cmd) {
-    // Temporary hack. See comment on declaration for details.
-    auto cursor = conn->query(namespaces.executionNss.db() + ".$cmd",
-                              cmd,
-                              -1,  // nToReturn
-                              0,   // nToSkip
-                              NULL);
-    massert(17014,
-            str::stream() << "aggregate command didn't return results on host: "
-                          << conn->toString(),
-            cursor && cursor->more());
-
-    BSONObj result = cursor->nextSafe().getOwned();
-
-    if (ErrorCodes::SendStaleConfig == getStatusFromCommandResult(result)) {
-        throw RecvStaleConfigException("command failed because of stale config", result);
-    }
-
-    // If this was an explain, then we get back an explain result object rather than a
-    // representation of a cursor. The remaining work here is related to cursor handling, so if
-    // there's no cursor, our work is done.
-    if (aggRequest.getExplain()) {
-        return result;
-    }
-
-    // Transfer ownership of the agg cursor opened on mongod to the mongos cursor manager.
-    auto executorPool = Grid::get(opCtx)->getExecutorPool();
-    result = uassertStatusOK(storePossibleCursor(opCtx,
-                                                 shardId,
-                                                 HostAndPort(cursor->originalHost()),
-                                                 result,
-                                                 namespaces.requestedNss,
-                                                 executorPool->getArbitraryExecutor(),
-                                                 Grid::get(opCtx)->getCursorManager()));
-    return result;
-}
-
 Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const Namespaces& namespaces,
                                         const ShardId& shardId,
@@ -463,10 +432,11 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         BSONObj cmdObj,
                                         BSONObjBuilder* out) {
     // Temporary hack. See comment on declaration for details.
-    auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-    if (!shardStatus.isOK()) {
-        return shardStatus.getStatus();
+    auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
+    if (!swShard.isOK()) {
+        return swShard.getStatus();
     }
+    auto shard = std::move(swShard.getValue());
 
     // If this is an explain, we need to re-create the explain command which will be forwarded to
     // the shards.
@@ -476,14 +446,40 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         cmdObj = explainCmdObj.toBson();
     }
 
-    ShardConnection conn(shardStatus.getValue()->getConnString(), "");
-    BSONObj result = aggRunCommand(opCtx, shardId, conn.get(), namespaces, aggRequest, cmdObj);
-    conn.done();
+    auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        getReadPref(cmdObj),
+        namespaces.executionNss.db().toString(),
+        !shard->isConfig() ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED()) : cmdObj,
+        Shard::RetryPolicy::kNoRetry));
+
+    if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
+        throw RecvStaleConfigException("command failed because of stale config",
+                                       cmdResponse.response);
+    }
+
+    BSONObj result;
+    if (aggRequest.getExplain()) {
+        // If this was an explain, then we get back an explain result object rather than a cursor.
+        result = cmdResponse.response;
+    } else {
+        // The merging shard is remote, so if a response was received, a HostAndPort must have been
+        // set.
+        invariant(cmdResponse.hostAndPort);
+        result = uassertStatusOK(
+            storePossibleCursor(opCtx,
+                                shard->getId(),
+                                *cmdResponse.hostAndPort,
+                                cmdResponse.response,
+                                namespaces.requestedNss,
+                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                Grid::get(opCtx)->getCursorManager()));
+    }
 
     // First append the properly constructed writeConcernError. It will then be skipped
     // in appendElementsUnique.
     if (auto wcErrorElem = result["writeConcernError"]) {
-        appendWriteConcernErrorToCmdResponse(shardStatus.getValue()->getId(), wcErrorElem, *out);
+        appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, *out);
     }
 
     out->appendElementsUnique(result);

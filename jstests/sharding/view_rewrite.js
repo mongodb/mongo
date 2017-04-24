@@ -70,7 +70,8 @@
             "command.comment": "agg_rewrite",
             "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         // Find
@@ -87,7 +88,8 @@
             "command.comment": "find_rewrite",
             "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         // Count
@@ -104,7 +106,8 @@
             "command.comment": "count_rewrite",
             "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         // Distinct
@@ -122,7 +125,8 @@
             "command.comment": "distinct_rewrite",
             "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
-            "command.pipeline.$mergeCursors": {"$exists": false}
+            "command.pipeline.$mergeCursors": {"$exists": false},
+            "nreturned": {"$exists": true}
         });
 
         assert.commandWorked(shardPrimary.setProfilingLevel(0));

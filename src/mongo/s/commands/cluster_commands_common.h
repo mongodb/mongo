@@ -46,6 +46,11 @@ class CachedDatabaseInfo;
 class OperationContext;
 
 /**
+ * Returns a copy of 'cmdObj' with 'version' appended.
+ */
+BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version);
+
+/**
  * Returns the read preference from the $queryOptions.$readPreference field in the cmdObj if set or
  * defaults to PrimaryOnly and an empty TagSet.
  */
