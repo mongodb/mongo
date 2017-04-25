@@ -623,6 +623,6 @@ private:
 
     friend IndexCatalogEntry;
     friend class IndexCatalogImpl;
-    friend class MultiIndexBlock;
+    friend class MultiIndexBlockImpl;
 };
 }  // namespace mongo
