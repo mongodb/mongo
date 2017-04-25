@@ -123,7 +123,14 @@
     restartServerReplication(stepUpResults.voter);
     assert.commandWorked(
         stepUpResults.voter.adminCommand({replSetSyncFrom: stepUpResults.oldPrimary.host}));
-    awaitOpTime(stepUpResults.voter, stepUpResults.latestOpOnOldPrimary.ts);
+    // Wait until the new primary knows the last applied optime on the voter, so it will keep
+    // catching up after the old primary is disconnected.
+    assert.soon(function() {
+        var replSetStatus =
+            assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+        var voterStatus = replSetStatus.members.filter(m => m.name == stepUpResults.voter.host)[0];
+        return rs.compareOpTimes(voterStatus.optime, stepUpResults.latestOpOnOldPrimary) == 0;
+    });
     // Disconnect the new primary and the old one.
     stepUpResults.oldPrimary.disconnect(stepUpResults.newPrimary);
     // Disable the failpoint, the new primary should sync from the other secondary.
