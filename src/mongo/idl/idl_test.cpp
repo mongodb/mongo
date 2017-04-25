@@ -33,6 +33,8 @@
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/unittest/unittest.h"
 
+using namespace mongo::idl::test;
+
 namespace mongo {
 
 // Use a seperate function to get better error messages when types do not match.

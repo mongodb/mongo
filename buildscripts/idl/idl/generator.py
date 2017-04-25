@@ -186,6 +186,30 @@ def _access_member(field):
     return '%s.get()' % (member_name)
 
 
+class _NamespaceScopeBlock(object):
+    """Generate an unindented blocks for a list of namespaces, and do not indent the contents."""
+
+    def __init__(self, indented_writer, namespaces):
+        # type: (writer.IndentedTextWriter, List[unicode]) -> None
+        """Create a block."""
+        self._writer = indented_writer
+        self._namespaces = namespaces
+
+    def __enter__(self):
+        # type: () -> None
+        """Write the beginning of the block and do not indent."""
+        for namespace in self._namespaces:
+            self._writer.write_unindented_line('namespace %s {' % (namespace))
+
+    def __exit__(self, *args):
+        # type: (*str) -> None
+        """Write the end of the block and do not change indentation."""
+        self._namespaces.reverse()
+
+        for namespace in self._namespaces:
+            self._writer.write_unindented_line('}  // namespace %s' % (namespace))
+
+
 class _FieldUsageChecker(object):
     """Check for duplicate fields, and required fields as needed."""
 
@@ -271,11 +295,11 @@ class _CppFileWriterBase(object):
         self._writer.write_unindented_line('#include "%s"' % (include))
 
     def gen_namespace_block(self, namespace):
-        # type: (unicode) -> writer.UnindentedScopedBlock
+        # type: (unicode) -> _NamespaceScopeBlock
         """Generate a namespace block."""
-        # TODO: support namespace strings which consist of '::' delimited namespaces
-        return writer.UnindentedScopedBlock(self._writer, 'namespace %s {' % (namespace),
-                                            '}  // namespace %s' % (namespace))
+        namespace_list = namespace.split("::")
+
+        return _NamespaceScopeBlock(self._writer, namespace_list)
 
     def gen_description_comment(self, description):
         # type: (unicode) -> None

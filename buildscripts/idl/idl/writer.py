@@ -169,27 +169,6 @@ class EmptyBlock(object):
         pass
 
 
-class UnindentedScopedBlock(object):
-    """Generate an unindented block, and do not indent the contents."""
-
-    def __init__(self, writer, opening, closing):
-        # type: (IndentedTextWriter, unicode, unicode) -> None
-        """Create a block."""
-        self._writer = writer
-        self._opening = opening
-        self._closing = closing
-
-    def __enter__(self):
-        # type: () -> None
-        """Write the beginning of the block and do not indent."""
-        self._writer.write_unindented_line(self._opening)
-
-    def __exit__(self, *args):
-        # type: (*str) -> None
-        """Write the end of the block and do not change indentation."""
-        self._writer.write_unindented_line(self._closing)
-
-
 class IndentedScopedBlock(object):
     """Generate a block, template the parameters, and indent the contents."""
 

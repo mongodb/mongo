@@ -15,7 +15,8 @@
 
 # IDL Unit Tests IDL file
 global:
-    cpp_namespace: "mongo"
+    # Use a nested namespace simply to exercise nested namespace support for the code generator.
+    cpp_namespace: "mongo::idl::test"
     cpp_includes:
         - "mongo/db/namespace_string.h"
         - "mongo/idl/idl_test_types.h"
