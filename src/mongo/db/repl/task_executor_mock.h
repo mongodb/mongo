@@ -39,9 +39,11 @@ namespace repl {
  */
 class TaskExecutorMock : public unittest::TaskExecutorProxy {
 public:
-    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+    using ShouldFailScheduleWorkRequestFn = stdx::function<bool()>;
+    using ShouldFailScheduleRemoteCommandRequestFn =
+        stdx::function<bool(const executor::RemoteCommandRequest&)>;
 
-    TaskExecutorMock(executor::TaskExecutor* executor, ShouldFailRequestFn shouldFailRequest);
+    explicit TaskExecutorMock(executor::TaskExecutor* executor);
 
     StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
@@ -49,20 +51,21 @@ public:
                                                      const RemoteCommandCallbackFn& cb) override;
 
     // Override to make scheduleWork() fail during testing.
-    bool shouldFailScheduleWork = false;
+    ShouldFailScheduleWorkRequestFn shouldFailScheduleWorkRequest = []() { return false; };
 
     // Override to make scheduleWorkAt() fail during testing.
-    bool shouldFailScheduleWorkAt = false;
+    ShouldFailScheduleWorkRequestFn shouldFailScheduleWorkAtRequest = []() { return false; };
 
-    // Set to true to make scheduleWork() schedule task 1 second later instead of running
-    // immediately. This allows us to test cancellation handling in callbacks scheduled
+    // If the predicate returns true, scheduleWork() will schedule the task 1 second later instead
+    // of running immediately. This allows us to test cancellation handling in callbacks scheduled
     // using scheduleWork().
-    bool shouldDeferScheduleWorkByOneSecond = false;
+    ShouldFailScheduleWorkRequestFn shouldDeferScheduleWorkRequestByOneSecond = []() {
+        return false;
+    };
 
-private:
-    // This predicate is set at construction and is used to determine if scheduleRemoteCommand()
-    // should return an error during testing.
-    ShouldFailRequestFn _shouldFailRequest;
+    // Override to make scheduleRemoteCommand fail during testing.
+    ShouldFailScheduleRemoteCommandRequestFn shouldFailScheduleRemoteCommandRequest =
+        [](const executor::RemoteCommandRequest&) { return false; };
 };
 
 }  // namespace repl

@@ -337,11 +337,10 @@ TEST_F(AbstractAsyncComponentTest,
 
 TEST_F(AbstractAsyncComponentTest,
        ScheduleWorkAndSaveHandlePassesThroughErrorFromTaskExecutorScheduleWork) {
-    TaskExecutorMock taskExecutorMock(&getExecutor(),
-                                      [](const executor::RemoteCommandRequest&) { return false; });
+    TaskExecutorMock taskExecutorMock(&getExecutor());
     MockAsyncComponent component(&taskExecutorMock);
 
-    taskExecutorMock.shouldFailScheduleWork = true;
+    taskExecutorMock.shouldFailScheduleWorkRequest = []() { return true; };
 
     auto callback = [](const executor::TaskExecutor::CallbackArgs&) {};
     executor::TaskExecutor::CallbackHandle handle;
@@ -381,11 +380,10 @@ TEST_F(AbstractAsyncComponentTest,
 
 TEST_F(AbstractAsyncComponentTest,
        ScheduleWorkAtAndSaveHandlePassesThroughErrorFromTaskExecutorScheduleWork) {
-    TaskExecutorMock taskExecutorMock(&getExecutor(),
-                                      [](const executor::RemoteCommandRequest&) { return false; });
+    TaskExecutorMock taskExecutorMock(&getExecutor());
     MockAsyncComponent component(&taskExecutorMock);
 
-    taskExecutorMock.shouldFailScheduleWorkAt = true;
+    taskExecutorMock.shouldFailScheduleWorkAtRequest = []() { return true; };
 
     auto when = getExecutor().now() + Seconds(1);
     auto callback = [](const executor::TaskExecutor::CallbackArgs&) {};

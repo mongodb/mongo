@@ -280,11 +280,7 @@ protected:
 
         launchExecutorThread();
 
-        _shouldFailRequest = [](const executor::RemoteCommandRequest&) { return false; };
-        _executorProxy = stdx::make_unique<TaskExecutorMock>(
-            &getExecutor(), [this](const executor::RemoteCommandRequest& request) {
-                return _shouldFailRequest(request);
-            });
+        _executorProxy = stdx::make_unique<TaskExecutorMock>(&getExecutor());
 
         _myLastOpTime = OpTime({3, 0}, 1);
 
@@ -390,7 +386,6 @@ protected:
         }
     }
 
-    TaskExecutorMock::ShouldFailRequestFn _shouldFailRequest;
     std::unique_ptr<TaskExecutorMock> _executorProxy;
 
     InitialSyncerOptions _options;
@@ -745,7 +740,7 @@ TEST_F(InitialSyncerTest,
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
-    _executorProxy->shouldFailScheduleWorkAt = true;
+    _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
@@ -771,7 +766,7 @@ TEST_F(InitialSyncerTest,
 
     // Last choose sync source attempt should now be scheduled. Advance clock so we fail last
     // choose sync source attempt which cause the next initial sync attempt to be scheduled.
-    _executorProxy->shouldFailScheduleWorkAt = true;
+    _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
     advanceClock(net, _options.syncSourceRetryWait);
 
     initialSyncer->join();
@@ -886,10 +881,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetRollbackIdScheduleError) 
     // replSetGetRBID is the first remote command to be scheduled by the initial syncer after
     // creating the oplog collection.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        request = requestToSend;
-        return true;
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            request = requestToSend;
+            return true;
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -994,10 +990,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
     // The last oplog entry fetcher is the first component that sends a find command so we reject
     // any find commands and save the request for inspection at the end of this test case.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        request = requestToSend;
-        return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData();
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            request = requestToSend;
+            return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData();
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1204,14 +1201,15 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
 
     // Make the tailable oplog query fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
-            requestToSend.cmdObj.getBoolField("tailable")) {
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
+                requestToSend.cmdObj.getBoolField("tailable")) {
+                request = requestToSend;
+                return true;
+            }
+            return false;
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1433,13 +1431,14 @@ TEST_F(InitialSyncerTest,
 
     // Make the listDatabases command fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("listDatabases" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("listDatabases" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
+                request = requestToSend;
+                return true;
+            }
+            return false;
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1670,19 +1669,20 @@ TEST_F(InitialSyncerTest,
     // scheduled.
     executor::RemoteCommandRequest request;
     bool first = true;
-    _shouldFailRequest = [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
-            requestToSend.cmdObj.hasField("sort") &&
-            1 == requestToSend.cmdObj.getIntField("limit")) {
-            if (first) {
-                first = false;
-                return false;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
+                requestToSend.cmdObj.hasField("sort") &&
+                1 == requestToSend.cmdObj.getIntField("limit")) {
+                if (first) {
+                    first = false;
+                    return false;
+                }
+                request = requestToSend;
+                return true;
             }
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+            return false;
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
@@ -2094,17 +2094,18 @@ TEST_F(
     // Make the second replSetGetRBID command fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
     bool first = true;
-    _shouldFailRequest = [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("replSetGetRBID" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
-            if (first) {
-                first = false;
-                return false;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("replSetGetRBID" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
+                if (first) {
+                    first = false;
+                    return false;
+                }
+                request = requestToSend;
+                return true;
             }
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+            return false;
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
@@ -2490,7 +2491,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // Before processing scheduled last oplog entry fetcher response, set flag in
         // TaskExecutorMock so that InitialSyncer will fail to schedule
         // _getNextApplierBatchCallback().
-        _executorProxy->shouldFailScheduleWork = true;
+        _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2544,7 +2545,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // Before processing scheduled last oplog entry fetcher response, set flag in
         // TaskExecutorMock so that InitialSyncer will fail to schedule second
         // _getNextApplierBatchCallback() at (now + options.getApplierBatchCallbackRetryWait).
-        _executorProxy->shouldFailScheduleWorkAt = true;
+        _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2786,7 +2787,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         assertRemoteCommandNameEquals("getMore", request);
 
         // Make MultiApplier::startup() fail.
-        _executorProxy->shouldFailScheduleWork = true;
+        _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
 
         // Advance clock until _getNextApplierBatchCallback() runs.
         auto when = net->now() + _options.getApplierBatchCallbackRetryWait;

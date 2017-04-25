@@ -33,16 +33,15 @@
 namespace mongo {
 namespace repl {
 
-TaskExecutorMock::TaskExecutorMock(executor::TaskExecutor* executor,
-                                   ShouldFailRequestFn shouldFailRequest)
-    : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
+TaskExecutorMock::TaskExecutorMock(executor::TaskExecutor* executor)
+    : unittest::TaskExecutorProxy(executor) {}
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWork(
     const CallbackFn& work) {
-    if (shouldFailScheduleWork) {
+    if (shouldFailScheduleWorkRequest()) {
         return Status(ErrorCodes::OperationFailed, "failed to schedule work");
     }
-    if (shouldDeferScheduleWorkByOneSecond) {
+    if (shouldDeferScheduleWorkRequestByOneSecond()) {
         auto when = now() + Seconds(1);
         return getExecutor()->scheduleWorkAt(when, work);
     }
@@ -51,7 +50,7 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWor
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWorkAt(
     Date_t when, const CallbackFn& work) {
-    if (shouldFailScheduleWorkAt) {
+    if (shouldFailScheduleWorkAtRequest()) {
         return Status(ErrorCodes::OperationFailed,
                       str::stream() << "failed to schedule work at " << when.toString());
     }
@@ -60,7 +59,7 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWor
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRemoteCommand(
     const executor::RemoteCommandRequest& request, const RemoteCommandCallbackFn& cb) {
-    if (_shouldFailRequest(request)) {
+    if (shouldFailScheduleRemoteCommandRequest(request)) {
         return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
     }
     return getExecutor()->scheduleRemoteCommand(request, cb);

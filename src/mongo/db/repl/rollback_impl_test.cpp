@@ -59,7 +59,6 @@ private:
     void tearDown() override;
 
 protected:
-    TaskExecutorMock::ShouldFailRequestFn _shouldFailScheduleRemoteCommandRequest;
     std::unique_ptr<TaskExecutorMock> _taskExecutorMock;
     Rollback::OnCompletionFn _onCompletion;
     StatusWith<OpTime> _onCompletionResult = executor::TaskExecutorTest::getDetectableErrorStatus();
@@ -70,14 +69,7 @@ protected:
 
 void RollbackImplTest::setUp() {
     RollbackTest::setUp();
-    _shouldFailScheduleRemoteCommandRequest = [](const executor::RemoteCommandRequest& request) {
-        return false;
-    };
-    _taskExecutorMock = stdx::make_unique<TaskExecutorMock>(
-        &_threadPoolExecutorTest.getExecutor(),
-        [this](const executor::RemoteCommandRequest& request) {
-            return _shouldFailScheduleRemoteCommandRequest(request);
-        });
+    _taskExecutorMock = stdx::make_unique<TaskExecutorMock>(&_threadPoolExecutorTest.getExecutor());
     _localOplog = stdx::make_unique<OplogInterfaceMock>(kEmptyMockOperations);
     HostAndPort syncSource("localhost", 1234);
     _requiredRollbackId = 1;
@@ -105,7 +97,6 @@ void RollbackImplTest::tearDown() {
     _requiredRollbackId = -1;
     _localOplog = {};
     _taskExecutorMock = {};
-    _shouldFailScheduleRemoteCommandRequest = {};
     RollbackTest::tearDown();
 }
 
@@ -159,14 +150,14 @@ TEST_F(RollbackImplTest, InvalidConstruction) {
 
 TEST_F(RollbackImplTest,
        StartupReturnsOperationFailedIfMockExecutorFailsToScheduleRollbackTransitionCallback) {
-    _taskExecutorMock->shouldFailScheduleWork = true;
+    _taskExecutorMock->shouldFailScheduleWorkRequest = []() { return true; };
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _rollback->startup());
 }
 
 TEST_F(
     RollbackImplTest,
     RollbackReturnsCallbackCanceledIfExecutorIsShutdownAfterSchedulingTransitionToRollbackCallback) {
-    _taskExecutorMock->shouldDeferScheduleWorkByOneSecond = true;
+    _taskExecutorMock->shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
     ASSERT_OK(_rollback->startup());
     _threadPoolExecutorTest.getExecutor().shutdown();
     _rollback->join();
@@ -176,7 +167,7 @@ TEST_F(
 TEST_F(
     RollbackImplTest,
     RollbackReturnsCallbackCanceledIfRollbackIsShutdownAfterSchedulingTransitionToRollbackCallback) {
-    _taskExecutorMock->shouldDeferScheduleWorkByOneSecond = true;
+    _taskExecutorMock->shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
     ASSERT_OK(_rollback->startup());
     _rollback->shutdown();
     _rollback->join();
@@ -184,7 +175,7 @@ TEST_F(
 }
 
 DEATH_TEST_F(RollbackImplTest, RollbackTerminatesIfCompletionCallbackThrowsException, "terminate") {
-    _taskExecutorMock->shouldDeferScheduleWorkByOneSecond = true;
+    _taskExecutorMock->shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
     ASSERT_OK(_rollback->startup());
     _onCompletion = [](const StatusWith<OpTime>&) noexcept {
         uassertStatusOK({ErrorCodes::InternalError,

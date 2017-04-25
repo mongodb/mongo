@@ -124,9 +124,9 @@ TEST_F(AbstractOplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFr
 TEST_F(AbstractOplogFetcherTest, StartupReturnsOperationFailedIfExecutorFailsToScheduleFetcher) {
     ShutdownState shutdownState;
 
-    TaskExecutorMock taskExecutorMock(
-        &getExecutor(), [this](const executor::RemoteCommandRequest& request) { return false; });
-    taskExecutorMock.shouldFailScheduleWork = true;
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldFailScheduleWorkRequest = []() { return true; };
+
     MockOplogFetcher oplogFetcher(
         &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
 
@@ -136,8 +136,10 @@ TEST_F(AbstractOplogFetcherTest, StartupReturnsOperationFailedIfExecutorFailsToS
 TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToScheduleFind) {
     ShutdownState shutdownState;
 
-    TaskExecutorMock taskExecutorMock(
-        &getExecutor(), [this](const executor::RemoteCommandRequest& request) { return true; });
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldFailScheduleRemoteCommandRequest =
+        [](const executor::RemoteCommandRequest&) { return true; };
+
     MockOplogFetcher oplogFetcher(
         &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
 
@@ -153,9 +155,9 @@ TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFai
 TEST_F(AbstractOplogFetcherTest, ShuttingExecutorDownAfterStartupStopsTheOplogFetcher) {
     ShutdownState shutdownState;
 
-    TaskExecutorMock taskExecutorMock(
-        &getExecutor(), [this](const executor::RemoteCommandRequest& request) { return false; });
-    taskExecutorMock.shouldDeferScheduleWorkByOneSecond = true;
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
+
     MockOplogFetcher oplogFetcher(
         &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
 
@@ -173,9 +175,9 @@ TEST_F(AbstractOplogFetcherTest, ShuttingExecutorDownAfterStartupStopsTheOplogFe
 TEST_F(AbstractOplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterStartup) {
     ShutdownState shutdownState;
 
-    TaskExecutorMock taskExecutorMock(
-        &getExecutor(), [this](const executor::RemoteCommandRequest& request) { return false; });
-    taskExecutorMock.shouldDeferScheduleWorkByOneSecond = true;
+    TaskExecutorMock taskExecutorMock(&getExecutor());
+    taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() { return true; };
+
     MockOplogFetcher oplogFetcher(
         &taskExecutorMock, lastFetched, source, nss, 0, stdx::ref(shutdownState));
 
