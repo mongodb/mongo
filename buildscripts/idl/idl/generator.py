@@ -243,7 +243,7 @@ class _FieldUsageChecker(object):
                                                 'if (usedFields.find("%s") == usedFields.end()) {' %
                                                 (field.name), '}'):
                     if field.default:
-                        self._writer.write_line('object.%s = %s;' %
+                        self._writer.write_line('%s = %s;' %
                                                 (_get_field_member_name(field), field.default))
                     else:
                         self._writer.write_line('ctxt.throwMissingField("%s");' % (field.name))
@@ -361,6 +361,15 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'static %s parse(const IDLParserErrorContext& ctxt, const BSONObj& object);' %
             (common.title_case(class_name)))
         self._writer.write_line('void serialize(BSONObjBuilder* builder) const;')
+        self._writer.write_empty_line()
+
+    def gen_protected_serializer_methods(self):
+        # type: () -> None
+        # pylint: disable=invalid-name
+        """Generate protected serializer method declarations."""
+
+        self._writer.write_line(
+            'void parseProtected(const IDLParserErrorContext& ctxt, const BSONObj& object);')
         self._writer.write_empty_line()
 
     def gen_getter(self, field):
@@ -550,6 +559,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             self.gen_getter(field)
                             self.gen_setter(field)
 
+                    self.write_unindented_line('protected:')
+                    self.gen_protected_serializer_methods()
+
                     self.write_unindented_line('private:')
 
                     # Write member variables
@@ -649,7 +661,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line('++expectedFieldNumber;')
 
-        self._writer.write_line('object.%s = std::move(values);' % (_get_field_member_name(field)))
+        self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
     def gen_field_deserializer(self, field):
         # type: (ast.Field) -> None
@@ -662,18 +674,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._predicate(_get_bson_type_check('element', 'ctxt', field)):
 
             object_value = self._gen_field_deserializer_expression('element', field)
-            self._writer.write_line('object.%s = %s;' %
-                                    (_get_field_member_name(field), object_value))
+            self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
 
-    def gen_deserializer_method(self, struct):
+    def gen_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
-        """Generate the C++ deserializer method definition."""
-
-        func_def = '%s %s::parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject)' % (
-            common.title_case(struct.name), common.title_case(struct.name))
+        """Generate the C++ deserializer method definitions."""
+        func_def = common.template_args(
+            '${class_name} ${class_name}::parse (const IDLParserErrorContext& ctxt,' +
+            'const BSONObj& bsonObject)',
+            class_name=common.title_case(struct.name))
         with self._block('%s {' % (func_def), '}'):
-
             self._writer.write_line('%s object;' % common.title_case(struct.name))
+            self._writer.write_line('object.parseProtected(ctxt, bsonObject);')
+            self._writer.write_line('return object;')
+
+        func_def = 'void %s::parseProtected(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject)' % (
+            common.title_case(struct.name))
+        with self._block('%s {' % (func_def), '}'):
 
             field_usage_check = _FieldUsageChecker(self._writer)
             self._writer.write_empty_line()
@@ -712,8 +729,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Check for required fields
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
-
-            self._writer.write_line('return object;')
 
     def _gen_serializer_method_custom(self, field):
         # type: (ast.Field) -> None
@@ -795,7 +810,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 optional_block_start = None
                 if field.optional:
-                    optional_block_start = 'if (%s) {' % (member_name)
+                    optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
                 elif field.struct_type or field.serializer:
                     # Introduce a new scope for required nested object serialization.
                     optional_block_start = '{'
@@ -839,7 +854,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             for struct in spec.structs:
                 # Write deserializer
-                self.gen_deserializer_method(struct)
+                self.gen_deserializer_methods(struct)
                 self.write_empty_line()
 
                 # Write serializer

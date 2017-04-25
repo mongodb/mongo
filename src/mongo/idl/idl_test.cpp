@@ -709,4 +709,63 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     ASSERT_TRUE(field2 == testStruct.getField2());
 }
 
+/**
+ * A simple class that derives from an IDL generated class
+ */
+class ClassDerivedFromStruct : public DerivedBaseStruct {
+public:
+    static ClassDerivedFromStruct parse(const IDLParserErrorContext& ctxt,
+                                        const BSONObj& bsonObject) {
+        ClassDerivedFromStruct o;
+        o.parseProtected(ctxt, bsonObject);
+        o._done = true;
+        return o;
+    }
+
+    bool aRandomAdditionalMethod() {
+        return true;
+    }
+
+    bool getDone() const {
+        return _done;
+    }
+
+private:
+    bool _done = false;
+};
+
+// Positive: demonstrate a class derived from an IDL parser.
+TEST(IDLCustomType, TestDerivedParser) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1" << 3 << "field2" << 5);
+
+    auto testStruct = ClassDerivedFromStruct::parse(ctxt, testDoc);
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getField2(), 5);
+
+    ASSERT_EQUALS(testStruct.getDone(), true);
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        ClassDerivedFromStruct one_new;
+        one_new.setField1(3);
+        one_new.setField2(5);
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
 }  // namespace mongo
