@@ -1624,10 +1624,40 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 				WT_RET_MSG(session, WT_ERROR,
 			    "choose either a start LSN or a start flag");
 
-			/* Offsets must be on allocation boundaries. */
-			if (lsnp->l.offset % allocsize != 0 ||
-			    lsnp->l.file > log->fileid)
-				return (WT_NOTFOUND);
+			/*
+			 * Offsets must be on allocation boundaries.
+			 * An invalid LSN from a user should just return
+			 * WT_NOTFOUND.  It is not an error.  But if it is
+			 * from recovery, we expect valid LSNs so give more
+			 * information about that.
+			 */
+			if (lsnp->l.offset % allocsize != 0) {
+				if (LF_ISSET(WT_LOGSCAN_RECOVER))
+					WT_RET_MSG(session, WT_NOTFOUND,
+					    "__wt_log_scan unaligned LSN %"
+					    PRIu32 "/%" PRIu32,
+					    lsnp->l.file, lsnp->l.offset);
+				else
+					return (WT_NOTFOUND);
+			}
+			/*
+			 * If the file is in the future it doesn't exist.
+			 * An invalid LSN from a user should just return
+			 * WT_NOTFOUND.  It is not an error.  But if it is
+			 * from recovery, we expect valid LSNs so give more
+			 * information about that.
+			 */
+			if (lsnp->l.file > log->fileid) {
+				if (LF_ISSET(WT_LOGSCAN_RECOVER))
+					WT_RET_MSG(session, WT_NOTFOUND,
+					    "__wt_log_scan LSN %" PRIu32 "/%"
+					    PRIu32
+					    " larger than biggest log file %"
+					    PRIu32, lsnp->l.file,
+					    lsnp->l.offset, log->fileid);
+				else
+					return (WT_NOTFOUND);
+			}
 
 			/*
 			 * Log cursors may not know the starting LSN.  If an
