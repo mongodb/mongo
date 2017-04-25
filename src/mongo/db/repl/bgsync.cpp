@@ -634,13 +634,16 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             if (_state != ProducerState::Running) {
                 return;
             }
-            _rollback = stdx::make_unique<RollbackImpl>(executor,
-                                                        &localOplog,
-                                                        source,
-                                                        requiredRBID,
-                                                        _replCoord,
-                                                        storageInterface,
-                                                        onRollbackShutdownCallbackFn);
+            _rollback = stdx::make_unique<RollbackImpl>(
+                executor,
+                &localOplog,
+                source,
+                NamespaceString(rsOplogName),
+                _replicationCoordinatorExternalState->getOplogFetcherMaxFetcherRestarts(),
+                requiredRBID,
+                _replCoord,
+                storageInterface,
+                onRollbackShutdownCallbackFn);
             rollback = _rollback.get();
         } catch (...) {
             fassertFailedWithStatus(40401, exceptionToStatus());

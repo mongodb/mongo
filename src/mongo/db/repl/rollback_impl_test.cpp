@@ -48,6 +48,8 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
+NamespaceString nss("local.oplog.rs");
+
 /**
  * Unit test for rollback implementation introduced in 3.6.
  */
@@ -79,6 +81,8 @@ void RollbackImplTest::setUp() {
         _taskExecutorMock.get(),
         _localOplog.get(),
         syncSource,
+        nss,
+        0,
         _requiredRollbackId,
         _coordinator,
         &_storageInterface,
@@ -125,6 +129,8 @@ TEST_F(RollbackImplTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(RollbackImpl(nullptr,
                                              &emptyOplog,
                                              syncSource,
+                                             nss,
+                                             0,
                                              requiredRollbackId,
                                              replicationCoordinator,
                                              storageInterface,
@@ -137,6 +143,8 @@ TEST_F(RollbackImplTest, InvalidConstruction) {
     ASSERT_THROWS_CODE_AND_WHAT(RollbackImpl(executor,
                                              &emptyOplog,
                                              HostAndPort(),
+                                             nss,
+                                             0,
                                              requiredRollbackId,
                                              replicationCoordinator,
                                              storageInterface,
@@ -242,6 +250,8 @@ TEST_F(RollbackImplTest, RollbackResetsOnCompletionCallbackFunctionPointerUponCo
         _taskExecutorMock.get(),
         _localOplog.get(),
         HostAndPort("localhost", 1234),
+        nss,
+        0,
         _requiredRollbackId,
         _coordinator,
         &_storageInterface,

@@ -91,6 +91,8 @@ public:
     RollbackImpl(executor::TaskExecutor* executor,
                  OplogInterface* localOplog,
                  const HostAndPort& syncSource,
+                 const NamespaceString& remoteOplogNss,
+                 std::size_t maxFetcherRestarts,
                  int requiredRollbackId,
                  ReplicationCoordinator* replicationCoordinator,
                  StorageInterface* storageInterface,
@@ -223,6 +225,12 @@ private:
 
     // Host and port of the sync source we are rolling back against.
     const HostAndPort _syncSource;  // (R)
+
+    // Fully qualified namespace of the remote oplog.
+    const NamespaceString _remoteOplogNss;  // (R)
+
+    // Number of times to restart the query in the RollbackCommonPointResolver and OplogFetcher.
+    std::size_t _maxFetcherRestarts;  // (R)
 
     // This is the current rollback ID on the sync source that we are rolling back against.
     // It is an error if the rollback ID on the sync source changes before rollback is complete.
