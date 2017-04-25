@@ -450,6 +450,7 @@ env.CppUnitTest(
         'rollback_impl_test.cpp',
     ],
     LIBDEPS=[
+        'abstract_oplog_fetcher_test_fixture',
         'oplog_interface_mock',
         'rollback_impl',
         'rollback_test_fixture',

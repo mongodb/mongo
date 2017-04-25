@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/optime.h"
@@ -152,6 +154,10 @@ private:
      *         |
      *         |
      *         V
+     *     _commonPointResolverCallback()
+     *         |
+     *         |
+     *         V
      *    _tearDown()
      *         |
      *         |
@@ -167,6 +173,13 @@ private:
      * This callback is scheduled by _doStartup_inlock().
      */
     void _transitionToRollbackCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs);
+
+    /**
+     * Callback function invoked when the RollbackCommonPointResolver completes its processing.
+     *
+     * This callback is scheduled by _transitionToRollbackCallback().
+     */
+    void _commonPointResolverCallback(const Status& commonPointResolverStatus);
 
     /**
      * If we detected that we rolled back the shardIdentity document as part of this rollback
@@ -244,6 +257,14 @@ private:
 
     // This is used to read and update the global minValid settings and to access the storage layer.
     StorageInterface* const _storageInterface;  // (R)
+
+    // Once we are in ROLLBACK, this is used to determine the common point between the local and
+    // remote oplogs. As we walk the local oplog backwards towards the common point, we will use
+    // the RollbackFixUpInfo to process each entry (but not including the common point itself). This
+    // gives us the information we need to roll back the local oplog entries that succeed the common
+    // point.
+    std::unique_ptr<RollbackCommonPointResolver::Listener> _listener;   // (S)
+    std::unique_ptr<RollbackCommonPointResolver> _commonPointResolver;  // (S)
 
     // This is invoked with the final status of the rollback. If startup() fails, this callback
     // is never invoked. The caller gets the last applied optime when the rollback completes
