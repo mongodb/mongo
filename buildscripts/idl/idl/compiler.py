@@ -93,7 +93,7 @@ class CompilerImportResolver(parser.ImportResolverBase):
     def open(self, resolved_file_name):
         # type: (unicode) -> Any
         """Return an io.Stream for the requested file."""
-        return io.open(resolved_file_name)
+        return io.open(resolved_file_name, encoding='utf-8')
 
 
 def _write_dependencies(spec):
@@ -177,7 +177,7 @@ def compile_idl(args):
         header_file_name = args.output_header
 
     # Compile the IDL through the 3 passes
-    with io.open(args.input_file) as file_stream:
+    with io.open(args.input_file, encoding='utf-8') as file_stream:
         parsed_doc = parser.parse(file_stream, args.input_file,
                                   CompilerImportResolver(args.import_directories))
 
