@@ -308,6 +308,27 @@ class TestReport(unittest.TestResult):
                 "failures": self.num_failed + self.num_errored + self.num_interrupted,
             }
 
+    @classmethod
+    def from_dict(cls, report_dict):
+        """
+        Returns the test report instance copied from a dict (generated in as_dict).
+
+        Used when combining reports instances.
+        """
+
+        report = cls(logging.loggers.EXECUTOR_LOGGER)
+        for result in report_dict["results"]:
+            # By convention, dynamic tests are named "<basename>:<hook name>".
+            is_dynamic = ":" in result["test_file"]
+            test_info = _TestInfo(result["test_file"], is_dynamic)
+            test_info.url_endpoint = result.get("url")
+            test_info.status = result["status"]
+            test_info.return_code = result["exit_code"]
+            test_info.start_time = result["start"]
+            test_info.end_time = result["end"]
+            report.test_infos.append(test_info)
+        return report
+
     def reset(self):
         """
         Resets the test report back to its initial state.
