@@ -12,7 +12,6 @@ executor:
     fixture:
       class: ReplicaSetFixture
       mongod_options:
-        bind_ip_all: ''
         set_parameters:
           enableTestCommands: 1
           numInitialSyncAttempts: 1
