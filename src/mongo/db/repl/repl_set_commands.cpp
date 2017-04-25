@@ -256,7 +256,7 @@ HostAndPort someHostAndPortForMe() {
             ips = "";
         }
         HostAndPort h = HostAndPort(ip, serverGlobalParams.port);
-        if (!h.isLocalHost()) {
+        if (!h.isLocalHost() && !h.isDefaultRoute()) {
             return h;
         }
     }

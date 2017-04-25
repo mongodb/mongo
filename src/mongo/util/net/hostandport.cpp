@@ -82,6 +82,23 @@ bool HostAndPort::isLocalHost() const {
             );
 }
 
+bool HostAndPort::isDefaultRoute() const {
+    if (_host == "0.0.0.0") {
+        return true;
+    }
+
+    // There are multiple ways to write IPv6 addresses.
+    // We're looking for any representation of the address "0:0:0:0:0:0:0:0".
+    // A single sequence of "0" bytes in an IPv6 address may be represented as "::",
+    // so we must also match addresses like "::" or "0::0:0".
+    // Return false if a character other than ':' or '0' is contained in the address.
+    auto firstNonDefaultIPv6Char =
+        std::find_if(std::begin(_host), std::end(_host), [](const char& c) {
+            return c != ':' && c != '0' && c != '[' && c != ']';
+        });
+    return firstNonDefaultIPv6Char == std::end(_host);
+}
+
 std::string HostAndPort::toString() const {
     StringBuilder ss;
     append(ss);

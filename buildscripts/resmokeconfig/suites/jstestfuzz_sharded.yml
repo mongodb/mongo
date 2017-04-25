@@ -20,10 +20,12 @@ executor:
       mongos_options:
         set_parameters:
           enableTestCommands: 1
+        bind_ip_all: ''
         verbose: ''
       mongod_options:
         set_parameters:
           enableTestCommands: 1
           numInitialSyncAttempts: 1
         verbose: ''
+        bind_ip_all: ''
       num_shards: 2
