@@ -165,7 +165,6 @@
             testDB.foo.remove({a: 1});
             assert.eq(null, testDB.runCommand({getlasterror: 1}).err);
             checkCommandSucceeded(testDB, {reIndex: 'foo'});
-            checkCommandSucceeded(testDB, {repairDatabase: 1});
             checkCommandSucceeded(testDB,
                                   {mapreduce: 'foo', map: map, reduce: reduce, out: 'mrOutput'});
             assert.eq(100, testDB.mrOutput.count());
@@ -185,7 +184,6 @@
             checkCommandFailed(
                 testDB, {findAndModify: "foo", query: {a: 1, i: 1, j: 1}, update: {$set: {b: 1}}});
             checkCommandFailed(testDB, {reIndex: 'foo'});
-            checkCommandFailed(testDB, {repairDatabase: 1});
             checkCommandFailed(testDB,
                                {mapreduce: 'foo', map: map, reduce: reduce, out: 'mrOutput'});
             checkCommandFailed(testDB, {drop: 'foo'});

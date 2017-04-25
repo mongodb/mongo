@@ -3770,6 +3770,7 @@ var authCommandsLib = {
         {
           testname: "repairDatabase",
           command: {repairDatabase: 1},
+          skipSharded: true,
           testcases: [
               {
                 runOnDb: adminDbName,

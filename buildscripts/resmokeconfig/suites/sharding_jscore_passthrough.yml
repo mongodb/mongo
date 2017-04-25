@@ -30,6 +30,9 @@ selector:
     - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
     - jstests/core/notablescan.js  # notablescan.
     - jstests/core/profile*.js  # profiling.
+    - jstests/core/repair_database.js # repairDatabase
+    - jstests/core/repair_database_input_validation.js # repairDatabase
+    - jstests/core/repair_server12955.js # repairDatabase
     - jstests/core/stages*.js  # stageDebug.
     - jstests/core/startup_log.js  # "local" database.
     - jstests/core/storageDetailsCommand.js  # diskStorageStats.
