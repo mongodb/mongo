@@ -124,7 +124,11 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(Namespace
         BSONElement el = it.next();
         const auto fieldName = el.fieldNameStringData();
         if (fieldName == kFindCommandName) {
+            // Check both String and UUID types for "find" field.
             Status status = checkFieldType(el, String);
+            if (!status.isOK()) {
+                status = checkFieldType(el, BinData);
+            }
             if (!status.isOK()) {
                 return status;
             }

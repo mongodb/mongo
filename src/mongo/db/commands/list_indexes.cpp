@@ -121,8 +121,7 @@ public:
              BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
-        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
-
+        const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
         Status parseCursorStatus =

@@ -502,6 +502,8 @@ env.Library(
         'commands/server_status_core',
         'commands/test_commands_enabled',
         'service_context',
+        '$BUILD_DIR/mongo/util/uuid',
+        '$BUILD_DIR/mongo/util/uuid_catalog',
     ],
 )
 

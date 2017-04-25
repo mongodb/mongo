@@ -232,12 +232,7 @@ public:
              BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        if (!nss.isValid() || nss.isCommand() || nss.isSpecialCommand()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::InvalidNamespace,
-                                        str::stream() << "Invalid collection name: " << nss.ns()});
-        }
+        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
 
         // Although it is a command, a find command gets counted as a query.
         globalOpCounters.gotQuery();

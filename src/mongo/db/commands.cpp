@@ -52,6 +52,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
+#include "mongo/util/uuid_catalog.h"
 
 namespace mongo {
 
@@ -100,6 +101,25 @@ NamespaceString Command::parseNsCollectionRequired(const string& dbname, const B
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
             nss.isValid());
     return nss;
+}
+
+NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
+                                       const string& dbname,
+                                       const BSONObj& cmdObj) {
+    BSONElement first = cmdObj.firstElement();
+    if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
+        StatusWith<UUID> uuidRes = UUID::parse(first);
+        uassertStatusOK(uuidRes);
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        return catalog.lookupNSSByUUID(uuidRes.getValue());
+    } else {
+        // Ensure collection identifier is not a Command or specialCommand
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid collection name specified '" << nss.ns() << "'",
+                !nss.isCommand() && !nss.isSpecialCommand());
+        return nss;
+    }
 }
 
 string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
