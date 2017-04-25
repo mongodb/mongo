@@ -148,7 +148,7 @@ class Graph(object):
             if node in nodes_in_cycle:
                 # The graph cycle starts at the index of node in nodes_in_cycle.
                 return nodes_in_cycle[nodes_in_cycle.index(node):]
-            if node in nodes_visited:
+            if node not in nodes_visited:
                 dfs_nodes = self.depth_first_search(node, nodes_visited, nodes_in_cycle)
                 if dfs_nodes:
                     return dfs_nodes
