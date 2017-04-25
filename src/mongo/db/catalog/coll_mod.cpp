@@ -216,6 +216,47 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
     return {std::move(cmr)};
 }
 
+/**
+ * Set a collection option flag for 'UsePowerOf2Sizes' or 'NoPadding'. Appends both the new and
+ * old flag setting to the given 'result' builder.
+ */
+void setCollectionOptionFlag(OperationContext* opCtx,
+                             Collection* coll,
+                             BSONElement& collOptionElement,
+                             BSONObjBuilder* result) {
+    const StringData flagName = collOptionElement.fieldNameStringData();
+
+    int flag;
+
+    if (flagName == "usePowerOf2Sizes") {
+        flag = CollectionOptions::Flag_UsePowerOf2Sizes;
+    } else if (flagName == "noPadding") {
+        flag = CollectionOptions::Flag_NoPadding;
+    } else {
+        flag = 0;
+    }
+
+    CollectionCatalogEntry* cce = coll->getCatalogEntry();
+
+    const int oldFlags = cce->getCollectionOptions(opCtx).flags;
+    const bool oldSetting = oldFlags & flag;
+    const bool newSetting = collOptionElement.trueValue();
+
+    result->appendBool(flagName.toString() + "_old", oldSetting);
+    result->appendBool(flagName.toString() + "_new", newSetting);
+
+    const int newFlags = newSetting ? (oldFlags | flag)    // set flag
+                                    : (oldFlags & ~flag);  // clear flag
+
+    // NOTE we do this unconditionally to ensure that we note that the user has
+    // explicitly set flags, even if they are just setting the default.
+    cce->updateFlags(opCtx, newFlags);
+
+    const CollectionOptions newOptions = cce->getCollectionOptions(opCtx);
+    invariant(newOptions.flags == newFlags);
+    invariant(newOptions.flagsSet);
+}
+
 Status collMod(OperationContext* opCtx,
                const NamespaceString& nss,
                const BSONObj& cmdObj,
@@ -265,6 +306,8 @@ Status collMod(OperationContext* opCtx,
 
     WriteUnitOfWork wunit(opCtx);
 
+    // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
+    // entries for modifications on a view.
     if (view) {
         if (!cmr.viewPipeLine.eoo())
             view->setPipeline(cmr.viewPipeLine);
@@ -283,73 +326,69 @@ Status collMod(OperationContext* opCtx,
         if (!errorStatus.isOK()) {
             return errorStatus;
         }
-    } else {
-        if (!cmr.indexExpireAfterSeconds.eoo()) {
-            BSONElement& newExpireSecs = cmr.indexExpireAfterSeconds;
-            BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
 
-            if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
-                result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
-                // Change the value of "expireAfterSeconds" on disk.
-                coll->getCatalogEntry()->updateTTLSetting(
-                    opCtx, cmr.idx->indexName(), newExpireSecs.safeNumberLong());
-                // Notify the index catalog that the definition of this index changed.
-                cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
-                result->appendAs(newExpireSecs, "expireAfterSeconds_new");
-            }
-        }
-
-        if (!cmr.collValidator.eoo())
-            coll->setValidator(opCtx, cmr.collValidator.Obj());
-
-        if (!cmr.collValidationAction.empty())
-            coll->setValidationAction(opCtx, cmr.collValidationAction);
-
-        if (!cmr.collValidationLevel.empty())
-            coll->setValidationLevel(opCtx, cmr.collValidationLevel);
-
-        auto setCollectionOption = [&](BSONElement& COElement) {
-            typedef CollectionOptions CO;
-            const StringData name = COElement.fieldNameStringData();
-
-            int flag = (name == "usePowerOf2Sizes")
-                ? CO::Flag_UsePowerOf2Sizes
-                : (name == "noPadding") ? CO::Flag_NoPadding : 0;
-
-            CollectionCatalogEntry* cce = coll->getCatalogEntry();
-
-            const int oldFlags = cce->getCollectionOptions(opCtx).flags;
-            const bool oldSetting = oldFlags & flag;
-            const bool newSetting = COElement.trueValue();
-
-            result->appendBool(name.toString() + "_old", oldSetting);
-            result->appendBool(name.toString() + "_new", newSetting);
-
-            const int newFlags = newSetting ? (oldFlags | flag)    // set flag
-                                            : (oldFlags & ~flag);  // clear flag
-
-            // NOTE we do this unconditionally to ensure that we note that the user has
-            // explicitly set flags, even if they are just setting the default.
-            cce->updateFlags(opCtx, newFlags);
-
-            const CollectionOptions newOptions = cce->getCollectionOptions(opCtx);
-            invariant(newOptions.flags == newFlags);
-            invariant(newOptions.flagsSet);
-        };
-
-        if (!cmr.usePowerOf2Sizes.eoo()) {
-            setCollectionOption(cmr.usePowerOf2Sizes);
-        }
-
-        if (!cmr.noPadding.eoo()) {
-            setCollectionOption(cmr.noPadding);
-        }
-
-        // Only observe non-view collMods, as view operations are observed as operations on the
-        // system.views collection.
-        getGlobalServiceContext()->getOpObserver()->onCollMod(
-            opCtx, nss, coll->uuid(opCtx), oplogEntryBuilder.obj());
+        wunit.commit();
+        return Status::OK();
     }
+
+    // In order to facilitate the replication rollback process, which makes a best effort attempt to
+    // "undo" a set of oplog operations, we store a snapshot of the old collection options to
+    // provide to the OpObserver. TTL index updates aren't a part of collection options so we
+    // save the relevant TTL index data in a separate object.
+
+    CollectionOptions oldCollOptions = coll->getCatalogEntry()->getCollectionOptions(opCtx);
+    boost::optional<TTLCollModInfo> ttlInfo;
+
+    // Handle collMod operation type appropriately.
+
+    // TTLIndex
+    if (!cmr.indexExpireAfterSeconds.eoo()) {
+        BSONElement& newExpireSecs = cmr.indexExpireAfterSeconds;
+        BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
+
+        if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs != newExpireSecs)) {
+            result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
+
+            // Change the value of "expireAfterSeconds" on disk.
+            coll->getCatalogEntry()->updateTTLSetting(
+                opCtx, cmr.idx->indexName(), newExpireSecs.safeNumberLong());
+
+            // Notify the index catalog that the definition of this index changed.
+            cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
+            result->appendAs(newExpireSecs, "expireAfterSeconds_new");
+        }
+
+        // Save previous TTL index expiration.
+        ttlInfo = TTLCollModInfo{Seconds(newExpireSecs.safeNumberLong()),
+                                 Seconds(oldExpireSecs.safeNumberLong()),
+                                 cmr.idx->indexName()};
+    }
+
+    // Validator
+    if (!cmr.collValidator.eoo())
+        coll->setValidator(opCtx, cmr.collValidator.Obj());
+
+    // ValidationAction
+    if (!cmr.collValidationAction.empty())
+        coll->setValidationAction(opCtx, cmr.collValidationAction);
+
+    // ValidationLevel
+    if (!cmr.collValidationLevel.empty())
+        coll->setValidationLevel(opCtx, cmr.collValidationLevel);
+
+    // UsePowerof2Sizes
+    if (!cmr.usePowerOf2Sizes.eoo())
+        setCollectionOptionFlag(opCtx, coll, cmr.usePowerOf2Sizes, result);
+
+    // NoPadding
+    if (!cmr.noPadding.eoo())
+        setCollectionOptionFlag(opCtx, coll, cmr.noPadding, result);
+
+
+    // Only observe non-view collMods, as view operations are observed as operations on the
+    // system.views collection.
+    getGlobalServiceContext()->getOpObserver()->onCollMod(
+        opCtx, nss, coll->uuid(opCtx), oplogEntryBuilder.obj(), oldCollOptions, ttlInfo);
 
     wunit.commit();
 

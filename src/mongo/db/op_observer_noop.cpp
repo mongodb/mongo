@@ -66,7 +66,9 @@ void OpObserverNoop::onCreateCollection(OperationContext*,
 void OpObserverNoop::onCollMod(OperationContext*,
                                const NamespaceString&,
                                OptionalCollectionUUID,
-                               const BSONObj&) {}
+                               const BSONObj&,
+                               const CollectionOptions& oldCollOptions,
+                               boost::optional<TTLCollModInfo> ttlInfo) {}
 
 void OpObserverNoop::onDropDatabase(OperationContext*, const std::string&) {}
 

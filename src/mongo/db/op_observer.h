@@ -62,6 +62,12 @@ struct OplogUpdateEntryArgs {
     bool fromMigrate;
 };
 
+struct TTLCollModInfo {
+    Seconds expireAfterSeconds;
+    Seconds oldExpireAfterSeconds;
+    std::string indexName;
+};
+
 class OpObserver {
     MONGO_DISALLOW_COPYING(OpObserver);
 
@@ -103,10 +109,43 @@ public:
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex) = 0;
+    /**
+     * This function logs an oplog entry when a 'collMod' command on a collection is executed.
+     * Since 'collMod' commands can take a variety of different formats, the 'o' field of the
+     * oplog entry is populated with the 'collMod' command object. For TTL index updates, we
+     * transform key pattern index specifications into index name specifications, for uniformity.
+     * All other collMod fields are added to the 'o' object without modifications.
+     *
+     * To facilitate the rollback process, 'oldCollOptions' contains the previous state of all
+     * collection options i.e. the state prior to completion of the current collMod command.
+     * 'ttlInfo' contains the index name and previous expiration time of a TTL index. The old
+     * collection options will be stored in the 'o2.collectionOptions_old' field, and the old TTL
+     * expiration value in the 'o2.expireAfterSeconds_old' field.
+     *
+     * Oplog Entry Example ('o' and 'o2' fields shown):
+     *
+     *      {
+     *          ...
+     *          o: {
+     *              collMod: "test",
+     *              validationLevel: "off",
+     *              index: {name: "indexName_1", expireAfterSeconds: 600}
+     *          }
+     *          o2: {
+     *              collectionOptions_old: {
+     *                  validationLevel: "strict",
+     *              },
+     *              expireAfterSeconds_old: 300
+     *          }
+     *      }
+     *
+     */
     virtual void onCollMod(OperationContext* opCtx,
                            const NamespaceString& nss,
                            OptionalCollectionUUID uuid,
-                           const BSONObj& collModCmd) = 0;
+                           const BSONObj& collModCmd,
+                           const CollectionOptions& oldCollOptions,
+                           boost::optional<TTLCollModInfo> ttlInfo) = 0;
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
     virtual void onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,

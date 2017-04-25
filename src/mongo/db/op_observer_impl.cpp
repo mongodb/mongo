@@ -219,18 +219,66 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     logOpForDbHash(opCtx, dbName);
 }
 
+namespace {
+/**
+ * Given a raw collMod command object and associated collection metadata, create and return the
+ * object for the 'o' field of a collMod oplog entry. For TTL index updates, we make sure the oplog
+ * entry always stores the index name, instead of a key pattern.
+ */
+BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
+                          const CollectionOptions& oldCollOptions,
+                          boost::optional<TTLCollModInfo> ttlInfo) {
+    BSONObjBuilder cmdObjBuilder;
+    std::string ttlIndexFieldName = "index";
+
+    // Add all fields from the original collMod command.
+    for (auto elem : collModCmd) {
+        // We normalize all TTL collMod oplog entry objects to use the index name, even if the
+        // command used an index key pattern.
+        if (elem.fieldNameStringData() == ttlIndexFieldName && ttlInfo) {
+            BSONObjBuilder ttlIndexObjBuilder;
+            ttlIndexObjBuilder.append("name", ttlInfo->indexName);
+            ttlIndexObjBuilder.append("expireAfterSeconds",
+                                      durationCount<Seconds>(ttlInfo->expireAfterSeconds));
+
+            cmdObjBuilder.append(ttlIndexFieldName, ttlIndexObjBuilder.obj());
+        } else {
+            cmdObjBuilder.append(elem);
+        }
+    }
+
+    return cmdObjBuilder.obj();
+}
+}
+
 void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
-                               const BSONObj& collModCmd) {
+                               const BSONObj& collModCmd,
+                               const CollectionOptions& oldCollOptions,
+                               boost::optional<TTLCollModInfo> ttlInfo) {
+
     const NamespaceString cmdNss = nss.getCommandNS();
+
+    // Create the 'o' field object.
+    BSONObj cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, ttlInfo);
+
+    // Create the 'o2' field object. We save the old collection metadata and TTL expiration.
+    BSONObjBuilder o2Builder;
+    o2Builder.append("collectionOptions_old", oldCollOptions.toBSON());
+    if (ttlInfo) {
+        auto oldExpireAfterSeconds = durationCount<Seconds>(ttlInfo->oldExpireAfterSeconds);
+        o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
+    }
+
+    const BSONObj o2Obj = o2Builder.obj();
 
     if (!nss.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", cmdNss, uuid, collModCmd, nullptr, false);
+        repl::logOp(opCtx, "c", cmdNss, uuid, cmdObj, &o2Obj, false);
     }
 
-    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, collModCmd, nullptr);
+    getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
     logOpForDbHash(opCtx, cmdNss);
 }
 

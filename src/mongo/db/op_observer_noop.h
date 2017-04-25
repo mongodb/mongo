@@ -67,7 +67,9 @@ public:
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
-                   const BSONObj& collModCmd) override;
+                   const BSONObj& collModCmd,
+                   const CollectionOptions& oldCollOptions,
+                   boost::optional<TTLCollModInfo> ttlInfo) override;
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
     void onDropCollection(OperationContext* opCtx,
                           const NamespaceString& collectionName,
