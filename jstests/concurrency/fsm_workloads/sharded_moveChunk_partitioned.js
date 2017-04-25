@@ -129,7 +129,7 @@ var $config = extendWorkload($config, function($config, $super) {
                     conn, this.partition.chunkLower, this.partition.chunkUpper);
                 msg = 'Number of chunks in partition seen by config changed with moveChunk.\n' +
                     msgBase;
-                assertWhenOwnColl.eq(numChunksBefore, numChunksAfter, msgBase);
+                assertWhenOwnColl.eq(numChunksBefore, numChunksAfter, msg);
             }
         }
 
@@ -142,7 +142,7 @@ var $config = extendWorkload($config, function($config, $super) {
             var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
             msg =
                 'Number of chunks in partition seen by mongos changed with moveChunk.\n' + msgBase;
-            assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msgBase);
+            assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msg);
 
             // If the moveChunk operation succeeded, verify that each mongos sees all data in the
             // chunk's range on only the toShard. If the operation failed, verify that each mongos
