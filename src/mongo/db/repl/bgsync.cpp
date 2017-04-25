@@ -617,19 +617,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     OplogInterfaceLocal localOplog(opCtx, rsOplogName);
     if (use3dot4Rollback) {
-        const int messagingPortTags = 0;
-        ConnectionPool connectionPool(messagingPortTags);
-        std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-        auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
-            if (!connection.get()) {
-                connection.reset(new ConnectionPool::ConnectionPtr(
-                    &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
-            };
-            return connection->get();
-        };
-
-        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-        rollback(opCtx, localOplog, rollbackSource, requiredRBID, _replCoord, storageInterface);
+        log() << "Rollback falling back on 3.4 algorithm due to startup server parameter";
+        _fallBackOn3dot4Rollback(opCtx, source, requiredRBID, &localOplog, storageInterface);
     } else {
         AbstractAsyncComponent* rollback;
         StatusWith<OpTime> onRollbackShutdownResult =
@@ -663,11 +652,16 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             warning() << "Unable to schedule rollback: " << scheduleStatus;
         } else {
             rollback->join();
-            if (!onRollbackShutdownResult.isOK()) {
-                warning() << "Rollback failed with error: " << onRollbackShutdownResult.getStatus();
-            } else {
+            auto status = onRollbackShutdownResult.getStatus();
+            if (status.isOK()) {
                 log() << "Rollback successful. Last applied optime: "
                       << onRollbackShutdownResult.getValue();
+            } else if (ErrorCodes::IncompatibleRollbackAlgorithm == status) {
+                log() << "Rollback falling back on 3.4 algorithm due to " << status;
+                _fallBackOn3dot4Rollback(
+                    opCtx, source, requiredRBID, &localOplog, storageInterface);
+            } else {
+                warning() << "Rollback failed with error: " << status;
             }
         }
     }
@@ -675,6 +669,26 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     // Reset the producer to clear the sync source and the last optime fetched.
     stop(true);
     startProducerIfStopped();
+}
+
+void BackgroundSync::_fallBackOn3dot4Rollback(OperationContext* opCtx,
+                                              const HostAndPort& source,
+                                              int requiredRBID,
+                                              OplogInterface* localOplog,
+                                              StorageInterface* storageInterface) {
+    const int messagingPortTags = 0;
+    ConnectionPool connectionPool(messagingPortTags);
+    std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
+    auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
+        if (!connection.get()) {
+            connection.reset(new ConnectionPool::ConnectionPtr(
+                &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
+        };
+        return connection->get();
+    };
+
+    RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+    rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, storageInterface);
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {

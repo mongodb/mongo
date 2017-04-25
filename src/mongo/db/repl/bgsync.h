@@ -52,6 +52,7 @@ class OperationContext;
 
 namespace repl {
 
+class OplogInterface;
 class ReplicationCoordinator;
 class ReplicationCoordinatorExternalState;
 class StorageInterface;
@@ -170,6 +171,24 @@ private:
                       const HostAndPort& source,
                       int requiredRBID,
                       StorageInterface* storageInterface);
+
+    /**
+     * Executes a rollback using the 3.4 algorithm in rs_rollback.cpp.
+     *
+     * We fall back on the 3.4 rollback algorithm when:
+     * 1)  the server parameter "use3dot4Rollback" is enabled; or
+     * 2)  the current rollback algorithm in RollbackImpl determines that it cannot handle certain
+     *     3.4 operations (either in the local or remote oplog) and returns an error code of
+     *     MustFallBackOn3dot4Rollback.
+     *
+     * Must be called from _runRollback() which ensures that all the conditions for entering
+     * rollback have been met.
+     */
+    void _fallBackOn3dot4Rollback(OperationContext* opCtx,
+                                  const HostAndPort& source,
+                                  int requiredRBID,
+                                  OplogInterface* localOplog,
+                                  StorageInterface* storageInterface);
 
     // restart syncing
     void start(OperationContext* opCtx);
