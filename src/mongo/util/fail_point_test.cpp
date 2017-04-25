@@ -38,11 +38,14 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
+using mongo::getGlobalFailPointRegistry;
 using mongo::BSONObj;
 using mongo::FailPoint;
+using mongo::FailPointEnableBlock;
 namespace stdx = mongo::stdx;
 
 namespace mongo_test {
@@ -397,5 +400,18 @@ TEST(FailPoint, parseBSONValidDataSucceeds) {
                                              << "data"
                                              << BSON("a" << 1)));
     ASSERT_TRUE(swTuple.isOK());
+}
+
+TEST(FailPoint, FailPointBlockBasicTest) {
+    auto failPoint = getGlobalFailPointRegistry()->getFailPoint("dummy");
+
+    ASSERT_FALSE(failPoint->shouldFail());
+
+    {
+        FailPointEnableBlock dummyFp("dummy");
+        ASSERT_TRUE(failPoint->shouldFail());
+    }
+
+    ASSERT_FALSE(failPoint->shouldFail());
 }
 }

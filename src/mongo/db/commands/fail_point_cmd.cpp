@@ -99,7 +99,7 @@ public:
         FailPointRegistry* registry = getGlobalFailPointRegistry();
         FailPoint* failPoint = registry->getFailPoint(failPointName);
 
-        if (failPoint == NULL) {
+        if (failPoint == nullptr) {
             errmsg = failPointName + " not found";
             return false;
         }
