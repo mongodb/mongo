@@ -122,7 +122,7 @@ def _get_field_storage_type(field):
 def _get_field_member_name(field):
     # type: (ast.Field) -> unicode
     """Get the C++ class member name for a field."""
-    return '_%s' % (common.camel_case(field.name))
+    return '_%s' % (common.camel_case(field.cpp_name))
 
 
 def _get_return_by_reference(field):
@@ -404,7 +404,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 body_template = 'return ${param_type}{${member_name}};'
 
         template_params = {
-            'method_name': common.title_case(field.name),
+            'method_name': common.title_case(field.cpp_name),
             'member_name': member_name,
             'optional_ampersand': optional_ampersand,
             'param_type': param_type,
@@ -436,7 +436,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         member_name = _get_field_member_name(field)
 
         template_params = {
-            'method_name': common.title_case(field.name),
+            'method_name': common.title_case(field.cpp_name),
             'member_name': member_name,
             'param_type': param_type,
         }

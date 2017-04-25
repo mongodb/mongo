@@ -284,43 +284,44 @@ TEST(IDLStructTests, TestNonStrictStruct) {
 
     // Positive: Just 3 required fields
     {
-        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
-        RequiredNonStrictField3::parse(ctxt, testDoc);
+        auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234);
+        auto testStruct = RequiredNonStrictField3::parse(ctxt, testDoc);
+
+        assert_same_types<decltype(testStruct.getField1()), std::int32_t>();
+        assert_same_types<decltype(testStruct.getField2()), std::int32_t>();
+        assert_same_types<decltype(testStruct.getField3()), std::int32_t>();
     }
 
     // Negative: Missing 1 required field
     {
-        auto testDoc = BSON("field2" << 123 << "field3" << 1234);
+        auto testDoc = BSON("2" << 123 << "3" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), UserException);
     }
     {
-        auto testDoc = BSON("field1" << 12 << "field3" << 1234);
+        auto testDoc = BSON("1" << 12 << "3" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), UserException);
     }
     {
-        auto testDoc = BSON("field1" << 12 << "field2" << 123);
+        auto testDoc = BSON("1" << 12 << "2" << 123);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), UserException);
     }
 
     // Positive: Extra field
     {
-        auto testDoc =
-            BSON("field1" << 12 << "field2" << 123 << "field3" << 1234 << "field4" << 1234);
+        auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
         RequiredNonStrictField3::parse(ctxt, testDoc);
     }
 
     // Negative: Duplicate field
     {
-        auto testDoc =
-            BSON("field1" << 12 << "field2" << 123 << "field3" << 1234 << "field2" << 12345);
+        auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234 << "2" << 12345);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), UserException);
     }
 
     // Negative: Duplicate extra field
     {
-        auto testDoc = BSON(
-            "field4" << 1234 << "field1" << 12 << "field2" << 123 << "field3" << 1234 << "field4"
-                     << 1234);
+        auto testDoc =
+            BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), UserException);
     }
 }

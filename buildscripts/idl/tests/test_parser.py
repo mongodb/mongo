@@ -344,6 +344,7 @@ class TestParser(testcase.IDLTestcase):
                         description: foo
                         optional: true
                         ignore: true
+                        cpp_name: bar
             """))
 
         # Test false bools

@@ -113,9 +113,16 @@ structs:
         description: UnitTest for a non-strict struct with 3 required fields
         strict: false
         fields:
-            field1: int
-            field2: int
-            field3: int
+            1:
+                type: int
+                cpp_name: field1
+            2:
+                type: int
+                cpp_name: field2
+            3:
+                type: int
+                cpp_name: field3
+
 
 ##################################################################################################
 #

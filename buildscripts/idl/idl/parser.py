@@ -195,6 +195,7 @@ def _parse_field(ctxt, name, node):
 
     _generic_parser(ctxt, node, "field", field, {
         "description": _RuleDesc('scalar'),
+        "cpp_name": _RuleDesc('scalar'),
         "type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
         "ignore": _RuleDesc("bool_scalar"),
         "optional": _RuleDesc("bool_scalar"),

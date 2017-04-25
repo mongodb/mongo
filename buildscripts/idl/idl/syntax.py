@@ -237,6 +237,7 @@ class Field(common.SourceLocation):
         # type: (unicode, int, int) -> None
         """Construct a Field."""
         self.name = None  # type: unicode
+        self.cpp_name = None  # type: unicode
         self.description = None  # type: unicode
         self.type = None  # type: unicode
         self.ignore = False  # type: bool

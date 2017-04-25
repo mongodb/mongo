@@ -236,6 +236,10 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.description = field.description
     ast_field.optional = field.optional
 
+    ast_field.cpp_name = field.name
+    if field.cpp_name:
+        ast_field.cpp_name = field.cpp_name
+
     # Validate naming restrictions
     if ast_field.name.startswith("array<"):
         ctxt.add_array_not_valid_error(ast_field, "field", ast_field.name)
