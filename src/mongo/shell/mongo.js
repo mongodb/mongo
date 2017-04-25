@@ -39,13 +39,44 @@ Mongo.prototype.setCausalConsistency = function(value) {
     this._isCausal = value;
 };
 
-Mongo.prototype.isCausalConsistencyEnabled = function(cmdName) {
+Mongo.prototype.isCausalConsistencyEnabled = function(cmdName, cmdObj) {
     if (!this._isCausal) {
         return false;
     }
-    if (typeof cmdName === "string" && cmdName === "find") {
-        return true;
+
+    // Currently, read concern afterClusterTime is only supported for read concern level majority.
+    var commandsThatSupportMajorityReadConcern = [
+        "count",
+        "distinct",
+        "find",
+        "geoNear",
+        "geoSearch",
+        "group",
+        "mapReduce",
+        "mapreduce",
+        "parallelCollectionScan",
+    ];
+
+    var supportsMajorityReadConcern =
+        Array.contains(commandsThatSupportMajorityReadConcern, cmdName);
+
+    if (cmdName === "aggregate") {
+        // Aggregate can be either a read or a write depending on whether it has a $out stage.
+        // $out is required to be the last stage of the pipeline.
+        var stages = cmdObj.pipeline;
+        const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
+            ? stages[stages.length - 1]
+            : undefined;
+        const hasOut =
+            lastStage && (typeof lastStage === "object") && lastStage.hasOwnProperty("$out");
+        const hasExplain = cmdObj.hasOwnProperty("explain");
+
+        if (!hasExplain && !hasOut) {
+            supportsMajorityReadConcern = true;
+        }
     }
+
+    return supportsMajorityReadConcern;
 };
 
 Mongo.prototype.setSlaveOk = function(value) {
@@ -122,7 +153,7 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
  */
 Mongo.prototype.runCausalConsistentCommandWithMetadata = function(
     dbName, cmdName, metadata, cmdObj) {
-    if (this.isCausalConsistencyEnabled(cmdName) && cmdObj) {
+    if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
         cmdObj = this._injectAfterClusterTime(cmdObj);
     }
     const res = this.runCommandWithMetadata(dbName, cmdName, metadata, cmdObj);
@@ -136,7 +167,7 @@ Mongo.prototype.runCausalConsistentCommandWithMetadata = function(
 Mongo.prototype.runCausalConsistentCommand = function(dbName, cmdObj, options) {
     const cmdName = Object.keys(cmdObj)[0];
 
-    if (this.isCausalConsistencyEnabled(cmdName) && cmdObj) {
+    if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
         cmdObj = this._injectAfterClusterTime(cmdObj);
     }
     const res = this.runCommand(dbName, cmdObj, options);
