@@ -55,7 +55,6 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
@@ -224,20 +223,11 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     }
 
     // Determine the default read preference mode based on the value of the slaveOk flag.
-    const ReadPreferenceSetting readPreference = [&]() {
-        BSONElement rpElem;
-        auto readPrefExtractStatus = bsonExtractTypedField(
-            q.query, QueryRequest::kWrappedReadPrefField, mongo::Object, &rpElem);
-        if (readPrefExtractStatus == ErrorCodes::NoSuchKey) {
-            return ReadPreferenceSetting(q.queryOptions & QueryOption_SlaveOk
-                                             ? ReadPreference::SecondaryPreferred
-                                             : ReadPreference::PrimaryOnly);
-        }
-
-        uassertStatusOK(readPrefExtractStatus);
-
-        return uassertStatusOK(ReadPreferenceSetting::fromBSON(rpElem.Obj()));
-    }();
+    const auto defaultReadPref = q.queryOptions & QueryOption_SlaveOk
+        ? ReadPreference::SecondaryPreferred
+        : ReadPreference::PrimaryOnly;
+    const auto readPreference =
+        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(q.query, defaultReadPref));
 
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx, q, ExtensionsCallbackNoop()));
@@ -251,12 +241,9 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
         // We default to allPlansExecution verbosity.
         const auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
 
-        const bool secondaryOk = (readPreference.pref != ReadPreference::PrimaryOnly);
-        const rpc::ServerSelectionMetadata metadata(secondaryOk, readPreference);
-
         BSONObjBuilder explainBuilder;
         uassertStatusOK(Strategy::explainFind(
-            opCtx, findCommand, queryRequest, verbosity, metadata, &explainBuilder));
+            opCtx, findCommand, queryRequest, verbosity, readPreference, &explainBuilder));
 
         BSONObj explainObj = explainBuilder.done();
         return replyToQuery(explainObj);
@@ -357,10 +344,9 @@ DbResponse Strategy::clientCommandOp(OperationContext* opCtx,
                 // The command has a read preference setting. We don't want to lose this information
                 // so we put it on the OperationContext and copy it to a new field called
                 // $queryOptions.$readPreference
-                auto readPref =
-                    uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefElem.Obj()));
-                rpc::ServerSelectionMetadata::get(opCtx) = rpc::ServerSelectionMetadata(
-                    readPref.pref != ReadPreference::PrimaryOnly, readPref);
+                ReadPreferenceSetting::get(opCtx) =
+                    uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPrefElem));
+
                 haveReadPref = true;
                 BSONObjBuilder finalCmdObjBuilder;
                 finalCmdObjBuilder.appendElements(e.embeddedObject());
@@ -378,16 +364,15 @@ DbResponse Strategy::clientCommandOp(OperationContext* opCtx,
         if (!haveReadPref && q.queryOptions & QueryOption_SlaveOk) {
             // If the slaveOK bit is set, behave as-if read preference secondary-preferred was
             // specified.
-            rpc::ServerSelectionMetadata::get(opCtx) = rpc::ServerSelectionMetadata(
-                true, ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
+            const auto readPref = ReadPreferenceSetting(ReadPreference::SecondaryPreferred);
+            ReadPreferenceSetting::get(opCtx) = readPref;
+
             BSONObjBuilder finalCmdObjBuilder;
             finalCmdObjBuilder.appendElements(cmdObj);
 
             BSONObjBuilder queryOptionsBuilder(finalCmdObjBuilder.subobjStart("$queryOptions"));
-            queryOptionsBuilder.append(
-                Query::ReadPrefField.name(),
-                ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toBSON());
-            queryOptionsBuilder.done();
+            readPref.toContainingBSON(&queryOptionsBuilder);
+            queryOptionsBuilder.doneFast();
 
             cmdObj = finalCmdObjBuilder.obj();
         }
@@ -624,7 +609,7 @@ Status Strategy::explainFind(OperationContext* opCtx,
                              const BSONObj& findCommand,
                              const QueryRequest& qr,
                              ExplainOptions::Verbosity verbosity,
-                             const rpc::ServerSelectionMetadata& ssm,
+                             const ReadPreferenceSetting& readPref,
                              BSONObjBuilder* out) {
     const auto explainCmd = ClusterExplain::wrapAsExplain(findCommand, verbosity);
 
@@ -635,7 +620,7 @@ Status Strategy::explainFind(OperationContext* opCtx,
     auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                       qr.nss(),
                                                       explainCmd,
-                                                      getReadPref(ssm),
+                                                      readPref,
                                                       qr.getFilter(),
                                                       qr.getCollation(),
                                                       true,  // do shard versioning

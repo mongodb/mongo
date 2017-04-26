@@ -31,7 +31,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -150,7 +149,7 @@ public:
         bool commandCanRunOnSecondary = commToExplain->slaveOk();
 
         bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
-            rpc::ServerSelectionMetadata::get(opCtx).canRunOnSecondary();
+            ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
         bool iAmStandalone = !opCtx->writesAreReplicated();
 
         const bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||

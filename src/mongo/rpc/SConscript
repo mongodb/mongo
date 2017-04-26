@@ -134,7 +134,6 @@ env.Clone().InjectModule("enterprise").Library(
         'metadata/config_server_metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
         'metadata/logical_time_metadata.cpp',
-        'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
         'metadata/oplog_query_metadata.cpp',
@@ -158,9 +157,9 @@ env.CppUnitTest(
         'rpc_metadata_test',
     ],
     source=[
+        'metadata_test.cpp',
         'metadata/egress_metadata_hook_list_test.cpp',
         'metadata/logical_time_metadata_test.cpp',
-        'metadata/server_selection_metadata_test.cpp',
         'metadata/sharding_metadata_test.cpp',
         'metadata/tracking_metadata_test.cpp',
     ],

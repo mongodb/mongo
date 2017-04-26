@@ -38,7 +38,6 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_find.h"
@@ -115,12 +114,8 @@ public:
             return qr.getStatus();
         }
 
-        auto result = Strategy::explainFind(opCtx,
-                                            cmdObj,
-                                            *qr.getValue(),
-                                            verbosity,
-                                            rpc::ServerSelectionMetadata::get(opCtx),
-                                            out);
+        auto result = Strategy::explainFind(
+            opCtx, cmdObj, *qr.getValue(), verbosity, ReadPreferenceSetting::get(opCtx), out);
 
         if (result == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
             auto resolvedView = ResolvedView::fromBSON(out->asTempObj());

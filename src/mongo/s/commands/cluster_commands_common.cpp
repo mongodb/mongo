@@ -37,7 +37,6 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
@@ -208,16 +207,7 @@ BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version) {
 
 ReadPreferenceSetting getReadPref(const BSONObj& cmdObj) {
     const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
-    const auto readPrefObj = queryOptionsObj.getObjectField(QueryRequest::kWrappedReadPrefField);
-    return readPrefObj.isEmpty() ? ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet())
-                                 : uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefObj));
-}
-
-ReadPreferenceSetting getReadPref(const rpc::ServerSelectionMetadata& ssm) {
-    return ssm.getReadPreference()
-        ? *ssm.getReadPreference()
-        : (ssm.isSecondaryOk() ? ReadPreferenceSetting(ReadPreference::SecondaryPreferred, TagSet())
-                               : ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet()));
+    return uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(queryOptionsObj));
 }
 
 StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(

@@ -57,19 +57,6 @@ BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version);
 ReadPreferenceSetting getReadPref(const BSONObj& cmdObj);
 
 /**
- * Returns the read preference from the ServerSelectionMetadata if set or defaults to PrimaryOnly
- * and an empty TagSet.
- *
- * This is used by explain commands, where the read preference is extracted and placed into
- * ServerSelectionMetadata before the explain command is run.
- *
- * This is because only the value of the 'explain' field in the cmdObj is passed to the Command's
- * explain() method, and the readPreference is at the same level as the 'explain' field:
- * { explain: { find: "foo" }, $queryOptions: { $readPreference: { ... } } }
- */
-ReadPreferenceSetting getReadPref(const rpc::ServerSelectionMetadata& ssm);
-
-/**
  * Broadcasts 'cmdObj' to all shards and returns the responses as a vector.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution.

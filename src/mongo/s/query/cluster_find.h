@@ -44,10 +44,6 @@ class OperationContext;
 struct GetMoreRequest;
 struct ReadPreferenceSetting;
 
-namespace rpc {
-class ServerSelectionMetadata;
-}  // namespace rpc
-
 /**
  * Methods for running find and getMore operations across a sharded cluster.
  */

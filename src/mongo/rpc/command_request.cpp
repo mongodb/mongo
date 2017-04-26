@@ -93,13 +93,24 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
             _commandArgs.firstElementFieldName() == _commandName);
 
     // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
-    // fields differently. We do all up- and down-conversion here so that the rest of the code only
-    // has to deal with the current format.
+    // fields differently. We do all up-conversion here so that the rest of the code only has to
+    // deal with the current format.
     uassertStatusOK(cur.readAndAdvance<>(&obj));
     BSONObjBuilder metadataBuilder;
     for (auto elem : obj.val) {
         if (elem.fieldNameStringData() == "configsvr") {
             metadataBuilder.appendAs(elem, "$configServerState");
+        } else if (elem.fieldNameStringData() == "$ssm") {
+            auto ssmObj = elem.Obj();
+            if (auto readPrefElem = ssmObj["$readPreference"]) {
+                // Promote the read preference to the top level.
+                metadataBuilder.append(readPrefElem);
+            } else if (ssmObj["$secondaryOk"].trueValue()) {
+                // Convert secondaryOk to equivalent read preference if none was explicitly
+                // provided.
+                ReadPreferenceSetting(ReadPreference::SecondaryPreferred)
+                    .toContainingBSON(&metadataBuilder);
+            }
         } else {
             metadataBuilder.append(elem);
         }

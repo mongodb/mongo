@@ -470,15 +470,7 @@ StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BS
     if (status.isOK()) {
         // There must be a nested object containing the read preference if there is a queryOptions
         // field.
-        BSONObj queryOptionsObj = queryOptionsElt.Obj();
-        invariant(queryOptionsObj[QueryRequest::kWrappedReadPrefField].type() == BSONType::Object);
-        BSONObj readPrefObj = queryOptionsObj[QueryRequest::kWrappedReadPrefField].Obj();
-
-        auto readPref = ReadPreferenceSetting::fromBSON(readPrefObj);
-        if (!readPref.isOK()) {
-            return readPref.getStatus();
-        }
-        return readPref.getValue();
+        return ReadPreferenceSetting::fromContainingBSON(queryOptionsElt.Obj());
     } else if (status != ErrorCodes::NoSuchKey) {
         return status;
     }

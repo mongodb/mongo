@@ -63,10 +63,6 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
-namespace rpc {
-class ServerSelectionMetadata;
-}  // namespace rpc
-
 /**
  * Serves as a base for server commands. See the constructor for more details.
  */
@@ -483,8 +479,8 @@ public:
             arg == "$gleStats" ||           //
             arg == "$oplogQueryData" ||     //
             arg == "$queryOptions" ||       //
+            arg == "$readPreference" ||     //
             arg == "$replData" ||           //
-            arg == "$ssm" ||                //
             arg == "logicalTime" ||         //
             arg == "maxTimeMS" ||           //
             arg == "readConcern" ||         //

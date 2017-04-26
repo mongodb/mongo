@@ -35,7 +35,6 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -62,11 +61,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     }
 
     // Initialize command metadata to handle the read preference.
-    BSONObjBuilder metadataBuilder;
-    rpc::ServerSelectionMetadata metadata(_readPreference.pref != ReadPreference::PrimaryOnly,
-                                          boost::none);
-    uassertStatusOK(metadata.writeToMetadata(&metadataBuilder));
-    _metadataObj = metadataBuilder.obj();
+    _metadataObj = readPreference.toContainingBSON();
 
     // Schedule the requests immediately.
 

@@ -43,7 +43,6 @@
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 
@@ -76,7 +75,7 @@ BSONObj makeEmptyMetadata() {
 }
 
 void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
-    BSONElement ssmElem;
+    BSONElement readPreferenceElem;
     BSONElement auditElem;
     BSONElement configSvrElem;
     BSONElement trackingElem;
@@ -85,8 +84,8 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
 
     for (const auto& metadataElem : metadataObj) {
         auto fieldName = metadataElem.fieldNameStringData();
-        if (fieldName == ServerSelectionMetadata::fieldName()) {
-            ssmElem = metadataElem;
+        if (fieldName == "$readPreference") {
+            readPreferenceElem = metadataElem;
         } else if (fieldName == AuditMetadata::fieldName()) {
             auditElem = metadataElem;
         } else if (fieldName == ConfigServerMetadata::fieldName()) {
@@ -100,8 +99,10 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
         }
     }
 
-    ServerSelectionMetadata::get(opCtx) =
-        uassertStatusOK(ServerSelectionMetadata::readFromMetadata(ssmElem));
+    if (readPreferenceElem) {
+        ReadPreferenceSetting::get(opCtx) =
+            uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreferenceElem));
+    }
 
     AuditMetadata::get(opCtx) = uassertStatusOK(AuditMetadata::readFromMetadata(auditElem));
 
@@ -143,20 +144,44 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
 CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
     // We can reuse the same metadata BOB for every upconvert call, but we need to keep
     // making new command BOBs as each metadata bob will need to remove fields. We can not use
-    // mutablebson here because the ServerSelectionMetadata upconvert routine performs
+    // mutablebson here because the ReadPreference upconvert routine performs
     // manipulations (replacing a root with its child) that mutablebson doesn't
     // support.
+
+    auto readPrefContainer = BSONObj();
+    const StringData firstFieldName = legacyCmdObj.firstElementFieldName();
+    if (firstFieldName == "$query" || firstFieldName == "query") {
+        // Commands sent over OP_QUERY specify read preference by putting it at the top level and
+        // putting the command in a nested field called either query or $query.
+
+        // Check if legacyCommand has an invalid $maxTimeMS option.
+        uassert(ErrorCodes::InvalidOptions,
+                "cannot use $maxTimeMS query option with commands; use maxTimeMS command option "
+                "instead",
+                !legacyCmdObj.hasField("$maxTimeMS"));
+        readPrefContainer = legacyCmdObj;
+        legacyCmdObj = legacyCmdObj.firstElement().Obj().getOwned();
+    } else if (auto queryOptions = legacyCmdObj["$queryOptions"]) {
+        // Mongos rewrites commands with $readPreference to put it in a field nested inside of
+        // $queryOptions. Its command implementations often forward commands in that format to
+        // shards. This function is responsible for rewriting it to a format that the shards
+        // understand.
+        readPrefContainer = queryOptions.Obj().getOwned();
+        legacyCmdObj = legacyCmdObj.removeField("$queryOptions");
+    }
+
     BSONObjBuilder metadataBob;
+    if (auto readPref = readPrefContainer["$readPreference"]) {
+        metadataBob.append(readPref);
+    } else if (queryFlags & QueryOption_SlaveOk) {
+        ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&metadataBob);
+    }
 
-    // Ordering is important here - ServerSelectionMetadata must be upconverted
-    // first, then AuditMetadata.
-    BSONObjBuilder ssmCommandBob;
-    uassertStatusOK(
-        ServerSelectionMetadata::upconvert(legacyCmdObj, queryFlags, &ssmCommandBob, &metadataBob));
-
+    // Ordering is important here - AuditMetadata::upconvert() expects the above up-conversion to
+    // already be done.
     BSONObjBuilder auditCommandBob;
     uassertStatusOK(
-        AuditMetadata::upconvert(ssmCommandBob.done(), queryFlags, &auditCommandBob, &metadataBob));
+        AuditMetadata::upconvert(legacyCmdObj, queryFlags, &auditCommandBob, &metadataBob));
 
     return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
 }
@@ -165,16 +190,28 @@ LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadat
     int legacyQueryFlags = 0;
     BSONObjBuilder auditCommandBob;
     // Ordering is important here - AuditingMetadata must be downconverted first,
-    // then ServerSelectionMetadata.
+    // then ReadPreference.
     uassertStatusOK(
         AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags));
 
 
-    BSONObjBuilder ssmCommandBob;
-    uassertStatusOK(ServerSelectionMetadata::downconvert(
-        auditCommandBob.done(), metadata, &ssmCommandBob, &legacyQueryFlags));
+    auto readPref = metadata["$readPreference"];
+    if (!readPref)
+        readPref = cmdObj["$readPreference"];
 
-    return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
+    if (readPref) {
+        BSONObjBuilder bob;
+        bob.append("$query", cmdObj);
+        bob.append(readPref);
+        cmdObj = bob.obj();
+
+        auto parsed = ReadPreferenceSetting::fromInnerBSON(readPref);
+        if (parsed.isOK() && parsed.getValue().canRunOnSecondary()) {
+            legacyQueryFlags |= QueryOption_SlaveOk;
+        }
+    }
+
+    return std::make_tuple(cmdObj, std::move(legacyQueryFlags));
 }
 
 CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply) {

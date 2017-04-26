@@ -102,7 +102,6 @@
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -1602,8 +1601,8 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         {
             bool commandCanRunOnSecondary = command->slaveOk();
 
-            bool commandIsOverriddenToRunOnSecondary = command->slaveOverrideOk() &&
-                rpc::ServerSelectionMetadata::get(opCtx).canRunOnSecondary();
+            bool commandIsOverriddenToRunOnSecondary =
+                command->slaveOverrideOk() && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
 
             bool iAmStandalone = !opCtx->writesAreReplicated();
             bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||

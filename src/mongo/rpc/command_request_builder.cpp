@@ -32,6 +32,7 @@
 
 #include <utility>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/message.h"
@@ -71,12 +72,18 @@ CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs
 CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
     invariant(_state == State::kMetadata);
     // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
-    // fields differently. We do all up- and down-conversion here so that the rest of the code only
-    // has to deal with the current format.
+    // fields differently. We do all down-conversion here so that the rest of the code only has to
+    // deal with the current format.
     BSONObjBuilder bob(_builder);
     for (auto elem : metadata) {
         if (elem.fieldNameStringData() == "$configServerState") {
             bob.appendAs(elem, "configsvr");
+        } else if (elem.fieldNameStringData() == "$readPreference") {
+            BSONObjBuilder ssmBuilder(bob.subobjStart("$ssm"));
+            ssmBuilder.append(elem);
+            ssmBuilder.append(
+                "$secondaryOk",
+                uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(elem)).canRunOnSecondary());
         } else {
             bob.append(elem);
         }

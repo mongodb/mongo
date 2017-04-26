@@ -39,7 +39,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture.h"
@@ -1226,7 +1225,9 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     ASSERT_FALSE(arm->ready());
 
     BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
-    ASSERT_BSONOBJ_EQ(cmdRequestMetadata, rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    ASSERT(uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(cmdRequestMetadata))
+               .canRunOnSecondary())
+        << "full metadata: " << cmdRequestMetadata;
 
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};

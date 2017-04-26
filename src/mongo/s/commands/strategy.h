@@ -42,10 +42,6 @@ class NamespaceString;
 class OperationContext;
 class QueryRequest;
 
-namespace rpc {
-class ServerSelectionMetadata;
-}  // namespace rpc
-
 /**
  * Legacy interface for processing client read/write/cmd requests.
  */
@@ -101,7 +97,7 @@ public:
                               const BSONObj& findCommand,
                               const QueryRequest& qr,
                               ExplainOptions::Verbosity verbosity,
-                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                              const ReadPreferenceSetting& readPref,
                               BSONObjBuilder* out);
 
     struct CommandResult {

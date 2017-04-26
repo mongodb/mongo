@@ -38,7 +38,6 @@
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
@@ -72,11 +71,7 @@ AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
     // is primaryOnly, in which case if the remote host for one of the cursors changes roles, the
     // remote will return an error.
     if (_params->readPreference) {
-        BSONObjBuilder metadataBuilder;
-        rpc::ServerSelectionMetadata metadata(
-            _params->readPreference->pref != ReadPreference::PrimaryOnly, boost::none);
-        uassertStatusOK(metadata.writeToMetadata(&metadataBuilder));
-        _metadataObj = metadataBuilder.obj();
+        _metadataObj = _params->readPreference->toContainingBSON();
     }
 }
 
