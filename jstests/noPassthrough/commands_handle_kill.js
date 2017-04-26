@@ -66,13 +66,21 @@
      * @param {Object} cmdObj - The command to run.
      * @param {Boolean} [options.commandYields=true] - Whether or not this command can yield during
      *   execution.
-     * @param {Object} [options.curOpFilter={query: cmdObj}] - The query to use to find this
-     *   operation in the currentOp output.
+     * @param {Object} [options.curOpFilter] - The query to use to find this operation in the
+     *   currentOp output. The default checks that all fields of cmdObj are in the curOp query.
      * @param {Function} [options.customSetup=undefined] - A callback to do any necessary setup
      *   before the command can be run, like adding a geospatial index before a geoNear command.
      */
     function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
         options = options || {};
+
+        var curOpFilter = options.curOpFilter;
+        if (!curOpFilter) {
+            curOpFilter = {};
+            for (var arg in cmdObj) {
+                curOpFilter['query.' + arg] = {$eq: cmdObj[arg]};
+            }
+        }
 
         // These are commands that will cause all running PlanExecutors to be invalidated, and the
         // error messages that should be propagated when that happens.
@@ -127,7 +135,7 @@ if (${ canYield }) {
                                        ns: coll.getFullName(),
                                        numYields: {$gt: 0},
                                      },
-                                     options.curOpFilter || {query: {$eq: cmdObj}},
+                                     curOpFilter,
                                  ]
                              }).inprog.length > 0;
                 },
