@@ -47,18 +47,18 @@
 
 namespace mongo {
 
-const StringData AggregationRequest::kCommandName = "aggregate"_sd;
-const StringData AggregationRequest::kCursorName = "cursor"_sd;
-const StringData AggregationRequest::kBatchSizeName = "batchSize"_sd;
-const StringData AggregationRequest::kFromRouterName = "fromRouter"_sd;
-const StringData AggregationRequest::kPipelineName = "pipeline"_sd;
-const StringData AggregationRequest::kCollationName = "collation"_sd;
-const StringData AggregationRequest::kExplainName = "explain"_sd;
-const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
-const StringData AggregationRequest::kHintName = "hint"_sd;
-const StringData AggregationRequest::kCommentName = "comment"_sd;
+constexpr StringData AggregationRequest::kCommandName;
+constexpr StringData AggregationRequest::kCursorName;
+constexpr StringData AggregationRequest::kBatchSizeName;
+constexpr StringData AggregationRequest::kFromRouterName;
+constexpr StringData AggregationRequest::kPipelineName;
+constexpr StringData AggregationRequest::kCollationName;
+constexpr StringData AggregationRequest::kExplainName;
+constexpr StringData AggregationRequest::kAllowDiskUseName;
+constexpr StringData AggregationRequest::kHintName;
+constexpr StringData AggregationRequest::kCommentName;
 
-const long long AggregationRequest::kDefaultBatchSize = 101;
+constexpr long long AggregationRequest::kDefaultBatchSize;
 
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
     : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}

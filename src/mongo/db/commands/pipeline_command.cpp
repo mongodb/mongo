@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
@@ -50,8 +49,7 @@ bool isMergePipeline(const std::vector<BSONObj>& pipeline) {
 
 class PipelineCommand : public Command {
 public:
-    PipelineCommand()
-        : Command(AggregationRequest::kCommandName) {}  // command is called "aggregate"
+    PipelineCommand() : Command("aggregate", false) {}
 
     // Locks are managed manually, in particular by DocumentSourceCursor.
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -152,13 +150,8 @@ public:
 
         return runAggregate(opCtx, nss, request.getValue(), cmdObj, *out);
     }
-};
 
-MONGO_INITIALIZER(PipelineCommand)(InitializerContext* context) {
-    new PipelineCommand();
-
-    return Status::OK();
-}
+} pipelineCmd;
 
 }  // namespace
 }  // namespace mongo

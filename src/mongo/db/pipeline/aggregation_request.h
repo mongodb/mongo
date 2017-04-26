@@ -47,18 +47,18 @@ class Document;
  */
 class AggregationRequest {
 public:
-    static const StringData kCommandName;
-    static const StringData kCursorName;
-    static const StringData kBatchSizeName;
-    static const StringData kFromRouterName;
-    static const StringData kPipelineName;
-    static const StringData kCollationName;
-    static const StringData kExplainName;
-    static const StringData kAllowDiskUseName;
-    static const StringData kHintName;
-    static const StringData kCommentName;
+    static constexpr StringData kCommandName = "aggregate"_sd;
+    static constexpr StringData kCursorName = "cursor"_sd;
+    static constexpr StringData kBatchSizeName = "batchSize"_sd;
+    static constexpr StringData kFromRouterName = "fromRouter"_sd;
+    static constexpr StringData kPipelineName = "pipeline"_sd;
+    static constexpr StringData kCollationName = "collation"_sd;
+    static constexpr StringData kExplainName = "explain"_sd;
+    static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
+    static constexpr StringData kHintName = "hint"_sd;
+    static constexpr StringData kCommentName = "comment"_sd;
 
-    static const long long kDefaultBatchSize;
+    static constexpr long long kDefaultBatchSize = 101;
 
     /**
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a

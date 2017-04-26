@@ -41,12 +41,9 @@
 namespace mongo {
 namespace {
 
-/**
- * Implements the aggregation (pipeline command for sharding).
- */
-class PipelineCommand : public Command {
+class ClusterPipelineCommand : public Command {
 public:
-    PipelineCommand() : Command(AggregationRequest::kCommandName, false) {}
+    ClusterPipelineCommand() : Command("aggregate", false) {}
 
     virtual bool slaveOk() const {
         return true;
@@ -124,6 +121,7 @@ public:
 
         return ClusterAggregate::runAggregate(opCtx, nsStruct, request.getValue(), aggCmd, out);
     }
+
 } clusterPipelineCmd;
 
 }  // namespace
