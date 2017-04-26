@@ -33,17 +33,24 @@
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
-
 namespace logger {
 
-stdx::function<int()> MaxLogSizeKB::_getter = nullptr;
+namespace {
+
+stdx::function<int()>& getGetterFunction() {
+    static stdx::function<int()> instance;
+    return instance;
+}
+
+}  // namespace
 
 int MaxLogSizeKB::get() {
-    return (_getter == nullptr) ? 10 : _getter();
+    auto& getter = getGetterFunction();
+    return !getter ? 10 : getter();
 }
 
 void MaxLogSizeKB::setGetter(stdx::function<int()> getter) {
-    _getter = getter;
+    getGetterFunction() = std::move(getter);
 }
 
 }  // namespace logger

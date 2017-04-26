@@ -89,6 +89,7 @@ baseSource=[
     'logger/log_severity.cpp',
     'logger/logger.cpp',
     'logger/logstream_builder.cpp',
+    'logger/max_log_size.cpp',
     'logger/message_event_utf8_encoder.cpp',
     'logger/message_log_domain.cpp',
     'logger/ramlog.cpp',
@@ -140,7 +141,6 @@ baseLibDeps=[
     '$BUILD_DIR/third_party/shim_intel_decimal128',
     '$BUILD_DIR/third_party/shim_pcrecpp',
     '$BUILD_DIR/third_party/shim_tz',
-    'logger/max_log_size',
     'util/debugger',
     'util/quick_exit',
 ]

@@ -116,7 +116,7 @@ public:
 
         // --- all sections
 
-        for (SectionMap::const_iterator i = _sections->begin(); i != _sections->end(); ++i) {
+        for (SectionMap::const_iterator i = _sections.begin(); i != _sections.end(); ++i) {
             ServerStatusSection* section = i->second;
 
             std::vector<Privilege> requiredPrivileges;
@@ -175,10 +175,7 @@ public:
 
     void addSection(ServerStatusSection* section) {
         verify(!_runCalled);
-        if (_sections == 0) {
-            _sections = new SectionMap();
-        }
-        (*_sections)[section->getSectionName()] = section;
+        _sections[section->getSectionName()] = section;
     }
 
 private:
@@ -186,14 +183,29 @@ private:
     bool _runCalled;
 
     typedef map<string, ServerStatusSection*> SectionMap;
-    static SectionMap* _sections;
-} cmdServerStatus;
+    SectionMap _sections;
+};
 
+namespace {
 
-CmdServerStatus::SectionMap* CmdServerStatus::_sections = 0;
+// This widget ensures that the serverStatus command is registered even if no
+// server status sections are registered.
+
+const struct CmdServerStatusInstantiator {
+    explicit CmdServerStatusInstantiator() {
+        getInstance();
+    }
+
+    static CmdServerStatus& getInstance() {
+        static CmdServerStatus instance;
+        return instance;
+    }
+} kDoNotMentionThisVariable;
+
+}  // namespace
 
 ServerStatusSection::ServerStatusSection(const string& sectionName) : _sectionName(sectionName) {
-    cmdServerStatus.addSection(this);
+    CmdServerStatusInstantiator::getInstance().addSection(this);
 }
 
 OpCounterServerStatusSection::OpCounterServerStatusSection(const string& sectionName,

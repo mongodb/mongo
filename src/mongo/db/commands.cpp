@@ -61,8 +61,8 @@ using std::stringstream;
 
 using logger::LogComponent;
 
-Command::CommandMap* Command::_commandsByBestName;
-Command::CommandMap* Command::_commands;
+Command::CommandMap* Command::_commandsByBestName = nullptr;
+Command::CommandMap* Command::_commands = nullptr;
 
 Counter64 Command::unknownCommands;
 static ServerStatusMetricField<Counter64> displayUnknownCommands("commands.<UNKNOWN>",

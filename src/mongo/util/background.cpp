@@ -96,12 +96,10 @@ private:
     std::vector<PeriodicTask*> _tasks;
 };
 
-// We rely here on zero-initialization of 'runnerMutex' to distinguish whether we are
-// running before or after static initialization for this translation unit has
-// completed. In the former case, we assume no threads are present, so we do not need
-// to use the mutex. When present, the mutex protects 'runner' and 'runnerDestroyed'
-// below.
-SimpleMutex* const runnerMutex = new SimpleMutex;
+SimpleMutex* runnerMutex() {
+    static SimpleMutex mutex;
+    return &mutex;
+}
 
 // A scoped lock like object that only locks/unlocks the mutex if it exists.
 class ConditionalScopedLock {
@@ -120,10 +118,10 @@ private:
 };
 
 // The unique PeriodicTaskRunner, also zero-initialized.
-PeriodicTaskRunner* runner;
+PeriodicTaskRunner* runner = nullptr;
 
 // The runner is never re-created once it has been destroyed.
-bool runnerDestroyed;
+bool runnerDestroyed = false;
 
 }  // namespace
 
@@ -228,7 +226,7 @@ bool BackgroundJob::running() const {
 // -------------------------
 
 PeriodicTask::PeriodicTask() {
-    ConditionalScopedLock lock(runnerMutex);
+    ConditionalScopedLock lock(runnerMutex());
     if (runnerDestroyed)
         return;
 
@@ -239,7 +237,7 @@ PeriodicTask::PeriodicTask() {
 }
 
 PeriodicTask::~PeriodicTask() {
-    ConditionalScopedLock lock(runnerMutex);
+    ConditionalScopedLock lock(runnerMutex());
     if (runnerDestroyed || !runner)
         return;
 
@@ -247,7 +245,7 @@ PeriodicTask::~PeriodicTask() {
 }
 
 void PeriodicTask::startRunningPeriodicTasks() {
-    ConditionalScopedLock lock(runnerMutex);
+    ConditionalScopedLock lock(runnerMutex());
     if (runnerDestroyed)
         return;
 
@@ -258,7 +256,7 @@ void PeriodicTask::startRunningPeriodicTasks() {
 }
 
 Status PeriodicTask::stopRunningPeriodicTasks(int gracePeriodMillis) {
-    ConditionalScopedLock lock(runnerMutex);
+    ConditionalScopedLock lock(runnerMutex());
 
     Status status = Status::OK();
     if (runnerDestroyed || !runner)

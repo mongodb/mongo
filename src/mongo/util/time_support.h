@@ -58,10 +58,10 @@ class Date_t {
 public:
     /**
      * The largest representable Date_t.
-     *
-     * TODO(schwerin): Make constexpr when supported by all compilers.
      */
-    static Date_t max();
+    static constexpr Date_t max() {
+        return fromMillisSinceEpoch(std::numeric_limits<long long>::max());
+    }
 
     /**
      * Reads the system clock and returns a Date_t representing the present time.
@@ -71,7 +71,7 @@ public:
     /**
      * Returns a Date_t from an integer number of milliseconds since the epoch.
      */
-    static Date_t fromMillisSinceEpoch(long long m) {
+    static constexpr Date_t fromMillisSinceEpoch(long long m) {
         return Date_t(m);
     }
 
@@ -86,7 +86,7 @@ public:
     /**
      * Constructs a Date_t representing the epoch.
      */
-    Date_t() = default;
+    constexpr Date_t() = default;
 
     /**
      * Constructs a Date_t from a system clock time point.
@@ -220,7 +220,7 @@ public:
     }
 
 private:
-    explicit Date_t(long long m) : millis(m) {}
+    constexpr explicit Date_t(long long m) : millis(m) {}
 
     long long millis = 0;
 };
