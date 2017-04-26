@@ -50,7 +50,6 @@ class TargetedWriteBatch;
 struct ShardError;
 struct ShardWCError;
 class TrackedErrors;
-struct BatchWriteStats;
 
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -153,6 +152,9 @@ public:
     int numWriteOpsIn(WriteOpState state) const;
 
 private:
+    void _incBatchStats(BatchedCommandRequest::BatchType batchType,
+                        const BatchedCommandResponse& response);
+
     // The incoming client request
     const BatchedCommandRequest& _clientRequest;
 
@@ -170,18 +172,11 @@ private:
     std::vector<std::unique_ptr<BatchedUpsertDetail>> _upsertedIds;
 
     // Stats for the entire batch op
-    std::unique_ptr<BatchWriteStats> _stats;
-};
-
-struct BatchWriteStats {
-
-    int numInserted{0};
-    int numUpserted{0};
-    int numMatched{0};
-    int numModified{0};
-    int numDeleted{0};
-
-    std::string toString() const;
+    int _numInserted{0};
+    int _numUpserted{0};
+    int _numMatched{0};
+    int _numModified{0};
+    int _numDeleted{0};
 };
 
 /**

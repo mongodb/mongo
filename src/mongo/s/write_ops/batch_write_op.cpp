@@ -260,35 +260,10 @@ void trackErrors(const ShardEndpoint& endpoint,
     }
 }
 
-void incBatchStats(BatchedCommandRequest::BatchType batchType,
-                   const BatchedCommandResponse& response,
-                   BatchWriteStats* stats) {
-    if (batchType == BatchedCommandRequest::BatchType_Insert) {
-        stats->numInserted += response.getN();
-    } else if (batchType == BatchedCommandRequest::BatchType_Update) {
-        int numUpserted = 0;
-        if (response.isUpsertDetailsSet()) {
-            numUpserted = response.sizeUpsertDetails();
-        }
-        stats->numMatched += (response.getN() - numUpserted);
-        long long numModified = response.getNModified();
-
-        if (numModified >= 0)
-            stats->numModified += numModified;
-        else
-            stats->numModified = -1;  // sentinel used to indicate we omit the field downstream
-
-        stats->numUpserted += numUpserted;
-    } else {
-        dassert(batchType == BatchedCommandRequest::BatchType_Delete);
-        stats->numDeleted += response.getN();
-    }
-}
-
 }  // namespace
 
 BatchWriteOp::BatchWriteOp(const BatchedCommandRequest& clientRequest)
-    : _clientRequest(clientRequest), _writeOps(NULL), _stats(new BatchWriteStats) {
+    : _clientRequest(clientRequest), _writeOps(NULL) {
     dassert(_clientRequest.isValid(NULL));
 
     size_t numWriteOps = _clientRequest.sizeWriteOps();
@@ -565,7 +540,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     _targeted.erase(&targetedBatch);
 
     // Increment stats for this batch
-    incBatchStats(_clientRequest.getBatchType(), response, _stats.get());
+    _incBatchStats(_clientRequest.getBatchType(), response);
 
     //
     // Assign errors to particular items.
@@ -709,10 +684,6 @@ bool BatchWriteOp::isFinished() {
     return true;
 }
 
-//
-// Aggregation functions for building the final response errors
-//
-
 void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     dassert(isFinished());
 
@@ -789,12 +760,11 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     }
 
     // Stats
-    int nValue =
-        _stats->numInserted + _stats->numUpserted + _stats->numMatched + _stats->numDeleted;
+    const int nValue = _numInserted + _numUpserted + _numMatched + _numDeleted;
     batchResp->setN(nValue);
     if (_clientRequest.getBatchType() == BatchedCommandRequest::BatchType_Update &&
-        _stats->numModified >= 0) {
-        batchResp->setNModified(_stats->numModified);
+        _numModified >= 0) {
+        batchResp->setNModified(_numModified);
     }
 
     dassert(batchResp->isValid(NULL));
@@ -817,10 +787,28 @@ int BatchWriteOp::numWriteOpsIn(WriteOpState opState) const {
     return count;
 }
 
-std::string BatchWriteStats::toString() const {
-    return str::stream() << "numInserted: " << numInserted << " numUpserted: " << numUpserted
-                         << " numMatched: " << numMatched << " numModified: " << numModified
-                         << " numDeleted: " << numDeleted;
+void BatchWriteOp::_incBatchStats(BatchedCommandRequest::BatchType batchType,
+                                  const BatchedCommandResponse& response) {
+    if (batchType == BatchedCommandRequest::BatchType_Insert) {
+        _numInserted += response.getN();
+    } else if (batchType == BatchedCommandRequest::BatchType_Update) {
+        int numUpserted = 0;
+        if (response.isUpsertDetailsSet()) {
+            numUpserted = response.sizeUpsertDetails();
+        }
+        _numMatched += (response.getN() - numUpserted);
+        long long numModified = response.getNModified();
+
+        if (numModified >= 0)
+            _numModified += numModified;
+        else
+            _numModified = -1;  // sentinel used to indicate we omit the field downstream
+
+        _numUpserted += numUpserted;
+    } else {
+        dassert(batchType == BatchedCommandRequest::BatchType_Delete);
+        _numDeleted += response.getN();
+    }
 }
 
 void TrackedErrors::startTracking(int errCode) {
