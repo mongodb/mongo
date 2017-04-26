@@ -1019,9 +1019,7 @@ env.CppUnitTest(
         'logical_clock_test.cpp',
     ],
     LIBDEPS=[
-        'service_context',
-        'logical_clock',
-        'signed_logical_time',
+        'logical_clock_test_fixture',
     ],
 )
 
@@ -1042,10 +1040,9 @@ env.Library(
         'logical_clock_test_fixture.cpp',
     ],
     LIBDEPS= [
-        'service_context',
         'logical_clock',
         'signed_logical_time',
-        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
     ],
 )
 

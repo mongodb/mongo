@@ -28,13 +28,17 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/db/logical_clock.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_clock_test_fixture.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/service_context_noop.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -43,68 +47,12 @@
 namespace mongo {
 namespace {
 
-/**
- * Setup LogicalClock with invalid initial time.
- */
-class LogicalClockTestBase : public unittest::Test {
-protected:
-    void setUp() {
-        _serviceContext = stdx::make_unique<ServiceContextNoop>();
-        auto pTps = stdx::make_unique<TimeProofService>();
-        _timeProofService = pTps.get();
-        _clock = stdx::make_unique<LogicalClock>(_serviceContext.get());
-        _clock->setTimeProofService(std::move(pTps));
-        _serviceContext->setFastClockSource(
-            stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
-    }
+std::string kDummyNamespaceString = "test.foo";
 
-    void tearDown() {
-        _clock.reset();
-        _serviceContext.reset();
-    }
-
-    LogicalClock* getClock() {
-        return _clock.get();
-    }
-
-    void setMockClockSourceTime(Date_t time) {
-        _mockClockSource->reset(time);
-    }
-
-    Date_t getMockClockSourceTime() {
-        return _mockClockSource->now();
-    }
-
-    SignedLogicalTime makeSignedLogicalTime(LogicalTime logicalTime) {
-        TimeProofService::Key key = {};
-        return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime, key), 0);
-    }
-
-    const unsigned currentWallClockSecs() {
-        return durationCount<Seconds>(
-            _serviceContext->getFastClockSource()->now().toDurationSinceEpoch());
-    }
-
-    void resetTimeProofService() {
-        auto pTps = stdx::make_unique<TimeProofService>();
-        _timeProofService = pTps.get();
-        _clock->setTimeProofService(std::move(pTps));
-    }
-
-    void unsetTimeProofService() {
-        _clock->setTimeProofService(std::unique_ptr<TimeProofService>());
-    }
-
-private:
-    TimeProofService* _timeProofService;
-    std::unique_ptr<ServiceContextNoop> _serviceContext;
-
-    std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
-    std::unique_ptr<LogicalClock> _clock;
-};
+using LogicalClockTest = LogicalClockTestFixture;
 
 // Check that the initial time does not change during logicalClock creation.
-TEST_F(LogicalClockTestBase, roundtrip) {
+TEST_F(LogicalClockTest, roundtrip) {
     Timestamp tX(1);
     auto time = LogicalTime(tX);
 
@@ -115,7 +63,7 @@ TEST_F(LogicalClockTestBase, roundtrip) {
 }
 
 // Verify the reserve ticks functionality.
-TEST_F(LogicalClockTestBase, reserveTicks) {
+TEST_F(LogicalClockTest, reserveTicks) {
     // Set clock to a non-zero time, so we can verify wall clock synchronization.
     setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
 
@@ -146,7 +94,7 @@ TEST_F(LogicalClockTestBase, reserveTicks) {
 }
 
 // Verify the advanceClusterTime functionality.
-TEST_F(LogicalClockTestBase, advanceClusterTime) {
+TEST_F(LogicalClockTest, advanceClusterTime) {
     auto t1 = getClock()->reserveTicks(1);
     t1.addTicks(100);
     SignedLogicalTime l1 = makeSignedLogicalTime(t1);
@@ -156,9 +104,11 @@ TEST_F(LogicalClockTestBase, advanceClusterTime) {
 }
 
 // Verify rate limiter rejects logical times whose seconds values are too far ahead.
-TEST_F(LogicalClockTestBase, RateLimiterRejectsLogicalTimesTooFarAhead) {
+TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
+
     Timestamp tooFarAheadTimestamp(
-        currentWallClockSecs() +
+        durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) +
             durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) +
             10,  // Add 10 seconds to ensure limit is exceeded.
         1);
@@ -170,9 +120,12 @@ TEST_F(LogicalClockTestBase, RateLimiterRejectsLogicalTimesTooFarAhead) {
 }
 
 // Verify cluster time can be initialized to a very old time.
-TEST_F(LogicalClockTestBase, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
+TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(
+        durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) * 10 * 1000));
+
     Timestamp veryOldTimestamp(
-        currentWallClockSecs() -
+        durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) -
         (durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) * 5));
     auto veryOldTime = LogicalTime(veryOldTimestamp);
     getClock()->initClusterTimeFromTrustedSource(veryOldTime);
@@ -181,7 +134,7 @@ TEST_F(LogicalClockTestBase, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
 }
 
 // A clock with no TimeProofService should reject new times in advanceClusterTime.
-TEST_F(LogicalClockTestBase, AdvanceClusterTimeFailsWithoutTimeProofService) {
+TEST_F(LogicalClockTest, AdvanceClusterTimeFailsWithoutTimeProofService) {
     LogicalTime initialTime(Timestamp(10));
     getClock()->initClusterTimeFromTrustedSource(initialTime);
 
@@ -199,7 +152,7 @@ TEST_F(LogicalClockTestBase, AdvanceClusterTimeFailsWithoutTimeProofService) {
 }
 
 // A clock with no TimeProofService can still advance its time through certain methods.
-TEST_F(LogicalClockTestBase, CertainMethodsCanAdvanceClockWithoutTimeProofService) {
+TEST_F(LogicalClockTest, CertainMethodsCanAdvanceClockWithoutTimeProofService) {
     unsetTimeProofService();
 
     LogicalTime t1(Timestamp(100));
@@ -216,6 +169,20 @@ TEST_F(LogicalClockTestBase, CertainMethodsCanAdvanceClockWithoutTimeProofServic
     SignedLogicalTime l4 = makeSignedLogicalTime(LogicalTime(Timestamp(400)));
     ASSERT_OK(getClock()->advanceClusterTimeFromTrustedSource(l4));
     ASSERT_TRUE(getClock()->getClusterTime().getTime() == l4.getTime());
+}
+
+// Verify writes to the oplog advance cluster time.
+TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
+    Timestamp tX(1);
+    auto initialTime = LogicalTime(tX);
+
+    getClock()->initClusterTimeFromTrustedSource(initialTime);
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() == initialTime);
+
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
+    ASSERT_TRUE(getClock()->getClusterTime().getTime() > initialTime);
+    ASSERT_EQ(getClock()->getClusterTime().getTime().asTimestamp(),
+              replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp());
 }
 
 }  // unnamed namespace
