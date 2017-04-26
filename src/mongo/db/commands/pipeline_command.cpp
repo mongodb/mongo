@@ -29,8 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/namespace_string.h"
@@ -51,20 +49,24 @@ class PipelineCommand : public Command {
 public:
     PipelineCommand() : Command("aggregate", false) {}
 
-    // Locks are managed manually, in particular by DocumentSourceCursor.
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    void help(std::stringstream& help) const override {
+        help << "Runs the aggregation command. See http://dochub.mongodb.org/core/aggregation for "
+                "more details.";
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return Pipeline::aggSupportsWriteConcern(cmd);
     }
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const override {
         return false;
     }
 
-    virtual bool slaveOverrideOk() const {
+    bool slaveOverrideOk() const override {
         return true;
     }
 
-    bool supportsReadConcern() const final {
+    bool supportsReadConcern() const override {
         return true;
     }
 
@@ -72,83 +74,56 @@ public:
         return ReadWriteType::kRead;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "{ pipeline: [ { $stage: {...} }, ... ]"
-             << ", allowDiskUse: <bool>"
-             << ", cursor: {batchSize: <number>}"
-             << ", ..."
-             << " }" << std::endl
-             << "See http://dochub.mongodb.org/core/aggregation for more details.";
-    }
-
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) override {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
-                     BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
-        const NamespaceString nss(parseNsCollectionRequired(db, cmdObj));
-
-        // Parse the options for this request.
-        auto request = AggregationRequest::parseFromBSON(nss, cmdObj);
-        if (!request.isOK()) {
-            return appendCommandStatus(result, request.getStatus());
-        }
-
-        // If the featureCompatibilityVersion is 3.2, we disallow collation from the user. However,
-        // operations should still respect the collection default collation. The mongos attaches the
-        // collection default collation to the merger pipeline, since the merger may not have the
-        // collection metadata. So the merger needs to accept a collation, and we rely on the shards
-        // to reject collations from the user.
-        if (!request.getValue().getCollation().isEmpty() &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k32 &&
-            !isMergePipeline(request.getValue().getPipeline())) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::InvalidOptions,
-                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
-                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
-        }
-
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
         return appendCommandStatus(result,
-                                   runAggregate(opCtx, nss, request.getValue(), cmdObj, result));
+                                   _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
     }
 
     Status explain(OperationContext* opCtx,
-                   const std::string& dbName,
+                   const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const override {
-        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
+        return _runAggCommand(opCtx, dbname, cmdObj, verbosity, out);
+    }
 
-        // Parse the options for this request, supplying the explain verbosity separately.
-        auto request = AggregationRequest::parseFromBSON(nss, cmdObj, verbosity);
-        if (!request.isOK()) {
-            return request.getStatus();
-        }
+private:
+    static Status _runAggCommand(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj,
+                                 boost::optional<ExplainOptions::Verbosity> verbosity,
+                                 BSONObjBuilder* result) {
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+
+        const auto aggregationRequest =
+            uassertStatusOK(AggregationRequest::parseFromBSON(nss, cmdObj, verbosity));
+
         // If the featureCompatibilityVersion is 3.2, we disallow collation from the user. However,
         // operations should still respect the collection default collation. The mongos attaches the
         // collection default collation to the merger pipeline, since the merger may not have the
         // collection metadata. So the merger needs to accept a collation, and we rely on the shards
         // to reject collations from the user.
-        if (!request.getValue().getCollation().isEmpty() &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k32 &&
-            !isMergePipeline(request.getValue().getPipeline())) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "The featureCompatibilityVersion must be 3.4 to use collation. See "
-                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-        }
+        uassert(ErrorCodes::InvalidOptions,
+                "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
+                aggregationRequest.getCollation().isEmpty() ||
+                    serverGlobalParams.featureCompatibility.version.load() !=
+                        ServerGlobalParams::FeatureCompatibility::Version::k32 ||
+                    isMergePipeline(aggregationRequest.getPipeline()));
 
-        return runAggregate(opCtx, nss, request.getValue(), cmdObj, *out);
+        return runAggregate(opCtx, nss, aggregationRequest, cmdObj, *result);
     }
 
 } pipelineCmd;

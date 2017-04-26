@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -45,59 +43,45 @@ class ClusterPipelineCommand : public Command {
 public:
     ClusterPipelineCommand() : Command("aggregate", false) {}
 
-    virtual bool slaveOk() const {
+    void help(std::stringstream& help) const {
+        help << "Runs the sharded aggregation command. See "
+                "http://dochub.mongodb.org/core/aggregation for more details.";
+    }
+
+    bool slaveOk() const override {
         return true;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return false;
     }
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return Pipeline::aggSupportsWriteConcern(cmd);
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "Runs the sharded aggregation command";
-    }
-
-    // virtuals from Command
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) override {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     BSONObj& cmdObj,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
-        NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
-
-        auto request = AggregationRequest::parseFromBSON(nss, cmdObj);
-        if (!request.isOK()) {
-            return appendCommandStatus(result, request.getStatus());
-        }
-
-        ClusterAggregate::Namespaces nsStruct;
-        nsStruct.requestedNss = nss;
-        nsStruct.executionNss = std::move(nss);
-        auto status =
-            ClusterAggregate::runAggregate(opCtx, nsStruct, request.getValue(), cmdObj, &result);
-        appendCommandStatus(result, status);
-        return status.isOK();
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
+        return appendCommandStatus(result,
+                                   _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
     }
 
     Status explain(OperationContext* opCtx,
-                   const std::string& dbName,
+                   const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const override {
-
         // Add the server selection metadata to the aggregate command in the "unwrapped" format that
         // runAggregate() expects: {aggregate: ..., $queryOptions: {$readPreference: ...}}.
         BSONObjBuilder aggCmdBuilder;
@@ -108,18 +92,25 @@ public:
         }
         BSONObj aggCmd = aggCmdBuilder.obj();
 
-        NamespaceString nss(parseNsCollectionRequired(dbName, aggCmd));
+        return _runAggCommand(opCtx, dbname, aggCmd, verbosity, out);
+    }
 
-        auto request = AggregationRequest::parseFromBSON(nss, aggCmd, verbosity);
-        if (!request.isOK()) {
-            return request.getStatus();
-        }
+private:
+    static Status _runAggCommand(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj,
+                                 boost::optional<ExplainOptions::Verbosity> verbosity,
+                                 BSONObjBuilder* result) {
+        NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
-        ClusterAggregate::Namespaces nsStruct;
-        nsStruct.requestedNss = nss;
-        nsStruct.executionNss = std::move(nss);
+        const auto aggregationRequest =
+            uassertStatusOK(AggregationRequest::parseFromBSON(nss, cmdObj, verbosity));
 
-        return ClusterAggregate::runAggregate(opCtx, nsStruct, request.getValue(), aggCmd, out);
+        return ClusterAggregate::runAggregate(opCtx,
+                                              ClusterAggregate::Namespaces{nss, std::move(nss)},
+                                              aggregationRequest,
+                                              cmdObj,
+                                              result);
     }
 
 } clusterPipelineCmd;
