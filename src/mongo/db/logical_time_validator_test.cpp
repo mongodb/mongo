@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,54 +28,58 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/logical_time_metadata_hook.h"
-
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/db/signed_logical_time.h"
+#include "mongo/db/time_proof_service.h"
+#include "mongo/platform/basic.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+namespace {
 
-namespace rpc {
+TEST(LogicalTimeValidator, GetTimeWithIncreasingTimes) {
+    LogicalTimeValidator validator;
 
-LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _service(service) {}
+    LogicalTime t1(Timestamp(10, 0));
+    auto newTime = validator.signLogicalTime(t1);
 
-Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
-                                                     BSONObjBuilder* metadataBob) {
-    auto validator = LogicalTimeValidator::get(_service);
-    if (!validator) {
-        return Status::OK();
-    }
+    ASSERT_EQ(t1.asTimestamp(), newTime.getTime().asTimestamp());
+    ASSERT_TRUE(newTime.getProof());
 
-    auto newTime = LogicalClock::get(_service)->getClusterTime();
-    LogicalTimeMetadata metadata(validator->signLogicalTime(newTime));
-    metadata.writeToMetadata(metadataBob);
-    return Status::OK();
+    LogicalTime t2(Timestamp(20, 0));
+    auto newTime2 = validator.signLogicalTime(t2);
+
+    ASSERT_EQ(t2.asTimestamp(), newTime2.getTime().asTimestamp());
+    ASSERT_TRUE(newTime2.getProof());
 }
 
-Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
-                                                  const BSONObj& metadataObj) {
-    auto parseStatus = LogicalTimeMetadata::readFromMetadata(metadataObj);
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
+TEST(LogicalTimeValidator, ValidateReturnsOkForValidSignature) {
+    LogicalTimeValidator validator;
 
-    auto& signedTime = parseStatus.getValue().getSignedTime();
+    LogicalTime t1(Timestamp(20, 0));
+    auto newTime = validator.signLogicalTime(t1);
 
-    // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
-    // default constructed SignedLogicalTime should be ignored.
-    if (signedTime.getTime() == LogicalTime::kUninitialized) {
-        return Status::OK();
-    }
-
-    auto validator = LogicalTimeValidator::get(_service);
-    if (validator) {
-        validator->updateCacheTrustedSource(signedTime);
-    }
-
-    return LogicalClock::get(_service)->advanceClusterTime(signedTime.getTime());
+    ASSERT_OK(validator.validate(newTime));
 }
 
-}  // namespace rpc
+TEST(LogicalTimeValidator, ValidateErrorsOnInvalidTime) {
+    LogicalTimeValidator validator;
+
+    LogicalTime t1(Timestamp(20, 0));
+    auto newTime = validator.signLogicalTime(t1);
+
+    TimeProofService::TimeProof invalidProof = {{1, 2, 3}};
+    SignedLogicalTime invalidTime(LogicalTime(Timestamp(30, 0)), invalidProof, 0);
+
+    auto status = validator.validate(invalidTime);
+    ASSERT_EQ(ErrorCodes::TimeProofMismatch, status);
+}
+
+}  // unnamed namespace
 }  // namespace mongo

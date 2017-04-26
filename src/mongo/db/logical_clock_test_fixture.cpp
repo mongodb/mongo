@@ -56,10 +56,6 @@ void LogicalClockTestFixture::setUp() {
     LogicalClock::set(service, std::move(logicalClock));
     _clock = LogicalClock::get(service);
 
-    auto pTps = stdx::make_unique<TimeProofService>();
-    _timeProofService = pTps.get();
-    _clock->setTimeProofService(std::move(pTps));
-
     service->setFastClockSource(stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
     service->setPreciseClockSource(stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
 
@@ -90,21 +86,6 @@ void LogicalClockTestFixture::setMockClockSourceTime(Date_t time) const {
 
 Date_t LogicalClockTestFixture::getMockClockSourceTime() const {
     return _mockClockSource->now();
-}
-
-SignedLogicalTime LogicalClockTestFixture::makeSignedLogicalTime(LogicalTime logicalTime) const {
-    TimeProofService::Key key = {};
-    return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime, key), 0);
-}
-
-void LogicalClockTestFixture::resetTimeProofService() {
-    auto pTps = stdx::make_unique<TimeProofService>();
-    _timeProofService = pTps.get();
-    _clock->setTimeProofService(std::move(pTps));
-}
-
-void LogicalClockTestFixture::unsetTimeProofService() const {
-    _clock->setTimeProofService(std::unique_ptr<TimeProofService>());
 }
 
 DBDirectClient* LogicalClockTestFixture::getDBClient() const {

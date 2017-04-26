@@ -234,7 +234,7 @@ TEST_F(KeysManagerTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
-    LogicalClock::get(operationContext())->initClusterTimeFromTrustedSource(currentTime);
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
     keyManager()->enableKeyGenerator(operationContext(), true);
 
@@ -250,7 +250,7 @@ TEST_F(KeysManagerTest, EnableModeFlipFlopStressTest) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
-    LogicalClock::get(operationContext())->initClusterTimeFromTrustedSource(currentTime);
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
     bool doEnable = true;
 
@@ -275,9 +275,8 @@ TEST_F(KeysManagerTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateKeys) {
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
 
     // Set the time to be very ahead so the updater will be forced to create new keys.
-    const LogicalTime currentTime(LogicalTime(Timestamp(20000, 0)));
-    const SignedLogicalTime fakeTime(currentTime, 2);
-    ASSERT_OK(LogicalClock::get(operationContext())->advanceClusterTimeFromTrustedSource(fakeTime));
+    const LogicalTime fakeTime(Timestamp(20000, 0));
+    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(fakeTime);
 
     FailPointEnableBlock failWriteBlock("failCollectionInserts");
 

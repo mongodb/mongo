@@ -37,8 +37,6 @@
 #include "mongo/db/logical_clock_test_fixture.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/signed_logical_time.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -56,10 +54,10 @@ TEST_F(LogicalClockTest, roundtrip) {
     Timestamp tX(1);
     auto time = LogicalTime(tX);
 
-    getClock()->initClusterTimeFromTrustedSource(time);
+    getClock()->setClusterTimeFromTrustedSource(time);
     auto storedTime(getClock()->getClusterTime());
 
-    ASSERT_TRUE(storedTime.getTime() == time);
+    ASSERT_TRUE(storedTime == time);
 }
 
 // Verify the reserve ticks functionality.
@@ -69,10 +67,10 @@ TEST_F(LogicalClockTest, reserveTicks) {
 
     auto t1 = getClock()->reserveTicks(1);
     auto t2(getClock()->getClusterTime());
-    ASSERT_TRUE(t1 == t2.getTime());
+    ASSERT_TRUE(t1 == t2);
 
     // Make sure we synchronized with the wall clock.
-    ASSERT_TRUE(t2.getTime().asTimestamp().getSecs() == 10);
+    ASSERT_TRUE(t2.asTimestamp().getSecs() == 10);
 
     auto t3 = getClock()->reserveTicks(1);
     t1.addTicks(1);
@@ -87,9 +85,9 @@ TEST_F(LogicalClockTest, reserveTicks) {
     ASSERT_TRUE(t3 == t1);
 
     // Ensure overflow to a new second.
-    auto initTimeSecs = getClock()->getClusterTime().getTime().asTimestamp().getSecs();
+    auto initTimeSecs = getClock()->getClusterTime().asTimestamp().getSecs();
     getClock()->reserveTicks((1U << 31) - 1);
-    auto newTimeSecs = getClock()->getClusterTime().getTime().asTimestamp().getSecs();
+    auto newTimeSecs = getClock()->getClusterTime().asTimestamp().getSecs();
     ASSERT_TRUE(newTimeSecs == initTimeSecs + 1);
 }
 
@@ -97,10 +95,8 @@ TEST_F(LogicalClockTest, reserveTicks) {
 TEST_F(LogicalClockTest, advanceClusterTime) {
     auto t1 = getClock()->reserveTicks(1);
     t1.addTicks(100);
-    SignedLogicalTime l1 = makeSignedLogicalTime(t1);
-    ASSERT_OK(getClock()->advanceClusterTimeFromTrustedSource(l1));
-    auto l2(getClock()->getClusterTime());
-    ASSERT_TRUE(l1.getTime() == l2.getTime());
+    ASSERT_OK(getClock()->advanceClusterTime(t1));
+    ASSERT_TRUE(t1 == getClock()->getClusterTime());
 }
 
 // Verify rate limiter rejects logical times whose seconds values are too far ahead.
@@ -112,11 +108,9 @@ TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
             durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) +
             10,  // Add 10 seconds to ensure limit is exceeded.
         1);
-    SignedLogicalTime l1 = makeSignedLogicalTime(LogicalTime(tooFarAheadTimestamp));
+    LogicalTime t1(tooFarAheadTimestamp);
 
-    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(l1));
-    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter,
-              getClock()->advanceClusterTimeFromTrustedSource(l1));
+    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(t1));
 }
 
 // Verify cluster time can be initialized to a very old time.
@@ -128,47 +122,9 @@ TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
         durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) -
         (durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) * 5));
     auto veryOldTime = LogicalTime(veryOldTimestamp);
-    getClock()->initClusterTimeFromTrustedSource(veryOldTime);
+    getClock()->setClusterTimeFromTrustedSource(veryOldTime);
 
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == veryOldTime);
-}
-
-// A clock with no TimeProofService should reject new times in advanceClusterTime.
-TEST_F(LogicalClockTest, AdvanceClusterTimeFailsWithoutTimeProofService) {
-    LogicalTime initialTime(Timestamp(10));
-    getClock()->initClusterTimeFromTrustedSource(initialTime);
-
-    unsetTimeProofService();
-
-    SignedLogicalTime l1 = makeSignedLogicalTime(LogicalTime(Timestamp(100)));
-    ASSERT_EQ(ErrorCodes::CannotVerifyAndSignLogicalTime, getClock()->advanceClusterTime(l1));
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == initialTime);
-
-    resetTimeProofService();
-
-    SignedLogicalTime l2 = makeSignedLogicalTime(LogicalTime(Timestamp(200)));
-    ASSERT_OK(getClock()->advanceClusterTime(l2));
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == l2.getTime());
-}
-
-// A clock with no TimeProofService can still advance its time through certain methods.
-TEST_F(LogicalClockTest, CertainMethodsCanAdvanceClockWithoutTimeProofService) {
-    unsetTimeProofService();
-
-    LogicalTime t1(Timestamp(100));
-    getClock()->initClusterTimeFromTrustedSource(t1);
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == t1);
-
-    auto t2 = getClock()->reserveTicks(1);
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == t2);
-
-    LogicalTime t3(Timestamp(300));
-    ASSERT_OK(getClock()->signAndAdvanceClusterTime(t3));
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == t3);
-
-    SignedLogicalTime l4 = makeSignedLogicalTime(LogicalTime(Timestamp(400)));
-    ASSERT_OK(getClock()->advanceClusterTimeFromTrustedSource(l4));
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == l4.getTime());
+    ASSERT_TRUE(getClock()->getClusterTime() == veryOldTime);
 }
 
 // Verify writes to the oplog advance cluster time.
@@ -176,12 +132,12 @@ TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
     Timestamp tX(1);
     auto initialTime = LogicalTime(tX);
 
-    getClock()->initClusterTimeFromTrustedSource(initialTime);
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() == initialTime);
+    getClock()->setClusterTimeFromTrustedSource(initialTime);
+    ASSERT_TRUE(getClock()->getClusterTime() == initialTime);
 
     getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
-    ASSERT_TRUE(getClock()->getClusterTime().getTime() > initialTime);
-    ASSERT_EQ(getClock()->getClusterTime().getTime().asTimestamp(),
+    ASSERT_TRUE(getClock()->getClusterTime() > initialTime);
+    ASSERT_EQ(getClock()->getClusterTime().asTimestamp(),
               replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp());
 }
 
