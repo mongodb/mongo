@@ -218,6 +218,8 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
                 sub.append(algo->getName());
             }
             sub.doneFast();
+        } else {
+            LOG(3) << "Compression negotiation not requested by client";
         }
         return;
     }
@@ -228,6 +230,12 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
 
     // First we go through all the compressor names that the client has requested support for
     BSONObj theirObj = elem.Obj();
+
+    if (!theirObj.nFields()) {
+        LOG(3) << "No compressors provided";
+        return;
+    }
+
     for (const auto& elem : theirObj) {
         MessageCompressorBase* cur;
         auto curName = elem.checkAndGetStringData();
@@ -249,6 +257,8 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
             sub.append(algo->getName());
         }
         sub.doneFast();
+    } else {
+        LOG(3) << "Could not agree on compressor to use";
     }
 }
 
