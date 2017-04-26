@@ -29,9 +29,12 @@
 #pragma once
 
 #include <iosfwd>
+#include <memory>
 #include <string>
+#include <type_traits>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
@@ -156,6 +159,24 @@ protected:
      */
     void _cancelHandle_inlock(executor::TaskExecutor::CallbackHandle handle);
 
+    /**
+     * Starts up a component, owned by us, and checks our shutdown state at the same time. If the
+     * component's startup() fails, resets the unique_ptr holding 'component' and return the error
+     * from startup().
+     */
+    template <typename T>
+    Status _startupComponent_inlock(std::unique_ptr<T>& component);
+    template <typename T>
+    Status _startupComponent(std::unique_ptr<T>& component);
+
+    /**
+     * Shuts down a component, owned by us, if not null.
+     */
+    template <typename T>
+    void _shutdownComponent_inlock(const std::unique_ptr<T>& component);
+    template <typename T>
+    void _shutdownComponent(const std::unique_ptr<T>& component);
+
 private:
     /**
      * Invoked by startup() to run startup procedure after a successful transition from PreStart to
@@ -214,6 +235,49 @@ private:
  * For testing only.
  */
 std::ostream& operator<<(std::ostream& os, const AbstractAsyncComponent::State& state);
+
+template <typename T>
+Status AbstractAsyncComponent::_startupComponent_inlock(std::unique_ptr<T>& component) {
+    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
+
+    if (_isShuttingDown_inlock()) {
+        // Save name of 'component' before resetting unique_ptr.
+        auto componentToStartUp = component->_componentName;
+        component.reset();
+        return Status(ErrorCodes::CallbackCanceled,
+                      str::stream() << "failed to start up " << componentToStartUp << ": "
+                                    << _componentName
+                                    << " is shutting down");
+    }
+
+    auto status = component->startup();
+    if (!status.isOK()) {
+        component.reset();
+    }
+    return status;
+}
+
+template <typename T>
+Status AbstractAsyncComponent::_startupComponent(std::unique_ptr<T>& component) {
+    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    return _startupComponent_inlock(component);
+}
+
+template <typename T>
+void AbstractAsyncComponent::_shutdownComponent_inlock(const std::unique_ptr<T>& component) {
+    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
+
+    if (!component) {
+        return;
+    }
+    component->shutdown();
+}
+
+template <typename T>
+void AbstractAsyncComponent::_shutdownComponent(const std::unique_ptr<T>& component) {
+    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    _shutdownComponent_inlock(component);
+}
 
 }  // namespace repl
 }  // namespace mongo
