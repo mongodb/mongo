@@ -271,4 +271,5 @@ void WriteOp::setOpError(const WriteErrorDetail& error) {
     _state = WriteOpState_Error;
     // No need to updateOpState, set directly
 }
-}
+
+}  // namespace mongo

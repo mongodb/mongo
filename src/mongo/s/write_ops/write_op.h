@@ -42,7 +42,6 @@ struct TargetedWrite;
 struct ChildWriteOp;
 
 enum WriteOpState {
-
     // Item is ready to be targeted
     WriteOpState_Ready,
 
@@ -232,4 +231,5 @@ struct TargetedWrite {
     // we need to be able to cancel ops.
     WriteOpRef writeOpRef;
 };
-}
+
+}  // namespace mongo

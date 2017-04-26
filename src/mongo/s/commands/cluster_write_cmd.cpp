@@ -189,7 +189,8 @@ public:
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work
         if (haveClient()) {
-            ClusterLastErrorInfo::get(cc())->addHostOpTimes(writer.getStats().getWriteOpTimes());
+            ClusterLastErrorInfo::get(opCtx->getClient())
+                ->addHostOpTimes(writer.getStats().getWriteOpTimes());
         }
 
         // TODO

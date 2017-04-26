@@ -267,8 +267,7 @@ void ClusterWriter::write(OperationContext* opCtx,
                 return;
             }
 
-            BatchWriteExec exec(&targeter);
-            exec.executeBatch(opCtx, *request, response, &_stats);
+            BatchWriteExec::executeBatch(opCtx, targeter, *request, response, &_stats);
         }
 
         if (_autoSplit) {

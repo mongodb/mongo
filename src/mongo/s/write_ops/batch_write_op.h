@@ -82,14 +82,8 @@ class BatchWriteOp {
     MONGO_DISALLOW_COPYING(BatchWriteOp);
 
 public:
-    BatchWriteOp();
-
+    explicit BatchWriteOp(const BatchedCommandRequest& clientRequest);
     ~BatchWriteOp();
-
-    /**
-     * Initializes the BatchWriteOp from a client batch request.
-     */
-    void initClientRequest(const BatchedCommandRequest* clientRequest);
 
     /**
      * Targets one or more of the next write ops in this batch op using a NSTargeter.  The
@@ -154,17 +148,13 @@ public:
      */
     void buildClientResponse(BatchedCommandResponse* batchResp);
 
-    //
-    // Accessors
-    //
-
     int numWriteOps() const;
 
     int numWriteOpsIn(WriteOpState state) const;
 
 private:
-    // Incoming client request, not owned here
-    const BatchedCommandRequest* _clientRequest;
+    // The incoming client request
+    const BatchedCommandRequest& _clientRequest;
 
     // Array of ops being processed from the client request
     WriteOp* _writeOps;
@@ -184,21 +174,14 @@ private:
 };
 
 struct BatchWriteStats {
-    BatchWriteStats();
 
-    int numInserted;
-    int numUpserted;
-    int numMatched;
-    int numModified;
-    int numDeleted;
+    int numInserted{0};
+    int numUpserted{0};
+    int numMatched{0};
+    int numModified{0};
+    int numDeleted{0};
 
-    std::string toString() const {
-        StringBuilder str;
-        str << "numInserted: " << numInserted << " numUpserted: " << numUpserted
-            << " numMatched: " << numMatched << " numModified: " << numModified
-            << " numDeleted: " << numDeleted;
-        return str.str();
-    }
+    std::string toString() const;
 };
 
 /**
@@ -288,4 +271,5 @@ private:
     typedef unordered_map<int, std::vector<ShardError*>> TrackedErrorMap;
     TrackedErrorMap _errorMap;
 };
-}
+
+}  // namespace mongo
