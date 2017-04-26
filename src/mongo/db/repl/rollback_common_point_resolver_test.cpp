@@ -48,8 +48,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
 
-const OplogInterfaceMock::Operations kEmptyMockOperations;
-
 class ListenerMock : public RollbackCommonPointResolver::Listener {
 
 public:
@@ -277,7 +275,7 @@ bool assertOpListsAreEqual(std::vector<BSONObj> oplog1,
 }
 
 TEST_F(RollbackCommonPointResolverTest, FindQueryContainsCorrectFields) {
-    OplogInterfaceMock oplog(kEmptyMockOperations);
+    OplogInterfaceMock oplog;
     ListenerMock listener(&localOplogEntriesProcessed,
                           &remoteOplogEntriesProcessed,
                           &commonPoint,
@@ -298,7 +296,7 @@ TEST_F(RollbackCommonPointResolverTest, FindQueryContainsCorrectFields) {
 TEST_F(RollbackCommonPointResolverTest,
        CommonPointResolverReturnsOplogStartMissingWithEmptyLocalOplog) {
     std::vector<BSONObj> remoteOplog = {makeOp(1)};
-    OplogInterfaceMock localOplog(kEmptyMockOperations);
+    OplogInterfaceMock localOplog;
     ListenerMock listener(&localOplogEntriesProcessed,
                           &remoteOplogEntriesProcessed,
                           &commonPoint,

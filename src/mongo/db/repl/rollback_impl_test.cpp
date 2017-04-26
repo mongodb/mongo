@@ -48,8 +48,6 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-const OplogInterfaceMock::Operations kEmptyMockOperations;
-
 /**
  * Unit test for rollback implementation introduced in 3.6.
  */
@@ -70,7 +68,7 @@ protected:
 void RollbackImplTest::setUp() {
     RollbackTest::setUp();
     _taskExecutorMock = stdx::make_unique<TaskExecutorMock>(&_threadPoolExecutorTest.getExecutor());
-    _localOplog = stdx::make_unique<OplogInterfaceMock>(kEmptyMockOperations);
+    _localOplog = stdx::make_unique<OplogInterfaceMock>();
     HostAndPort syncSource("localhost", 1234);
     _requiredRollbackId = 1;
     _onCompletionResult = executor::TaskExecutorTest::getDetectableErrorStatus();
@@ -115,7 +113,7 @@ TEST_F(RollbackImplTest, TestFixtureSetUpInitializesTaskExecutor) {
 
 TEST_F(RollbackImplTest, InvalidConstruction) {
     auto executor = &_threadPoolExecutorTest.getExecutor();
-    OplogInterfaceMock emptyOplog(kEmptyMockOperations);
+    OplogInterfaceMock emptyOplog;
     HostAndPort syncSource("localhost", 1234);
     int requiredRollbackId = 1;
     auto replicationCoordinator = _coordinator;
