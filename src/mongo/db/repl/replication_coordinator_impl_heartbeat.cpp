@@ -69,7 +69,7 @@ MONGO_FP_DECLARE(blockHeartbeatReconfigFinish);
 
 using executor::RemoteCommandRequest;
 
-Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset() {
+Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock() {
     long long electionTimeout = durationCount<Milliseconds>(_rsConfig.getElectionTimeoutPeriod());
     long long randomOffsetUpperBound =
         electionTimeout * _externalState->getElectionTimeoutOffsetLimitFraction();
@@ -79,8 +79,7 @@ Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset() {
         return Milliseconds(0);
     }
 
-    int64_t randomOffset = _replExecutor->nextRandomInt64(randomOffsetUpperBound);
-    return Milliseconds(randomOffset);
+    return Milliseconds{_nextRandomInt64_inlock(randomOffsetUpperBound)};
 }
 
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
@@ -302,7 +301,7 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
 
                 // Add randomized offset to calculated priority takeover delay.
                 Milliseconds priorityTakeoverDelay = _rsConfig.getPriorityTakeoverDelay(_selfIndex);
-                Milliseconds randomOffset = _getRandomizedElectionOffset();
+                Milliseconds randomOffset = _getRandomizedElectionOffset_inlock();
                 _priorityTakeoverWhen = _replExecutor->now() + priorityTakeoverDelay + randomOffset;
                 log() << "Scheduling priority takeover at " << _priorityTakeoverWhen;
                 _priorityTakeoverCbh = _scheduleWorkAt(
@@ -827,7 +826,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         return;
     }
 
-    Milliseconds randomOffset = _getRandomizedElectionOffset();
+    Milliseconds randomOffset = _getRandomizedElectionOffset_inlock();
     auto now = _replExecutor->now();
     auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
     invariant(when > now);

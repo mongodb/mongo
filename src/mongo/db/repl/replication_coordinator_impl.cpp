@@ -320,7 +320,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _sleptLastElection(false),
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
-      _storage(storage) {
+      _storage(storage),
+      _random(prngSeed) {
 
     invariant(_service);
 
@@ -336,7 +337,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     _externalState->setupNoopWriter(kNoopWriterPeriod);
 }
 
-ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
+ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() = default;
 
 void ReplicationCoordinatorImpl::waitForStartUpComplete_forTest() {
     _waitForStartUpComplete();
@@ -370,7 +371,8 @@ Date_t ReplicationCoordinatorImpl::getElectionTimeout_forTest() const {
 }
 
 Milliseconds ReplicationCoordinatorImpl::getRandomizedElectionOffset_forTest() {
-    return _getRandomizedElectionOffset();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _getRandomizedElectionOffset_inlock();
 }
 
 boost::optional<Date_t> ReplicationCoordinatorImpl::getPriorityTakeover_forTest() const {
@@ -3784,6 +3786,10 @@ ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inTopoLock() {
         }
     }
     return _electionFinishedEvent;
+}
+
+int64_t ReplicationCoordinatorImpl::_nextRandomInt64_inlock(int64_t limit) {
+    return _random.nextInt64(limit);
 }
 
 }  // namespace repl

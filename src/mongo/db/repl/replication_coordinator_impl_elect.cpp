@@ -173,7 +173,7 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
             break;
         case FreshnessChecker::FreshnessTie:
             if ((_selfIndex != 0) && !_sleptLastElection) {
-                const auto ms = Milliseconds(_replExecutor->nextRandomInt64(1000) + 50);
+                const auto ms = Milliseconds(_nextRandomInt64_inlock(1000) + 50);
                 const Date_t nextCandidateTime = now + ms;
                 log() << "possible election tie; sleeping " << ms << " until "
                       << dateToISOStringLocal(nextCandidateTime);
@@ -245,7 +245,7 @@ void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
               << " votes, but needed at least " << _rsConfig.getMajorityVoteCount();
         // Suppress ourselves from standing for election again, giving other nodes a chance
         // to win their elections.
-        const auto ms = Milliseconds(_replExecutor->nextRandomInt64(1000) + 50);
+        const auto ms = Milliseconds(_nextRandomInt64_inlock(1000) + 50);
         const Date_t now(_replExecutor->now());
         const Date_t nextCandidateTime = now + ms;
         log() << "waiting until " << nextCandidateTime << " before standing for election again";

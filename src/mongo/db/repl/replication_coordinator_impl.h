@@ -49,6 +49,7 @@
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/condition_variable.h"
@@ -808,7 +809,7 @@ private:
      * Return a randomized offset amount that is scaled in proportion to the size of the
      * _electionTimeoutPeriod. Used to add randomization to an election timeout.
      */
-    Milliseconds _getRandomizedElectionOffset();
+    Milliseconds _getRandomizedElectionOffset_inlock();
 
     /**
      * Helper for _handleHeartbeatResponse.
@@ -1233,6 +1234,11 @@ private:
      */
     Status _waitUntilClusterTimeForRead(OperationContext* opCtx, LogicalTime clusterTime);
 
+    /**
+     * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).
+     */
+    int64_t _nextRandomInt64_inlock(int64_t limit);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -1429,6 +1435,9 @@ private:
 
     // Cached copy of the current config protocol version.
     AtomicInt64 _protVersion;  // (S)
+
+    // Source of random numbers used in setting election timeouts, etc.
+    PseudoRandom _random;  // (M)
 
     // This setting affects the Applier prefetcher behavior.
     mutable stdx::mutex _indexPrefetchMutex;
