@@ -93,7 +93,6 @@ env.Library(
     source=[
         "latency_server_status_section.cpp",
         "lock_server_status_section.cpp",
-        "snapshots.cpp",
         'storage_stats.cpp',
     ],
     LIBDEPS=[

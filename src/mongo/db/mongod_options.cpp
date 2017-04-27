@@ -120,17 +120,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     general_options.addOptionChaining("security.enableLocalhostAuthBypass", "", moe::String, "TODO")
         .setSources(moe::SourceYAMLConfig);
 
-
-    // Network Options
-
-    general_options.addOptionChaining("net.http.JSONPEnabled",
-                                      "jsonp",
-                                      moe::Switch,
-                                      "allow JSONP access via http (has security implications)");
-
-    general_options.addOptionChaining(
-        "net.http.RESTInterfaceEnabled", "rest", moe::Switch, "turn on simple rest api");
-
     // Diagnostic Options
 
     general_options
@@ -637,33 +626,6 @@ Status validateMongodOptions(const moe::Environment& params) {
                       "Can't specify both --journal and --nojournal options.");
     }
 
-    // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in all cases in the
-    // future
-    if (params.count("net.http.RESTInterfaceEnabled") &&
-        params["net.http.RESTInterfaceEnabled"].as<bool>() == true) {
-        // If we are explicitly setting httpinterface to false in the config file (the source of
-        // "net.http.enabled") and not overriding it on the command line (the source of
-        // "httpinterface"), then we can fail with an error message without breaking backwards
-        // compatibility.
-        if (!params.count("httpinterface") && params.count("net.http.enabled") &&
-            params["net.http.enabled"].as<bool>() == false) {
-            return Status(ErrorCodes::BadValue,
-                          "httpinterface must be enabled to use the rest api");
-        }
-    }
-
-    if (params.count("net.http.JSONPEnabled") &&
-        params["net.http.JSONPEnabled"].as<bool>() == true) {
-        // If we are explicitly setting httpinterface to false in the config file (the source of
-        // "net.http.enabled") and not overriding it on the command line (the source of
-        // "httpinterface"), then we can fail with an error message without breaking backwards
-        // compatibility.
-        if (!params.count("httpinterface") && params.count("net.http.enabled") &&
-            params["net.http.enabled"].as<bool>() == false) {
-            return Status(ErrorCodes::BadValue, "httpinterface must be enabled to use jsonp");
-        }
-    }
-
 #ifdef _WIN32
     if (params.count("install") || params.count("reinstall")) {
         if (params.count("storage.dbPath") &&
@@ -713,48 +675,6 @@ Status validateMongodOptions(const moe::Environment& params) {
 }
 
 Status canonicalizeMongodOptions(moe::Environment* params) {
-    // Need to handle this before canonicalizing the general "server options", since
-    // httpinterface and nohttpinterface are shared between mongos and mongod, but mongod has
-    // extra validation required.
-    if (params->count("net.http.RESTInterfaceEnabled") &&
-        (*params)["net.http.RESTInterfaceEnabled"].as<bool>() == true) {
-        bool httpEnabled = false;
-        if (params->count("net.http.enabled")) {
-            Status ret = params->get("net.http.enabled", &httpEnabled);
-            if (!ret.isOK()) {
-                return ret;
-            }
-        }
-        if (params->count("nohttpinterface")) {
-            log() << "** WARNING: Should not specify both --rest and --nohttpinterface"
-                  << startupWarningsLog;
-        } else if (!(params->count("httpinterface") ||
-                     (params->count("net.http.enabled") && httpEnabled == true))) {
-            log() << "** WARNING: --rest is specified without --httpinterface,"
-                  << startupWarningsLog;
-            log() << "**          enabling http interface" << startupWarningsLog;
-            Status ret = params->set("httpinterface", moe::Value(true));
-            if (!ret.isOK()) {
-                return ret;
-            }
-        }
-    }
-
-    if (params->count("net.http.JSONPEnabled") &&
-        (*params)["net.http.JSONPEnabled"].as<bool>() == true) {
-        if (params->count("nohttpinterface")) {
-            log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface"
-                  << startupWarningsLog;
-        } else if (!params->count("httpinterface")) {
-            log() << "** WARNING --jsonp is specified without --httpinterface,"
-                  << startupWarningsLog;
-            log() << "**         enabling http interface" << startupWarningsLog;
-            Status ret = params->set("httpinterface", moe::Value(true));
-            if (!ret.isOK()) {
-                return ret;
-            }
-        }
-    }
 
     Status ret = canonicalizeServerOptions(params);
     if (!ret.isOK()) {
@@ -1121,12 +1041,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         mmapv1GlobalOptions.preallocj = !params["storage.mmapv1.journal.nopreallocj"].as<bool>();
     }
 
-    if (params.count("net.http.RESTInterfaceEnabled")) {
-        serverGlobalParams.rest = params["net.http.RESTInterfaceEnabled"].as<bool>();
-    }
-    if (params.count("net.http.JSONPEnabled")) {
-        serverGlobalParams.jsonp = params["net.http.JSONPEnabled"].as<bool>();
-    }
     if (params.count("security.javascriptEnabled")) {
         mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
     }

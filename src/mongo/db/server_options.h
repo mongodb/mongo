@@ -51,7 +51,6 @@ struct ServerGlobalParams {
 
     std::string bind_ip;  // --bind_ip
     bool rest = false;    // --rest
-    bool jsonp = false;   // --jsonp
 
     bool indexBuildRetry = true;  // --noIndexBuildRetry
 
@@ -85,8 +84,6 @@ struct ServerGlobalParams {
     bool logRenameOnRotate = true;  // True if logging should rename log files on rotate
     bool logWithSyslog = false;     // True if logging to syslog; must not be set if logpath is set.
     int syslogFacility;             // Facility used when appending messages to the syslog.
-
-    bool isHttpInterfaceEnabled = false;  // True if the dbwebserver should be enabled.
 
 #ifndef _WIN32
     ProcessId parentProc;  // --fork pid of initial process

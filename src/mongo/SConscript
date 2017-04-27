@@ -287,7 +287,6 @@ mongodLibDeps = [
     'db/mongod_options',
     'db/mongodandmongos',
     'db/op_observer_d',
-    'db/mongodwebserver',
     'db/repl/repl_set_commands',
     'db/repair_database',
     'db/repl/storage_interface_impl',

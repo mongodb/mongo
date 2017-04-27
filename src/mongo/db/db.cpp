@@ -63,7 +63,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/dbwebserver.h"
 #include "mongo/db/diag_log.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
@@ -89,7 +88,6 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
-#include "mongo/db/restapi.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
@@ -102,7 +100,6 @@
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -123,6 +120,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -488,18 +486,6 @@ ExitCode _initAndListen(int listenPort) {
         return EXIT_NET_ERROR;
     }
 
-    std::shared_ptr<DbWebServer> dbWebServer;
-    if (serverGlobalParams.isHttpInterfaceEnabled) {
-        dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
-                                          serverGlobalParams.port + 1000,
-                                          globalServiceContext,
-                                          new RestAdminAccess()));
-        if (!dbWebServer->setupSockets()) {
-            error() << "Failed to set up sockets for HTTP interface during startup.";
-            return EXIT_NET_ERROR;
-        }
-    }
-
     globalServiceContext->initializeGlobalStorageEngine();
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -591,16 +577,6 @@ ExitCode _initAndListen(int listenPort) {
 
     /* this is for security on certain platforms (nonce generation) */
     srand((unsigned)(curTimeMicros64() ^ startupSrandTimer.micros()));
-
-    // The snapshot thread provides historical collection level and lock statistics for use
-    // by the web interface. Only needed when HTTP is enabled.
-    if (serverGlobalParams.isHttpInterfaceEnabled) {
-        statsSnapshotThread.go();
-
-        invariant(dbWebServer);
-        stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
-        web.detach();
-    }
 
     AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {

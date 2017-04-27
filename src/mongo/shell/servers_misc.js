@@ -17,7 +17,6 @@ ToolTest.prototype.startDB = function(coll) {
     var options = {
         port: this.port,
         dbpath: this.dbpath,
-        nohttpinterface: "",
         noprealloc: "",
         smallfiles: "",
         bind_ip: "127.0.0.1"
@@ -101,7 +100,7 @@ ReplTest.prototype.getOptions = function(master, extra, putBinaryFirst, norepl) 
     var a = [];
     if (putBinaryFirst)
         a.push("mongod");
-    a.push("--nohttpinterface", "--noprealloc", "--bind_ip", "127.0.0.1", "--smallfiles");
+    a.push("--noprealloc", "--bind_ip", "127.0.0.1", "--smallfiles");
 
     a.push("--port");
     a.push(this.getPort(master));

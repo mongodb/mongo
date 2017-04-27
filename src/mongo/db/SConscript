@@ -385,7 +385,6 @@ env.CppUnitTest(
 env.Library(
     target="mongodandmongos",
     source=[
-        "dbwebserver.cpp",
         "initialize_server_global_state.cpp",
         "server_extra_log_context.cpp",
         "server_options_init.cpp",
@@ -397,32 +396,9 @@ env.Library(
         "$BUILD_DIR/mongo/rpc/command_reply",
         "$BUILD_DIR/mongo/rpc/command_request",
         "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/util/net/miniwebserver",
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",
         "auth/authorization_manager_global",
-    ],
-)
-
-env.Library(
-    target="mongodwebserver",
-    source=[
-        "clientlistplugin.cpp",
-        "restapi.cpp",
-        "stats/snapshots_webplugins.cpp",
-        "repl/repl_set_web_handler.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/background',
-        "$BUILD_DIR/mongo/db/curop",
-        '$BUILD_DIR/mongo/db/clientcursor',
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
-        '$BUILD_DIR/mongo/db/stats/serveronly',
-        "$BUILD_DIR/mongo/util/net/miniwebserver",
-        "mongodandmongos",
-        'repl/repl_coordinator_global',
-        'repl/serveronly',
     ],
 )
 

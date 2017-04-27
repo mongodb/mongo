@@ -284,19 +284,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .composing();
 
     options
-        ->addOptionChaining("httpinterface", "httpinterface", moe::Switch, "enable http interface")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("nohttpinterface");
-
-    options->addOptionChaining("net.http.enabled", "", moe::Bool, "enable http interface")
-        .setSources(moe::SourceYAMLConfig);
-
-    options
-        ->addOptionChaining(
-            "net.http.port", "", moe::Switch, "port to listen on for http interface")
-        .setSources(moe::SourceYAMLConfig);
-
-    options
         ->addOptionChaining(
             "security.transitionToAuth",
             "transitionToAuth",
@@ -347,14 +334,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
             .hidden()
             .setSources(moe::SourceAllLegacy);
     }
-
-    // Extra hidden options
-    options
-        ->addOptionChaining(
-            "nohttpinterface", "nohttpinterface", moe::Switch, "disable http interface")
-        .hidden()
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("httpinterface");
 
     options
         ->addOptionChaining("objcheck",
@@ -631,31 +610,6 @@ Status canonicalizeServerOptions(moe::Environment* params) {
         }
     }
 
-    // "net.http.enabled" comes from the config file, so override it if "nohttpinterface" or
-    // "httpinterface" are set since those come from the command line.
-    if (params->count("nohttpinterface")) {
-        Status ret =
-            params->set("net.http.enabled", moe::Value(!(*params)["nohttpinterface"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("nohttpinterface");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("httpinterface")) {
-        Status ret =
-            params->set("net.http.enabled", moe::Value((*params)["httpinterface"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("httpinterface");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
     // "net.unixDomainSocket.enabled" comes from the config file, so override it if
     // "nounixsocket" is set since that comes from the command line.
     if (params->count("nounixsocket")) {
@@ -783,11 +737,6 @@ Status storeServerOptions(const moe::Environment& params) {
         return ret;
     }
 
-    // Check options that are not yet supported
-    if (params.count("net.http.port")) {
-        return Status(ErrorCodes::BadValue, "The net.http.port option is not currently supported");
-    }
-
     if (params.count("systemLog.verbosity")) {
         int verbosity = params["systemLog.verbosity"].as<int>();
         if (verbosity < 0) {
@@ -832,10 +781,6 @@ Status storeServerOptions(const moe::Environment& params) {
 
     if (params.count("net.ipv6") && params["net.ipv6"].as<bool>() == true) {
         enableIPv6();
-    }
-
-    if (params.count("net.http.enabled")) {
-        serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
     }
 
     if (params.count("security.transitionToAuth")) {

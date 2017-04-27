@@ -36,7 +36,6 @@ networkEnv.Library(
         "asio_message_port.cpp",
         "asio_ssl_context.cpp",
         "hostname_canonicalization.cpp",
-        "httpclient.cpp",
         "listen.cpp",
         "message.cpp",
         "message_port.cpp",
@@ -80,16 +79,6 @@ env.CppUnitTest(
     target='sock_test',
     source=[
         'sock_test.cpp',
-    ],
-    LIBDEPS=[
-        'network',
-    ],
-)
-
-env.Library(
-    target='miniwebserver',
-    source=[
-        'miniwebserver.cpp',
     ],
     LIBDEPS=[
         'network',

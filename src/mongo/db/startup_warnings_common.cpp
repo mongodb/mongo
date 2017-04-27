@@ -61,19 +61,6 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         }
     }
 
-    if (serverParams.authState == ServerGlobalParams::AuthState::kEnabled &&
-        (serverParams.rest || serverParams.isHttpInterfaceEnabled || serverParams.jsonp)) {
-        log() << startupWarningsLog;
-        log()
-            << "** WARNING: The server is started with the web server interface and access control."
-            << startupWarningsLog;
-        log() << "**          The web interfaces (rest, httpinterface and/or jsonp) are insecure "
-              << startupWarningsLog;
-        log() << "**          and should be disabled unless required for backward compatibility."
-              << startupWarningsLog;
-        warned = true;
-    }
-
     if (serverParams.authState == ServerGlobalParams::AuthState::kUndefined) {
         log() << startupWarningsLog;
         log() << "** WARNING: Access control is not enabled for the database."
