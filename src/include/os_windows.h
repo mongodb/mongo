@@ -12,7 +12,10 @@
  */
 typedef CONDITION_VARIABLE	wt_cond_t;
 typedef CRITICAL_SECTION	wt_mutex_t;
-typedef HANDLE			wt_thread_t;
+typedef struct {
+	bool created;
+	HANDLE id;
+} wt_thread_t;
 
 /*
  * Thread callbacks need to match the return signature of _beginthreadex.

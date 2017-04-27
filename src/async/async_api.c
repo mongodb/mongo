@@ -395,13 +395,12 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 			 * Join any worker we're stopping.
 			 * After the thread is stopped, close its session.
 			 */
-			WT_ASSERT(session, async->worker_tids[i] != 0);
+			WT_ASSERT(session, async->worker_tids[i].created);
 			WT_ASSERT(session, async->worker_sessions[i] != NULL);
 			F_CLR(async->worker_sessions[i],
 			    WT_SESSION_SERVER_ASYNC);
 			WT_TRET(__wt_thread_join(
 			    session, async->worker_tids[i]));
-			async->worker_tids[i] = 0;
 			wt_session = &async->worker_sessions[i]->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			async->worker_sessions[i] = NULL;
@@ -435,11 +434,7 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 
 	F_CLR(conn, WT_CONN_SERVER_ASYNC);
 	for (i = 0; i < conn->async_workers; i++)
-		if (async->worker_tids[i] != 0) {
-			WT_TRET(__wt_thread_join(
-			    session, async->worker_tids[i]));
-			async->worker_tids[i] = 0;
-		}
+		WT_TRET(__wt_thread_join(session, async->worker_tids[i]));
 	WT_TRET(__wt_cond_destroy(session, &async->flush_cond));
 
 	/* Close the server threads' sessions. */
@@ -497,7 +492,7 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 	 */
 	workers = 0;
 	for (i = 0; i < conn->async_workers; ++i)
-		if (async->worker_tids[i] != 0)
+		if (async->worker_tids[i].created)
 			++workers;
 	if (workers == 0)
 		return (0);

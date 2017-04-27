@@ -79,7 +79,7 @@ __thread_group_shrink(
 		if (thread == NULL)
 			continue;
 
-		WT_ASSERT(session, thread->tid != 0);
+		WT_ASSERT(session, thread->tid.created);
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
 		    "Stopping utility thread: %p:%" PRIu32,
 		    (void *)group, thread->id);
