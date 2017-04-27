@@ -20,22 +20,28 @@ def _check_version(linter, cmd_path, args):
 
     try:
         cmd = cmd_path + args
-        logging.debug(str(cmd))
-        output = subprocess.check_output(cmd)
+        logging.info(str(cmd))
+        process_handle = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, stderr = process_handle.communicate()
+
+        if process_handle.returncode:
+            logging.info("Version check failed for [%s], return code '%d'." +
+                         "Standard Output:\n%s\nStandard Error:\n%s", cmd,
+                         process_handle.returncode, output, stderr)
 
         required_version = re.escape(linter.required_version)
+
         pattern = r"\b%s\b" % (required_version)
         if not re.search(pattern, output):
-            logging.info("Linter %s has wrong version for '%s'. Expected '%s', received '%s'",
-                         linter.cmd_name, cmd, required_version, output)
+            logging.info("Linter %s has wrong version for '%s'. Expected '%s'," +
+                         "Standard Output:\n'%s'\nStandard Error:\n%s", linter.cmd_name, cmd,
+                         required_version, output, stderr)
             return False
+
     except OSError as os_error:
         # The WindowsError exception is thrown if the command is not found.
         # We catch OSError since WindowsError does not exist on non-Windows platforms.
         logging.info("Version check command [%s] failed: %s", cmd, os_error)
-        return False
-    except subprocess.CalledProcessError as cpe:
-        logging.info("Version check command [%s] failed:\n%s", cmd, cpe.output)
         return False
 
     return True
@@ -89,6 +95,9 @@ def _find_linter(linter, config_dict):
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
         return base.LinterInstance(linter, cmd)
 
+    logging.info("First version check failed for linter '%s', trying a different location.",
+                 linter.cmd_name)
+
     # Check 2: current path
     cmd = [linter.cmd_name]
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
@@ -105,8 +114,17 @@ def find_linters(linter_list, config_dict):
     for linter in linter_list:
         linter_instance = _find_linter(linter, config_dict)
         if not linter_instance:
-            logging.error("Could not find correct version of linter '%s', expected '%s'",
-                          linter.cmd_name, linter.required_version)
+            logging.error("""\
+Could not find the correct version of linter '%s', expected '%s'. Check your
+PATH environment variable or re-run with --verbose for more information.
+
+To fix, install the needed python modules for both Python 2.7, and Python 3.x:
+   sudo pip2 install -r buildscripts/requirements.txt
+   sudo pip3 install -r buildscripts/requirements.txt
+
+These commands are typically available via packages with names like python-pip,
+python2-pip, and python3-pip. See your OS documentation for help.
+""", linter.cmd_name, linter.required_version)
             return None
 
         linter_instances.append(linter_instance)
