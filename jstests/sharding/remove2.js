@@ -10,7 +10,7 @@ load("jstests/replsets/rslib.js");
             return elem.host;
         });
         return replTest.name + '/' + members.join(',');
-    };
+    }
 
     function removeShard(st, replTest) {
         jsTest.log("Removing shard with name: " + replTest.name);
@@ -25,7 +25,7 @@ load("jstests/replsets/rslib.js");
 
         // Drop the database so the shard can be re-added.
         assert.commandWorked(replTest.getPrimary().getDB(coll.getDB().getName()).dropDatabase());
-    };
+    }
 
     function addShard(st, replTest) {
         var seed = seedString(replTest);
@@ -54,7 +54,7 @@ load("jstests/replsets/rslib.js");
             assert.eq(300, coll.find().itcount());
         }
         print("Shard added successfully");
-    };
+    }
 
     var st = new ShardingTest(
         {shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}, other: {chunkSize: 1, enableBalancer: true}});
