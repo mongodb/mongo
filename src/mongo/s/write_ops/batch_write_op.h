@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <memory>
 #include <set>
 #include <vector>
 
@@ -50,6 +49,15 @@ class TargetedWriteBatch;
 struct ShardError;
 struct ShardWCError;
 class TrackedErrors;
+
+/**
+ * Compares endpoints in a map.
+ */
+struct EndpointComp {
+    bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
+};
+
+using TargetedBatchMap = std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp>;
 
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -147,19 +155,28 @@ public:
      */
     void buildClientResponse(BatchedCommandResponse* batchResp);
 
-    int numWriteOps() const;
-
+    /**
+     * Returns the number of write operations which are in the specified state. Runs in O(number of
+     * write operations).
+     */
     int numWriteOpsIn(WriteOpState state) const;
 
 private:
-    void _incBatchStats(BatchedCommandRequest::BatchType batchType,
-                        const BatchedCommandResponse& response);
+    /**
+     * Maintains the batch execution statistics when a response is received.
+     */
+    void _incBatchStats(const BatchedCommandResponse& response);
+
+    /**
+     * Helper function to cancel all the write ops of targeted batches in a map.
+     */
+    void _cancelBatches(const WriteErrorDetail& why, TargetedBatchMap&& batchMapToCancel);
 
     // The incoming client request
     const BatchedCommandRequest& _clientRequest;
 
     // Array of ops being processed from the client request
-    WriteOp* _writeOps;
+    std::vector<WriteOp> _writeOps;
 
     // Current outstanding batch op write requests
     // Not owned here but tracked for reporting
