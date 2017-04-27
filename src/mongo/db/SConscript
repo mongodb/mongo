@@ -662,15 +662,11 @@ env.Library(
         "cloner.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "dbdirectclient",
-        "ops/write_ops",
-        "repl/isself",
-        #"catalog/catalog", # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        'dbdirectclient',
+        'ops/write_ops',
+        'repl/isself',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/index_create',
     ],
 )
 
@@ -693,14 +689,10 @@ env.Library(
         "index_rebuilder.cpp",
     ],
     LIBDEPS=[
-        "db_raii",
-        "index/index_access_methods",
+        'db_raii',
+        'index/index_access_methods',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        #"catalog/catalog", # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        '$BUILD_DIR/mongo/db/catalog/index_create',
     ],
 )
 
@@ -715,18 +707,14 @@ env.Library(
 )
 
 env.Library(
-    target="prefetch",
+    target='prefetch',
     source=[
-        "prefetch.cpp",
+        'prefetch.cpp',
     ],
     LIBDEPS=[
-        #"catalog/catalog", # CYCLE
-        "dbhelpers",
-        "index/index_access_methods",
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        'dbhelpers',
+        'index/index_access_methods',
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap',
     ],
 )
 
@@ -759,11 +747,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/database',
         "$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1",
-        #"catalog/catalog", # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
