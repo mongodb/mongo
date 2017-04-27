@@ -221,7 +221,7 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     if (scope->_hasOutOfMemoryException) {
         scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
     } else if (scope->isKillPending()) {
-        scope->_status = Status(ErrorCodes::Interrupted, "Interrupted by the host");
+        scope->_status = Status(ErrorCodes::Interrupted, "JavaScript execution interrupted");
     }
     // If we are on the right thread, in the middle of an operation, and we have a registered opCtx,
     // then we should check the opCtx for interrupts.
