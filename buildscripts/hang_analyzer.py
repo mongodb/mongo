@@ -456,7 +456,9 @@ class JstackDumper(object):
             logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing" % (jstack, process_name, pid))
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (jstack,
+                                                                            process_name,
+                                                                            pid))
 
         call([jstack, "-l", str(pid)], logger)
 
