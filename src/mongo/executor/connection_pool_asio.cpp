@@ -63,10 +63,10 @@ void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
 
         cancelTimeout();
 
-        std::error_code ec;
-        _impl.expires_after(std::min(kMaxTimerDuration, timeout).toSystemDuration(), ec);
-        if (ec) {
-            severe() << "Failed to set connection pool timer: " << ec.message();
+        try {
+            _impl.expires_after(std::min(kMaxTimerDuration, timeout).toSystemDuration());
+        } catch (const asio::system_error& ec) {
+            severe() << "Failed to set connection pool timer: " << ec.what();
             fassertFailed(40333);
         }
 

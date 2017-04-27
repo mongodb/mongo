@@ -1,0 +1,47 @@
+From 262a53a7d9f2a987ed34c0e03a7f6180c7315cd6 Mon Sep 17 00:00:00 2001
+From: Spencer Jackson <spencer.jackson@mongodb.com>
+Date: Fri, 28 Apr 2017 13:15:18 -0400
+Subject: [PATCH] Fix signature and implementation of dev_poll_reactor::run
+
+---
+ asio/include/asio/detail/dev_poll_reactor.hpp      | 2 +-
+ asio/include/asio/detail/impl/dev_poll_reactor.ipp | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/asio/include/asio/detail/dev_poll_reactor.hpp b/asio/include/asio/detail/dev_poll_reactor.hpp
+index 1f59cf30..2ea8dd46 100644
+--- a/asio/include/asio/detail/dev_poll_reactor.hpp
++++ b/asio/include/asio/detail/dev_poll_reactor.hpp
+@@ -137,11 +137,11 @@ public:
+   void move_timer(timer_queue<Time_Traits>& queue,
+       typename timer_queue<Time_Traits>::per_timer_data& target,
+       typename timer_queue<Time_Traits>::per_timer_data& source);
+ 
+   // Run /dev/poll once until interrupted or events are ready to be dispatched.
+-  ASIO_DECL void run(bool block, op_queue<operation>& ops);
++  ASIO_DECL void run(long usec, op_queue<operation>& ops);
+ 
+   // Interrupt the select loop.
+   ASIO_DECL void interrupt();
+ 
+ private:
+diff --git a/asio/include/asio/detail/impl/dev_poll_reactor.ipp b/asio/include/asio/detail/impl/dev_poll_reactor.ipp
+index ac0cedea..c1d4fa0f 100644
+--- a/asio/include/asio/detail/impl/dev_poll_reactor.ipp
++++ b/asio/include/asio/detail/impl/dev_poll_reactor.ipp
+@@ -238,11 +238,11 @@ void dev_poll_reactor::run(long usec, op_queue<operation>& ops)
+ {
+   asio::detail::mutex::scoped_lock lock(mutex_);
+ 
+   // We can return immediately if there's no work to do and the reactor is
+   // not supposed to block.
+-  if (!block && op_queue_[read_op].empty() && op_queue_[write_op].empty()
++  if (usec == 0 && op_queue_[read_op].empty() && op_queue_[write_op].empty()
+       && op_queue_[except_op].empty() && timer_queues_.all_empty())
+     return;
+ 
+   // Write the pending event registration changes to the /dev/poll descriptor.
+   std::size_t events_size = sizeof(::pollfd) * pending_event_changes_.size();
+-- 
+2.12.2
+

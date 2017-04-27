@@ -76,7 +76,7 @@ if not use_system_version_of_library('yaml'):
 
 if not use_system_version_of_library('asio'):
     thirdPartyIncludePathList.append(
-        ('asio', '#/src/third_party/asio-asio-1-11-0/asio/include'))
+        ('asio', '#/src/third_party/asio-master/asio/include'))
 
 if not use_system_version_of_library('intel_decimal128'):
     thirdPartyIncludePathList.append(
@@ -336,10 +336,10 @@ if use_system_version_of_library("asio"):
 else:
     asioEnv = env.Clone()
     asioEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
-    asioEnv.SConscript('asio-asio-1-11-0/SConscript', exports={ 'env' : asioEnv })
+    asioEnv.SConscript('asio-master/SConscript', exports={ 'env' : asioEnv })
     asioEnv = asioEnv.Clone(
         LIBDEPS=[
-            ('asio-asio-1-11-0/asio', libdeps.dependency.Interface),
+            ('asio-master/asio', libdeps.dependency.Interface),
         ])
 
 asioEnv.Library(

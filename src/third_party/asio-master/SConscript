@@ -1,0 +1,18 @@
+Import("env")
+Import("has_option")
+
+env = env.Clone()
+
+asio_src = [
+    "asio/src/asio.cpp",
+]
+
+if has_option("ssl"):
+    asio_src.append("asio/src/asio_ssl.cpp")
+
+env.InjectThirdPartyIncludePaths(libraries=['boost'])
+
+env.Library(
+    target="asio",
+    source=asio_src
+)
