@@ -114,7 +114,7 @@ void setThreadName(StringData name) {
     if (error) {
         log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
     }
-#elif defined(__linux__)
+#elif defined(__linux__) && defined(MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
     // Maximum thread name length supported on Linux is 16 including the null terminator. Ideally
     // we use short and descriptive thread names that fit: this helps for log readibility as well.
     // Since several components set verbose thread names with a uniqifier at the end, we do a split
