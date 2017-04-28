@@ -337,8 +337,7 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
     if (ns.isListCollectionsCursorNS()) {
         // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
         // listCollections action on the database resource for "<db>".
-        if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                              ActionType::listCollections)) {
+        if (!isAuthorizedToListCollections(ns.db())) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized for listCollections getMore on "
                                         << ns.ns());
@@ -446,8 +445,7 @@ Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
     if (ns.isListCollectionsCursorNS()) {
         if (!(isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
                                                ActionType::killCursors) ||
-              isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                               ActionType::listCollections))) {
+              isAuthorizedToListCollections(ns.db()))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listCollections cursor on "
                                         << ns.ns());
@@ -720,6 +718,17 @@ bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName&
 bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) {
     return AuthorizationSession::isAuthorizedToChangeAsUser(userName,
                                                             ActionType::changeOwnCustomData);
+}
+
+bool AuthorizationSession::isAuthorizedToListCollections(StringData dbname) {
+    // Check for the listCollections ActionType on the database or find on system.namespaces for
+    // pre 3.0 systems.
+
+    return AuthorizationSession::isAuthorizedForActionsOnResource(
+               ResourcePattern::forDatabaseName(dbname), ActionType::listCollections) ||
+        AuthorizationSession::isAuthorizedForActionsOnResource(
+               ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
+               ActionType::find);
 }
 
 bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

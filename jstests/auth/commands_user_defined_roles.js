@@ -31,6 +31,7 @@ function testProperAuthorization(conn, t, testcase, privileges) {
 
     assert(adminDb.auth(testUser, "password"));
 
+    authCommandsLib.authenticatedSetup(t, runOnDb);
     var res = runOnDb.runCommand(t.command);
 
     if (!testcase.expectFail && res.ok != 1 && res.code != commandNotSupportedCode) {
@@ -63,6 +64,7 @@ function testInsufficientPrivileges(conn, t, testcase, privileges) {
 
     assert(adminDb.auth(testUser, "password"));
 
+    authCommandsLib.authenticatedSetup(t, runOnDb);
     var res = runOnDb.runCommand(t.command);
 
     if (res.ok == 1 || res.code != authErrCode) {

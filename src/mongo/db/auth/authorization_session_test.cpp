@@ -129,6 +129,8 @@ const ResourcePattern otherProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("other.system.profile")));
 const ResourcePattern thirdProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("third.system.profile")));
+const ResourcePattern testSystemNamespacesResource(
+    ResourcePattern::forExactNamespace(NamespaceString("test.system.namespaces")));
 
 TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     // Check that disabling auth checks works
@@ -919,5 +921,33 @@ TEST_F(AuthorizationSessionTest,
     ASSERT_TRUE(
         authzSession->isCoauthorizedWith(makeUserNameIterator(userSet.begin(), userSet.end())));
 }
+
+TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPrivilege) {
+    // With no privileges, there is not authorization to list collections
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+}
+
+TEST_F(AuthorizationSessionTest, CanListCollectionsWithLegacySystemNamespacesAccess) {
+    // Deprecated: permissions for the find action on test.system.namespaces allows us to list
+    // collections in the test database.
+    authzSession->assumePrivilegesForDB(
+        Privilege(testSystemNamespacesResource, {ActionType::find}));
+
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+}
+
+TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {
+    // The listCollections privilege authorizes the list collections command.
+    authzSession->assumePrivilegesForDB(Privilege(testDBResource, {ActionType::listCollections}));
+
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+}
+
 }  // namespace
 }  // namespace mongo
