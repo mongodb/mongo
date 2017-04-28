@@ -856,20 +856,14 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
     pMerger->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
 
     for (auto&& accumulatedField : _accumulatedFields) {
-        StringData factoryName(accumulatedField.fieldName);
-
-        /*
-          The merger's output field names will be the same, as will the
-          accumulator factories.  However, for some accumulators, the
-          expression to be accumulated will be different.  The original
-          accumulator may be collecting an expression based on a field
-          expression or constant.  Here, we accumulate the output of the
-          same name from the prior group.
-        */
-        pMerger->addAccumulator(
-            {accumulatedField.fieldName,
-             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + accumulatedField.fieldName, vps),
-             accumulatedField.getFactory(factoryName)});
+        // The merger's output field names will be the same, as will the accumulator factories.
+        // However, for some accumulators, the expression to be accumulated will be different. The
+        // original accumulator may be collecting an expression based on a field expression or
+        // constant.  Here, we accumulate the output of the same name from the prior group.
+        auto copiedAccumuledField = accumulatedField;
+        copiedAccumuledField.expression =
+            ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + accumulatedField.fieldName, vps);
+        pMerger->addAccumulator(copiedAccumuledField);
     }
 
     pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));
