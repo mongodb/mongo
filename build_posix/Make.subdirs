@@ -45,4 +45,5 @@ test/syscall
 test/thread
 
 # Benchmark programs.
+bench/workgen PYTHON
 bench/wtperf
