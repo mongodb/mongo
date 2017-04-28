@@ -40,6 +40,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -120,6 +121,10 @@ void ReplCoordTest::init() {
     StorageInterface* storageInterface = new StorageInterfaceMock();
     StorageInterface::set(service, std::unique_ptr<StorageInterface>(storageInterface));
     ASSERT_TRUE(storageInterface == StorageInterface::get(service));
+
+    ReplicationProcess::set(service, stdx::make_unique<ReplicationProcess>(storageInterface));
+    auto replicationProcess = ReplicationProcess::get(service);
+
     // PRNG seed for tests.
     const int64_t seed = 0;
 
@@ -138,6 +143,7 @@ void ReplCoordTest::init() {
                                                           std::move(externalState),
                                                           std::move(net),
                                                           std::move(topo),
+                                                          replicationProcess,
                                                           storageInterface,
                                                           seed);
     service->setFastClockSource(stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));

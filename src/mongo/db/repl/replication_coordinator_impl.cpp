@@ -61,6 +61,7 @@
 #include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/topology_coordinator.h"
@@ -305,6 +306,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
     std::unique_ptr<NetworkInterface> network,
     std::unique_ptr<TopologyCoordinator> topCoord,
+    ReplicationProcess* replicationProcess,
     StorageInterface* storage,
     int64_t prngSeed)
     : _service(service),
@@ -320,6 +322,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _sleptLastElection(false),
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
+      _replicationProcess(replicationProcess),
       _storage(storage),
       _random(prngSeed) {
 
@@ -424,11 +427,11 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     }
 
     // Check that we have a local Rollback ID. If we do not have one, create one.
-    auto rbid = _storage->getRollbackID(opCtx);
+    auto rbid = _replicationProcess->getRollbackID(opCtx);
     if (!rbid.isOK()) {
         if (rbid.getStatus() == ErrorCodes::NamespaceNotFound) {
             log() << "Did not find local Rollback ID document at startup. Creating one.";
-            auto initializingStatus = _storage->initializeRollbackID(opCtx);
+            auto initializingStatus = _replicationProcess->initializeRollbackID(opCtx);
             fassertStatusOK(40424, initializingStatus);
         } else {
             severe() << "Error loading local Rollback ID document at startup; " << rbid.getStatus();
@@ -3336,7 +3339,7 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(OperationContext* opCtx,
         return;
     }
 
-    auto rbid = _storage->getRollbackID(opCtx);
+    auto rbid = _replicationProcess->getRollbackID(opCtx);
     fassertStatusOK(40427, rbid.getStatus());
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);

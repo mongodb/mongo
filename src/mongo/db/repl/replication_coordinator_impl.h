@@ -79,6 +79,7 @@ class HandshakeArgs;
 class HeartbeatResponseAction;
 class LastVote;
 class OplogReader;
+class ReplicationProcess;
 class ReplSetRequestVotesArgs;
 class ReplSetConfig;
 class SyncSourceFeedback;
@@ -95,6 +96,7 @@ public:
                                std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
                                std::unique_ptr<executor::NetworkInterface> network,
                                std::unique_ptr<TopologyCoordinator> topoCoord,
+                               ReplicationProcess* replicationProcess,
                                StorageInterface* storage,
                                int64_t prngSeed);
 
@@ -1379,6 +1381,10 @@ private:
     // OpTime representing our transition to PRIMARY and the start of our term.
     // _lastCommittedOpTime cannot be set to an earlier OpTime.
     OpTime _firstOpTimeOfMyTerm;  // (M)
+
+    // ReplicationProcess used to hold information related to the replication and application of
+    // operations from the sync source.
+    ReplicationProcess* const _replicationProcess;  // (PS)
 
     // Storage interface used by initial syncer.
     StorageInterface* _storage;  // (PS)

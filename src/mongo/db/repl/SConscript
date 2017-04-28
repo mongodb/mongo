@@ -188,6 +188,18 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='replication_process',
+    source=[
+        'replication_process.cpp',
+    ],
+    LIBDEPS=[
+        'storage_interface',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/decorable',
+    ],
+)
+
+env.Library(
     target='replication_executor',
     source=[
         'replication_executor.cpp',
@@ -328,6 +340,7 @@ env.Library(
         'rs_rollback.cpp',
     ],
     LIBDEPS=[
+        'replication_process',
         'roll_back_local_operations',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/s/sharding',
@@ -560,6 +573,7 @@ env.Library('repl_coordinator_impl',
                      'repl_settings',
                      'replica_set_messages',
                      'replication_executor',
+                     'replication_process',
                      'reporter',
                      'rslog',
                      'scatter_gather',
@@ -813,6 +827,7 @@ env.Library(
         'repl_settings',
         'replica_set_messages',
         'replication_executor',
+        'replication_process',
         'serveronly',
     ],
 )
@@ -1356,6 +1371,7 @@ env.Library(
         'repl_coordinator_interface',
         'repl_coordinator_impl',
         'repl_settings',
+        'replication_process',
         'sync_tail',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver',

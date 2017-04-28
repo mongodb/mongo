@@ -54,6 +54,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context.h"
@@ -169,7 +170,7 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        auto rbid = StorageInterface::get(opCtx)->getRollbackID(opCtx);
+        auto rbid = ReplicationProcess::get(opCtx)->getRollbackID(opCtx);
 
         // We should always have a Rollback ID since it is created at startup.
         fassertStatusOK(40426, rbid.getStatus());
