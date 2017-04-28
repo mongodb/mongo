@@ -36,7 +36,6 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/cluster_commands_common.h"

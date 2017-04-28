@@ -36,7 +36,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"

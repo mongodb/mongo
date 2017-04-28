@@ -46,7 +46,6 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
