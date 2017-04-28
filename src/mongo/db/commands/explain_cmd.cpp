@@ -165,12 +165,8 @@ public:
         }
 
         // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(opCtx,
-                                                      dbname,
-                                                      explainObj,
-                                                      verbosity.getValue(),
-                                                      rpc::ServerSelectionMetadata::get(opCtx),
-                                                      &result);
+        Status explainStatus =
+            commToExplain->explain(opCtx, dbname, explainObj, verbosity.getValue(), &result);
         if (!explainStatus.isOK()) {
             return appendCommandStatus(result, explainStatus);
         }

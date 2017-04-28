@@ -94,7 +94,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const override {
         return _runAggCommand(opCtx, dbname, cmdObj, verbosity, out);
     }

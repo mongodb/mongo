@@ -167,7 +167,6 @@ Status Command::explain(OperationContext* opCtx,
                         const string& dbname,
                         const BSONObj& cmdObj,
                         ExplainOptions::Verbosity verbosity,
-                        const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                         BSONObjBuilder* out) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }

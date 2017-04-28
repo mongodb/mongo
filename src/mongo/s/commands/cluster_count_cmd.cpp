@@ -241,7 +241,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& ssm,
                    BSONObjBuilder* out) const override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,

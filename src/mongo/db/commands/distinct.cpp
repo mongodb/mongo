@@ -116,7 +116,6 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainOptions::Verbosity verbosity,
-                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 

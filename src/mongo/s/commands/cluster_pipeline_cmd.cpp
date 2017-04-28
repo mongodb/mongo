@@ -80,13 +80,12 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const override {
         // Add the server selection metadata to the aggregate command in the "unwrapped" format that
         // runAggregate() expects: {aggregate: ..., $queryOptions: {$readPreference: ...}}.
         BSONObjBuilder aggCmdBuilder;
         aggCmdBuilder.appendElements(cmdObj);
-        if (auto readPref = serverSelectionMetadata.getReadPreference()) {
+        if (auto readPref = rpc::ServerSelectionMetadata::get(opCtx).getReadPreference()) {
             aggCmdBuilder.append(QueryRequest::kUnwrappedReadPrefField,
                                  BSON("$readPreference" << readPref->toBSON()));
         }

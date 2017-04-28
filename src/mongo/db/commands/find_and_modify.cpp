@@ -252,7 +252,6 @@ public:
                    const std::string& dbName,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const override {
         const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
         Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());

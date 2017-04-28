@@ -38,6 +38,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_find.h"
@@ -105,7 +106,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const final {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         // Parse the command BSON to a QueryRequest.
@@ -115,8 +115,12 @@ public:
             return qr.getStatus();
         }
 
-        auto result = Strategy::explainFind(
-            opCtx, cmdObj, *qr.getValue(), verbosity, serverSelectionMetadata, out);
+        auto result = Strategy::explainFind(opCtx,
+                                            cmdObj,
+                                            *qr.getValue(),
+                                            verbosity,
+                                            rpc::ServerSelectionMetadata::get(opCtx),
+                                            out);
 
         if (result == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
             auto resolvedView = ResolvedView::fromBSON(out->asTempObj());

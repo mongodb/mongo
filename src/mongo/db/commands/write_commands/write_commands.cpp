@@ -304,7 +304,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const final {
         const auto batch = parseUpdateCommand(dbname, cmdObj);
         uassert(ErrorCodes::InvalidLength,
@@ -375,7 +374,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const final {
         const auto batch = parseDeleteCommand(dbname, cmdObj);
         uassert(ErrorCodes::InvalidLength,

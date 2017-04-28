@@ -888,7 +888,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const override {
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -1116,7 +1115,6 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& ssm,
                    BSONObjBuilder* out) const {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 

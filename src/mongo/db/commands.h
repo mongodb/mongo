@@ -210,17 +210,11 @@ public:
      *
      *   2) Calling Explain::explainStages(...) on the PlanExecutor. This is the function
      *   which knows how to convert an execution stage tree into explain output.
-     *
-     * TODO: Remove the 'serverSelectionMetadata' parameter in favor of reading the
-     * ServerSelectionMetadata off 'opCtx'. Once OP_COMMAND is implemented in mongos, this metadata
-     * will be parsed and attached as a decoration on the OperationContext, as is already done on
-     * the mongod side.
      */
     virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainOptions::Verbosity verbosity,
-                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const;
 
     /**

@@ -353,15 +353,20 @@ DbResponse Strategy::clientCommandOp(OperationContext* opCtx,
         if (e.type() == Object && (e.fieldName()[0] == '$' ? str::equals("query", e.fieldName() + 1)
                                                            : str::equals("query", e.fieldName()))) {
             // Extract the embedded query object.
-            if (cmdObj.hasField(Query::ReadPrefField.name())) {
+            if (auto readPrefElem = cmdObj[Query::ReadPrefField.name()]) {
                 // The command has a read preference setting. We don't want to lose this information
-                // so we copy this to a new field called $queryOptions.$readPreference
+                // so we put it on the OperationContext and copy it to a new field called
+                // $queryOptions.$readPreference
+                auto readPref =
+                    uassertStatusOK(ReadPreferenceSetting::fromBSON(readPrefElem.Obj()));
+                rpc::ServerSelectionMetadata::get(opCtx) = rpc::ServerSelectionMetadata(
+                    readPref.pref != ReadPreference::PrimaryOnly, readPref);
                 haveReadPref = true;
                 BSONObjBuilder finalCmdObjBuilder;
                 finalCmdObjBuilder.appendElements(e.embeddedObject());
 
                 BSONObjBuilder queryOptionsBuilder(finalCmdObjBuilder.subobjStart("$queryOptions"));
-                queryOptionsBuilder.append(cmdObj[Query::ReadPrefField.name()]);
+                queryOptionsBuilder.append(readPrefElem);
                 queryOptionsBuilder.done();
 
                 cmdObj = finalCmdObjBuilder.obj();
@@ -373,6 +378,8 @@ DbResponse Strategy::clientCommandOp(OperationContext* opCtx,
         if (!haveReadPref && q.queryOptions & QueryOption_SlaveOk) {
             // If the slaveOK bit is set, behave as-if read preference secondary-preferred was
             // specified.
+            rpc::ServerSelectionMetadata::get(opCtx) = rpc::ServerSelectionMetadata(
+                true, ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
             BSONObjBuilder finalCmdObjBuilder;
             finalCmdObjBuilder.appendElements(cmdObj);
 

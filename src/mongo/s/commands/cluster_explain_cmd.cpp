@@ -143,16 +143,9 @@ public:
                        str::stream() << "Explain failed due to unknown command: " << cmdName});
         }
 
-        auto readPref = ClusterFind::extractUnwrappedReadPref(cmdObj);
-        if (!readPref.isOK()) {
-            return appendCommandStatus(result, readPref.getStatus());
-        }
-        const bool secondaryOk = (readPref.getValue().pref != ReadPreference::PrimaryOnly);
-        rpc::ServerSelectionMetadata metadata(secondaryOk, readPref.getValue());
-
         // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(
-            opCtx, dbName, explainObj, verbosity.getValue(), metadata, &result);
+        Status explainStatus =
+            commToExplain->explain(opCtx, dbName, explainObj, verbosity.getValue(), &result);
         if (!explainStatus.isOK()) {
             return appendCommandStatus(result, explainStatus);
         }

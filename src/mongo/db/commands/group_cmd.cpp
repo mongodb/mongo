@@ -124,7 +124,6 @@ private:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainOptions::Verbosity verbosity,
-                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         GroupRequest groupRequest;
         Status parseRequestStatus = _parseRequest(dbname, cmdObj, &groupRequest);
