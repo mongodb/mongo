@@ -1101,16 +1101,6 @@ var ReplSetTest = function(opts) {
 
     // Call the provided checkerFunction, after the replica set has been write locked.
     this.checkReplicaSet = function(checkerFunction, ...checkerFunctionArgs) {
-
-        function generateUniqueDbName(dbNames, prefix) {
-            var uniqueDbName;
-            Random.setRandomSeed();
-            do {
-                uniqueDbName = prefix + Random.randInt(100000);
-            } while (dbNames.has(uniqueDbName));
-            return uniqueDbName;
-        }
-
         assert.eq(typeof checkerFunction,
                   "function",
                   "Expected checkerFunction parameter to be a function");
@@ -1119,16 +1109,12 @@ var ReplSetTest = function(opts) {
         var primary = this.getPrimary();
         assert(primary, 'calling getPrimary() failed');
 
-        // Since we cannot determine if there is a background index in progress (SERVER-26624),
-        // we flush indexing as follows:
-        //  1. Iterate through all collections and run collMod against each (collMod will block
-        //     replication to wait for any active background index builds to complete)
-        //  2. Insert a document into a dummy collection with a writeConcern for all nodes (which
-        //     will block on completion of the background index build + collMod)
-        var dbNameSet = new Set(primary.getDBNames());
-        var uniqueDbName = generateUniqueDbName(dbNameSet, "flush_all_background_indexes_");
-
-        for (let dbName of dbNameSet.values()) {
+        // Since we cannot determine if there is a background index in progress (SERVER-26624), we
+        // use the "collMod" command to wait for any index builds that may be in progress on the
+        // primary or on one of the secondaries to complete. Running the "collMod" command with a
+        // write concern of w=<# nodes> on each collection will block until all background index
+        // builds have completed.
+        for (let dbName of primary.getDBNames()) {
             if (dbName === "local") {
                 continue;
             }
@@ -1141,28 +1127,28 @@ var ReplSetTest = function(opts) {
                     // skip view evaluation, and therefore won't fail on an invalid view.
                     if (!collInfo.name.startsWith('system.')) {
                         // 'usePowerOf2Sizes' is ignored by the server so no actual collection
-                        // modification takes place.
-                        assert.commandWorked(
-                            dbHandle.runCommand({collMod: collInfo.name, usePowerOf2Sizes: true}));
+                        // modification takes place. We intentionally await replication without
+                        // doing any I/O to avoid any overhead from allocating or deleting data
+                        // files when using the MMAPv1 storage engine.
+                        assert.commandWorked(dbHandle.runCommand({
+                            collMod: collInfo.name,
+                            usePowerOf2Sizes: true,
+                            writeConcern: {
+                                w: self.nodeList().length,
+                                wtimeout: self.kDefaultTimeoutMS,
+                            },
+                        }));
                     }
                 });
         }
 
-        let dummyDB = primary.getDB(uniqueDbName);
-        let dummyColl = dummyDB.dummy;
-        assert.writeOK(dummyColl.insert(
-            {x: 1}, {writeConcern: {w: this.nodeList().length, wtimeout: self.kDefaultTimeoutMS}}));
-
-        // We drop the dummy database for cleanup purposes only.
-        assert.commandWorked(dummyDB.dropDatabase());
-
         var activeException = false;
 
+        // Lock the primary to prevent the TTL monitor from deleting expired documents in
+        // the background while we are getting the dbhashes of the replica set members.
+        assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
+                             'failed to lock the primary');
         try {
-            // Lock the primary to prevent the TTL monitor from deleting expired documents in
-            // the background while we are getting the dbhashes of the replica set members.
-            assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
-                                 'failed to lock the primary');
             this.awaitReplication(60 * 1000 * 5);
             checkerFunction.apply(this, checkerFunctionArgs);
         } catch (e) {
