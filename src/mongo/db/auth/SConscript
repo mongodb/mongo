@@ -188,3 +188,10 @@ env.Library(
         'authcore',
     ]
 )
+
+env.CppUnitTest('sasl_scramsha1_test',                                                              
+                'sasl_scramsha1_test.cpp',                                                          
+                LIBDEPS=[                                                                           
+                    'saslauth',                                                                     
+                    '$BUILD_DIR/mongo/client/sasl_client',                                          
+                ]) 

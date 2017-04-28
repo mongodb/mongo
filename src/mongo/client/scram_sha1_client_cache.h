@@ -68,8 +68,8 @@ public:
      * match those recorded for the hostname. Otherwise, no secrets
      * are returned.
      */
-    boost::optional<scram::SCRAMSecrets> getCachedSecrets(
-        const HostAndPort& target, const scram::SCRAMPresecrets& presecrets) const;
+    scram::SCRAMSecrets getCachedSecrets(const HostAndPort& target,
+                                         const scram::SCRAMPresecrets& presecrets) const;
 
     /**
      * Records a set of precomputed SCRAMSecrets for the specified

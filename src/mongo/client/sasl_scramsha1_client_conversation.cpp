@@ -187,11 +187,9 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<
         _saslClientSession->getParameter(SaslClientSession::parameterServiceHostAndPort));
 
     if (targetHost.isOK()) {
-        auto cachedSecrets = _clientCache->getCachedSecrets(targetHost.getValue(), presecrets);
+        _credentials = _clientCache->getCachedSecrets(targetHost.getValue(), presecrets);
 
-        if (cachedSecrets) {
-            _credentials = *cachedSecrets;
-        } else {
+        if (!_credentials) {
             _credentials = scram::generateSecrets(presecrets);
 
             _clientCache->setCachedSecrets(
