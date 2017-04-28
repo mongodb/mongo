@@ -3353,8 +3353,12 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(OperationContext* opCtx,
         return;
     }
 
-    auto rbid = _replicationProcess->getRollbackID(opCtx);
-    fassertStatusOK(40427, rbid.getStatus());
+    // Avoid retrieving Rollback ID if we do not need it for _prepareOplogQueryMetadata_inlock().
+    int rbid = -1;
+    if (hasOplogQueryMetadata) {
+        rbid = fassertStatusOK(40427, _replicationProcess->getRollbackID(opCtx));
+        invariant(-1 != rbid);
+    }
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -3363,7 +3367,7 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(OperationContext* opCtx,
     }
 
     if (hasOplogQueryMetadata) {
-        _prepareOplogQueryMetadata_inlock(rbid.getValue(), builder);
+        _prepareOplogQueryMetadata_inlock(rbid, builder);
     }
 }
 
