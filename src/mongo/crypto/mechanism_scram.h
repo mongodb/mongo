@@ -76,12 +76,50 @@ SHA1Block generateSaltedPassword(const SCRAMPresecrets& presecrets);
 
 /*
  * Stores all of the keys, generated from a password, needed for a client or server to perform a
- * SCRAM handshake. This structure will secureZeroMemory itself on destruction.
+ * SCRAM handshake.
+ * These keys are reference counted, and allocated using the SecureAllocator.
+ * May be unpopulated. SCRAMSecrets created via the default constructor are unpopulated.
+ * The behavior is undefined if the accessors are called when unpopulated.
  */
-struct SCRAMSecrets {
-    SecureHandle<SHA1Block> clientKey;
-    SecureHandle<SHA1Block> storedKey;
-    SecureHandle<SHA1Block> serverKey;
+class SCRAMSecrets {
+private:
+    struct SCRAMSecretsHolder {
+        SHA1Block clientKey;
+        SHA1Block storedKey;
+        SHA1Block serverKey;
+    };
+
+public:
+    // Creates an unpopulated SCRAMSecrets object.
+    SCRAMSecrets() = default;
+
+    // Creates a populated SCRAMSecrets object. First, allocates secure storage, then provides it
+    // to a callback, which fills the memory.
+    template <typename T>
+    explicit SCRAMSecrets(T initializationFun)
+        : _ptr(std::make_shared<SecureHandle<SCRAMSecretsHolder>>()) {
+        initializationFun((*this)->clientKey, (*this)->storedKey, (*this)->serverKey);
+    }
+
+    // Returns true if the underlying shared_pointer is populated.
+    explicit operator bool() const {
+        return static_cast<bool>(_ptr);
+    }
+
+    const SecureHandle<SCRAMSecretsHolder>& operator*() const& {
+        invariant(_ptr);
+        return *_ptr;
+    }
+    void operator*() && = delete;
+
+    const SecureHandle<SCRAMSecretsHolder>& operator->() const& {
+        invariant(_ptr);
+        return *_ptr;
+    }
+    void operator->() && = delete;
+
+private:
+    std::shared_ptr<SecureHandle<SCRAMSecretsHolder>> _ptr;
 };
 
 /*

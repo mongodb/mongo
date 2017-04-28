@@ -122,8 +122,8 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
                                           16),
             creds.scram.iterationCount));
         if (creds.scram.storedKey !=
-            base64::encode(reinterpret_cast<const char*>(secrets.storedKey->data()),
-                           secrets.storedKey->size())) {
+            base64::encode(reinterpret_cast<const char*>(secrets->storedKey.data()),
+                           secrets->storedKey.size())) {
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                                     mongoutils::str::stream() << "Incorrect user name or password");
         }

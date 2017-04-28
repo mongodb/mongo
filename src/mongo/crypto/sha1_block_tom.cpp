@@ -58,12 +58,12 @@ SHA1Block SHA1Block::computeHash(const uint8_t* input, size_t inputLen) {
 /*
  * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
  */
-SHA1Block SHA1Block::computeHmac(const uint8_t* key,
-                                 size_t keyLen,
-                                 const uint8_t* input,
-                                 size_t inputLen) {
+void SHA1Block::computeHmac(const uint8_t* key,
+                            size_t keyLen,
+                            const uint8_t* input,
+                            size_t inputLen,
+                            SHA1Block* const output) {
     invariant(key && input);
-    HashType output;
 
     static int hashId = -1;
     if (hashId == -1) {
@@ -73,9 +73,8 @@ SHA1Block SHA1Block::computeHmac(const uint8_t* key,
 
     unsigned long sha1HashLen = 20;
     fassert(40382,
-            hmac_memory(hashId, key, keyLen, input, inputLen, output.data(), &sha1HashLen) ==
+            hmac_memory(hashId, key, keyLen, input, inputLen, output->_hash.data(), &sha1HashLen) ==
                 CRYPT_OK);
-    return SHA1Block(output);
 }
 
 }  // namespace mongo
