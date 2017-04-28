@@ -353,8 +353,6 @@ TORTIOUS
 TSO
 TXN
 TXNC
-ThreadList
-ThreadListWrapper
 Timespec
 Timestamp
 TryCV
@@ -1196,7 +1194,6 @@ txnid
 txnmin
 txt
 typedef
-typemaps
 uB
 uS
 ui
@@ -1277,7 +1274,6 @@ whitespace
 wiredTiger
 wiredtiger
 workFactor
-workgen
 wrapup
 writeable
 writelock
