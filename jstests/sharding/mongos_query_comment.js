@@ -44,17 +44,17 @@
     // TEST CASE: A legacy string $comment meta-operator is propagated to the shards via mongos.
     assert.eq(mongosColl.find({$query: {a: 1}, $comment: "TEST"}).itcount(), 1);
     profilerHasSingleMatchingEntryOrThrow(shardDB,
-                                          {op: "query", ns: collNS, "query.comment": "TEST"});
+                                          {op: "query", ns: collNS, "command.comment": "TEST"});
 
     // TEST CASE: A legacy BSONObj $comment is converted to a string and propagated via mongos.
     assert.eq(mongosColl.find({$query: {a: 1}, $comment: {c: 2, d: {e: "TEST"}}}).itcount(), 1);
     profilerHasSingleMatchingEntryOrThrow(
-        shardDB, {op: "query", ns: collNS, "query.comment": "{ c: 2.0, d: { e: \"TEST\" } }"});
+        shardDB, {op: "query", ns: collNS, "command.comment": "{ c: 2.0, d: { e: \"TEST\" } }"});
 
     // TEST CASE: Legacy BSONObj $comment is NOT converted to a string when issued on the mongod.
     assert.eq(shardColl.find({$query: {a: 1}, $comment: {c: 3, d: {e: "TEST"}}}).itcount(), 1);
     profilerHasSingleMatchingEntryOrThrow(
-        shardDB, {op: "query", ns: collNS, "query.comment": {c: 3, d: {e: "TEST"}}});
+        shardDB, {op: "query", ns: collNS, "command.comment": {c: 3, d: {e: "TEST"}}});
 
     //
     // Revert to "commands" read mode for the find command test cases below.
@@ -64,9 +64,10 @@
 
     // TEST CASE: Verify that string find.comment and non-string find.filter.$comment propagate.
     assert.eq(mongosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);
-    profilerHasSingleMatchingEntryOrThrow(
-        shardDB,
-        {op: "query", ns: collNS, "query.comment": "TEST", "query.filter.$comment": {b: "TEST"}});
+    profilerHasSingleMatchingEntryOrThrow(shardDB, {
+        op: "query",
+        ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}
+    });
 
     // TEST CASE: Verify that find command with a non-string comment parameter is rejected.
     assert.commandFailedWithCode(

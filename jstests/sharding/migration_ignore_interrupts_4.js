@@ -57,7 +57,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var inProgressOps = admin.currentOp().inprog;
     var abortedMigration = false;
     for (var op in inProgressOps) {
-        if (inProgressOps[op].query.moveChunk) {
+        if (inProgressOps[op].command.moveChunk) {
             admin.killOp(inProgressOps[op].opid);
             abortedMigration = true;
         }

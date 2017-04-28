@@ -67,7 +67,7 @@
      * @param {Boolean} [options.commandYields=true] - Whether or not this command can yield during
      *   execution.
      * @param {Object} [options.curOpFilter] - The query to use to find this operation in the
-     *   currentOp output. The default checks that all fields of cmdObj are in the curOp query.
+     *   currentOp output. The default checks that all fields of cmdObj are in the curOp command.
      * @param {Function} [options.customSetup=undefined] - A callback to do any necessary setup
      *   before the command can be run, like adding a geospatial index before a geoNear command.
      */
@@ -78,7 +78,7 @@
         if (!curOpFilter) {
             curOpFilter = {};
             for (var arg in cmdObj) {
-                curOpFilter['query.' + arg] = {$eq: cmdObj[arg]};
+                curOpFilter['command.' + arg] = {$eq: cmdObj[arg]};
             }
         }
 

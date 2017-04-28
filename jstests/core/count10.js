@@ -12,7 +12,7 @@ for (i = 0; i < 100; i++) {
 // kill it via db.killOp().
 s = startParallelShell('assert.soon(function() {' +
                        '   current = db.currentOp({"ns": db.count10.getFullName(), ' +
-                       '                           "query.count": db.count10.getName()}); ' +
+                       '                           "command.count": db.count10.getName()}); ' +
 
                        // Check that we found the count op. If not, return false so
                        // that assert.soon will retry.

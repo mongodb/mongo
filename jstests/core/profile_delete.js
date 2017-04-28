@@ -31,7 +31,7 @@
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "remove", tojson(profileObj));
     if (db.getMongo().writeMode() === "commands") {
-        assert.eq(profileObj.collation, {locale: "fr"}, tojson(profileObj));
+        assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
     }
     assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));

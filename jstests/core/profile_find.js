@@ -37,18 +37,18 @@
     assert.eq(profileObj.nreturned, 1, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
-    assert.eq(profileObj.query.filter, {a: 1}, tojson(profileObj));
+    assert.eq(profileObj.command.filter, {a: 1}, tojson(profileObj));
     if (isLegacyReadMode) {
-        assert.eq(profileObj.query.ntoreturn, -1, tojson(profileObj));
+        assert.eq(profileObj.command.ntoreturn, -1, tojson(profileObj));
     } else {
-        assert.eq(profileObj.query.limit, 1, tojson(profileObj));
+        assert.eq(profileObj.command.limit, 1, tojson(profileObj));
         assert.eq(profileObj.protocol,
                   getProfilerProtocolStringForCommand(testDB.getMongo()),
                   tojson(profileObj));
     }
 
     if (!isLegacyReadMode) {
-        assert.eq(profileObj.query.collation, {locale: "fr"});
+        assert.eq(profileObj.command.collation, {locale: "fr"});
     }
     assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
     assert(!profileObj.hasOwnProperty("cursorid"), tojson(profileObj));
@@ -124,36 +124,36 @@
 
     assert.eq(coll.find().hint({_id: 1}).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.hint, {_id: 1}, tojson(profileObj));
+    assert.eq(profileObj.command.hint, {_id: 1}, tojson(profileObj));
 
     assert.eq(coll.find().comment("a comment").itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.comment, "a comment", tojson(profileObj));
+    assert.eq(profileObj.command.comment, "a comment", tojson(profileObj));
 
     assert.eq(coll.find().maxScan(3000).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.maxScan, 3000, tojson(profileObj));
+    assert.eq(profileObj.command.maxScan, 3000, tojson(profileObj));
 
     var maxTimeMS = 100000;
     assert.eq(coll.find().maxTimeMS(maxTimeMS).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.maxTimeMS, maxTimeMS, tojson(profileObj));
+    assert.eq(profileObj.command.maxTimeMS, maxTimeMS, tojson(profileObj));
 
     assert.eq(coll.find().max({_id: 3}).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.max, {_id: 3}, tojson(profileObj));
+    assert.eq(profileObj.command.max, {_id: 3}, tojson(profileObj));
 
     assert.eq(coll.find().min({_id: 0}).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.min, {_id: 0}, tojson(profileObj));
+    assert.eq(profileObj.command.min, {_id: 0}, tojson(profileObj));
 
     assert.eq(coll.find().returnKey().itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.returnKey, true, tojson(profileObj));
+    assert.eq(profileObj.command.returnKey, true, tojson(profileObj));
 
     assert.eq(coll.find().snapshot().itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.query.snapshot, true, tojson(profileObj));
+    assert.eq(profileObj.command.snapshot, true, tojson(profileObj));
 
     //
     // Confirm that queries are truncated in the profiler as { $truncated: <string>, comment:
@@ -167,6 +167,6 @@
 
     assert.eq(coll.find(queryPredicate).comment("profile_find").itcount(), 0);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq((typeof profileObj.query.$truncated), "string", tojson(profileObj));
-    assert.eq(profileObj.query.comment, "profile_find", tojson(profileObj));
+    assert.eq((typeof profileObj.command.$truncated), "string", tojson(profileObj));
+    assert.eq(profileObj.command.comment, "profile_find", tojson(profileObj));
 })();

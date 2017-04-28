@@ -74,7 +74,7 @@
         // Find all the where queries
         var myProcs = [];
         inprog.forEach(function(op) {
-            if (op.query && op.query.filter && op.query.filter.$where) {
+            if (op.command && op.command.filter && op.command.filter.$where) {
                 myProcs.push(op);
             }
         });

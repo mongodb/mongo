@@ -863,11 +863,6 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
         parsedUpdate->setCollator(collection->getDefaultCollator()->clone());
     }
 
-    // TODO: This seems a bit circuitious.
-    if (opDebug) {
-        opDebug->updateobj = request->getUpdates();
-    }
-
     // If this is a user-issued update, then we want to return an error: you cannot perform
     // writes on a secondary. If this is an update to a secondary from the replication system,
     // however, then we make an exception and let the write proceed.

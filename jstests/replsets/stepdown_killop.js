@@ -53,7 +53,7 @@
         var res = primary.getDB('admin').currentOp(true);
         for (var index in res.inprog) {
             var entry = res.inprog[index];
-            if (entry["query"] && entry["query"]["replSetStepDown"] === 60) {
+            if (entry["command"] && entry["command"]["replSetStepDown"] === 60) {
                 stepDownOpID = entry.opid;
                 return true;
             }

@@ -126,7 +126,7 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
         var in_progress = admin.currentOp().inprog;
         for (var i = 0; i < in_progress.length; ++i) {
             var op = in_progress[i];
-            if (op.query && op.query.moveChunk) {
+            if (op.command && op.command.moveChunk) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
                 if (op.msg && op.msg.startsWith(searchString)) {

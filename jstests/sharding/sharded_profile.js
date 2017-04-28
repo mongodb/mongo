@@ -28,7 +28,7 @@
     profileEntry = profileColl.findOne();
     assert.neq(null, profileEntry);
     printjson(profileEntry);
-    assert.eq(profileEntry.query.documents, inserts);
+    assert.eq(profileEntry.command.documents, inserts);
 
     st.stop();
 

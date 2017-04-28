@@ -361,9 +361,7 @@ void CurOp::reportState(BSONObjBuilder* builder) {
     // query object size here to reduce the risk of exceeding.
     const size_t maxQuerySize = 1000;
 
-    if (_networkOp == dbInsert) {
-        appendAsObjOrString("insert", _query, maxQuerySize, builder);
-    } else if (!_command && _networkOp == dbQuery) {
+    if (!_command && _networkOp == dbQuery) {
         // This is a legacy OP_QUERY. We upconvert the "query" field of the currentOp output to look
         // similar to a find command.
         //
@@ -372,22 +370,19 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         const int ntoreturn = 0;
         const int ntoskip = 0;
 
-        appendAsObjOrString("query",
-                            upconvertQueryEntry(_query, NamespaceString(_ns), ntoreturn, ntoskip),
-                            maxQuerySize,
-                            builder,
-                            TruncationMode::kIncludeComment);
+        appendAsObjOrString(
+            "command",
+            upconvertQueryEntry(_opDescription, NamespaceString(_ns), ntoreturn, ntoskip),
+            maxQuerySize,
+            builder,
+            TruncationMode::kIncludeComment);
     } else {
         appendAsObjOrString(
-            "query",
-            _query,
+            "command",
+            _opDescription,
             maxQuerySize,
             builder,
             (_isCommand ? TruncationMode::kIncludeComment : TruncationMode::kNoComment));
-    }
-
-    if (!_collation.isEmpty()) {
-        appendAsObjOrString("collation", _collation, maxQuerySize, builder);
     }
 
     if (!_originatingCommand.isEmpty()) {
@@ -463,16 +458,15 @@ string OpDebug::report(Client* client,
     // If necessary, upconvert legacy find operations so that their log lines resemble their find
     // command counterpart.
     if (!iscommand && networkOp == dbQuery) {
-        query =
-            upconvertQueryEntry(curop.query(), NamespaceString(curop.getNS()), ntoreturn, ntoskip);
+        query = upconvertQueryEntry(
+            curop.opDescription(), NamespaceString(curop.getNS()), ntoreturn, ntoskip);
     } else {
-        query = curop.query();
+        query = curop.opDescription();
     }
 
     if (!query.isEmpty()) {
+        s << " command: ";
         if (iscommand) {
-            s << " command: ";
-
             Command* curCommand = curop.getCommand();
             if (curCommand) {
                 mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
@@ -483,7 +477,6 @@ string OpDebug::report(Client* client,
                 s << redact(query);
             }
         } else {
-            s << " query: ";
             s << redact(query);
         }
     }
@@ -495,16 +488,6 @@ string OpDebug::report(Client* client,
 
     if (!curop.getPlanSummary().empty()) {
         s << " planSummary: " << redact(curop.getPlanSummary().toString());
-    }
-
-    if (!updateobj.isEmpty()) {
-        s << " update: " << redact(updateobj);
-    }
-
-    auto collation = curop.collation();
-    if (!collation.isEmpty()) {
-        s << " collation: ";
-        collation.toString(s);
     }
 
     OPDEBUG_TOSTRING_HELP(cursorid);
@@ -587,16 +570,15 @@ void OpDebug::append(const CurOp& curop,
     b.append("ns", nss.ns());
 
     if (!iscommand && networkOp == dbQuery) {
-        appendAsObjOrString("query",
-                            upconvertQueryEntry(curop.query(), nss, ntoreturn, ntoskip),
+        appendAsObjOrString("command",
+                            upconvertQueryEntry(curop.opDescription(), nss, ntoreturn, ntoskip),
                             maxElementSize,
                             &b,
                             TruncationMode::kIncludeComment);
-    } else if (curop.haveQuery()) {
-        const char* fieldName = (logicalOp == LogicalOp::opCommand) ? "command" : "query";
+    } else if (curop.haveOpDescription()) {
         appendAsObjOrString(
-            fieldName,
-            curop.query(),
+            "command",
+            curop.opDescription(),
             maxElementSize,
             &b,
             (iscommand ? TruncationMode::kIncludeComment : TruncationMode::kNoComment));
@@ -609,15 +591,6 @@ void OpDebug::append(const CurOp& curop,
                             maxElementSize,
                             &b,
                             TruncationMode::kIncludeComment);
-    }
-
-    if (!updateobj.isEmpty()) {
-        appendAsObjOrString("updateobj", updateobj, maxElementSize, &b);
-    }
-
-    auto collation = curop.collation();
-    if (!collation.isEmpty()) {
-        appendAsObjOrString("collation", collation, maxElementSize, &b);
     }
 
     OPDEBUG_APPEND_NUMBER(cursorid);

@@ -44,7 +44,7 @@
         var res = primary.getDB('admin').currentOp();
         for (var index in res.inprog) {
             var entry = res.inprog[index];
-            if (entry["query"] && entry["query"]["$eval"]) {
+            if (entry["command"] && entry["command"]["$eval"]) {
                 if ("W" === entry["locks"]["Global"]) {
                     return true;
                 }

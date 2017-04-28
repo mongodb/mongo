@@ -133,7 +133,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         // Show which index we're building in the curop display.
-        CurOp::get(opCtx)->setQuery_inlock(_index);
+        CurOp::get(opCtx)->setOpDescription_inlock(_index);
     }
 
     bool haveSetBgIndexStarting = false;

@@ -29,7 +29,7 @@ var RPC_PROTOCOLS = {OP_QUERY: "opQueryOnly", OP_COMMAND: "opCommandOnly"};
         assert(db.getMongo().getClientRPCProtocols() === "opQueryOnly");
         db.getSiblingDB("test").rpcProtocols.find().comment("opQueryCommandLine").itcount();
     });
-    var profileDoc = db.system.profile.findOne({"query.comment": "opQueryCommandLine"});
+    var profileDoc = db.system.profile.findOne({"command.comment": "opQueryCommandLine"});
     assert(profileDoc !== null);
     assert.eq(profileDoc.protocol, "op_query");
 
@@ -38,7 +38,7 @@ var RPC_PROTOCOLS = {OP_QUERY: "opQueryOnly", OP_COMMAND: "opCommandOnly"};
         assert(db.getMongo().getClientRPCProtocols() === "opCommandOnly");
         db.getSiblingDB("test").rpcProtocols.find().comment("opCommandCommandLine").itcount();
     });
-    profileDoc = db.system.profile.findOne({"query.comment": "opCommandCommandLine"});
+    profileDoc = db.system.profile.findOne({"command.comment": "opCommandCommandLine"});
     assert(profileDoc !== null);
     assert.eq(profileDoc.protocol, "op_command");
 
@@ -50,7 +50,7 @@ var RPC_PROTOCOLS = {OP_QUERY: "opQueryOnly", OP_COMMAND: "opCommandOnly"};
         assert(db.getMongo().getClientRPCProtocols() === "opQueryOnly");
         db.getSiblingDB("test").rpcProtocols.find().comment("opQueryRuntime").itcount();
     });
-    profileDoc = db.system.profile.findOne({"query.comment": "opQueryRuntime"});
+    profileDoc = db.system.profile.findOne({"command.comment": "opQueryRuntime"});
     assert(profileDoc !== null);
     assert.eq(profileDoc.protocol, "op_query");
 
@@ -62,7 +62,7 @@ var RPC_PROTOCOLS = {OP_QUERY: "opQueryOnly", OP_COMMAND: "opCommandOnly"};
         assert(db.getMongo().getClientRPCProtocols() === "opCommandOnly");
         db.getSiblingDB("test").rpcProtocols.find().comment("opCommandRuntime").itcount();
     });
-    profileDoc = db.system.profile.findOne({"query.comment": "opCommandRuntime"});
+    profileDoc = db.system.profile.findOne({"command.comment": "opCommandRuntime"});
     assert(profileDoc !== null);
     assert.eq(profileDoc.protocol, "op_command");
 

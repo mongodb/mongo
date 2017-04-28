@@ -71,7 +71,7 @@ assert.soon(function() {
     printjson(curOp);
     for (var i = 0; i < curOp.inprog.length; i++) {
         try {
-            if (curOp.inprog[i].insert.background) {
+            if (curOp.inprog[i].command.background) {
                 return true;
             }
         } catch (e) {

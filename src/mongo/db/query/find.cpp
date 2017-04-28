@@ -132,7 +132,7 @@ void beginQueryOp(OperationContext* opCtx,
     curOp->debug().ntoreturn = ntoreturn;
     curOp->debug().ntoskip = ntoskip;
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    curOp->setQuery_inlock(queryObj);
+    curOp->setOpDescription_inlock(queryObj);
     curOp->setNS_inlock(nss.ns());
 }
 
@@ -395,7 +395,7 @@ Message getMore(OperationContext* opCtx,
             // Ensure that the original query object is available in the slow query log, profiler
             // and currentOp. Upconvert _query to resemble a getMore command, and set the original
             // command or upconverted legacy query in the originatingCommand field.
-            curOp.setQuery_inlock(upconvertGetMoreEntry(nss, cursorid, ntoreturn));
+            curOp.setOpDescription_inlock(upconvertGetMoreEntry(nss, cursorid, ntoreturn));
             curOp.setOriginatingCommand_inlock(cc->getOriginatingCommandObj());
         }
 

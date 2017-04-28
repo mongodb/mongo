@@ -34,7 +34,7 @@
                 printjson(o);
 
                 // Find the active 'repairDatabase' op and kill it.
-                if (o.active && o.query && o.query.repairDatabase) {
+                if (o.active && o.command && o.command.repairDatabase) {
                     db.killOp(o.opid);
                     return;
                 }

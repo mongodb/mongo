@@ -32,8 +32,8 @@
     // Wait for the drop operation to appear in the db.currentOp() output.
     let dropCommandOpId = null;
     assert.soon(function() {
-        let dropOpsInProgress =
-            db.currentOp().inprog.filter(op => op.query && op.query.drop === collection.getName());
+        let dropOpsInProgress = db.currentOp().inprog.filter(
+            op => op.command && op.command.drop === collection.getName());
         if (dropOpsInProgress.length > 0) {
             dropCommandOpId = dropOpsInProgress[0].opid;
         }

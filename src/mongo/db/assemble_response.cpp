@@ -141,7 +141,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 void beginCommandOp(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& queryObj) {
     auto curop = CurOp::get(opCtx);
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    curop->setQuery_inlock(queryObj);
+    curop->setOpDescription_inlock(queryObj);
     curop->setNS_inlock(nss.ns());
 }
 

@@ -1,4 +1,4 @@
-// Cannot implicitly shard accessed collections because the "query" field in the currentOp()
+// Cannot implicitly shard accessed collections because the "command" field in the currentOp()
 // output is reported as {"mapreduce.shardedfinish": { mapreduce: "jstests_mr_killop", ... }, ... }
 // when the "finalize" option to the "mapReduce" command is used on a sharded collection.
 // @tags: [assumes_unsharded_collection]
@@ -23,13 +23,13 @@ function op(childLoop) {
         // Identify a map/reduce or where distinct operation by its collection, whether or not
         // it is currently active.
         if (childLoop) {
-            if ((o.active || o.waitingForLock) && o.query && o.query.query &&
-                o.query.query.$where && o.query.distinct == "jstests_mr_killop") {
+            if ((o.active || o.waitingForLock) && o.command && o.command.query &&
+                o.command.query.$where && o.command.distinct == "jstests_mr_killop") {
                 return o.opid;
             }
         } else {
-            if ((o.active || o.waitingForLock) && o.query && o.query.mapreduce &&
-                o.query.mapreduce == "jstests_mr_killop") {
+            if ((o.active || o.waitingForLock) && o.command && o.command.mapreduce &&
+                o.command.mapreduce == "jstests_mr_killop") {
                 return o.opid;
             }
         }

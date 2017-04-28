@@ -26,7 +26,7 @@
         assert.soon(
             function() {
                 const result =
-                    db.currentOp({"ns": dbName + "." + collName, "query.filter": {x: 1}});
+                    db.currentOp({"ns": dbName + "." + collName, "command.filter": {x: 1}});
                 assert.commandWorked(result);
                 if (result.inprog.length === 1) {
                     opId = result.inprog[0].opid;
@@ -41,7 +41,7 @@
 
         assert.commandWorked(db.killOp(opId));
 
-        let result = db.currentOp({"ns": dbName + "." + collName, "query.filter": {x: 1}});
+        let result = db.currentOp({"ns": dbName + "." + collName, "command.filter": {x: 1}});
         assert.commandWorked(result);
         assert(result.inprog.length === 1, tojson(db.currentOp()));
         assert(result.inprog[0].hasOwnProperty("killPending"));

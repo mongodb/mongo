@@ -43,8 +43,8 @@
     assert.soon(function() {
         var res = primary.getDB('admin').currentOp(true);
         for (var entry in res.inprog) {
-            if (res.inprog[entry]["query"] &&
-                res.inprog[entry]["query"]["replSetStepDown"] === 60) {
+            if (res.inprog[entry]["command"] &&
+                res.inprog[entry]["command"]["replSetStepDown"] === 60) {
                 return true;
             }
         }

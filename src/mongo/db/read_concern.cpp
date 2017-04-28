@@ -181,7 +181,7 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
             return status;
         }
 
-        LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->query();
+        LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->opDescription();
     }
 
     return Status::OK();

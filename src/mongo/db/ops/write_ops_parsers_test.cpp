@@ -90,49 +90,50 @@ TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
     auto cmd = BSON("update"
                     << "bar"
                     << "updates"
-                    << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "GARBAGE" << 1));
-    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+                    << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj() << "GARBAGE" << 1)));
+    ASSERT_THROWS_CODE(parseUpdateCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
 TEST(CommandWriteOpsParsers, GarbageFieldsInDeleteDoc) {
     auto cmd = BSON("delete"
                     << "bar"
                     << "deletes"
-                    << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1));
+                    << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0 << "GARBAGE" << 1)));
+    ASSERT_THROWS_CODE(parseDeleteCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
 TEST(CommandWriteOpsParsers, BadCollationFieldInUpdateDoc) {
     auto cmd = BSON("update"
                     << "bar"
                     << "updates"
-                    << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "collation" << 1));
-    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+                    << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj() << "collation" << 1)));
+    ASSERT_THROWS_CODE(parseUpdateCommand("foo", cmd), UserException, ErrorCodes::TypeMismatch);
 }
 
 TEST(CommandWriteOpsParsers, BadCollationFieldInDeleteDoc) {
     auto cmd = BSON("delete"
                     << "bar"
                     << "deletes"
-                    << BSON_ARRAY("q" << BSONObj() << "limit" << 0 << "collation" << 1));
-    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+                    << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0 << "collation" << 1)));
+    ASSERT_THROWS_CODE(parseDeleteCommand("foo", cmd), UserException, ErrorCodes::TypeMismatch);
 }
 
 TEST(CommandWriteOpsParsers, BadArrayFiltersFieldInUpdateDoc) {
     auto cmd = BSON("update"
                     << "bar"
                     << "updates"
-                    << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "arrayFilters"
-                                      << "bad"));
-    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+                    << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj() << "arrayFilters"
+                                           << "bad")));
+    ASSERT_THROWS_CODE(parseUpdateCommand("foo", cmd), UserException, ErrorCodes::TypeMismatch);
 }
 
 TEST(CommandWriteOpsParsers, BadArrayFiltersElementInUpdateDoc) {
-    auto cmd = BSON(
-        "update"
-        << "bar"
-        << "updates"
-        << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "arrayFilters" << BSON_ARRAY("bad")));
-    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+    auto cmd = BSON("update"
+                    << "bar"
+                    << "updates"
+                    << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj() << "arrayFilters"
+                                           << BSON_ARRAY("bad"))));
+    ASSERT_THROWS_CODE(parseUpdateCommand("foo", cmd), UserException, ErrorCodes::TypeMismatch);
 }
 
 TEST(CommandWriteOpsParsers, SingleInsert) {
@@ -176,15 +177,13 @@ TEST(CommandWriteOpsParsers, Update) {
     const BSONObj arrayFilter = BSON("i" << 0);
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            auto cmd = BSON("update" << ns.coll() << "updates"
-                                     << BSON_ARRAY(BSON("q" << query << "u" << update << "collation"
-                                                            << collation
-                                                            << "arrayFilters"
-                                                            << BSON_ARRAY(arrayFilter)
-                                                            << "upsert"
-                                                            << upsert
-                                                            << "multi"
-                                                            << multi)));
+            auto rawUpdate =
+                BSON("q" << query << "u" << update << "multi" << multi << "upsert" << upsert
+                         << "collation"
+                         << collation
+                         << "arrayFilters"
+                         << BSON_ARRAY(arrayFilter));
+            auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
             auto op = parseUpdateCommand(ns.db(), cmd);
             ASSERT_EQ(op.ns.ns(), ns.ns());
             ASSERT(!op.bypassDocumentValidation);
@@ -197,6 +196,7 @@ TEST(CommandWriteOpsParsers, Update) {
             ASSERT_BSONOBJ_EQ(op.updates[0].arrayFilters[0], arrayFilter);
             ASSERT_EQ(op.updates[0].upsert, upsert);
             ASSERT_EQ(op.updates[0].multi, multi);
+            ASSERT_BSONOBJ_EQ(op.updates[0].toBSON(), rawUpdate);
         }
     }
 }
@@ -207,10 +207,9 @@ TEST(CommandWriteOpsParsers, Remove) {
     const BSONObj collation = BSON("locale"
                                    << "en_US");
     for (bool multi : {false, true}) {
-        auto cmd =
-            BSON("delete" << ns.coll() << "deletes"
-                          << BSON_ARRAY(BSON("q" << query << "collation" << collation << "limit"
-                                                 << (multi ? 0 : 1))));
+        auto rawDelete =
+            BSON("q" << query << "limit" << (multi ? 0 : 1) << "collation" << collation);
+        auto cmd = BSON("delete" << ns.coll() << "deletes" << BSON_ARRAY(rawDelete));
         auto op = parseDeleteCommand(ns.db(), cmd);
         ASSERT_EQ(op.ns.ns(), ns.ns());
         ASSERT(!op.bypassDocumentValidation);
@@ -219,6 +218,7 @@ TEST(CommandWriteOpsParsers, Remove) {
         ASSERT_BSONOBJ_EQ(op.deletes[0].query, query);
         ASSERT_BSONOBJ_EQ(op.deletes[0].collation, collation);
         ASSERT_EQ(op.deletes[0].multi, multi);
+        ASSERT_BSONOBJ_EQ(op.deletes[0].toBSON(), rawDelete);
     }
 }
 
@@ -229,8 +229,7 @@ TEST(CommandWriteOpsParsers, RemoveErrorsWithBadLimit) {
                         << "bar"
                         << "deletes"
                         << BSON_ARRAY("q" << BSONObj() << "limit" << limit));
-        ASSERT_THROWS_CODE(
-            parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+        ASSERT_THROWS_CODE(parseDeleteCommand("foo", cmd), UserException, ErrorCodes::TypeMismatch);
     }
 }
 

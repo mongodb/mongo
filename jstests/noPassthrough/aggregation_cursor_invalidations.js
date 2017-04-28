@@ -312,7 +312,7 @@
     // Use a failpoint to cause a getMore to hang indefinitely.
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'keepCursorPinnedDuringGetMore', mode: 'alwaysOn'}));
-    const curOpFilter = {'query.getMore': res.cursor.id};
+    const curOpFilter = {'command.getMore': res.cursor.id};
     assert.eq(0, testDB.currentOp(curOpFilter).inprog.length);
 
     getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);

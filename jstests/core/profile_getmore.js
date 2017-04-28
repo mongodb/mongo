@@ -36,9 +36,9 @@
     assert.eq(profileObj.docsExamined, 2, tojson(profileObj));
     assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));
     assert.eq(profileObj.nreturned, 2, tojson(profileObj));
-    assert.eq(profileObj.query.getMore, cursorId, tojson(profileObj));
-    assert.eq(profileObj.query.collection, coll.getName(), tojson(profileObj));
-    assert.eq(profileObj.query.batchSize, 2, tojson(profileObj));
+    assert.eq(profileObj.command.getMore, cursorId, tojson(profileObj));
+    assert.eq(profileObj.command.collection, coll.getName(), tojson(profileObj));
+    assert.eq(profileObj.command.batchSize, 2, tojson(profileObj));
     assert.eq(profileObj.originatingCommand.filter, {a: {$gt: 0}});
     assert.eq(profileObj.originatingCommand.sort, {a: 1});
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
@@ -109,8 +109,8 @@
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "getmore", tojson(profileObj));
-    assert.eq(profileObj.query.getMore, cursorId, tojson(profileObj));
-    assert.eq(profileObj.query.collection, coll.getName(), tojson(profileObj));
+    assert.eq(profileObj.command.getMore, cursorId, tojson(profileObj));
+    assert.eq(profileObj.command.collection, coll.getName(), tojson(profileObj));
     assert.eq(
         profileObj.originatingCommand.pipeline[0], {$match: {a: {$gte: 0}}}, tojson(profileObj));
     assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));

@@ -91,10 +91,9 @@
         var u = {$inc: {x: 1}};
         db.profile1.update(q, u);
         var r = profileCursor({ns: db.profile1.getFullName()}).sort({$natural: -1})[0];
-        assert.eq(q, r.query, "Y1: " + tojson(r));
-        assert.eq(u, r.updateobj, "Y2");
-        assert.eq("update", r.op, "Y3");
-        assert.eq("profile1.profile1", r.ns, "Y4");
+        assert.eq({q: q, u: u, multi: false, upsert: false}, r.command, tojson(r));
+        assert.eq("update", r.op, tojson(r));
+        assert.eq("profile1.profile1", r.ns, tojson(r));
     } finally {
         // disable profiling for subsequent tests
         assert.commandWorked(db.runCommand({profile: 0}));

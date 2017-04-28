@@ -21,7 +21,7 @@
             // Identify the index build as the createIndex command
             // It is assumed that no other clients are concurrently
             // accessing the 'test' database.
-            if ((op.op == 'query' || op.op == 'command') && 'createIndexes' in op.query) {
+            if ((op.op == 'query' || op.op == 'command') && 'createIndexes' in op.command) {
                 indexBuildOpId = op.opid;
             }
         });

@@ -71,7 +71,7 @@ load("jstests/libs/analyze_plan.js");
         jsTestLog("curOp output: " + tojson(curOps));
         for (var i in curOps.inprog) {
             var op = curOps.inprog[i];
-            if (op.op === 'query' && op.ns === "test.$cmd" && op.query.find === 'readMajority') {
+            if (op.op === 'query' && op.ns === "test.$cmd" && op.command.find === 'readMajority') {
                 db.killOp(op.opid);
                 return true;
             }
