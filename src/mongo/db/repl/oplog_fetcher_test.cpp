@@ -279,9 +279,7 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                                     enqueueDocumentsFn,
                                     [](Status) {})
                            .getMetadataObject_forTest();
-    ASSERT_BSONOBJ_EQ(BSON(rpc::ServerSelectionMetadata::fieldName()
-                           << BSON(rpc::ServerSelectionMetadata::kSecondaryOkFieldName << 1)),
-                      metadataObj);
+    ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(), metadataObj);
 }
 
 TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProtocolVersion1) {

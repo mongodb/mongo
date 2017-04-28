@@ -54,7 +54,7 @@ using unittest::assertGet;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};

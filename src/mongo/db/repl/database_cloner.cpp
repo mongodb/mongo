@@ -115,7 +115,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                                          stdx::placeholders::_1,
                                          stdx::placeholders::_2,
                                          stdx::placeholders::_3),
-                              rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                              ReadPreferenceSetting::secondaryPreferredMetadata(),
                               RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::makeRetryPolicy(
                                   numInitialSyncListCollectionsAttempts.load(),

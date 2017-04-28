@@ -174,7 +174,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                    stdx::placeholders::_1,
                    candidate,
                    earliestOpTimeSeen),
-        rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
         kFetcherTimeout);
 }
 
@@ -194,7 +194,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
                    stdx::placeholders::_1,
                    candidate,
                    earliestOpTimeSeen),
-        rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
         kFetcherTimeout);
 }
 

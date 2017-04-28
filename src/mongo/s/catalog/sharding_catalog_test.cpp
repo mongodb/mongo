@@ -79,7 +79,7 @@ const int kMaxCommandRetry = 3;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};
@@ -1492,7 +1492,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "totalSize" << 10);
@@ -1506,7 +1506,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "totalSize" << 1);
@@ -1519,7 +1519,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseSuccess) {
         string cmdName = request.cmdObj.firstElement().fieldName();
         ASSERT_EQUALS("listDatabases", cmdName);
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "totalSize" << 100);
@@ -1774,7 +1774,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "totalSize" << 10);
@@ -1788,7 +1788,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "totalSize" << 1);
@@ -1802,7 +1802,7 @@ TEST_F(ShardingCatalogClientTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQUALS("listDatabases", cmdName);
         ASSERT_FALSE(request.cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "totalSize" << 100);
@@ -1900,7 +1900,7 @@ TEST_F(ShardingCatalogClientTest, EnableShardingNoDBExists) {
         ASSERT_EQ("admin", request.dbname);
         ASSERT_BSONOBJ_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return fromjson(R"({

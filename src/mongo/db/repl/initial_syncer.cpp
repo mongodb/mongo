@@ -1165,7 +1165,7 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn 
                                    _opts.remoteOplogNS.db().toString(),
                                    query,
                                    callback,
-                                   rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                                   ReadPreferenceSetting::secondaryPreferredMetadata(),
                                    RemoteCommandRequest::kNoTimeout,
                                    RemoteCommandRetryScheduler::makeRetryPolicy(
                                        numInitialSyncOplogFindAttempts.load(),

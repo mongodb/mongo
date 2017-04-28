@@ -116,6 +116,17 @@ private:
 
 struct ReadPreferenceSetting {
     /**
+     * The minimal value maxStalenessSeconds can have.
+     */
+    static const Seconds kMinimalMaxStalenessValue;
+
+    /**
+     * An object representing the metadata generated for a SecondaryPreferred read preference:
+     * {$ssm: {$secondaryOk: true}}
+     */
+    static const BSONObj& secondaryPreferredMetadata();
+
+    /**
      * @param pref the read preference mode.
      * @param tag the tag set. Note that this object will have the
      *     tag set will have this in a reset state (meaning, this
@@ -156,11 +167,6 @@ struct ReadPreferenceSetting {
     TagSet tags;
     Seconds maxStalenessSeconds{};
     repl::OpTime minOpTime{};
-
-    /**
-     * The minimal value maxStalenessSeconds can have.
-     */
-    static const Seconds kMinimalMaxStalenessValue;
 };
 
 }  // namespace mongo

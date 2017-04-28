@@ -96,7 +96,7 @@ RollbackCommonPointResolver::RollbackCommonPointResolver(executor::TaskExecutor*
           maxFetcherRestarts,
           onShutdownCallbackFn,
           "rollback common point resolver"),
-      _metadataObject(rpc::ServerSelectionMetadata(true, boost::none).toBSON()),
+      _metadataObject(ReadPreferenceSetting::secondaryPreferredMetadata()),
       _localOplog(localOplog),
       _listener(listener) {
 

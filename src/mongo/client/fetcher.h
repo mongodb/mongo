@@ -129,7 +129,7 @@ public:
             const std::string& dbname,
             const BSONObj& cmdObj,
             const CallbackFn& work,
-            const BSONObj& metadata = rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+            const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
             Milliseconds timeout = RemoteCommandRequest::kNoTimeout,
             std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
                 RemoteCommandRetryScheduler::makeNoRetryPolicy());

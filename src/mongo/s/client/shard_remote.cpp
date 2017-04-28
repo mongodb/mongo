@@ -69,9 +69,6 @@ namespace {
 // response.
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 
-// Allow the command to be executed on a secondary (see ServerSelectionMetadata).
-const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
-
 /**
  * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with maxTimeMS
  * replaced by maxTimeMSOverride (or removed if maxTimeMSOverride is Milliseconds::max()).
@@ -164,12 +161,12 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
         if (readPref.pref == ReadPreference::PrimaryOnly) {
             builder.appendElements(kReplMetadata);
         } else {
-            builder.appendElements(kSecondaryOkMetadata);
+            builder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
             builder.appendElements(kReplMetadata);
         }
     } else {
         if (readPref.pref != ReadPreference::PrimaryOnly) {
-            builder.appendElements(kSecondaryOkMetadata);
+            builder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
         }
     }
     return builder.obj();

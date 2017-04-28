@@ -119,6 +119,13 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
  */
 const Seconds ReadPreferenceSetting::kMinimalMaxStalenessValue(90);
 
+const BSONObj& ReadPreferenceSetting::secondaryPreferredMetadata() {
+    // This is a static method rather than a static member only because it is used by another TU
+    // during dynamic init.
+    static const auto bson = BSON("$ssm" << BSON("$secondaryOk" << true));
+    return bson;
+}
+
 TagSet::TagSet() : _tags(BSON_ARRAY(BSONObj())) {}
 
 TagSet TagSet::primaryOnly() {
