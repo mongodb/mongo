@@ -682,6 +682,45 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
 
 }  // namespace
 
+std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement& fieldO,
+                                                               const BSONObj& op,
+                                                               const NamespaceString& requestNss) {
+    uassert(ErrorCodes::NoSuchKey,
+            str::stream() << "Missing expected index spec in field 'o': " << op,
+            !fieldO.eoo());
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Expected object for index spec in field 'o': " << op,
+            fieldO.isABSONObj());
+    BSONObj indexSpec = fieldO.embeddedObject();
+
+    std::string indexNs;
+    uassertStatusOK(bsonExtractStringField(indexSpec, "ns", &indexNs));
+    const NamespaceString indexNss(indexNs);
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid namespace in index spec: " << op,
+            indexNss.isValid());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Database name mismatch for database (" << requestNss.db()
+                          << ") while creating index: "
+                          << op,
+            requestNss.db() == indexNss.db());
+
+    if (!indexSpec["v"]) {
+        // If the "v" field isn't present in the index specification, then we assume it is a
+        // v=1 index from an older version of MongoDB. This is because
+        //   (1) we haven't built v=0 indexes as the default for a long time, and
+        //   (2) the index version has been included in the corresponding oplog entry since
+        //       v=2 indexes were introduced.
+        BSONObjBuilder bob;
+
+        bob.append("v", static_cast<int>(IndexVersion::kV1));
+        bob.appendElements(indexSpec);
+
+        indexSpec = bob.obj();
+    }
+
+    return std::make_pair(indexSpec, indexNss);
+}
 // @return failure status if an update should have happened and the document DNE.
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
@@ -741,27 +780,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
     invariant(*opType != 'c');  // commands are processed in applyCommand_inlock()
 
     if (*opType == 'i') {
-        if (nsToCollectionSubstring(ns) == "system.indexes") {
-            uassert(ErrorCodes::NoSuchKey,
-                    str::stream() << "Missing expected index spec in field 'o': " << op,
-                    !fieldO.eoo());
-            uassert(ErrorCodes::TypeMismatch,
-                    str::stream() << "Expected object for index spec in field 'o': " << op,
-                    fieldO.isABSONObj());
-            BSONObj indexSpec = fieldO.embeddedObject();
-
-            std::string indexNs;
-            uassertStatusOK(bsonExtractStringField(indexSpec, "ns", &indexNs));
-            const NamespaceString indexNss(indexNs);
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace in index spec: " << op,
-                    indexNss.isValid());
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Database name mismatch for database ("
-                                  << nsToDatabaseSubstring(ns)
-                                  << ") while creating index: "
-                                  << op,
-                    nsToDatabaseSubstring(ns) == indexNss.db());
+        if (requestNss.isSystemDotIndexes()) {
+            BSONObj indexSpec;
+            NamespaceString indexNss;
+            std::tie(indexSpec, indexNss) =
+                repl::prepForApplyOpsIndexInsert(fieldO, op, requestNss);
 
             // Check if collection exists.
             auto indexCollection = db->getCollection(opCtx, indexNss);
@@ -771,20 +794,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     indexCollection);
 
             opCounters->gotInsert();
-
-            if (!indexSpec["v"]) {
-                // If the "v" field isn't present in the index specification, then we assume it is a
-                // v=1 index from an older version of MongoDB. This is because
-                //   (1) we haven't built v=0 indexes as the default for a long time, and
-                //   (2) the index version has been included in the corresponding oplog entry since
-                //       v=2 indexes were introduced.
-                BSONObjBuilder bob;
-
-                bob.append("v", static_cast<int>(IndexVersion::kV1));
-                bob.appendElements(indexSpec);
-
-                indexSpec = bob.obj();
-            }
 
             bool relaxIndexConstraints =
                 ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss);
@@ -995,16 +1004,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
         throw MsgAssertionException(
             14825, str::stream() << "error in applyOperation : unknown opType " << *opType);
     }
-
-    // AuthorizationManager's logOp method registers a RecoveryUnit::Change and to do so we need
-    // to a new WriteUnitOfWork, if we dont have a wrapping unit of work already. If we already
-    // have a wrapping WUOW, the extra nexting is harmless. The logOp really should have been
-    // done in the WUOW that did the write, but this won't happen because applyOps turns off
-    // observers.
-    WriteUnitOfWork wuow(opCtx);
-    getGlobalAuthorizationManager()->logOp(
-        opCtx, opType, requestNss, o, fieldO2.isABSONObj() ? &o2 : NULL);
-    wuow.commit();
 
     return Status::OK();
 }

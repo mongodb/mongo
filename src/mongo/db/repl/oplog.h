@@ -107,6 +107,15 @@ void oplogCheckCloseDatabase(OperationContext* opCtx, Database* db);
 
 using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 /**
+ * Take the object field of a BSONObj, the BSONObj, and the namespace of
+ * the operation and perform necessary validation to ensure the BSONObj is a
+ * properly-formed command to insert into system.indexes. This is only to
+ * be used for insert operations into system.indexes. It is called via applyOps.
+ */
+std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement& fieldO,
+                                                               const BSONObj& op,
+                                                               const NamespaceString& requestNss);
+/**
  * Take a non-command op and apply it locally
  * Used for applying from an oplog
  * @param inSteadyStateReplication convert some updates to upserts for idempotency reasons

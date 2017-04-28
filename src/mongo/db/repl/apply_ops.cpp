@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/apply_ops.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
@@ -49,6 +51,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -109,144 +112,102 @@ Status _applyOps(OperationContext* opCtx,
         applyOpCmd.hasField("alwaysUpsert") ? applyOpCmd["alwaysUpsert"].trueValue() : true;
     const bool haveWrappingWUOW = opCtx->lockState()->inAWriteUnitOfWork();
 
-    {
-        repl::UnreplicatedWritesBlock uwb(opCtx);
+    while (i.more()) {
+        BSONElement e = i.next();
+        const BSONObj& opObj = e.Obj();
 
-        while (i.more()) {
-            BSONElement e = i.next();
-            const BSONObj& opObj = e.Obj();
+        // Ignore 'n' operations.
+        const char* opType = opObj["op"].valuestrsafe();
+        if (*opType == 'n')
+            continue;
 
-            // Ignore 'n' operations.
-            const char* opType = opObj["op"].valuestrsafe();
-            if (*opType == 'n')
-                continue;
+        const std::string ns = opObj["ns"].String();
+        const NamespaceString nss{ns};
 
-            const std::string ns = opObj["ns"].String();
-            const NamespaceString nss{ns};
+        // Need to check this here, or OldClientContext may fail an invariant.
+        if (*opType != 'c' && !nss.isValid())
+            return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
 
-            // Need to check this here, or OldClientContext may fail an invariant.
-            if (*opType != 'c' && !nss.isValid())
-                return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
+        Status status(ErrorCodes::InternalError, "");
 
-            Status status(ErrorCodes::InternalError, "");
+        if (haveWrappingWUOW) {
+            invariant(*opType != 'c');
 
-            if (haveWrappingWUOW) {
-                invariant(*opType != 'c');
+            if (!dbHolder().get(opCtx, ns)) {
+                throw DBException(
+                    "cannot create a database in atomic applyOps mode; will retry without "
+                    "atomicity",
+                    ErrorCodes::NamespaceNotFound);
+            }
 
-                if (!dbHolder().get(opCtx, ns)) {
-                    throw DBException(
-                        "cannot create a database in atomic applyOps mode; will retry without "
-                        "atomicity",
-                        ErrorCodes::NamespaceNotFound);
-                }
+            OldClientContext ctx(opCtx, ns);
+            status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
+            if (!status.isOK())
+                return status;
+            logOpForDbHash(opCtx, nss);
+        } else {
+            try {
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    if (*opType == 'c') {
+                        status = repl::applyCommand_inlock(opCtx, opObj, true);
+                    } else {
+                        OldClientContext ctx(opCtx, ns);
+                        const char* names[] = {"o", "ns"};
+                        BSONElement fields[2];
+                        opObj.getFields(2, names, fields);
+                        BSONElement& fieldO = fields[0];
+                        BSONElement& fieldNs = fields[1];
+                        const StringData ns = fieldNs.valueStringData();
+                        NamespaceString requestNss{ns};
 
-                OldClientContext ctx(opCtx, ns);
-                status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
-                if (!status.isOK())
-                    return status;
-                logOpForDbHash(opCtx, nss);
-            } else {
-                try {
-                    // Run operations under a nested lock as a hack to prevent yielding.
-                    //
-                    // The list of operations is supposed to be applied atomically; yielding
-                    // would break atomicity by allowing an interruption or a shutdown to occur
-                    // after only some operations are applied.  We are already locked globally
-                    // at this point, so taking a DBLock on the namespace creates a nested lock,
-                    // and yields are disallowed for operations that hold a nested lock.
-                    //
-                    // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
-                    // commit to happen with a subset of ops applied.
-                    Lock::GlobalWrite globalWriteLockDisallowTempRelease(opCtx);
+                        if (nss.isSystemDotIndexes()) {
+                            BSONObj indexSpec;
+                            NamespaceString indexNss;
+                            std::tie(indexSpec, indexNss) =
+                                repl::prepForApplyOpsIndexInsert(fieldO, opObj, requestNss);
+                            BSONObjBuilder command;
+                            command.append("createIndexes", indexNss.coll());
+                            {
+                                BSONArrayBuilder indexes(command.subarrayStart("indexes"));
+                                indexes.append(indexSpec);
+                                indexes.doneFast();
+                            }
+                            const BSONObj commandObj = command.done();
 
-                    // Ensures that yielding will not happen (see the comment above).
-                    DEV {
-                        Locker::LockSnapshot lockSnapshot;
-                        invariant(!opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot));
-                    };
-
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                        if (*opType == 'c') {
-                            status = repl::applyCommand_inlock(opCtx, opObj, true);
+                            DBDirectClient client(opCtx);
+                            BSONObj infoObj;
+                            client.runCommand(nsToDatabase(ns), commandObj, infoObj);
+                            status = getStatusFromCommandResult(infoObj);
                         } else {
-                            OldClientContext ctx(opCtx, ns);
-
                             status =
                                 repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
                         }
                     }
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", ns);
-                } catch (const DBException& ex) {
-                    ab.append(false);
-                    result->append("applied", ++(*numApplied));
-                    result->append("code", ex.getCode());
-                    result->append("codeName",
-                                   ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
-                    result->append("errmsg", ex.what());
-                    result->append("results", ab.arr());
-                    return Status(ErrorCodes::UnknownError, ex.what());
                 }
-                WriteUnitOfWork wuow(opCtx);
-                logOpForDbHash(opCtx, nss);
-                wuow.commit();
-            }
-
-            ab.append(status.isOK());
-            if (!status.isOK()) {
-                log() << "applyOps error applying: " << status;
-                errors++;
-            }
-
-            (*numApplied)++;
-        }
-
-        result->append("applied", *numApplied);
-        result->append("results", ab.arr());
-    }  // set replicatedWrites back to original value
-
-    if (opCtx->writesAreReplicated()) {
-        // We want this applied atomically on slaves
-        // so we re-wrap without the pre-condition for speed
-
-        // TODO: possibly use mutable BSON to remove preCondition field
-        // once it is available
-        BSONObjBuilder cmdBuilder;
-
-        for (auto elem : applyOpCmd) {
-            auto name = elem.fieldNameStringData();
-            if (name == "preCondition")
-                continue;
-            if (name == "bypassDocumentValidation")
-                continue;
-            cmdBuilder.append(elem);
-        }
-
-        const BSONObj cmdRewritten = cmdBuilder.done();
-
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        invariant(opObserver);
-        if (haveWrappingWUOW) {
-            opObserver->onApplyOps(opCtx, dbName, cmdRewritten);
-        } else {
-            // When executing applyOps outside of a wrapping WriteUnitOfWOrk, always logOp the
-            // command regardless of whether the individial ops succeeded and rely on any
-            // failures to also on secondaries. This isn't perfect, but it's what the command
-            // has always done and is part of its "correct" behavior.
-            while (true) {
-                try {
-                    WriteUnitOfWork wunit(opCtx);
-                    opObserver->onApplyOps(opCtx, dbName, cmdRewritten);
-
-                    wunit.commit();
-                    break;
-                } catch (const WriteConflictException& wce) {
-                    LOG(2) << "WriteConflictException while logging applyOps command, retrying.";
-                    opCtx->recoveryUnit()->abandonSnapshot();
-                    continue;
-                }
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", ns);
+            } catch (const DBException& ex) {
+                ab.append(false);
+                result->append("applied", ++(*numApplied));
+                result->append("code", ex.getCode());
+                result->append("codeName",
+                               ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
+                result->append("errmsg", ex.what());
+                result->append("results", ab.arr());
+                return Status(ErrorCodes::UnknownError, ex.what());
             }
         }
+
+        ab.append(status.isOK());
+        if (!status.isOK()) {
+            log() << "applyOps error applying: " << status;
+            errors++;
+        }
+
+        (*numApplied)++;
     }
+
+    result->append("applied", *numApplied);
+    result->append("results", ab.arr());
 
     if (errors != 0) {
         return Status(ErrorCodes::UnknownError, "applyOps had one or more errors applying ops");
@@ -333,7 +294,34 @@ mongo::Status mongo::applyOps(OperationContext* opCtx,
             BSONObjBuilder intermediateResult;
             WriteUnitOfWork wunit(opCtx);
             numApplied = 0;
-            uassertStatusOK(_applyOps(opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied));
+            {
+                // Suppress replication for atomic operations until end of applyOps.
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                uassertStatusOK(
+                    _applyOps(opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied));
+            }
+            // Generate oplog entry for all atomic ops collectively.
+            if (opCtx->writesAreReplicated()) {
+                // We want this applied atomically on slaves so we rewrite the oplog entry without
+                // the pre-condition for speed.
+
+                BSONObjBuilder cmdBuilder;
+
+                for (auto elem : applyOpCmd) {
+                    auto name = elem.fieldNameStringData();
+                    if (name == "preCondition")
+                        continue;
+                    if (name == "bypassDocumentValidation")
+                        continue;
+                    cmdBuilder.append(elem);
+                }
+
+                const BSONObj cmdRewritten = cmdBuilder.done();
+
+                auto opObserver = getGlobalServiceContext()->getOpObserver();
+                invariant(opObserver);
+                opObserver->onApplyOps(opCtx, dbName, cmdRewritten);
+            }
             wunit.commit();
             result->appendElements(intermediateResult.obj());
         }
