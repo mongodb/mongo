@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-boost::optional<scram::SCRAMSecrets> SCRAMSHA1ClientCache::getCachedSecrets(
+scram::SCRAMSecrets SCRAMSHA1ClientCache::getCachedSecrets(
     const HostAndPort& target, const scram::SCRAMPresecrets& presecrets) const {
     const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
 

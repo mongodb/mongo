@@ -80,15 +80,15 @@ SHA1Block SHA1Block::computeHash(const uint8_t* input, size_t inputLen) {
 }
 
 /*
- * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
+ * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key', writes output into 'output'.
  */
-SHA1Block SHA1Block::computeHmac(const uint8_t* key,
-                                 size_t keyLen,
-                                 const uint8_t* input,
-                                 size_t inputLen) {
-    HashType output;
-    fassert(40380, HMAC(EVP_sha1(), key, keyLen, input, inputLen, output.data(), NULL) != NULL);
-    return SHA1Block(output);
+void SHA1Block::computeHmac(const uint8_t* key,
+                            size_t keyLen,
+                            const uint8_t* input,
+                            size_t inputLen,
+                            SHA1Block* const output) {
+    fassert(40380,
+            HMAC(EVP_sha1(), key, keyLen, input, inputLen, output->_hash.data(), NULL) != NULL);
 }
 
 }  // namespace mongo

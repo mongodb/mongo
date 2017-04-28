@@ -95,27 +95,27 @@ SCRAMSecrets generateSecrets(const SCRAMPresecrets& presecrets) {
 }
 
 SCRAMSecrets generateSecrets(const SHA1Block& saltedPassword) {
-    SCRAMSecrets credentials;
+    auto generateAndStoreSecrets = [&saltedPassword](
+        SHA1Block& clientKey, SHA1Block& storedKey, SHA1Block& serverKey) {
 
-    // ClientKey := HMAC(saltedPassword, "Client Key")
-    credentials.clientKey =
-        SHA1Block::computeHmac(saltedPassword.data(),
-                               saltedPassword.size(),
-                               reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
-                               clientKeyConst.size());
+        // ClientKey := HMAC(saltedPassword, "Client Key")
+        clientKey =
+            SHA1Block::computeHmac(saltedPassword.data(),
+                                   saltedPassword.size(),
+                                   reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
+                                   clientKeyConst.size());
 
-    // StoredKey := H(clientKey)
-    credentials.storedKey =
-        SHA1Block::computeHash(credentials.clientKey->data(), credentials.clientKey->size());
+        // StoredKey := H(clientKey)
+        storedKey = SHA1Block::computeHash(clientKey.data(), clientKey.size());
 
-    // ServerKey       := HMAC(SaltedPassword, "Server Key")
-    credentials.serverKey =
-        SHA1Block::computeHmac(saltedPassword.data(),
-                               saltedPassword.size(),
-                               reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
-                               serverKeyConst.size());
-
-    return credentials;
+        // ServerKey       := HMAC(SaltedPassword, "Server Key")
+        serverKey =
+            SHA1Block::computeHmac(saltedPassword.data(),
+                                   saltedPassword.size(),
+                                   reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
+                                   serverKeyConst.size());
+    };
+    return SCRAMSecrets(std::move(generateAndStoreSecrets));
 }
 
 
@@ -140,8 +140,8 @@ BSONObj generateCredentials(const std::string& hashedPassword, int iterationCoun
                                                       saltLenQWords * sizeof(uint64_t)),
                         iterationCount));
 
-    std::string encodedStoredKey = secrets.storedKey->toString();
-    std::string encodedServerKey = secrets.serverKey->toString();
+    std::string encodedStoredKey = secrets->storedKey.toString();
+    std::string encodedServerKey = secrets->serverKey.toString();
 
     return BSON(iterationCountFieldName << iterationCount << saltFieldName << encodedUserSalt
                                         << storedKeyFieldName
@@ -154,12 +154,12 @@ std::string generateClientProof(const SCRAMSecrets& clientCredentials,
                                 const std::string& authMessage) {
     // ClientSignature := HMAC(StoredKey, AuthMessage)
     SHA1Block clientSignature =
-        SHA1Block::computeHmac(clientCredentials.storedKey->data(),
-                               clientCredentials.storedKey->size(),
+        SHA1Block::computeHmac(clientCredentials->storedKey.data(),
+                               clientCredentials->storedKey.size(),
                                reinterpret_cast<const unsigned char*>(authMessage.c_str()),
                                authMessage.size());
 
-    clientSignature.xorInline(*clientCredentials.clientKey);
+    clientSignature.xorInline(clientCredentials->clientKey);
     return clientSignature.toString();
 }
 
@@ -168,8 +168,8 @@ bool verifyServerSignature(const SCRAMSecrets& clientCredentials,
                            const std::string& receivedServerSignature) {
     // ServerSignature := HMAC(ServerKey, AuthMessage)
     SHA1Block serverSignature =
-        SHA1Block::computeHmac(clientCredentials.serverKey->data(),
-                               clientCredentials.serverKey->size(),
+        SHA1Block::computeHmac(clientCredentials->serverKey.data(),
+                               clientCredentials->serverKey.size(),
                                reinterpret_cast<const unsigned char*>(authMessage.c_str()),
                                authMessage.size());
 

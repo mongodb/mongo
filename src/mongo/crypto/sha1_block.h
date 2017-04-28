@@ -63,11 +63,27 @@ public:
     static SHA1Block computeHmac(const uint8_t* key,
                                  size_t keyLen,
                                  const uint8_t* input,
-                                 size_t inputLen);
+                                 size_t inputLen) {
+        SHA1Block output;
+        SHA1Block::computeHmac(key, keyLen, input, inputLen, &output);
+        return output;
+    }
 
-    const uint8_t* data() const {
+    /**
+     * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'. Writes the results into
+     * a pre-allocated SHA1Block. This lets us allocate SHA1Blocks with the SecureAllocator.
+     */
+    static void computeHmac(const uint8_t* key,
+                            size_t keyLen,
+                            const uint8_t* input,
+                            size_t inputLen,
+                            SHA1Block* const output);
+
+    const uint8_t* data() const& {
         return _hash.data();
     }
+
+    uint8_t* data() const&& = delete;
 
     size_t size() const {
         return _hash.size();
