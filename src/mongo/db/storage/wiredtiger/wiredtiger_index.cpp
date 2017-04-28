@@ -457,8 +457,8 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
 Status WiredTigerIndex::compact(OperationContext* txn) {
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
     if (!cache->isEphemeral()) {
-        UniqueWiredTigerSession session = cache->getSession();
-        WT_SESSION* s = session->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
+        txn->recoveryUnit()->abandonSnapshot();
         int ret = s->compact(s, uri().c_str(), "timeout=0");
         invariantWTOK(ret);
     }

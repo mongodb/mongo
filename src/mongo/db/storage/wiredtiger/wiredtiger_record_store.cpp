@@ -1524,8 +1524,8 @@ Status WiredTigerRecordStore::compact(OperationContext* txn,
                                       CompactStats* stats) {
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
     if (!cache->isEphemeral()) {
-        UniqueWiredTigerSession session = cache->getSession();
-        WT_SESSION* s = session->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
+        txn->recoveryUnit()->abandonSnapshot();
         int ret = s->compact(s, getURI().c_str(), "timeout=0");
         invariantWTOK(ret);
     }
