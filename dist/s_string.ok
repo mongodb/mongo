@@ -733,6 +733,7 @@ fsyncLock
 fsyncs
 ftruncate
 func
+fvisibility
 gcc
 gdb
 ge

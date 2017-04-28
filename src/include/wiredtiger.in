@@ -39,6 +39,16 @@ extern "C" {
 #define	__F(func) (*(func))
 #endif
 
+/*
+ * We support configuring WiredTiger with the gcc/clang -fvisibility=hidden
+ * flags, but that requires public APIs be specifically marked.
+ */
+#if defined(DOXYGEN) || defined(SWIG) || !defined(__GNUC__)
+#define	WT_ATTRIBUTE_LIBRARY_VISIBLE
+#else
+#define	WT_ATTRIBUTE_LIBRARY_VISIBLE	__attribute__((visibility("default")))
+#endif
+
 #ifdef SWIG
 %{
 #include <wiredtiger.h>
@@ -2570,7 +2580,7 @@ struct __wt_connection {
  */
 int wiredtiger_open(const char *home,
     WT_EVENT_HANDLER *errhandler, const char *config,
-    WT_CONNECTION **connectionp);
+    WT_CONNECTION **connectionp) WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Return information about a WiredTiger error as a string (see
@@ -2581,7 +2591,7 @@ int wiredtiger_open(const char *home,
  * @param error a return value from a WiredTiger, ISO C, or POSIX standard API
  * @returns a string representation of the error
  */
-const char *wiredtiger_strerror(int error);
+const char *wiredtiger_strerror(int error) WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 #if !defined(SWIG)
 /*!
@@ -2718,7 +2728,8 @@ struct __wt_event_handler {
  * @errors
  */
 int wiredtiger_struct_pack(WT_SESSION *session,
-    void *buffer, size_t size, const char *format, ...);
+    void *buffer, size_t size, const char *format, ...)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Calculate the size required to pack a structure.
@@ -2736,7 +2747,7 @@ int wiredtiger_struct_pack(WT_SESSION *session,
  * @errors
  */
 int wiredtiger_struct_size(WT_SESSION *session,
-    size_t *sizep, const char *format, ...);
+    size_t *sizep, const char *format, ...) WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Unpack a structure from a buffer.
@@ -2753,7 +2764,8 @@ int wiredtiger_struct_size(WT_SESSION *session,
  * @errors
  */
 int wiredtiger_struct_unpack(WT_SESSION *session,
-    const void *buffer, size_t size, const char *format, ...);
+    const void *buffer, size_t size, const char *format, ...)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 #if !defined(SWIG)
 
@@ -2780,7 +2792,8 @@ typedef struct __wt_pack_stream WT_PACK_STREAM;
  * @errors
  */
 int wiredtiger_pack_start(WT_SESSION *session,
-    const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp);
+    const char *format, void *buffer, size_t size, WT_PACK_STREAM **psp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Start an unpacking operation from a buffer with the given format string.
@@ -2796,7 +2809,8 @@ int wiredtiger_pack_start(WT_SESSION *session,
  * @errors
  */
 int wiredtiger_unpack_start(WT_SESSION *session,
-    const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp);
+    const char *format, const void *buffer, size_t size, WT_PACK_STREAM **psp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Close a packing stream.
@@ -2805,7 +2819,8 @@ int wiredtiger_unpack_start(WT_SESSION *session,
  * @param[out] usedp the number of bytes in the buffer used by the stream
  * @errors
  */
-int wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp);
+int wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Pack an item into a packing stream.
@@ -2814,7 +2829,8 @@ int wiredtiger_pack_close(WT_PACK_STREAM *ps, size_t *usedp);
  * @param item an item to pack
  * @errors
  */
-int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Pack a signed integer into a packing stream.
@@ -2823,7 +2839,8 @@ int wiredtiger_pack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
  * @param i a signed integer to pack
  * @errors
  */
-int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i);
+int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Pack a string into a packing stream.
@@ -2832,7 +2849,8 @@ int wiredtiger_pack_int(WT_PACK_STREAM *ps, int64_t i);
  * @param s a string to pack
  * @errors
  */
-int wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s);
+int wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Pack an unsigned integer into a packing stream.
@@ -2841,7 +2859,8 @@ int wiredtiger_pack_str(WT_PACK_STREAM *ps, const char *s);
  * @param u an unsigned integer to pack
  * @errors
  */
-int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
+int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Unpack an item from a packing stream.
@@ -2850,7 +2869,8 @@ int wiredtiger_pack_uint(WT_PACK_STREAM *ps, uint64_t u);
  * @param item an item to unpack
  * @errors
  */
-int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
+int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Unpack a signed integer from a packing stream.
@@ -2859,7 +2879,8 @@ int wiredtiger_unpack_item(WT_PACK_STREAM *ps, WT_ITEM *item);
  * @param[out] ip the unpacked signed integer
  * @errors
  */
-int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
+int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Unpack a string from a packing stream.
@@ -2868,7 +2889,8 @@ int wiredtiger_unpack_int(WT_PACK_STREAM *ps, int64_t *ip);
  * @param[out] sp the unpacked string
  * @errors
  */
-int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
+int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * Unpack an unsigned integer from a packing stream.
@@ -2877,7 +2899,8 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
  * @param[out] up the unpacked unsigned integer
  * @errors
  */
-int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
+int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 /*! @} */
 
 /*!
@@ -2955,7 +2978,8 @@ struct __wt_config_item {
  * @snippet ex_all.c Validate a configuration string
  */
 int wiredtiger_config_validate(WT_SESSION *session,
-    WT_EVENT_HANDLER *errhandler, const char *name, const char *config);
+    WT_EVENT_HANDLER *errhandler, const char *name, const char *config)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 #endif
 
 /*!
@@ -2975,7 +2999,8 @@ int wiredtiger_config_validate(WT_SESSION *session,
  * @snippet ex_config_parse.c Create a configuration parser
  */
 int wiredtiger_config_parser_open(WT_SESSION *session,
-    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
+    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*!
  * A handle that can be used to search and traverse configuration strings
@@ -3064,7 +3089,8 @@ struct __wt_config_parser {
  * @param patchp a location where the patch version number is returned
  * @returns a string representation of the version
  */
-const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
+const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
+    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 /*******************************************
  * Error returns
