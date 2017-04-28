@@ -185,6 +185,10 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj);
 
+    virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj);
+
+    virtual void incrementRollbackID();
+
     virtual Status processReplSetFresh(const ReplSetFreshArgs& args, BSONObjBuilder* resultObj);
 
     virtual Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* resultObj);
@@ -222,8 +226,7 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response);
 
-    void prepareReplMetadata(OperationContext* opCtx,
-                             const BSONObj& metadataRequestObj,
+    void prepareReplMetadata(const BSONObj& metadataRequestObj,
                              const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 

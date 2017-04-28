@@ -329,6 +329,13 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
         return;
     }
 
+    std::unique_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+    _rbid = static_cast<int>(rbidGenerator->nextInt64());
+    if (_rbid < 0) {
+        // Ensure _rbid is always positive
+        _rbid = -_rbid;
+    }
+
     // Make sure there is always an entry in _slaveInfo for ourself.
     SlaveInfo selfInfo;
     selfInfo.self = true;
@@ -421,19 +428,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     } else {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _topCoord->loadLastVote(lastVote.getValue());
-    }
-
-    // Check that we have a local Rollback ID. If we do not have one, create one.
-    auto rbid = _storage->getRollbackID(opCtx);
-    if (!rbid.isOK()) {
-        if (rbid.getStatus() == ErrorCodes::NamespaceNotFound) {
-            log() << "Did not find local Rollback ID document at startup. Creating one.";
-            auto initializingStatus = _storage->initializeRollbackID(opCtx);
-            fassertStatusOK(40424, initializingStatus);
-        } else {
-            severe() << "Error loading local Rollback ID document at startup; " << rbid.getStatus();
-            fassertFailedNoTrace(40428);
-        }
     }
 
     StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(opCtx);
@@ -2873,6 +2867,17 @@ void ReplicationCoordinatorImpl::_enterDrainMode_inlock() {
     _externalState->stopProducer();
 }
 
+Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    resultObj->append("rbid", _rbid);
+    return Status::OK();
+}
+
+void ReplicationCoordinatorImpl::incrementRollbackID() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    ++_rbid;
+}
+
 Status ReplicationCoordinatorImpl::processReplSetFresh(const ReplSetFreshArgs& args,
                                                        BSONObjBuilder* resultObj) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -3324,8 +3329,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::prepareReplMetadata(OperationContext* opCtx,
-                                                     const BSONObj& metadataRequestObj,
+void ReplicationCoordinatorImpl::prepareReplMetadata(const BSONObj& metadataRequestObj,
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {
 
@@ -3336,9 +3340,6 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(OperationContext* opCtx,
         return;
     }
 
-    auto rbid = _storage->getRollbackID(opCtx);
-    fassertStatusOK(40427, rbid.getStatus());
-
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (hasReplSetMetadata) {
@@ -3346,7 +3347,7 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(OperationContext* opCtx,
     }
 
     if (hasOplogQueryMetadata) {
-        _prepareOplogQueryMetadata_inlock(rbid.getValue(), builder);
+        _prepareOplogQueryMetadata_inlock(builder);
     }
 }
 
@@ -3358,11 +3359,10 @@ void ReplicationCoordinatorImpl::_prepareReplSetMetadata_inlock(const OpTime& la
     metadata.writeToMetadata(builder);
 }
 
-void ReplicationCoordinatorImpl::_prepareOplogQueryMetadata_inlock(int rbid,
-                                                                   BSONObjBuilder* builder) const {
+void ReplicationCoordinatorImpl::_prepareOplogQueryMetadata_inlock(BSONObjBuilder* builder) const {
     OpTime lastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
     auto metadata =
-        _topCoord->prepareOplogQueryMetadata(_lastCommittedOpTime, lastAppliedOpTime, rbid);
+        _topCoord->prepareOplogQueryMetadata(_lastCommittedOpTime, lastAppliedOpTime, _rbid);
     metadata.writeToMetadata(builder);
 }
 

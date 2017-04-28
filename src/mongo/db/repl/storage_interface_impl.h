@@ -49,9 +49,6 @@ public:
     static const char kInitialSyncFlagFieldName[];
     static const char kBeginFieldName[];
     static const char kOplogDeleteFromPointFieldName[];
-    static const char kDefaultRollbackIdNamespace[];
-    static const char kRollbackIdFieldName[];
-    static const char kRollbackIdDocumentId[];
 
     StorageInterfaceImpl();
     explicit StorageInterfaceImpl(const NamespaceString& minValidNss);
@@ -70,9 +67,6 @@ public:
     OpTime getMinValid(OperationContext* opCtx) const override;
     void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& endOpTime) override;
-    StatusWith<int> getRollbackID(OperationContext* opCtx) override;
-    Status initializeRollbackID(OperationContext* opCtx) override;
-    Status incrementRollbackID(OperationContext* opCtx) override;
     void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) override;
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
@@ -157,7 +151,6 @@ private:
     void updateMinValidDocument(OperationContext* opCtx, const BSONObj& updateSpec);
 
     const NamespaceString _minValidNss;
-    const NamespaceString _rollbackIdNss;
 };
 
 }  // namespace repl

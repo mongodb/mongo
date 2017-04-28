@@ -337,143 +337,6 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
 }
 
-TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsNamespaceNotFoundOnMissingCollection) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.getRollbackID(opCtx).getStatus());
-}
-
-TEST_F(StorageInterfaceImplTest, IncrementRollbackIDReturnsNamespaceNotFoundOnMissingCollection) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.incrementRollbackID(opCtx));
-}
-
-TEST_F(StorageInterfaceImplTest, InitializeRollbackIDReturnsNamespaceExistsOnExistingCollection) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-
-    createCollection(opCtx, NamespaceString(StorageInterfaceImpl::kDefaultRollbackIdNamespace));
-    ASSERT_EQUALS(ErrorCodes::NamespaceExists, storage.initializeRollbackID(opCtx));
-}
-
-TEST_F(StorageInterfaceImplTest,
-       InitializeRollbackIDReturnsNamespaceExistsIfItHasAlreadyBeenInitialized) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-
-    ASSERT_OK(storage.initializeRollbackID(opCtx));
-    ASSERT_EQUALS(ErrorCodes::NamespaceExists, storage.initializeRollbackID(opCtx));
-}
-
-/**
- * Check collection contents. OplogInterface returns documents in reverse natural order.
- */
-void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const std::vector<BSONObj>& docs) {
-    std::vector<BSONObj> reversedDocs(docs);
-    std::reverse(reversedDocs.begin(), reversedDocs.end());
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    for (const auto& doc : reversedDocs) {
-        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
-    }
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-}
-
-/**
- * Check collection contents for a singleton Rollback ID document.
- */
-void _assertRollbackIDDocument(OperationContext* opCtx, int id) {
-    _assertDocumentsInCollectionEquals(
-        opCtx,
-        NamespaceString(StorageInterfaceImpl::kDefaultRollbackIdNamespace),
-        {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
-                    << StorageInterfaceImpl::kRollbackIdFieldName
-                    << id)});
-}
-
-TEST_F(StorageInterfaceImplTest, RollbackIdInitializesIncrementsAndReadsProperly) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-
-    ASSERT_OK(storage.initializeRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 0);
-
-    auto rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 0);
-
-    ASSERT_OK(storage.incrementRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 1);
-
-    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 1);
-
-    ASSERT_OK(storage.incrementRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 2);
-
-    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 2);
-}
-
-TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToZeroWhenExceedingMaxInt) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-    NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
-    createCollection(opCtx, nss);
-    auto maxDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
-                              << StorageInterfaceImpl::kRollbackIdFieldName
-                              << std::numeric_limits<int>::max())};
-    ASSERT_OK(storage.insertDocuments(opCtx, nss, maxDoc));
-    _assertRollbackIDDocument(opCtx, std::numeric_limits<int>::max());
-
-    auto rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, std::numeric_limits<int>::max());
-
-    ASSERT_OK(storage.incrementRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 0);
-
-    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 0);
-
-    ASSERT_OK(storage.incrementRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 1);
-
-    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 1);
-}
-
-TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadField) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-    NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
-
-    createCollection(opCtx, nss);
-
-    auto badDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId << "bad field" << 3)};
-    ASSERT_OK(storage.insertDocuments(opCtx, nss, badDoc));
-    ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40415),
-                  storage.getRollbackID(opCtx).getStatus());
-}
-
-TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotInt) {
-    StorageInterfaceImpl storage;
-    auto opCtx = getOperationContext();
-    NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
-
-    createCollection(opCtx, nss);
-
-    auto badDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
-                              << StorageInterfaceImpl::kRollbackIdFieldName
-                              << "bad id")};
-    ASSERT_OK(storage.insertDocuments(opCtx, nss, badDoc));
-    ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40410),
-                  storage.getRollbackID(opCtx).getStatus());
-}
-
 TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
     auto opCtx = getOperationContext();
     Status status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
@@ -899,6 +762,22 @@ std::string _toString(const std::vector<BSONObj>& docs) {
     }
     ss << "]";
     return ss;
+}
+
+/**
+ * Check collection contents. OplogInterface returns documents in reverse natural order.
+ */
+void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const std::vector<BSONObj>& docs) {
+    std::vector<BSONObj> reversedDocs(docs);
+    std::reverse(reversedDocs.begin(), reversedDocs.end());
+    OplogInterfaceLocal oplog(opCtx, nss.ns());
+    auto iter = oplog.makeIterator();
+    for (const auto& doc : reversedDocs) {
+        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
+    }
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 /**
