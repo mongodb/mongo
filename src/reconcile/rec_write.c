@@ -48,9 +48,8 @@ typedef struct {
 	/* Track the page's maximum transaction ID. */
 	uint64_t max_txn;
 
-	/* Track if all updates were skipped. */
-	uint64_t update_cnt;
-	uint64_t update_skip_cnt;
+	uint64_t update_mem;		/* Total update memory */
+	uint64_t update_mem_skipped;	/* Skipped update memory */
 
 	/*
 	 * When we can't mark the page clean (for example, checkpoint found some
@@ -453,7 +452,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * that's worth trying. The lookaside table doesn't help if we skipped
 	 * updates, it can only help with older readers preventing eviction.
 	 */
-	if (lookaside_retryp != NULL && r->update_cnt == r->update_skip_cnt)
+	if (lookaside_retryp != NULL && r->update_mem_skipped == 0)
 		*lookaside_retryp = true;
 
 	/* Update statistics. */
@@ -557,13 +556,23 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 /*
  * __rec_write_check_complete --
- *	Check that reconciliation should complete
+ *	Check that reconciliation should complete.
  */
 static int
 __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_BOUNDARY *bnd;
 	size_t i;
+
+	/*
+	 * Tests in this function are lookaside tests and tests to decide if
+	 * rewriting a page in memory is worth doing. In-memory configurations
+	 * can't use a lookaside table, and we ignore page rewrite desirability
+	 * checks for in-memory eviction because a small cache can force us to
+	 * rewrite every possible page.
+	 */
+	if (F_ISSET(r, WT_EVICT_IN_MEMORY))
+		return (0);
 
 	/*
 	 * If we have used the lookaside table, check for a lookaside table and
@@ -573,16 +582,29 @@ __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		return (EBUSY);
 
 	/*
-	 * If we are doing update/restore based eviction, confirm part of the
-	 * page is being discarded, or at least 10% of the updates won't have
-	 * to be re-instantiated. Otherwise, it isn't progress, don't bother.
+	 * If doing update/restore based eviction, see if rewriting the page in
+	 * memory is worth the effort.
 	 */
 	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
-		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i)
+		/* If discarding a disk-page size chunk, do it. */
+		for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 			if (bnd->supd == NULL)
-				break;
-		if (i == r->bnd_entries &&
-		    r->update_cnt / 10 >= r->update_skip_cnt)
+				return (0);
+
+		/*
+		 * Switch to the lookaside table if we can: it's more effective
+		 * than rewriting a page in memory because it implies eviction.
+		 */
+		if (r->update_mem_skipped == 0)
+			return (EBUSY);
+
+		/*
+		 * Don't rewrite pages where we're not going to get back enough
+		 * memory to care. There's no empirical evidence the 2KB limit
+		 * is a good configuration, but it should keep us from wasting
+		 * time on tiny pages and pages with only a few updates.
+		 */
+		if (r->update_mem - r->update_mem_skipped < 2 * WT_KILOBYTE)
 			return (EBUSY);
 	}
 	return (0);
@@ -888,7 +910,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->max_txn = WT_TXN_NONE;
 
 	/* Track if all updates were skipped. */
-	r->update_cnt = r->update_skip_cnt = 0;
+	r->update_mem = r->update_mem_skipped = 0;
 
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = false;
@@ -1112,7 +1134,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_DECL_ITEM(tmp);
 	WT_PAGE *page;
 	WT_UPDATE *append, *upd, *upd_list;
-	size_t notused;
+	size_t notused, update_mem;
 	uint64_t max_txn, min_txn, txnid;
 	bool append_origv, skipped;
 
@@ -1133,36 +1155,62 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	} else
 		upd_list = ins->upd;
 
-	++r->update_cnt;
-	for (skipped = false,
-	    max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
-	    upd = upd_list; upd != NULL; upd = upd->next) {
-		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
-			continue;
+	skipped = false;
+	update_mem = 0;
+	max_txn = WT_TXN_NONE;
+	min_txn = UINT64_MAX;
 
-		/* Track the largest/smallest transaction IDs on the list. */
-		if (WT_TXNID_LT(max_txn, txnid))
-			max_txn = txnid;
-		if (WT_TXNID_LT(txnid, min_txn))
-			min_txn = txnid;
+	if (F_ISSET(r, WT_EVICTING)) {
+		/* Discard obsolete updates. */
+		if ((upd = __wt_update_obsolete_check(
+		    session, page, upd_list->next)) != NULL)
+			__wt_update_obsolete_free(session, page, upd);
 
-		/*
-		 * Find the first update we can use.
-		 */
-		if (F_ISSET(r, WT_EVICTING)) {
+		for (upd = upd_list; upd != NULL; upd = upd->next) {
+			/* Track the total memory in the update chain. */
+			update_mem += WT_UPDATE_MEMSIZE(upd);
+
+			if ((txnid = upd->txnid) == WT_TXN_ABORTED)
+				continue;
+
 			/*
+			 * Track the largest/smallest transaction IDs on the
+			 * list.
+			 */
+			if (WT_TXNID_LT(max_txn, txnid))
+				max_txn = txnid;
+			if (WT_TXNID_LT(txnid, min_txn))
+				min_txn = txnid;
+
+			/*
+			 * Find the first update we can use.
+			 *
 			 * Eviction can write any committed update.
 			 *
 			 * When reconciling for eviction, track whether any
 			 * uncommitted updates are found.
+			 *
+			 * When reconciling for eviction, track the memory held
+			 * by the update chain.
 			 */
 			if (__wt_txn_committed(session, txnid)) {
 				if (*updp == NULL)
 					*updp = upd;
 			} else
 				skipped = true;
-		} else {
+		}
+	} else
+		for (upd = upd_list; upd != NULL; upd = upd->next) {
+			if ((txnid = upd->txnid) == WT_TXN_ABORTED)
+				continue;
+
+			/* Track the largest transaction ID on the list. */
+			if (WT_TXNID_LT(max_txn, txnid))
+				max_txn = txnid;
+
 			/*
+			 * Find the first update we can use.
+			 *
 			 * Checkpoint can only write updates visible as of its
 			 * snapshot.
 			 *
@@ -1177,7 +1225,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 					skipped = true;
 			}
 		}
-	}
 
 	/* Reconciliation should never see a reserved update. */
 	WT_ASSERT(session, *updp == NULL || !WT_UPDATE_RESERVED_ISSET(*updp));
@@ -1227,12 +1274,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    txnid != S2C(session)->txn_global.checkpoint_txnid ||
 		    WT_SESSION_IS_CHECKPOINT(session));
 #endif
-
-		/*
-		 * Track how many update chains we saw vs. how many update
-		 * chains had an entry we skipped.
-		 */
-		++r->update_skip_cnt;
 		return (0);
 	}
 
@@ -1275,6 +1316,23 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		return (EBUSY);
 	if (skipped && !F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
 		return (EBUSY);
+
+	/*
+	 * Track the memory required by the update chain.
+	 *
+	 * A page with no uncommitted (skipped) updates, that can't be evicted
+	 * because some updates aren't yet globally visible, can be evicted by
+	 * writing previous versions of the updates to the lookaside file. That
+	 * test is just checking if the skipped updates memory is zero.
+	 *
+	 * If that's not possible (there are skipped updates), we can rewrite
+	 * the pages in-memory, but we don't want to unless there's memory to
+	 * recover. That test is comparing the memory we'd recover to the memory
+	 * we'd have to re-instantiate as part of the rewrite.
+	 */
+	r->update_mem += update_mem;
+	if (skipped)
+		r->update_mem_skipped += update_mem;
 
 	append_origv = false;
 	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
@@ -3613,9 +3671,13 @@ __rec_update_las(WT_SESSION_IMPL *session,
 
 		/*
 		 * Walk the list of updates, storing each key/value pair into
-		 * the lookaside table.
+		 * the lookaside table. Skipped reserved items, they're never
+		 * restored, obviously.
 		 */
 		do {
+			if (WT_UPDATE_RESERVED_ISSET(upd))
+				continue;
+
 			cursor->set_key(cursor, btree_id,
 			    &las_addr, ++las_counter, list->onpage_txn, key);
 
