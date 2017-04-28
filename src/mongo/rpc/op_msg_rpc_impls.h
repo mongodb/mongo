@@ -61,7 +61,12 @@ public:
         return *this;
     }
     BSONObjBuilder getInPlaceReplyBuilder(std::size_t reserveBytes) override {
-        return _builder.beginBody();
+        BSONObjBuilder bob = _builder.beginBody();
+        // Eagerly reserve space and claim our reservation immediately so we can actually write data
+        // to it.
+        bob.bb().reserveBytes(reserveBytes);
+        bob.bb().claimReservedBytes(reserveBytes);
+        return bob;
     }
     ReplyBuilderInterface& setMetadata(const BSONObj& metadata) override {
         _builder.resumeBody().appendElements(metadata);
