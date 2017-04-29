@@ -635,7 +635,7 @@ void MigrationManager::_scheduleWithDistLock_inlock(OperationContext* opCtx,
             remoteRequest,
             [this, collectionMigrationState, itMigration](
                 const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-                Client::initThread(getThreadName().c_str());
+                Client::initThread(getThreadName());
                 ON_BLOCK_EXIT([&] { Client::destroy(); });
                 auto opCtx = cc().makeOperationContext();
 

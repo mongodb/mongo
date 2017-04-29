@@ -65,7 +65,7 @@ public:
      * "contextName" is a short name of the thread or other context.
      * "severity" is the logging severity of the message.
      */
-    LogstreamBuilder(MessageLogDomain* domain, std::string contextName, LogSeverity severity);
+    LogstreamBuilder(MessageLogDomain* domain, StringData contextName, LogSeverity severity);
 
     /**
      * Construct a LogstreamBuilder that writes to "domain" on destruction.
@@ -75,16 +75,14 @@ public:
      * "component" is the primary log component of the message.
      */
     LogstreamBuilder(MessageLogDomain* domain,
-                     std::string contextName,
+                     StringData contextName,
                      LogSeverity severity,
                      LogComponent component);
 
     /**
      * Deprecated.
      */
-    LogstreamBuilder(MessageLogDomain* domain,
-                     const std::string& contextName,
-                     LabeledLevel labeledLevel);
+    LogstreamBuilder(MessageLogDomain* domain, StringData contextName, LabeledLevel labeledLevel);
 
     LogstreamBuilder(LogstreamBuilder&& other) = default;
     LogstreamBuilder& operator=(LogstreamBuilder&& other) = default;

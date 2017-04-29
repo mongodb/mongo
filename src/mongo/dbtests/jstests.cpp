@@ -160,7 +160,7 @@ class LogRecordingScope {
 public:
     LogRecordingScope()
         : _logged(false),
-          _threadName(mongo::getThreadName()),
+          _threadName(mongo::getThreadName().toString()),
           _handle(mongo::logger::globalLogDomain()->attachAppender(
               mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {}
     ~LogRecordingScope() {

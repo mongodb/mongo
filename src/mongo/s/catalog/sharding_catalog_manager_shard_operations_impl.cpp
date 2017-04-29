@@ -970,7 +970,7 @@ void ShardingCatalogManagerImpl::_handleAddShardTaskResponse(
     // pool are not created with Client objects associated with them, so a Client is created and
     // attached here to do the local update. The Client is destroyed at the end of the scope,
     // leaving the thread state as it was before.
-    Client::initThread(getThreadName().c_str());
+    Client::initThread(getThreadName());
     ON_BLOCK_EXIT([&] { Client::destroy(); });
 
     // Use the thread's Client to create an OperationContext to perform the local write to

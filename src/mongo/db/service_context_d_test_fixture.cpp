@@ -49,7 +49,7 @@
 namespace mongo {
 
 void ServiceContextMongoDTest::setUp() {
-    Client::initThread(getThreadName().c_str());
+    Client::initThread(getThreadName());
     ServiceContext* serviceContext = getServiceContext();
     if (!serviceContext->getGlobalStorageEngine()) {
         // When using the "ephemeralForTest" storage engine, it is fine for the temporary directory
