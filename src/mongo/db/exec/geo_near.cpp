@@ -352,14 +352,6 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* txn,
     _children->emplace_back(_indexScan);
 }
 
-// NOTE(deyukong): DensityEstimator is used to calculate the radius of the first 
-// inner cycle. It begins from the smallest cell, the smallest cell has the 
-// largest level_id, which in geo_2d_index is 26 by default, the DensityEstimator 
-// keeps iterating, in each iterating, it scans the cells nearest to the central 
-// point to find whether there is at least one another point.
-// if found, radius of the first cycle is set to the length of the cell's edge.
-// if not found, next iterater begins with the upper level, cells in the upper
-// level has edges twice as long.
 // Return IS_EOF is we find a document in it's ancestor cells and set estimated distance
 // from the nearest document.
 PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* txn,
@@ -458,15 +450,7 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* txn,
         // Estimator finished its work, we need to finish initialization too.
         if (SPHERE == _nearParams.nearQuery->centroid->crs) {
             // Estimated distance is in degrees, convert it to meters.
-            // NOTE(deyukong): _boundsIncrement is three times as long as
-            // estimatedDistance, which is the distance between the first point
-            // and the central point.
-            // we give up the default strategy and use the minimal step as 
-            // _boundsIncrement, and use estimatedDistance as the radius of the 
-            // first cycle
-            _firstbound = deg2rad(estimatedDistance) * kRadiusOfEarthInMeters;
-            _boundsIncrement = min2DBoundsIncrement(*_nearParams.nearQuery, _twoDIndex);
-            // _boundsIncrement = deg2rad(estimatedDistance) * kRadiusOfEarthInMeters * 3;
+            _boundsIncrement = deg2rad(estimatedDistance) * kRadiusOfEarthInMeters * 3;
             // Limit boundsIncrement to ~20KM, so that the first circle won't be too aggressive.
             _boundsIncrement = std::min(_boundsIncrement, kMaxEarthDistanceInMeters / 1000.0);
         } else {
@@ -501,8 +485,7 @@ GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
       _twoDIndex(twoDIndex),
       _fullBounds(twoDDistanceBounds(nearParams, twoDIndex)),
       _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
-      _boundsIncrement(0.0),
-      _firstbound(0.0) {
+      _boundsIncrement(0.0) {
     _specificStats.keyPattern = twoDIndex->keyPattern();
     _specificStats.indexName = twoDIndex->indexName();
     _specificStats.indexVersion = static_cast<int>(twoDIndex->version());
@@ -620,30 +603,22 @@ StatusWith<NearStage::CoveredInterval*>  //
     // Setup the next interval
     //
 
-    bool first_cycle = _specificStats.intervalStats.empty();
     if (!_specificStats.intervalStats.empty()) {
         const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
 
         // TODO: Generally we want small numbers of results fast, then larger numbers later
-        // NOTE(deyukong): 300 is meaningless in our situation
-        // if nothing found, speed up the search process
-        if (lastIntervalStats.numResultsReturned == 0) {
+        if (lastIntervalStats.numResultsReturned < 300)
             _boundsIncrement *= 2;
-	}
+        else if (lastIntervalStats.numResultsReturned > 600)
+            _boundsIncrement /= 2;
     }
 
-    double delta = 0;
-    if (first_cycle) {
-        delta = _firstbound;
-    } else {
-        delta = _boundsIncrement;
-    }
     _boundsIncrement =
         max(_boundsIncrement, min2DBoundsIncrement(*_nearParams.nearQuery, _twoDIndex));
 
     R2Annulus nextBounds(_currBounds.center(),
                          _currBounds.getOuter(),
-                         min(_currBounds.getOuter() + delta, _fullBounds.getOuter()));
+                         min(_currBounds.getOuter() + _boundsIncrement, _fullBounds.getOuter()));
 
     const bool isLastInterval = (nextBounds.getOuter() == _fullBounds.getOuter());
     _currBounds = nextBounds;

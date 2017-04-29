@@ -149,8 +149,6 @@ private:
     // Amount to increment the next bounds by
     double _boundsIncrement;
 
-    // radius of the first cycle
-    double _firstbound;
     // Keeps track of the region that has already been scanned
     S2CellUnion _scannedCells;
 
