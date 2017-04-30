@@ -198,7 +198,7 @@ public:
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override;
 
-    Status updateCappedSize(OperationContext* txn, long long cappedSize) final;
+    Status updateCappedSize(OperationContext* opCtx, long long cappedSize) final;
 
     bool isOplog() const {
         return _isOplog;

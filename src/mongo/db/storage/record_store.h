@@ -620,7 +620,7 @@ public:
     /** 
      * used to support online change oplog size.                    
      */
-    virtual Status updateCappedSize(OperationContext* txn, long long cappedSize) {   
+    virtual Status updateCappedSize(OperationContext* opCtx, long long cappedSize) {   
         return Status(ErrorCodes::CommandNotSupported,              
                 "this storage engine does not support updateCappedSize");
     }                                                               

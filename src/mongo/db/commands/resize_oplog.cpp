@@ -1,7 +1,5 @@
-// resize_oplog.cpp
-
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2017 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,7 +26,7 @@
 *    it in the license file.
 */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -71,18 +69,17 @@ public:
         return false;
     }
     virtual void help(stringstream& help) const {
-        help << "resize oplog size, only support wiredTiger";
+        help << "resize oplog size";
     }
     CmdResizeOplog() : Command("resizeOplog") {}
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
             const string& dbname,
             BSONObj& jsobj,
             int,
             string& errmsg,
             BSONObjBuilder& result) {
         StringData dbName("local");
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetDb autoDb(txn, dbName, MODE_X);
+        AutoGetDb autoDb(opCtx, dbName, MODE_X);
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection("local.oplog.rs") : nullptr;
         if (!coll) {
@@ -96,13 +93,16 @@ public:
         }
 
         long long size = jsobj["size"].numberLong();
-            WriteUnitOfWork wunit(txn);
-        Status status = coll->getRecordStore()->updateCappedSize(txn, size);
+        if (size < 990LL * 1024 * 1024) {
+            return appendCommandStatus(result, Status(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least"));
+        }
+        WriteUnitOfWork wunit(opCtx);
+        Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
         CollectionCatalogEntry* entry = coll->getCatalogEntry();
-        entry->updateCappedSize(txn, size);
+        entry->updateCappedSize(opCtx, size);
         wunit.commit();
         LOG(1) << "resizeOplog success, currentSize:" << size;
         return appendCommandStatus(result, Status::OK());

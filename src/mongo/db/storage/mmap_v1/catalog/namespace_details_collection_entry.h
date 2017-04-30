@@ -100,7 +100,7 @@ public:
                          StringData validationLevel,
                          StringData validationAction) final;
 
-    void updateCappedSize(OperationContext* txn, long long size) final;
+    void updateCappedSize(OperationContext* opCtx, long long size) final;
 
     // not part of interface, but available to my storage engine
 

@@ -143,7 +143,7 @@ private:
     OplogStones* _oplogStones;
 };
 
-WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* txn, WiredTigerRecordStore* rs)
+WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs)
     : _rs(rs) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -159,7 +159,7 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* txn, WiredTige
     _minBytesPerStone = maxSize / numStonesToKeep;
     invariant(_minBytesPerStone > 0);
 
-    _calculateStones(txn, numStonesToKeep);
+    _calculateStones(opCtx, numStonesToKeep);
     _pokeReclaimThreadIfNeeded();  // Reclaim stones if over the limit.
 }
 
@@ -226,7 +226,7 @@ void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(RecordId lastRec
         return;
     }
 
-    LOG(1) << "create new oplogStone, current stones:" << _stones.size();
+    LOG(2) << "create new oplogStone, current stones:" << _stones.size();
     OplogStones::Stone stone = {_currentRecords.swap(0), _currentBytes.swap(0), lastRecord};
     _stones.push_back(stone);
 
@@ -282,9 +282,9 @@ void WiredTigerRecordStore::OplogStones::setMinBytesPerStone(int64_t size) {
     _minBytesPerStone = size;
 }
 
-void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn, size_t numStonesToKeep) {
-    long long numRecords = _rs->numRecords(txn);
-    long long dataSize = _rs->dataSize(txn);
+void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* opCtx, size_t numStonesToKeep) {
+    long long numRecords = _rs->numRecords(opCtx);
+    long long dataSize = _rs->dataSize(opCtx);
 
     log() << "The size storer reports that the oplog contains " << numRecords
           << " records totaling to " << dataSize << " bytes";
@@ -298,7 +298,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn,
     if (numRecords <= 0 || dataSize <= 0 ||
         uint64_t(numRecords) <
             kMinSampleRatioForRandCursor * kRandomSamplesPerStone * numStonesToKeep) {
-        _calculateStonesByScanning(txn);
+        _calculateStonesByScanning(opCtx);
         return;
     }
 
@@ -308,7 +308,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn,
     double estRecordsPerStone = std::ceil(_minBytesPerStone / avgRecordSize);
     double estBytesPerStone = estRecordsPerStone * avgRecordSize;
 
-    _calculateStonesBySampling(txn, int64_t(estRecordsPerStone), int64_t(estBytesPerStone));
+    _calculateStonesBySampling(opCtx, int64_t(estRecordsPerStone), int64_t(estBytesPerStone));
 }
 
 void WiredTigerRecordStore::OplogStones::_calculateStonesByScanning(OperationContext* txn) {
@@ -1935,7 +1935,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* txn,
     }
 }
 
-Status WiredTigerRecordStore::updateCappedSize(OperationContext* txn, long long cappedSize) {
+Status WiredTigerRecordStore::updateCappedSize(OperationContext* opCtx, long long cappedSize) {
         if (_cappedMaxSize == cappedSize) {
                 return Status::OK();
         }

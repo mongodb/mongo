@@ -133,7 +133,7 @@ public:
     /**
     * Updates size of a capped Collection.
     */
-    virtual void updateCappedSize(OperationContext* txn, long long size) = 0;
+    virtual void updateCappedSize(OperationContext* opCtx, long long size) = 0;
 
 private:
     NamespaceString _ns;
