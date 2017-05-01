@@ -961,9 +961,10 @@ env.Library(
         'keys_collection_cache_reader_and_updater.cpp',
     ],
     LIBDEPS=[
+        'logical_clock',
         'keys_collection_document',
         'logical_time',
-        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
     ],
 )
 
@@ -985,6 +986,7 @@ env.Library(
         'logical_time_validator.cpp',
     ],
     LIBDEPS=[
+        'keys_collection_manager',
         'service_context',
         'signed_logical_time',
         'time_proof_service',
@@ -998,6 +1000,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'keys_collection_document',
+        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 
@@ -1086,6 +1089,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'keys_collection_manager',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 
@@ -1097,6 +1101,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'keys_collection_manager',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 

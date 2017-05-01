@@ -31,13 +31,13 @@
 #include "mongo/db/keys_collection_cache_reader.h"
 
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-KeysCollectionCacheReader::KeysCollectionCacheReader(std::string purpose)
-    : _purpose(std::move(purpose)) {}
+KeysCollectionCacheReader::KeysCollectionCacheReader(std::string purpose,
+                                                     ShardingCatalogClient* client)
+    : _purpose(std::move(purpose)), _catalogClient(client) {}
 
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationContext* opCtx) {
     LogicalTime newerThanThis;
@@ -50,7 +50,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationC
         }
     }
 
-    auto refreshStatus = Grid::get(opCtx)->catalogClient(opCtx)->getNewKeys(
+    auto refreshStatus = _catalogClient->getNewKeys(
         opCtx, _purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
 
     if (!refreshStatus.isOK()) {

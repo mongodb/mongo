@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -49,15 +48,15 @@ namespace {
  * locally and never remotely even if this node is no longer primary.
  */
 Status insertNewKey(OperationContext* opCtx,
+                    ShardingCatalogClient* client,
                     long long keyId,
                     const std::string& purpose,
                     const LogicalTime& expiresAt) {
     KeysCollectionDocument newKey(keyId, purpose, TimeProofService::generateRandomKey(), expiresAt);
-    return Grid::get(opCtx)->catalogClient(opCtx)->insertConfigDocument(
-        opCtx,
-        KeysCollectionDocument::ConfigNS,
-        newKey.toBSON(),
-        ShardingCatalogClient::kMajorityWriteConcern);
+    return client->insertConfigDocument(opCtx,
+                                        KeysCollectionDocument::ConfigNS,
+                                        newKey.toBSON(),
+                                        ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 /**
@@ -70,16 +69,17 @@ LogicalTime addSeconds(const LogicalTime& logicalTime, const Seconds& seconds) {
 }  // unnamed namespace
 
 KeysCollectionCacheReaderAndUpdater::KeysCollectionCacheReaderAndUpdater(
-    std::string purpose, Seconds keyValidForInterval)
-    : KeysCollectionCacheReader(purpose),
+    std::string purpose, ShardingCatalogClient* client, Seconds keyValidForInterval)
+    : KeysCollectionCacheReader(purpose, client),
       _purpose(std::move(purpose)),
-      _keyValidForInterval(keyValidForInterval) {}
+      _keyValidForInterval(keyValidForInterval),
+      _catalogClient(client) {}
 
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
     OperationContext* opCtx) {
 
     auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
-    auto keyStatus = Grid::get(opCtx)->catalogClient(opCtx)->getNewKeys(
+    auto keyStatus = _catalogClient->getNewKeys(
         opCtx, _purpose, currentTime, repl::ReadConcernLevel::kLocalReadConcern);
 
     if (!keyStatus.isOK()) {
@@ -95,7 +95,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
 
     if (keyIter == newKeys.cend()) {
         currentKeyExpiresAt = addSeconds(currentTime, _keyValidForInterval);
-        auto status = insertNewKey(opCtx, keyId, _purpose, currentKeyExpiresAt);
+        auto status = insertNewKey(opCtx, _catalogClient, keyId, _purpose, currentKeyExpiresAt);
 
         if (!status.isOK()) {
             return status;
@@ -104,7 +104,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
         keyId++;
     } else if (keyIter->getExpiresAt() < currentTime) {
         currentKeyExpiresAt = addSeconds(currentTime, _keyValidForInterval);
-        auto status = insertNewKey(opCtx, keyId, _purpose, currentKeyExpiresAt);
+        auto status = insertNewKey(opCtx, _catalogClient, keyId, _purpose, currentKeyExpiresAt);
 
         if (!status.isOK()) {
             return status;
@@ -122,14 +122,14 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
     // Note: Convert this block into a loop if more reserved keys are desired.
     if (keyIter == newKeys.cend()) {
         auto reserveKeyExpiresAt = addSeconds(currentKeyExpiresAt, _keyValidForInterval);
-        auto status = insertNewKey(opCtx, keyId, _purpose, reserveKeyExpiresAt);
+        auto status = insertNewKey(opCtx, _catalogClient, keyId, _purpose, reserveKeyExpiresAt);
 
         if (!status.isOK()) {
             return status;
         }
     } else if (keyIter->getExpiresAt() < currentTime) {
         currentKeyExpiresAt = addSeconds(currentKeyExpiresAt, _keyValidForInterval);
-        auto status = insertNewKey(opCtx, keyId, _purpose, currentKeyExpiresAt);
+        auto status = insertNewKey(opCtx, _catalogClient, keyId, _purpose, currentKeyExpiresAt);
 
         if (!status.isOK()) {
             return status;

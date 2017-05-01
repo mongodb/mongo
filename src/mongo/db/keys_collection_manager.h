@@ -45,6 +45,7 @@ namespace mongo {
 class OperationContext;
 class LogicalTime;
 class ServiceContext;
+class ShardingCatalogClient;
 
 /**
  * This is responsible for providing keys that can be used for HMAC computation. This also supports
@@ -52,7 +53,12 @@ class ServiceContext;
  */
 class KeysCollectionManager {
 public:
-    KeysCollectionManager(std::string purpose, Seconds keyValidForInterval);
+    /**
+     * Creates a new instance of key manager. This should outlive the client.
+     */
+    KeysCollectionManager(std::string purpose,
+                          ShardingCatalogClient* client,
+                          Seconds keyValidForInterval);
 
     /**
      * Return a key that is valid for the given time and also matches the keyId. Note that this call
@@ -164,6 +170,7 @@ private:
 
     const std::string _purpose;
     const Seconds _keyValidForInterval;
+    ShardingCatalogClient* _catalogClient;
 
     // No mutex needed since the members below have their own mutexes.
     KeysCollectionCacheReader _keysCache;

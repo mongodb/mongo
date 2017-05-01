@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/config_server_test_fixture.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -58,7 +59,8 @@ protected:
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
-        _keyManager = stdx::make_unique<KeysCollectionManager>("dummy", Seconds(1));
+        auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+        _keyManager = stdx::make_unique<KeysCollectionManager>("dummy", catalogClient, Seconds(1));
     }
 
     void tearDown() override {

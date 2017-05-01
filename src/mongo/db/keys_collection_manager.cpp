@@ -74,10 +74,13 @@ Milliseconds howMuchSleepNeedFor(const LogicalTime& currentTime,
 
 }  // unnamed namespace
 
-KeysCollectionManager::KeysCollectionManager(std::string purpose, Seconds keyValidForInterval)
+KeysCollectionManager::KeysCollectionManager(std::string purpose,
+                                             ShardingCatalogClient* client,
+                                             Seconds keyValidForInterval)
     : _purpose(std::move(purpose)),
       _keyValidForInterval(keyValidForInterval),
-      _keysCache(_purpose) {}
+      _catalogClient(client),
+      _keysCache(_purpose, client) {}
 
 StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForValidation(
     OperationContext* opCtx, long long keyId, const LogicalTime& forThisTime) {
@@ -170,7 +173,8 @@ void KeysCollectionManager::stopMonitoring() {
 void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doEnable) {
     if (doEnable) {
         _refresher.switchFunc(opCtx, [this](OperationContext* opCtx) {
-            KeysCollectionCacheReaderAndUpdater keyGenerator(_purpose, _keyValidForInterval);
+            KeysCollectionCacheReaderAndUpdater keyGenerator(
+                _purpose, _catalogClient, _keyValidForInterval);
             auto keyGenerationStatus = keyGenerator.refresh(opCtx);
 
             if (ErrorCodes::isShutdownError(keyGenerationStatus.getStatus().code())) {

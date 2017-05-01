@@ -33,6 +33,7 @@
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/config_server_test_fixture.h"
+#include "mongo/s/grid.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -40,21 +41,24 @@ namespace mongo {
 using CacheReaderTest = ConfigServerTestFixture;
 
 TEST_F(CacheReaderTest, ErrorsIfCacheIsEmpty) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
     auto status = reader.getKey(LogicalTime(Timestamp(1, 0))).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(CacheReaderTest, RefreshErrorsIfCacheIsEmpty) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
     auto status = reader.refresh(operationContext()).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
@@ -85,7 +89,8 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
 }
 
 TEST_F(CacheReaderTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
@@ -108,7 +113,8 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
 }
 
 TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey0(
         0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
@@ -149,7 +155,8 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
 }
 
 TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey0(
         0, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
@@ -193,7 +200,8 @@ TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
 }
 
 TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
-    KeysCollectionCacheReader reader("test");
+    auto catalogClient = Grid::get(operationContext())->catalogClient(operationContext());
+    KeysCollectionCacheReader reader("test", catalogClient);
 
     KeysCollectionDocument origKey0(
         0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));

@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+class ShardingCatalogClient;
+
 /**
  * Keeps a local cache of the keys with the ability to refresh.
  *
@@ -42,7 +44,7 @@ namespace mongo {
  */
 class KeysCollectionCacheReader : public KeysCollectionCache {
 public:
-    KeysCollectionCacheReader(std::string purpose);
+    KeysCollectionCacheReader(std::string purpose, ShardingCatalogClient* client);
     ~KeysCollectionCacheReader() = default;
 
     /**
@@ -54,6 +56,7 @@ public:
 
 private:
     const std::string _purpose;
+    ShardingCatalogClient* const _catalogClient;
 
     stdx::mutex _cacheMutex;
     std::map<LogicalTime, KeysCollectionDocument> _cache;  // expiresAt -> KeysDocument
