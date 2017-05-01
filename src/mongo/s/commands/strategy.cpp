@@ -123,8 +123,8 @@ void execCommandHandler(OperationContext* opCtx,
     int queryFlags = 0;
     BSONObj cmdObj;
 
-    std::tie(cmdObj, queryFlags) = uassertStatusOK(
-        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata()));
+    std::tie(cmdObj, queryFlags) =
+        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata());
 
     std::string db = request.getDatabase().toString();
     uassert(ErrorCodes::InvalidNamespace,

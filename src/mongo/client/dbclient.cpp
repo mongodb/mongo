@@ -256,8 +256,7 @@ std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarg
     // TODO: This will be downconverted immediately if the underlying
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
-    std::tie(upconvertedCmd, upconvertedMetadata) =
-        uassertStatusOK(rpc::upconvertRequestMetadata(cmd, options));
+    std::tie(upconvertedCmd, upconvertedMetadata) = rpc::upconvertRequestMetadata(cmd, options);
 
     auto commandName = upconvertedCmd.firstElementFieldName();
 

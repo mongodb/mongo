@@ -70,7 +70,7 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     BSONObj upconvertedMetadata;
 
     std::tie(upconvertedCommand, upconvertedMetadata) =
-        uassertStatusOK(rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions));
+        rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions);
 
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);

@@ -41,9 +41,8 @@ LegacyRequest::LegacyRequest(const Message* message)
     : _message(std::move(message)), _dbMessage(*message), _queryMessage(_dbMessage) {
     _database = nsToDatabaseSubstring(_queryMessage.ns);
 
-    std::tie(_upconvertedCommandArgs, _upconvertedMetadata) =
-        uassertStatusOK(rpc::upconvertRequestMetadata(std::move(_queryMessage.query),
-                                                      std::move(_queryMessage.queryOptions)));
+    std::tie(_upconvertedCommandArgs, _upconvertedMetadata) = rpc::upconvertRequestMetadata(
+        std::move(_queryMessage.query), std::move(_queryMessage.queryOptions));
 }
 
 LegacyRequest::~LegacyRequest() = default;

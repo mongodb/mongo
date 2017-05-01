@@ -76,8 +76,8 @@ LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
     BSONObj legacyCommandArgs;
     int queryOptions;
 
-    std::tie(legacyCommandArgs, queryOptions) = uassertStatusOK(
-        rpc::downconvertRequestMetadata(std::move(_commandArgs), std::move(metadata)));
+    std::tie(legacyCommandArgs, queryOptions) =
+        rpc::downconvertRequestMetadata(std::move(_commandArgs), std::move(metadata));
 
     _builder.appendNum(queryOptions);  // queryOptions
     _builder.appendStr(_ns);

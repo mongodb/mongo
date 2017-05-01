@@ -1546,7 +1546,7 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
 
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
-        uassertStatusOK(rpc::readRequestMetadata(opCtx, request.getMetadata()));
+        rpc::readRequestMetadata(opCtx, request.getMetadata());
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
         std::string dbname = request.getDatabase().toString();

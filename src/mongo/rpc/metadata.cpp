@@ -75,7 +75,7 @@ BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
+void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
     BSONElement ssmElem;
     BSONElement auditElem;
     BSONElement configSvrElem;
@@ -100,82 +100,47 @@ Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) 
         }
     }
 
-    auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(ssmElem);
-    if (!swServerSelectionMetadata.isOK()) {
-        return swServerSelectionMetadata.getStatus();
-    }
-    ServerSelectionMetadata::get(opCtx) = std::move(swServerSelectionMetadata.getValue());
+    ServerSelectionMetadata::get(opCtx) =
+        uassertStatusOK(ServerSelectionMetadata::readFromMetadata(ssmElem));
 
-    auto swAuditMetadata = AuditMetadata::readFromMetadata(auditElem);
-    if (!swAuditMetadata.isOK()) {
-        return swAuditMetadata.getStatus();
-    }
-    AuditMetadata::get(opCtx) = std::move(swAuditMetadata.getValue());
+    AuditMetadata::get(opCtx) = uassertStatusOK(AuditMetadata::readFromMetadata(auditElem));
 
-    const auto statusClientMetadata =
-        ClientMetadataIsMasterState::readFromMetadata(opCtx, clientElem);
-    if (!statusClientMetadata.isOK()) {
-        return statusClientMetadata;
-    }
+    uassertStatusOK(ClientMetadataIsMasterState::readFromMetadata(opCtx, clientElem));
 
-    auto configServerMetadata = ConfigServerMetadata::readFromMetadata(configSvrElem);
-    if (!configServerMetadata.isOK()) {
-        return configServerMetadata.getStatus();
-    }
-    ConfigServerMetadata::get(opCtx) = std::move(configServerMetadata.getValue());
+    ConfigServerMetadata::get(opCtx) =
+        uassertStatusOK(ConfigServerMetadata::readFromMetadata(configSvrElem));
 
-    auto trackingMetadata = TrackingMetadata::readFromMetadata(trackingElem);
-    if (!trackingMetadata.isOK()) {
-        return trackingMetadata.getStatus();
-    }
-    TrackingMetadata::get(opCtx) = std::move(trackingMetadata.getValue());
+    TrackingMetadata::get(opCtx) =
+        uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
 
     auto logicalClock = LogicalClock::get(opCtx);
     if (logicalClock) {
-        auto logicalTimeMetadata = rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem);
-        if (!logicalTimeMetadata.isOK()) {
-            return logicalTimeMetadata.getStatus();
-        }
+        auto logicalTimeMetadata =
+            uassertStatusOK(rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem));
 
-        auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
+        auto& signedTime = logicalTimeMetadata.getSignedTime();
         // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
         // default constructed SignedLogicalTime should be ignored.
-        if (signedTime.getTime() == LogicalTime::kUninitialized) {
-            return Status::OK();
-        }
-
-        auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
-        if (isAuthorizedToAdvanceClock(opCtx)) {
-            if (logicalTimeValidator) {
-                logicalTimeValidator->updateCacheTrustedSource(signedTime);
-            }
-        } else if (!logicalTimeValidator) {
-            return Status(ErrorCodes::CannotVerifyAndSignLogicalTime,
+        if (signedTime.getTime() != LogicalTime::kUninitialized) {
+            auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
+            if (isAuthorizedToAdvanceClock(opCtx)) {
+                if (logicalTimeValidator) {
+                    logicalTimeValidator->updateCacheTrustedSource(signedTime);
+                }
+            } else if (!logicalTimeValidator) {
+                uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
                           "Cannot accept logicalTime: " + signedTime.getTime().toString() +
                               ". May not be a part of a sharded cluster");
-        } else {
-            auto advanceClockStatus = logicalTimeValidator->validate(signedTime);
-
-            if (!advanceClockStatus.isOK()) {
-                return advanceClockStatus;
+            } else {
+                uassertStatusOK(logicalTimeValidator->validate(signedTime));
             }
+
+            uassertStatusOK(logicalClock->advanceClusterTime(signedTime.getTime()));
         }
-
-        logicalClock->advanceClusterTime(signedTime.getTime());
     }
-
-    return Status::OK();
 }
 
-Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) {
-    auto ssStatus = ServerSelectionMetadata::get(opCtx).writeToMetadata(metadataBob);
-    if (!ssStatus.isOK()) {
-        return ssStatus;
-    }
-    return Status::OK();
-}
-
-StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
+CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
     // We can reuse the same metadata BOB for every upconvert call, but we need to keep
     // making new command BOBs as each metadata bob will need to remove fields. We can not use
     // mutablebson here because the ServerSelectionMetadata upconvert routine performs
@@ -186,72 +151,38 @@ StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, in
     // Ordering is important here - ServerSelectionMetadata must be upconverted
     // first, then AuditMetadata.
     BSONObjBuilder ssmCommandBob;
-    auto upconvertStatus =
-        ServerSelectionMetadata::upconvert(legacyCmdObj, queryFlags, &ssmCommandBob, &metadataBob);
-    if (!upconvertStatus.isOK()) {
-        return upconvertStatus;
-    }
-
+    uassertStatusOK(
+        ServerSelectionMetadata::upconvert(legacyCmdObj, queryFlags, &ssmCommandBob, &metadataBob));
 
     BSONObjBuilder auditCommandBob;
-    upconvertStatus =
-        AuditMetadata::upconvert(ssmCommandBob.done(), queryFlags, &auditCommandBob, &metadataBob);
-
-    if (!upconvertStatus.isOK()) {
-        return upconvertStatus;
-    }
-
+    uassertStatusOK(
+        AuditMetadata::upconvert(ssmCommandBob.done(), queryFlags, &auditCommandBob, &metadataBob));
 
     return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
 }
 
-StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
+LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
     int legacyQueryFlags = 0;
     BSONObjBuilder auditCommandBob;
     // Ordering is important here - AuditingMetadata must be downconverted first,
     // then ServerSelectionMetadata.
-    auto downconvertStatus =
-        AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags);
-
-    if (!downconvertStatus.isOK()) {
-        return downconvertStatus;
-    }
+    uassertStatusOK(
+        AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags));
 
 
     BSONObjBuilder ssmCommandBob;
-    downconvertStatus = ServerSelectionMetadata::downconvert(
-        auditCommandBob.done(), metadata, &ssmCommandBob, &legacyQueryFlags);
-    if (!downconvertStatus.isOK()) {
-        return downconvertStatus;
-    }
-
+    uassertStatusOK(ServerSelectionMetadata::downconvert(
+        auditCommandBob.done(), metadata, &ssmCommandBob, &legacyQueryFlags));
 
     return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
 }
 
-StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(const BSONObj& legacyReply) {
+CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply) {
     BSONObjBuilder commandReplyBob;
     BSONObjBuilder metadataBob;
 
-    auto upconvertStatus = ShardingMetadata::upconvert(legacyReply, &commandReplyBob, &metadataBob);
-    if (!upconvertStatus.isOK()) {
-        return upconvertStatus;
-    }
-
+    uassertStatusOK(ShardingMetadata::upconvert(legacyReply, &commandReplyBob, &metadataBob));
     return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
-}
-
-StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
-                                             const BSONObj& replyMetadata) {
-    BSONObjBuilder legacyCommandReplyBob;
-
-    auto downconvertStatus =
-        ShardingMetadata::downconvert(commandReply, replyMetadata, &legacyCommandReplyBob);
-    if (!downconvertStatus.isOK()) {
-        return downconvertStatus;
-    }
-
-    return legacyCommandReplyBob.obj();
 }
 
 }  // namespace rpc

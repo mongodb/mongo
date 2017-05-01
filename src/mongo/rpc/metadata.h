@@ -53,12 +53,7 @@ BSONObj makeEmptyMetadata();
 /**
  * Reads metadata from a metadata object and sets it on this OperationContext.
  */
-Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj);
-
-/**
- * Writes metadata from an OperationContext to a metadata object.
- */
-Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob);
+void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj);
 
 /**
  * A command object and a corresponding metadata object.
@@ -75,13 +70,13 @@ using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
  * Given a legacy command object and a query flags bitfield, attempts to parse and remove
  * the metadata from the command object and construct a corresponding metadata object.
  */
-StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags);
+CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags);
 
 /**
  * Given a command object and a metadata object, attempts to construct a legacy command
  * object and query flags bitfield augmented with the given metadata.
  */
-StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata);
+LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata);
 
 /**
  * A command reply and associated metadata object.
@@ -92,14 +87,7 @@ using CommandReplyWithMetadata = std::tuple<BSONObj, BSONObj>;
  * Given a legacy command reply, attempts to strip the metadata from the reply and construct
  * a metadata object.
  */
-StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(const BSONObj& legacyReply);
-
-/**
- * Given a command reply object and an associated metadata object,
- * attempts to construct a legacy command object.
- */
-StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
-                                             const BSONObj& replyMetadata);
+CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply);
 
 /**
  * A function type for writing request metadata. The function takes a pointer to an optional
