@@ -91,7 +91,7 @@ public:
     explicit OpMsgRequest(OpMsg msg) : _msg(std::move(msg)) {}
     StringData getDatabase() const override {
         if (auto db = _msg.body["$db"]) {
-            return db.valueStringData();
+            return db.checkAndGetStringData();
         }
         return "admin";
     }
