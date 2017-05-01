@@ -130,11 +130,11 @@ public:
                 continue;
             }
 
-            const OperationContext* opCtx = client->getOperationContext();
+            const OperationContext* clientOpCtx = client->getOperationContext();
 
             if (!includeAll) {
                 // Skip over inactive connections.
-                if (!opCtx)
+                if (!clientOpCtx)
                     continue;
             }
 
@@ -153,18 +153,18 @@ public:
             }
 
             // Operation context specific information
-            infoBuilder.appendBool("active", static_cast<bool>(opCtx));
-            if (opCtx) {
-                infoBuilder.append("opid", opCtx->getOpID());
-                if (opCtx->isKillPending()) {
+            infoBuilder.appendBool("active", static_cast<bool>(clientOpCtx));
+            if (clientOpCtx) {
+                infoBuilder.append("opid", clientOpCtx->getOpID());
+                if (clientOpCtx->isKillPending()) {
                     infoBuilder.append("killPending", true);
                 }
 
-                CurOp::get(opCtx)->reportState(&infoBuilder);
+                CurOp::get(clientOpCtx)->reportState(&infoBuilder);
 
                 // LockState
                 Locker::LockerInfo lockerInfo;
-                opCtx->lockState()->getLockerInfo(&lockerInfo);
+                clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
                 fillLockerInfo(lockerInfo, infoBuilder);
             }
 

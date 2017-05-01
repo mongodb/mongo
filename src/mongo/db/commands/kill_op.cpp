@@ -140,9 +140,9 @@ public:
         auto swLkAndOp = _findOp(opCtx->getClient(), opId);
         if (swLkAndOp.isOK()) {
             stdx::unique_lock<Client> lk;
-            OperationContext* opCtx;
-            std::tie(lk, opCtx) = std::move(swLkAndOp.getValue());
-            opCtx->getServiceContext()->killOperation(opCtx);
+            OperationContext* opCtxToKill;
+            std::tie(lk, opCtxToKill) = std::move(swLkAndOp.getValue());
+            opCtx->getServiceContext()->killOperation(opCtxToKill);
         }
 
         return true;

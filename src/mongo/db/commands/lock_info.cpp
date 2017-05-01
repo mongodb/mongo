@@ -91,16 +91,16 @@ public:
             invariant(client);
 
             stdx::lock_guard<Client> lk(*client);
-            const OperationContext* opCtx = client->getOperationContext();
+            const OperationContext* clientOpCtx = client->getOperationContext();
 
             // Operation context specific information
-            if (opCtx) {
+            if (clientOpCtx) {
                 BSONObjBuilder infoBuilder;
                 // The client information
                 client->reportState(infoBuilder);
 
-                infoBuilder.append("opid", opCtx->getOpID());
-                LockerId lockerId = opCtx->lockState()->getId();
+                infoBuilder.append("opid", clientOpCtx->getOpID());
+                LockerId lockerId = clientOpCtx->lockState()->getId();
                 lockToClientMap.insert({lockerId, infoBuilder.obj()});
             }
         }

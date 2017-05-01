@@ -637,9 +637,9 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
             startCompleted();
         }
         // Repair local db (to compact it).
-        auto opCtx = cc().makeOperationContext();
-        uassertStatusOK(_externalState->runRepairOnLocalDB(opCtx.get()));
-        _externalState->startSteadyStateReplication(opCtx.get(), this);
+        auto opCtxHolder = cc().makeOperationContext();
+        uassertStatusOK(_externalState->runRepairOnLocalDB(opCtxHolder.get()));
+        _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
     };
 
     std::shared_ptr<InitialSyncer> initialSyncerCopy;

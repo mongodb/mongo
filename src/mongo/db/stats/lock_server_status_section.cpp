@@ -59,8 +59,9 @@ public:
             invariant(client);
             stdx::unique_lock<Client> uniqueLock(*client);
 
-            const OperationContext* opCtx = client->getOperationContext();
-            auto state = opCtx ? opCtx->lockState()->getClientState() : Locker::kInactive;
+            const OperationContext* clientOpCtx = client->getOperationContext();
+            auto state =
+                clientOpCtx ? clientOpCtx->lockState()->getClientState() : Locker::kInactive;
             invariant(state < sizeof(clientStatusCounts));
             clientStatusCounts[state]++;
         }
