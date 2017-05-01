@@ -204,6 +204,9 @@ NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {
 }
 
 void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {
+    LOG(2) << "Request " << _request.id << " finished with response: "
+           << (status.getStatus().isOK() ? status.getValue().data.toString()
+                                         : status.getStatus().toString());
     _onFinish(status);
 }
 
