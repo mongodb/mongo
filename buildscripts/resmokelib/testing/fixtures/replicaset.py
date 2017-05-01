@@ -22,6 +22,7 @@ class ReplicaSetFixture(interface.ReplFixture):
     """
 
     # Error response codes copied from mongo/base/error_codes.err.
+    _ALREADY_INITIALIZED = 23
     _NODE_NOT_FOUND = 74
 
     def __init__(self,
@@ -35,7 +36,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                  start_initial_sync_node=False,
                  write_concern_majority_journal_default=None,
                  auth_options=None,
-                 replset_config_options=None):
+                 replset_config_options=None,
+                 voting_secondaries=True):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
@@ -47,6 +49,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
+        self.voting_secondaries = voting_secondaries
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -97,9 +100,10 @@ class ReplicaSetFixture(interface.ReplFixture):
             member_info = {"_id": i, "host": node.get_connection_string()}
             if i > 0:
                 member_info["priority"] = 0
-            if i >= 7:
-                # Only 7 nodes in a replica set can vote, so the other members must be non-voting.
-                member_info["votes"] = 0
+                if i >= 7 or not self.voting_secondaries:
+                    # Only 7 nodes in a replica set can vote, so the other members must still be
+                    # non-voting when this fixture is configured to have voting secondaries.
+                    member_info["votes"] = 0
             members.append(member_info)
         if self.initial_sync_node:
             members.append({"_id": self.initial_sync_node_idx,
@@ -164,6 +168,11 @@ class ReplicaSetFixture(interface.ReplFixture):
                 client.admin.command(cmd_obj)
                 break
             except pymongo.errors.OperationFailure as err:
+                # Ignore errors from the "replSetInitiate" command when the replica set has already
+                # been initiated.
+                if err.code == ReplicaSetFixture._ALREADY_INITIALIZED:
+                    return
+
                 # Retry on NodeNotFound errors from the "replSetInitiate" command.
                 if err.code != ReplicaSetFixture._NODE_NOT_FOUND:
                     raise

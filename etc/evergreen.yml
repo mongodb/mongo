@@ -2128,6 +2128,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_kill_secondaries_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: mongosTest
   commands:
   - func: "do setup"
@@ -4938,6 +4949,9 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
     distros:
     - windows-64-vs2015-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_jscore_passthrough
@@ -5377,6 +5391,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_jscore_passthrough
@@ -5646,6 +5661,9 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
     distros:
     - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+    distros:
+    - rhel62-large
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
@@ -5864,6 +5882,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: replica_sets_resync_static_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
     distros:
     - rhel62-large
   - name: master_slave
@@ -8341,6 +8362,7 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8514,6 +8536,7 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough_WT
+  - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
