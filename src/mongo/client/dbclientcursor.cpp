@@ -104,19 +104,21 @@ int DBClientCursor::nextBatchSize() {
 void DBClientCursor::_assembleInit(Message& toSend) {
     // If we haven't gotten a cursorId yet, we need to issue a new query or command.
     if (!cursorId) {
-        // HACK:
-        // Unfortunately, this code is used by the shell to run commands,
-        // so we need to allow the shell to send invalid options so that we can
-        // test that the server rejects them. Thus, to allow generating commands with
-        // invalid options, we validate them here, and fall back to generating an OP_QUERY
-        // through assembleQueryRequest if the options are invalid.
+        if (_isCommand) {
+            // HACK:
+            // Unfortunately, this code is used by the shell to run commands,
+            // so we need to allow the shell to send invalid options so that we can
+            // test that the server rejects them. Thus, to allow generating commands with
+            // invalid options, we validate them here, and fall back to generating an OP_QUERY
+            // through assembleQueryRequest if the options are invalid.
+            bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
+            bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
+            bool hasInvalidMaxTimeMs = query.hasField("$maxTimeMS");
 
-        bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
-        bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
-
-        if (_isCommand && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
-            toSend = assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query);
-            return;
+            if (hasValidNToReturnForCommand && hasValidFlagsForCommand && !hasInvalidMaxTimeMs) {
+                toSend = assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query);
+                return;
+            }
         }
         assembleQueryRequest(ns, query, nextBatchSize(), nToSkip, fieldsToReturn, opts, toSend);
         return;

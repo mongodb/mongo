@@ -271,15 +271,9 @@ cursor._ensureSpecial();
 assert.eq(0, cursor.next().ok);
 
 // Verify that the $maxTimeMS query option can't be sent with $query-wrapped commands.
-// the shell will throw here as it will validate itself when sending the command.
-// The server uses the same logic.
-// TODO: rewrite to use runCommandWithMetadata when we have a shell helper so that
-// we can test server side validation.
-assert.throws(function() {
-    cursor = t.getDB().$cmd.find({ping: 1}).limit(-1).maxTimeMS(0);
-    cursor._ensureSpecial();
-    cursor.next();
-});
+cursor = t.getDB().$cmd.find({ping: 1}).limit(-1).maxTimeMS(0);
+cursor._ensureSpecial();
+assert.commandFailed(cursor.next());
 
 //
 // Tests for fail points maxTimeAlwaysTimeOut and maxTimeNeverTimeOut.
