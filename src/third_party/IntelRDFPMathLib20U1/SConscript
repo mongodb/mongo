@@ -340,6 +340,9 @@ env.Library(
     target='intel_decimal128',
     source=source_files,
     LIBS=libs,
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ]
 )
 
 readtest = env.Program(

@@ -51,6 +51,9 @@ debuggerEnv.Library(
     LIBDEPS=[
         # NOTE: You *must not* add any library dependencies to the debugger library
     ],
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ]
 )
 
 env.Library(

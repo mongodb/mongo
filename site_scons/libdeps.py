@@ -350,25 +350,44 @@ def setup_environment(env, emitting_shared=False):
         env['_LIBDEPS'] = '$_LIBDEPS_LIBS'
 
     env['_LIBDEPS_TAGS'] = expand_libdeps_tags
-
-    env['_LIBDEPS_LIBS'] = get_libdeps
-
+    env['_LIBDEPS_GET_LIBS'] = get_libdeps
     env['_LIBDEPS_OBJS'] = get_libdeps_objs
     env['_SYSLIBDEPS'] = get_syslibdeps
-    env['_SHLIBDEPS'] = '$SHLIBDEP_GROUP_START ${_concat(SHLIBDEPPREFIX, __env__.subst(_LIBDEPS, target=TARGET, source=SOURCE), SHLIBDEPSUFFIX, __env__, target=TARGET, source=SOURCE)} $SHLIBDEP_GROUP_END'
 
     env[libdeps_env_var] = SCons.Util.CLVar()
     env[syslibdeps_env_var] = SCons.Util.CLVar()
+
     env.Append(LIBEMITTER=libdeps_emitter)
     if emitting_shared:
+        env['_LIBDEPS_LIBS'] = '$_LIBDEPS_GET_LIBS'
         env.Append(
             PROGEMITTER=shlibdeps_emitter,
             SHLIBEMITTER=shlibdeps_emitter)
     else:
+
+        def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
+            result = []
+            libs = get_libdeps(source, target, env, for_signature)
+            for lib in libs:
+                if 'init-no-global-side-effects' in env.Entry(lib).get_env().get('LIBDEPS_TAGS', []):
+                    result.append(str(lib))
+                else:
+                    result.extend(env.subst('$LINK_WHOLE_ARCHIVE_LIB_START'
+                                            '$TARGET'
+                                            '$LINK_WHOLE_ARCHIVE_LIB_END', target=lib).split())
+            return result
+
+        env['_LIBDEPS_LIBS_WITH_TAGS'] = expand_libdeps_with_extraction_flags
+
+        env['_LIBDEPS_LIBS'] = ('$LINK_WHOLE_ARCHIVE_START '
+                                '$LINK_LIBGROUP_START '
+                                '$_LIBDEPS_LIBS_WITH_TAGS '
+                                '$LINK_LIBGROUP_END '
+                                '$LINK_WHOLE_ARCHIVE_END')
         env.Append(
             PROGEMITTER=libdeps_emitter,
             SHLIBEMITTER=libdeps_emitter)
-    env.Prepend(_LIBFLAGS=' $_LIBDEPS_TAGS $LINK_WHOLE_ARCHIVE_START $LINK_LIBGROUP_START $_LIBDEPS $LINK_LIBGROUP_END $LINK_WHOLE_ARCHIVE_END $_SYSLIBDEPS ')
+    env.Prepend(_LIBFLAGS='$_LIBDEPS_TAGS $_LIBDEPS $_SYSLIBDEPS ')
     for builder_name in ('Program', 'SharedLibrary', 'LoadableModule'):
         try:
             update_scanner(env['BUILDERS'][builder_name])

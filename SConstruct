@@ -1181,8 +1181,8 @@ elif has_option("release") and link_model != "object":
 
 # The only link model currently supported on Windows is 'object', since there is no equivalent
 # to --whole-archive.
-if env.TargetOSIs('windows') and link_model != 'object':
-    env.FatalError("Windows builds must use the 'object' link model");
+if env.TargetOSIs('windows') and link_model not in ['object', 'static']:
+    env.FatalError("Windows builds must use the 'object' or 'static' link models");
 
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
@@ -1366,18 +1366,24 @@ libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")
 if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
-    env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,--whole-archive'
-    env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,--no-whole-archive'
+    # NOTE: The leading and trailing spaces here are important. Do not remove them.
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,--whole-archive '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,--no-whole-archive'
 elif env.TargetOSIs('darwin'):
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
-    env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,-all_load'
-    env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,-noall_load'
+    # NOTE: The trailing space here is important. Do not remove it.
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-force_load '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 elif env.TargetOSIs('solaris'):
     env['LINK_LIBGROUP_START'] = '-z rescan-start'
     env['LINK_LIBGROUP_END'] = '-z rescan-end'
-    env['LINK_WHOLE_ARCHIVE_START'] = '-z allextract'
-    env['LINK_WHOLE_ARCHIVE_END'] = '-z defaultextract'
+    # NOTE: The leading and trailing spaces here are important. Do not remove them.
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-z allextract '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -z defaultextract'
+elif env.TargetOSIs('windows'):
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '/WHOLEARCHIVE:'
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 
 # ---- other build setup -----
 if debugBuild:
