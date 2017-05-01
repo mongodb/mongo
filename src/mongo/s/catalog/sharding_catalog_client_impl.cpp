@@ -1509,8 +1509,10 @@ void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* opCtx,
     }
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    *batchResponse = configShard->runBatchWriteCommandOnConfig(
-        opCtx, batchRequest, Shard::RetryPolicy::kNotIdempotent);
+    *batchResponse = configShard->runBatchWriteCommand(opCtx,
+                                                       Shard::kDefaultConfigCommandTimeout,
+                                                       batchRequest,
+                                                       Shard::RetryPolicy::kNotIdempotent);
 }
 
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
@@ -1532,8 +1534,8 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        auto response =
-            configShard->runBatchWriteCommandOnConfig(opCtx, request, Shard::RetryPolicy::kNoRetry);
+        auto response = configShard->runBatchWriteCommand(
+            opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1615,8 +1617,8 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response =
-        configShard->runBatchWriteCommandOnConfig(opCtx, request, Shard::RetryPolicy::kIdempotent);
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1647,9 +1649,8 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     request.setWriteConcern(writeConcern.toBSON());
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response =
-        configShard->runBatchWriteCommandOnConfig(opCtx, request, Shard::RetryPolicy::kIdempotent);
-
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
     return response.toStatus();
 }
 

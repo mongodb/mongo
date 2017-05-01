@@ -190,12 +190,14 @@ public:
         RetryPolicy retryPolicy);
 
     /**
-     * Expects a single-entry batch wrtie command and runs it on the config server's primary using
-     * the specified retry policy.
+     * Runs a write command against a shard. This is separate from runCommand, because write
+     * commands return errors in a different format than regular commands do, so checking for
+     * retriable errors must be done differently.
      */
-    BatchedCommandResponse runBatchWriteCommandOnConfig(OperationContext* opCtx,
-                                                        const BatchedCommandRequest& batchRequest,
-                                                        RetryPolicy retryPolicy);
+    BatchedCommandResponse runBatchWriteCommand(OperationContext* opCtx,
+                                                const Milliseconds maxTimeMS,
+                                                const BatchedCommandRequest& batchRequest,
+                                                RetryPolicy retryPolicy);
 
     /**
     * Warning: This method exhausts the cursor and pulls all data into memory.

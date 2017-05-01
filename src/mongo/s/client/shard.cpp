@@ -182,26 +182,29 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     MONGO_UNREACHABLE;
 }
 
-BatchedCommandResponse Shard::runBatchWriteCommandOnConfig(
-    OperationContext* opCtx, const BatchedCommandRequest& batchRequest, RetryPolicy retryPolicy) {
-    invariant(isConfig());
+BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
+                                                   const Milliseconds maxTimeMS,
+                                                   const BatchedCommandRequest& batchRequest,
+                                                   RetryPolicy retryPolicy) {
+    // Cluster metadata writes are not done in batches.
+    if (isConfig()) {
+        invariant(batchRequest.sizeWriteOps() == 1);
+    }
 
     const std::string dbname = batchRequest.getNS().db().toString();
-    invariant(batchRequest.sizeWriteOps() == 1);
 
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto swResponse = _runCommand(opCtx,
-                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                      dbname,
-                                      kDefaultConfigCommandTimeout,
-                                      cmdObj);
+        // Note: write commands can only be issued against a primary.
+        auto swResponse = _runCommand(
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, dbname, maxTimeMS, cmdObj);
 
         BatchedCommandResponse batchResponse;
         auto writeStatus = CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
         if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
-            LOG(2) << "Batch write command failed with retriable error and will be retried"
+            LOG(2) << "Batch write command to " << getId()
+                   << " failed with retriable error and will be retried"
                    << causedBy(redact(writeStatus));
             continue;
         }
