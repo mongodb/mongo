@@ -1355,6 +1355,7 @@ void InitialSyncer::_cancelHandle_inlock(executor::TaskExecutor::CallbackHandle 
 template <typename Component>
 Status InitialSyncer::_startupComponent_inlock(Component& component) {
     if (_isShuttingDown_inlock()) {
+        component.reset();
         return Status(ErrorCodes::CallbackCanceled,
                       "initial syncer shutdown while trying to call startup() on component");
     }
