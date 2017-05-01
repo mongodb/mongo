@@ -112,13 +112,11 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
     }
 
     if (authSession->getAuthorizationManager().isAuthEnabled()) {
-        auto advanceClockStatus = logicalTimeValidator->validate(signedTime);
+        auto advanceClockStatus = logicalTimeValidator->validate(opCtx, signedTime);
 
         if (!advanceClockStatus.isOK()) {
             return advanceClockStatus;
         }
-    } else {
-        logicalTimeValidator->updateCacheTrustedSource(signedTime);
     }
 
     return logicalClock->advanceClusterTime(signedTime.getTime());
@@ -129,7 +127,8 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
     auto validator = LogicalTimeValidator::get(opCtx);
-    auto currentTime = validator->signLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+    auto currentTime =
+        validator->signLogicalTime(opCtx, LogicalClock::get(opCtx)->getClusterTime());
     rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
     logicalTimeMetadata.writeToMetadata(responseBuilder);
     auto tracker = OperationTimeTracker::get(opCtx);

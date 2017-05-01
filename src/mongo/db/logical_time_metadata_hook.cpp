@@ -49,7 +49,7 @@ Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
     }
 
     auto newTime = LogicalClock::get(_service)->getClusterTime();
-    LogicalTimeMetadata metadata(validator->signLogicalTime(newTime));
+    LogicalTimeMetadata metadata(validator->trySignLogicalTime(newTime));
     metadata.writeToMetadata(metadataBob);
     return Status::OK();
 }
@@ -67,11 +67,6 @@ Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
     // default constructed SignedLogicalTime should be ignored.
     if (signedTime.getTime() == LogicalTime::kUninitialized) {
         return Status::OK();
-    }
-
-    auto validator = LogicalTimeValidator::get(_service);
-    if (validator) {
-        validator->updateCacheTrustedSource(signedTime);
     }
 
     return LogicalClock::get(_service)->advanceClusterTime(signedTime.getTime());

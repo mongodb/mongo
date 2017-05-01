@@ -38,6 +38,8 @@ namespace mongo {
 
 class OperationContext;
 class ServiceContext;
+class KeysCollectionDocument;
+class KeysCollectionManager;
 
 /**
  * This is responsible for signing logical times that can be used to sent to other servers and
@@ -50,26 +52,52 @@ public:
     static LogicalTimeValidator* get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalTimeValidator> validator);
 
+    explicit LogicalTimeValidator(std::unique_ptr<KeysCollectionManager> keyManager);
+
+    /**
+     * Tries to sign the newTime with a valid signature. Can return an empty signature and keyId
+     * of 0 if it cannot find valid key for newTime.
+     */
+    SignedLogicalTime trySignLogicalTime(const LogicalTime& newTime);
+
     /**
      * Returns the newTime with a valid signature.
      */
-    SignedLogicalTime signLogicalTime(const LogicalTime& newTime);
+    SignedLogicalTime signLogicalTime(OperationContext* opCtx, const LogicalTime& newTime);
 
     /**
      * Returns true if the signature of newTime is valid.
      */
-    Status validate(const SignedLogicalTime& newTime);
+    Status validate(OperationContext* opCtx, const SignedLogicalTime& newTime);
 
     /**
-     * Saves the newTime if it is newer than the last seen valid LogicalTime without performing
-     * validation.
+     * Initializes this validator. This should be called first before the other methods can be used.
      */
-    void updateCacheTrustedSource(const SignedLogicalTime& newTime);
+    void init(ServiceContext* service);
+
+    /**
+     * Cleans up this validator. This will no longer be usable after this is called.
+     */
+    void shutDown();
+
+    /**
+     * Enable writing new keys to the config server primary. Should only be called if current node
+     * is the config primary.
+     */
+    void enableKeyGenerator(OperationContext* opCtx, bool doEnable);
+
+    /**
+     * Returns true if client has sufficient privilege to advance clock.
+     */
+    static bool isAuthorizedToAdvanceClock(OperationContext* opCtx);
 
 private:
+    SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
+
     stdx::mutex _mutex;
     SignedLogicalTime _lastSeenValidTime;
     TimeProofService _timeProofService;
+    std::unique_ptr<KeysCollectionManager> _keyManager;
 };
 
 }  // namespace mongo

@@ -37,8 +37,10 @@
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -96,6 +98,8 @@ using executor::ThreadPoolTaskExecutor;
 using executor::ShardingTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
+const std::string kKeyManagerPurposeString = "SigningClusterTime";
+const Seconds kKeyValidInterval(3 * 30 * 24 * 60 * 60);  // ~3 months
 
 auto makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
@@ -200,7 +204,8 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         makeTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
     auto rawCatalogManager = catalogManager.get();
 
-    grid.init(
+    auto grid = Grid::get(opCtx);
+    grid->init(
         std::move(catalogClient),
         std::move(catalogManager),
         std::move(catalogCache),
@@ -211,7 +216,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         networkPtr);
 
     // must be started once the grid is initialized
-    grid.shardRegistry()->startup(opCtx);
+    grid->shardRegistry()->startup(opCtx);
 
     auto status = rawCatalogClient->startup();
     if (!status.isOK()) {
@@ -226,9 +231,18 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         }
     }
 
-    LogicalTimeValidator::set(opCtx->getServiceContext(),
-                              stdx::make_unique<LogicalTimeValidator>());
+    auto keyManager = stdx::make_unique<KeysCollectionManager>(
+        kKeyManagerPurposeString, grid->catalogClient(opCtx), kKeyValidInterval);
+    keyManager->startMonitoring(opCtx->getServiceContext());
 
+    LogicalTimeValidator::set(opCtx->getServiceContext(),
+                              stdx::make_unique<LogicalTimeValidator>(std::move(keyManager)));
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        replCoord->getMemberState().primary()) {
+        LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, true);
+    }
     return Status::OK();
 }
 

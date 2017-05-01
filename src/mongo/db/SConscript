@@ -1058,6 +1058,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'logical_time_validator',
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 

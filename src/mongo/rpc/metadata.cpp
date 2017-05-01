@@ -30,12 +30,7 @@
 
 #include "mongo/rpc/metadata.h"
 
-#include "mongo/base/init.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
@@ -48,27 +43,6 @@
 
 namespace mongo {
 namespace rpc {
-
-namespace {
-
-std::vector<Privilege> advanceLogicalClockPrivilege;
-
-MONGO_INITIALIZER(InitializeAdvanceLogicalClockPrivilegeVector)(InitializerContext* const) {
-    ActionSet actions;
-    actions.addAction(ActionType::internal);
-    advanceLogicalClockPrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
-    return Status::OK();
-}
-
-bool isAuthorizedToAdvanceClock(OperationContext* opCtx) {
-    auto client = opCtx->getClient();
-    // Note: returns true if auth is off, courtesy of
-    // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.
-    return AuthorizationSession::get(client)->isAuthorizedForPrivileges(
-        advanceLogicalClockPrivilege);
-}
-
-}  // unnamed namespace
 
 BSONObj makeEmptyMetadata() {
     return BSONObj();
@@ -124,16 +98,14 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
         // default constructed SignedLogicalTime should be ignored.
         if (signedTime.getTime() != LogicalTime::kUninitialized) {
             auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
-            if (isAuthorizedToAdvanceClock(opCtx)) {
-                if (logicalTimeValidator) {
-                    logicalTimeValidator->updateCacheTrustedSource(signedTime);
+            if (!LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                if (!logicalTimeValidator) {
+                    uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
+                              "Cannot accept logicalTime: " + signedTime.getTime().toString() +
+                                  ". May not be a part of a sharded cluster");
+                } else {
+                    uassertStatusOK(logicalTimeValidator->validate(opCtx, signedTime));
                 }
-            } else if (!logicalTimeValidator) {
-                uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
-                          "Cannot accept logicalTime: " + signedTime.getTime().toString() +
-                              ". May not be a part of a sharded cluster");
-            } else {
-                uassertStatusOK(logicalTimeValidator->validate(signedTime));
             }
 
             uassertStatusOK(logicalClock->advanceClusterTime(signedTime.getTime()));

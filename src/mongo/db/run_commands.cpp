@@ -226,15 +226,18 @@ void appendReplyMetadata(OperationContext* opCtx,
         if (isShardingAware || isConfig) {
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                 .writeToMetadata(metadataBob);
-        }
-
-        auto validator = LogicalTimeValidator::get(opCtx);
-        if (validator) {
-
-            auto currentTime =
-                validator->signLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-            logicalTimeMetadata.writeToMetadata(metadataBob);
+            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+                // No need to sign logical times for internal clients.
+                SignedLogicalTime currentTime(
+                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+                auto currentTime =
+                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            }
         }
     }
 

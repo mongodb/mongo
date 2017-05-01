@@ -72,6 +72,7 @@ const string escapeTable[256] = {
     ".252", ".253", ".254", ".255"};
 
 const char kConfigCollection[] = "admin.system.version";
+const char kLogicalTimeKeysCollection[] = "admin.system.keys";
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
@@ -89,6 +90,8 @@ bool legalClientSystemNS(StringData ns) {
     if (ns == "admin.system.roles")
         return true;
     if (ns == kConfigCollection)
+        return true;
+    if (ns == kLogicalTimeKeysCollection)
         return true;
     if (ns == "admin.system.new_users")
         return true;

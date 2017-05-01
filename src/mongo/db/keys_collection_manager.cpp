@@ -96,28 +96,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForValidation(
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionManager::getKeyForSigning(
-    OperationContext* opCtx, const LogicalTime& forThisTime) {
-
-    auto keyStatusWith = _getKey(forThisTime);
-    auto keyStatus = keyStatusWith.getStatus();
-
-    if (keyStatus != ErrorCodes::KeyNotFound) {
-        return keyStatusWith;
-    }
-
-    do {
-        _refresher.refreshNow(opCtx);
-
-        keyStatusWith = _getKey(forThisTime);
-        keyStatus = keyStatusWith.getStatus();
-
-        if (keyStatus == ErrorCodes::KeyNotFound) {
-            sleepFor(kRefreshIntervalIfErrored);
-        }
-
-    } while (keyStatus == ErrorCodes::KeyNotFound);
-
-    return keyStatusWith;
+    const LogicalTime& forThisTime) {
+    return _getKey(forThisTime);
 }
 
 StatusWith<KeysCollectionDocument> KeysCollectionManager::_getKeyWithKeyIdCheck(
@@ -158,6 +138,10 @@ StatusWith<KeysCollectionDocument> KeysCollectionManager::_getKey(const LogicalT
     }
 
     return key;
+}
+
+void KeysCollectionManager::refreshNow(OperationContext* opCtx) {
+    _refresher.refreshNow(opCtx);
 }
 
 void KeysCollectionManager::startMonitoring(ServiceContext* service) {
@@ -230,6 +214,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
     while (true) {
         auto opCtx = cc().makeOperationContext();
 
+        bool hasRefreshRequestInitially = false;
         std::shared_ptr<RefreshFunc> doRefresh;
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -240,6 +225,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
             invariant(_doRefresh.get() != nullptr);
             doRefresh = _doRefresh;
+            hasRefreshRequestInitially = _refreshRequest.get() != nullptr;
         }
 
         Milliseconds nextWakeup = kRefreshIntervalIfErrored;
@@ -258,6 +244,11 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         stdx::unique_lock<stdx::mutex> lock(_mutex);
 
         if (_refreshRequest) {
+            if (!hasRefreshRequestInitially) {
+                // A fresh request came in, fulfill the request before going to sleep.
+                continue;
+            }
+
             _refreshRequest->set();
             _refreshRequest.reset();
         }
@@ -290,10 +281,6 @@ void KeysCollectionManager::PeriodicRunner::setFunc(RefreshFunc newRefreshStrate
 void KeysCollectionManager::PeriodicRunner::switchFunc(OperationContext* opCtx,
                                                        RefreshFunc newRefreshStrategy) {
     setFunc(newRefreshStrategy);
-
-    // Note: calling refreshNow will ensure that if there is an ongoing method call to the original
-    // refreshStrategy, it will be finished after this.
-    refreshNow(opCtx);
 }
 
 void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,

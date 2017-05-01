@@ -53,9 +53,6 @@ class ShardingCatalogClient;
  */
 class KeysCollectionManager {
 public:
-    /**
-     * Creates a new instance of key manager. This should outlive the client.
-     */
     KeysCollectionManager(std::string purpose,
                           ShardingCatalogClient* client,
                           Seconds keyValidForInterval);
@@ -71,13 +68,17 @@ public:
                                                            const LogicalTime& forThisTime);
 
     /**
-     * Return a key that is valid for the given time. Note that this call can block if it will need
-     * to do a refresh.
+     * Returns a key that is valid for the given time. Note that unlike getKeyForValidation, this
+     * will never do a refresh.
      *
      * Throws ErrorCode::ExceededTimeLimit if it times out.
      */
-    StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
-                                                        const LogicalTime& forThisTime);
+    StatusWith<KeysCollectionDocument> getKeyForSigning(const LogicalTime& forThisTime);
+
+    /**
+     * Request this manager to perform a refresh.
+     */
+    void refreshNow(OperationContext* opCtx);
 
     /**
      * Starts a background thread that will constantly update the internal cache of keys.

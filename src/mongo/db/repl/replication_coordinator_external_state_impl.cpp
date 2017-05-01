@@ -48,6 +48,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_metadata_hook.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/bgsync.h"
@@ -688,6 +689,19 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     }
 
     ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (auto validator = LogicalTimeValidator::get(_service)) {
+            auto opCtx = cc().getOperationContext();
+
+            if (opCtx != nullptr) {
+                validator->enableKeyGenerator(opCtx, false);
+            } else {
+                auto opCtxPtr = cc().makeOperationContext();
+                validator->enableKeyGenerator(opCtxPtr.get(), false);
+            }
+        }
+    }
 }
 
 void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook(
@@ -743,6 +757,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         // If this is a config server node becoming a primary, start the balancer
         Balancer::get(opCtx)->initiateBalancer(opCtx);
+
+        if (auto validator = LogicalTimeValidator::get(_service)) {
+            validator->enableKeyGenerator(opCtx, true);
+        }
     } else if (ShardingState::get(opCtx)->enabled()) {
         invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 

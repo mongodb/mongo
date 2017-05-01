@@ -55,6 +55,7 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_metadata_hook.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -146,6 +147,12 @@ static void cleanupTask() {
 
         if (serviceContext)
             serviceContext->setKillAllOperations();
+
+        // Validator shutdown must be called after setKillAllOperations is called. Otherwise, this
+        // can deadlock.
+        if (auto validator = LogicalTimeValidator::get(serviceContext)) {
+            validator->shutDown();
+        }
 
         if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
             cursorManager->shutdown();

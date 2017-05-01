@@ -161,24 +161,6 @@ TEST_F(KeysManagerTest, GetKeyWithoutRefreshShouldReturnRightKey) {
     }
 }
 
-TEST_F(KeysManagerTest, GetKeyForSigningTimesOutIfRefresherIsNotRunning) {
-    operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000));
-
-    ASSERT_THROWS(
-        keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(100, 0))),
-        DBException);
-}
-
-TEST_F(KeysManagerTest, GetKeyForSigningTimesOutIfKeyDoesntExist) {
-    keyManager()->startMonitoring(getServiceContext());
-
-    operationContext()->setDeadlineAfterNowBy(Microseconds(250 * 1000));
-
-    ASSERT_THROWS(
-        keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(100, 0))),
-        DBException);
-}
-
 TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightKey) {
     keyManager()->startMonitoring(getServiceContext());
 
@@ -187,8 +169,9 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightKey) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
 
-    auto keyStatus =
-        keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(100, 0)));
+    keyManager()->refreshNow(operationContext());
+
+    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
     ASSERT_OK(keyStatus.getStatus());
 
     auto key = keyStatus.getValue();
@@ -197,7 +180,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightKey) {
     ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
 }
 
-TEST_F(KeysManagerTest, GetKeyForSigningWithoutRefreshShouldReturnRightKey) {
+TEST_F(KeysManagerTest, GetKeyForSigningShouldReturnRightOldKey) {
     keyManager()->startMonitoring(getServiceContext());
 
     KeysCollectionDocument origKey1(
@@ -209,9 +192,10 @@ TEST_F(KeysManagerTest, GetKeyForSigningWithoutRefreshShouldReturnRightKey) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
 
+    keyManager()->refreshNow(operationContext());
+
     {
-        auto keyStatus =
-            keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(100, 0)));
+        auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 0)));
         ASSERT_OK(keyStatus.getStatus());
 
         auto key = keyStatus.getValue();
@@ -221,8 +205,7 @@ TEST_F(KeysManagerTest, GetKeyForSigningWithoutRefreshShouldReturnRightKey) {
     }
 
     {
-        auto keyStatus =
-            keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(105, 0)));
+        auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(105, 0)));
         ASSERT_OK(keyStatus.getStatus());
 
         auto key = keyStatus.getValue();
@@ -239,9 +222,9 @@ TEST_F(KeysManagerTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
     keyManager()->enableKeyGenerator(operationContext(), true);
+    keyManager()->refreshNow(operationContext());
 
-    auto keyStatus =
-        keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(100, 100)));
+    auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 100)));
     ASSERT_OK(keyStatus.getStatus());
 
     auto key = keyStatus.getValue();
@@ -258,9 +241,9 @@ TEST_F(KeysManagerTest, EnableModeFlipFlopStressTest) {
 
     for (int x = 0; x < 10; x++) {
         keyManager()->enableKeyGenerator(operationContext(), doEnable);
+        keyManager()->refreshNow(operationContext());
 
-        auto keyStatus =
-            keyManager()->getKeyForSigning(operationContext(), LogicalTime(Timestamp(100, 100)));
+        auto keyStatus = keyManager()->getKeyForSigning(LogicalTime(Timestamp(100, 100)));
         ASSERT_OK(keyStatus.getStatus());
 
         auto key = keyStatus.getValue();

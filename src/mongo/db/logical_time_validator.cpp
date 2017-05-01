@@ -30,20 +30,36 @@
 
 #include "mongo/db/logical_time_validator.h"
 
+#include "mongo/base/init.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 namespace {
 const auto getLogicalClockValidator =
     ServiceContext::declareDecoration<std::unique_ptr<LogicalTimeValidator>>();
-stdx::mutex validatorMutex;
 
-// TODO: SERVER-28127 Implement KeysCollectionManager
-// Remove _tempKey and its uses from logical clock, and pass actual key from key manager.
-TimeProofService::Key tempKey = {};
+stdx::mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
+
+std::vector<Privilege> advanceLogicalClockPrivilege;
+
+MONGO_INITIALIZER(InitializeAdvanceLogicalClockPrivilegeVector)(InitializerContext* const) {
+    ActionSet actions;
+    actions.addAction(ActionType::internal);
+    advanceLogicalClockPrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
+    return Status::OK();
 }
+
+Milliseconds kRefreshIntervalIfErrored(200);
+
+}  // unnamed namespace
 
 LogicalTimeValidator* LogicalTimeValidator::get(ServiceContext* service) {
     stdx::lock_guard<stdx::mutex> lk(validatorMutex);
@@ -61,7 +77,13 @@ void LogicalTimeValidator::set(ServiceContext* service,
     validator = std::move(newValidator);
 }
 
-SignedLogicalTime LogicalTimeValidator::signLogicalTime(const LogicalTime& newTime) {
+LogicalTimeValidator::LogicalTimeValidator(std::unique_ptr<KeysCollectionManager> keyManager)
+    : _keyManager(std::move(keyManager)) {}
+
+SignedLogicalTime LogicalTimeValidator::_getProof(const KeysCollectionDocument& keyDoc,
+                                                  LogicalTime newTime) {
+    auto key = keyDoc.getKey();
+
     // Compare and calculate HMAC inside mutex to prevent multiple threads computing HMAC for the
     // same logical time.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -70,8 +92,8 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(const LogicalTime& newTi
         return _lastSeenValidTime;
     }
 
-    auto signature = _timeProofService.getProof(newTime, tempKey);
-    SignedLogicalTime newSignedTime(newTime, std::move(signature), 0);
+    auto signature = _timeProofService.getProof(newTime, key);
+    SignedLogicalTime newSignedTime(newTime, std::move(signature), keyDoc.getKeyId());
 
     if (newTime > _lastSeenValidTime.getTime() || !_lastSeenValidTime.getProof()) {
         _lastSeenValidTime = newSignedTime;
@@ -80,7 +102,40 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(const LogicalTime& newTi
     return newSignedTime;
 }
 
-Status LogicalTimeValidator::validate(const SignedLogicalTime& newTime) {
+SignedLogicalTime LogicalTimeValidator::trySignLogicalTime(const LogicalTime& newTime) {
+    auto keyStatusWith = _keyManager->getKeyForSigning(newTime);
+    auto keyStatus = keyStatusWith.getStatus();
+
+    if (keyStatus == ErrorCodes::KeyNotFound) {
+        // Attach invalid signature and keyId if we don't have the right keys to sign it.
+        return SignedLogicalTime(newTime, TimeProofService::TimeProof(), 0);
+    }
+
+    uassertStatusOK(keyStatus);
+    return _getProof(keyStatusWith.getValue(), newTime);
+}
+
+SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
+                                                        const LogicalTime& newTime) {
+    auto keyStatusWith = _keyManager->getKeyForSigning(newTime);
+    auto keyStatus = keyStatusWith.getStatus();
+
+    while (keyStatus == ErrorCodes::KeyNotFound) {
+        _keyManager->refreshNow(opCtx);
+
+        keyStatusWith = _keyManager->getKeyForSigning(newTime);
+        keyStatus = keyStatusWith.getStatus();
+
+        if (keyStatus == ErrorCodes::KeyNotFound) {
+            sleepFor(kRefreshIntervalIfErrored);
+        }
+    }
+
+    uassertStatusOK(keyStatus);
+    return _getProof(keyStatusWith.getValue(), newTime);
+}
+
+Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogicalTime& newTime) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (newTime.getTime() == _lastSeenValidTime.getTime()) {
@@ -88,12 +143,17 @@ Status LogicalTimeValidator::validate(const SignedLogicalTime& newTime) {
         }
     }
 
+    auto keyStatus = _keyManager->getKeyForValidation(opCtx, newTime.getKeyId(), newTime.getTime());
+    uassertStatusOK(keyStatus.getStatus());
+
+    const auto& key = keyStatus.getValue().getKey();
+
     const auto newProof = newTime.getProof();
     // Logical time is only sent if a server's clock can verify and sign logical times, so any
     // received logical times should have proofs.
     invariant(newProof);
 
-    auto res = _timeProofService.checkProof(newTime.getTime(), newProof.get(), tempKey);
+    auto res = _timeProofService.checkProof(newTime.getTime(), newProof.get(), key);
     if (res != Status::OK()) {
         return res;
     }
@@ -101,11 +161,24 @@ Status LogicalTimeValidator::validate(const SignedLogicalTime& newTime) {
     return Status::OK();
 }
 
-void LogicalTimeValidator::updateCacheTrustedSource(const SignedLogicalTime& newTime) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (newTime.getTime() > _lastSeenValidTime.getTime()) {
-        _lastSeenValidTime = newTime;
-    }
+void LogicalTimeValidator::init(ServiceContext* service) {
+    _keyManager->startMonitoring(service);
+}
+
+void LogicalTimeValidator::shutDown() {
+    _keyManager->stopMonitoring();
+}
+
+void LogicalTimeValidator::enableKeyGenerator(OperationContext* opCtx, bool doEnable) {
+    _keyManager->enableKeyGenerator(opCtx, doEnable);
+}
+
+bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
+    auto client = opCtx->getClient();
+    // Note: returns true if auth is off, courtesy of
+    // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.
+    return AuthorizationSession::get(client)->isAuthorizedForPrivileges(
+        advanceLogicalClockPrivilege);
 }
 
 }  // namespace mongo

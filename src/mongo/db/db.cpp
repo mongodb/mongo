@@ -75,6 +75,7 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_metadata_hook.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/operation_context.h"
@@ -950,6 +951,12 @@ static void shutdownTask() {
     ReplicaSetMonitor::shutdown();
     if (auto sr = grid.shardRegistry()) {  // TODO: race: sr is a naked pointer
         sr->shutdown();
+    }
+
+    // Validator shutdown must be called after setKillAllOperations is called. Otherwise, this can
+    // deadlock.
+    if (auto validator = LogicalTimeValidator::get(serviceContext)) {
+        validator->shutDown();
     }
 
 #if __has_feature(address_sanitizer)
