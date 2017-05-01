@@ -64,9 +64,8 @@ DocumentSource::GetNextResult DocumentSourceRedact::getNext() {
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         auto& variables = pExpCtx->variables;
-        variables.setRoot(nextInput.getDocument());
-        variables.setValue(_currentId, Value(nextInput.releaseDocument()));
-        if (boost::optional<Document> result = redactObject()) {
+        variables.setValue(_currentId, Value(nextInput.getDocument()));
+        if (boost::optional<Document> result = redactObject(nextInput.releaseDocument())) {
             return std::move(*result);
         }
     }
@@ -97,11 +96,11 @@ Pipeline::SourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceRedact::redactValue(const Value& in) {
+Value DocumentSourceRedact::redactValue(const Value& in, Document root) {
     const BSONType valueType = in.getType();
     if (valueType == Object) {
         pExpCtx->variables.setValue(_currentId, in);
-        const boost::optional<Document> result = redactObject();
+        const boost::optional<Document> result = redactObject(root);
         if (result) {
             return Value(*result);
         } else {
@@ -113,7 +112,7 @@ Value DocumentSourceRedact::redactValue(const Value& in) {
         const vector<Value>& arr = in.getArray();
         for (size_t i = 0; i < arr.size(); i++) {
             if (arr[i].getType() == Object || arr[i].getType() == Array) {
-                const Value toAdd = redactValue(arr[i]);
+                const Value toAdd = redactValue(arr[i], root);
                 if (!toAdd.missing()) {
                     newArr.push_back(toAdd);
                 }
@@ -127,17 +126,17 @@ Value DocumentSourceRedact::redactValue(const Value& in) {
     }
 }
 
-boost::optional<Document> DocumentSourceRedact::redactObject() {
+boost::optional<Document> DocumentSourceRedact::redactObject(Document root) {
     auto& variables = pExpCtx->variables;
-    const Value expressionResult = _expression->evaluate();
+    const Value expressionResult = _expression->evaluate(root);
 
     ValueComparator simpleValueCmp;
     if (simpleValueCmp.evaluate(expressionResult == keepVal)) {
-        return variables.getDocument(_currentId);
+        return variables.getDocument(_currentId, root);
     } else if (simpleValueCmp.evaluate(expressionResult == pruneVal)) {
         return boost::optional<Document>();
     } else if (simpleValueCmp.evaluate(expressionResult == descendVal)) {
-        const Document in = variables.getDocument(_currentId);
+        const Document in = variables.getDocument(_currentId, root);
         MutableDocument out;
         out.copyMetaDataFrom(in);
         FieldIterator fields(in);
@@ -145,7 +144,7 @@ boost::optional<Document> DocumentSourceRedact::redactObject() {
             const Document::FieldPair field(fields.next());
 
             // This changes CURRENT so don't read from variables after this
-            const Value val = redactValue(field.second);
+            const Value val = redactValue(field.second, root);
             if (!val.missing()) {
                 out.addField(field.first, val);
             }

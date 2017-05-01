@@ -109,12 +109,12 @@ void Variables::setValue(Id id, const Value& value) {
     _valueList[id] = value;
 }
 
-Value Variables::getValue(Id id) const {
+Value Variables::getValue(Id id, Document root) const {
     if (id < 0) {
         // This is a reserved id for a builtin variable.
         switch (id) {
             case Variables::kRootId:
-                return Value(_root);
+                return Value(root);
             case Variables::kRemoveId:
                 return Value();
             default:
@@ -128,13 +128,13 @@ Value Variables::getValue(Id id) const {
     return _valueList[id];
 }
 
-Document Variables::getDocument(Id id) const {
+Document Variables::getDocument(Id id, Document root) const {
     if (id == Variables::kRootId) {
         // For the common case of ROOT, avoid round-tripping through Value.
-        return _root;
+        return root;
     }
 
-    const Value var = getValue(id);
+    const Value var = getValue(id, root);
     if (var.getType() == Object)
         return var.getDocument();
 

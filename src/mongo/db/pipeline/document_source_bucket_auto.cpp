@@ -118,8 +118,7 @@ Value DocumentSourceBucketAuto::extractKey(const Document& doc) {
         return Value(BSONNULL);
     }
 
-    pExpCtx->variables.setRoot(doc);
-    Value key = _groupByExpression->evaluate();
+    Value key = _groupByExpression->evaluate(doc);
 
     if (_granularityRounder) {
         uassert(40258,
@@ -151,9 +150,8 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
     bucket._max = entry.first;
 
     const size_t numAccumulators = _accumulatorFactories.size();
-    pExpCtx->variables.setRoot(entry.second);
     for (size_t k = 0; k < numAccumulators; k++) {
-        bucket._accums[k]->process(_expressions[k]->evaluate(), false);
+        bucket._accums[k]->process(_expressions[k]->evaluate(entry.second), false);
     }
 }
 

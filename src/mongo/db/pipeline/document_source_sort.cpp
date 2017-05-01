@@ -306,15 +306,14 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
 }
 
 Value DocumentSourceSort::extractKey(const Document& d) const {
-    pExpCtx->variables.setRoot(d);
     if (vSortKey.size() == 1) {
-        return vSortKey[0]->evaluate();
+        return vSortKey[0]->evaluate(d);
     }
 
     vector<Value> keys;
     keys.reserve(vSortKey.size());
     for (size_t i = 0; i < vSortKey.size(); i++) {
-        keys.push_back(vSortKey[i]->evaluate());
+        keys.push_back(vSortKey[i]->evaluate(d));
     }
     return Value(std::move(keys));
 }

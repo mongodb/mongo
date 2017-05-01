@@ -84,14 +84,10 @@ void ParsedAddFields::parse(const BSONObj& spec) {
     }
 }
 
-Document ParsedAddFields::applyProjection(Document inputDoc, Variables* vars) const {
-    // All expressions will be evaluated in the context of the input document, before any
-    // transformations have been applied.
-    vars->setRoot(inputDoc);
-
+Document ParsedAddFields::applyProjection(Document inputDoc) const {
     // The output doc is the same as the input doc, with the added fields.
     MutableDocument output(inputDoc);
-    _root->addComputedFields(&output);
+    _root->addComputedFields(&output, inputDoc);
 
     // Pass through the metadata.
     output.copyMetaDataFrom(inputDoc);

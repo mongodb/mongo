@@ -140,7 +140,7 @@ private:
     /**
      * Computes the internal representation of the group key.
      */
-    Value computeId();
+    Value computeId(Document root);
 
     /**
      * Converts the internal representation of the group key to the _id shape specified by the

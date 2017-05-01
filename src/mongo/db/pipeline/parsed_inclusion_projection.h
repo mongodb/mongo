@@ -88,7 +88,7 @@ public:
     /**
      * Add computed fields to 'outputDoc'.
      */
-    void addComputedFields(MutableDocument* outputDoc) const;
+    void addComputedFields(MutableDocument* outputDoc, Document root) const;
 
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted.
@@ -139,7 +139,7 @@ private:
     // Helpers for the Document versions above. These will apply the transformation recursively to
     // each element of any arrays, and ensure non-documents are handled appropriately.
     Value applyInclusionsToValue(Value inputVal) const;
-    Value addComputedFields(Value inputVal) const;
+    Value addComputedFields(Value inputVal, Document root) const;
 
     /**
      * Returns nullptr if no such child exists.
@@ -242,13 +242,7 @@ public:
      * Arrays will be traversed, with any dotted/nested exclusions or computed fields applied to
      * each element in the array.
      */
-    Document applyProjection(Document inputDoc) const final {
-        auto& vars = _expCtx->variables;
-        vars.setRoot(inputDoc);
-        return applyProjection(inputDoc, &vars);
-    }
-
-    Document applyProjection(Document inputDoc, Variables* vars) const;
+    Document applyProjection(Document inputDoc) const final;
 
 private:
     /**

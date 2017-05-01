@@ -72,33 +72,22 @@ public:
     static const StringMap<Id> kBuiltinVarNameToId;
 
     /**
-     * Use this instead of setValue for setting ROOT
-     */
-    void setRoot(const Document& root) {
-        _root = root;
-    }
-    void clearRoot() {
-        _root = Document();
-    }
-    const Document& getRoot() const {
-        return _root;
-    }
-
-    /**
      * Sets the value of a user-defined variable. Illegal to use with the reserved builtin variables
      * defined above.
      */
     void setValue(Variables::Id id, const Value& value);
 
     /**
-     * Gets the value of a user-defined or system variable.
+     * Gets the value of a user-defined or system variable. If the 'id' provided represents the
+     * special ROOT variable, then we return 'root' in Value form.
      */
-    Value getValue(Variables::Id id) const;
+    Value getValue(Variables::Id id, Document root) const;
 
     /**
-     * Returns Document() for non-document values, but otherwise identical to getValue().
+     * Returns Document() for non-document values, but otherwise identical to getValue(). If the
+     * 'id' provided represents the special ROOT variable, then we return 'root'.
      */
-    Document getDocument(Variables::Id id) const;
+    Document getDocument(Variables::Id id, Document root) const;
 
     IdGenerator* useIdGenerator() {
         return &_idGenerator;
@@ -106,7 +95,6 @@ public:
 
 
 private:
-    Document _root;
     IdGenerator _idGenerator;
     std::vector<Value> _valueList;
 };

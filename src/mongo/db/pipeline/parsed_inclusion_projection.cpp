@@ -141,29 +141,29 @@ Value InclusionNode::applyInclusionsToValue(Value inputValue) const {
     }
 }
 
-void InclusionNode::addComputedFields(MutableDocument* outputDoc) const {
+void InclusionNode::addComputedFields(MutableDocument* outputDoc, Document root) const {
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
             outputDoc->setField(field,
-                                childIt->second->addComputedFields(outputDoc->peek()[field]));
+                                childIt->second->addComputedFields(outputDoc->peek()[field], root));
         } else {
             auto expressionIt = _expressions.find(field);
             invariant(expressionIt != _expressions.end());
-            outputDoc->setField(field, expressionIt->second->evaluate());
+            outputDoc->setField(field, expressionIt->second->evaluate(root));
         }
     }
 }
 
-Value InclusionNode::addComputedFields(Value inputValue) const {
+Value InclusionNode::addComputedFields(Value inputValue, Document root) const {
     if (inputValue.getType() == BSONType::Object) {
         MutableDocument outputDoc(inputValue.getDocument());
-        addComputedFields(&outputDoc);
+        addComputedFields(&outputDoc, root);
         return outputDoc.freezeToValue();
     } else if (inputValue.getType() == BSONType::Array) {
         std::vector<Value> values = inputValue.getArray();
         for (auto it = values.begin(); it != values.end(); ++it) {
-            *it = addComputedFields(*it);
+            *it = addComputedFields(*it, root);
         }
         return Value(std::move(values));
     } else {
@@ -172,7 +172,7 @@ Value InclusionNode::addComputedFields(Value inputValue) const {
             // document of all the computed values. This case represents applying a projection like
             // {"a.b": {$literal: 1}} to the document {a: 1}. This should yield {a: {b: 1}}.
             MutableDocument outputDoc;
-            addComputedFields(&outputDoc);
+            addComputedFields(&outputDoc, root);
             return outputDoc.freezeToValue();
         }
         // We didn't have any expressions, so just return the missing value.
@@ -349,14 +349,12 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
             atLeastOneFieldInOutput);
 }
 
-Document ParsedInclusionProjection::applyProjection(Document inputDoc, Variables* vars) const {
+Document ParsedInclusionProjection::applyProjection(Document inputDoc) const {
     // All expressions will be evaluated in the context of the input document, before any
     // transformations have been applied.
-    vars->setRoot(inputDoc);
-
     MutableDocument output;
     _root->applyInclusions(inputDoc, &output);
-    _root->addComputedFields(&output);
+    _root->addComputedFields(&output, inputDoc);
 
     // Always pass through the metadata.
     output.copyMetaDataFrom(inputDoc);

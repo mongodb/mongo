@@ -54,8 +54,7 @@ public:
 
     Document applyTransformation(Document input) final {
         // Extract subdocument in the form of a Value.
-        _expCtx->variables.setRoot(input);
-        Value newRoot = _newRoot->evaluate();
+        Value newRoot = _newRoot->evaluate(input);
 
         // The newRoot expression, if it exists, must evaluate to an object.
         uassert(40228,

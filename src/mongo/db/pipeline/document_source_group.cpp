@@ -128,26 +128,21 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStandard() {
 
 DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
     // Streaming optimization is active.
-    auto& variables = pExpCtx->variables;
     if (!_firstDocOfNextGroup) {
         auto nextInput = pSource->getNext();
         if (!nextInput.isAdvanced()) {
             return nextInput;
         }
         _firstDocOfNextGroup = nextInput.releaseDocument();
-        variables.setRoot(*_firstDocOfNextGroup);
     }
 
     Value id;
     do {
         // Add to the current accumulator(s).
         for (size_t i = 0; i < _currentAccumulators.size(); i++) {
-            _currentAccumulators[i]->process(vpExpression[i]->evaluate(), _doingMerge);
+            _currentAccumulators[i]->process(vpExpression[i]->evaluate(*_firstDocOfNextGroup),
+                                             _doingMerge);
         }
-
-        // Release our references to the previous input document before asking for the next. This
-        // makes operations like $unwind more efficient.
-        variables.clearRoot();
 
         // Retrieve the next document.
         auto nextInput = pSource->getNext();
@@ -157,11 +152,10 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
 
         _firstDocOfNextGroup = nextInput.releaseDocument();
 
-        variables.setRoot(*_firstDocOfNextGroup);
 
         // Compute the id. If it does not match _currentId, we will exit the loop, leaving
         // _firstDocOfNextGroup set for the next time getNext() is called.
-        id = computeId();
+        id = computeId(*_firstDocOfNextGroup);
     } while (pExpCtx->getValueComparator().evaluate(_currentId == id));
 
     Document out = makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
@@ -479,10 +473,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             return firstInput;
         }
         _firstDocOfNextGroup = firstInput.releaseDocument();
-        pExpCtx->variables.setRoot(*_firstDocOfNextGroup);
 
         // Compute the _id value.
-        _currentId = computeId();
+        _currentId = computeId(*_firstDocOfNextGroup);
         _initialized = true;
         return DocumentSource::GetNextResult::makeEOF();
     }
@@ -501,10 +494,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             _memoryUsageBytes = 0;
         }
 
-        auto& variables = pExpCtx->variables;
-        variables.setRoot(input.releaseDocument());
-
-        Value id = computeId();
+        Value id = computeId(input.getDocument());
 
         // Look for the _id value in the map. If it's not there, add a new entry with a blank
         // accumulator. This is done in a somewhat odd way in order to avoid hashing 'id' and
@@ -532,12 +522,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         dassert(numAccumulators == group.size());
 
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(vpExpression[i]->evaluate(), _doingMerge);
+            group[i]->process(vpExpression[i]->evaluate(input.getDocument()), _doingMerge);
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
-
-        // We are done with the ROOT document so release it.
-        variables.clearRoot();
 
         if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
@@ -782,10 +769,10 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
 }
 
 
-Value DocumentSourceGroup::computeId() {
+Value DocumentSourceGroup::computeId(Document root) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
-        Value retValue = _idExpressions[0]->evaluate();
+        Value retValue = _idExpressions[0]->evaluate(root);
         return retValue.missing() ? Value(BSONNULL) : std::move(retValue);
     }
 
@@ -793,7 +780,7 @@ Value DocumentSourceGroup::computeId() {
     vector<Value> vals;
     vals.reserve(_idExpressions.size());
     for (size_t i = 0; i < _idExpressions.size(); i++) {
-        vals.push_back(_idExpressions[i]->evaluate());
+        vals.push_back(_idExpressions[i]->evaluate(root));
     }
     return Value(std::move(vals));
 }
