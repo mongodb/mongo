@@ -110,8 +110,7 @@ public:
             return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
         }
 
-        BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -120,7 +119,7 @@ public:
         BatchItemRef targetingBatchItem(&request, 0);
         vector<Strategy::CommandResult> shardResults;
         Status status =
-            _commandOpWrite(opCtx, dbname, explainCmdBob.obj(), targetingBatchItem, &shardResults);
+            _commandOpWrite(opCtx, dbname, explainCmd, targetingBatchItem, &shardResults);
         if (!status.isOK()) {
             return status;
         }

@@ -116,8 +116,23 @@ public:
             return appendCommandStatus(result, verbosity.getStatus());
         }
 
-        // This is the nested command which we are explaining.
-        BSONObj explainObj = cmdObj.firstElement().Obj();
+        // This is the nested command which we are explaining. We need to propagate generic
+        // arguments into the inner command since it is what is passed to the virtual
+        // Command::explain() method.
+        const BSONObj explainObj = ([&] {
+            const auto innerObj = cmdObj.firstElement().Obj();
+            BSONObjBuilder bob;
+            bob.appendElements(innerObj);
+            for (auto outerElem : cmdObj) {
+                // If the argument is in both the inner and outer command, we currently let the
+                // inner version take precedence.
+                const auto name = outerElem.fieldNameStringData();
+                if (Command::isGenericArgument(name) && !innerObj.hasField(name)) {
+                    bob.append(outerElem);
+                }
+            }
+            return bob.obj();
+        }());
 
         const std::string cmdName = explainObj.firstElementFieldName();
         Command* commToExplain = Command::findCommand(cmdName);

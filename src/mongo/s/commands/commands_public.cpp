@@ -52,7 +52,6 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
@@ -893,17 +892,7 @@ public:
                    BSONObjBuilder* out) const override {
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
-
-        BSONObj command;
-        int options = 0;
-
-        {
-            BSONObjBuilder explainCmdBob;
-            ClusterExplain::wrapAsExplainDeprecated(
-                cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
-            command = explainCmdBob.obj();
-        }
-
+        BSONObj command = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         auto routingInfo =
@@ -919,7 +908,7 @@ public:
             ShardConnection conn(routingInfo.primary()->getConnString(), "");
 
             // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
-            if (!conn->runCommand(nss.db().toString(), command, shardResult, options)) {
+            if (!conn->runCommand(nss.db().toString(), command, shardResult)) {
                 conn.done();
                 return Status(ErrorCodes::OperationFailed,
                               str::stream() << "Passthrough command failed: " << command
@@ -1150,8 +1139,7 @@ public:
         // Extract the targeting collation.
         auto targetingCollation = uassertStatusOK(getCollation(cmdObj));
 
-        BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -1159,8 +1147,8 @@ public:
         BSONObj viewDefinition;
         auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                           nss,
-                                                          explainCmdBob.obj(),
-                                                          getReadPref(ssm),
+                                                          explainCmd,
+                                                          getReadPref(explainCmd),
                                                           targetingQuery,
                                                           targetingCollation,
                                                           true,  // do shard versioning

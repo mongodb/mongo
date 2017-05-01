@@ -128,16 +128,13 @@ public:
             shard = shardStatus.getValue();
         }
 
-        BSONObjBuilder explainCmd;
-        int options = 0;
-        ClusterExplain::wrapAsExplainDeprecated(
-            cmdObj, verbosity, serverSelectionMetadata, &explainCmd, &options);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
         // Time how long it takes to run the explain command on the shard.
         Timer timer;
 
         BSONObjBuilder result;
-        bool ok = _runCommand(opCtx, chunkMgr, shard->getId(), nss, explainCmd.obj(), result);
+        bool ok = _runCommand(opCtx, chunkMgr, shard->getId(), nss, explainCmd, result);
         long long millisElapsed = timer.millis();
 
         if (!ok) {

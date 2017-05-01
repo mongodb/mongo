@@ -39,10 +39,6 @@ namespace mongo {
 
 class OperationContext;
 
-namespace rpc {
-class ServerSelectionMetadata;
-}  // namespace rpc
-
 /**
  * Namespace for the collection of static methods used by commands in the implementation of
  * explain on mongos.
@@ -61,33 +57,10 @@ public:
         OperationContext* opCtx, const std::vector<AsyncRequestsSender::Response>& responses);
 
     /**
-     * Given the BSON specification for a command, 'cmdObj', wraps the object in order to produce
-     * the BSON for an explain of that command, at the given verbosity level 'verbosity.'
-     *
-     * Adds the result to the BSONObjBuidler 'out'.
-     *
-     * Unlike wrapAsExplain, does not downconvert the command to OP_QUERY. Should be used for paths
-     * that send the command over the NetworkInterfaceASIO rather than DBClient.
+     * Returns an explain command request wrapping the passed in command at the given verbosity
+     * level, propagating generic top-level command arguments.
      */
-    static void wrapAsExplain(const BSONObj& cmdObj,
-                              ExplainOptions::Verbosity verbosity,
-                              BSONObjBuilder* explainBuilder);
-
-    /**
-     * Given the BSON specification for a command, 'cmdObj', wraps the object in order to
-     * produce the BSON for an explain of that command, at the given verbosity level
-     * 'verbosity' and according to the metadata in 'serverSelectionMetadata'.
-     *
-     * Adds the result to the BSONObj builder 'out'.
-     *
-     * Also uses 'serverSelectionMetdata' to set 'optionsOut' to the options bit vector that should
-     * be forwarded to the shards.
-     */
-    static void wrapAsExplainDeprecated(const BSONObj& cmdObj,
-                                        ExplainOptions::Verbosity verbosity,
-                                        const rpc::ServerSelectionMetadata& serverSelectionMetadata,
-                                        BSONObjBuilder* out,
-                                        int* optionsOut);
+    static BSONObj wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity);
 
     /**
      * Determines the kind of "execution stage" that mongos would use in order to collect

@@ -31,7 +31,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/commands.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
@@ -130,35 +129,20 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
 }
 
 // static
-void ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
-                                   ExplainOptions::Verbosity verbosity,
-                                   BSONObjBuilder* explainBuilder) {
-    explainBuilder->append("explain", cmdObj);
-    explainBuilder->append("verbosity", ExplainOptions::verbosityString(verbosity));
+BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity) {
+    BSONObjBuilder out;
+    out.append("explain", cmdObj);
+    out.append("verbosity", ExplainOptions::verbosityString(verbosity));
 
-    // Propagate readConcern
-    if (auto readConcern = cmdObj["readConcern"]) {
-        explainBuilder->append(readConcern);
+    // Propagate all generic arguments out of the inner command since the shards will only process
+    // them at the top level.
+    for (auto elem : cmdObj) {
+        if (Command::isGenericArgument(elem.fieldNameStringData())) {
+            out.append(elem);
+        }
     }
-}
 
-// static
-void ClusterExplain::wrapAsExplainDeprecated(
-    const BSONObj& cmdObj,
-    ExplainOptions::Verbosity verbosity,
-    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
-    BSONObjBuilder* out,
-    int* optionsOut) {
-    BSONObjBuilder explainBuilder;
-    wrapAsExplain(cmdObj, verbosity, &explainBuilder);
-    const BSONObj explainCmdObj = explainBuilder.done();
-
-    // Attach metadata to the explain command in legacy format.
-    BSONObjBuilder metadataBuilder;
-    serverSelectionMetadata.writeToMetadata(&metadataBuilder);
-    const BSONObj metadataObj = metadataBuilder.done();
-    uassertStatusOK(
-        serverSelectionMetadata.downconvert(explainCmdObj, metadataObj, out, optionsOut));
+    return out.obj();
 }
 
 // static

@@ -265,8 +265,7 @@ public:
             return status;
         }
 
-        BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;
@@ -274,8 +273,8 @@ public:
         BSONObj viewDefinition;
         auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                           nss,
-                                                          explainCmdBob.obj(),
-                                                          getReadPref(ssm),
+                                                          explainCmd,
+                                                          getReadPref(explainCmd),
                                                           targetingQuery,
                                                           targetingCollation,
                                                           true,  // do shard versioning

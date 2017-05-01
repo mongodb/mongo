@@ -619,8 +619,7 @@ Status Strategy::explainFind(OperationContext* opCtx,
                              ExplainOptions::Verbosity verbosity,
                              const rpc::ServerSelectionMetadata& ssm,
                              BSONObjBuilder* out) {
-    BSONObjBuilder explainCmdBob;
-    ClusterExplain::wrapAsExplain(findCommand, verbosity, &explainCmdBob);
+    const auto explainCmd = ClusterExplain::wrapAsExplain(findCommand, verbosity);
 
     // We will time how long it takes to run the commands on the shards.
     Timer timer;
@@ -628,7 +627,7 @@ Status Strategy::explainFind(OperationContext* opCtx,
     BSONObj viewDefinition;
     auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                       qr.nss(),
-                                                      explainCmdBob.obj(),
+                                                      explainCmd,
                                                       getReadPref(ssm),
                                                       qr.getFilter(),
                                                       qr.getCollation(),
