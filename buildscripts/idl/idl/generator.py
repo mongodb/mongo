@@ -576,6 +576,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     template_params['expression'] = expression
                     self._writer.write_template('builder->append("${field_name}", ${expression});')
 
+            elif field.bson_serialization_type[0] == 'any':
+                # Any types are special
+                # Array variants - we pass an array builder
+                # Non-array variants - we pass the field name they should use, and a BSONObjBuilder.
+                method_name = writer.get_method_name(field.serializer)
+                template_params['method_name'] = method_name
+
+                if field.array:
+                    self._writer.write_template(
+                        'BSONArrayBuilder arrayBuilder(builder->subarrayStart("${field_name}"));')
+                    with self._block('for (const auto& item : ${access_member}) {', '}'):
+                        # Call a method like class::method(BSONArrayBuilder*)
+                        self._writer.write_template('item.${method_name}(&arrayBuilder);')
+                else:
+                    # Call a method like class::method(StringData, BSONObjBuilder*)
+                    self._writer.write_template(
+                        '${access_member}.${method_name}("${field_name}", builder);')
             else:
                 method_name = writer.get_method_name(field.serializer)
                 template_params['method_name'] = method_name
@@ -643,12 +660,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with self._block(optional_block_start, '}'):
 
                     if not field.struct_type:
-                        # Is this a scalar bson C++ type?
-                        bson_cpp_type = cpp_types.get_bson_cpp_type(field)
-
-                        needs_custom_serializer = field.serializer or (
-                            bson_cpp_type and bson_cpp_type.has_serializer())
-
                         if needs_custom_serializer:
                             self._gen_serializer_method_custom(field)
                         else:

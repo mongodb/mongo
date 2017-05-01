@@ -232,13 +232,25 @@ TEST(IDLOneTypeTests, TestAnyType) {
     {
         auto testDoc = BSON("value"
                             << "Foo");
-        One_any_basic_type::parse(ctxt, testDoc);
+        auto testStruct = One_any_basic_type::parse(ctxt, testDoc);
+
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
     }
 
     // Positive: int field
     {
         auto testDoc = BSON("value" << 12);
-        One_any_basic_type::parse(ctxt, testDoc);
+        auto testStruct = One_any_basic_type::parse(ctxt, testDoc);
+
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
     }
 }
 
@@ -250,7 +262,13 @@ TEST(IDLOneTypeTests, TestObjectType) {
     {
         auto testDoc = BSON("value" << BSON("value"
                                             << "foo"));
-        One_any_basic_type::parse(ctxt, testDoc);
+        auto testStruct = One_any_basic_type::parse(ctxt, testDoc);
+
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
     }
 }
 

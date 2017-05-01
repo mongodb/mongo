@@ -38,11 +38,28 @@ namespace mongo {
  */
 class AnyBasicType {
 public:
-    static AnyBasicType parse(BSONElement element) {
-        return AnyBasicType();
+    static AnyBasicType parse(const BSONElement& element) {
+        AnyBasicType any;
+        any._element = element;
+        return any;
     }
 
-    void serialize(BSONObjBuilder* builder) const {}
+    /**
+     * Serialize this class as a field in a document.
+     */
+    void serialize(StringData fieldName, BSONObjBuilder* builder) const {
+        builder->appendAs(_element, fieldName);
+    }
+
+    /**
+     * Serialize this class as an element of a BSON array.
+     */
+    void serialize(BSONArrayBuilder* builder) const {
+        builder->append(_element);
+    }
+
+private:
+    BSONElement _element;
 };
 
 /**
@@ -52,10 +69,17 @@ public:
 class ObjectBasicType {
 public:
     static ObjectBasicType parse(const BSONObj& obj) {
-        return ObjectBasicType();
+        ObjectBasicType object;
+        object._obj = obj.getOwned();
+        return object;
     }
 
-    void serialize(BSONObjBuilder* builder) const {}
+    const BSONObj serialize() const {
+        return _obj;
+    }
+
+private:
+    BSONObj _obj;
 };
 
 }  // namespace mongo

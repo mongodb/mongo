@@ -497,11 +497,14 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
 
     def has_serializer(self):
         # type: () -> bool
-        return False
+        return self._field.serializer is not None
 
     def gen_serializer_expression(self, indented_writer, expression):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
-        raise NotImplementedError()
+        indented_writer.write_line(
+            common.template_args(
+                'const BSONObj localObject = ${expression}.serialize();', expression=expression))
+        return "localObject"
 
 
 # For some fields, we want to support custom serialization but defer most of the serialization to
