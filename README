@@ -18,7 +18,6 @@ UTILITIES
   mongostat         - Show the status of a running mongod/mongos.
   bsondump          - Convert BSON files into human-readable formats.
   mongooplog        - Poll the oplog and apply to a local server.
-  mongoreplay       - Traffic capture and replay tool.
   mongotop          - Track time spent reading and writing data.
 
 BUILDING
