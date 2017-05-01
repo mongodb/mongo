@@ -68,7 +68,7 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "agg_rewrite",
-            "command.maxTimeMS": 5 * 60 * 1000,
+            "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
             "command.pipeline.$mergeCursors": {"$exists": false}
         });
@@ -85,7 +85,7 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "find_rewrite",
-            "command.maxTimeMS": 5 * 60 * 1000,
+            "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
             "command.pipeline.$mergeCursors": {"$exists": false}
         });
@@ -102,7 +102,7 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "count_rewrite",
-            "command.maxTimeMS": 5 * 60 * 1000,
+            "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
             "command.pipeline.$mergeCursors": {"$exists": false}
         });
@@ -120,7 +120,7 @@
             "ns": coll.getFullName(),
             "command.aggregate": coll.getName(),
             "command.comment": "distinct_rewrite",
-            "command.maxTimeMS": 5 * 60 * 1000,
+            "command.maxTimeMS": {"$exists": true},
             "command.readConcern": {level: "linearizable"},
             "command.pipeline.$mergeCursors": {"$exists": false}
         });
