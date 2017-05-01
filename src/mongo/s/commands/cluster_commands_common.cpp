@@ -129,7 +129,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> gatherResponses(
     BSONObj* viewDefinition) {
 
     // Send the requests.
-    LOG(0) << "Dispatching command " << redact(cmdObj) << " to " << requests.size()
+    LOG(2) << "Dispatching command " << redact(cmdObj) << " to " << requests.size()
            << " targeted shards using readPreference " << readPref;
     AsyncRequestsSender ars(opCtx,
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
