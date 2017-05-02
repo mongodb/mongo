@@ -71,6 +71,11 @@ BSONObj OpTime::toBSON() const {
     return bldr.obj();
 }
 
+// static
+OpTime OpTime::parse(const BSONObj& obj) {
+    return uassertStatusOK(parseFromOplogEntry(obj));
+}
+
 std::string OpTime::toString() const {
     return toBSON().toString();
 }

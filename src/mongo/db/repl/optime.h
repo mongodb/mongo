@@ -87,6 +87,14 @@ public:
 
     static StatusWith<OpTime> parseFromOplogEntry(const BSONObj& obj);
 
+    /**
+     * Parses OpTime from a document in the form:
+     *     { ts: <timestamp>, t: <term> }
+     *
+     * Throws an exception on error.
+     */
+    static OpTime parse(const BSONObj& obj);
+
     std::string toString() const;
 
     // Returns true when this OpTime is not yet initialized.
