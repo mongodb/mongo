@@ -66,7 +66,7 @@ class TestParser(testcase.IDLTestcase):
         self.assert_parse(
             textwrap.dedent("""
         global:
-            cpp_includes: 
+            cpp_includes:
                 - 'bar'
                 - 'foo'"""))
 

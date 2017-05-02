@@ -278,7 +278,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             if cpp_type_info.disable_xvalue():
                 self._writer.write_template(
                     'const ${param_type} get${method_name}() const& { ${body} }')
-                self._writer.write_template('const ${param_type} get${method_name}() && = delete;')
+                self._writer.write_template('void get${method_name}() && = delete;')
             else:
                 self._writer.write_template(
                     'const ${param_type} get${method_name}() const { ${body} }')
@@ -351,6 +351,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # Generate user includes second
         header_list = [
             'mongo/base/string_data.h',
+            'mongo/base/data_range.h',
             'mongo/bson/bsonobj.h',
             'mongo/bson/bsonobjbuilder.h',
             'mongo/idl/idl_parser.h',
@@ -422,7 +423,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('IDLParserErrorContext tempContext("%s", &ctxt);' %
                                     (field.name))
             self._writer.write_line('const auto localObject = %s.Obj();' % (element_name))
-            return '%s::parse(tempContext, localObject);' % (common.title_case(field.struct_type))
+            return '%s::parse(tempContext, localObject)' % (common.title_case(field.struct_type))
         elif field.deserializer and 'BSONElement::' in field.deserializer:
             method_name = writer.get_method_name(field.deserializer)
             return '%s.%s()' % (element_name, method_name)
@@ -431,9 +432,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             bson_cpp_type = cpp_types.get_bson_cpp_type(field)
 
             if bson_cpp_type:
-                # Call a method like: Class::method(StringData value)
+                # Call a static class method with the signature:
+                # Class Class::method(StringData value)
                 # or
-                # Call a method like: Class::method(const BSONObj& value)
+                # Class::method(const BSONObj& value)
                 expression = bson_cpp_type.gen_deserializer_expression(self._writer, element_name)
                 if field.deserializer:
                     method_name = writer.get_method_name_from_qualified_method_name(
@@ -449,7 +451,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             0] == 'object'
                     return expression
             else:
-                # Call a method like: Class::method(const BSONElement& value)
+                # Call a static class method with the signature:
+                # Class Class::method(const BSONElement& value)
                 method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
 
                 return '%s(%s)' % (method_name, element_name)
@@ -637,7 +640,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             if field.array:
                 self._writer.write_template(
-                    'BSONArrayBuilder arrayBuilder(builder->subarrayStart(""${field_name}"));')
+                    'BSONArrayBuilder arrayBuilder(builder->subarrayStart("${field_name}"));')
                 with self._block('for (const auto& item : ${access_member}) {', '}'):
                     self._writer.write_line(
                         'BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());')

@@ -41,6 +41,20 @@ types:
 
 ##################################################################################################
 #
+# Test a custom non-BSONElement deserialization and serialization methods for a bindata type
+#
+##################################################################################################
+
+    bindata_custom:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: "A MongoDB BinDataCustomType"
+        cpp_type: "mongo::BinDataCustomType"
+        serializer: mongo::BinDataCustomType::serialize
+        deserializer: mongo::BinDataCustomType::parse
+
+##################################################################################################
+#
 # Test a custom non-BSONElement deserialization and serialization methods for an any type
 #
 ##################################################################################################
@@ -81,6 +95,11 @@ types:
                                 - double
         deserializer: "mongo::BSONElement::numberInt"
 
+##################################################################################################
+#
+# Unit test structs for a single value to ensure type validation works correctly
+#
+##################################################################################################
 
 structs:
 
@@ -172,6 +191,17 @@ structs:
 
 ##################################################################################################
 #
+# Test a custom non-BSONElement deserialization and serialization methods for a bindata type
+#
+##################################################################################################
+
+    one_bindata_custom:
+        description: UnitTest for a custom bindata
+        fields:
+            value: bindata_custom
+
+##################################################################################################
+#
 # Test a custom non-BSONElement deserialization and serialization methods for an any type
 #
 ##################################################################################################
@@ -248,6 +278,12 @@ structs:
             field3:
                 type: object
                 optional: true
+            field4:
+                type: bindata_generic
+                optional: true
+            field5:
+                type: bindata_uuid
+                optional: true
 
 ##################################################################################################
 #
@@ -269,6 +305,10 @@ structs:
                 type: array<int>
             field3:
                 type: array<double>
+            field4:
+                type: array<bindata_generic>
+            field5:
+                type: array<bindata_uuid>
 
     optional_array_fields:
         description: UnitTest for arrays of optional simple types
@@ -281,6 +321,12 @@ structs:
                 optional: true
             field3:
                 type: array<double>
+                optional: true
+            field4:
+                type: array<bindata_generic>
+                optional: true
+            field5:
+                type: array<bindata_uuid>
                 optional: true
 
 ##################################################################################################
@@ -302,6 +348,8 @@ structs:
                 type: array<object_basic_type>
             field5:
                 type: array<object>
+            field6:
+                type: array<one_string>
             field1o:
                 type: array<safeInt32>
                 optional: true
@@ -317,3 +365,7 @@ structs:
             field5o:
                 type: array<object>
                 optional: true
+            field6o:
+                type: array<one_string>
+                optional: true
+#  

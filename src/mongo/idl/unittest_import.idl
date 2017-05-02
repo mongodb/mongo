@@ -58,6 +58,26 @@ structs:
         fields:
             value: bool
 
+    one_bindata:
+        description: UnitTest for a single bindata_generic
+        fields:
+            value: bindata_generic
+
+    one_function:
+        description: UnitTest for a single bindata_function
+        fields:
+            value: bindata_function
+
+    one_uuid:
+        description: UnitTest for a single bindata_uuid
+        fields:
+            value: bindata_uuid
+
+    one_md5:
+        description: UnitTest for a single bindata_md5
+        fields:
+            value: bindata_md5
+
     one_objectid:
         description: UnitTest for a single objectid
         fields:

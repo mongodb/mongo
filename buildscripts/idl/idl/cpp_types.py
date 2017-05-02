@@ -30,8 +30,10 @@ from . import writer
 def _is_primitive_type(cpp_type):
     # type: (unicode) -> bool
     """Return True if a cpp_type is a primitive type and should not be returned as reference."""
+    cpp_type = cpp_type.replace(' ', '')
     return cpp_type in [
-        'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t'
+        'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t',
+        'std::array<std::uint8_t,16>'
     ]
 
 
@@ -226,6 +228,62 @@ class _CppTypeView(CppTypeBase):
             expression=expression, )
 
 
+class _CppTypeVector(CppTypeBase):
+    """Base type for C++ Std::Vector Types information."""
+
+    def __init__(self, field):
+        # type: (ast.Field) -> None
+        super(_CppTypeVector, self).__init__(field)
+
+    def get_type_name(self):
+        # type: () -> unicode
+        return 'std::vector<std::uint8_t>'
+
+    def get_storage_type(self):
+        # type: () -> unicode
+        return self.get_type_name()
+
+    def get_getter_setter_type(self):
+        # type: () -> unicode
+        return 'ConstDataRange'
+
+    def return_by_reference(self):
+        # type: () -> bool
+        return False
+
+    def disable_xvalue(self):
+        # type: () -> bool
+        return True
+
+    def is_view_type(self):
+        # type: () -> bool
+        return True
+
+    def get_getter_body(self, member_name):
+        # type: (unicode) -> unicode
+        return common.template_args(
+            'return ConstDataRange(reinterpret_cast<const char*>($member_name.data()), $member_name.size());',
+            member_name=member_name)
+
+    def get_setter_body(self, member_name):
+        # type: (unicode) -> unicode
+        return common.template_args(
+            '$member_name = ${value};',
+            member_name=member_name,
+            value=self.get_transform_to_storage_type("value"))
+
+    def get_transform_to_getter_type(self, expression):
+        # type: (unicode) -> Optional[unicode]
+        return common.template_args('makeCDR(${expression});', expression=expression)
+
+    def get_transform_to_storage_type(self, expression):
+        # type: (unicode) -> Optional[unicode]
+        return common.template_args(
+            'std::vector<std::uint8_t>(reinterpret_cast<const uint8_t*>(${expression}.data()), ' +
+            'reinterpret_cast<const uint8_t*>(${expression}.data()) + ${expression}.length())',
+            expression=expression)
+
+
 class _CppTypeDelegating(CppTypeBase):
     """Delegates all method calls a nested instance of CppTypeBase. Used to build other classes."""
 
@@ -404,12 +462,15 @@ class _CppTypeOptional(_CppTypeDelegating):
 
 def get_cpp_type(field):
     # type: (ast.Field) -> CppTypeBase
+    # pylint: disable=redefined-variable-type
     """Get the C++ Type information for the given field."""
 
     cpp_type_info = None  # type: Any
 
     if field.cpp_type == 'std::string':
         cpp_type_info = _CppTypeView(field, 'std::string', 'StringData')
+    elif field.cpp_type == 'std::vector<std::uint8_t>':
+        cpp_type_info = _CppTypeVector(field)
     else:
         cpp_type_info = _CppTypeBasic(field)  # pylint: disable=redefined-variable-type
 
@@ -507,6 +568,41 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
         return "localObject"
 
 
+class _BinDataBsonCppTypeBase(BsonCppTypeBase):
+    """Custom C++ support for all binData BSON types."""
+
+    def __init__(self, field):
+        # type: (ast.Field) -> None
+        super(_BinDataBsonCppTypeBase, self).__init__(field)
+
+    def gen_deserializer_expression(self, indented_writer, object_instance):
+        # type: (writer.IndentedTextWriter, unicode) -> unicode
+        return common.template_args(
+            '${object_instance}._binDataVector()', object_instance=object_instance)
+
+    def has_serializer(self):
+        # type: () -> bool
+        return True
+
+    def gen_serializer_expression(self, indented_writer, expression):
+        # type: (writer.IndentedTextWriter, unicode) -> unicode
+        if self._field.serializer:
+            method_name = writer.get_method_name(self._field.serializer)
+            indented_writer.write_line(
+                common.template_args(
+                    'ConstDataRange tempCDR = ${expression}.${method_name}();',
+                    expression=expression,
+                    method_name=method_name))
+        else:
+            indented_writer.write_line(
+                common.template_args(
+                    'ConstDataRange tempCDR = makeCDR(${expression});', expression=expression))
+
+        return common.template_args(
+            'BSONBinData(tempCDR.data(), tempCDR.length(), ${bindata_subtype})',
+            bindata_subtype=bson.cpp_bindata_subtype_type_name(self._field.bindata_subtype))
+
+
 # For some fields, we want to support custom serialization but defer most of the serialization to
 # the core BSONElement class. This means that callers need to only process a string, a vector of
 # bytes, or a integer, not a BSONElement or BSONObj.
@@ -523,6 +619,9 @@ def get_bson_cpp_type(field):
 
     if field.bson_serialization_type[0] == 'object':
         return _ObjectBsonCppTypeBase(field)
+
+    if field.bson_serialization_type[0] == 'bindata':
+        return _BinDataBsonCppTypeBase(field)
 
     # Unsupported type
     return None

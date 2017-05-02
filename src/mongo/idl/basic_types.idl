@@ -54,11 +54,33 @@ types:
         cpp_type: "bool"
         deserializer: "mongo::BSONElement::boolean"
 
-    # TODO: support bindata
-    # bindata:
-    #     bson_serialization_type: bindata
-    #     cpp_type: "std:"
-    #     deserializer: "mongo::BSONElement::str"
+    bindata_generic:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: "A BSON bindata of "
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+
+    bindata_function:
+        bson_serialization_type: bindata
+        bindata_subtype: function
+        description: "A BSON bindata of function sub type"
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+
+    bindata_uuid:
+        bson_serialization_type: bindata
+        bindata_subtype: uuid
+        description: "A BSON bindata of uuid sub type"
+        cpp_type: "std::array<std::uint8_t, 16>"
+        deserializer: "mongo::BSONElement::uuid"
+
+    bindata_md5:
+        bson_serialization_type: bindata
+        bindata_subtype: md5
+        description: "A BSON bindata of uuid sub type"
+        cpp_type: "std::array<std::uint8_t, 16>"
+        deserializer: "mongo::BSONElement::md5"
 
     objectid:
         bson_serialization_type: objectid

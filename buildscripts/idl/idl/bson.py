@@ -97,14 +97,16 @@ _BINDATA_SUBTYPE = {
         'scalar': True,
         'bindata_enum': 'Function'
     },
-    "binary": {
-        'scalar': False,
-        'bindata_enum': 'ByteArrayDeprecated'
-    },
-    "uuid_old": {
-        'scalar': False,
-        'bindata_enum': 'bdtUUID'
-    },
+    # Also simply known as type 2, deprecated, and requires special handling
+    #"binary": {
+    #    'scalar': False,
+    #    'bindata_enum': 'ByteArrayDeprecated'
+    #},
+    # Deprecated
+    # "uuid_old": {
+    #     'scalar': False,
+    #     'bindata_enum': 'bdtUUID'
+    # },
     "uuid": {
         'scalar': True,
         'bindata_enum': 'newUUID'
