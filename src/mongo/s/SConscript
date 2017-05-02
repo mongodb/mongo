@@ -265,7 +265,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/fts/ftsmongos',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/s/query/cluster_query',
-        '$BUILD_DIR/mongo/util/concurrency/task',
         'cluster_last_error_info',
     ],
 )
