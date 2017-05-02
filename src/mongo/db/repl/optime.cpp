@@ -80,4 +80,9 @@ std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
 }
 
 }  // namespace repl
+
+BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const repl::OpTime& value) {
+    return builder << value.toBSON();
+}
+
 }  // namespace mongo

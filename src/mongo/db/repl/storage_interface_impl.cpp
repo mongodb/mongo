@@ -224,7 +224,7 @@ void StorageInterfaceImpl::clearInitialSyncFlag(OperationContext* opCtx) {
         BSON("$unset" << kInitialSyncFlag << "$set"
                       << BSON("ts" << time.getTimestamp() << "t" << time.getTerm()
                                    << kBeginFieldName
-                                   << time.toBSON())));
+                                   << time)));
 
     if (getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
         opCtx->recoveryUnit()->waitUntilDurable();
@@ -290,7 +290,7 @@ void StorageInterfaceImpl::setAppliedThrough(OperationContext* opCtx, const OpTi
     if (optime.isNull()) {
         updateMinValidDocument(opCtx, BSON("$unset" << BSON(kBeginFieldName << 1)));
     } else {
-        updateMinValidDocument(opCtx, BSON("$set" << BSON(kBeginFieldName << optime.toBSON())));
+        updateMinValidDocument(opCtx, BSON("$set" << BSON(kBeginFieldName << optime)));
     }
 }
 

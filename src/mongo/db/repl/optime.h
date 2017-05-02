@@ -36,6 +36,7 @@ namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
+class BSONObjBuilderValueStream;
 template <typename T>
 class StatusWith;
 
@@ -141,4 +142,11 @@ private:
 };
 
 }  // namespace repl
+
+/**
+ * Support BSONObjBuilder and BSONArrayBuilder "stream" API.
+ */
+BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const repl::OpTime& value);
+
+
 }  // namespace mongo
