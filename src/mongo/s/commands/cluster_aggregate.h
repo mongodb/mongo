@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 
@@ -83,7 +84,7 @@ private:
         const std::vector<ClusterClientCursorParams::RemoteCursor>& cursors);
 
     static void uassertAllShardsSupportExplain(
-        const std::vector<Strategy::CommandResult>& shardResults);
+        const std::vector<AsyncRequestsSender::Response>& shardResults);
 
     // These are temporary hacks because the runCommand method doesn't report the exact
     // host the command was run on which is necessary for cursor support. The exact host

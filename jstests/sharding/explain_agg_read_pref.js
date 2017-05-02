@@ -78,11 +78,15 @@
                     $readPreference: {mode: pref, tags: tagSets}
                 }));
 
+                // Look for an operation without an exception, since the shard throws a stale config
+                // exception if the shard or mongos has stale routing metadata, and the operation
+                // gets retried.
                 profilerHasSingleMatchingEntryOrThrow(target, {
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
                     "command.explain.comment": comment,
-                    "command.explain.$queryOptions.$readPreference.mode": pref
+                    "command.explain.$queryOptions.$readPreference.mode": pref,
+                    "exception": {"$exists": false}
                 });
 
                 //
@@ -95,11 +99,15 @@
                     $queryOptions: {$readPreference: {mode: pref, tags: tagSets}}
                 }));
 
+                // Look for an operation without an exception, since the shard throws a stale config
+                // exception if the shard or mongos has stale routing metadata, and the operation
+                // gets retried.
                 profilerHasSingleMatchingEntryOrThrow(target, {
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
                     "command.explain.comment": comment,
-                    "command.explain.$queryOptions.$readPreference.mode": pref
+                    "command.explain.$queryOptions.$readPreference.mode": pref,
+                    "exception": {"$exists": false}
                 });
             });
 

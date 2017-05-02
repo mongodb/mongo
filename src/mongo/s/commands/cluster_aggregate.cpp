@@ -271,15 +271,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     BSONObj shardQuery = pipelineForTargetedShards->getInitialQuery();
 
     if (mergeCtx->explain) {
-        // TODO(SERVER-28973): convert to using scatterGatherForNamespace()
-        std::vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(opCtx,
-                            namespaces.executionNss.db().toString(),
-                            targetedCommand,
-                            namespaces.executionNss.ns(),
-                            shardQuery,
-                            request.getCollation(),
-                            &shardResults);
+        auto shardResults = uassertStatusOK(scatterGatherForNamespace(opCtx,
+                                                                      namespaces.executionNss,
+                                                                      targetedCommand,
+                                                                      getReadPref(targetedCommand),
+                                                                      shardQuery,
+                                                                      request.getCollation()));
 
         // This must be checked before we start modifying result.
         uassertAllShardsSupportExplain(shardResults);
@@ -295,10 +292,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
 
         BSONObjBuilder shardExplains(result->subobjStart("shards"));
-        for (size_t i = 0; i < shardResults.size(); i++) {
-            shardExplains.append(shardResults[i].shardTargetId,
-                                 BSON("host" << shardResults[i].target.toString() << "stages"
-                                             << shardResults[i].result["stages"]));
+        for (const auto& result : shardResults) {
+            invariant(result.shardHostAndPort);
+            shardExplains.append(result.shardId.toString(),
+                                 BSON("host" << result.shardHostAndPort->toString() << "stages"
+                                             << result.swResponse.getValue().data["stages"]));
         }
 
         return Status::OK();
@@ -411,17 +409,21 @@ std::vector<DocumentSourceMergeCursors::CursorDescriptor> ClusterAggregate::pars
 }
 
 void ClusterAggregate::uassertAllShardsSupportExplain(
-    const std::vector<Strategy::CommandResult>& shardResults) {
-    for (size_t i = 0; i < shardResults.size(); i++) {
+    const std::vector<AsyncRequestsSender::Response>& shardResults) {
+    for (const auto& result : shardResults) {
+        auto status = result.swResponse.getStatus();
+        if (status.isOK()) {
+            status = getStatusFromCommandResult(result.swResponse.getValue().data);
+        }
         uassert(17403,
-                str::stream() << "Shard " << shardResults[i].target.toString() << " failed: "
-                              << shardResults[i].result,
-                shardResults[i].result["ok"].trueValue());
+                str::stream() << "Shard " << result.shardId.toString() << " failed: "
+                              << causedBy(status),
+                status.isOK());
 
         uassert(17404,
-                str::stream() << "Shard " << shardResults[i].target.toString()
+                str::stream() << "Shard " << result.shardId.toString()
                               << " does not support $explain",
-                shardResults[i].result.hasField("stages"));
+                result.swResponse.getValue().data.hasField("stages"));
     }
 }
 
