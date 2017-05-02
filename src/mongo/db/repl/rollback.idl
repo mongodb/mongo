@@ -27,10 +27,13 @@
 # Rollback IDL File
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::repl"
+    cpp_includes:
+        - "mongo/db/repl/optime.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/repl/replication_types.idl"
 
 structs:
     rollbackID:
@@ -42,3 +45,13 @@ structs:
             rollbackId:
                 type: int
                 description: "The Rollback ID stored in the document"
+
+    rollbackProgress:
+        description: A document in which the server stores its rollback progress on disk.
+        fields:
+            _id:
+                type: string
+                description: "The _id of the document stored in the database."
+            applyUntil:
+                type: optime
+                description: "The op time that rollback has to reach to complete successfully."

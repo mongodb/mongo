@@ -28,12 +28,17 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
@@ -46,7 +51,15 @@ const auto getReplicationProcess =
 
 const int kUninitializedRollbackId = -1;
 
+const auto kRollbackNamespacePrefix = "local.system.rollback."_sd;
+
+const auto kRollbackProgressIdDoc = BSON("_id"
+                                         << "rollbackProgress");
+const auto kRollbackProgressIdKey = kRollbackProgressIdDoc["_id"];
 }  // namespace
+
+const NamespaceString ReplicationProcess::kRollbackProgressNamespace(kRollbackNamespacePrefix +
+                                                                     "progress");
 
 ReplicationProcess* ReplicationProcess::get(ServiceContext* service) {
     return getReplicationProcess(service).get();
@@ -116,6 +129,48 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
     }
 
     return status;
+}
+
+StatusWith<OpTime> ReplicationProcess::getRollbackProgress(OperationContext* opCtx) {
+    auto documentResult =
+        _storageInterface->findById(opCtx, kRollbackProgressNamespace, kRollbackProgressIdKey);
+    if (!documentResult.isOK()) {
+        return documentResult.getStatus();
+    }
+    const auto& doc = documentResult.getValue();
+    RollbackProgress rollbackProgress;
+    try {
+        rollbackProgress = RollbackProgress::parse(IDLParserErrorContext("RollbackProgress"), doc);
+    } catch (...) {
+        return exceptionToStatus();
+    }
+    return rollbackProgress.getApplyUntil();
+}
+
+Status ReplicationProcess::setRollbackProgress(OperationContext* opCtx, const OpTime& applyUntil) {
+    auto status = _storageInterface->createCollection(opCtx, kRollbackProgressNamespace, {});
+    if (ErrorCodes::NamespaceExists == status.code()) {
+        // Collection exists. Proceed to upsert progress document.
+    } else if (!status.isOK()) {
+        return status;
+    }
+    RollbackProgress rollbackProgress;
+    rollbackProgress.set_id(kRollbackProgressIdKey.String());
+    rollbackProgress.setApplyUntil(applyUntil);
+    BSONObjBuilder bob;
+    rollbackProgress.serialize(&bob);
+    return _storageInterface->upsertById(
+        opCtx, kRollbackProgressNamespace, kRollbackProgressIdKey, bob.obj());
+}
+
+Status ReplicationProcess::clearRollbackProgress(OperationContext* opCtx) {
+    auto status = _storageInterface->deleteByFilter(opCtx, kRollbackProgressNamespace, {});
+    if (ErrorCodes::NamespaceNotFound == status) {
+        return Status::OK();
+    } else if (!status.isOK()) {
+        return status;
+    }
+    return Status::OK();
 }
 
 }  // namespace repl

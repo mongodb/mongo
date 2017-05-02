@@ -140,6 +140,7 @@ env.Library(
         env.Idlc('rollback.idl')[0],
     ],
     LIBDEPS=[
+        'optime',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
@@ -193,9 +194,24 @@ env.Library(
         'replication_process.cpp',
     ],
     LIBDEPS=[
+        'optime',
+        'rollback_idl',
         'storage_interface',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/decorable',
+    ],
+)
+
+env.CppUnitTest(
+    target='replication_process_test',
+    source=[
+        'replication_process_test.cpp',
+    ],
+    LIBDEPS=[
+        'replication_process',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )
 
