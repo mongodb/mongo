@@ -405,6 +405,15 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             break;
         }
 
+        // Due to SERVER-27286, a find command with batchSize:0 may not establish cursors on the
+        // targeted shards. Since only the shards have knowledge of the view catalog, we may not
+        // discover that this is a query over a view until getMore time. In this case we simply
+        // error, since the getMore path cannot handle views.
+        if (next.getValue().getViewDefinition()) {
+            return {ErrorCodes::OptionNotSupportedOnView,
+                    "A find with batchSize 0 followed by a getMore is not supported on views"};
+        }
+
         if (!FindCommon::haveSpaceForNext(
                 *next.getValue().getResult(), batch.size(), bytesBuffered)) {
             pinnedCursor.getValue().queueResult(*next.getValue().getResult());

@@ -82,5 +82,18 @@
     assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
                                  ErrorCodes.NamespaceNotSharded);
 
+    //
+    // Confirm find with batchSize 0 followed by getMore fails.
+    // This fails on getMore rather than on find due to SERVER-27286.
+    //
+    result = assert.commandWorked(db.runCommand({find: 'view', batchSize: 0}));
+    assert.commandWorked(result);
+
+    const cursor = new DBCommandCursor(db.getMongo(), result, 2);
+    assert.commandFailedWithCode(assert.throws(() => {
+        cursor.next();
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+
     st.stop();
 })();
