@@ -1597,7 +1597,12 @@ if env.TargetOSIs('posix'):
             env.Append( CCFLAGS=["-Werror"] )
 
     env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
-    env.Append( LINKFLAGS=["-pthread"] )
+
+    # On OS X, clang doesn't want the pthread flag at link time, or it
+    # issues warnings which make it impossible for us to declare link
+    # warnings as errors. See http://stackoverflow.com/a/19382663.
+    if not (env.TargetOSIs('darwin') and env.ToolchainIs('clang')):
+        env.Append( LINKFLAGS=["-pthread"] )
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
@@ -1627,11 +1632,11 @@ if env.TargetOSIs('posix'):
 
     # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
     # noall_load obsolete and warns about it.
-    if not env.TargetOSIs('darwin') and not has_option("disable-warnings-as-errors"):
+    if not has_option("disable-warnings-as-errors"):
         env.Append(
             LINKFLAGS=[
-                "-Wl,--fatal-warnings",
-            ],
+                '-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings",
+            ]
         )
 
 mmapv1 = False
