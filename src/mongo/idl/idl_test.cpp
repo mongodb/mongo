@@ -187,7 +187,7 @@ TEST(IDLOneTypeTests, TestSafeInt32) {
 TEST(IDLOneTypeTests, TestNamespaceString) {
     IDLParserErrorContext ctxt("root");
 
-    auto testDoc = BSON("value"
+    auto testDoc = BSON(One_namespacestring::kValueFieldName
                         << "foo.bar");
 
     auto element = testDoc.firstElement();

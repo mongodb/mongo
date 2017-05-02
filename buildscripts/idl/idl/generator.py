@@ -311,6 +311,19 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_line('%s %s;' % (member_type, member_name))
 
+    def gen_string_constants_declarations(self, struct):
+        # type: (ast.Struct) -> None
+        # pylint: disable=invalid-name
+        """Generate a StringData constant for field name."""
+        field_names = sorted([field.name for field in struct.fields if not field.ignore])
+
+        for field_name in field_names:
+            self._writer.write_line(
+                common.template_args(
+                    'static constexpr auto k${constant_name}FieldName = "${field_name}"_sd;',
+                    constant_name=common.title_case(field_name),
+                    field_name=field_name))
+
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
@@ -358,6 +371,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.gen_description_comment(struct.description)
                 with self.gen_class_declaration_block(struct.name):
                     self.write_unindented_line('public:')
+
+                    # Generate a sorted list of string constants
+                    self.gen_string_constants_declarations(struct)
+                    self.write_empty_line()
 
                     # Write constructor
                     self.gen_serializer_methods(struct.name)
@@ -673,6 +690,22 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # Add a blank line after each block
                 self._writer.write_empty_line()
 
+    def gen_string_constants_definitions(self, struct):
+        # type: (ast.Struct) -> None
+        # pylint: disable=invalid-name
+        """Generate a StringData constant for field name in the cpp file."""
+
+        # Generate a sorted list of string constants
+
+        field_names = sorted([field.name for field in struct.fields if not field.ignore])
+
+        for field_name in field_names:
+            self._writer.write_line(
+                common.template_args(
+                    'constexpr StringData ${class_name}::k${constant_name}FieldName;',
+                    class_name=common.title_case(struct.name),
+                    constant_name=common.title_case(field_name)))
+
     def generate(self, spec, header_file_name):
         # type: (ast.IDLAST, unicode) -> None
         """Generate the C++ header to a stream."""
@@ -695,6 +728,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self.write_empty_line()
 
             for struct in spec.structs:
+                self.gen_string_constants_definitions(struct)
+                self.write_empty_line()
+
                 # Write deserializer
                 self.gen_deserializer_methods(struct)
                 self.write_empty_line()
