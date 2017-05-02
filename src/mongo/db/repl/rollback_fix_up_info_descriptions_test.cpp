@@ -52,8 +52,7 @@ TEST(RollbackFixUpInfoDescriptionsTest, SingleDocumentDescriptionToBson) {
         "mydb");
 
     auto expectedDocument = BSON(
-        "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
-                                       << docId.firstElement())
+        "_id" << BSON("collectionUuid" << collectionUuid << "documentId" << docId.firstElement())
               << "operationType"
               << "insert"
               << "db"
@@ -70,8 +69,7 @@ TEST(RollbackFixUpInfoDescriptionsTest, CollectionUuidDescriptionToBson) {
 
     RollbackFixUpInfo::CollectionUuidDescription description(collectionUuid, nss);
 
-    auto expectedDocument =
-        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << nss.ns());
+    auto expectedDocument = BSON("_id" << collectionUuid << "ns" << nss.ns());
 
     ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
 }
@@ -82,7 +80,7 @@ TEST(RollbackFixUpInfoDescriptionsTest, CollectionUuidDescriptionWithEmptyNamesp
 
     RollbackFixUpInfo::CollectionUuidDescription description(collectionUuid, emptyNss);
 
-    auto expectedDocument = BSON("_id" << collectionUuid.toBSON().firstElement() << "ns"
+    auto expectedDocument = BSON("_id" << collectionUuid << "ns"
                                        << "");
 
     ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
@@ -99,8 +97,7 @@ TEST(RollbackFixUpInfoDescriptionsTest, CollectionOptionsDescriptionToBson) {
 
     RollbackFixUpInfo::CollectionOptionsDescription description(collectionUuid, options.toBSON());
 
-    auto expectedDocument =
-        BSON("_id" << collectionUuid.toBSON().firstElement() << "options" << options.toBSON());
+    auto expectedDocument = BSON("_id" << collectionUuid << "options" << options.toBSON());
 
     ASSERT_BSONOBJ_EQ(expectedDocument, description.toBSON());
 }
@@ -142,8 +139,7 @@ TEST(RollbackFixUpInfoDescriptionsTest, IndexDescriptionToBson) {
         collectionUuid, indexName, RollbackFixUpInfo::IndexOpType::kDrop, infoObj);
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "drop"
                    << "infoObj"

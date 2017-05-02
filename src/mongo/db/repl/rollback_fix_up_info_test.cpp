@@ -160,7 +160,7 @@ TEST_F(RollbackFixUpInfoTest,
                                << "ns"
                                << "test.t"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("_id"
                                        << "mydocid"
@@ -180,15 +180,14 @@ TEST_F(RollbackFixUpInfoTest,
         RollbackFixUpInfo::SingleDocumentOpType::kInsert,
         nss.db().toString()));
 
-    auto expectedDocument = BSON(
-        "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
-                                       << docId)
-              << "operationType"
-              << "insert"
-              << "db"
-              << "test"
-              << "documentToRestore"
-              << BSONNULL);
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "documentId" << docId)
+                   << "operationType"
+                   << "insert"
+                   << "db"
+                   << "test"
+                   << "documentToRestore"
+                   << BSONNULL);
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {expectedDocument});
 }
@@ -269,7 +268,7 @@ TEST_F(RollbackFixUpInfoTest,
                                << "ns"
                                << "test.t"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("_id"
                                        << "mydocid"));
@@ -287,15 +286,14 @@ TEST_F(RollbackFixUpInfoTest,
         RollbackFixUpInfo::SingleDocumentOpType::kDelete,
         nss.db().toString()));
 
-    auto expectedDocument = BSON(
-        "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
-                                       << docId)
-              << "operationType"
-              << "delete"
-              << "db"
-              << "test"
-              << "documentToRestore"
-              << BSONNULL);
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "documentId" << docId)
+                   << "operationType"
+                   << "delete"
+                   << "db"
+                   << "test"
+                   << "documentToRestore"
+                   << BSONNULL);
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {expectedDocument});
@@ -308,7 +306,7 @@ TEST_F(RollbackFixUpInfoTest,
                                << "ns"
                                << "test.t"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o2"
                                << BSON("_id"
                                        << "mydocid")
@@ -328,15 +326,14 @@ TEST_F(RollbackFixUpInfoTest,
         RollbackFixUpInfo::SingleDocumentOpType::kUpdate,
         nss.db().toString()));
 
-    auto expectedDocument = BSON(
-        "_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "documentId"
-                                       << docId)
-              << "operationType"
-              << "update"
-              << "db"
-              << "test"
-              << "documentToRestore"
-              << BSONNULL);
+    auto expectedDocument =
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "documentId" << docId)
+                   << "operationType"
+                   << "update"
+                   << "db"
+                   << "test"
+                   << "documentToRestore"
+                   << BSONNULL);
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackDocsNamespace, {expectedDocument});
@@ -432,7 +429,7 @@ TEST_F(
                                << "ns"
                                << "mydb.$cmd"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("create"
                                        << "mynewcoll"
@@ -526,7 +523,7 @@ TEST_F(
 
     ASSERT_OK(rollbackFixUpInfo.processCreateCollectionOplogEntry(opCtx.get(), collectionUuid));
 
-    auto expectedDocument = BSON("_id" << collectionUuid.toBSON().firstElement() << "ns"
+    auto expectedDocument = BSON("_id" << collectionUuid << "ns"
                                        << "");
 
     // Finally, process create collection oplog entry.
@@ -556,7 +553,7 @@ TEST_F(RollbackFixUpInfoTest,
                                << "ns"
                                << "mydb.$cmd"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("drop"
                                        << "mydroppedcoll"));
@@ -571,8 +568,7 @@ TEST_F(RollbackFixUpInfoTest,
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
     ASSERT_OK(rollbackFixUpInfo.processDropCollectionOplogEntry(opCtx.get(), collectionUuid, nss));
 
-    auto expectedDocument =
-        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << nss.ns());
+    auto expectedDocument = BSON("_id" << collectionUuid << "ns" << nss.ns());
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {expectedDocument});
@@ -586,7 +582,7 @@ TEST_F(
                                << "ns"
                                << "mydb.$cmd"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("renameCollection"
                                        << "mydb.prevCollName"
@@ -607,8 +603,7 @@ TEST_F(
     ASSERT_OK(rollbackFixUpInfo.processRenameCollectionOplogEntry(
         opCtx.get(), collectionUuid, sourceNss, boost::none));
 
-    auto expectedDocument =
-        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << sourceNss.ns());
+    auto expectedDocument = BSON("_id" << collectionUuid << "ns" << sourceNss.ns());
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionUuidNamespace, {expectedDocument});
@@ -622,7 +617,7 @@ TEST_F(
                                << "ns"
                                << "mydb.$cmd"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("renameCollection"
                                        << "mydb.prevCollName"
@@ -631,7 +626,7 @@ TEST_F(
                                        << "stayTemp"
                                        << false
                                        << "dropTarget"
-                                       << UUID::gen().toBSON().firstElement()));
+                                       << UUID::gen()));
     auto collectionUuid = unittest::assertGet(UUID::parse(operation["ui"]));
     NamespaceString sourceNss(operation["o"].Obj().firstElement().String());
     NamespaceString targetNss(operation["o"].Obj()["to"].String());
@@ -645,10 +640,8 @@ TEST_F(
     ASSERT_OK(rollbackFixUpInfo.processRenameCollectionOplogEntry(
         opCtx.get(), collectionUuid, sourceNss, std::make_pair(droppedCollectionUuid, targetNss)));
 
-    auto expectedDocument1 =
-        BSON("_id" << collectionUuid.toBSON().firstElement() << "ns" << sourceNss.ns());
-    auto expectedDocument2 =
-        BSON("_id" << droppedCollectionUuid.toBSON().firstElement() << "ns" << targetNss.ns());
+    auto expectedDocument1 = BSON("_id" << collectionUuid << "ns" << sourceNss.ns());
+    auto expectedDocument2 = BSON("_id" << droppedCollectionUuid << "ns" << targetNss.ns());
 
     _assertDocumentsInCollectionEquals(opCtx.get(),
                                        RollbackFixUpInfo::kRollbackCollectionUuidNamespace,
@@ -663,7 +656,7 @@ TEST_F(RollbackFixUpInfoTest,
                   << "ns"
                   << "mydb.$cmd"
                   << "ui"
-                  << UUID::gen().toBSON().firstElement()
+                  << UUID::gen()
                   << "o"
                   << BSON("collMod"
                           << "mycoll"
@@ -688,8 +681,7 @@ TEST_F(RollbackFixUpInfoTest,
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
     ASSERT_OK(rollbackFixUpInfo.processCollModOplogEntry(opCtx.get(), collectionUuid, optionsObj));
 
-    auto expectedDocument =
-        BSON("_id" << collectionUuid.toBSON().firstElement() << "options" << optionsObj);
+    auto expectedDocument = BSON("_id" << collectionUuid << "options" << optionsObj);
 
     _assertDocumentsInCollectionEquals(
         opCtx.get(), RollbackFixUpInfo::kRollbackCollectionOptionsNamespace, {expectedDocument});
@@ -703,7 +695,7 @@ TEST_F(RollbackFixUpInfoTest,
                   << "ns"
                   << "mydb.$cmd"
                   << "ui"
-                  << UUID::gen().toBSON().firstElement()
+                  << UUID::gen()
                   << "o"
                   << BSON("createIndex" << 1 << "v" << 2 << "key" << BSON("b" << 1) << "name"
                                         << "b_1"
@@ -722,8 +714,7 @@ TEST_F(RollbackFixUpInfoTest,
         rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "create"
                    << "infoObj"
@@ -756,9 +747,7 @@ TEST_F(RollbackFixUpInfoTest,
     _assertDocumentsInCollectionEquals(
         opCtx.get(),
         RollbackFixUpInfo::kRollbackIndexNamespace,
-        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
-                                             << "indexName"
-                                             << indexName)
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                     << "operationType"
                     << "drop"
                     << "infoObj"
@@ -792,9 +781,7 @@ TEST_F(RollbackFixUpInfoTest,
     _assertDocumentsInCollectionEquals(
         opCtx.get(),
         RollbackFixUpInfo::kRollbackIndexNamespace,
-        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
-                                             << "indexName"
-                                             << indexName)
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                     << "operationType"
                     << "updateTTL"
                     << "infoObj"
@@ -807,9 +794,7 @@ TEST_F(RollbackFixUpInfoTest,
     _assertDocumentsInCollectionEquals(
         opCtx.get(),
         RollbackFixUpInfo::kRollbackIndexNamespace,
-        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
-                                             << "indexName"
-                                             << indexName)
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                     << "operationType"
                     << "create"
                     << "infoObj"
@@ -827,8 +812,7 @@ TEST_F(
     RollbackFixUpInfo rollbackFixUpInfo(_storageInterface.get());
 
     auto malformedDoc =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "unknownIndexOpType"
                    << "infoObj"
@@ -846,8 +830,7 @@ TEST_F(
         rollbackFixUpInfo.processCreateIndexOplogEntry(opCtx.get(), collectionUuid, indexName));
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "create"
                    << "infoObj"
@@ -865,7 +848,7 @@ TEST_F(
                                << "ns"
                                << "mydb.$cmd"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("collMod"
                                        << "mycoll"
@@ -890,8 +873,7 @@ TEST_F(
         opCtx.get(), collectionUuid, indexName, expireAfterSeconds));
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "updateTTL"
                    << "infoObj"
@@ -942,8 +924,7 @@ TEST_F(
     auto expectedInfoObj = bob.obj();
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "drop"
                    << "infoObj"
@@ -976,8 +957,7 @@ TEST_F(
         opCtx.get(), collectionUuid, indexName, Seconds(60)));
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "updateTTL"
                    << "infoObj"
@@ -994,7 +974,7 @@ TEST_F(RollbackFixUpInfoTest,
                                << "ns"
                                << "mydb.$cmd"
                                << "ui"
-                               << UUID::gen().toBSON().firstElement()
+                               << UUID::gen()
                                << "o"
                                << BSON("dropIndexes"
                                        << "mycoll"
@@ -1019,8 +999,7 @@ TEST_F(RollbackFixUpInfoTest,
         opCtx.get(), collectionUuid, indexName, infoObj));
 
     auto expectedDocument =
-        BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement() << "indexName"
-                                            << indexName)
+        BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                    << "operationType"
                    << "drop"
                    << "infoObj"
@@ -1053,9 +1032,7 @@ TEST_F(RollbackFixUpInfoTest,
     _assertDocumentsInCollectionEquals(
         opCtx.get(),
         RollbackFixUpInfo::kRollbackIndexNamespace,
-        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
-                                             << "indexName"
-                                             << indexName)
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                     << "operationType"
                     << "create"
                     << "infoObj"
@@ -1070,9 +1047,7 @@ TEST_F(RollbackFixUpInfoTest,
     _assertDocumentsInCollectionEquals(
         opCtx.get(),
         RollbackFixUpInfo::kRollbackIndexNamespace,
-        {BSON("_id" << BSON("collectionUuid" << collectionUuid.toBSON().firstElement()
-                                             << "indexName"
-                                             << indexName)
+        {BSON("_id" << BSON("collectionUuid" << collectionUuid << "indexName" << indexName)
                     << "operationType"
                     << "drop"
                     << "infoObj"

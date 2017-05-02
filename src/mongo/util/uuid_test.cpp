@@ -170,5 +170,16 @@ TEST(UUIDTest, toAndFromBSONTest) {
     ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson4.getField("uuid")));
 }
 
+TEST(UUIDTest, toBSONUsingBSONMacroTest) {
+    auto uuid = UUID::gen();
+    auto bson = BSON("myuuid" << uuid);
+
+    BSONObjBuilder bob;
+    uuid.appendToBuilder(&bob, "myuuid");
+    auto expectedBson = bob.obj();
+
+    ASSERT_BSONOBJ_EQ(expectedBson, bson);
+}
+
 }  // namespace
 }  // namespace mongo
