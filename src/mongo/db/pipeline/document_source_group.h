@@ -148,15 +148,7 @@ private:
      */
     Value expandId(const Value& val);
 
-    /**
-     * 'vFieldName' contains the field names for the result documents, 'vpAccumulatorFactory'
-     * contains the accumulator factories for the result documents, and 'vpExpression' contains the
-     * common expressions used by each instance of each accumulator in order to find the right-hand
-     * side of what gets added to the accumulator. These three vectors parallel each other.
-     */
-    std::vector<std::string> vFieldName;
-    std::vector<Accumulator::Factory> vpAccumulatorFactory;
-    std::vector<boost::intrusive_ptr<Expression>> vpExpression;
+    std::vector<AccumulationStatement> _accumulatedFields;
 
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
