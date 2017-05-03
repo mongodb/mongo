@@ -1361,20 +1361,37 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
         return false;
     }
 
-    // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
-    auto distinctNode = stdx::make_unique<DistinctNode>(indexScanNode->index);
-    distinctNode->direction = indexScanNode->direction;
-    distinctNode->bounds = indexScanNode->bounds;
-
     // Figure out which field we're skipping to the next value of.
-    distinctNode->fieldNo = 0;
+    int fieldNo = 0;
     BSONObjIterator it(indexScanNode->index.keyPattern);
     while (it.more()) {
         if (field == it.next().fieldName()) {
             break;
         }
-        distinctNode->fieldNo++;
+        ++fieldNo;
     }
+
+    // We should not use a distinct scan if the field over which we are computing the distinct is
+    // multikey.
+    if (indexScanNode->index.multikey) {
+        const auto& multikeyPaths = indexScanNode->index.multikeyPaths;
+        if (multikeyPaths.empty()) {
+            // We don't have path-level multikey information available.
+            return false;
+        }
+
+        if (!multikeyPaths[fieldNo].empty()) {
+            // Path-level multikey information indicates that the distinct key contains at least one
+            // array component.
+            return false;
+        }
+    }
+
+    // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
+    auto distinctNode = stdx::make_unique<DistinctNode>(indexScanNode->index);
+    distinctNode->direction = indexScanNode->direction;
+    distinctNode->bounds = indexScanNode->bounds;
+    distinctNode->fieldNo = fieldNo;
 
     if (fetchNode) {
         // If there is a fetch node, then there is no need for the projection. The fetch node should
