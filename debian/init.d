@@ -121,6 +121,11 @@ running() {
     [ ! -f "$PIDFILE" ] && return 1
     pid=`cat $PIDFILE`
     running_pid $pid $DAEMON || return 1
+    for i in `seq 1 20`; do
+      nc -z localhost <%= node['mongodb']['port'] %> && return 0
+      echo -n "."
+      sleep 15
+    done
     return 0
 }
 
