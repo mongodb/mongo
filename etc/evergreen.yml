@@ -94,7 +94,6 @@ variables:
     file: src/compile_expansions.yml
 
 - &jepsen_config_vars
-  hang_analyzer_processes: "java"
   jepsen_key_time_limit: --key-time-limit 15
   jepsen_protocol_version: --protocol-version 1
   jepsen_read_concern: ""
@@ -1162,9 +1161,17 @@ timeout:
       working_dir: src
       script: |
         set -o verbose
+
+        # We run the hang_analyzer.py script with root privileges when running the Jepsen tests in
+        # order to be able to attach to the mongod processes inside the LXC containers.
+        sudo=
+        if [ ${distro_id} = "ubuntu1404-jepsen" ]; then
+          ${set_sudo}
+        fi
+
         hang_analyzer_option="-c -o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
-        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option
+        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option
 
 #######################################
 #               Tasks                 #
@@ -1397,7 +1404,6 @@ tasks:
   - func: "run jepsen test"
     vars:
       <<: *jepsen_config_vars
-      hang_analyzer_processes: "java"
       jepsen_read_with_find_and_modify: --read-with-find-and-modify
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: register
@@ -1436,7 +1442,6 @@ tasks:
   - func: "run jepsen test"
     vars:
       <<: *jepsen_config_vars
-      hang_analyzer_processes: "java"
       jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine mmapv1
       jepsen_test_name: register
@@ -1452,7 +1457,6 @@ tasks:
   - func: "run jepsen test"
     vars:
       <<: *jepsen_config_vars
-      hang_analyzer_processes: "java"
       jepsen_read_concern: --read-concern linearizable
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: register
