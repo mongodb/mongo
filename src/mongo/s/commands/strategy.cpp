@@ -153,6 +153,11 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
     auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
     const auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
 
+    // No need to check proof is no time is given.
+    if (signedTime.getTime() == LogicalTime::kUninitialized) {
+        return Status::OK();
+    }
+
     if (authSession->getAuthorizationManager().isAuthEnabled()) {
         auto advanceClockStatus = logicalTimeValidator->validate(signedTime);
 

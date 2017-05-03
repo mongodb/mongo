@@ -65,14 +65,15 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(const LogicalTime& newTi
     // Compare and calculate HMAC inside mutex to prevent multiple threads computing HMAC for the
     // same logical time.
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (newTime == _lastSeenValidTime.getTime()) {
+    // Note: _lastSeenValidTime will initially not have a proof set.
+    if (newTime == _lastSeenValidTime.getTime() && _lastSeenValidTime.getProof()) {
         return _lastSeenValidTime;
     }
 
     auto signature = _timeProofService.getProof(newTime, tempKey);
     SignedLogicalTime newSignedTime(newTime, std::move(signature), 0);
 
-    if (newTime > _lastSeenValidTime.getTime()) {
+    if (newTime > _lastSeenValidTime.getTime() || !_lastSeenValidTime.getProof()) {
         _lastSeenValidTime = newSignedTime;
     }
 
