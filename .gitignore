@@ -85,6 +85,8 @@ scratch
 /mongoshim
 /mongosniff
 
+/file_allocator_bench
+
 *.tgz
 *.zip
 *.tar.gz
