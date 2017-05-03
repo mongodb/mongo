@@ -142,7 +142,6 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
         for (size_t i = 0; i < _currentAccumulators.size(); i++) {
             _currentAccumulators[i]->process(
                 _accumulatedFields[i].expression->evaluate(*_firstDocOfNextGroup), _doingMerge);
-
         }
 
         // Retrieve the next document.
