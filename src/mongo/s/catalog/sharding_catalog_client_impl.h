@@ -185,6 +185,12 @@ public:
                                const BSONObj& cmdObj,
                                BSONObjBuilder* result);
 
+    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        repl::ReadConcernLevel readConcernLevel) override;
+
 private:
     /**
      * Selects an optimal shard on which to place a newly created database from the set of

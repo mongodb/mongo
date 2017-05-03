@@ -58,7 +58,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -426,6 +425,9 @@ void State::prepTempCollection() {
             CollectionOptions options;
             options.setNoIdIndex();
             options.temp = true;
+            if (enableCollectionUUIDs) {
+                options.uuid.emplace(UUID::gen());
+            }
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
             invariant(incColl);
 
@@ -497,6 +499,9 @@ void State::prepTempCollection() {
 
         CollectionOptions options = finalOptions;
         options.temp = true;
+        if (enableCollectionUUIDs) {
+            options.uuid.emplace(UUID::gen());
+        }
         tempColl = tempCtx.db()->createCollection(_opCtx, _config.tempNamespace.ns(), options);
 
         for (vector<BSONObj>::iterator it = indexesToInsert.begin(); it != indexesToInsert.end();
@@ -510,8 +515,9 @@ void State::prepTempCollection() {
                 uassertStatusOK(status);
             }
             // Log the createIndex operation.
-            NamespaceString logNs{_config.tempNamespace.db(), "system.indexes"};
-            getGlobalServiceContext()->getOpObserver()->onCreateIndex(_opCtx, logNs, *it, false);
+            auto uuid = tempColl->uuid(_opCtx);
+            getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                _opCtx, _config.tempNamespace, uuid, *it, false);
         }
         wuow.commit();
     }
@@ -630,7 +636,7 @@ unsigned long long _collectionCount(OperationContext* opCtx,
     if (callerHoldsGlobalLock) {
         Database* db = dbHolder().get(opCtx, nss.ns());
         if (db) {
-            coll = db->getCollection(nss);
+            coll = db->getCollection(opCtx, nss);
         }
     } else {
         ctx.emplace(opCtx, nss);
@@ -707,7 +713,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
             {
                 OldClientContext tx(opCtx, _config.outputOptions.finalNamespace.ns());
                 Collection* coll =
-                    getCollectionOrUassert(tx.db(), _config.outputOptions.finalNamespace);
+                    getCollectionOrUassert(opCtx, tx.db(), _config.outputOptions.finalNamespace);
                 found = Helpers::findOne(opCtx, coll, temp["_id"].wrap(), old, true);
             }
 
@@ -742,7 +748,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         uassert(ErrorCodes::PrimarySteppedDown,
                 "no longer primary",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_opCtx, nss));
-        Collection* coll = getCollectionOrUassert(ctx.db(), nss);
+        Collection* coll = getCollectionOrUassert(_opCtx, ctx.db(), nss);
 
         BSONObjBuilder b;
         if (!o.hasField("_id")) {
@@ -774,7 +780,7 @@ void State::_insertToInc(BSONObj& o) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         OldClientWriteContext ctx(_opCtx, _config.incLong.ns());
         WriteUnitOfWork wuow(_opCtx);
-        Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
+        Collection* coll = getCollectionOrUassert(_opCtx, ctx.db(), _config.incLong);
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         // The documents inserted into the incremental collection are of the form
@@ -983,8 +989,10 @@ void State::bailFromJS() {
     _config.reducer->numReduces = _scope->getNumberInt("_redCt");
 }
 
-Collection* State::getCollectionOrUassert(Database* db, const NamespaceString& nss) {
-    Collection* out = db ? db->getCollection(nss) : NULL;
+Collection* State::getCollectionOrUassert(OperationContext* opCtx,
+                                          Database* db,
+                                          const NamespaceString& nss) {
+    Collection* out = db ? db->getCollection(opCtx, nss) : NULL;
     uassert(18697, "Collection unexpectedly disappeared: " + nss.ns(), out);
     return out;
 }
@@ -1062,7 +1070,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         OldClientWriteContext incCtx(_opCtx, _config.incLong.ns());
         WriteUnitOfWork wuow(_opCtx);
-        Collection* incColl = getCollectionOrUassert(incCtx.db(), _config.incLong);
+        Collection* incColl = getCollectionOrUassert(_opCtx, incCtx.db(), _config.incLong);
 
         bool foundIndex = false;
         IndexCatalog::IndexIterator ii = incColl->getIndexCatalog()->getIndexIterator(_opCtx, true);
@@ -1105,14 +1113,22 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    Collection* coll = getCollectionOrUassert(ctx->getDb(), _config.incLong);
+    Collection* coll = getCollectionOrUassert(opCtx, ctx->getDb(), _config.incLong);
     invariant(coll);
 
     auto statusWithPlanExecutor = getExecutor(
         _opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO, QueryPlannerParams::NO_TABLE_SCAN);
     verify(statusWithPlanExecutor.isOK());
 
-    unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
+
+    // Make sure the PlanExecutor is destroyed while holding a collection lock.
+    ON_BLOCK_EXIT([&exec, &ctx, opCtx, this] {
+        if (!ctx) {
+            AutoGetCollection autoColl(opCtx, _config.incLong, MODE_IS);
+            exec.reset();
+        }
+    });
 
     // iterate over all sorted objects
     BSONObj o;
@@ -1360,7 +1376,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmd,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         Timer t;
@@ -1396,34 +1411,16 @@ public:
         uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
 
         // Prevent sharding state from changing during the MR.
-        unique_ptr<RangePreserver> rangePreserver;
         ScopedCollectionMetadata collMetadata;
         {
-            AutoGetCollectionForReadCommand ctx(opCtx, config.nss);
-
-            Collection* collection = ctx.getCollection();
+            // Get metadata before we check our version, to make sure it doesn't increment in the
+            // meantime.
+            AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
+            auto collection = autoColl.getCollection();
             if (collection) {
-                rangePreserver.reset(new RangePreserver(collection));
-            }
-
-            // Get metadata before we check our version, to make sure it doesn't increment
-            // in the meantime.  Need to do this in the same lock scope as the block.
-            if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, config.nss.ns())) {
                 collMetadata = CollectionShardingState::get(opCtx, config.nss)->getMetadata();
             }
         }
-
-        // Ensure that the RangePreserver is freed under the lock. This is necessary since the
-        // RangePreserver's destructor unpins a ClientCursor, and access to the CursorManager must
-        // be done under the lock.
-        ON_BLOCK_EXIT([opCtx, &config, &rangePreserver] {
-            if (rangePreserver) {
-                // Be sure not to use AutoGetCollectionForReadCommand here, since that has
-                // side-effects other than lock acquisition.
-                AutoGetCollection ctx(opCtx, config.nss, MODE_IS);
-                rangePreserver.reset();
-            }
-        });
 
         bool shouldHaveData = false;
 
@@ -1501,10 +1498,10 @@ public:
                 }
                 std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-                unique_ptr<PlanExecutor> exec;
+                unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
                 {
                     Database* db = scopedAutoDb->getDb();
-                    Collection* coll = State::getCollectionOrUassert(db, config.nss);
+                    Collection* coll = State::getCollectionOrUassert(opCtx, db, config.nss);
                     invariant(coll);
 
                     auto statusWithPlanExecutor =
@@ -1599,7 +1596,7 @@ public:
                 // metrics. There is no harm adding here for the time being.
                 curOp->debug().setPlanSummaryMetrics(stats);
 
-                Collection* coll = scopedAutoDb->getDb()->getCollection(config.nss);
+                Collection* coll = scopedAutoDb->getDb()->getCollection(opCtx, config.nss);
                 invariant(coll);  // 'exec' hasn't been killed, so collection must be alive.
                 coll->infoCache()->notifyOfQuery(opCtx, stats.indexesUsed);
 
@@ -1714,7 +1711,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

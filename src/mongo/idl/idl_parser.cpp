@@ -184,4 +184,63 @@ void IDLParserErrorContext::throwUnknownField(StringData fieldName) const {
     std::string path = getElementPath(fieldName);
     uasserted(40415, str::stream() << "BSON field '" << path << "' is an unknown field.");
 }
+
+void IDLParserErrorContext::throwBadArrayFieldNumberValue(StringData value) const {
+    std::string path = getElementPath(StringData());
+    uasserted(40422,
+              str::stream() << "BSON array field '" << path << "' has an invalid value '" << value
+                            << "' for an array field name.");
+}
+void IDLParserErrorContext::throwBadArrayFieldNumberSequence(std::uint32_t actualValue,
+                                                             std::uint32_t expectedValue) const {
+    std::string path = getElementPath(StringData());
+    uasserted(40423,
+              str::stream() << "BSON array field '" << path << "' has a non-sequential value '"
+                            << actualValue
+                            << "' for an array field name, expected value '"
+                            << expectedValue
+                            << "'.");
+}
+
+std::vector<StringData> transformVector(const std::vector<std::string>& input) {
+    return std::vector<StringData>(begin(input), end(input));
+}
+
+std::vector<std::string> transformVector(const std::vector<StringData>& input) {
+    std::vector<std::string> output;
+
+    output.reserve(input.size());
+
+    std::transform(begin(input), end(input), std::back_inserter(output), [](auto&& str) {
+        return str.toString();
+    });
+
+    return output;
+}
+
+std::vector<ConstDataRange> transformVector(const std::vector<std::vector<std::uint8_t>>& input) {
+    std::vector<ConstDataRange> output;
+
+    output.reserve(input.size());
+
+    std::transform(begin(input), end(input), std::back_inserter(output), [](auto&& vec) {
+        return makeCDR(vec);
+    });
+
+    return output;
+}
+
+std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDataRange>& input) {
+    std::vector<std::vector<std::uint8_t>> output;
+
+    output.reserve(input.size());
+
+    std::transform(begin(input), end(input), std::back_inserter(output), [](auto&& cdr) {
+        return std::vector<std::uint8_t>(reinterpret_cast<const uint8_t*>(cdr.data()),
+                                         reinterpret_cast<const uint8_t*>(cdr.data()) +
+                                             cdr.length());
+    });
+
+    return output;
+}
 }  // namespace mongo

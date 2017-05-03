@@ -42,6 +42,10 @@ LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _ser
 
 Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                      BSONObjBuilder* metadataBob) {
+    if (!LogicalClock::get(_service)->canVerifyAndSign()) {
+        return Status::OK();
+    }
+
     LogicalTimeMetadata metadata(LogicalClock::get(_service)->getClusterTime());
     metadata.writeToMetadata(metadataBob);
     return Status::OK();
@@ -54,6 +58,12 @@ Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
         return parseStatus.getStatus();
     }
     auto& signedTime = parseStatus.getValue().getSignedTime();
+    // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
+    // default constructed SignedLogicalTime should be ignored.
+    if (signedTime.getTime() == LogicalTime::kUninitialized) {
+        return Status::OK();
+    }
+
     return LogicalClock::get(_service)->advanceClusterTimeFromTrustedSource(signedTime);
 }
 

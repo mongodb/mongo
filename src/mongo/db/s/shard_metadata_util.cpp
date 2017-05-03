@@ -35,9 +35,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -61,119 +59,70 @@ struct QueryAndSort {
 };
 
 /**
- * Returns a sort by ascending lastmod value.
- */
-BSONObj createChunkDiffQuerySort() {
-    // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, IN ORDER TO HANDLE CURSOR
-    // YIELDING BETWEEN CHUNKS OPERATIONS (SPLIT, MERGE, MOVE).
-    //
-    // This ensures that changes to chunk version (which will always be greater than any preceeding
-    // update) will always come *after* our current position in the chunk cursor, using an index on
-    // lastmod.
-    return BSON(ChunkType::DEPRECATED_lastmod() << 1);
-}
-
-/**
- * Returns the query needed to find incremental changes to the config.chunks collection on the
- * config server.
+ * Returns the query needed to find incremental changes to the chunks collection on a shard server.
  *
- * {"ns": nss, "lastmod": {"$gte": collectionVersion}}
- */
-QueryAndSort createConfigChunkDiffQuery(const NamespaceString& nss,
-                                        const ChunkVersion& collectionVersion) {
-    // The query has to find all the chunks $gte the server's current collection version. Splits,
-    // merges and moves will increment the collection version, so all updates are seen. The equal
-    // part of $gte is necessary because no chunk results indicates the collection has been dropped.
-    BSONObjBuilder queryBuilder;
-    queryBuilder.append(ChunkType::ns(), nss.ns());
-    {
-        BSONObjBuilder lastmodBuilder(queryBuilder.subobjStart(ChunkType::DEPRECATED_lastmod()));
-        lastmodBuilder.appendTimestamp("$gte", collectionVersion.toLong());
-        lastmodBuilder.done();
-    }
-
-    return QueryAndSort{queryBuilder.obj(), createChunkDiffQuerySort()};
-}
-
-/**
- * Returns the query needed to find incremental changes to a config.chunks.ns collection on a shard
- * server.
+ * The query has to find all the chunks $gte the current max version. Currently, any splits, merges
+ * and moves will increment the current max version. Querying by lastmod is essential because we
+ * want to use the {lastmod} index on the chunks collection. This makes potential cursor yields to
+ * apply split/merge/move updates safe: updates always move or insert documents at the end of the
+ * index (because the document updates always have higher lastmod), so changed always come *after*
+ * our current cursor position and are seen when the cursor recommences.
  *
- * {"lastmod": {"$gte": collectionVersion, "$lte": lastConsistentCollectionVersion}}
+ * The sort must be by ascending version so that the updates can be applied in-memory in order. This
+ * is important because it is possible for a cursor to read updates to the same _id document twice,
+ * due to the yield described above. If updates are applied in ascending version order, the later
+ * update is applied last and remains.
  */
-QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion,
-                                       const ChunkVersion& lastConsistentCollectionVersion) {
-    // The query has to find all the chunks $gte the server's current collection version, and $lte
-    // to the last consistent collection version the shard primary set. Splits, merges and moves
-    // will increment the collection version, so all updates are seen. The equal part of $gte is
-    // necessary because no chunk results indicates the collection has been dropped.
-    BSONObjBuilder queryBuilder;
-    {
-        BSONObjBuilder lastmodBuilder(queryBuilder.subobjStart(ChunkType::DEPRECATED_lastmod()));
-        lastmodBuilder.appendTimestamp("$gte", collectionVersion.toLong());
-        lastmodBuilder.appendTimestamp("$lte", lastConsistentCollectionVersion.toLong());
-        lastmodBuilder.done();
-    }
-
-    return QueryAndSort{queryBuilder.obj(), createChunkDiffQuerySort()};
+QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
+    return {BSON(ChunkType::DEPRECATED_lastmod() << GTE << Timestamp(collectionVersion.toLong())),
+            BSON(ChunkType::DEPRECATED_lastmod() << 1)};
 }
 
 }  // namespace
 
-StatusWith<std::pair<BSONObj, OID>> getCollectionShardKeyAndEpoch(
-    OperationContext* opCtx,
-    ShardingCatalogClient* catalogClient,
-    const NamespaceString& nss,
-    bool isShardPrimary) {
-    if (isShardPrimary) {
-        // Get the config.collections entry for 'nss'.
-        auto statusWithColl = catalogClient->getCollection(opCtx, nss.ns());
-        if (!statusWithColl.isOK()) {
-            if (statusWithColl.getStatus() == ErrorCodes::NamespaceNotFound) {
-                auto status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-
-            return statusWithColl.getStatus();
-        }
-        auto collInfo = statusWithColl.getValue().value;
-
-        // Update the shard's config.collections entry so that secondaries receive any changes.
-        Status updateStatus = updateShardCollectionEntry(opCtx,
-                                                         nss,
-                                                         BSON(ShardCollectionType::uuid(nss.ns())),
-                                                         ShardCollectionType(collInfo).toBSON());
-        if (!updateStatus.isOK()) {
-            return updateStatus;
-        }
-
-        return std::pair<BSONObj, OID>(collInfo.getKeyPattern().toBSON(), collInfo.getEpoch());
-    } else {  // shard secondary
-        // TODO: a secondary must wait and retry if the entry is not found or does not yet have a
-        // lastConsistentCollectionVersion.
-
-        auto statusWithCollectionEntry = readShardCollectionEntry(opCtx, nss);
-        if (!statusWithCollectionEntry.isOK()) {
-            return statusWithCollectionEntry.getStatus();
-        }
-        ShardCollectionType shardCollTypeEntry = statusWithCollectionEntry.getValue();
-        if (!shardCollTypeEntry.isLastConsistentCollectionVersionSet()) {
-            // The collection has been dropped since the refresh began.
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Could not load metadata because collection " << nss.ns()
-                                  << " was dropped"};
-        }
-
-        return std::pair<BSONObj, OID>(
-            shardCollTypeEntry.getKeyPattern().toBSON(),
-            shardCollTypeEntry.getLastConsistentCollectionVersionEpoch());
-    }
+bool RefreshState::operator==(RefreshState& other) {
+    return (other.epoch == epoch) && (other.refreshing == refreshing) &&
+        (other.sequenceNumber == sequenceNumber);
 }
 
-StatusWith<ShardCollectionType> readShardCollectionEntry(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
+Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
+    // Set 'refreshing' to true.
+    BSONObj update = BSON(ShardCollectionType::refreshing() << true);
+    return updateShardCollectionsEntry(
+        opCtx, BSON(ShardCollectionType::uuid() << nss.ns()), update, BSONObj(), false /*upsert*/);
+}
+
+Status unsetPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
+    // Set 'refreshing' to false and increment the sequence number so it's differs from the last
+    // stable state. Note: incrementing a non-existent field sets the field to the increment value,
+    // so such a situation is safe.
+    BSONObj update = BSON(ShardCollectionType::refreshing()
+                          << false
+                          << "$inc"
+                          << BSON(ShardCollectionType::refreshSequenceNumber() << 1));
+
+    return updateShardCollectionsEntry(opCtx,
+                                       BSON(ShardCollectionType::uuid() << nss.ns()),
+                                       BSON(ShardCollectionType::refreshing() << false),
+                                       BSON(ShardCollectionType::refreshSequenceNumber() << 1),
+                                       false /*upsert*/);
+}
+
+StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
+                                                  const NamespaceString& nss) {
+    auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
+    if (!statusWithCollectionEntry.isOK()) {
+        return statusWithCollectionEntry.getStatus();
+    }
+    ShardCollectionType entry = statusWithCollectionEntry.getValue();
+
+    return RefreshState{entry.getEpoch(),
+                        entry.hasRefreshing() ? entry.getRefreshing() : false,
+                        entry.hasRefreshSequenceNumber() ? entry.getRefreshSequenceNumber() : 0LL};
+}
+
+StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
     Query fullQuery(BSON(ShardCollectionType::uuid() << nss.ns()));
     fullQuery.readPref(ReadPreference::SecondaryOnly, BSONArray());
     try {
@@ -208,27 +157,37 @@ StatusWith<ShardCollectionType> readShardCollectionEntry(OperationContext* opCtx
     }
 }
 
-Status updateShardCollectionEntry(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const BSONObj& query,
-                                  const BSONObj& update) {
-    const BSONElement idField = query.getField("_id");
-    invariant(!idField.eoo());
+Status updateShardCollectionsEntry(OperationContext* opCtx,
+                                   const BSONObj& query,
+                                   const BSONObj& update,
+                                   const BSONObj& inc,
+                                   const bool upsert) {
+    invariant(query.hasField("_id"));
+    if (upsert) {
+        // If upserting, this should be an update from the config server that does not have shard
+        // refresh information.
+        invariant(!update.hasField(ShardCollectionType::refreshing()));
+        invariant(!update.hasField(ShardCollectionType::refreshSequenceNumber()));
+        invariant(inc.isEmpty());
+    }
 
     // Want to modify the document, not replace it.
     BSONObjBuilder updateBuilder;
     updateBuilder.append("$set", update);
+    if (!inc.isEmpty()) {
+        updateBuilder.append("$inc", inc);
+    }
 
     std::unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
     updateDoc->setQuery(query);
     updateDoc->setUpdateExpr(updateBuilder.obj());
-    updateDoc->setUpsert(true);
+    updateDoc->setUpsert(upsert);
 
     std::unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
     updateRequest->addToUpdates(updateDoc.release());
 
     BatchedCommandRequest request(updateRequest.release());
-    request.setNS(NamespaceString(CollectionType::ConfigNS));
+    request.setNS(NamespaceString(ShardCollectionType::ConfigNS));
     request.setWriteConcern(kLocalWriteConcern.toBSON());
     BSONObj cmdObj = request.toBSON();
 
@@ -247,91 +206,17 @@ Status updateShardCollectionEntry(OperationContext* opCtx,
         return Status::OK();
     } catch (const DBException& ex) {
         return {ex.toStatus().code(),
-                str::stream() << "Failed to locally update the '" << nss.ns()
-                              << "' entry in config.collections"
+                str::stream() << "Failed to apply the update '" << request.toString()
+                              << "' to config.collections"
                               << causedBy(ex.toStatus())};
-    }
-}
-
-StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
-                                             ShardingCatalogClient* catalogClient,
-                                             const NamespaceString& nss,
-                                             const ChunkVersion& collectionVersion,
-                                             bool isShardPrimary) {
-    if (isShardPrimary) {
-        // Get the chunks from the config server.
-        std::vector<ChunkType> chunks;
-        QueryAndSort diffQuery = createConfigChunkDiffQuery(nss, collectionVersion);
-        Status status = catalogClient->getChunks(opCtx,
-                                                 diffQuery.query,
-                                                 diffQuery.sort,
-                                                 boost::none,
-                                                 &chunks,
-                                                 nullptr,
-                                                 repl::ReadConcernLevel::kMajorityReadConcern);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        if (chunks.empty()) {
-            // This means that the collection was dropped because the query does $gte a version it
-            // already has: the query should always find that version or a greater one, never
-            // nothing.
-            status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-            if (!status.isOK()) {
-                return status;
-            }
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Could not load metadata because collection " << nss.ns()
-                                  << " was dropped"};
-        }
-
-        // Persist copies locally on the shard.
-        status = shardmetadatautil::writeNewChunks(opCtx, nss, chunks, collectionVersion.epoch());
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return chunks;
-    } else {  // shard secondary
-        // Get the chunks from this shard.
-        auto statusWithChunks = readShardChunks(opCtx, nss, collectionVersion);
-        if (!statusWithChunks.isOK()) {
-            return statusWithChunks.getStatus();
-        }
-
-        if (statusWithChunks.getValue().empty()) {
-            // If no chunks were found, then the collection has been dropped since the refresh
-            // began.
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Could not load metadata because collection " << nss.ns()
-                                  << " was dropped"};
-        }
-
-        return statusWithChunks.getValue();
     }
 }
 
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const ChunkVersion& collectionVersion) {
-    // Get the lastConsistentCollectionVersion from the config.collections entry for 'nss'.
-    auto statusWithShardCollectionType = readShardCollectionEntry(opCtx, nss);
-    if (!statusWithShardCollectionType.isOK()) {
-        return statusWithShardCollectionType.getStatus();
-    }
-    ShardCollectionType shardCollectionType = statusWithShardCollectionType.getValue();
-
-    if (!shardCollectionType.isLastConsistentCollectionVersionSet()) {
-        // The collection has been dropped and recreated since the refresh began.
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Could not load metadata because collection " << nss.ns()
-                              << " was dropped"};
-    }
-
     // Query to retrieve the chunks.
-    QueryAndSort diffQuery = createShardChunkDiffQuery(
-        collectionVersion, shardCollectionType.getLastConsistentCollectionVersion());
+    QueryAndSort diffQuery = createShardChunkDiffQuery(collectionVersion);
     Query fullQuery(diffQuery.query);
     fullQuery.sort(diffQuery.sort);
     fullQuery.readPref(ReadPreference::SecondaryOnly, BSONArray());
@@ -351,8 +236,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
         std::vector<ChunkType> chunks;
         while (cursor->more()) {
             BSONObj document = cursor->nextSafe().getOwned();
-            auto statusWithChunk = ChunkType::fromShardBSON(
-                document, shardCollectionType.getLastConsistentCollectionVersion().epoch());
+            auto statusWithChunk = ChunkType::fromShardBSON(document, collectionVersion.epoch());
             if (!statusWithChunk.isOK()) {
                 return {statusWithChunk.getStatus().code(),
                         str::stream() << "Failed to parse chunk '" << document.toString()
@@ -368,10 +252,10 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
     }
 }
 
-Status writeNewChunks(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      const std::vector<ChunkType>& chunks,
-                      const OID& currEpoch) {
+Status updateShardChunks(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const std::vector<ChunkType>& chunks,
+                         const OID& currEpoch) {
     invariant(!chunks.empty());
 
     NamespaceString chunkMetadataNss(ChunkType::ShardNSPrefix + nss.ns());
@@ -411,7 +295,7 @@ Status writeNewChunks(OperationContext* opCtx,
                     return status;
                 }
 
-                return Status{ErrorCodes::RemoteChangeDetected,
+                return Status{ErrorCodes::ConflictingOperationInProgress,
                               str::stream() << "Invalid chunks found when reloading '"
                                             << nss.toString()
                                             << "'. Previous collection epoch was '"
@@ -469,19 +353,6 @@ Status writeNewChunks(OperationContext* opCtx,
             }
         }
 
-        // Must update the config.collections 'lastConsistentCollectionVersion' field so that
-        // secondaries can load the latest chunk writes.
-        BSONObjBuilder builder;
-        chunks.back().getVersion().appendWithFieldForCommands(
-            &builder, ShardCollectionType::lastConsistentCollectionVersion());
-        BSONObj update = builder.obj();
-
-        auto collUpdateStatus = updateShardCollectionEntry(
-            opCtx, nss, BSON(ShardCollectionType::uuid(nss.ns())), update);
-        if (!collUpdateStatus.isOK()) {
-            return collUpdateStatus;
-        }
-
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -494,7 +365,7 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
     try {
         DBDirectClient client(opCtx);
 
-        // Delete the config.collections entry matching 'nss'.
+        // Delete the collections collection entry matching 'nss'.
         auto deleteDocs(stdx::make_unique<BatchedDeleteDocument>());
         deleteDocs->setQuery(BSON(ShardCollectionType::uuid << nss.ns()));
         deleteDocs->setLimit(0);

@@ -48,7 +48,7 @@ public:
           _fromMigrate(false),
           _isExplain(false),
           _returnDeleted(false),
-          _yieldPolicy(PlanExecutor::YIELD_MANUAL) {}
+          _yieldPolicy(PlanExecutor::NO_YIELD) {}
 
     void setQuery(const BSONObj& query) {
         _query = query;

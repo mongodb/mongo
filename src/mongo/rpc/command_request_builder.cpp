@@ -70,26 +70,19 @@ CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs
 
 CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
     invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
+    BSONObjBuilder bob(_builder);
+    for (auto elem : metadata) {
+        if (elem.fieldNameStringData() == "$configServerState") {
+            bob.appendAs(elem, "configsvr");
+        } else {
+            bob.append(elem);
+        }
+    }
     _state = State::kInputDocs;
     return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-    invariant(_state == State::kInputDocs);
-    auto rangeData = inputDocs.data();
-    _builder.appendBuf(rangeData.data(), rangeData.length());
-    return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
-    invariant(_state == State::kInputDocs);
-    inputDoc.appendSelfToBufBuilder(_builder);
-    return *this;
-}
-
-RequestBuilderInterface::State CommandRequestBuilder::getState() const {
-    return _state;
 }
 
 Protocol CommandRequestBuilder::getProtocol() const {

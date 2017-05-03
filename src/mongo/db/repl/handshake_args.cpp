@@ -53,7 +53,8 @@ const std::string kLegalHandshakeFieldNames[] = {
 HandshakeArgs::HandshakeArgs() : _hasRid(false), _hasMemberId(false), _rid(OID()), _memberId(-1) {}
 
 Status HandshakeArgs::initialize(const BSONObj& argsObj) {
-    Status status = bsonCheckOnlyHasFields("HandshakeArgs", argsObj, kLegalHandshakeFieldNames);
+    Status status =
+        bsonCheckOnlyHasFieldsForCommand("HandshakeArgs", argsObj, kLegalHandshakeFieldNames);
     if (!status.isOK())
         return status;
 

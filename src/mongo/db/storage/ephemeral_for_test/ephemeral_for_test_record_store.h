@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -180,8 +181,9 @@ private:
     StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len) const;
 
     RecordId allocateLoc();
-    bool cappedAndNeedDelete(OperationContext* opCtx) const;
-    void cappedDeleteAsNeeded(OperationContext* opCtx);
+    bool cappedAndNeedDelete_inlock(OperationContext* opCtx) const;
+    void cappedDeleteAsNeeded_inlock(OperationContext* opCtx);
+    void deleteRecord_inlock(OperationContext* opCtx, const RecordId& dl);
 
     // TODO figure out a proper solution to metadata
     const bool _isCapped;
@@ -192,13 +194,10 @@ private:
     // This is the "persistent" data.
     struct Data {
         Data(StringData ns, bool isOplog)
-            : dataSize(0),
-              recordsMutex(str::stream() << "recordsMutex_" << ns),
-              nextId(1),
-              isOplog(isOplog) {}
+            : dataSize(0), recordsMutex(), nextId(1), isOplog(isOplog) {}
 
         int64_t dataSize;
-        Lock::ResourceMutex recordsMutex;
+        stdx::mutex recordsMutex;
         Records records;
         int64_t nextId;
         const bool isOplog;

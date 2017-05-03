@@ -38,6 +38,8 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/query_request.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -54,12 +56,12 @@ const Document kDefaultCursorOptionDocument{
 TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{pipeline: [{$match: {a: 'abc'}}], explain: true, allowDiskUse: true, fromRouter: true, "
+        "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromRouter: true, "
         "bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: {batchSize: 10}, "
-        "hint: {a: 1}, comment: 'agg_comment'}");
+        "hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
+        "$queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment'}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
-    ASSERT_TRUE(request.getExplain());
-    ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
+    ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
     ASSERT_TRUE(request.isFromRouter());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
@@ -69,6 +71,21 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_BSONOBJ_EQ(request.getCollation(),
                       BSON("locale"
                            << "en_US"));
+    ASSERT_EQ(request.getMaxTimeMS(), 100u);
+    ASSERT_BSONOBJ_EQ(request.getReadConcern(),
+                      BSON("level"
+                           << "linearizable"));
+    ASSERT_BSONOBJ_EQ(request.getUnwrappedReadPref(),
+                      BSON("$readPreference"
+                           << "nearest"));
+}
+
+TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson("{pipeline: [], explain: true, cursor: {}}");
+    auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
+    ASSERT_TRUE(request.getExplain());
+    ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
 }
 
 TEST(AggregationRequestTest, ShouldParseExplicitExplainFalseWithCursorOption) {
@@ -123,6 +140,9 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setCollation(BSONObj());
     request.setHint(BSONObj());
     request.setComment("");
+    request.setMaxTimeMS(0u);
+    request.setUnwrappedReadPref(BSONObj());
+    request.setReadConcern(BSONObj());
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -138,6 +158,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setFromRouter(true);
     request.setBypassDocumentValidation(true);
     request.setBatchSize(10);
+    request.setMaxTimeMS(10u);
     const auto hintObj = BSON("a" << 1);
     request.setHint(hintObj);
     const auto comment = std::string("agg_comment");
@@ -145,6 +166,12 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     const auto collationObj = BSON("locale"
                                    << "en_US");
     request.setCollation(collationObj);
+    const auto readPrefObj = BSON("$readPreference"
+                                  << "nearest");
+    request.setUnwrappedReadPref(readPrefObj);
+    const auto readConcernObj = BSON("level"
+                                     << "linearizable");
+    request.setReadConcern(readConcernObj);
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -156,7 +183,10 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kCursorName,
                   Value(Document({{AggregationRequest::kBatchSizeName, 10}}))},
                  {AggregationRequest::kHintName, hintObj},
-                 {AggregationRequest::kCommentName, comment}};
+                 {AggregationRequest::kCommentName, comment},
+                 {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
+                 {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
+                 {QueryRequest::cmdOptionMaxTimeMS, 10}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -338,10 +368,10 @@ TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithWriteConce
 // Ignore fields parsed elsewhere.
 //
 
-TEST(AggregationRequestTest, ShouldIgnoreFieldsPrefixedWithDollar) {
+TEST(AggregationRequestTest, ShouldIgnoreQueryOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, $unknown: 1}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, $queryOptions: {}}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
@@ -349,20 +379,6 @@ TEST(AggregationRequestTest, ShouldIgnoreWriteConcernOption) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, writeConcern: 'invalid'}");
-    ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
-}
-
-TEST(AggregationRequestTest, ShouldIgnoreMaxTimeMsOption) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, maxTimeMS: 'invalid'}");
-    ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
-}
-
-TEST(AggregationRequestTest, ShouldIgnoreReadConcernOption) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, readConcern: 'invalid'}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

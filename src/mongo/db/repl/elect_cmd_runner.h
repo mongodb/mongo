@@ -33,8 +33,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
@@ -59,7 +59,7 @@ public:
         virtual ~Algorithm();
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                     const ResponseStatus& response);
+                                     const executor::RemoteCommandResponse& response);
         virtual bool hasReceivedSufficientResponses() const;
 
         int getReceivedVotes() const {

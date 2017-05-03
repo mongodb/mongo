@@ -73,13 +73,13 @@ bool checkIfSingleDoc(OperationContext* opCtx,
     BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
     BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
 
-    unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(opCtx,
-                                                             collection,
-                                                             idx,
-                                                             newmin,
-                                                             newmax,
-                                                             BoundInclusion::kIncludeStartKeyOnly,
-                                                             PlanExecutor::YIELD_MANUAL));
+    auto exec = InternalPlanner::indexScan(opCtx,
+                                           collection,
+                                           idx,
+                                           newmin,
+                                           newmax,
+                                           BoundInclusion::kIncludeStartKeyOnly,
+                                           PlanExecutor::NO_YIELD);
     // check if exactly one document found
     PlanExecutor::ExecState state;
     BSONObj obj;
@@ -170,7 +170,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         auto shardingState = ShardingState::get(opCtx);

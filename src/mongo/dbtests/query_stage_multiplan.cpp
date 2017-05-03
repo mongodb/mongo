@@ -187,7 +187,7 @@ public:
         mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
         // Plan 0 aka the first plan aka the index scan should be the best.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         mps->pickBestPlan(&yieldPolicy);
         ASSERT(mps->bestPlanChosen());
         ASSERT_EQUALS(0, mps->bestPlanIdx());
@@ -198,9 +198,9 @@ public:
                                                          std::move(mps),
                                                          std::move(cq),
                                                          coll,
-                                                         PlanExecutor::YIELD_MANUAL);
+                                                         PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Get all our results out.
         int results = 0;
@@ -271,7 +271,7 @@ public:
         }
 
         // This sets a backup plan.
-        PlanYieldPolicy yieldPolicy(PlanExecutor::YIELD_MANUAL, _clock);
+        PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
         mps->pickBestPlan(&yieldPolicy);
         ASSERT(mps->bestPlanChosen());
         ASSERT(mps->hasBackupPlan());
@@ -351,11 +351,8 @@ public:
         mps->addPlan(secondSoln.release(), secondPlan.release(), ws.get());
 
         // Making a PlanExecutor chooses the best plan.
-        auto exec = uassertStatusOK(PlanExecutor::make(&_opCtx,
-                                                       std::move(ws),
-                                                       std::move(mps),
-                                                       ctx.getCollection(),
-                                                       PlanExecutor::YIELD_MANUAL));
+        auto exec = uassertStatusOK(PlanExecutor::make(
+            &_opCtx, std::move(ws), std::move(mps), ctx.getCollection(), PlanExecutor::NO_YIELD));
 
         auto root = static_cast<MultiPlanStage*>(exec->getRootStage());
         ASSERT_TRUE(root->bestPlanChosen());
@@ -422,7 +419,7 @@ public:
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
             opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
         auto exec =
-            uassertStatusOK(getExecutor(&_opCtx, coll, std::move(cq), PlanExecutor::YIELD_MANUAL));
+            uassertStatusOK(getExecutor(&_opCtx, coll, std::move(cq), PlanExecutor::NO_YIELD));
 
         ASSERT_EQ(exec->getRootStage()->stageType(), STAGE_MULTI_PLAN);
 

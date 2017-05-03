@@ -133,8 +133,7 @@ public:
      * inclusions and exclusions. 'variablesParseState' is used by any contained expressions to
      * track which variables are defined so that they can later be referenced at execution time.
      */
-    virtual void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       const BSONObj& spec) = 0;
+    virtual void parse(const BSONObj& spec) = 0;
 
     /**
      * Optimize any expressions contained within this projection.
@@ -156,12 +155,15 @@ public:
     }
 
 protected:
-    ParsedAggregationProjection() = default;
+    ParsedAggregationProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : _expCtx(expCtx){};
 
     /**
      * Apply the projection to 'input'.
      */
     virtual Document applyProjection(Document input) const = 0;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 }  // namespace parsed_aggregation_projection
 }  // namespace mongo

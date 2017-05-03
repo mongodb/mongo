@@ -130,8 +130,6 @@ public:
      */
     const std::vector<BSONObj>& getCollectionInfos_forTest() const;
 
-    std::string getDiagnosticString() const override;
-
     bool isActive() const override;
 
     Status startup() noexcept override;
@@ -202,8 +200,6 @@ private:
      * Calls the above method after unlocking.
      */
     void _finishCallback_inlock(UniqueLock& lk, const Status& status);
-
-    std::string _getDiagnosticString_inlock() const;
 
     //
     // All member variables are labeled with one of the following codes indicating the

@@ -39,8 +39,8 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -54,126 +54,77 @@ namespace {
 const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
 
 /**
- * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently.
+ * Given an (optional) initial routing table and a set of changed chunks returned by the catalog
+ * cache loader, produces a new routing table with the changes applied.
  *
- * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
- */
-class CMConfigDiffTracker : public ConfigDiffTracker<std::shared_ptr<Chunk>> {
-public:
-    CMConfigDiffTracker(const NamespaceString& nss,
-                        RangeMap* currMap,
-                        ChunkVersion* maxVersion,
-                        MaxChunkVersionMap* maxShardVersions)
-        : ConfigDiffTracker<std::shared_ptr<Chunk>>(
-              nss.ns(), currMap, maxVersion, maxShardVersions) {}
-
-    bool isTracked(const ChunkType& chunk) const final {
-        // Mongos tracks all shards
-        return true;
-    }
-
-    bool isMinKeyIndexed() const final {
-        return false;
-    }
-
-    std::pair<BSONObj, std::shared_ptr<Chunk>> rangeFor(OperationContext* opCtx,
-                                                        const ChunkType& chunk) const final {
-        return std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk));
-    }
-
-    ShardId shardFor(OperationContext* opCtx, const ShardId& shardId) const final {
-        const auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-        return shard->getId();
-    }
-};
-
-/**
- * Blocking method, which refreshes the routing information for the specified collection. If
- * 'existingRoutingInfo' has been specified uses this as a basis to perform an 'incremental'
- * refresh, which only fetches the chunks which changed. Otherwise does a full refresh, fetching all
- * the chunks for the collection.
+ * If the collection is no longer sharded returns nullptr. If the epoch has changed, expects that
+ * the 'collectionChunksList' contains the full contents of the chunks collection for that namespace
+ * so that the routing table can be built from scratch.
  *
- * Returns the refreshed routing information if the collection is still sharded or nullptr if it is
- * not. If refresh fails for any reason, throws a DBException.
- *
- * With the exception of ConflictingOperationInProgress, error codes thrown from this method are
- * final in that there is nothing that can be done to remedy them other than pass the error to the
- * user.
- *
- * ConflictingOperationInProgress indicates that the chunk metadata was found to be inconsistent.
- * Since this may be transient, due to the collection being dropped or recreated, the caller must
- * retry the reload up to some configurable number of attempts.
+ * Throws ConflictingOperationInProgress if the chunk metadata was found to be inconsistent (not
+ * containing all the necessary chunks, contains overlaps or chunks' epoch values are not the same
+ * as that of the collection). Since this situation may be transient, due to the collection being
+ * dropped or recreated concurrently, the caller must retry the reload up to some configurable
+ * number of attempts.
  */
 std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    std::shared_ptr<ChunkManager> existingRoutingInfo) {
-    Timer t;
-
-    const auto catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
-
-    // Decide whether to do a full or partial load based on the state of the collection
-    auto collStatus = catalogClient->getCollection(opCtx, nss.ns());
-    if (collStatus == ErrorCodes::NamespaceNotFound) {
+    std::shared_ptr<ChunkManager> existingRoutingInfo,
+    StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollectionAndChangedChunks) {
+    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
         return nullptr;
     }
 
-    const auto coll = uassertStatusOK(std::move(collStatus)).value;
-    if (coll.getDropped()) {
-        return nullptr;
-    }
+    const auto collectionAndChunks = uassertStatusOK(std::move(swCollectionAndChangedChunks));
 
+    // Check whether the collection epoch might have changed
     ChunkVersion startingCollectionVersion;
     ChunkMap chunkMap =
         SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>();
 
     if (!existingRoutingInfo) {
         // If we don't have a basis chunk manager, do a full refresh
-        startingCollectionVersion = ChunkVersion(0, 0, coll.getEpoch());
-    } else if (existingRoutingInfo->getVersion().epoch() != coll.getEpoch()) {
+        startingCollectionVersion = ChunkVersion(0, 0, collectionAndChunks.epoch);
+    } else if (existingRoutingInfo->getVersion().epoch() != collectionAndChunks.epoch) {
         // If the collection's epoch has changed, do a full refresh
-        startingCollectionVersion = ChunkVersion(0, 0, coll.getEpoch());
+        startingCollectionVersion = ChunkVersion(0, 0, collectionAndChunks.epoch);
     } else {
-        // Otherwise do a partial refresh
         startingCollectionVersion = existingRoutingInfo->getVersion();
         chunkMap = existingRoutingInfo->chunkMap();
     }
 
-    log() << "Refreshing chunks for collection " << nss << " based on version "
-          << startingCollectionVersion;
-
-    // Diff tracker should *always* find at least one chunk if collection exists
-    const auto diffQuery =
-        CMConfigDiffTracker::createConfigDiffQuery(nss, startingCollectionVersion);
-
-    // Query the chunks which have changed
-    std::vector<ChunkType> newChunks;
-    repl::OpTime opTime;
-    uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->getChunks(
-        opCtx,
-        diffQuery.query,
-        diffQuery.sort,
-        boost::none,
-        &newChunks,
-        &opTime,
-        repl::ReadConcernLevel::kMajorityReadConcern));
-
     ChunkVersion collectionVersion = startingCollectionVersion;
 
-    ShardVersionMap unusedShardVersions;
-    CMConfigDiffTracker differ(nss, &chunkMap, &collectionVersion, &unusedShardVersions);
+    for (const auto& chunk : collectionAndChunks.changedChunks) {
+        const auto& chunkVersion = chunk.getVersion();
 
-    const int diffsApplied = differ.calculateConfigDiff(opCtx, newChunks);
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Chunk " << chunk.genID(nss.ns(), chunk.getMin())
+                              << " has epoch different from that of the collection "
+                              << chunkVersion.epoch(),
+                collectionVersion.epoch() == chunkVersion.epoch());
 
-    if (diffsApplied < 1) {
-        log() << "Refresh for collection " << nss << " took " << t.millis()
-              << " ms and failed because the collection's "
-                 "sharding metadata either changed in between or "
-                 "became corrupted";
+        // Chunks must always come in incrementally sorted order
+        invariant(chunkVersion >= collectionVersion);
+        collectionVersion = chunkVersion;
 
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  "Collection sharding status changed during refresh or became corrupted");
+        // Ensure chunk references a valid shard and that the shard is available and loaded
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShard()));
+
+        // Returns the first chunk with a max key that is > min - implies that the chunk overlaps
+        // min
+        const auto low = chunkMap.upper_bound(chunk.getMin());
+
+        // Returns the first chunk with a max key that is > max - implies that the next chunk cannot
+        // not overlap max
+        const auto high = chunkMap.upper_bound(chunk.getMax());
+
+        // Erase all chunks from the map, which overlap the chunk we got from the persistent store
+        chunkMap.erase(low, high);
+
+        // Insert only the chunk itself
+        chunkMap.insert(std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk)));
     }
 
     // If at least one diff was applied, the metadata is correct, but it might not have changed so
@@ -184,42 +135,34 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
     // sequence number to detect batch writes not making progress because of chunks moving across
     // shards too frequently.
     if (collectionVersion == startingCollectionVersion) {
-        log() << "Refresh for collection " << nss << " took " << t.millis()
-              << " ms and didn't find any metadata changes";
-
         return existingRoutingInfo;
     }
 
     std::unique_ptr<CollatorInterface> defaultCollator;
-    if (!coll.getDefaultCollation().isEmpty()) {
+    if (!collectionAndChunks.defaultCollation.isEmpty()) {
         // The collation should have been validated upon collection creation
         defaultCollator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(coll.getDefaultCollation()));
+                                              ->makeFromBSON(collectionAndChunks.defaultCollation));
     }
 
-    log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and found version "
-          << collectionVersion;
-
     return stdx::make_unique<ChunkManager>(nss,
-                                           coll.getKeyPattern(),
+                                           KeyPattern(collectionAndChunks.shardKeyPattern),
                                            std::move(defaultCollator),
-                                           coll.getUnique(),
+                                           collectionAndChunks.shardKeyIsUnique,
                                            std::move(chunkMap),
                                            collectionVersion);
 }
 
 }  // namespace
 
-CatalogCache::CatalogCache() = default;
+CatalogCache::CatalogCache() : _cacheLoader(stdx::make_unique<ConfigServerCatalogCacheLoader>()) {}
 
 CatalogCache::~CatalogCache() = default;
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
     try {
-        return {CachedDatabaseInfo(_getDatabase_inlock(opCtx, dbName))};
+        return {CachedDatabaseInfo(_getDatabase(opCtx, dbName))};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -227,17 +170,15 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
-    int numRefreshAttempts = 0;
-
     while (true) {
-        stdx::unique_lock<stdx::mutex> ul(_mutex);
-
         std::shared_ptr<DatabaseInfoEntry> dbEntry;
         try {
-            dbEntry = _getDatabase_inlock(opCtx, nss.db());
+            dbEntry = _getDatabase(opCtx, nss.db());
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
+
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
 
         auto& collections = dbEntry->collections;
 
@@ -259,37 +200,24 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
         auto& collEntry = it->second;
 
         if (collEntry.needsRefresh) {
-            numRefreshAttempts++;
-
-            try {
-                auto newRoutingInfo =
-                    refreshCollectionRoutingInfo(opCtx, nss, std::move(collEntry.routingInfo));
-                if (newRoutingInfo == nullptr) {
-                    collections.erase(it);
-
-                    // Loop around so we can return an "unsharded" routing info
-                    continue;
-                }
-
-                collEntry.routingInfo = std::move(newRoutingInfo);
-                collEntry.needsRefresh = false;
-            } catch (const DBException& ex) {
-                // It is possible that the metadata is being changed concurrently, so retry the
-                // refresh with a wait
-                if (ex.getCode() == ErrorCodes::ConflictingOperationInProgress &&
-                    numRefreshAttempts < kMaxInconsistentRoutingInfoRefreshAttempts) {
-                    ul.unlock();
-
-                    log() << "Metadata refresh for " << nss << " failed and will be retried"
-                          << causedBy(redact(ex));
-
-                    // Do the sleep outside of the mutex
-                    sleepFor(Milliseconds(10) * numRefreshAttempts);
-                    continue;
-                }
-
-                return ex.toStatus();
+            auto refreshNotification = collEntry.refreshCompletionNotification;
+            if (!refreshNotification) {
+                refreshNotification = (collEntry.refreshCompletionNotification =
+                                           std::make_shared<Notification<Status>>());
+                _scheduleCollectionRefresh_inlock(
+                    dbEntry, std::move(collEntry.routingInfo), nss, 1);
             }
+
+            // Wait on the notification outside of the mutex
+            ul.unlock();
+
+            auto refreshStatus = refreshNotification->get(opCtx);
+            if (!refreshStatus.isOK()) {
+                return refreshStatus;
+            }
+
+            // Once the refresh is complete, loop around to get the latest value
+            continue;
         }
 
         return {CachedCollectionRoutingInfo(dbEntry->primaryShardId, collEntry.routingInfo)};
@@ -391,8 +319,10 @@ void CatalogCache::purgeAllDatabases() {
     _databases.clear();
 }
 
-std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase_inlock(
-    OperationContext* opCtx, StringData dbName) {
+std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(OperationContext* opCtx,
+                                                                            StringData dbName) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
     auto it = _databases.find(dbName);
     if (it != _databases.end()) {
         return it->second;
@@ -414,11 +344,103 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase_inlo
 
     StringMap<CollectionRoutingInfoEntry> collectionEntries;
     for (const auto& coll : collections) {
+        if (coll.getDropped()) {
+            continue;
+        }
+
         collectionEntries[coll.getNs().ns()].needsRefresh = true;
     }
 
     return _databases[dbName] = std::shared_ptr<DatabaseInfoEntry>(new DatabaseInfoEntry{
                dbDesc.getPrimary(), dbDesc.getSharded(), std::move(collectionEntries)});
+}
+
+void CatalogCache::_scheduleCollectionRefresh_inlock(
+    std::shared_ptr<DatabaseInfoEntry> dbEntry,
+    std::shared_ptr<ChunkManager> existingRoutingInfo,
+    const NamespaceString& nss,
+    int refreshAttempt) {
+    Timer t;
+
+    const ChunkVersion startingCollectionVersion =
+        (existingRoutingInfo ? existingRoutingInfo->getVersion() : ChunkVersion::UNSHARDED());
+
+    const auto refreshFailed_inlock =
+        [ this, t, dbEntry, nss, refreshAttempt ](const Status& status) noexcept {
+        log() << "Refresh for collection " << nss << " took " << t.millis() << " ms and failed"
+              << causedBy(redact(status));
+
+        auto& collections = dbEntry->collections;
+        auto it = collections.find(nss.ns());
+        invariant(it != collections.end());
+        auto& collEntry = it->second;
+
+        // It is possible that the metadata is being changed concurrently, so retry the
+        // refresh again
+        if (status == ErrorCodes::ConflictingOperationInProgress &&
+            refreshAttempt < kMaxInconsistentRoutingInfoRefreshAttempts) {
+            _scheduleCollectionRefresh_inlock(dbEntry, nullptr, nss, refreshAttempt + 1);
+        } else {
+            // Leave needsRefresh to true so that any subsequent get attempts will kick off
+            // another round of refresh
+            collEntry.refreshCompletionNotification->set(status);
+            collEntry.refreshCompletionNotification = nullptr;
+        }
+    };
+
+    const auto refreshCallback =
+        [ this, t, dbEntry, nss, existingRoutingInfo, refreshFailed_inlock ](
+            OperationContext * opCtx,
+            StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
+        std::shared_ptr<ChunkManager> newRoutingInfo;
+        try {
+            newRoutingInfo = refreshCollectionRoutingInfo(
+                opCtx, nss, std::move(existingRoutingInfo), std::move(swCollAndChunks));
+        } catch (const DBException& ex) {
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
+            refreshFailed_inlock(ex.toStatus());
+            return;
+        }
+
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        auto& collections = dbEntry->collections;
+        auto it = collections.find(nss.ns());
+        invariant(it != collections.end());
+        auto& collEntry = it->second;
+
+        collEntry.needsRefresh = false;
+        collEntry.refreshCompletionNotification->set(Status::OK());
+        collEntry.refreshCompletionNotification = nullptr;
+
+        if (!newRoutingInfo) {
+            log() << "Refresh for collection " << nss << " took " << t.millis()
+                  << " and found the collection is not sharded";
+
+            collections.erase(it);
+        } else {
+            log() << "Refresh for collection " << nss << " took " << t.millis()
+                  << " ms and found version " << newRoutingInfo->getVersion();
+
+            collEntry.routingInfo = std::move(newRoutingInfo);
+        }
+    };
+
+    log() << "Refreshing chunks for collection " << nss << " based on version "
+          << startingCollectionVersion;
+
+    try {
+        _cacheLoader->getChunksSince(nss, startingCollectionVersion, refreshCallback);
+    } catch (const DBException& ex) {
+        const auto status = ex.toStatus();
+
+        // ConflictingOperationInProgress errors trigger retry of the catalog cache reload logic. If
+        // we failed to schedule the asynchronous reload, there is no point in doing another
+        // attempt.
+        invariant(status != ErrorCodes::ConflictingOperationInProgress);
+
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        refreshFailed_inlock(status);
+    }
 }
 
 CachedDatabaseInfo::CachedDatabaseInfo(std::shared_ptr<CatalogCache::DatabaseInfoEntry> db)

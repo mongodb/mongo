@@ -52,7 +52,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/range_preserver.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
@@ -102,7 +101,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         if (!cmdObj["start"].eoo()) {
@@ -235,7 +233,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.
-        RangePreserver preserver(collection);
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
         auto statusWithPlanExecutor =
             getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);
@@ -244,7 +242,7 @@ public:
             return false;
         }
 
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         auto curOp = CurOp::get(opCtx);
         {

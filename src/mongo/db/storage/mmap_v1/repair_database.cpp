@@ -338,9 +338,9 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
 
         map<string, CollectionOptions> namespacesToCopy;
         {
-            string ns = dbName + ".system.namespaces";
-            OldClientContext ctx(opCtx, ns);
-            Collection* coll = originalDatabase->getCollection(ns);
+            NamespaceString nss(dbName, "system.namespaces");
+            OldClientContext ctx(opCtx, nss.ns());
+            Collection* coll = originalDatabase->getCollection(opCtx, nss);
             if (coll) {
                 auto cursor = coll->getCursor(opCtx);
                 while (auto record = cursor->next()) {
@@ -375,6 +375,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
              i != namespacesToCopy.end();
              ++i) {
             string ns = i->first;
+            NamespaceString nss(ns);
             CollectionOptions options = i->second;
 
             Collection* tempCollection = NULL;
@@ -385,7 +386,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
             }
 
             OldClientContext readContext(opCtx, ns, originalDatabase);
-            Collection* originalCollection = originalDatabase->getCollection(ns);
+            Collection* originalCollection = originalDatabase->getCollection(opCtx, nss);
             invariant(originalCollection);
 
             // data
@@ -447,7 +448,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
         repairFileDeleter->success();
 
     // Close the database so we can rename/delete the original data files
-    dbHolder().close(opCtx, dbName);
+    dbHolder().close(opCtx, dbName, "database closed for repair");
 
     if (backupOriginalFiles) {
         _renameForBackup(dbName, reservedPath);

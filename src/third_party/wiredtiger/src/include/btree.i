@@ -1354,8 +1354,13 @@ __wt_page_can_evict(
 	 * the original parent page's index, because evicting an internal page
 	 * discards its WT_REF array, and a thread traversing the original
 	 * parent page index might see a freed WT_REF.
+	 *
+	 * One special case where we know this is safe is if the handle is
+	 * locked exclusive (e.g., when the whole tree is being evicted).  In
+	 * that case, no readers can be looking at an old index.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) && !__wt_split_obsolete(
+	if (!F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	    WT_PAGE_IS_INTERNAL(page) && !__wt_split_obsolete(
 	    session, page->pg_intl_split_gen))
 		return (false);
 

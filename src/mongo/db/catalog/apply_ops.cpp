@@ -282,7 +282,7 @@ Status preconditionOK(OperationContext* opCtx, const BSONObj& applyOpCmd, BSONOb
                 return {ErrorCodes::NamespaceNotFound,
                         "database in ns does not exist: " + nss.ns()};
             }
-            Collection* collection = database->getCollection(nss.ns());
+            Collection* collection = database->getCollection(opCtx, nss);
             if (!collection) {
                 return {ErrorCodes::NamespaceNotFound,
                         "collection in ns does not exist: " + nss.ns()};
@@ -329,10 +329,12 @@ Status applyOps(OperationContext* opCtx,
     // Perform write ops atomically
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            BSONObjBuilder intermediateResult;
             WriteUnitOfWork wunit(opCtx);
             numApplied = 0;
-            uassertStatusOK(_applyOps(opCtx, dbName, applyOpCmd, result, &numApplied));
+            uassertStatusOK(_applyOps(opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied));
             wunit.commit();
+            result->appendElements(intermediateResult.obj());
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", dbName);
     } catch (const DBException& ex) {

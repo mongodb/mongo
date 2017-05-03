@@ -33,7 +33,6 @@
 #include "mongo/db/json.h"
 #include "mongo/rpc/command_reply.h"
 #include "mongo/rpc/command_reply_builder.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/unittest/death_test.h"
@@ -180,19 +179,12 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
     outputDoc1.appendSelfToBufBuilder(outputDocs);
     outputDoc2.appendSelfToBufBuilder(outputDocs);
     outputDoc3.appendSelfToBufBuilder(outputDocs);
-    rpc::DocumentRange outputDocRange{outputDocs.buf(), outputDocs.buf() + outputDocs.len()};
-    if (replyBuilder.getProtocol() != rpc::Protocol::kOpQuery) {
-        replyBuilder.addOutputDocs(outputDocRange);
-    }
 
     auto msg = replyBuilder.done();
 
     T parsed(&msg);
 
     ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
-    if (replyBuilder.getProtocol() != rpc::Protocol::kOpQuery) {
-        ASSERT_TRUE(parsed.getOutputDocs() == outputDocRange);
-    }
 }
 
 }  // namespace

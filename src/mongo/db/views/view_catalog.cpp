@@ -89,10 +89,22 @@ Status ViewCatalog::_reloadIfNeeded_inlock(OperationContext* opCtx) {
         }
 
         NamespaceString viewName(view["_id"].str());
+
+        auto pipeline = view["pipeline"].Obj();
+        for (auto&& stage : pipeline) {
+            if (BSONType::Object != stage.type()) {
+                return Status(ErrorCodes::InvalidViewDefinition,
+                              str::stream() << "View 'pipeline' entries must be objects, but "
+                                            << viewName.toString()
+                                            << " has a pipeline element of type "
+                                            << stage.type());
+            }
+        }
+
         _viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(viewName.db(),
                                                                    viewName.coll(),
                                                                    view["viewOn"].str(),
-                                                                   view["pipeline"].Obj(),
+                                                                   pipeline,
                                                                    std::move(collator.getValue()));
         return Status::OK();
     });
@@ -198,9 +210,9 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
             if (!collationStatus.isOK()) {
                 return collationStatus;
             }
-            return _viewGraph.insertAndValidate(viewDef.name(), refs, pipelineSize);
+            return _viewGraph.insertAndValidate(viewDef, refs, pipelineSize);
         } else {
-            _viewGraph.insertWithoutValidating(viewDef.name(), refs, pipelineSize);
+            _viewGraph.insertWithoutValidating(viewDef, refs, pipelineSize);
             return Status::OK();
         }
     };

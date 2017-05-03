@@ -67,11 +67,16 @@ Status ParsedUpdate::parseRequest() {
         _collator = std::move(collator.getValue());
     }
 
+    Status status = parseArrayFilters();
+    if (!status.isOK()) {
+        return status;
+    }
+
     // We parse the update portion before the query portion because the dispostion of the update
     // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
     // the update involves the positional-dollar operator, we must have a CanonicalQuery even if
     // it isn't required for query execution.
-    Status status = parseUpdate();
+    status = parseUpdate();
     if (!status.isOK())
         return status;
     status = parseQuery();
@@ -138,9 +143,33 @@ Status ParsedUpdate::parseUpdate() {
     return _driver.parse(_request->getUpdates(), _request->isMulti());
 }
 
+Status ParsedUpdate::parseArrayFilters() {
+    const ExtensionsCallbackReal extensionsCallback(_opCtx, &_request->getNamespaceString());
+
+    for (auto rawArrayFilter : _request->getArrayFilters()) {
+        auto arrayFilterStatus =
+            ArrayFilter::parse(rawArrayFilter, extensionsCallback, _collator.get());
+        if (!arrayFilterStatus.isOK()) {
+            return arrayFilterStatus.getStatus();
+        }
+        auto arrayFilter = std::move(arrayFilterStatus.getValue());
+
+        if (_arrayFilters.find(arrayFilter->getId()) != _arrayFilters.end()) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Found multiple array filters with the same top-level field name "
+                              << arrayFilter->getId());
+        }
+
+        _arrayFilters[arrayFilter->getId()] = std::move(arrayFilter);
+    }
+
+    return Status::OK();
+}
+
 PlanExecutor::YieldPolicy ParsedUpdate::yieldPolicy() const {
     if (_request->isGod()) {
-        return PlanExecutor::YIELD_MANUAL;
+        return PlanExecutor::NO_YIELD;
     }
     if (_request->getYieldPolicy() == PlanExecutor::YIELD_AUTO && isIsolated()) {
         return PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;  // Don't yield locks.

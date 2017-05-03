@@ -42,6 +42,7 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -145,11 +146,13 @@ TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     net->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
     // blackhole heartbeat
-    net->scheduleResponse(noi, net->now(), ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+    net->scheduleResponse(
+        noi, net->now(), executor::RemoteCommandResponse(ErrorCodes::OperationFailed, "timeout"));
     net->runReadyNetworkOperations();
     // blackhole freshness
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
-    net->scheduleResponse(noi2, net->now(), ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+    net->scheduleResponse(
+        noi2, net->now(), executor::RemoteCommandResponse(ErrorCodes::OperationFailed, "timeout"));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
@@ -349,14 +352,10 @@ TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateFreshEnoughForElectability();
 
-    bool success = false;
-    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
+    ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
 
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the freshness checker and election command runner.
-    getReplCoord()->waitForElectionFinish_forTest();
-    getReplExec()->waitForEvent(event);
-    ASSERT_TRUE(success);
     ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 }
 
@@ -383,8 +382,9 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0));
 
-    // set hbreconfig to hang while in progress
-    getExternalState()->setStoreLocalConfigDocumentToHang(true);
+    getGlobalFailPointRegistry()
+        ->getFailPoint("blockHeartbeatReconfigFinish")
+        ->setMode(FailPoint::alwaysOn);
 
     // hb reconfig
     NetworkInterfaceMock* net = getNet();
@@ -455,7 +455,9 @@ TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     ASSERT_EQUALS(1,
                   countLogLinesContaining("Not standing for election; processing "
                                           "a configuration change"));
-    getExternalState()->setStoreLocalConfigDocumentToHang(false);
+    getGlobalFailPointRegistry()
+        ->getFailPoint("blockHeartbeatReconfigFinish")
+        ->setMode(FailPoint::off);
 }
 
 TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrimary) {
@@ -492,25 +494,27 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
         ReplSetHeartbeatArgs hbArgs;
         if (hbArgs.initialize(request.cmdObj).isOK()) {
             ReplSetHeartbeatResponse hbResp;
+            Date_t responseDate = net->now();
             hbResp.setSetName(config.getReplSetName());
             if (request.target == HostAndPort("node2", 12345)) {
                 hbResp.setState(MemberState::RS_PRIMARY);
             } else {
                 hbResp.setState(MemberState::RS_SECONDARY);
+                responseDate += Milliseconds{1};
             }
             hbResp.setConfigVersion(config.getConfigVersion());
             auto response = makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
-            net->scheduleResponse(noi, net->now(), response);
+            net->scheduleResponse(noi, responseDate, response);
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
             net->blackHole(noi);
         }
     }
-    net->runReadyNetworkOperations();
-    net->exitNetwork();
+    const auto afterHeartbeatsProcessed = net->now() + Milliseconds{1};
+    net->runUntil(afterHeartbeatsProcessed);
+    ASSERT_EQ(afterHeartbeatsProcessed, net->now());
 
-    net->enterNetwork();
     ASSERT_TRUE(net->hasReadyRequests());
     auto noi = net->getNextReadyRequest();
     auto&& request = noi->getRequest();

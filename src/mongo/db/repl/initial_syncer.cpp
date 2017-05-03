@@ -187,21 +187,6 @@ StatusWith<BSONObj> getLatestOplogEntry(executor::TaskExecutor* exec,
     return statusToReturn;
 }
 
-StatusWith<OpTimeWithHash> parseOpTimeWithHash(const BSONObj& oplogEntry) {
-    long long oplogEntryHash = 0LL;
-    auto status = bsonExtractIntegerField(oplogEntry, "h", &oplogEntryHash);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    const auto lastOpTime = OpTime::parseFromOplogEntry(oplogEntry);
-    if (!lastOpTime.isOK()) {
-        return lastOpTime.getStatus();
-    }
-
-    return OpTimeWithHash{oplogEntryHash, lastOpTime.getValue()};
-}
-
 StatusWith<OpTimeWithHash> parseOpTimeWithHash(const QueryResponseStatus& fetchResult) {
     if (!fetchResult.isOK()) {
         return fetchResult.getStatus();
@@ -209,7 +194,7 @@ StatusWith<OpTimeWithHash> parseOpTimeWithHash(const QueryResponseStatus& fetchR
     const auto docs = fetchResult.getValue().documents;
     const auto hasDoc = docs.begin() != docs.end();
     return hasDoc
-        ? parseOpTimeWithHash(docs.front())
+        ? AbstractOplogFetcher::parseOpTimeWithHash(docs.front())
         : StatusWith<OpTimeWithHash>{ErrorCodes::NoMatchingDocument, "no oplog entry found"};
 }
 
@@ -692,7 +677,6 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
                                         stdx::bind(&InitialSyncer::_oplogFetcherCallback,
                                                    this,
                                                    stdx::placeholders::_1,
-                                                   stdx::placeholders::_2,
                                                    onCompletionGuard));
 
     LOG(2) << "Starting OplogFetcher: " << _oplogFetcher->toString();
@@ -738,12 +722,11 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
 }
 
 void InitialSyncer::_oplogFetcherCallback(const Status& oplogFetcherFinishStatus,
-                                          const OpTimeWithHash& lastFetched,
                                           std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    log() << "Finished fetching oplog during initial sync: " << redact(oplogFetcherFinishStatus)
-          << ". Last fetched optime and hash: " << lastFetched;
-
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    log() << "Finished fetching oplog during initial sync: " << redact(oplogFetcherFinishStatus)
+          << ". Last fetched optime and hash: " << _lastFetched.toString();
+
     auto status = _checkForShutdownAndConvertStatus_inlock(
         oplogFetcherFinishStatus, "error fetching oplog during initial sync");
 
@@ -758,8 +741,7 @@ void InitialSyncer::_oplogFetcherCallback(const Status& oplogFetcherFinishStatus
     // OplogFetcher to ignore the current sync source response and return early.
     if (status.isOK()) {
         log() << "Finished fetching oplog fetching early. Last fetched optime and hash: "
-              << lastFetched.toString();
-        _lastFetched = lastFetched;
+              << _lastFetched.toString();
         return;
     }
 
@@ -888,7 +870,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
                                                    stdx::placeholders::_3);
 
         const auto lastEntry = ops.back().raw;
-        const auto opTimeWithHashStatus = parseOpTimeWithHash(lastEntry);
+        const auto opTimeWithHashStatus = AbstractOplogFetcher::parseOpTimeWithHash(lastEntry);
         status = opTimeWithHashStatus.getStatus();
         if (!status.isOK()) {
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);

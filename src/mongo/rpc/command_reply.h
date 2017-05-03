@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/reply_interface.h"
 
 namespace mongo {
@@ -68,18 +67,6 @@ public:
      */
     const BSONObj& getCommandReply() const final;
 
-    /**
-     * A variable number of BSON documents returned by the command. It is valid for the
-     * returned range to be empty.
-     *
-     * Example usage:
-     *
-     * for (auto&& doc : reply.getOutputDocs()) {
-     *    ... do stuff with doc
-     * }
-     */
-    DocumentRange getOutputDocs() const final;
-
     Protocol getProtocol() const final;
 
     friend bool operator==(const CommandReply& lhs, const CommandReply& rhs);
@@ -90,7 +77,6 @@ private:
 
     BSONObj _metadata;
     BSONObj _commandReply;
-    DocumentRange _outputDocs;
 };
 
 }  // namespace rpc

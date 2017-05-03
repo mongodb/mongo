@@ -55,6 +55,21 @@ types:
                                 - double
         deserializer: "mongo::BSONElement::numberInt"
 
+    bindata_generic:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: "A BSON bindata of "
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+
+    bindata_uuid:
+        bson_serialization_type: bindata
+        bindata_subtype: uuid
+        description: "A BSON bindata of uuid sub type"
+        cpp_type: "std::array<std::uint8_t, 16>"
+        deserializer: "mongo::BSONElement::uuid"
+
+
 structs:
     default_values:
         description: UnitTest for a single safeInt32
@@ -77,3 +92,13 @@ structs:
                 type: string
                 optional: true
                 description: "An optional string"
+            vectorField:
+                type: array<int>
+                description: "An example int array field with default value"
+            binDataField:
+                type: bindata_generic
+                description: "A binData of generic subtype"
+            uuidField:
+                type: bindata_uuid
+                description: "A binData of uuid subtype"
+

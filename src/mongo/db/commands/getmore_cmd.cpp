@@ -213,9 +213,8 @@ public:
             cursorManager = collection->getCursorManager();
         }
 
-        auto ccPin = cursorManager->pinCursor(request.cursorid);
+        auto ccPin = cursorManager->pinCursor(opCtx, request.cursorid);
         if (!ccPin.isOK()) {
-            // We didn't find the cursor.
             return appendCommandStatus(result, ccPin.getStatus());
         }
 
@@ -448,7 +447,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         // Counted as a getMore, not as a command.
@@ -513,7 +511,7 @@ public:
             }
         }
 
-        if (PlanExecutor::FAILURE == *state || PlanExecutor::DEAD == *state) {
+        if (PlanExecutor::FAILURE == *state) {
             nextBatch->abandon();
 
             error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
@@ -521,6 +519,12 @@ public:
 
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "GetMore command executor error: "
+                                        << WorkingSetCommon::toStatusString(obj));
+        } else if (PlanExecutor::DEAD == *state) {
+            nextBatch->abandon();
+
+            return Status(ErrorCodes::QueryPlanKilled,
+                          str::stream() << "PlanExecutor killed: "
                                         << WorkingSetCommon::toStatusString(obj));
         }
 

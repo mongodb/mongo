@@ -82,7 +82,7 @@ BSONObj fixForShards(const BSONObj& orig,
     BSONObjIterator i(orig);
     while (i.more()) {
         BSONElement e = i.next();
-        const std::string fn = e.fieldName();
+        const auto fn = e.fieldNameStringData();
 
         if (fn == bypassDocumentValidationCommandOption() || fn == "map" || fn == "mapreduce" ||
             fn == "mapReduce" || fn == "mapparams" || fn == "reduce" || fn == "query" ||
@@ -92,8 +92,8 @@ BSONObj fixForShards(const BSONObj& orig,
             b.append(e);
         } else if (fn == "out" || fn == "finalize" || fn == "writeConcern") {
             // We don't want to copy these
-        } else {
-            badShardedField = fn;
+        } else if (!Command::isGenericArgument(fn)) {
+            badShardedField = fn.toString();
             return BSONObj();
         }
     }
@@ -179,7 +179,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         Timer t;
@@ -326,7 +325,7 @@ public:
 
             try {
                 Strategy::commandOp(
-                    opCtx, dbname, shardedCommand, 0, nss.ns(), q, collation, &mrCommandResults);
+                    opCtx, dbname, shardedCommand, nss.ns(), q, collation, &mrCommandResults);
             } catch (DBException& e) {
                 e.addContext(str::stream() << "could not run map command on all shards for ns "
                                            << nss.ns()
@@ -479,7 +478,6 @@ public:
                     Strategy::commandOp(opCtx,
                                         outDB,
                                         finalCmdObj,
-                                        0,
                                         outputCollNss.ns(),
                                         query,
                                         CollationSpec::kSimpleSpec,

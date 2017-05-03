@@ -41,6 +41,7 @@ class OperationContext;
 class PlanStage;
 class WorkingSet;
 struct DeleteStageParams;
+struct UpdateStageParams;
 
 /**
  * The internal planner is a one-stop shop for "off-the-shelf" plans.  Most internal procedures
@@ -66,17 +67,18 @@ public:
     /**
      * Returns a collection scan.  Caller owns pointer.
      */
-    static std::unique_ptr<PlanExecutor> collectionScan(OperationContext* opCtx,
-                                                        StringData ns,
-                                                        Collection* collection,
-                                                        PlanExecutor::YieldPolicy yieldPolicy,
-                                                        const Direction direction = FORWARD,
-                                                        const RecordId startLoc = RecordId());
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
+        OperationContext* opCtx,
+        StringData ns,
+        Collection* collection,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        const Direction direction = FORWARD,
+        const RecordId startLoc = RecordId());
 
     /**
      * Returns a FETCH => DELETE plan.
      */
-    static std::unique_ptr<PlanExecutor> deleteWithCollectionScan(
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithCollectionScan(
         OperationContext* opCtx,
         Collection* collection,
         const DeleteStageParams& params,
@@ -87,28 +89,41 @@ public:
     /**
      * Returns an index scan.  Caller owns returned pointer.
      */
-    static std::unique_ptr<PlanExecutor> indexScan(OperationContext* opCtx,
-                                                   const Collection* collection,
-                                                   const IndexDescriptor* descriptor,
-                                                   const BSONObj& startKey,
-                                                   const BSONObj& endKey,
-                                                   BoundInclusion boundInclusion,
-                                                   PlanExecutor::YieldPolicy yieldPolicy,
-                                                   Direction direction = FORWARD,
-                                                   int options = IXSCAN_DEFAULT);
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> indexScan(
+        OperationContext* opCtx,
+        const Collection* collection,
+        const IndexDescriptor* descriptor,
+        const BSONObj& startKey,
+        const BSONObj& endKey,
+        BoundInclusion boundInclusion,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        Direction direction = FORWARD,
+        int options = IXSCAN_DEFAULT);
 
     /**
      * Returns an IXSCAN => FETCH => DELETE plan.
      */
-    static std::unique_ptr<PlanExecutor> deleteWithIndexScan(OperationContext* opCtx,
-                                                             Collection* collection,
-                                                             const DeleteStageParams& params,
-                                                             const IndexDescriptor* descriptor,
-                                                             const BSONObj& startKey,
-                                                             const BSONObj& endKey,
-                                                             BoundInclusion boundInclusion,
-                                                             PlanExecutor::YieldPolicy yieldPolicy,
-                                                             Direction direction = FORWARD);
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithIndexScan(
+        OperationContext* opCtx,
+        Collection* collection,
+        const DeleteStageParams& params,
+        const IndexDescriptor* descriptor,
+        const BSONObj& startKey,
+        const BSONObj& endKey,
+        BoundInclusion boundInclusion,
+        PlanExecutor::YieldPolicy yieldPolicy,
+        Direction direction = FORWARD);
+
+    /**
+     * Returns an IDHACK => UPDATE plan.
+     */
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> updateWithIdHack(
+        OperationContext* opCtx,
+        Collection* collection,
+        const UpdateStageParams& params,
+        const IndexDescriptor* descriptor,
+        const BSONObj& key,
+        PlanExecutor::YieldPolicy yieldPolicy);
 
 private:
     /**

@@ -47,18 +47,18 @@ class Document;
  */
 class AggregationRequest {
 public:
-    static const StringData kCommandName;
-    static const StringData kCursorName;
-    static const StringData kBatchSizeName;
-    static const StringData kFromRouterName;
-    static const StringData kPipelineName;
-    static const StringData kCollationName;
-    static const StringData kExplainName;
-    static const StringData kAllowDiskUseName;
-    static const StringData kHintName;
-    static const StringData kCommentName;
+    static constexpr StringData kCommandName = "aggregate"_sd;
+    static constexpr StringData kCursorName = "cursor"_sd;
+    static constexpr StringData kBatchSizeName = "batchSize"_sd;
+    static constexpr StringData kFromRouterName = "fromRouter"_sd;
+    static constexpr StringData kPipelineName = "pipeline"_sd;
+    static constexpr StringData kCollationName = "collation"_sd;
+    static constexpr StringData kExplainName = "explain"_sd;
+    static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
+    static constexpr StringData kHintName = "hint"_sd;
+    static constexpr StringData kCommentName = "comment"_sd;
 
-    static const long long kDefaultBatchSize;
+    static constexpr long long kDefaultBatchSize = 101;
 
     /**
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a
@@ -140,6 +140,18 @@ public:
         return _explainMode;
     }
 
+    unsigned int getMaxTimeMS() const {
+        return _maxTimeMS;
+    }
+
+    const BSONObj& getReadConcern() const {
+        return _readConcern;
+    }
+
+    const BSONObj& getUnwrappedReadPref() const {
+        return _unwrappedReadPref;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -180,6 +192,18 @@ public:
         _bypassDocumentValidation = shouldBypassDocumentValidation;
     }
 
+    void setMaxTimeMS(unsigned int maxTimeMS) {
+        _maxTimeMS = maxTimeMS;
+    }
+
+    void setReadConcern(BSONObj readConcern) {
+        _readConcern = readConcern.getOwned();
+    }
+
+    void setUnwrappedReadPref(BSONObj unwrappedReadPref) {
+        _unwrappedReadPref = unwrappedReadPref.getOwned();
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -203,11 +227,21 @@ private:
     // The comment parameter attached to this aggregation.
     std::string _comment;
 
+    BSONObj _readConcern;
+
+    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
+    // This object will be empty when no readPreference is specified or if the request does not
+    // originate from mongos.
+    BSONObj _unwrappedReadPref;
+
     // The explain mode to use, or boost::none if this is not a request for an aggregation explain.
     boost::optional<ExplainOptions::Verbosity> _explainMode;
 
     bool _allowDiskUse = false;
     bool _fromRouter = false;
     bool _bypassDocumentValidation = false;
+
+    // A user-specified maxTimeMS limit, or a value of '0' if not specified.
+    unsigned int _maxTimeMS = 0;
 };
 }  // namespace mongo

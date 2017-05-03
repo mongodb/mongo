@@ -149,6 +149,13 @@ void DocumentSourceFacet::setSource(DocumentSource* source) {
     _teeBuffer->setSource(source);
 }
 
+void DocumentSourceFacet::doDispose() {
+    for (auto&& facet : _facets) {
+        facet.pipeline.get_deleter().dismissDisposal();
+        facet.pipeline->dispose(pExpCtx->opCtx);
+    }
+}
+
 DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
     pExpCtx->checkForInterrupt();
 

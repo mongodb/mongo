@@ -43,13 +43,7 @@
 
     // We bump the term to make sure node 0's oplog is ahead of node 2's.
     var term = getLatestOp(conns[0]).t;
-    try {
-        assert.commandWorked(conns[0].adminCommand({replSetStepDown: 1, force: true}));
-    } catch (e) {
-        if (!isNetworkError(e)) {
-            throw e;
-        }
-    }
+    assert.adminCommandWorkedAllowingNetworkError(conns[0], {replSetStepDown: 1, force: true});
 
     // After stepping down due to the higher term, it will eventually get reelected.
     replTest.waitForState(conns[0], ReplSetTest.State.PRIMARY);

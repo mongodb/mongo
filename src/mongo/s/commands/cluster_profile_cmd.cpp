@@ -61,7 +61,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         errmsg = "profile currently not supported via mongos";

@@ -1,5 +1,3 @@
-// counttests.cpp : count.{h,cpp} unit tests.
-
 /**
  *    Copyright (C) 2008 10gen Inc.
  *
@@ -35,18 +33,11 @@
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/thread.h"
 
-#include "mongo/dbtests/dbtests.h"
-
 namespace CountTests {
-
-namespace {
-const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
-}  // namespace
 
 class Base {
 public:
@@ -58,7 +49,7 @@ public:
 
         {
             WriteUnitOfWork wunit(&_opCtx);
-            _collection = _database->getCollection(ns());
+            _collection = _database->getCollection(&_opCtx, ns());
             if (_collection) {
                 _database->dropCollection(&_opCtx, ns());
             }
@@ -66,8 +57,10 @@ public:
             wunit.commit();
         }
 
-        addIndex(fromjson("{\"a\":1}"));
+        DBDirectClient client(&_opCtx);
+        client.createIndex(ns(), IndexSpec().addKey("a").unique(false));
     }
+
     ~Base() {
         try {
             WriteUnitOfWork wunit(&_opCtx);
@@ -81,15 +74,6 @@ public:
 protected:
     static const char* ns() {
         return "unittests.counttests";
-    }
-
-    void addIndex(const BSONObj& key) {
-        Helpers::ensureIndex(&_opCtx,
-                             _collection,
-                             key,
-                             kIndexVersion,
-                             /*unique=*/false,
-                             /*name=*/key.firstElementFieldName());
     }
 
     void insert(const char* s) {
@@ -109,7 +93,6 @@ protected:
         }
         wunit.commit();
     }
-
 
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
@@ -161,7 +144,6 @@ public:
         ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":/^b/}")));
     }
 };
-
 
 class All : public Suite {
 public:

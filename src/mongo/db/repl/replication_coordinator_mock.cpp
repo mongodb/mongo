@@ -326,12 +326,6 @@ Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* opCt
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::processReplSetGetRBID(BSONObjBuilder* resultObj) {
-    return Status::OK();
-}
-
-void ReplicationCoordinatorMock::incrementRollbackID() {}
-
 Status ReplicationCoordinatorMock::processReplSetFresh(const ReplSetFreshArgs& args,
                                                        BSONObjBuilder* resultObj) {
     return Status::OK();
@@ -416,7 +410,8 @@ Status ReplicationCoordinatorMock::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::prepareReplMetadata(const BSONObj& metadataRequestObj,
+void ReplicationCoordinatorMock::prepareReplMetadata(OperationContext* opCtx,
+                                                     const BSONObj& metadataRequestObj,
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {}
 
@@ -495,6 +490,10 @@ void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
 
 void ReplicationCoordinatorMock::setMaster(bool isMaster) {
     _settings.setMaster(isMaster);
+}
+
+Status ReplicationCoordinatorMock::abortCatchupIfNeeded() {
+    return Status::OK();
 }
 
 }  // namespace repl

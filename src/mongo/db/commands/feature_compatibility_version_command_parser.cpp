@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/util/version.h"
 
@@ -62,8 +63,8 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
 
     // Ensure that the command does not contain any unrecognized parameters
     for (const auto& cmdElem : cmdObj) {
-        if (cmdElem.fieldNameStringData() == commandName ||
-            cmdElem.fieldNameStringData() == QueryRequest::cmdOptionMaxTimeMS) {
+        const auto fieldName = cmdElem.fieldNameStringData();
+        if (fieldName == commandName || Command::isGenericArgument(fieldName)) {
             continue;
         }
 

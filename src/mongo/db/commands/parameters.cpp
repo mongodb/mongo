@@ -91,7 +91,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         bool all = *cmdObj.firstElement().valuestrsafe() == '*';
@@ -140,7 +139,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         int numSet = 0;
@@ -164,6 +162,8 @@ public:
         while (parameterCheckIterator.more()) {
             BSONElement parameter = parameterCheckIterator.next();
             std::string parameterName = parameter.fieldName();
+            if (Command::isGenericArgument(parameterName))
+                continue;
 
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
 

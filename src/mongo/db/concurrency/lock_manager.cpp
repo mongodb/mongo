@@ -32,9 +32,10 @@
 
 #include "mongo/db/concurrency/lock_manager.h"
 
-#include <sstream>
+#include <third_party/murmurhash3/MurmurHash3.h>
 
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
@@ -97,6 +98,11 @@ uint32_t modeMask(LockMode mode) {
     return 1 << mode;
 }
 
+uint64_t hashStringData(StringData str) {
+    char hash[16];
+    MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
+    return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
+}
 
 /**
  * Maps the resource id to a human-readable string.
@@ -1116,14 +1122,14 @@ uint64_t ResourceId::fullHash(ResourceType type, uint64_t hashId) {
 }
 
 ResourceId::ResourceId(ResourceType type, StringData ns)
-    : _fullHash(fullHash(type, SimpleStringDataComparator::kInstance.hash(ns))) {
+    : _fullHash(fullHash(type, hashStringData(ns))) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     _nsCopy = ns.toString();
 #endif
 }
 
 ResourceId::ResourceId(ResourceType type, const std::string& ns)
-    : _fullHash(fullHash(type, SimpleStringDataComparator::kInstance.hash(ns))) {
+    : _fullHash(fullHash(type, hashStringData(ns))) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     _nsCopy = ns;
 #endif

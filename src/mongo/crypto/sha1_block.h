@@ -97,4 +97,6 @@ private:
     HashType _hash;
 };
 
+std::ostream& operator<<(std::ostream& os, const SHA1Block& sha1);
+
 }  // namespace mongo

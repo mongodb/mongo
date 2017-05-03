@@ -35,8 +35,6 @@
 #include "mongo/client/constants.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -317,13 +315,12 @@ public:
 
 /**
  * A response to a DbMessage.
+ *
+ * Order of fields makes DbResponse{funcReturningMessage()} valid.
  */
 struct DbResponse {
-    Message response;
-    int32_t responseToMsgId;
-    std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
-    DbResponse(Message r, int32_t rtId) : response(std::move(r)), responseToMsgId(rtId) {}
-    DbResponse() = default;
+    Message response;       // If empty, nothing will be returned to the client.
+    std::string exhaustNS;  // Namespace of cursor if exhaust mode, else "".
 };
 
 /**
@@ -348,58 +345,39 @@ public:
     }
 
     /**
-     * Finishes the reply and transfers the message buffer into 'out'.
+     * Finishes the reply and returns the message buffer.
      */
-    void putInMessage(Message* out,
-                      int queryResultFlags,
-                      int nReturned,
-                      int startingFrom = 0,
-                      long long cursorId = 0);
+    Message toQueryReply(int queryResultFlags,
+                         int nReturned,
+                         int startingFrom = 0,
+                         long long cursorId = 0);
 
     /**
-     * Finishes the reply and sends the message out to 'destination'.
+     * Similar to toQueryReply() but used for replying to a command.
      */
-    void send(const transport::SessionHandle& session,
-              int queryResultFlags,
-              const Message& requestMsg,
-              int nReturned,
-              int startingFrom = 0,
-              long long cursorId = 0);
-
-    /**
-     * Similar to send() but used for replying to a command.
-     */
-    void sendCommandReply(const transport::SessionHandle& session, const Message& requestMsg);
+    Message toCommandReply() {
+        return toQueryReply(0, 1);
+    }
 
 private:
     BufBuilder _buffer;
 };
 
-void replyToQuery(int queryResultFlags,
-                  const transport::SessionHandle& session,
-                  const Message& requestMsg,
-                  const void* data,
-                  int size,
-                  int nReturned,
-                  int startingFrom = 0,
-                  long long cursorId = 0);
+/**
+ * Helper to build a DbResponse from a buffer containing an OP_QUERY response.
+ */
+DbResponse replyToQuery(int queryResultFlags,
+                        const void* data,
+                        int size,
+                        int nReturned,
+                        int startingFrom = 0,
+                        long long cursorId = 0);
 
-/* object reply helper. */
-void replyToQuery(int queryResultFlags,
-                  const transport::SessionHandle& session,
-                  const Message& requestMsg,
-                  const BSONObj& responseObj);
-
-/* helper to do a reply using a DbResponse object */
-void replyToQuery(int queryResultFlags, const Message& m, DbResponse& dbresponse, BSONObj obj);
 
 /**
- * Helper method for setting up a response object.
- *
- * @param queryResultFlags The flags to set to the response object.
- * @param response The object to be used for building the response. The internal buffer of
- *     this object will contain the raw data from resultObj after a successful call.
- * @param resultObj The bson object that contains the reply data.
+ * Helper to build a DbRespose for OP_QUERY with a single reply object.
  */
-void replyToQuery(int queryResultFlags, Message& response, const BSONObj& resultObj);
+inline DbResponse replyToQuery(const BSONObj& obj, int queryResultFlags = 0) {
+    return replyToQuery(queryResultFlags, obj.objdata(), obj.objsize(), /*nReturned*/ 1);
+}
 }  // namespace mongo

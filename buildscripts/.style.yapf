@@ -1,0 +1,6 @@
+# See https://github.com/google/yapf
+[style]
+based_on_style = pep8
+column_limit = 100
+indent_dictionary_value = True
+

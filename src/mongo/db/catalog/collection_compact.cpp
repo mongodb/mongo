@@ -1,5 +1,3 @@
-// collection_compact.cpp
-
 /**
 *    Copyright (C) 2013 MongoDB Inc.
 *
@@ -30,7 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_impl.h"
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
@@ -107,8 +105,8 @@ private:
 }
 
 
-StatusWith<CompactStats> Collection::compact(OperationContext* opCtx,
-                                             const CompactOptions* compactOptions) {
+StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
+                                                 const CompactOptions* compactOptions) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
     DisableDocumentValidation validationDisabler(opCtx);
@@ -186,7 +184,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* opCtx,
 
     CompactStats stats;
 
-    MultiIndexBlock indexer(opCtx, this);
+    MultiIndexBlock indexer(opCtx, _this);
     indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 
@@ -194,7 +192,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* opCtx,
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 
-    MyCompactAdaptor adaptor(this, &indexer);
+    MyCompactAdaptor adaptor(_this, &indexer);
 
     status = _recordStore->compact(opCtx, &adaptor, compactOptions, &stats);
     if (!status.isOK())

@@ -33,12 +33,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/range_preserver.h"
 
 namespace mongo {
-
-class PlanExecutor;
 
 /**
  * Constructs and returns Documents from the BSONObj objects produced by a supplied PlanExecutor.
@@ -51,16 +49,10 @@ public:
     BSONObjSet getOutputSorts() final {
         return _outputSorts;
     }
-    /**
-     * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     bool isValidInitialSource() const final {
         return true;
     }
-    void dispose() final;
 
     void detachFromOperationContext() final;
 
@@ -72,7 +64,7 @@ public:
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
         Collection* collection,
-        std::unique_ptr<PlanExecutor> exec,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /*
@@ -139,11 +131,33 @@ public:
         return _planSummaryStats;
     }
 
+protected:
+    /**
+     * Disposes of '_exec' and '_rangePreserver' if they haven't been disposed already. This
+     * involves taking a collection lock.
+     */
+    void doDispose() final;
+
+    /**
+     * Attempts to combine with any subsequent $limit stages by setting the internal '_limit' field.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     DocumentSourceCursor(Collection* collection,
-                         std::unique_ptr<PlanExecutor> exec,
+                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    ~DocumentSourceCursor();
 
+    /**
+     * Acquires locks to properly destroy and de-register '_exec'. '_exec' must be non-null.
+     */
+    void cleanupExecutor();
+
+    /**
+     * Reads a batch of data from '_exec'.
+     */
     void loadBatch();
 
     void recordPlanSummaryStats();
@@ -159,8 +173,10 @@ private:
     boost::intrusive_ptr<DocumentSourceLimit> _limit;
     long long _docsAddedToBatches;  // for _limit enforcement
 
-    RangePreserver _rangePreserver;
-    std::unique_ptr<PlanExecutor> _exec;
+    // The underlying query plan which feeds this pipeline. Must be destroyed while holding the
+    // collection lock.
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
+
     BSONObjSet _outputSorts;
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;

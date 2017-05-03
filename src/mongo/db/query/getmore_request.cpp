@@ -34,6 +34,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/util/assert_util.h"
@@ -112,15 +113,15 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
     boost::optional<repl::OpTime> lastKnownCommittedOpTime;
 
     for (BSONElement el : cmdObj) {
-        const char* fieldName = el.fieldName();
-        if (str::equals(fieldName, kGetMoreCommandName)) {
+        const auto fieldName = el.fieldNameStringData();
+        if (fieldName == kGetMoreCommandName) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
             }
 
             cursorid = el.Long();
-        } else if (str::equals(fieldName, kCollectionField)) {
+        } else if (fieldName == kCollectionField) {
             if (el.type() != BSONType::String) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'collection' must be of type string in: "
@@ -128,14 +129,14 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
             }
 
             nss = parseNs(dbname, cmdObj);
-        } else if (str::equals(fieldName, kBatchSizeField)) {
+        } else if (fieldName == kBatchSizeField) {
             if (!el.isNumber()) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
             }
 
             batchSize = el.numberLong();
-        } else if (str::equals(fieldName, kAwaitDataTimeoutField)) {
+        } else if (fieldName == kAwaitDataTimeoutField) {
             auto maxAwaitDataTime = QueryRequest::parseMaxTimeMS(el);
             if (!maxAwaitDataTime.isOK()) {
                 return maxAwaitDataTime.getStatus();
@@ -144,20 +145,20 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
             if (maxAwaitDataTime.getValue()) {
                 awaitDataTimeout = Milliseconds(maxAwaitDataTime.getValue());
             }
-        } else if (str::equals(fieldName, kTermField)) {
+        } else if (fieldName == kTermField) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'term' must be of type NumberLong in: " << cmdObj};
             }
             term = el.Long();
-        } else if (str::equals(fieldName, kLastKnownCommittedOpTimeField)) {
+        } else if (fieldName == kLastKnownCommittedOpTimeField) {
             repl::OpTime ot;
             Status status = bsonExtractOpTimeField(el.wrap(), kLastKnownCommittedOpTimeField, &ot);
             if (!status.isOK()) {
                 return status;
             }
             lastKnownCommittedOpTime = ot;
-        } else if (!str::startsWith(fieldName, "$")) {
+        } else if (!Command::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
                                   << "Unrecognized field '"

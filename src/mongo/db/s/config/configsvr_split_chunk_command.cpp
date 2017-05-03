@@ -99,7 +99,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
@@ -116,9 +115,7 @@ public:
                                                                  parsedRequest.getChunkRange(),
                                                                  parsedRequest.getSplitPoints(),
                                                                  parsedRequest.getShardName());
-        if (!splitChunkResult.isOK()) {
-            return appendCommandStatus(result, splitChunkResult);
-        }
+        uassertStatusOK(splitChunkResult);
 
         return true;
     }

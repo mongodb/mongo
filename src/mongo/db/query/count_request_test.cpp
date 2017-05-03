@@ -61,8 +61,12 @@ TEST(CountRequest, ParseDefaults) {
     // Defaults
     ASSERT_EQUALS(countRequest.getLimit(), 0);
     ASSERT_EQUALS(countRequest.getSkip(), 0);
+    ASSERT_EQUALS(countRequest.getMaxTimeMS(), 0u);
     ASSERT(countRequest.getHint().isEmpty());
     ASSERT(countRequest.getCollation().isEmpty());
+    ASSERT(countRequest.getReadConcern().isEmpty());
+    ASSERT(countRequest.getUnwrappedReadPref().isEmpty());
+    ASSERT(countRequest.getComment().empty());
 }
 
 TEST(CountRequest, ParseComplete) {
@@ -81,7 +85,17 @@ TEST(CountRequest, ParseComplete) {
                                          << BSON("b" << 5)
                                          << "collation"
                                          << BSON("locale"
-                                                 << "en_US")),
+                                                 << "en_US")
+                                         << "readConcern"
+                                         << BSON("level"
+                                                 << "linearizable")
+                                         << "$queryOptions"
+                                         << BSON("$readPreference"
+                                                 << "secondary")
+                                         << "comment"
+                                         << "aComment"
+                                         << "maxTimeMS"
+                                         << 10000),
                                     isExplain);
 
     ASSERT_OK(countRequestStatus.getStatus());
@@ -92,8 +106,13 @@ TEST(CountRequest, ParseComplete) {
     ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
+    ASSERT_EQUALS(countRequest.getMaxTimeMS(), 10000u);
+    ASSERT_EQUALS(countRequest.getComment(), "aComment");
     ASSERT_BSONOBJ_EQ(countRequest.getHint(), fromjson("{ b : 5 }"));
     ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getReadConcern(), fromjson("{ level: 'linearizable' }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getUnwrappedReadPref(),
+                      fromjson("{ $readPreference: 'secondary' }"));
 }
 
 TEST(CountRequest, ParseWithExplain) {
@@ -189,26 +208,6 @@ TEST(CountRequest, FailParseBadCollationValue) {
     ASSERT_EQUALS(countRequestStatus.getStatus(), ErrorCodes::BadValue);
 }
 
-TEST(CountRequest, ToBSON) {
-    CountRequest countRequest(NamespaceString("TestDB.TestColl"), BSON("a" << BSON("$gte" << 11)));
-    countRequest.setLimit(100);
-    countRequest.setSkip(1000);
-    countRequest.setHint(BSON("b" << 5));
-    countRequest.setCollation(BSON("locale"
-                                   << "en_US"));
-
-    BSONObj actualObj = countRequest.toBSON();
-    BSONObj expectedObj(
-        fromjson("{ count : 'TestDB.TestColl',"
-                 "  query : { a : { '$gte' : 11 } },"
-                 "  limit : 100,"
-                 "  skip : 1000,"
-                 "  hint : { b : 5 },"
-                 "  collation : { locale : 'en_US' } },"));
-
-    ASSERT_BSONOBJ_EQ(actualObj, expectedObj);
-}
-
 TEST(CountRequest, ConvertToAggregationWithHint) {
     CountRequest countRequest(testns, BSONObj());
     countRequest.setHint(BSON("x" << 1));
@@ -268,6 +267,88 @@ TEST(CountRequest, ConvertToAggregationWithQueryAndFilterAndLimit) {
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountRequest, ConvertToAggregationWithMaxTimeMS) {
+    CountRequest countRequest(testns, BSONObj());
+    countRequest.setMaxTimeMS(100);
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_EQ(ar.getValue().getMaxTimeMS(), 100u);
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountRequest, ConvertToAggregationWithQueryOptions) {
+    CountRequest countRequest(testns, BSONObj());
+    countRequest.setUnwrappedReadPref(BSON("readPreference"
+                                           << "secondary"));
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_BSONOBJ_EQ(ar.getValue().getUnwrappedReadPref(),
+                      BSON("readPreference"
+                           << "secondary"));
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountRequest, ConvertToAggregationWithComment) {
+    CountRequest countRequest(testns, BSONObj());
+    countRequest.setComment("aComment");
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_EQ(ar.getValue().getComment(), "aComment");
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountRequest, ConvertToAggregationWithReadConcern) {
+    CountRequest countRequest(testns, BSONObj());
+    countRequest.setReadConcern(BSON("level"
+                                     << "linearizable"));
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_BSONOBJ_EQ(ar.getValue().getReadConcern(),
+                      BSON("level"
+                           << "linearizable"));
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 

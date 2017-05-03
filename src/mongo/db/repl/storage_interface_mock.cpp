@@ -69,6 +69,35 @@ void StorageInterfaceMock::setMinValidToAtLeast(OperationContext* opCtx, const O
     _minValid = std::max(_minValid, minValid);
 }
 
+StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    if (!_rbidInitialized) {
+        return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
+    }
+    return _rbid;
+}
+
+Status StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    if (_rbidInitialized) {
+        return Status(ErrorCodes::NamespaceExists, "Rollback ID already initialized");
+    }
+    _rbidInitialized = true;
+
+    // Start the mock RBID at a very high number to differentiate it from uninitialized RBIDs.
+    _rbid = 100;
+    return Status::OK();
+}
+
+Status StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    if (!_rbidInitialized) {
+        return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
+    }
+    _rbid++;
+    return Status::OK();
+}
+
 void StorageInterfaceMock::setOplogDeleteFromPoint(OperationContext* opCtx,
                                                    const Timestamp& timestamp) {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);

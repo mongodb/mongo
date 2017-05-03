@@ -58,7 +58,7 @@ DocumentSource::GetNextResult DocumentSourceTeeConsumer::getNext() {
     return _bufferSource->getNext(_facetId);
 }
 
-void DocumentSourceTeeConsumer::dispose() {
+void DocumentSourceTeeConsumer::doDispose() {
     _bufferSource->dispose(_facetId);
 }
 

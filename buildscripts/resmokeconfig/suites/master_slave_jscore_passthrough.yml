@@ -22,6 +22,7 @@ executor:
     fixture:
       class: MasterSlaveFixture
       mongod_options:
+        bind_ip_all: ''
         oplogSize: 511
         set_parameters:
           enableTestCommands: 1

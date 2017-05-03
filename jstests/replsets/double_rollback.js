@@ -106,8 +106,8 @@
     checkLog.contains(
         nodes[2], "remote oplog does not contain entry with optime matching our required optime");
 
-    var node0RBID = nodes[0].adminCommand('replSetGetRBID').rbid;
-    var node1RBID = nodes[1].adminCommand('replSetGetRBID').rbid;
+    var node0RBID = assert.commandWorked(nodes[0].adminCommand('replSetGetRBID')).rbid;
+    var node1RBID = assert.commandWorked(nodes[1].adminCommand('replSetGetRBID')).rbid;
 
     jsTestLog("Reconnect all nodes.");
     nodes[0].reconnect(nodes[1]);
@@ -124,8 +124,8 @@
 
     // Check that rollback happened on node 0, but not on node 2 since it had already rolled back
     // and just needed to finish applying ops to reach minValid.
-    assert.neq(node0RBID, nodes[0].adminCommand('replSetGetRBID').rbid);
-    assert.eq(node1RBID, nodes[1].adminCommand('replSetGetRBID').rbid);
+    assert.neq(node0RBID, assert.commandWorked(nodes[0].adminCommand('replSetGetRBID')).rbid);
+    assert.eq(node1RBID, assert.commandWorked(nodes[1].adminCommand('replSetGetRBID')).rbid);
 
     // Node 1 should still be primary, and should now be able to satisfy majority writes again.
     assert.writeOK(nodes[1].getDB(dbName).getCollection(collName + "4").insert({a: 4}, {

@@ -284,6 +284,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         const OpTime minValidSaved = storageInterface->getMinValid(opCtx);
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_state != ProducerState::Running) {
+            return;
+        }
         const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
         lastOpTimeFetched = _lastOpTimeFetched;
         _syncSourceHost = HostAndPort();
@@ -313,20 +316,29 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
 
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
         // All (accessible) sync sources were too stale.
-        // TODO: End catchup mode early if we are too stale.
         if (_replCoord->getMemberState().primary()) {
             warning() << "Too stale to catch up.";
             log() << "Our newest OpTime : " << lastOpTimeFetched;
             log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen
                   << " from " << syncSourceResp.getSyncSource();
-            sleepsecs(1);
+            _replCoord->abortCatchupIfNeeded();
             return;
         }
+
+        // We only need to mark ourselves as too stale once.
+        if (_tooStale) {
+            return;
+        }
+
+        // Mark yourself as too stale.
+        _tooStale = true;
 
         error() << "too stale to catch up -- entering maintenance mode";
         log() << "Our newest OpTime : " << lastOpTimeFetched;
         log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen;
         log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
+
+        // Activate maintenance mode and transition to RECOVERING.
         auto status = _replCoord->setMaintenanceMode(true);
         if (!status.isOK()) {
             warning() << "Failed to transition into maintenance mode: " << status;
@@ -338,10 +350,11 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         }
         return;
     } else if (syncSourceResp.isOK() && !syncSourceResp.getSyncSource().empty()) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _syncSourceHost = syncSourceResp.getSyncSource();
-        source = _syncSourceHost;
-
+        {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            _syncSourceHost = syncSourceResp.getSyncSource();
+            source = _syncSourceHost;
+        }
         // If our sync source has not changed, it is likely caused by our heartbeat data map being
         // out of date. In that case we sleep for 1 second to reduce the amount we spin waiting
         // for our map to update.
@@ -359,6 +372,20 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         // No sync source found.
         sleepsecs(1);
         return;
+    }
+
+    // If we find a good sync source after having gone too stale, disable maintenance mode so we can
+    // transition to SECONDARY.
+    if (_tooStale) {
+
+        _tooStale = false;
+
+        log() << "No longer too stale. Able to sync from " << _syncSourceHost;
+
+        auto status = _replCoord->setMaintenanceMode(false);
+        if (!status.isOK()) {
+            warning() << "Failed to leave maintenance mode: " << status;
+        }
     }
 
     long long lastHashFetched;
@@ -388,10 +415,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
-        auto onOplogFetcherShutdownCallbackFn =
-            [&fetcherReturnStatus](const Status& status, const OpTimeWithHash& lastFetched) {
-                fetcherReturnStatus = status;
-            };
+        auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus](const Status& status) {
+            fetcherReturnStatus = status;
+        };
         // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
         // replication coordinator.
         auto oplogFetcherPtr = stdx::make_unique<OplogFetcher>(
@@ -411,6 +437,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
                        stdx::placeholders::_3),
             onOplogFetcherShutdownCallbackFn);
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_state != ProducerState::Running) {
+            return;
+        }
         _oplogFetcher = std::move(oplogFetcherPtr);
         oplogFetcher = _oplogFetcher.get();
     } catch (const mongo::DBException& ex) {
@@ -419,7 +448,7 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
 
     const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
     LOG(logLevel) << "scheduling fetcher to read remote oplog on " << _syncSourceHost
-                  << " starting at " << oplogFetcher->getCommandObject_forTest()["filter"];
+                  << " starting at " << oplogFetcher->getFindQuery_forTest()["filter"];
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
@@ -545,9 +574,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
                                   int requiredRBID,
                                   StorageInterface* storageInterface) {
     if (_replCoord->getMemberState().primary()) {
-        // TODO: Abort catchup mode early if rollback detected.
-        warning() << "Rollback situation detected in catch-up mode; catch-up mode will end.";
-        sleepsecs(1);
+        warning() << "Rollback situation detected in catch-up mode. Aborting catch-up mode.";
+        _replCoord->abortCatchupIfNeeded();
         return;
     }
 
@@ -589,19 +617,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     OplogInterfaceLocal localOplog(opCtx, rsOplogName);
     if (use3dot4Rollback) {
-        const int messagingPortTags = 0;
-        ConnectionPool connectionPool(messagingPortTags);
-        std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
-        auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
-            if (!connection.get()) {
-                connection.reset(new ConnectionPool::ConnectionPtr(
-                    &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
-            };
-            return connection->get();
-        };
-
-        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-        rollback(opCtx, localOplog, rollbackSource, requiredRBID, _replCoord, storageInterface);
+        log() << "Rollback falling back on 3.4 algorithm due to startup server parameter";
+        _fallBackOn3dot4Rollback(opCtx, source, requiredRBID, &localOplog, storageInterface);
     } else {
         AbstractAsyncComponent* rollback;
         StatusWith<OpTime> onRollbackShutdownResult =
@@ -614,6 +631,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             };
 
             stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (_state != ProducerState::Running) {
+                return;
+            }
             _rollback = stdx::make_unique<RollbackImpl>(executor,
                                                         &localOplog,
                                                         source,
@@ -632,11 +652,16 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             warning() << "Unable to schedule rollback: " << scheduleStatus;
         } else {
             rollback->join();
-            if (!onRollbackShutdownResult.isOK()) {
-                warning() << "Rollback failed with error: " << onRollbackShutdownResult.getStatus();
-            } else {
+            auto status = onRollbackShutdownResult.getStatus();
+            if (status.isOK()) {
                 log() << "Rollback successful. Last applied optime: "
                       << onRollbackShutdownResult.getValue();
+            } else if (ErrorCodes::IncompatibleRollbackAlgorithm == status) {
+                log() << "Rollback falling back on 3.4 algorithm due to " << status;
+                _fallBackOn3dot4Rollback(
+                    opCtx, source, requiredRBID, &localOplog, storageInterface);
+            } else {
+                warning() << "Rollback failed with error: " << status;
             }
         }
     }
@@ -644,6 +669,26 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     // Reset the producer to clear the sync source and the last optime fetched.
     stop(true);
     startProducerIfStopped();
+}
+
+void BackgroundSync::_fallBackOn3dot4Rollback(OperationContext* opCtx,
+                                              const HostAndPort& source,
+                                              int requiredRBID,
+                                              OplogInterface* localOplog,
+                                              StorageInterface* storageInterface) {
+    const int messagingPortTags = 0;
+    ConnectionPool connectionPool(messagingPortTags);
+    std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
+    auto getConnection = [&connection, &connectionPool, source]() -> DBClientBase* {
+        if (!connection.get()) {
+            connection.reset(new ConnectionPool::ConnectionPtr(
+                &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
+        };
+        return connection->get();
+    };
+
+    RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+    rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, storageInterface);
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {

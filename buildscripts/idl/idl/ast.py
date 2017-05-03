@@ -23,7 +23,7 @@ the structs that need code generated for them, and just enough information to do
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-#from typing import List, Union, Any, Optional, Tuple
+from typing import List, Union, Any, Optional, Tuple
 
 from . import common
 from . import errors
@@ -79,6 +79,7 @@ class Struct(common.SourceLocation):
         self.name = None  # type: unicode
         self.description = None  # type: unicode
         self.strict = True  # type: bool
+        self.chained_types = []  # type: List[Field]
         self.fields = []  # type: List[Field]
         super(Struct, self).__init__(file_name, line, column)
 
@@ -88,7 +89,7 @@ class Field(common.SourceLocation):
     An instance of a field in a struct.
 
     Name is always populated.
-    A struct will either have a struct_type or a cpp_type, but not both.
+    A field will either have a struct_type or a cpp_type, but not both.
     Not all fields are set, it depends on the input document.
     """
 
@@ -99,8 +100,10 @@ class Field(common.SourceLocation):
         """Construct a Field."""
         self.name = None  # type: unicode
         self.description = None  # type: unicode
+        self.cpp_name = None  # type: unicode
         self.optional = False  # type: bool
         self.ignore = False  # type: bool
+        self.chained = False  # type: bool
 
         # Properties specific to fields which are types.
         self.cpp_type = None  # type: unicode
@@ -110,7 +113,10 @@ class Field(common.SourceLocation):
         self.bindata_subtype = None  # type: unicode
         self.default = None  # type: unicode
 
-        # Properties specific to fields with are structs.
+        # Properties specific to fields which are structs.
         self.struct_type = None  # type: unicode
+
+        # Properties specific to fields which are arrays.
+        self.array = False  # type: bool
 
         super(Field, self).__init__(file_name, line, column)

@@ -359,7 +359,7 @@ void CurOp::reportState(BSONObjBuilder* builder) {
     // When currentOp is run, it returns a single response object containing all current
     // operations. This request will fail if the response exceeds the 16MB document limit. We limit
     // query object size here to reduce the risk of exceeding.
-    const size_t maxQuerySize = 512;
+    const size_t maxQuerySize = 1000;
 
     if (_networkOp == dbInsert) {
         appendAsObjOrString("insert", _query, maxQuerySize, builder);
@@ -421,7 +421,9 @@ void CurOp::reportState(BSONObjBuilder* builder) {
 
 namespace {
 StringData getProtoString(int op) {
-    if (op == dbQuery) {
+    if (op == dbMsg) {
+        return "op_msg";
+    } else if (op == dbQuery) {
         return "op_query";
     } else if (op == dbCommand) {
         return "op_command";

@@ -67,21 +67,6 @@ MultiApplier::~MultiApplier() {
     DESTRUCTOR_GUARD(shutdown(); join(););
 }
 
-std::string MultiApplier::toString() const {
-    return getDiagnosticString();
-}
-
-std::string MultiApplier::getDiagnosticString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    str::stream output;
-    output << "MultiApplier";
-    output << " active: " << _isActive_inlock();
-    output << ", ops: " << _operations.front().ts.timestamp().toString();
-    output << " - " << _operations.back().ts.timestamp().toString();
-    output << ", executor: " << _executor->getDiagnosticString();
-    return output;
-}
-
 bool MultiApplier::isActive() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isActive_inlock();

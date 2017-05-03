@@ -53,7 +53,7 @@ public:
     virtual void startup() override;
     virtual void shutdown() override;
     virtual void join() override;
-    virtual std::string getDiagnosticString() const override;
+    virtual void appendDiagnosticBSON(BSONObjBuilder* builder) const override;
     virtual Date_t now() override;
     virtual StatusWith<EventHandle> makeEvent() override;
     virtual void signalEvent(const EventHandle& event) override;

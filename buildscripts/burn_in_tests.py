@@ -14,6 +14,7 @@ import subprocess
 import re
 import requests
 import sys
+import urlparse
 import yaml
 
 API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
@@ -106,12 +107,10 @@ def find_last_activated_task(revisions, variant, branch_name):
     build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
 
     evg_cfg = read_evg_config()
-    try:
-        api_server = evg_cfg["api_server_host"]
-        # Makes some assumptions, but saves doing a full url parse.
-        if api_server.endsWith("/api"):
-            api_server = api_server[:-4]
-    except:
+    if evg_cfg is not None and "api_server_host" in evg_cfg:
+        api_server = "{url.scheme}://{url.netloc}".format(
+            url=urlparse.urlparse(evg_cfg["api_server_host"]))
+    else:
         api_server = API_SERVER_DEFAULT
 
     api_prefix = api_server + rest_prefix
@@ -294,26 +293,33 @@ def create_task_list(evergreen_file, buildvariant, suites, exclude_tasks):
     with open(evergreen_file, "r") as fstream:
         evg = yaml.load(fstream)
 
+    evg_buildvariant = next(item for item in evg["buildvariants"] if item["name"] == buildvariant)
+
     # Find all the task names for the specified buildvariant.
-    variant_tasks = [li["name"] for li in next(item for item in evg["buildvariants"]
-                                               if item["name"] == buildvariant)["tasks"]]
+    variant_tasks = [li["name"] for li in evg_buildvariant['tasks']]
 
     # Find all the buildvariant task's resmoke_args.
     variant_task_args = {}
     for task in [a for a in evg["tasks"] if a["name"] in set(variant_tasks) - set(exclude_tasks)]:
         for command in task["commands"]:
             if ("func" in command and command["func"] == "run tests" and
-                "vars" in command and "resmoke_args" in command["vars"]):
+                    "vars" in command and "resmoke_args" in command["vars"]):
                 variant_task_args[task["name"]] = command["vars"]["resmoke_args"]
+
+    # Find if the buildvariant has a test_flags expansion, which will be passed onto resmoke.py.
+    test_flags = evg_buildvariant.get("expansions", {}).get("test_flags", "")
 
     # Create the list of tasks to run for the specified suite.
     tasks_to_run = {}
     for suite in suites.keys():
         for task_name, task_arg in variant_task_args.items():
+            # Append the test_flags to the task arguments to match the logic in the "run tests"
+            # function. This allows the storage engine to be overridden.
+            task_arg = "{} {}".format(task_arg, test_flags)
             # Find the resmoke_args for matching suite names.
             # Change the --suites to --executor
             if (re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg) or
-                re.compile('--executor=' + suite + '(?:\s+|$)').match(task_arg)):
+                    re.compile('--executor=' + suite + '(?:\s+|$)').match(task_arg)):
                 tasks_to_run[task_name] = {
                     "resmoke_args": task_arg.replace("--suites", "--executor"),
                     "tests": suites[suite]}
@@ -420,6 +426,7 @@ def main():
         _write_report_file(test_results, values.report_file)
 
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

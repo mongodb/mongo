@@ -46,7 +46,6 @@ class OplogInterface {
 public:
     class Iterator;
 
-    OplogInterface() = default;
     virtual ~OplogInterface() = default;
 
     /**
@@ -58,6 +57,9 @@ public:
      * Produces an iterator over oplog collection in reverse natural order.
      */
     virtual std::unique_ptr<Iterator> makeIterator() const = 0;
+
+protected:
+    OplogInterface() = default;
 };
 
 class OplogInterface::Iterator {

@@ -19,9 +19,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import idl.ast
-import idl.binder
-import idl.errors
-import idl.generator
-import idl.parser
-import idl.syntax
+import idl.ast  # pylint: disable=wrong-import-position
+import idl.binder  # pylint: disable=wrong-import-position
+import idl.compiler  # pylint: disable=wrong-import-position
+import idl.errors  # pylint: disable=wrong-import-position
+import idl.generator  # pylint: disable=wrong-import-position
+import idl.parser  # pylint: disable=wrong-import-position
+import idl.syntax  # pylint: disable=wrong-import-position

@@ -43,7 +43,8 @@ if __name__ == "__main__" and __package__ is None:
 def call(a, logger):
     logger.info(str(a))
 
-    process = subprocess.Popen(a, stdout=subprocess.PIPE)
+    # Use a common pipe for stdout & stderr for logging.
+    process = subprocess.Popen(a, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     logger_pipe = core.pipe.LoggerPipe(logger, logging.INFO, process.stdout)
     logger_pipe.wait_until_started()
 
@@ -455,7 +456,9 @@ class JstackDumper(object):
             logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing" % (jstack, process_name, pid))
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (jstack,
+                                                                            process_name,
+                                                                            pid))
 
         call([jstack, "-l", str(pid)], logger)
 
@@ -548,6 +551,15 @@ def signal_process(logger, pid, signalnum):
         logger.error("Cannot send signal to a process on Windows")
 
 
+def pname_match(match_type, pname, interesting_processes):
+    pname = os.path.splitext(pname)[0]
+    for ip in interesting_processes:
+        if (match_type == 'exact' and pname == ip or
+           match_type == 'contains' and ip in pname):
+            return True
+    return False
+
+
 # Basic procedure
 #
 # 1. Get a list of interesting processes
@@ -588,37 +600,46 @@ def main():
     process_ids = []
 
     parser = OptionParser(description=__doc__)
+    parser.add_option('-m', '--process-match',
+                      dest='process_match',
+                      choices=['contains', 'exact'],
+                      default='contains',
+                      help="Type of match for process names (-p & -g), specify 'contains', or"
+                           " 'exact'. Note that the process name match performs the following"
+                           " conversions: change all process names to lowecase, strip off the file"
+                           " extension, like '.exe' on Windows. Default is 'contains'.")
     parser.add_option('-p', '--process-names',
-        dest='process_names',
-        help='Comma separated list of process names to analyze')
+                      dest='process_names',
+                      help='Comma separated list of process names to analyze')
     parser.add_option('-g', '--go-process-names',
-        dest='go_process_names',
-        help='Comma separated list of go process names to analyze')
+                      dest='go_process_names',
+                      help='Comma separated list of go process names to analyze')
     parser.add_option('-d', '--process-ids',
-        dest='process_ids',
-        default=None,
-        help='Comma separated list of process ids (PID) to analyze, overrides -p & -g')
+                      dest='process_ids',
+                      default=None,
+                      help='Comma separated list of process ids (PID) to analyze, overrides -p &'
+                           ' -g')
     parser.add_option('-c', '--dump-core',
-        dest='dump_core',
-        action="store_true",
-        default=False,
-        help='Dump core file for each analyzed process')
+                      dest='dump_core',
+                      action="store_true",
+                      default=False,
+                      help='Dump core file for each analyzed process')
     parser.add_option('-s', '--max-core-dumps-size',
-        dest='max_core_dumps_size',
-        default=10000,
-        help='Maximum total size of core dumps to keep in megabytes')
+                      dest='max_core_dumps_size',
+                      default=10000,
+                      help='Maximum total size of core dumps to keep in megabytes')
     parser.add_option('-o', '--debugger-output',
-        dest='debugger_output',
-        action="append",
-        choices=['file', 'stdout'],
-        default=None,
-        help="If 'stdout', then the debugger's output is written to the Python"
-            " process's stdout. If 'file', then the debugger's output is written"
-            " to a file named debugger_<process>_<pid>.log for each process it"
-            " attaches to. This option can be specified multiple times on the"
-            " command line to have the debugger's output written to multiple"
-            " locations. By default, the debugger's output is written only to the"
-            " Python process's stdout.")
+                      dest='debugger_output',
+                      action="append",
+                      choices=['file', 'stdout'],
+                      default=None,
+                      help="If 'stdout', then the debugger's output is written to the Python"
+                           " process's stdout. If 'file', then the debugger's output is written"
+                           " to a file named debugger_<process>_<pid>.log for each process it"
+                           " attaches to. This option can be specified multiple times on the"
+                           " command line to have the debugger's output written to multiple"
+                           " locations. By default, the debugger's output is written only to the"
+                           " Python process's stdout.")
 
     (options, args) = parser.parse_args()
 
@@ -662,8 +683,9 @@ def main():
                                 list(missing_pids))
     else:
         processes = [(pid, pname) for (pid, pname) in all_processes
-                     if any(pname.find(ip) >= 0 for ip in interesting_processes) and
+                     if pname_match(options.process_match, pname, interesting_processes) and
                      pid != os.getpid()]
+
     root_logger.info("Found %d interesting processes %s" % (len(processes), processes))
 
     max_dump_size_bytes = int(options.max_core_dumps_size) * 1024 * 1024

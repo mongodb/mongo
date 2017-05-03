@@ -67,12 +67,11 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(cc()).disable();
-            ClusterLastErrorInfo::get(cc()).disableForCommand();
+            ClusterLastErrorInfo::get(cc())->disableForCommand();
         }
 
         errmsg = "replSetGetStatus is not supported through mongos";

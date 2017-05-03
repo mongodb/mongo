@@ -144,6 +144,7 @@ void makeUpdateRequest(const FindAndModifyRequest& args,
     requestOut->setUpdates(args.getUpdateObj());
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
+    requestOut->setArrayFilters(args.getArrayFilters());
     requestOut->setUpsert(args.isUpsert());
     requestOut->setReturnDocs(args.shouldReturnNew() ? UpdateRequest::RETURN_NEW
                                                      : UpdateRequest::RETURN_OLD);
@@ -297,7 +298,7 @@ public:
             if (!statusWithPlanExecutor.isOK()) {
                 return statusWithPlanExecutor.getStatus();
             }
-            const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+            const auto exec = std::move(statusWithPlanExecutor.getValue());
             Explain::explainStages(exec.get(), collection, verbosity, out);
         } else {
             UpdateRequest request(nsString);
@@ -328,7 +329,7 @@ public:
             if (!statusWithPlanExecutor.isOK()) {
                 return statusWithPlanExecutor.getStatus();
             }
-            const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+            const auto exec = std::move(statusWithPlanExecutor.getValue());
             Explain::explainStages(exec.get(), collection, verbosity, out);
         }
 
@@ -338,7 +339,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         // findAndModify command is not replicated directly.
@@ -410,7 +410,7 @@ public:
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                Collection* const collection = autoDb.getDb()->getCollection(nsString.ns());
+                Collection* const collection = autoDb.getDb()->getCollection(opCtx, nsString);
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
@@ -421,8 +421,7 @@ public:
                 if (!statusWithPlanExecutor.isOK()) {
                     return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
-                const std::unique_ptr<PlanExecutor> exec =
-                    std::move(statusWithPlanExecutor.getValue());
+                const auto exec = std::move(statusWithPlanExecutor.getValue());
 
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -487,7 +486,7 @@ public:
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
+                Collection* collection = autoDb.getDb()->getCollection(opCtx, nsString.ns());
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
@@ -500,7 +499,7 @@ public:
                     // Release the collection lock and reacquire a lock on the database
                     // in exclusive mode in order to create the collection.
                     collLock.relockAsDatabaseExclusive(autoDb.lock());
-                    collection = autoDb.getDb()->getCollection(nsString.ns());
+                    collection = autoDb.getDb()->getCollection(opCtx, nsString);
                     Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(opCtx, nsString);
                     if (!isPrimaryAfterRelock.isOK()) {
                         return appendCommandStatus(result, isPrimaryAfterRelock);
@@ -517,7 +516,7 @@ public:
                         }
                         wuow.commit();
 
-                        collection = autoDb.getDb()->getCollection(nsString.ns());
+                        collection = autoDb.getDb()->getCollection(opCtx, nsString);
                         invariant(collection);
                     }
                 }
@@ -527,8 +526,7 @@ public:
                 if (!statusWithPlanExecutor.isOK()) {
                     return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
-                const std::unique_ptr<PlanExecutor> exec =
-                    std::move(statusWithPlanExecutor.getValue());
+                const auto exec = std::move(statusWithPlanExecutor.getValue());
 
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());

@@ -70,9 +70,12 @@ struct Context {
 void* runFunc(void* ptr) {
     std::unique_ptr<Context> ctx(static_cast<Context*>(ptr));
 
-    auto tl = ctx->session->getTransportLayer();
-    Client::initThread("conn", ctx->session);
+    auto client = getGlobalServiceContext()->makeClient("conn", ctx->session);
     setThreadName(str::stream() << "conn" << ctx->session->id());
+
+    Client::setCurrent(std::move(client));
+
+    auto tl = ctx->session->getTransportLayer();
 
     try {
         ctx->task(ctx->session);
@@ -96,8 +99,6 @@ void* runFunc(void* ptr) {
         log() << "end connection " << ctx->session->remote() << " (" << conns << word
               << " now open)";
     }
-
-    Client::destroy();
 
     return nullptr;
 }

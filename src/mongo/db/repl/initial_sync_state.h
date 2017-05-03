@@ -38,7 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/databases_cloner.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

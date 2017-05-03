@@ -222,7 +222,7 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
 
             // If the "admin.system.version" collection has not been created yet, explicitly create
             // it to hold the v=2 index.
-            if (!autoDB.getDb()->getCollection(nss)) {
+            if (!autoDB.getDb()->getCollection(opCtx, nss)) {
                 uassertStatusOK(
                     repl::StorageInterface::get(opCtx)->createCollection(opCtx, nss, {}));
             }
@@ -233,8 +233,9 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
 
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wuow(opCtx);
+                auto uuid = autoDB.getDb()->getCollection(opCtx, nss)->uuid(opCtx);
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, autoDB.getDb()->getSystemIndexesName(), k32IncompatibleIndexSpec, false);
+                    opCtx, nss, uuid, k32IncompatibleIndexSpec, false);
                 wuow.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(

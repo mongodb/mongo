@@ -168,7 +168,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
@@ -202,7 +201,7 @@ public:
             BSONObjBuilder aggResult;
 
             (void)Command::findCommand("aggregate")
-                ->run(opCtx, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+                ->run(opCtx, dbname, viewAggregation.getValue(), errmsg, aggResult);
 
             if (ResolvedView::isResolvedViewErrorResponse(aggResult.asTempObj())) {
                 result.appendElements(aggResult.obj());

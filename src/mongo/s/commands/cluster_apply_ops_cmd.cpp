@@ -59,7 +59,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         uasserted(ErrorCodes::CommandNotSupported, "applyOps not allowed through mongos");

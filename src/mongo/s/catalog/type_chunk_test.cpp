@@ -245,6 +245,65 @@ TEST(ChunkRange, BasicBSONParsing) {
     ASSERT_BSONOBJ_EQ(BSON("x" << 10), chunkRange.getMax());
 }
 
+TEST(ChunkRange, Covers) {
+    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 5))));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 10), BSON("x" << 15))));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 7))));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 7), BSON("x" << 15))));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 15))));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 0), BSON("x" << 10))));
+    ASSERT(!target.covers(ChunkRange(BSON("x" << 5), BSON("x" << 15))));
+    ASSERT(target.covers(ChunkRange(BSON("x" << 5), BSON("x" << 10))));
+    ASSERT(target.covers(ChunkRange(BSON("x" << 6), BSON("x" << 10))));
+    ASSERT(target.covers(ChunkRange(BSON("x" << 5), BSON("x" << 9))));
+    ASSERT(target.covers(ChunkRange(BSON("x" << 6), BSON("x" << 9))));
+}
+
+TEST(ChunkRange, Overlap) {
+    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
+    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 5))));
+    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 4))));
+    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 10), BSON("x" << 15))));
+    ASSERT(!target.overlapWith(ChunkRange(BSON("x" << 11), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 7), BSON("x" << 10)) ==
+           *target.overlapWith(ChunkRange(BSON("x" << 7), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 10)) ==
+           *target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 10))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 10)) ==
+           *target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 10)) ==
+           *target.overlapWith(ChunkRange(BSON("x" << 5), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 9)) ==
+           *target.overlapWith(ChunkRange(BSON("x" << 0), BSON("x" << 9))));
+    ASSERT(ChunkRange(BSON("x" << 9), BSON("x" << 10)) ==
+           *target.overlapWith(ChunkRange(BSON("x" << 9), BSON("x" << 15))));
+}
+
+TEST(ChunkRange, Union) {
+    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
+    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
+           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 5))));
+    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
+           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 4))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
+           target.unionWith(ChunkRange(BSON("x" << 10), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
+           target.unionWith(ChunkRange(BSON("x" << 11), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
+           target.unionWith(ChunkRange(BSON("x" << 7), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
+           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 10))));
+    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 14)) ==
+           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 14))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
+           target.unionWith(ChunkRange(BSON("x" << 5), BSON("x" << 15))));
+    ASSERT(ChunkRange(BSON("x" << 0), BSON("x" << 10)) ==
+           target.unionWith(ChunkRange(BSON("x" << 0), BSON("x" << 9))));
+    ASSERT(ChunkRange(BSON("x" << 5), BSON("x" << 15)) ==
+           target.unionWith(ChunkRange(BSON("x" << 9), BSON("x" << 15))));
+}
+
 TEST(ChunkRange, MinGreaterThanMaxShouldError) {
     auto parseStatus =
         ChunkRange::fromBSON(BSON("min" << BSON("x" << 10) << "max" << BSON("x" << 0)));

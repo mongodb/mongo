@@ -349,7 +349,7 @@
         }
 
         //
-        // Confirm 512 byte size limit for currentOp query field.
+        // Confirm ~1000 byte size limit for currentOp query field.
         //
         coll.drop();
         assert.writeOK(coll.insert({a: 1}));
@@ -358,20 +358,18 @@
         // values inside it are truncated at 150 characters. To test "total length" truncation we
         // need to pass multiple values, each smaller than 150 bytes.
         TestData.queryFilter = {
-            "1": "1".repeat(100),
-            "2": "2".repeat(100),
-            "3": "3".repeat(100),
-            "4": "4".repeat(100),
-            "5": "5".repeat(100),
-            "6": "6".repeat(100),
+            "1": "1".repeat(149),
+            "2": "2".repeat(149),
+            "3": "3".repeat(149),
+            "4": "4".repeat(149),
+            "5": "5".repeat(149),
+            "6": "6".repeat(149),
+            "7": "7".repeat(149),
         };
 
-        var truncatedQueryString = "{ find: \"currentop_query\", filter: { " +
-            "1: \"1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111\", " +
-            "2: \"2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222\", " +
-            "3: \"3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333\", " +
-            "4: \"4444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\", " +
-            "5: \"5555555555555555555555555555555555555555...";
+        var truncatedQueryString = "^\\{ find: \"currentop_query\", filter: \\{ " +
+            "1: \"1{149}\", 2: \"2{149}\", 3: \"3{149}\", 4: \"4{149}\", 5: \"5{149}\", " +
+            "6: \"6{149}\", 7: \"7+\\.\\.\\.";
 
         confirmCurrentOpContents({
             test: function() {
@@ -381,8 +379,10 @@
                           0);
             },
             planSummary: "COLLSCAN",
-            currentOpFilter:
-                {"query.$truncated": truncatedQueryString, "query.comment": "currentop_query"}
+            currentOpFilter: {
+                "query.$truncated": {$regex: truncatedQueryString},
+                "query.comment": "currentop_query"
+            }
         });
 
         // Verify that an originatingCommand truncated by currentOp appears as { $truncated:
@@ -399,7 +399,7 @@
 
         filter = {
             "query.getMore": TestData.commandResult.cursor.id,
-            "originatingCommand.$truncated": truncatedQueryString,
+            "originatingCommand.$truncated": {$regex: truncatedQueryString},
             "originatingCommand.comment": "currentop_query"
         };
 
@@ -416,13 +416,10 @@
 
         // Verify that an aggregation truncated by currentOp appears as { $truncated: <string>,
         // comment: <string> } when a comment parameter is present.
-        truncatedQueryString = "{ aggregate: \"currentop_query\", pipeline: [ { $match: { 1: " +
-            "\"111111111111111111111111111111111111111111111111111111111111111111111111111111" +
-            "1111111111111111111111\", 2: \"2222222222222222222222222222222222222222222222222" +
-            "222222222222222222222222222222222222222222222222222\", 3: \"33333333333333333333" +
-            "33333333333333333333333333333333333333333333333333333333333333333333333333333333" +
-            "\", 4: \"44444444444444444444444444444444444444444444444444444444444444444444444" +
-            "44444444444444444444444444444\", 5: \"555555555555555555555...";
+        truncatedQueryString =
+            "^\\{ aggregate: \"currentop_query\", pipeline: \\[ \\{ \\$match: \\{ " +
+            "1: \"1{149}\", 2: \"2{149}\", 3: \"3{149}\", 4: \"4{149}\", 5: \"5{149}\", " +
+            "6: \"6{149}\", 7: \"7+\\.\\.\\.";
 
         confirmCurrentOpContents({
             test: function() {
@@ -433,8 +430,10 @@
                     0);
             },
             planSummary: "COLLSCAN",
-            currentOpFilter:
-                {"query.$truncated": truncatedQueryString, "query.comment": "currentop_query"}
+            currentOpFilter: {
+                "query.$truncated": {$regex: truncatedQueryString},
+                "query.comment": "currentop_query"
+            }
         });
 
         delete TestData.queryFilter;

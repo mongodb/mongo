@@ -129,7 +129,7 @@ public:
 
         BSONObjBuilder explainCmd;
         int options = 0;
-        ClusterExplain::wrapAsExplain(
+        ClusterExplain::wrapAsExplainDeprecated(
             cmdObj, verbosity, serverSelectionMetadata, &explainCmd, &options);
 
         // Time how long it takes to run the explain command on the shard.
@@ -160,7 +160,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss = parseNsCollectionRequired(dbName, cmdObj);

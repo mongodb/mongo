@@ -29,31 +29,22 @@
 #pragma once
 
 #include <cstddef>
-#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/abstract_async_component.h"
+#include "mongo/db/repl/abstract_oplog_fetcher.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
-#include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace repl {
 
 MONGO_FP_FORWARD_DECLARE(stopReplProducer);
-
-/**
- * Used to keep track of the optime and hash of the last fetched operation.
- */
-using OpTimeWithHash = OpTimeWith<long long>;
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable cursor.
@@ -75,22 +66,15 @@ using OpTimeWithHash = OpTimeWith<long long>;
  *
  * When there is an error or when it is not possible to issue another getMore request, calls
  * "onShutdownCallbackFn" to signal the end of processing.
+ *
+ * This class subclasses AbstractOplogFetcher which takes care of scheduling the Fetcher and
+ * `getMore` commands, and handles restarting on errors.
  */
-class OplogFetcher : public AbstractAsyncComponent {
+class OplogFetcher : public AbstractOplogFetcher {
     MONGO_DISALLOW_COPYING(OplogFetcher);
 
 public:
     static Seconds kDefaultProtocolZeroAwaitDataTimeout;
-
-    /**
-     * Type of function called by the oplog fetcher on shutdown with
-     * the final oplog fetcher status, last optime fetched and last hash fetched.
-     *
-     * The status will be Status::OK() if we have processed the last batch of operations
-     * from the tailable cursor ("bob" is null in the fetcher callback).
-     */
-    using OnShutdownCallbackFn =
-        stdx::function<void(const Status& shutdownStatus, const OpTimeWithHash& lastFetched)>;
 
     /**
      * Statistics on current batch of operations returned by the fetcher.
@@ -126,9 +110,7 @@ public:
                                                        Timestamp lastTS);
 
     /**
-     * Initializes fetcher with command to tail remote oplog.
-     *
-     * Throws a UserException if validation fails on any of the provided arguments.
+     * Invariants if validation fails on any of the provided arguments.
      */
     OplogFetcher(executor::TaskExecutor* executor,
                  OpTimeWithHash lastFetched,
@@ -144,19 +126,7 @@ public:
 
     virtual ~OplogFetcher();
 
-    std::string toString() const;
-
-    /**
-     * Returns optime and hash of the last oplog entry in the most recent oplog query result.
-     */
-    OpTimeWithHash getLastOpTimeWithHashFetched() const;
-
     // ================== Test support API ===================
-
-    /**
-     * Returns command object sent in first remote command.
-     */
-    BSONObj getCommandObject_forTest() const;
 
     /**
      * Returns metadata object sent in remote commands.
@@ -174,48 +144,18 @@ public:
     Milliseconds getAwaitDataTimeout_forTest() const;
 
 private:
-    // AbstractAsyncComponent overrides.
-    Status _doStartup_inlock() noexcept override;
-    void _doShutdown_inlock() noexcept override;
-    stdx::mutex* _getMutex() noexcept override;
+    BSONObj _makeFindCommandObject(const NamespaceString& nss,
+                                   OpTime lastOpTimeFetched) const override;
+
+    BSONObj _makeMetadataObject() const override;
 
     /**
-     * Schedules fetcher and updates counters.
+     * This function is run by the AbstractOplogFetcher on a successful batch of oplog entries.
      */
-    Status _scheduleFetcher_inlock();
+    StatusWith<BSONObj> _onSuccessfulBatch(const Fetcher::QueryResponse& queryResponse) override;
 
-    /**
-     * Processes each batch of results from the tailable cursor started by the fetcher on the sync
-     * source.
-     *
-     * Calls "onShutdownCallbackFn" if there is an error or if there are no further results to
-     * request from the sync source.
-     */
-    void _callback(const Fetcher::QueryResponseStatus& result, BSONObjBuilder* getMoreBob);
-
-    /**
-     * Notifies caller that the oplog fetcher has completed processing operations from
-     * the remote oplog.
-     */
-    void _finishCallback(Status status);
-    void _finishCallback(Status status, OpTimeWithHash opTimeWithHash);
-
-    /**
-     * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
-     */
-    std::unique_ptr<Fetcher> _makeFetcher(long long currentTerm, OpTime lastFetchedOpTime);
-
-    // Protects member data of this OplogFetcher.
-    mutable stdx::mutex _mutex;
-
-    mutable stdx::condition_variable _condition;
-
-    const HostAndPort _source;
-    const NamespaceString _nss;
+    // The metadata object sent with the Fetcher queries.
     const BSONObj _metadataObject;
-
-    // Maximum number of times to consecutively restart the fetcher on non-cancellation errors.
-    const std::size_t _maxFetcherRestarts;
 
     // Rollback ID that the sync source is required to have after the first batch.
     int _requiredRBID;
@@ -229,18 +169,6 @@ private:
     DataReplicatorExternalState* const _dataReplicatorExternalState;
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
-    OnShutdownCallbackFn _onShutdownCallbackFn;
-
-    // Used to validate start of first batch of results from the remote oplog
-    // tailing query and to keep track of the last known operation consumed via
-    // "_enqueueDocumentsFn".
-    OpTimeWithHash _lastFetched;
-
-    // Fetcher restarts since the last successful oplog query response.
-    std::size_t _fetcherRestarts = 0;
-
-    std::unique_ptr<Fetcher> _fetcher;
-    std::unique_ptr<Fetcher> _shuttingDownFetcher;
 };
 
 }  // namespace repl

@@ -74,6 +74,8 @@ TEST(BatchedUpdateRequest, CloneBatchedUpdateDocCopiesAllFields) {
     updateDoc.setUpsert(true);
     updateDoc.setCollation(BSON("locale"
                                 << "en_US"));
+    std::vector<BSONObj> arrayFilters{BSON("i" << 5)};
+    updateDoc.setArrayFilters(arrayFilters);
 
     BatchedUpdateDocument cloneToDoc;
     updateDoc.cloneTo(&cloneToDoc);
@@ -89,6 +91,9 @@ TEST(BatchedUpdateRequest, CloneBatchedUpdateDocCopiesAllFields) {
     ASSERT_BSONOBJ_EQ(BSON("locale"
                            << "en_US"),
                       cloneToDoc.getCollation());
+    ASSERT_TRUE(cloneToDoc.isArrayFiltersSet());
+    ASSERT_EQ(1U, cloneToDoc.getArrayFilters().size());
+    ASSERT_BSONOBJ_EQ(arrayFilters[0], cloneToDoc.getArrayFilters()[0]);
 }
 
 TEST(BatchedUpdateRequest, CanSetAndRetrieveCollationField) {
@@ -154,6 +159,69 @@ TEST(BatchedUpdateRequest, CollationFieldParsesFromBSONCorrectly) {
     ASSERT_BSONOBJ_EQ(BSON("locale"
                            << "en_US"),
                       request.getUpdatesAt(0)->getCollation());
+
+    // Ensure we re-serialize to the original BSON request.
+    ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
+}
+
+TEST(BatchedUpdateRequest, CanSetAndRetrieveArrayFiltersField) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+
+    ASSERT_FALSE(updateDoc.isArrayFiltersSet());
+    std::vector<BSONObj> arrayFilters{BSON("i" << 5)};
+    updateDoc.setArrayFilters(arrayFilters);
+    ASSERT_TRUE(updateDoc.isArrayFiltersSet());
+    ASSERT_BSONOBJ_EQ(arrayFilters[0], updateDoc.getArrayFilters()[0]);
+    updateDoc.unsetArrayFilters();
+    ASSERT_FALSE(updateDoc.isArrayFiltersSet());
+}
+
+TEST(BatchedUpdateRequest, ClearBatchedUpdateDocUnsetsArrayFilters) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+    std::vector<BSONObj> arrayFilters{BSON("i" << 5)};
+    updateDoc.setArrayFilters(arrayFilters);
+
+    ASSERT_TRUE(updateDoc.isArrayFiltersSet());
+    updateDoc.clear();
+    ASSERT_FALSE(updateDoc.isArrayFiltersSet());
+}
+
+TEST(BatchedUpdateRequest, ArrayFiltersFieldSerializesToBSONCorrectly) {
+    BatchedUpdateDocument updateDoc;
+    updateDoc.setQuery(BSON("a" << 1));
+    updateDoc.setUpdateExpr(BSON("$set" << BSON("a" << 2)));
+    std::vector<BSONObj> arrayFilters{BSON("i" << 5)};
+    updateDoc.setArrayFilters(arrayFilters);
+
+    BSONObj expectedUpdateObj =
+        BSON(BatchedUpdateDocument::query(BSON("a" << 1))
+             << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 2)))
+             << BatchedUpdateDocument::arrayFilters(BSON_ARRAY(BSON("i" << 5))));
+
+    ASSERT_BSONOBJ_EQ(expectedUpdateObj, updateDoc.toBSON());
+}
+
+TEST(BatchedUpdateRequest, ArrayFiltersFieldParsesFromBSONCorrectly) {
+    BSONArray updateArray =
+        BSON_ARRAY(BSON(BatchedUpdateDocument::query(BSON("a" << 1))
+                        << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("a" << 2)))
+                        << BatchedUpdateDocument::arrayFilters(BSON_ARRAY(BSON("i" << 5)))));
+
+    BSONObj origUpdateRequestObj = BSON(
+        BatchedUpdateRequest::collName("test") << BatchedUpdateRequest::updates() << updateArray);
+
+    std::string errMsg;
+    BatchedUpdateRequest request;
+    ASSERT_TRUE(request.parseBSON("foo", origUpdateRequestObj, &errMsg));
+
+    ASSERT_EQ(1U, request.sizeUpdates());
+    ASSERT_TRUE(request.getUpdatesAt(0)->isArrayFiltersSet());
+    ASSERT_EQ(1U, request.getUpdatesAt(0)->getArrayFilters().size());
+    ASSERT_BSONOBJ_EQ(BSON("i" << 5), request.getUpdatesAt(0)->getArrayFilters()[0]);
 
     // Ensure we re-serialize to the original BSON request.
     ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());

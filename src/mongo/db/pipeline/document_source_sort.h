@@ -49,7 +49,7 @@ public:
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}};
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
     bool canSwapWithMatch() const final {
@@ -59,13 +59,6 @@ public:
     BSONObjSet getOutputSorts() final {
         return allPrefixes(_sort);
     }
-
-    /**
-     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
-    void dispose() final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
@@ -121,6 +114,14 @@ public:
     boost::intrusive_ptr<DocumentSourceLimit> getLimitSrc() const {
         return limitSrc;
     }
+
+protected:
+    /**
+     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+    void doDispose() final;
 
 private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

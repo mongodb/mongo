@@ -63,6 +63,7 @@ struct UpdateOp : ParsedWriteOp {
         BSONObj query;
         BSONObj update;
         BSONObj collation;
+        std::vector<BSONObj> arrayFilters;
         bool multi = false;
         bool upsert = false;
     };

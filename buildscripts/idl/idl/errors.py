@@ -22,8 +22,9 @@ Common error handling code for IDL compiler.
 from __future__ import absolute_import, print_function, unicode_literals
 
 import inspect
+import os
 import sys
-# from typing import List, Union, Any
+from typing import List, Union, Any
 from yaml import nodes
 import yaml
 
@@ -55,6 +56,17 @@ ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_STRUCT = "ID0019"
 ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED = "ID0020"
 ERROR_ID_BAD_ANY_TYPE_USE = "ID0021"
 ERROR_ID_BAD_NUMERIC_CPP_TYPE = "ID0022"
+ERROR_ID_BAD_ARRAY_TYPE_NAME = "ID0023"
+ERROR_ID_ARRAY_NO_DEFAULT = "ID0024"
+ERROR_ID_BAD_IMPORT = "ID0025"
+ERROR_ID_BAD_BINDATA_DEFAULT = "ID0026"
+ERROR_ID_CHAINED_TYPE_NOT_FOUND = "ID0027"
+ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE = "ID0028"
+ERROR_ID_CHAINED_DUPLICATE_FIELD = "ID0029"
+ERROR_ID_CHAINED_NO_TYPE_STRICT = "ID0030"
+ERROR_ID_CHAINED_STRUCT_NOT_FOUND = "ID0031"
+ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT = "ID0032"
+ERROR_ID_CHAINED_NO_NESTED_CHAINED = "ID0033"
 
 
 class IDLError(Exception):
@@ -91,8 +103,8 @@ class ParserError(common.SourceLocation):
         Example error message:
         test.idl: (17, 4): ID0008: Unknown IDL node 'cpp_namespac' for YAML entity 'global'.
         """
-        msg = "%s: (%d, %d): %s: %s" % (self.file_name, self.line, self.column, self.error_id,
-                                        self.msg)
+        msg = "%s: (%d, %d): %s: %s" % (os.path.basename(self.file_name), self.line, self.column,
+                                        self.error_id, self.msg)
         return msg  # type: ignore
 
 
@@ -223,13 +235,19 @@ class ParserContext(object):
         """Return True if this YAML node is a Scalar."""
         return self._is_node_type(node, node_name, "scalar")
 
-    def is_sequence_node(self, node, node_name):
+    def is_scalar_sequence(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], unicode) -> bool
-        """Return True if this YAML node is a Sequence."""
-        return self._is_node_type(node, node_name, "sequence")
+        """Return True if this YAML node is a Sequence of Scalars."""
+        if self._is_node_type(node, node_name, "sequence"):
+            for seq_node in node.value:
+                if not self.is_scalar_node(seq_node, node_name):
+                    return False
+            return True
+        return False
 
-    def is_sequence_or_scalar_node(self, node, node_name):
+    def is_scalar_sequence_or_scalar_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], unicode) -> bool
+        # pylint: disable=invalid-name
         """Return True if the YAML node is a Scalar or Sequence."""
         if not node.id == "scalar" and not node.id == "sequence":
             self._add_node_error(
@@ -237,6 +255,10 @@ class ParserContext(object):
                 "Illegal node type '%s' for '%s', expected either node type 'scalar' or 'sequence'"
                 % (node.id, node_name))
             return False
+
+        if node.id == "sequence":
+            return self.is_scalar_sequence(node, node_name)
+
         return True
 
     def is_scalar_bool_node(self, node, node_name):
@@ -265,7 +287,7 @@ class ParserContext(object):
     def get_list(self, node):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> List[unicode]
         """Get a YAML scalar or sequence node as a list of strings."""
-        assert self.is_sequence_or_scalar_node(node, "unknown")
+        assert self.is_scalar_sequence_or_scalar_node(node, "unknown")
         if node.id == "scalar":
             return [node.value]
         else:
@@ -282,8 +304,8 @@ class ParserContext(object):
         # type: (yaml.nodes.Node, unicode) -> None
         """Add an error about a struct without fields."""
         self._add_node_error(node, ERROR_ID_EMPTY_FIELDS,
-                             "Struct '%s' must have fields specified but no fields were found" %
-                             (name))
+                             ("Struct '%s' must either have fields, chained_types, or " +
+                              " chained_structs specified but neither were found") % (name))
 
     def add_missing_required_field_error(self, node, node_parent, node_name):
         # type: (yaml.nodes.Node, unicode, unicode) -> None
@@ -371,13 +393,13 @@ class ParserContext(object):
             " use bson type '%s', use a bson_serialization_type of 'any' instead.") %
                         (ast_type, ast_parent, bson_type_name))
 
-    def add_bad_any_type_use_error(self, location, ast_type, ast_parent):
-        # type: (common.SourceLocation, unicode, unicode) -> None
+    def add_bad_any_type_use_error(self, location, bson_type, ast_type, ast_parent):
+        # type: (common.SourceLocation, unicode, unicode, unicode) -> None
         # pylint: disable=invalid-name
         """Add an error about any being used in a list of bson types."""
         self._add_error(location, ERROR_ID_BAD_ANY_TYPE_USE, (
-            "The BSON Type 'any' is not allowed in a list of bson serialization types for" +
-            "%s '%s'. It must be only a single bson type.") % (ast_type, ast_parent))
+            "The BSON Type '%s' is not allowed in a list of bson serialization types for" +
+            "%s '%s'. It must be only a single bson type.") % (bson_type, ast_type, ast_parent))
 
     def add_bad_cpp_numeric_type_use_error(self, location, ast_type, ast_parent, cpp_type):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
@@ -387,6 +409,88 @@ class ParserContext(object):
             "The C++ numeric type '%s' is not allowed for %s '%s'. Only 'std::int32_t'," +
             " 'std::uint32_t', 'std::uint64_t', and 'std::int64_t' are supported.") %
                         (cpp_type, ast_type, ast_parent))
+
+    def add_bad_array_type_name_error(self, location, field_name, type_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about a field type having a malformed type name."""
+        self._add_error(location, ERROR_ID_BAD_ARRAY_TYPE_NAME,
+                        ("'%s' is not a valid array type for field '%s'. A valid array type" +
+                         " is in the form 'array<type_name>'.") % (type_name, field_name))
+
+    def add_array_no_default_error(self, location, field_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about an array having a type with a default value."""
+        self._add_error(
+            location, ERROR_ID_ARRAY_NO_DEFAULT,
+            "Field '%s' is not allowed to have both a default value and be an array type" %
+            (field_name))
+
+    def add_cannot_find_import(self, location, imported_file_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about not being able to find an import."""
+        self._add_error(location, ERROR_ID_BAD_IMPORT,
+                        "Could not resolve import '%s', file not found" % (imported_file_name))
+
+    def add_bindata_no_default(self, location, ast_type, ast_parent):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about 'any' being used in a list of bson types."""
+        self._add_error(location, ERROR_ID_BAD_BINDATA_DEFAULT,
+                        ("Default values are not allowed for %s '%s'") % (ast_type, ast_parent))
+
+    def add_chained_type_not_found_error(self, location, type_name):
+        # type: (common.SourceLocation, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about a chained_type not found."""
+        self._add_error(location, ERROR_ID_CHAINED_TYPE_NOT_FOUND,
+                        ("Type '%s' is not a valid chained type") % (type_name))
+
+    def add_chained_type_wrong_type_error(self, location, type_name, bson_type_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about a chained_type being the wrong type."""
+        self._add_error(location, ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE,
+                        ("Chained Type '%s' has the wrong bson serialization type '%s', only" +
+                         "'chain' is supported for chained types.") % (type_name, bson_type_name))
+
+    def add_duplicate_field_error(self, location, field_container, field_name, duplicate_location):
+        # type: (common.SourceLocation, unicode, unicode, common.SourceLocation) -> None
+        """Add an error about duplicate fields as a result of chained structs/types."""
+        self._add_error(location, ERROR_ID_CHAINED_DUPLICATE_FIELD, (
+            "Chained Struct or Type '%s' duplicates an existing field '%s' at location" + "'%s'.") %
+                        (field_container, field_name, duplicate_location))
+
+    def add_chained_type_no_strict_error(self, location, struct_name):
+        # type: (common.SourceLocation, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about strict parser validate and chained types."""
+        self._add_error(location, ERROR_ID_CHAINED_NO_TYPE_STRICT,
+                        ("Strict IDL parser validation is not supported with chained types for " +
+                         "struct '%s'. Specify 'strict: false' for this struct.") % (struct_name))
+
+    def add_chained_struct_not_found_error(self, location, struct_name):
+        # type: (common.SourceLocation, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about a chained_struct not found."""
+        self._add_error(location, ERROR_ID_CHAINED_STRUCT_NOT_FOUND,
+                        ("Type '%s' is not a valid chained struct") % (struct_name))
+
+    def add_chained_nested_struct_no_strict_error(self, location, struct_name, nested_struct_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about strict parser validate and chained types."""
+        self._add_error(location, ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT,
+                        ("Strict IDL parser validation is not supported for a chained struct '%s'" +
+                         " contained by struct '%s'. Specify 'strict: false' for this struct.") %
+                        (nested_struct_name, struct_name))
+
+    def add_chained_nested_struct_no_nested_error(self, location, struct_name, chained_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        # pylint: disable=invalid-name
+        """Add an error about struct's chaining being a struct with nested chaining."""
+        self._add_error(location, ERROR_ID_CHAINED_NO_NESTED_CHAINED,
+                        ("Struct '%s' is not allowed to nest struct '%s' since it has chained" +
+                         " structs and/or types.") % (struct_name, chained_name))
 
 
 def _assert_unique_error_messages():

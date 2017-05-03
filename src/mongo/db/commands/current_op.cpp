@@ -88,7 +88,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         const bool includeAll = cmdObj["$all"].trueValue();
@@ -103,9 +102,12 @@ public:
             i.next();  // skip {currentOp: 1} which is required to be the first element
             while (i.more()) {
                 BSONElement e = i.next();
-                if (str::equals("$all", e.fieldName())) {
+                const auto fieldName = e.fieldNameStringData();
+                if (fieldName == "$all") {
                     continue;
-                } else if (str::equals("$ownOps", e.fieldName())) {
+                } else if (fieldName == "$ownOps") {
+                    continue;
+                } else if (Command::isGenericArgument(fieldName)) {
                     continue;
                 }
 

@@ -63,7 +63,9 @@ Status createCollection(OperationContext* opCtx,
     // Build options object from remaining cmdObj elements.
     BSONObjBuilder optionsBuilder;
     while (it.more()) {
-        optionsBuilder.append(it.next());
+        const auto elem = it.next();
+        if (!Command::isGenericArgument(elem.fieldNameStringData()))
+            optionsBuilder.append(elem);
     }
 
     BSONObj options = optionsBuilder.obj();

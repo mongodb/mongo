@@ -48,7 +48,7 @@ TEST(ConfigSvrMetadataTest, Roundtrip) {
     metadata.writeToMetadata(&builder);
 
     BSONObj expectedObj(
-        BSON("configsvr" << BSON(
+        BSON("$configServerState" << BSON(
                  "opTime" << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm()))));
 
     BSONObj serializedObj = builder.obj();

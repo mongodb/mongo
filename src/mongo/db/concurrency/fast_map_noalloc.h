@@ -181,6 +181,10 @@ public:
      * entry just inserted.
      */
     Iterator insert(const KeyType& key) {
+        uassert(ErrorCodes::TooManyLocks,
+                "Operation requires too many locks",
+                _fastAccessUsedSize < PreallocCount);
+
         // Find the first unused slot. This could probably be even further optimized by adding
         // a field pointing to the first unused location.
         int idx = 0;

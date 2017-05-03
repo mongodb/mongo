@@ -274,11 +274,10 @@ void ReplSource::loadAll(OperationContext* opCtx, SourceVector& v) {
         // check that no items are in sources other than that
         // add if missing
         int n = 0;
-        unique_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(opCtx,
-                                            localSources,
-                                            ctx.db()->getCollection(localSources),
-                                            PlanExecutor::YIELD_MANUAL));
+        auto exec = InternalPlanner::collectionScan(opCtx,
+                                                    localSources,
+                                                    ctx.db()->getCollection(opCtx, localSources),
+                                                    PlanExecutor::NO_YIELD);
         BSONObj obj;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -318,8 +317,8 @@ void ReplSource::loadAll(OperationContext* opCtx, SourceVector& v) {
         }
     }
 
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        opCtx, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, localSources, ctx.db()->getCollection(opCtx, localSources), PlanExecutor::NO_YIELD);
     BSONObj obj;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -384,7 +383,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         HandshakeArgs handshake;

@@ -27,7 +27,10 @@
  */
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/concurrency/locker_noop.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/stdx/memory.h"
@@ -43,8 +46,8 @@ public:
      * These constructors are for use in legacy tests that do not need operation contexts that are
      * properly connected to clients.
      */
-    OperationContextNoop() : OperationContextNoop(nullptr, 0) {}
-    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0) {
+    OperationContextNoop() : OperationContextNoop(nullptr, 0, boost::none) {}
+    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0, boost::none) {
         setRecoveryUnit(ru, kNotInUnitOfWork);
     }
 
@@ -52,7 +55,8 @@ public:
     /**
      * This constructor is for use by ServiceContexts, and should not be called directly.
      */
-    OperationContextNoop(Client* client, unsigned int opId) : OperationContext(client, opId) {
+    OperationContextNoop(Client* client, unsigned int opId, boost::optional<LogicalSessionId> lsid)
+        : OperationContext(client, opId, std::move(lsid)) {
         setRecoveryUnit(new RecoveryUnitNoop(), kNotInUnitOfWork);
         setLockState(stdx::make_unique<LockerNoop>());
     }

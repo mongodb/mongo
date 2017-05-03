@@ -235,4 +235,12 @@ Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(
     return Status::OK();
 }
 
+StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewKeys(
+    OperationContext* opCtx,
+    StringData purpose,
+    const LogicalTime& newerThanThis,
+    repl::ReadConcernLevel readConcernLevel) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 }  // namespace mongo

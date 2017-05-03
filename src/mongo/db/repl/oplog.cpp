@@ -273,6 +273,7 @@ bool oplogDisabled(OperationContext* opCtx,
 OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             const char* opstr,
                             const NamespaceString& nss,
+                            OptionalCollectionUUID uuid,
                             const BSONObj& obj,
                             const BSONObj* o2,
                             bool fromMigrate,
@@ -287,6 +288,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.append("v", OplogEntry::kOplogVersion);
     b.append("op", opstr);
     b.append("ns", nss.ns());
+    if (uuid)
+        uuid->appendToBuilder(&b, "ui");
     if (fromMigrate)
         b.appendBool("fromMigrate", true);
     if (o2)
@@ -301,7 +304,7 @@ void truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp) {
     const NamespaceString oplogNss(rsOplogName);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
-    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
+    Collection* oplogCollection = autoDb.getDb()->getCollection(opCtx, oplogNss);
     if (!oplogCollection) {
         fassertFailedWithStatusNoTrace(
             34418,
@@ -391,6 +394,7 @@ void _logOpsInner(OperationContext* opCtx,
 void logOp(OperationContext* opCtx,
            const char* opstr,
            const NamespaceString& nss,
+           OptionalCollectionUUID uuid,
            const BSONObj& obj,
            const BSONObj* o2,
            bool fromMigrate) {
@@ -405,7 +409,8 @@ void logOp(OperationContext* opCtx,
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
-    auto writer = _logOpWriter(opCtx, opstr, nss, obj, o2, fromMigrate, slot.opTime, slot.hash);
+    auto writer =
+        _logOpWriter(opCtx, opstr, nss, uuid, obj, o2, fromMigrate, slot.opTime, slot.hash);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
 }
@@ -413,6 +418,7 @@ void logOp(OperationContext* opCtx,
 void logOps(OperationContext* opCtx,
             const char* opstr,
             const NamespaceString& nss,
+            OptionalCollectionUUID uuid,
             std::vector<BSONObj>::const_iterator begin,
             std::vector<BSONObj>::const_iterator end,
             bool fromMigrate) {
@@ -433,7 +439,7 @@ void logOps(OperationContext* opCtx,
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
     for (size_t i = 0; i < count; i++) {
         writers.emplace_back(_logOpWriter(
-            opCtx, opstr, nss, begin[i], NULL, fromMigrate, slots[i].opTime, slots[i].hash));
+            opCtx, opstr, nss, uuid, begin[i], NULL, fromMigrate, slots[i].opTime, slots[i].hash));
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
@@ -494,7 +500,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName);
-    Collection* collection = ctx.db()->getCollection(oplogCollectionName);
+    Collection* collection = ctx.db()->getCollection(opCtx, oplogCollectionName);
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
@@ -723,7 +729,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_X));
         }
     }
-    Collection* collection = db->getCollection(ns);
+    Collection* collection = db->getCollection(opCtx, requestNss);
     IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -758,7 +764,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
             // Check if collection exists.
-            auto indexCollection = db->getCollection(indexNss);
+            auto indexCollection = db->getCollection(opCtx, indexNss);
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create index due to missing collection: "
                                   << op.toString(),
@@ -974,8 +980,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 o.hasField("_id"));
 
         if (opType[1] == 0) {
-            deleteObjects(
-                opCtx, collection, requestNss, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
+            deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
         } else
             verify(opType[1] == 'b');  // "db" advertisement
         if (incrementOpsAppliedStats) {
@@ -1036,7 +1041,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
     }
     {
         Database* db = dbHolder().get(opCtx, nss.ns());
-        if (db && !db->getCollection(nss.ns()) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
+        if (db && !db->getCollection(opCtx, nss) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }

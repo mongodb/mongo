@@ -30,7 +30,6 @@
 
 #include <utility>
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
@@ -41,11 +40,6 @@ namespace rpc {
 LegacyRequest::LegacyRequest(const Message* message)
     : _message(std::move(message)), _dbMessage(*message), _queryMessage(_dbMessage) {
     _database = nsToDatabaseSubstring(_queryMessage.ns);
-
-    uassert(
-        ErrorCodes::InvalidNamespace,
-        str::stream() << "Invalid database name: '" << _database << "'",
-        NamespaceString::validDBName(_database, NamespaceString::DollarInDbNameBehavior::Allow));
 
     std::tie(_upconvertedCommandArgs, _upconvertedMetadata) =
         uassertStatusOK(rpc::upconvertRequestMetadata(std::move(_queryMessage.query),
@@ -69,11 +63,6 @@ const BSONObj& LegacyRequest::getMetadata() const {
 
 const BSONObj& LegacyRequest::getCommandArgs() const {
     return _upconvertedCommandArgs;
-}
-
-DocumentRange LegacyRequest::getInputDocs() const {
-    // return an empty document range.
-    return DocumentRange{};
 }
 
 Protocol LegacyRequest::getProtocol() const {

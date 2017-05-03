@@ -143,7 +143,7 @@ private:
             return statusWithPlanExecutor.getStatus();
         }
 
-        unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
+        auto planExecutor = std::move(statusWithPlanExecutor.getValue());
 
         Explain::explainStages(planExecutor.get(), coll, verbosity, out);
         return Status::OK();
@@ -152,7 +152,6 @@ private:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         RARELY {
@@ -175,7 +174,7 @@ private:
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
-        unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
+        auto planExecutor = std::move(statusWithPlanExecutor.getValue());
 
         auto curOp = CurOp::get(opCtx);
         {

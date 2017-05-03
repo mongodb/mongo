@@ -50,8 +50,8 @@
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
@@ -156,7 +156,7 @@ struct Cloner::Fun {
         bool createdCollection = false;
         Collection* collection = NULL;
 
-        collection = db->getCollection(to_collection);
+        collection = db->getCollection(opCtx, to_collection);
         if (!collection) {
             massert(17321,
                     str::stream() << "collection dropped during clone [" << to_collection.ns()
@@ -176,7 +176,7 @@ struct Cloner::Fun {
                                         fixIndexSpec(to_collection.db().toString(), from_id_index));
                 verify(s.isOK());
                 wunit.commit();
-                collection = db->getCollection(to_collection);
+                collection = db->getCollection(opCtx, to_collection);
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", to_collection.ns());
         }
@@ -215,7 +215,7 @@ struct Cloner::Fun {
                         str::stream() << "Database " << _dbName << " dropped while cloning",
                         db != NULL);
 
-                collection = db->getCollection(to_collection);
+                collection = db->getCollection(opCtx, to_collection);
                 uassert(28594,
                         str::stream() << "Collection " << to_collection.ns()
                                       << " dropped while cloning",
@@ -368,7 +368,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     // during the temp release
     Database* db = dbHolder().openDb(opCtx, toDBName);
 
-    Collection* collection = db->getCollection(to_collection);
+    Collection* collection = db->getCollection(opCtx, to_collection);
     if (!collection) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             opCtx->checkForInterrupt();
@@ -384,7 +384,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                 createDefaultIndexes,
                 fixIndexSpec(to_collection.db().toString(), getIdIndexSpec(from_indexes)));
             invariant(s.isOK());
-            collection = db->getCollection(to_collection);
+            collection = db->getCollection(opCtx, to_collection);
             invariant(collection);
             wunit.commit();
         }
@@ -409,11 +409,9 @@ void Cloner::copyIndexes(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
     indexer.commit();
     if (opCtx->writesAreReplicated()) {
-        const string targetSystemIndexesCollectionName = to_collection.getSystemIndexesCollection();
-        const NamespaceString createIndexNs{targetSystemIndexesCollectionName};
         for (auto&& infoObj : indexInfoObjs) {
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                opCtx, createIndexNs, infoObj, false);
+                opCtx, collection->ns(), collection->uuid(opCtx), infoObj, false);
         }
     }
     wunit.commit();

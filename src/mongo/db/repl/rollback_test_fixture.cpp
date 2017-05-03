@@ -36,6 +36,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace repl {
@@ -70,12 +72,15 @@ void RollbackTest::setUp() {
     _threadPoolExecutorTest.setUp();
     _opCtx = cc().makeOperationContext();
     auto serviceContext = _serviceContextMongoDTest.getServiceContext();
+    ReplicationProcess::set(serviceContext,
+                            stdx::make_unique<ReplicationProcess>(&_storageInterface));
     _coordinator = new ReplicationCoordinatorRollbackMock(serviceContext);
     ReplicationCoordinator::set(serviceContext,
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
     setOplogCollectionName();
     _storageInterface.setAppliedThrough(_opCtx.get(), OpTime{});
     _storageInterface.setMinValid(_opCtx.get(), OpTime{});
+    ReplicationProcess::get(_opCtx.get())->initializeRollbackID(_opCtx.get());
 
     _threadPoolExecutorTest.launchExecutorThread();
 }

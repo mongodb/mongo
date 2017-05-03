@@ -134,45 +134,47 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
     RemoteCommandTargeter* targeter,
     const std::string& dbName,
     const BSONObj& cmdObj) {
-    auto host = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-    if (!host.isOK()) {
-        return host.getStatus();
+    auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+    if (!swHost.isOK()) {
+        return swHost.getStatus();
     }
+    auto host = std::move(swHost.getValue());
 
     executor::RemoteCommandRequest request(
-        host.getValue(), dbName, cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
-    executor::RemoteCommandResponse swResponse =
+        host, dbName, cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
+
+    executor::RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    auto callStatus = _executorForAddShard->scheduleRemoteCommand(
-        request, [&swResponse](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            swResponse = args.response;
+    auto swCallbackHandle = _executorForAddShard->scheduleRemoteCommand(
+        request, [&response](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            response = args.response;
         });
-    if (!callStatus.isOK()) {
-        return callStatus.getStatus();
+    if (!swCallbackHandle.isOK()) {
+        return swCallbackHandle.getStatus();
     }
 
     // Block until the command is carried out
-    _executorForAddShard->wait(callStatus.getValue());
+    _executorForAddShard->wait(swCallbackHandle.getValue());
 
-    if (!swResponse.isOK()) {
-        if (swResponse.status.compareCode(ErrorCodes::ExceededTimeLimit)) {
-            LOG(0) << "Operation for addShard timed out with status " << swResponse.status;
-        }
-        if (!Shard::shouldErrorBePropagated(swResponse.status.code())) {
-            swResponse.status = {ErrorCodes::OperationFailed,
-                                 str::stream() << "failed to run command " << cmdObj
-                                               << " when attempting to add shard "
-                                               << targeter->connectionString().toString()
-                                               << causedBy(swResponse.status)};
-        }
-        return swResponse.status;
+    if (response.status == ErrorCodes::ExceededTimeLimit) {
+        LOG(0) << "Operation timed out with status " << redact(response.status);
     }
 
-    BSONObj responseObj = swResponse.data.getOwned();
-    BSONObj responseMetadata = swResponse.metadata.getOwned();
+    if (!response.isOK()) {
+        if (!Shard::shouldErrorBePropagated(response.status.code())) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "failed to run command " << cmdObj
+                                  << " when attempting to add shard "
+                                  << targeter->connectionString().toString()
+                                  << causedBy(response.status)};
+        }
+        return response.status;
+    }
 
-    Status commandStatus = getStatusFromCommandResult(responseObj);
+    BSONObj result = response.data.getOwned();
+
+    Status commandStatus = getStatusFromCommandResult(result);
     if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
         commandStatus = {ErrorCodes::OperationFailed,
                          str::stream() << "failed to run command " << cmdObj
@@ -181,7 +183,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
                                        << causedBy(commandStatus)};
     }
 
-    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
+    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
     if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
         writeConcernStatus = {ErrorCodes::OperationFailed,
                               str::stream() << "failed to satisfy writeConcern for command "
@@ -191,8 +193,9 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
                                             << causedBy(writeConcernStatus)};
     }
 
-    return Shard::CommandResponse(std::move(responseObj),
-                                  std::move(responseMetadata),
+    return Shard::CommandResponse(std::move(host),
+                                  std::move(result),
+                                  response.metadata.getOwned(),
                                   std::move(commandStatus),
                                   std::move(writeConcernStatus));
 }
@@ -481,8 +484,8 @@ StatusWith<ShardType> ShardingCatalogManagerImpl::_validateHostAsShard(
 StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
-    auto swCommandResponse =
-        _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("listDatabases" << 1));
+    auto swCommandResponse = _runCommandForAddShard(
+        opCtx, targeter.get(), "admin", BSON("listDatabases" << 1 << "nameOnly" << true));
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }

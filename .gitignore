@@ -2,6 +2,10 @@
 /src/mongo/db/modules
 /.jsdbshell
 /.dbshell
+/*.ninja
+/*.ninja.deps
+/.ninja_deps
+/.ninja_log
 /perf.data
 /perf.data.old
 /massif.out.*

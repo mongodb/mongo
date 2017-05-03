@@ -73,7 +73,6 @@ class OplogReader;
 class OpTime;
 class ReadConcernArgs;
 class ReplSetConfig;
-class ReplicationExecutor;
 class ReplSetHeartbeatArgs;
 class ReplSetHeartbeatArgsV1;
 class ReplSetHeartbeatResponse;
@@ -131,11 +130,6 @@ public:
      * blocking until all replication-related shutdown tasks are complete.
      */
     virtual void shutdown(OperationContext* opCtx) = 0;
-
-    /**
-     * Returns a pointer to the ReplicationExecutor.
-     */
-    virtual ReplicationExecutor* getExecutor() = 0;
 
     /**
      * Returns a reference to the parsed command line arguments that are related to replication.
@@ -639,17 +633,6 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj) = 0;
 
-    /*
-     * Handles an incoming replSetGetRBID command.
-     * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
-     */
-    virtual Status processReplSetGetRBID(BSONObjBuilder* resultObj) = 0;
-
-    /**
-     * Increments this process's rollback id.  Called every time a rollback occurs.
-     */
-    virtual void incrementRollbackID() = 0;
-
     /**
      * Arguments to the replSetFresh command.
      */
@@ -771,7 +754,8 @@ public:
      * Prepares a metadata object with the ReplSetMetadata and the OplogQueryMetadata depending
      * on what has been requested.
      */
-    virtual void prepareReplMetadata(const BSONObj& metadataRequestObj,
+    virtual void prepareReplMetadata(OperationContext* opCtx,
+                                     const BSONObj& metadataRequestObj,
                                      const OpTime& lastOpTimeFromClient,
                                      BSONObjBuilder* builder) const = 0;
 
@@ -857,6 +841,11 @@ public:
     virtual OpTime getCurrentCommittedSnapshotOpTime() const = 0;
 
     /**
+     * Appends diagnostics about the replication subsystem.
+     */
+    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) = 0;
+
+    /**
      * Appends connection information to the provided BSONObjBuilder.
      */
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const = 0;
@@ -880,6 +869,11 @@ public:
     virtual Status stepUpIfEligible() = 0;
 
     virtual ServiceContext* getServiceContext() = 0;
+
+    /**
+     * Abort catchup if the node is in catchup mode.
+     */
+    virtual Status abortCatchupIfNeeded() = 0;
 
 protected:
     ReplicationCoordinator();

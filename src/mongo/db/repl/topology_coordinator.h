@@ -34,7 +34,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -406,15 +405,14 @@ public:
      *      C2. If C1 holds, then there must exist at least one electable secondary node in the
      *      majority set M.
      *
-     * If C1 and C2 hold, a step down occurs and this method returns true. Else, the step down
+     * C1 should already be checked in ReplicationCoordinator. This method checks C2.
+     *
+     * If C2 holds, a step down occurs and this method returns true. Else, the step down
      * fails and this method returns false.
      *
      * NOTE: It is illegal to call this method if the node is not a primary.
      */
-    virtual bool stepDown(Date_t until,
-                          bool force,
-                          const OpTime& lastOpApplied,
-                          const OpTime& lastOpCommitted) = 0;
+    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied) = 0;
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
@@ -499,6 +497,21 @@ public:
      * creation.
      */
     virtual void setStorageEngineSupportsReadCommitted(bool supported) = 0;
+
+    /**
+     * Reset the booleans to record the last heartbeat restart.
+     */
+    virtual void restartHeartbeats() = 0;
+
+    /**
+     * Scans through all members that are 'up' and return the latest known optime, if we have
+     * received (successful or failed) heartbeats from all nodes since heartbeat restart.
+     *
+     * Returns boost::none if any node hasn't responded to a heartbeat since we last restarted
+     * heartbeats.
+     * Returns OpTime(Timestamp(0, 0), 0), the smallest OpTime in PV1, if other nodes are all down.
+     */
+    virtual boost::optional<OpTime> latestKnownOpTimeSinceHeartbeatRestart() const = 0;
 
 protected:
     TopologyCoordinator() {}

@@ -83,7 +83,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         Timer timer;
@@ -213,13 +212,13 @@ private:
         }
 
         *fromCache = false;
-        Collection* collection = db->getCollection(fullCollectionName);
+        Collection* collection = db->getCollection(opCtx, ns);
         if (!collection)
             return "";
 
         IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
-        unique_ptr<PlanExecutor> exec;
+        unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         if (desc) {
             exec = InternalPlanner::indexScan(opCtx,
                                               collection,
@@ -227,12 +226,12 @@ private:
                                               BSONObj(),
                                               BSONObj(),
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanExecutor::YIELD_MANUAL,
+                                              PlanExecutor::NO_YIELD,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
         } else if (collection->isCapped()) {
             exec = InternalPlanner::collectionScan(
-                opCtx, fullCollectionName, collection, PlanExecutor::YIELD_MANUAL);
+                opCtx, fullCollectionName, collection, PlanExecutor::NO_YIELD);
         } else {
             log() << "can't find _id index for: " << fullCollectionName;
             return "no _id _index";

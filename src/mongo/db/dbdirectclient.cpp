@@ -123,10 +123,9 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
     DirectClientScope directClientScope(_opCtx);
     LastError::get(_opCtx->getClient()).startRequest();
 
-    DbResponse dbResponse;
     CurOp curOp(_opCtx);
-    assembleResponse(_opCtx, toSend, dbResponse, kHostAndPortForDirectClient);
-    verify(!dbResponse.response.empty());
+    auto dbResponse = assembleResponse(_opCtx, toSend, kHostAndPortForDirectClient);
+    invariant(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
 
     return true;
@@ -136,9 +135,9 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
     DirectClientScope directClientScope(_opCtx);
     LastError::get(_opCtx->getClient()).startRequest();
 
-    DbResponse dbResponse;
     CurOp curOp(_opCtx);
-    assembleResponse(_opCtx, toSend, dbResponse, kHostAndPortForDirectClient);
+    auto dbResponse = assembleResponse(_opCtx, toSend, kHostAndPortForDirectClient);
+    invariant(dbResponse.response.empty());
 }
 
 unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
@@ -164,7 +163,7 @@ unsigned long long DBDirectClient::count(
 
     std::string errmsg;
     BSONObjBuilder result;
-    bool runRetval = countCmd->run(_opCtx, dbname, cmdObj, options, errmsg, result);
+    bool runRetval = countCmd->run(_opCtx, dbname, cmdObj, errmsg, result);
     if (!runRetval) {
         Command::appendCommandStatus(result, runRetval, errmsg);
         Status commandStatus = getStatusFromCommandResult(result.obj());

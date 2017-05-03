@@ -40,47 +40,63 @@ public:
     virtual ~OpObserverImpl() = default;
 
     void onCreateIndex(OperationContext* opCtx,
-                       const NamespaceString& ns,
+                       const NamespaceString& nss,
+                       OptionalCollectionUUID uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
     void onInserts(OperationContext* opCtx,
-                   const NamespaceString& ns,
+                   const NamespaceString& nss,
+                   OptionalCollectionUUID uuid,
                    std::vector<BSONObj>::const_iterator begin,
                    std::vector<BSONObj>::const_iterator end,
                    bool fromMigrate) override;
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
     CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
-                                                       const NamespaceString& ns,
+                                                       const NamespaceString& nss,
                                                        const BSONObj& doc) override;
     void onDelete(OperationContext* opCtx,
-                  const NamespaceString& ns,
+                  const NamespaceString& nss,
+                  OptionalCollectionUUID uuid,
                   CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate) override;
     void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) override;
     void onCreateCollection(OperationContext* opCtx,
+                            Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex) override;
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const BSONObj& collModCmd) override;
+                   OptionalCollectionUUID uuid,
+                   const BSONObj& collModCmd,
+                   const CollectionOptions& oldCollOptions,
+                   boost::optional<TTLCollModInfo> ttlInfo) override;
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
-    void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName) override;
+    void onDropCollection(OperationContext* opCtx,
+                          const NamespaceString& collectionName,
+                          OptionalCollectionUUID uuid) override;
     void onDropIndex(OperationContext* opCtx,
-                     const NamespaceString& ns,
+                     const NamespaceString& nss,
+                     OptionalCollectionUUID uuid,
                      const std::string& indexName,
                      const BSONObj& indexInfo) override;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
                             bool dropTarget,
+                            OptionalCollectionUUID dropTargetUUID,
+                            OptionalCollectionUUID dropSourceUUID,
                             bool stayTemp) override;
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
                     const BSONObj& applyOpCmd) override;
-    void onEmptyCapped(OperationContext* opCtx, const NamespaceString& collectionName);
+    void onEmptyCapped(OperationContext* opCtx,
+                       const NamespaceString& collectionName,
+                       OptionalCollectionUUID uuid);
     void onConvertToCapped(OperationContext* opCtx,
                            const NamespaceString& collectionName,
+                           OptionalCollectionUUID uuid,
                            double size) override;
 };
 

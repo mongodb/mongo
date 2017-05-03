@@ -57,15 +57,15 @@ public:
         invariant(false);
     }
 
-    virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs) {
+    virtual LockResult lockGlobal(LockMode mode) {
         invariant(false);
     }
 
-    virtual LockResult lockGlobalBegin(LockMode mode) {
+    virtual LockResult lockGlobalBegin(LockMode mode, Milliseconds timeout) {
         invariant(false);
     }
 
-    virtual LockResult lockGlobalComplete(unsigned timeoutMs) {
+    virtual LockResult lockGlobalComplete(Milliseconds timeout) {
         invariant(false);
     }
 
@@ -91,7 +91,7 @@ public:
 
     virtual LockResult lock(ResourceId resId,
                             LockMode mode,
-                            unsigned timeoutMs,
+                            Milliseconds timeout,
                             bool checkDeadlock) {
         return LockResult::LOCK_OK;
     }

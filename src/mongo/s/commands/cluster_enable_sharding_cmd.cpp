@@ -89,7 +89,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname_unused,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         const std::string dbname = parseNs("", cmdObj);
@@ -99,7 +98,8 @@ public:
             str::stream() << "invalid db name specified: " << dbname,
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-        if (dbname == "admin" || dbname == "config" || dbname == "local") {
+        if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kConfigDb ||
+            dbname == NamespaceString::kLocalDb) {
             errmsg = "can't shard " + dbname + " database";
             return false;
         }

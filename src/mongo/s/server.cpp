@@ -50,7 +50,6 @@
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
@@ -231,7 +230,7 @@ static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // connect to version supporting Write Concern only
     spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     spec.isInternalClient = true;
 }
@@ -288,9 +287,7 @@ static ExitCode runMongosServer() {
 
     auto opCtx = cc().makeOperationContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(opCtx->getServiceContext(), std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(opCtx->getServiceContext());
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
 
     {
@@ -306,17 +303,6 @@ static ExitCode runMongosServer() {
         }
 
         Grid::get(opCtx.get())->getBalancerConfiguration()->refreshAndCheck(opCtx.get());
-    }
-
-    if (serverGlobalParams.isHttpInterfaceEnabled) {
-        std::shared_ptr<DbWebServer> dbWebServer(new DbWebServer(serverGlobalParams.bind_ip,
-                                                                 serverGlobalParams.port + 1000,
-                                                                 getGlobalServiceContext(),
-                                                                 new NoAdminAccess()));
-        dbWebServer->setupSockets();
-
-        stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
-        web.detach();
     }
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);

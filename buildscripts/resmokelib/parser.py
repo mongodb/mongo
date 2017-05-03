@@ -36,6 +36,7 @@ DEST_TO_CONFIG = {
     "num_clients_per_fixture": "numClientsPerFixture",
     "prealloc_journal": "preallocJournal",
     "repeat": "repeat",
+    "report_failure_status": "reportFailureStatus",
     "report_file": "reportFile",
     "seed": "seed",
     "shell_read_mode": "shellReadMode",
@@ -44,6 +45,7 @@ DEST_TO_CONFIG = {
     "stagger_jobs": "staggerJobs",
     "storage_engine": "storageEngine",
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
+    "tag_file": "tagFile",
     "task_id": "taskId",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
@@ -165,6 +167,13 @@ def parse_command_line():
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
                       help="Repeat the given suite(s) N times, or until one fails.")
 
+    parser.add_option("--reportFailureStatus", type="choice", action="store",
+                      dest="report_failure_status", choices=("fail", "silentfail"),
+                      metavar="STATUS",
+                      help="Controls if the test failure status should be reported as failed"
+                           " or be silently ignored (STATUS=silentfail). Defaults to"
+                           " STATUS=%default.")
+
     parser.add_option("--reportFile", dest="report_file", metavar="REPORT",
                       help="Write a JSON file with test status and timing information.")
 
@@ -194,6 +203,9 @@ def parse_command_line():
     parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size",
                       metavar="CONFIG", help="Set the storage engine cache size configuration"
                       " setting for all mongod's.")
+
+    parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
+                      help="A YAML file that associates tests and tags.")
 
     parser.add_option("--taskId", dest="task_id", metavar="TASK_ID",
                       help="Set the Id of the Evergreen task running the tests.")
@@ -255,6 +267,7 @@ def update_config_vars(values):
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("numClientsPerFixture")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
+    _config.REPORT_FAILURE_STATUS = config.pop("reportFailureStatus")
     _config.REPORT_FILE = config.pop("reportFile")
     _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
@@ -262,6 +275,7 @@ def update_config_vars(values):
     _config.STAGGER_JOBS = config.pop("staggerJobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storageEngine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
+    _config.TAG_FILE = config.pop("tagFile")
     _config.TASK_ID = config.pop("taskId")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")

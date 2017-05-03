@@ -66,8 +66,6 @@ namespace {
 
 const StringData kIndexesFieldName = "indexes"_sd;
 const StringData kCommandName = "createIndexes"_sd;
-const StringData kWriteConcern = "writeConcern"_sd;
-const StringData kMaxTimeMS = "maxTimeMS"_sd;
 
 /**
  * Parses the index specifications from 'cmdObj', validates them, and returns equivalent index
@@ -124,8 +122,8 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             }
 
             hasIndexesField = true;
-        } else if (kCommandName == cmdElemFieldName || kWriteConcern == cmdElemFieldName ||
-                   kMaxTimeMS == cmdElemFieldName) {
+        } else if (kCommandName == cmdElemFieldName ||
+                   Command::isGenericArgument(cmdElemFieldName)) {
             continue;
         } else {
             return {ErrorCodes::BadValue,
@@ -230,7 +228,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
@@ -261,7 +258,7 @@ public:
             db = dbHolder().openDb(opCtx, ns.db());
         }
 
-        Collection* collection = db->getCollection(ns.ns());
+        Collection* collection = db->getCollection(opCtx, ns);
         if (collection) {
             result.appendBool("createdCollectionAutomatically", false);
         } else {
@@ -383,7 +380,7 @@ public:
 
             Database* db = dbHolder().get(opCtx, ns.db());
             uassert(28551, "database dropped during index build", db);
-            uassert(28552, "collection dropped during index build", db->getCollection(ns.ns()));
+            uassert(28552, "collection dropped during index build", db->getCollection(opCtx, ns));
         }
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -392,9 +389,8 @@ public:
             indexer.commit();
 
             for (auto&& infoObj : indexInfoObjs) {
-                NamespaceString systemIndexes{ns.getSystemIndexesCollection()};
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, systemIndexes, infoObj, false);
+                    opCtx, ns, collection->uuid(opCtx), infoObj, false);
             }
 
             wunit.commit();

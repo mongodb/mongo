@@ -157,7 +157,7 @@ public:
         return false;
     }
 
-    StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
@@ -223,6 +223,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
 
     ASSERT_TRUE(lookup->getNext().isEOF());
     ASSERT_TRUE(lookup->getNext().isEOF());
+    lookup->dispose();
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
@@ -275,6 +276,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     ASSERT_TRUE(lookup->getNext().isEOF());
     ASSERT_TRUE(lookup->getNext().isEOF());
+    lookup->dispose();
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
@@ -296,6 +298,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
     ASSERT_EQ(1U, modifiedPaths.paths.size());
     ASSERT_EQ(1U, modifiedPaths.paths.count("foreignDocs"));
+    lookup->dispose();
 }
 
 TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
@@ -323,6 +326,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
     ASSERT_EQ(2U, modifiedPaths.paths.size());
     ASSERT_EQ(1U, modifiedPaths.paths.count("foreignDoc"));
     ASSERT_EQ(1U, modifiedPaths.paths.count("arrIndex"));
+    lookup->dispose();
 }
 
 }  // namespace

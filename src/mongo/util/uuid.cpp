@@ -136,4 +136,11 @@ std::string UUID::toString() const {
     return ss.str();
 }
 
+template <>
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<<UUID>(UUID value) {
+    value.appendToBuilder(_builder, _fieldName);
+    _fieldName = StringData();
+    return *_builder;
+}
+
 }  // namespace mongo

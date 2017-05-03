@@ -83,11 +83,6 @@ const char* DocumentSource::getSourceName() const {
     return unknown;
 }
 
-void DocumentSource::setSource(DocumentSource* pTheSource) {
-    verify(!isValidInitialSource());
-    pSource = pTheSource;
-}
-
 intrusive_ptr<DocumentSource> DocumentSource::optimize() {
     return this;
 }
@@ -152,10 +147,15 @@ splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& matc
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             DepsTracker depsTracker;
             match->getDependencies(&depsTracker);
-            modifiedPaths = extractModifiedDependencies(depsTracker.fields, modifiedPathsRet.paths);
+
+            auto preservedPaths = modifiedPathsRet.paths;
+            for (auto&& rename : modifiedPathsRet.renames) {
+                preservedPaths.insert(rename.first);
+            }
+            modifiedPaths = extractModifiedDependencies(depsTracker.fields, preservedPaths);
         }
     }
-    return match->splitSourceBy(modifiedPaths);
+    return match->splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
 }
 
 }  // namespace
@@ -190,12 +190,6 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
         }
     }
     return doOptimizeAt(itr, container);
-}
-
-void DocumentSource::dispose() {
-    if (pSource) {
-        pSource->dispose();
-    }
 }
 
 void DocumentSource::serializeToArray(vector<Value>& array,

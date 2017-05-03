@@ -80,8 +80,10 @@ BSONObj makeIdIndexSpec(const NamespaceString& nss) {
  * Generates a unique namespace from the test registration agent.
  */
 template <typename T>
-NamespaceString makeNamespace(const T& t, const char* suffix = "") {
-    return NamespaceString("local." + t.getSuiteName() + "_" + t.getTestName() + suffix);
+NamespaceString makeNamespace(const T& t, const std::string& suffix = "") {
+    return NamespaceString(std::string("local." + t.getSuiteName() + "_" + t.getTestName())
+                               .substr(0, NamespaceString::MaxNsCollectionLen - suffix.length()) +
+                           suffix);
 }
 
 /**
@@ -170,13 +172,22 @@ protected:
         return _opCtx.get();
     }
 
+    ReplicationCoordinatorMock* getReplicationCoordinatorMock() {
+        return _replicationCoordinatorMock;
+    }
+
+    void resetUnreplicatedWritesBlock() {
+        _uwb.reset(nullptr);
+    }
+
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         _createOpCtx();
-        ReplicationCoordinator::set(getServiceContext(),
-                                    stdx::make_unique<ReplicationCoordinatorMock>(
-                                        getServiceContext(), createReplSettings()));
+        auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(getServiceContext(),
+                                                                       createReplSettings());
+        _replicationCoordinatorMock = replCoord.get();
+        ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
     }
 
     void tearDown() override {
@@ -197,6 +208,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<UnreplicatedWritesBlock> _uwb;
     std::unique_ptr<DisableDocumentValidation> _ddv;
+    ReplicationCoordinatorMock* _replicationCoordinatorMock = nullptr;
 };
 
 /**
@@ -323,6 +335,143 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     ASSERT_EQUALS(storage.getAppliedThrough(opCtx), OpTime());
     ASSERT_EQUALS(storage.getMinValid(opCtx), endOpTime2);
     ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
+}
+
+TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsNamespaceNotFoundOnMissingCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.getRollbackID(opCtx).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, IncrementRollbackIDReturnsNamespaceNotFoundOnMissingCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.incrementRollbackID(opCtx));
+}
+
+TEST_F(StorageInterfaceImplTest, InitializeRollbackIDReturnsNamespaceExistsOnExistingCollection) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    createCollection(opCtx, NamespaceString(StorageInterfaceImpl::kDefaultRollbackIdNamespace));
+    ASSERT_EQUALS(ErrorCodes::NamespaceExists, storage.initializeRollbackID(opCtx));
+}
+
+TEST_F(StorageInterfaceImplTest,
+       InitializeRollbackIDReturnsNamespaceExistsIfItHasAlreadyBeenInitialized) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_OK(storage.initializeRollbackID(opCtx));
+    ASSERT_EQUALS(ErrorCodes::NamespaceExists, storage.initializeRollbackID(opCtx));
+}
+
+/**
+ * Check collection contents. OplogInterface returns documents in reverse natural order.
+ */
+void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const std::vector<BSONObj>& docs) {
+    std::vector<BSONObj> reversedDocs(docs);
+    std::reverse(reversedDocs.begin(), reversedDocs.end());
+    OplogInterfaceLocal oplog(opCtx, nss.ns());
+    auto iter = oplog.makeIterator();
+    for (const auto& doc : reversedDocs) {
+        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
+    }
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+/**
+ * Check collection contents for a singleton Rollback ID document.
+ */
+void _assertRollbackIDDocument(OperationContext* opCtx, int id) {
+    _assertDocumentsInCollectionEquals(
+        opCtx,
+        NamespaceString(StorageInterfaceImpl::kDefaultRollbackIdNamespace),
+        {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
+                    << StorageInterfaceImpl::kRollbackIdFieldName
+                    << id)});
+}
+
+TEST_F(StorageInterfaceImplTest, RollbackIdInitializesIncrementsAndReadsProperly) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+
+    ASSERT_OK(storage.initializeRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 0);
+
+    auto rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 0);
+
+    ASSERT_OK(storage.incrementRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 1);
+
+    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 1);
+
+    ASSERT_OK(storage.incrementRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 2);
+
+    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 2);
+}
+
+TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToZeroWhenExceedingMaxInt) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+    NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
+    createCollection(opCtx, nss);
+    auto maxDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
+                              << StorageInterfaceImpl::kRollbackIdFieldName
+                              << std::numeric_limits<int>::max())};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, maxDoc));
+    _assertRollbackIDDocument(opCtx, std::numeric_limits<int>::max());
+
+    auto rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, std::numeric_limits<int>::max());
+
+    ASSERT_OK(storage.incrementRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 0);
+
+    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 0);
+
+    ASSERT_OK(storage.incrementRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 1);
+
+    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 1);
+}
+
+TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadField) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+    NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
+
+    createCollection(opCtx, nss);
+
+    auto badDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId << "bad field" << 3)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, badDoc));
+    ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40415),
+                  storage.getRollbackID(opCtx).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotInt) {
+    StorageInterfaceImpl storage;
+    auto opCtx = getOperationContext();
+    NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
+
+    createCollection(opCtx, nss);
+
+    auto badDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
+                              << StorageInterfaceImpl::kRollbackIdFieldName
+                              << "bad id")};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, badDoc));
+    ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40410),
+                  storage.getRollbackID(opCtx).getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
@@ -641,6 +790,22 @@ TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithMissingCollection) {
     ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_IS).getDb());
 }
 
+TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithSystemCollection) {
+    NamespaceString nss("local.system.mysyscoll");
+    ASSERT_TRUE(nss.isSystem());
+
+    // If we can create a system collection using the StorageInterface, we should be able to drop it
+    // using the same interface.
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+
+    ASSERT_OK(storage.createCollection(opCtx, nss, {}));
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
+
+    ASSERT_OK(storage.dropCollection(opCtx, nss));
+    ASSERT_FALSE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
+}
+
 TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsInvalidNamespaceIfCollectionIsMissing) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
@@ -734,22 +899,6 @@ std::string _toString(const std::vector<BSONObj>& docs) {
     }
     ss << "]";
     return ss;
-}
-
-/**
- * Check collection contents. OplogInterface returns documents in reverse natural order.
- */
-void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
-                                        const NamespaceString& nss,
-                                        const std::vector<BSONObj>& docs) {
-    std::vector<BSONObj> reversedDocs(docs);
-    std::reverse(reversedDocs.begin(), reversedDocs.end());
-    OplogInterfaceLocal oplog(opCtx, nss.ns());
-    auto iter = oplog.makeIterator();
-    for (const auto& doc : reversedDocs) {
-        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
-    }
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 /**
@@ -1468,6 +1617,450 @@ TEST_F(StorageInterfaceImplTest,
                                        BoundInclusion::kIncludeEndKeyOnly,
                                        1U)
                       .getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.findById(opCtx, nss, doc["_id"]).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindByIdReturnsNoSuchKeyWhenCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.findById(opCtx, nss, doc["_id"]).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindByIdReturnsNoSuchKeyWhenDocumentIsNotFound) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc3}));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.findById(opCtx, nss, doc2["_id"]).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindByIdReturnsDocumentWhenDocumentExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2, doc3}));
+    ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.findById(opCtx, nss, doc2["_id"])));
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.deleteById(opCtx, nss, doc["_id"]).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNoSuchKeyWhenCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.deleteById(opCtx, nss, doc["_id"]).getStatus());
+    _assertDocumentsInCollectionEquals(opCtx, nss, {});
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNoSuchKeyWhenDocumentIsNotFound) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc3}));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.deleteById(opCtx, nss, doc2["_id"]).getStatus());
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsDocumentWhenDocumentExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2, doc3}));
+    ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.deleteById(opCtx, nss, doc2["_id"])));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto doc = BSON("_id" << 0 << "x" << 1);
+    auto status = storage.upsertById(opCtx, nss, doc["_id"], doc);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS("Database [nosuchdb] not found. Unable to update document.", status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.coll");
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc = BSON("_id" << 0 << "x" << 1);
+    auto status = storage.upsertById(opCtx, wrongColl, doc["_id"], doc);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS("Collection [mydb.wrongColl] not found. Unable to update document.",
+                  status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReplacesExistingDocumentInCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto originalDoc = BSON("_id" << 1 << "x" << 1);
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 0 << "x" << 0), originalDoc, BSON("_id" << 2 << "x" << 2)}));
+
+    ASSERT_OK(storage.upsertById(opCtx, nss, originalDoc["_id"], BSON("x" << 100)));
+
+    _assertDocumentsInCollectionEquals(opCtx,
+                                       nss,
+                                       {BSON("_id" << 0 << "x" << 0),
+                                        BSON("_id" << 1 << "x" << 100),
+                                        BSON("_id" << 2 << "x" << 2)});
+}
+
+TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentInsertsNewDocumentInCollectionIfIdIsNotFound) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 0 << "x" << 0), BSON("_id" << 2 << "x" << 2)}));
+
+    ASSERT_OK(storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), BSON("x" << 100)));
+
+    // _assertDocumentsInCollectionEquals() reads collection in $natural order. Assumes new document
+    // is inserted at end of collection.
+    _assertDocumentsInCollectionEquals(opCtx,
+                                       nss,
+                                       {BSON("_id" << 0 << "x" << 0),
+                                        BSON("_id" << 2 << "x" << 2),
+                                        BSON("_id" << 1 << "x" << 100)});
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReplacesExistingDocumentInIllegalClientSystemNamespace) {
+    // Checks that we can update collections with namespaces not considered "legal client system"
+    // namespaces.
+    NamespaceString nss("local.system.rollback.docs");
+    ASSERT_FALSE(legalClientSystemNS(nss.ns()));
+
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto originalDoc = BSON("_id" << 1 << "x" << 1);
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, {BSON("_id" << 0 << "x" << 0), originalDoc, BSON("_id" << 2 << "x" << 2)}));
+
+    ASSERT_OK(storage.upsertById(opCtx, nss, originalDoc["_id"], BSON("x" << 100)));
+
+    _assertDocumentsInCollectionEquals(opCtx,
+                                       nss,
+                                       {BSON("_id" << 0 << "x" << 0),
+                                        BSON("_id" << 1 << "x" << 100),
+                                        BSON("_id" << 2 << "x" << 2)});
+}
+
+TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReturnsFailedToParseOnNonSimpleIdQuery) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto status = storage.upsertById(
+        opCtx, nss, BSON("" << BSON("$gt" << 3)).firstElement(), BSON("x" << 100));
+    ASSERT_EQUALS(ErrorCodes::InvalidIdField, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Unable to update document with a non-simple _id query:");
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsIndexNotFoundIfCollectionDoesNotHaveAnIdIndex) {
+    CollectionOptions options;
+    options.setNoIdIndex();
+
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+
+    auto doc = BSON("_id" << 0 << "x" << 100);
+    auto status = storage.upsertById(opCtx, nss, doc["_id"], doc);
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Unable to update document in a collection without an _id index.");
+}
+
+TEST_F(StorageInterfaceImplTest,
+       UpsertSingleDocumentReturnsFailedToParseWhenUpdateDocumentContainsUnknownOperator) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto status = storage.upsertById(
+        opCtx, nss, BSON("" << 1).firstElement(), BSON("$unknownUpdateOp" << BSON("x" << 1000)));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "Unknown modifier: $unknownUpdateOp");
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto filter = BSON("x" << 1);
+    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS(str::stream() << "Database [nosuchdb] not found. Unable to delete documents in "
+                                << nss.ns()
+                                << " using filter "
+                                << filter,
+                  status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsBadValueWhenFilterContainsUnknownOperator) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto filter = BSON("x" << BSON("$unknownFilterOp" << 1));
+    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "unknown operator: $unknownFilterOp");
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsIllegalOperationOnCappedCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = 1024 * 1024;
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+
+    auto filter = BSON("x" << 1);
+    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           str::stream() << "cannot remove from a capped collection: " << nss.ns());
+}
+
+TEST_F(
+    StorageInterfaceImplTest,
+    DeleteByFilterReturnsPrimarySteppedDownWhenCurrentMemberStateIsRollbackAndReplicatedWritesAreEnabled) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.mycoll");
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc}));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc});
+
+    // This test fixture disables replicated writes by default. We want to re-enable this setting
+    // for this test.
+    resetUnreplicatedWritesBlock();
+    ASSERT_TRUE(opCtx->writesAreReplicated());
+
+    // deleteByFilter() checks the current member state indirectly through
+    // ReplicationCoordinator::canAcceptWrites() if replicated writes are enabled.
+    ASSERT_TRUE(getReplicationCoordinatorMock()->setFollowerMode(MemberState::RS_ROLLBACK));
+
+    auto filter = BSON("x" << 0);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, storage.deleteByFilter(opCtx, nss, filter));
+}
+
+TEST_F(
+    StorageInterfaceImplTest,
+    DeleteByFilterReturnsPrimarySteppedDownWhenReplicationCoordinatorCannotAcceptWritesAndReplicatedWritesAreEnabled) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.mycoll");
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto doc = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc}));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc});
+
+    // This test fixture disables replicated writes by default. We want to re-enable this setting
+    // for this test.
+    resetUnreplicatedWritesBlock();
+    ASSERT_TRUE(opCtx->writesAreReplicated());
+
+    // deleteByFilter() checks ReplicationCoordinator::canAcceptWritesFor() if replicated writes are
+    // enabled on the OperationContext.
+    getReplicationCoordinatorMock()->alwaysAllowWrites(false);
+
+    auto filter = BSON("x" << 0);
+    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, storage.deleteByFilter(opCtx, nss, filter));
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("mydb.coll");
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto filter = BSON("x" << 1);
+    auto status = storage.deleteByFilter(opCtx, wrongColl, filter);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    ASSERT_EQUALS(
+        str::stream() << "Collection [mydb.wrongColl] not found. Unable to delete documents in "
+                      << wrongColl.ns()
+                      << " using filter "
+                      << filter,
+        status.reason());
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsSuccessIfCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, {}));
+
+    _assertDocumentsInCollectionEquals(opCtx, nss, {});
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterLeavesCollectionUnchangedIfNoDocumentsMatchFilter) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0), BSON("_id" << 2 << "x" << 2)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("x" << 1);
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    _assertDocumentsInCollectionEquals(opCtx, nss, docs);
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterRemoveDocumentsThatMatchFilter) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0),
+                 BSON("_id" << 1 << "x" << 1),
+                 BSON("_id" << 2 << "x" << 2),
+                 BSON("_id" << 3 << "x" << 3)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("x" << BSON("$in" << BSON_ARRAY(1 << 2)));
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 0 << "x" << 0), BSON("_id" << 3 << "x" << 3)};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterUsesIdHackIfFilterContainsIdFieldOnly) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0), BSON("_id" << 1 << "x" << 1)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("_id" << 1);
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 0 << "x" << 0)};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
+TEST_F(StorageInterfaceImplTest, DeleteByFilterRemovesDocumentsInIllegalClientSystemNamespace) {
+    // Checks that we can remove documents from collections with namespaces not considered "legal
+    // client system" namespaces.
+    NamespaceString nss("local.system.rollback.docs");
+    ASSERT_FALSE(legalClientSystemNS(nss.ns()));
+
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+
+    auto docs = {BSON("_id" << 0 << "x" << 0),
+                 BSON("_id" << 1 << "x" << 1),
+                 BSON("_id" << 2 << "x" << 2),
+                 BSON("_id" << 3 << "x" << 3)};
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+
+    auto filter = BSON("$or" << BSON_ARRAY(BSON("x" << 0) << BSON("_id" << 2)));
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    auto docsRemaining = {BSON("_id" << 1 << "x" << 1), BSON("_id" << 3 << "x" << 3)};
+    _assertDocumentsInCollectionEquals(opCtx, nss, docsRemaining);
+}
+
+TEST_F(StorageInterfaceImplTest,
+       DeleteByFilterRespectsCollectionsDefaultCollationWhenRemovingDocuments) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+
+    // Create a collection using a case-insensitive collation.
+    CollectionOptions options;
+    options.collation = BSON("locale"
+                             << "en_US"
+                             << "strength"
+                             << 2);
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+
+    auto doc1 = BSON("_id" << 1 << "x"
+                           << "ABC");
+    auto doc2 = BSON("_id" << 2 << "x"
+                           << "abc");
+    auto doc3 = BSON("_id" << 3 << "x"
+                           << "DEF");
+    auto doc4 = BSON("_id" << 4 << "x"
+                           << "def");
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2, doc3, doc4}));
+
+    // This filter should remove doc1 and doc2 because the values of the field "x"
+    // are equivalent to "aBc" under the case-insensive collation.
+    auto filter = BSON("x"
+                       << "aBc");
+    ASSERT_OK(storage.deleteByFilter(opCtx, nss, filter));
+
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc3, doc4});
 }
 
 TEST_F(StorageInterfaceImplTest,

@@ -135,6 +135,13 @@ public:
     virtual void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& endOpTime) = 0;
 
     /**
+     * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.
+     */
+    virtual StatusWith<int> getRollbackID(OperationContext* opCtx) = 0;
+    virtual Status initializeRollbackID(OperationContext* opCtx) = 0;
+    virtual Status incrementRollbackID(OperationContext* opCtx) = 0;
+
+    /**
      * On startup all oplog entries with a value >= the oplog delete from point should be deleted.
      * If null, no documents should be deleted.
      */
@@ -261,6 +268,47 @@ public:
                                                              const BSONObj& startKey,
                                                              BoundInclusion boundInclusion,
                                                              std::size_t limit) = 0;
+
+    /**
+     * Finds a single document in the collection referenced by the specified _id.
+     *
+     * Not supported on collections with a default collation.
+     */
+    virtual StatusWith<BSONObj> findById(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const BSONElement& idKey) = 0;
+
+    /**
+     * Deletes a single document in the collection referenced by the specified _id.
+     * Returns deleted document on success.
+     *
+     * Not supported on collections with a default collation.
+     */
+    virtual StatusWith<BSONObj> deleteById(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const BSONElement& idKey) = 0;
+
+    /**
+     * Updates a single document in the collection referenced by the specified _id.
+     * The document is located by looking up "idKey" in the id index.
+     * "update" represents the replacement document or list of requested modifications to be applied
+     * to the document.
+     * If the document is not found, a new document will be created with the requested modifications
+     * applied.
+     */
+    virtual Status upsertById(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONElement& idKey,
+                              const BSONObj& update) = 0;
+
+    /**
+     * Removes all documents that match the "filter" from a collection.
+     * "filter" specifies the deletion criteria using query operators. Pass in an empty document to
+     * delete all documents in a collection.
+     */
+    virtual Status deleteByFilter(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const BSONObj& filter) = 0;
 
     using CollectionSize = uint64_t;
     using CollectionCount = uint64_t;

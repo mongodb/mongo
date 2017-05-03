@@ -82,7 +82,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         std::map<LockerId, BSONObj> lockToClientMap;

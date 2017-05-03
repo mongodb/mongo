@@ -153,7 +153,8 @@ public:
                 }
 
                 std::unique_ptr<rpc::RequestInterface> cmdRequest;
-                if (request.operation() == dbQuery || request.operation() == dbCommand) {
+                if (request.operation() == dbQuery || request.operation() == dbCommand ||
+                    request.operation() == dbMsg) {
                     cmdRequest = rpc::makeRequest(&request);
                     if (receivingFirstMessage) {
                         host = extractHostInfo(*cmdRequest);
@@ -221,7 +222,8 @@ public:
                 // OP_QUERY, OP_GET_MORE, and OP_COMMAND messages that we respond back to
                 // '_mp' with.
                 if (request.operation() == dbQuery || request.operation() == dbGetMore ||
-                    request.operation() == dbCommand) {
+                    request.operation() == dbCommand || request.operation() == dbMsg) {
+                    // TODO dbMsg moreToCome
                     // Forward the message to 'dest' and receive its reply in 'response'.
                     response.reset();
                     dest.port().call(request, response);
@@ -339,7 +341,8 @@ private:
 class BridgeListener final : public Listener {
 public:
     BridgeListener()
-        : Listener("bridge", "", mongoBridgeGlobalParams.port, getGlobalServiceContext(), false),
+        : Listener(
+              "bridge", "0.0.0.0", mongoBridgeGlobalParams.port, getGlobalServiceContext(), false),
           _seedSource(mongoBridgeGlobalParams.seed) {
         log() << "Setting random seed: " << mongoBridgeGlobalParams.seed;
     }

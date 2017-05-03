@@ -253,7 +253,12 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_parallel_collection_scan.js",
             parallelFilesDir + "/profile_repair_cursor.js",
             parallelFilesDir + "/profile_sampling.js",
-            parallelFilesDir + "/profile_update.js"
+            parallelFilesDir + "/profile_update.js",
+
+            // These tests use getLog to examine the slow query logs. Tests which examine the slow
+            // query logs can't be run concurrently with tests that affect the profile sampling
+            // rate, since that also impacts which operations get logged.
+            parallelFilesDir + "/getlog2.js",
         ];
         var serialTests = makeKeys(serialTestsArr);
 

@@ -19,7 +19,10 @@
     testDB.setProfilingLevel(2);
 
     const listIndexesCommand = {listIndexes: testColl.getName(), cursor: {batchSize: 1}};
-    const profileEntryFilter = {op: "command", command: listIndexesCommand};
+    const profileEntryFilter = {op: "command"};
+    for (var field in listIndexesCommand) {
+        profileEntryFilter['command.' + field] = listIndexesCommand[field];
+    }
 
     let cmdRes = assert.commandWorked(testDB.runCommand(listIndexesCommand));
 
@@ -32,5 +35,7 @@
         testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
 
     const getMoreProfileEntry = getLatestProfilerEntry(testDB, {op: "getmore"});
-    assert.eq(getMoreProfileEntry.originatingCommand, listIndexesCommand);
+    for (var field in listIndexesCommand) {
+        assert.eq(getMoreProfileEntry.originatingCommand[field], listIndexesCommand[field], field);
+    }
 })();

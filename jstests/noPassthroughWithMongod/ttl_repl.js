@@ -47,7 +47,9 @@ printjson(slave1col.stats());
 
 // create TTL index, wait for TTL monitor to kick in, then check that
 // the correct number of docs age out
-assert.commandWorked(mastercol.ensureIndex({x: 1}, {expireAfterSeconds: 20000}));
+var initialExpireAfterSeconds = 20000;
+assert.commandWorked(
+    mastercol.ensureIndex({x: 1}, {expireAfterSeconds: initialExpireAfterSeconds}));
 rt.awaitReplication();
 
 sleep(70 * 1000);  // TTL monitor runs every 60 seconds, so wait 70
@@ -94,6 +96,15 @@ function getTTLTime(theCollection, theKey) {
 printjson(masterdb.c.getIndexes());
 assert.eq(10000, getTTLTime(masterdb.c, {x: 1}));
 assert.eq(10000, getTTLTime(slave1db.c, {x: 1}));
+
+// Verify the format of TTL collMod oplog entry. The old expiration time should be saved,
+// and index key patterns should be normalized to index names.
+var masterOplog = master.getDB('local').oplog.rs.find().sort({ts: 1}).toArray();
+var collModEntry = masterOplog.find(op => op.o.collMod);
+
+assert(collModEntry, "collMod entry was not present in the oplog.");
+assert.eq(initialExpireAfterSeconds, collModEntry.o2["expireAfterSeconds_old"]);
+assert.eq("x_1", collModEntry.o["index"]["name"]);
 
 // finish up
 rt.stopSet();

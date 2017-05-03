@@ -136,16 +136,21 @@ Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) 
             return logicalTimeMetadata.getStatus();
         }
 
+        auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
+        // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
+        // default constructed SignedLogicalTime should be ignored.
+        if (signedTime.getTime() == LogicalTime::kUninitialized) {
+            return Status::OK();
+        }
+
         if (isAuthorizedToAdvanceClock(opCtx)) {
-            auto advanceClockStatus = logicalClock->advanceClusterTimeFromTrustedSource(
-                logicalTimeMetadata.getValue().getSignedTime());
+            auto advanceClockStatus = logicalClock->advanceClusterTimeFromTrustedSource(signedTime);
 
             if (!advanceClockStatus.isOK()) {
                 return advanceClockStatus;
             }
         } else {
-            auto advanceClockStatus =
-                logicalClock->advanceClusterTime(logicalTimeMetadata.getValue().getSignedTime());
+            auto advanceClockStatus = logicalClock->advanceClusterTime(signedTime);
 
             if (!advanceClockStatus.isOK()) {
                 return advanceClockStatus;

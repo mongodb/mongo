@@ -198,6 +198,7 @@ var Explainable = (function() {
             var upsert = parsed.upsert;
             var multi = parsed.multi;
             var collation = parsed.collation;
+            var arrayFilters = parsed.arrayFilters;
 
             var bulk = this._collection.initializeOrderedBulkOp();
             var updateOp = bulk.find(query);
@@ -208,6 +209,10 @@ var Explainable = (function() {
 
             if (collation) {
                 updateOp.collation(collation);
+            }
+
+            if (arrayFilters) {
+                updateOp.arrayFilters(arrayFilters);
             }
 
             if (multi) {

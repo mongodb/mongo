@@ -114,7 +114,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      mongo::BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      mongo::BSONObjBuilder& result) {
         // Connection information
@@ -419,7 +418,7 @@ ShardConnection::ShardConnection(const ConnectionString& connectionString,
     if (isMongos()) {
         // In mongos, we record this connection as having been used for useful work to provide
         // useful information in getLastError.
-        ClusterLastErrorInfo::get(cc()).addShardHost(csString);
+        ClusterLastErrorInfo::get(cc())->addShardHost(csString);
     }
 }
 

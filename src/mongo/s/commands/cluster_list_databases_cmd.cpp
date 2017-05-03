@@ -86,7 +86,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname_unused,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         const bool nameOnly = cmdObj["nameOnly"].trueValue();

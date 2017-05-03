@@ -30,6 +30,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -56,8 +57,17 @@ class TaskExecutor;
  * returns 'cmdResult'. If a parsing error occurs, returns an error Status. Otherwise, returns a
  * BSONObj response document describing the newly-created cursor, which is suitable for returning to
  * the client.
- */
+ *
+ * @ shardId the name of the shard on which the cursor-establishing command was run
+ * @ server the exact host in the shard on which the cursor-establishing command was run
+ * @ cmdResult the result of running the cursor-establishing command
+ * @ requestedNss the namespace on which the client issued the cursor-establishing command (can
+ * differ from the execution namespace if the command was issued on a view)
+ * @ executor the TaskExecutor to store in the resulting ClusterClientCursor
+ * @ cursorManager the ClusterCursorManager on which to register the resulting ClusterClientCursor
+*/
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
                                         const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,

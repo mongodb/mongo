@@ -47,6 +47,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
@@ -96,8 +98,8 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
         {
             const NamespaceString localSources{"local.sources"};
             AutoGetCollectionForReadCommand ctx(opCtx, localSources);
-            unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                opCtx, localSources.ns(), ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
+            auto exec = InternalPlanner::collectionScan(
+                opCtx, localSources.ns(), ctx.getCollection(), PlanExecutor::NO_YIELD);
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -168,7 +170,11 @@ public:
 
         BSONObjBuilder result;
         appendReplicationInfo(opCtx, result, level);
-        getGlobalReplicationCoordinator()->processReplSetGetRBID(&result);
+
+        auto rbid = ReplicationProcess::get(opCtx)->getRollbackID(opCtx);
+        if (rbid.isOK()) {
+            result.append("rbid", rbid.getValue());
+        }
 
         return result.obj();
     }
@@ -228,7 +234,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/range_arithmetic.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -51,10 +52,7 @@ class ChunkType;
 class CollectionMetadata {
 public:
     /**
-     * The main way to construct CollectionMetadata is through MetadataLoader or the clone*()
-     * methods.
-     *
-     * The constructors should not be used directly outside of tests.
+     * The main way to construct CollectionMetadata is through MetadataLoader or clone() methods.
      */
     CollectionMetadata(const BSONObj& keyPattern,
                        ChunkVersion collectionVersion,
@@ -64,20 +62,9 @@ public:
     ~CollectionMetadata();
 
     /**
-     * Returns a new metadata's instance based on 'this's state by removing a 'pending' chunk.
-     *
-     * The shard and collection version of the new metadata are unaffected.  The caller owns the
-     * new metadata.
+     * Returns a new metadata's instance based on 'this's state;
      */
-    std::unique_ptr<CollectionMetadata> cloneMinusPending(const ChunkType& chunk) const;
-
-    /**
-     * Returns a new metadata's instance based on 'this's state by adding a 'pending' chunk.
-     *
-     * The shard and collection version of the new metadata are unaffected.  The caller owns the
-     * new metadata.
-     */
-    std::unique_ptr<CollectionMetadata> clonePlusPending(const ChunkType& chunk) const;
+    std::unique_ptr<CollectionMetadata> clone() const;
 
     /**
      * Returns true if the document key 'key' is a valid instance of a shard key for this
@@ -91,12 +78,6 @@ public:
      * collection / chunkset yet. Key must be the full shard key.
      */
     bool keyBelongsToMe(const BSONObj& key) const;
-
-    /**
-     * Returns true if the document key 'key' is or has been migrated to this shard, and may
-     * belong to us after a subsequent config reload.  Key must be the full shard key.
-     */
-    bool keyIsPending(const BSONObj& key) const;
 
     /**
      * Given a key 'lookupKey' in the shard key range, get the next chunk which overlaps or is
@@ -117,6 +98,11 @@ public:
     Status checkChunkIsValid(const ChunkType& chunk);
 
     /**
+     * Returns true if the argument range overlaps any chunk.
+     */
+    bool rangeOverlapsChunk(ChunkRange const& range);
+
+    /**
      * Given a key in the shard key range, get the next range which overlaps or is greater than
      * this key.
      *
@@ -124,15 +110,17 @@ public:
      *
      * KeyRange range;
      * BSONObj lookupKey = metadata->getMinKey();
-     * while( metadata->getNextOrphanRange( lookupKey, &orphanRange ) ) {
-     *   // Do stuff with range
-     *   lookupKey = orphanRange.maxKey;
+     * boost::optional<KeyRange> range;
+     * while((range = metadata->getNextOrphanRange(receiveMap, lookupKey))) {
+     *     lookupKey = range->maxKey;
      * }
      *
      * @param lookupKey passing a key that does not belong to this metadata is undefined.
+     * @param receiveMap is an extra set of chunks not considered orphaned.
      * @param orphanRange the output range. Note that the NS is not set.
      */
-    bool getNextOrphanRange(const BSONObj& lookupKey, KeyRange* orphanRange) const;
+    boost::optional<KeyRange> getNextOrphanRange(RangeMap const& receiveMap,
+                                                 BSONObj const& lookupKey) const;
 
     ChunkVersion getCollVersion() const {
         return _collVersion;
@@ -173,16 +161,16 @@ public:
     void toBSONChunks(BSONArrayBuilder& bb) const;
 
     /**
-     * BSON output of the pending metadata into a BSONArray
-     */
-    void toBSONPending(BSONArrayBuilder& bb) const;
-
-    /**
      * String output of the collection and shard versions.
      */
     std::string toStringBasic() const;
 
 private:
+    /**
+     * Builds _rangesMap from the contents of _chunksMap.
+     */
+    void _buildRangesMap();
+
     // Shard key pattern for the collection
     ShardKeyPattern _shardKeyPattern;
 
@@ -196,10 +184,7 @@ private:
     // Map of chunks tracked by this shard
     RangeMap _chunksMap;
 
-    // Map of ranges of chunks that are migrating but have not been confirmed added yet
-    RangeMap _pendingMap;
-
-    // A second map from a min key into a range or contiguous chunks. The map is redundant
+    // A second map from a min key into a range of contiguous chunks. The map is redundant
     // w.r.t. _chunkMap but we expect high chunk contiguity, especially in small
     // installations.
     RangeMap _rangesMap;

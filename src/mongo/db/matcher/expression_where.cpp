@@ -114,7 +114,7 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     params.scope = getScope();
     unique_ptr<WhereMatchExpression> e =
         make_unique<WhereMatchExpression>(_opCtx, std::move(params));
-    e->init(_dbName);
+    uassertStatusOK(e->init(_dbName));
     if (getTag()) {
         e->setTag(getTag()->clone());
     }

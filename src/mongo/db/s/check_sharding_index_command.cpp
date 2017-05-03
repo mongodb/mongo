@@ -85,7 +85,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& jsobj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
@@ -135,16 +134,14 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
         }
 
-        unique_ptr<PlanExecutor> exec(
-            InternalPlanner::indexScan(opCtx,
-                                       collection,
-                                       idx,
-                                       min,
-                                       max,
-                                       BoundInclusion::kIncludeStartKeyOnly,
-                                       PlanExecutor::YIELD_MANUAL,
-                                       InternalPlanner::FORWARD));
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
+        auto exec = InternalPlanner::indexScan(opCtx,
+                                               collection,
+                                               idx,
+                                               min,
+                                               max,
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               PlanExecutor::YIELD_AUTO,
+                                               InternalPlanner::FORWARD);
 
         // Find the 'missingField' value used to represent a missing document field in a key of
         // this index.

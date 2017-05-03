@@ -37,6 +37,7 @@
 namespace mongo {
 
 class DbMessage;
+struct DbResponse;
 class NamespaceString;
 class OperationContext;
 class QueryRequest;
@@ -56,13 +57,13 @@ public:
      *
      * Must not be called with legacy '.$cmd' commands.
      */
-    static void queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
+    static DbResponse queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style getMore request and sends the response back on success (or cursor not
      * found) or throws on error.
      */
-    static void getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
+    static DbResponse getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style killCursors request. Doesn't send any response on success or throws on
@@ -84,9 +85,9 @@ public:
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static void clientCommandOp(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                DbMessage* dbm);
+    static DbResponse clientCommandOp(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      DbMessage* dbm);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
@@ -104,6 +105,11 @@ public:
                               BSONObjBuilder* out);
 
     struct CommandResult {
+        CommandResult() = default;
+        CommandResult(ShardId shardId, ConnectionString target, BSONObj result)
+            : shardTargetId(std::move(shardId)),
+              target(std::move(target)),
+              result(std::move(result)) {}
         ShardId shardTargetId;
         ConnectionString target;
         BSONObj result;
@@ -122,7 +128,6 @@ public:
     static void commandOp(OperationContext* opCtx,
                           const std::string& db,
                           const BSONObj& command,
-                          int options,
                           const std::string& versionedNS,
                           const BSONObj& targetingQuery,
                           const BSONObj& targetingCollation,

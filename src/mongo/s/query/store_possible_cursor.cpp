@@ -41,6 +41,7 @@
 namespace mongo {
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
                                         const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
@@ -63,7 +64,9 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         incomingCursorResponse.getValue().getNSS(),
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames());
     params.remotes.emplace_back(
-        server, CursorResponse(requestedNss, incomingCursorResponse.getValue().getCursorId(), {}));
+        shardId,
+        server,
+        CursorResponse(requestedNss, incomingCursorResponse.getValue().getCursorId(), {}));
 
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));

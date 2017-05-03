@@ -117,6 +117,24 @@ TEST(CommandWriteOpsParsers, BadCollationFieldInDeleteDoc) {
     ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
 }
 
+TEST(CommandWriteOpsParsers, BadArrayFiltersFieldInUpdateDoc) {
+    auto cmd = BSON("update"
+                    << "bar"
+                    << "updates"
+                    << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "arrayFilters"
+                                      << "bad"));
+    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+}
+
+TEST(CommandWriteOpsParsers, BadArrayFiltersElementInUpdateDoc) {
+    auto cmd = BSON(
+        "update"
+        << "bar"
+        << "updates"
+        << BSON_ARRAY("q" << BSONObj() << "u" << BSONObj() << "arrayFilters" << BSON_ARRAY("bad")));
+    ASSERT_THROWS_CODE(parseInsertCommand("foo", cmd), UserException, ErrorCodes::FailedToParse);
+}
+
 TEST(CommandWriteOpsParsers, SingleInsert) {
     const auto ns = NamespaceString("test", "foo");
     const BSONObj obj = BSON("x" << 1);
@@ -155,11 +173,14 @@ TEST(CommandWriteOpsParsers, Update) {
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     const BSONObj collation = BSON("locale"
                                    << "en_US");
+    const BSONObj arrayFilter = BSON("i" << 0);
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
             auto cmd = BSON("update" << ns.coll() << "updates"
                                      << BSON_ARRAY(BSON("q" << query << "u" << update << "collation"
                                                             << collation
+                                                            << "arrayFilters"
+                                                            << BSON_ARRAY(arrayFilter)
                                                             << "upsert"
                                                             << upsert
                                                             << "multi"
@@ -172,6 +193,8 @@ TEST(CommandWriteOpsParsers, Update) {
             ASSERT_BSONOBJ_EQ(op.updates[0].query, query);
             ASSERT_BSONOBJ_EQ(op.updates[0].update, update);
             ASSERT_BSONOBJ_EQ(op.updates[0].collation, collation);
+            ASSERT_EQ(op.updates[0].arrayFilters.size(), 1u);
+            ASSERT_BSONOBJ_EQ(op.updates[0].arrayFilters[0], arrayFilter);
             ASSERT_EQ(op.updates[0].upsert, upsert);
             ASSERT_EQ(op.updates[0].multi, multi);
         }

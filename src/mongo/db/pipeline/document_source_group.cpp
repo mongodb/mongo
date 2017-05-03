@@ -141,12 +141,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
         // Add to the current accumulator(s).
         for (size_t i = 0; i < _currentAccumulators.size(); i++) {
             _currentAccumulators[i]->process(
-                _accumulatedFields[i].expression->evaluate(_variables.get()), _doingMerge);
-        }
+                _accumulatedFields[i].expression->evaluate(*_firstDocOfNextGroup), _doingMerge);
 
-        // Release our references to the previous input document before asking for the next. This
-        // makes operations like $unwind more efficient.
-        _variables->clearRoot();
+        }
 
         // Retrieve the next document.
         auto nextInput = pSource->getNext();
@@ -156,11 +153,10 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
 
         _firstDocOfNextGroup = nextInput.releaseDocument();
 
-        _variables->setRoot(*_firstDocOfNextGroup);
 
         // Compute the id. If it does not match _currentId, we will exit the loop, leaving
         // _firstDocOfNextGroup set for the next time getNext() is called.
-        id = computeId(_variables.get());
+        id = computeId(*_firstDocOfNextGroup);
     } while (pExpCtx->getValueComparator().evaluate(_currentId == id));
 
     Document out = makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
@@ -169,7 +165,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStreaming() {
     return std::move(out);
 }
 
-void DocumentSourceGroup::dispose() {
+void DocumentSourceGroup::doDispose() {
     // Free our resources.
     _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
     _sorterIterator.reset();
@@ -178,9 +174,6 @@ void DocumentSourceGroup::dispose() {
     groupsIterator = _groups->end();
 
     _firstDocOfNextGroup = boost::none;
-
-    // Free our source's resources.
-    pSource->dispose();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
@@ -253,7 +246,6 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<AccumulationStatement> accumulationStatements,
-    Variables::Id numVariables,
     size_t maxMemoryUsageBytes) {
     intrusive_ptr<DocumentSourceGroup> groupStage(
         new DocumentSourceGroup(pExpCtx, maxMemoryUsageBytes));
@@ -261,7 +253,7 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     for (auto&& statement : accumulationStatements) {
         groupStage->addAccumulator(statement);
     }
-    groupStage->_variables = stdx::make_unique<Variables>(numVariables);
+
     return groupStage;
 }
 
@@ -339,8 +331,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
 
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
+    VariablesParseState vps = pExpCtx->variablesParseState;
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         const char* pFieldName = groupField.fieldName();
@@ -362,9 +353,6 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     }
 
     uassert(15955, "a group specification must include an _id", !pGroup->_idExpressions.empty());
-
-    pGroup->_variables.reset(new Variables(idGenerator.getIdCount()));
-
     return pGroup;
 }
 
@@ -483,10 +471,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             return firstInput;
         }
         _firstDocOfNextGroup = firstInput.releaseDocument();
-        _variables->setRoot(*_firstDocOfNextGroup);
 
         // Compute the _id value.
-        _currentId = computeId(_variables.get());
+        _currentId = computeId(*_firstDocOfNextGroup);
         _initialized = true;
         return DocumentSource::GetNextResult::makeEOF();
     }
@@ -504,9 +491,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             _memoryUsageBytes = 0;
         }
 
-        _variables->setRoot(input.releaseDocument());
-
-        Value id = computeId(_variables.get());
+        Value id = computeId(input.getDocument());
 
         // Look for the _id value in the map. If it's not there, add a new entry with a blank
         // accumulator. This is done in a somewhat odd way in order to avoid hashing 'id' and
@@ -532,14 +517,13 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
         /* tickle all the accumulators for the group we found */
         dassert(numAccumulators == group.size());
+
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(_accumulatedFields[i].expression->evaluate(_variables.get()),
+            group[i]->process(_accumulatedFields[i].expression->evaluate(input.getDocument()),
                               _doingMerge);
+
             _memoryUsageBytes += group[i]->memUsageForSorter();
         }
-
-        // We are done with the ROOT document so release it.
-        _variables->clearRoot();
 
         if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
@@ -784,10 +768,10 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
 }
 
 
-Value DocumentSourceGroup::computeId(Variables* vars) {
+Value DocumentSourceGroup::computeId(Document root) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
-        Value retValue = _idExpressions[0]->evaluate(vars);
+        Value retValue = _idExpressions[0]->evaluate(root);
         return retValue.missing() ? Value(BSONNULL) : std::move(retValue);
     }
 
@@ -795,7 +779,7 @@ Value DocumentSourceGroup::computeId(Variables* vars) {
     vector<Value> vals;
     vals.reserve(_idExpressions.size());
     for (size_t i = 0; i < _idExpressions.size(); i++) {
-        vals.push_back(_idExpressions[i]->evaluate(vars));
+        vals.push_back(_idExpressions[i]->evaluate(root));
     }
     return Value(std::move(vals));
 }
@@ -850,8 +834,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
     intrusive_ptr<DocumentSourceGroup> pMerger(new DocumentSourceGroup(pExpCtx));
     pMerger->setDoingMerge(true);
 
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
+    VariablesParseState vps = pExpCtx->variablesParseState;
     /* the merger will use the same grouping key */
     pMerger->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
 
@@ -865,8 +848,6 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + accumulatedField.fieldName, vps);
         pMerger->addAccumulator(copiedAccumuledField);
     }
-
-    pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));
 
     return pMerger;
 }

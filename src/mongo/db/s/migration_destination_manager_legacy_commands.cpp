@@ -88,7 +88,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto shardingState = ShardingState::get(opCtx);
@@ -138,19 +137,6 @@ public:
         // Ensure this shard is not currently receiving or donating any chunks.
         auto scopedRegisterReceiveChunk(
             uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
-
-        // Even if this shard is not currently donating any chunks, it may still have pending
-        // deletes from a previous migration, particularly if there are still open cursors on the
-        // range pending deletion.
-        const size_t numDeletes = getDeleter()->getTotalDeletes();
-        if (numDeletes > 0) {
-            errmsg = str::stream() << "can't accept new chunks because "
-                                   << " there are still " << numDeletes
-                                   << " deletes from previous migration";
-
-            warning() << errmsg;
-            return appendCommandStatus(result, {ErrorCodes::ChunkRangeCleanupPending, errmsg});
-        }
 
         uassertStatusOK(shardingState->migrationDestinationManager()->start(
             nss,
@@ -202,7 +188,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         ShardingState::get(opCtx)->migrationDestinationManager()->report(result);
@@ -243,7 +228,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
@@ -291,7 +275,6 @@ public:
     bool run(OperationContext* opCtx,
              const string&,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         auto const mdm = ShardingState::get(opCtx)->migrationDestinationManager();

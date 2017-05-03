@@ -106,21 +106,6 @@ Status validateWriteConcern(OperationContext* opCtx,
                       "cannot use 'j' option when a host does not have journaling enabled");
     }
 
-    // Remote callers of the config server (as in callers making network calls, not the internal
-    // logic) should never be making non-majority writes against the config server, because sharding
-    // is not resilient against rollbacks of metadata writes.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        dbName != NamespaceString::kLocalDb && !writeConcern.validForConfigServers()) {
-        // The only cases where we allow non-majority writes are from within the config servers
-        // themselves, because these wait for write concern explicitly.
-        if (!opCtx->getClient()->isInDirectClient()) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "w:'majority' is the only valid write concern when writing "
-                                     "to config servers, got: "
-                                  << writeConcern.toBSON()};
-        }
-    }
-
     const auto replMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 
     if (replMode == repl::ReplicationCoordinator::modeNone && writeConcern.wNumNodes > 1) {

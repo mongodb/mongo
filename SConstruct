@@ -20,86 +20,22 @@ import SCons
 # we are to avoid bulk loading all tools in the DefaultEnvironment.
 DefaultEnvironment(tools=[])
 
+# These come from site_scons/mongo. Import these things
+# after calling DefaultEnvironment, for the sake of paranoia.
+import mongo
+import mongo.platform as mongo_platform
+import mongo.toolchain as mongo_toolchain
+import mongo.generators as mongo_generators
+
 EnsurePythonVersion(2, 7)
 EnsureSConsVersion(2, 5)
 
 from buildscripts import utils
 from buildscripts import moduleconfig
 
-from mongo_scons_utils import (
-    default_buildinfo_environment_data,
-    default_variant_dir_generator,
-    get_toolchain_ver,
-)
-
 import libdeps
 
-def print_build_failures():
-    from SCons.Script import GetBuildFailures
-    for bf in GetBuildFailures():
-        print "%s failed: %s" % (bf.node, bf.errstr)
-atexit.register(print_build_failures)
-
-def versiontuple(v):
-    return tuple(map(int, (v.split("."))))
-
-# --- OS identification ---
-#
-# This needs to precede the options section so that we can only offer some options on certain
-# operating systems.
-
-# This function gets the running OS as identified by Python
-# It should only be used to set up defaults for options/variables, because
-# its value could potentially be overridden by setting TARGET_OS on the
-# command-line. Treat this output as the value of HOST_OS
-def get_running_os_name():
-    running_os = os.sys.platform
-    if running_os.startswith('linux'):
-        running_os = 'linux'
-    elif running_os.startswith('freebsd'):
-        running_os = 'freebsd'
-    elif running_os.startswith('openbsd'):
-        running_os = 'openbsd'
-    elif running_os == 'sunos5':
-        running_os = 'solaris'
-    elif running_os == 'win32':
-        running_os = 'windows'
-    elif running_os == 'darwin':
-        running_os = 'macOS'
-    else:
-        running_os = 'unknown'
-    return running_os
-
-def env_get_os_name_wrapper(self):
-    return env['TARGET_OS']
-
-def is_os_raw(target_os, os_list_to_check):
-    okay = False
-
-    darwin_os_list = [ 'macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim' ]
-    posix_os_list = [ 'linux', 'openbsd', 'freebsd', 'solaris' ] + darwin_os_list
-
-    for p in os_list_to_check:
-        if p == 'posix' and target_os in posix_os_list:
-            okay = True
-            break
-        if p == 'darwin' and target_os in darwin_os_list:
-            okay = True
-            break
-        elif p == target_os:
-            okay = True
-            break
-    return okay
-
-# This function tests the running OS as identified by Python
-# It should only be used to set up defaults for options/variables, because
-# its value could potentially be overridden by setting TARGET_OS on the
-# command-line. Treat this output as the value of HOST_OS
-def is_running_os(*os_list):
-    return is_os_raw(get_running_os_name(), os_list)
-
-def env_os_is_wrapper(self, *os_list):
-    return is_os_raw(self['TARGET_OS'], os_list)
+atexit.register(mongo.print_build_failures)
 
 def add_option(name, **kwargs):
 
@@ -555,7 +491,7 @@ def variable_shlex_converter(val):
         return val
     parse_mode = get_option('variable-parse-mode')
     if parse_mode == 'auto':
-        parse_mode = 'other' if is_running_os('windows') else 'posix'
+        parse_mode = 'other' if mongo_platform.is_running_os('windows') else 'posix'
     return shlex.split(val, posix=(parse_mode == 'posix'))
 
 def variable_arch_converter(val):
@@ -585,12 +521,12 @@ def variable_arch_converter(val):
 # If we aren't on a platform where we know the minimal set of tools, we fall back to loading
 # the 'default' tool.
 def decide_platform_tools():
-    if is_running_os('windows'):
+    if mongo_platform.is_running_os('windows'):
         # we only support MS toolchain on windows
         return ['msvc', 'mslink', 'mslib', 'masm']
-    elif is_running_os('linux', 'solaris'):
+    elif mongo_platform.is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
-    elif is_running_os('darwin'):
+    elif mongo_platform.is_running_os('darwin'):
         return ['gcc', 'g++', 'applelink', 'ar', 'as']
     else:
         return ["default"]
@@ -704,7 +640,7 @@ env_vars.Add('MAXLINELENGTH',
 # default_buildinfo_environment_data() function for examples of how to use this.
 env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
-    default=default_buildinfo_environment_data())
+    default=mongo_generators.default_buildinfo_environment_data())
 
 env_vars.Add('MONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
@@ -778,7 +714,7 @@ env_vars.Add('TARGET_ARCH',
 
 env_vars.Add('TARGET_OS',
     help='Sets the target OS to build for',
-    default=get_running_os_name())
+    default=mongo_platform.get_running_os_name())
 
 env_vars.Add('TOOLS',
     help='Sets the list of SCons tools to add to the environment',
@@ -787,7 +723,7 @@ env_vars.Add('TOOLS',
 
 env_vars.Add('VARIANT_DIR',
     help='Sets the name (or generator function) for the variant directory',
-    default=default_variant_dir_generator,
+    default=mongo_generators.default_variant_dir_generator,
 )
 
 env_vars.Add('VERBOSE',
@@ -933,8 +869,8 @@ envDict = dict(BUILD_ROOT=buildDir,
 env = Environment(variables=env_vars, **envDict)
 del envDict
 
-env.AddMethod(env_os_is_wrapper, 'TargetOSIs')
-env.AddMethod(env_get_os_name_wrapper, 'GetTargetOSName')
+env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
+env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
 def fatal_error(env, msg, *args):
     print msg.format(*args)
@@ -1131,7 +1067,7 @@ if not detectConf.CheckForCXXLink():
         detectEnv['CXX'])
 
 toolchain_search_sequence = [ "GCC", "clang" ]
-if is_running_os('windows'):
+if mongo_platform.is_running_os('windows'):
     toolchain_search_sequence = [ 'MSVC', 'clang', 'GCC' ]
 for candidate_toolchain in toolchain_search_sequence:
     if detectConf.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
@@ -1175,8 +1111,8 @@ elif not detectConf.CheckForOS(env['TARGET_OS']):
 
 detectConf.Finish()
 
-env['CC_VERSION'] = get_toolchain_ver(env, 'CC')
-env['CXX_VERSION'] = get_toolchain_ver(env, 'CXX')
+env['CC_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CC')
+env['CXX_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CXX')
 
 if not env['HOST_ARCH']:
     env['HOST_ARCH'] = env['TARGET_ARCH']
@@ -1245,8 +1181,8 @@ elif has_option("release") and link_model != "object":
 
 # The only link model currently supported on Windows is 'object', since there is no equivalent
 # to --whole-archive.
-if env.TargetOSIs('windows') and link_model != 'object':
-    env.FatalError("Windows builds must use the 'object' link model");
+if env.TargetOSIs('windows') and link_model not in ['object', 'static']:
+    env.FatalError("Windows builds must use the 'object' or 'static' link models");
 
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
@@ -1430,18 +1366,24 @@ libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")
 if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
-    env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,--whole-archive'
-    env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,--no-whole-archive'
+    # NOTE: The leading and trailing spaces here are important. Do not remove them.
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,--whole-archive '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,--no-whole-archive'
 elif env.TargetOSIs('darwin'):
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
-    env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,-all_load'
-    env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,-noall_load'
+    # NOTE: The trailing space here is important. Do not remove it.
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-force_load '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 elif env.TargetOSIs('solaris'):
     env['LINK_LIBGROUP_START'] = '-z rescan-start'
     env['LINK_LIBGROUP_END'] = '-z rescan-end'
-    env['LINK_WHOLE_ARCHIVE_START'] = '-z allextract'
-    env['LINK_WHOLE_ARCHIVE_END'] = '-z defaultextract'
+    # NOTE: The leading and trailing spaces here are important. Do not remove them.
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-z allextract '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -z defaultextract'
+elif env.TargetOSIs('windows'):
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '/WHOLEARCHIVE:'
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 
 # ---- other build setup -----
 if debugBuild:
@@ -1513,8 +1455,14 @@ elif env.TargetOSIs('windows'):
     #  on extremely old versions of MSVC (pre 2k5), default constructing an array member in a
     #  constructor's initialization list would not zero the array members "in some cases".
     #  since we don't target MSVC versions that old, this warning is safe to ignore.
+    # c4373
+    #  Older versions of MSVC would fail to make a function in a derived class override a virtual
+    #  function in the parent, when defined inline and at least one of the parameters is made const.
+    #  The behavior is incorrect under the standard.  MSVC is fixed now, and the warning exists
+    #  merely to alert users who may have relied upon the older, non-compliant behavior.  Our code
+    #  should not have any problems with the older behavior, so we can just disable this warning.
     env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244",
-                         "/wd4290", "/wd4068", "/wd4351"] )
+                         "/wd4290", "/wd4068", "/wd4351", "/wd4373"] )
 
     # some warnings we should treat as errors:
     # c4013
@@ -1649,7 +1597,12 @@ if env.TargetOSIs('posix'):
             env.Append( CCFLAGS=["-Werror"] )
 
     env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
-    env.Append( LINKFLAGS=["-pthread"] )
+
+    # On OS X, clang doesn't want the pthread flag at link time, or it
+    # issues warnings which make it impossible for us to declare link
+    # warnings as errors. See http://stackoverflow.com/a/19382663.
+    if not (env.TargetOSIs('darwin') and env.ToolchainIs('clang')):
+        env.Append( LINKFLAGS=["-pthread"] )
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
@@ -1679,11 +1632,11 @@ if env.TargetOSIs('posix'):
 
     # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
     # noall_load obsolete and warns about it.
-    if not env.TargetOSIs('darwin') and not has_option("disable-warnings-as-errors"):
+    if not has_option("disable-warnings-as-errors"):
         env.Append(
             LINKFLAGS=[
-                "-Wl,--fatal-warnings",
-            ],
+                '-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings",
+            ]
         )
 
 mmapv1 = False
@@ -2466,8 +2419,10 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('gcc', 'clang'):
         # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
-        # because it is much faster.
-        AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+        # because it is much faster. Don't use it if the user has already configured another linker
+        # selection manually.
+        if not any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
+            AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
 
         # Explicitly enable GNU build id's if the linker supports it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
@@ -3009,7 +2964,7 @@ env.Tool("compilation_db")
 
 # If we can, load the dagger tool for build dependency graph introspection.
 # Dagger is only supported on Linux and OSX (not Windows or Solaris).
-should_dagger = ( is_running_os('osx') or is_running_os('linux')  ) and "dagger" in COMMAND_LINE_TARGETS
+should_dagger = ( mongo_platform.is_running_os('osx') or mongo_platform.is_running_os('linux')  ) and "dagger" in COMMAND_LINE_TARGETS
 
 if should_dagger:
     env.Tool("dagger")
@@ -3044,6 +2999,9 @@ def doLint( env , target , source ):
     import buildscripts.clang_format
     if not buildscripts.clang_format.lint_all(None):
         raise Exception("clang-format lint errors")
+
+    import buildscripts.pylinters
+    buildscripts.pylinters.lint_all(None, {}, [])
 
     import buildscripts.lint
     if not buildscripts.lint.run_lint( [ "src/mongo/" ] ):

@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/functional.h"
@@ -84,6 +85,7 @@ extern int OPLOG_VERSION;
 void logOps(OperationContext* opCtx,
             const char* opstr,
             const NamespaceString& nss,
+            OptionalCollectionUUID uuid,
             std::vector<BSONObj>::const_iterator begin,
             std::vector<BSONObj>::const_iterator end,
             bool fromMigrate);
@@ -94,6 +96,7 @@ void logOps(OperationContext* opCtx,
 void logOp(OperationContext* opCtx,
            const char* opstr,
            const NamespaceString& ns,
+           OptionalCollectionUUID uuid,
            const BSONObj& obj,
            const BSONObj* o2,
            bool fromMigrate);

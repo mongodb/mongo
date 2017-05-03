@@ -74,16 +74,6 @@ TEST(CommandRequest, ParseAllFields) {
     auto metadata = metadataBob.done();
     writeObj(metadata);
 
-    BSONObjBuilder inputDoc1Bob{};
-    inputDoc1Bob.append("meep", "boop").append("meow", "chirp");
-    auto inputDoc1 = inputDoc1Bob.done();
-    writeObj(inputDoc1);
-
-    BSONObjBuilder inputDoc2Bob{};
-    inputDoc1Bob.append("bleep", "bop").append("woof", "squeak");
-    auto inputDoc2 = inputDoc2Bob.done();
-    writeObj(inputDoc2);
-
     Message toSend;
     toSend.setData(dbCommand, opCommandData.data(), opCommandData.size());
 
@@ -93,29 +83,6 @@ TEST(CommandRequest, ParseAllFields) {
     ASSERT_EQUALS(opCmd.getDatabase(), database);
     ASSERT_BSONOBJ_EQ(opCmd.getMetadata(), metadata);
     ASSERT_BSONOBJ_EQ(opCmd.getCommandArgs(), commandArgs);
-
-    auto inputDocRange = opCmd.getInputDocs();
-    auto inputDocRangeIter = inputDocRange.begin();
-
-    ASSERT_BSONOBJ_EQ(*inputDocRangeIter, inputDoc1);
-    // can't use assert equals since we don't have an op to print the iter.
-    ASSERT_FALSE(inputDocRangeIter == inputDocRange.end());
-    ++inputDocRangeIter;
-    ASSERT_BSONOBJ_EQ(*inputDocRangeIter, inputDoc2);
-    ASSERT_FALSE(inputDocRangeIter == inputDocRange.end());
-    ++inputDocRangeIter;
-
-    ASSERT_TRUE(inputDocRangeIter == inputDocRange.end());
-}
-
-TEST(CommandRequest, InvalidNSThrows) {
-    rpc::CommandRequestBuilder crb;
-    crb.setDatabase("foo////!!!!<><><>");
-    crb.setCommandName("ping");
-    crb.setCommandArgs(BSON("ping" << 1));
-    crb.setMetadata(BSONObj());
-    auto msg = crb.done();
-    ASSERT_THROWS_CODE(rpc::CommandRequest{&msg}, AssertionException, ErrorCodes::InvalidNamespace);
 }
 
 TEST(CommandRequest, EmptyCommandObjThrows) {

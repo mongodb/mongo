@@ -111,7 +111,7 @@ var DB;
 
     // runCommand uses this impl to actually execute the command
     DB.prototype._runCommandImpl = function(name, obj, options) {
-        return this.getMongo().runCommand(name, obj, options);
+        return this.getMongo().runCausalConsistentCommand(name, obj, options);
     };
 
     DB.prototype.runCommand = function(obj, extra, queryOptions) {
@@ -120,9 +120,9 @@ var DB;
         // Otherwise use getQueryOptions.
         var options =
             (typeof(queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
-        var res;
+
         try {
-            res = this._runCommandImpl(this._name, mergedObj, options);
+            return this._runCommandImpl(this._name, mergedObj, options);
         } catch (ex) {
             // When runCommand flowed through query, a connection error resulted in the message
             // "error doing query: failed". Even though this message is arguably incorrect
@@ -133,11 +133,10 @@ var DB;
             }
             throw ex;
         }
-        return res;
     };
 
     DB.prototype.runCommandWithMetadata = function(commandName, commandArgs, metadata) {
-        return this.getMongo().runCommandWithMetadata(
+        return this.getMongo().runCausalConsistentCommandWithMetadata(
             this._name, commandName, metadata, commandArgs);
     };
 

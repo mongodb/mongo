@@ -102,7 +102,17 @@ struct StorageGlobalParams {
     static const double kMaxSyncdelaySecs;
     AtomicDouble syncdelay{60.0};  // seconds between fsyncs
 
+    // --queryableBackupMode
+    // Puts MongoD into "read-only" mode. MongoD will not write any data to the underlying
+    // filesystem. Note that read operations may require writes. For example, a sort on a large
+    // dataset may fail if it requires spilling to disk.
     bool readOnly = false;
+
+    // --groupCollections
+    // Dictate to the storage engine that it should attempt to create new MongoDB collections from
+    // an existing underlying MongoDB database level resource if possible. This can improve
+    // workloads that rely heavily on creating many collections within a database.
+    bool groupCollections = false;
 };
 
 extern StorageGlobalParams storageGlobalParams;

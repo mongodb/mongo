@@ -208,13 +208,7 @@ public:
                                        const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        // Check for the listCollections ActionType on the database
-        // or find on system.namespaces for pre 3.0 systems.
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                           ActionType::listCollections) ||
-            authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
-                ActionType::find)) {
+        if (authzSession->isAuthorizedToListCollections(dbname)) {
             return Status::OK();
         }
 
@@ -227,7 +221,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         unique_ptr<MatchExpression> matcher;
@@ -266,7 +259,7 @@ public:
             if (auto collNames = _getExactNameMatches(matcher.get())) {
                 for (auto&& collName : *collNames) {
                     auto nss = NamespaceString(db->name(), collName);
-                    Collection* collection = db->getCollection(nss);
+                    Collection* collection = db->getCollection(opCtx, nss);
                     BSONObj collBson = buildCollectionBson(opCtx, collection);
                     if (!collBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
@@ -298,11 +291,11 @@ public:
         const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::YIELD_MANUAL);
+            opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder firstBatch;
 
@@ -328,6 +321,7 @@ public:
             exec->saveState();
             exec->detachFromOperationContext();
             auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+                opCtx,
                 {std::move(exec),
                  cursorNss,
                  AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),

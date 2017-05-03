@@ -63,7 +63,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/dbwebserver.h"
 #include "mongo/db/diag_log.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
@@ -87,9 +86,9 @@
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
-#include "mongo/db/restapi.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
@@ -102,11 +101,10 @@
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/snapshots.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -123,6 +121,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -200,13 +199,13 @@ void logStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
     Database* db = autoDb.getDb();
-    Collection* collection = db->getCollection(startupLogCollectionName);
+    Collection* collection = db->getCollection(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         repl::UnreplicatedWritesBlock uwb(opCtx);
         uassertStatusOK(userCreateNS(opCtx, db, startupLogCollectionName.ns(), options));
-        collection = db->getCollection(startupLogCollectionName);
+        collection = db->getCollection(opCtx, startupLogCollectionName);
     }
     invariant(collection);
 
@@ -231,7 +230,7 @@ void checkForIdIndexes(OperationContext* opCtx, Database* db) {
         if (ns.isSystem())
             continue;
 
-        Collection* coll = db->getCollection(collectionName);
+        Collection* coll = db->getCollection(opCtx, collectionName);
         if (!coll)
             continue;
 
@@ -270,7 +269,7 @@ unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
 void checkForCappedOplog(OperationContext* opCtx, Database* db) {
     const NamespaceString oplogNss(repl::rsOplogName);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
-    Collection* oplogCollection = db->getCollection(oplogNss);
+    Collection* oplogCollection = db->getCollection(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
         severe() << "The oplog collection " << oplogNss
                  << " is not capped; a capped oplog is a requirement for replication to function.";
@@ -352,7 +351,7 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // If a valid featureCompatibilityVersion is present, cache it as a server parameter.
         if (dbName == "admin") {
             if (Collection* versionColl =
-                    db->getCollection(FeatureCompatibilityVersion::kCollection)) {
+                    db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection)) {
                 BSONObj featureCompatibilityVersion;
                 if (Helpers::findOne(opCtx,
                                      versionColl,
@@ -369,11 +368,11 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
 
         // Major versions match, check indexes
-        const string systemIndexes = db->name() + ".system.indexes";
+        const NamespaceString systemIndexes(db->name(), "system.indexes");
 
-        Collection* coll = db->getCollection(systemIndexes);
-        unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-            opCtx, systemIndexes, coll, PlanExecutor::YIELD_MANUAL));
+        Collection* coll = db->getCollection(opCtx, systemIndexes);
+        auto exec = InternalPlanner::collectionScan(
+            opCtx, systemIndexes.ns(), coll, PlanExecutor::NO_YIELD);
 
         BSONObj index;
         PlanExecutor::ExecState state;
@@ -436,7 +435,7 @@ ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     _initWireSpec();
-    auto globalServiceContext = getGlobalServiceContext();
+    auto globalServiceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
 
     globalServiceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     globalServiceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
@@ -470,42 +469,28 @@ ExitCode _initAndListen(int listenPort) {
 
     logProcessDetails();
 
-    checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
+    globalServiceContext->createLockFile();
 
     transport::TransportLayerLegacy::Options options;
     options.port = listenPort;
     options.ipList = serverGlobalParams.bind_ip;
 
-    auto sep =
-        stdx::make_unique<ServiceEntryPointMongod>(getGlobalServiceContext()->getTransportLayer());
-    auto sepPtr = sep.get();
-
-    getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
+    globalServiceContext->setServiceEntryPoint(
+        stdx::make_unique<ServiceEntryPointMongod>(globalServiceContext->getTransportLayer()));
 
     // Create, start, and attach the TL
-    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(options, sepPtr);
+    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(
+        options, globalServiceContext->getServiceEntryPoint());
     auto res = transportLayer->setup();
     if (!res.isOK()) {
         error() << "Failed to set up listener: " << res;
         return EXIT_NET_ERROR;
     }
 
-    std::shared_ptr<DbWebServer> dbWebServer;
-    if (serverGlobalParams.isHttpInterfaceEnabled) {
-        dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
-                                          serverGlobalParams.port + 1000,
-                                          getGlobalServiceContext(),
-                                          new RestAdminAccess()));
-        if (!dbWebServer->setupSockets()) {
-            error() << "Failed to set up sockets for HTTP interface during startup.";
-            return EXIT_NET_ERROR;
-        }
-    }
-
-    getGlobalServiceContext()->initializeGlobalStorageEngine();
+    globalServiceContext->initializeGlobalStorageEngine();
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
-    if (WiredTigerCustomizationHooks::get(getGlobalServiceContext())->restartRequired()) {
+    if (EncryptionHooks::get(getGlobalServiceContext())->restartRequired()) {
         exitCleanly(EXIT_CLEAN);
     }
 #endif
@@ -525,7 +510,7 @@ ExitCode _initAndListen(int listenPort) {
             }
 
             // Warn if field name matches non-active registered storage engine.
-            if (getGlobalServiceContext()->isRegisteredStorageEngine(e.fieldName())) {
+            if (globalServiceContext->isRegisteredStorageEngine(e.fieldName())) {
                 warning() << "Detected configuration for non-active storage engine "
                           << e.fieldName() << " when current storage engine is "
                           << storageGlobalParams.engine;
@@ -533,7 +518,7 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
-    if (!getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager()) {
+    if (!globalServiceContext->getGlobalStorageEngine()->getSnapshotManager()) {
         if (moe::startupOptionsParsed.count("replication.enableMajorityReadConcern") &&
             moe::startupOptionsParsed["replication.enableMajorityReadConcern"].as<bool>()) {
             // Note: we are intentionally only erroring if the user explicitly requested that we
@@ -580,7 +565,7 @@ ExitCode _initAndListen(int listenPort) {
         ScriptEngine::setup();
     }
 
-    auto startupOpCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    auto startupOpCtx = globalServiceContext->makeOperationContext(&cc());
 
     repairDatabasesAndCheckVersion(startupOpCtx.get());
 
@@ -593,16 +578,6 @@ ExitCode _initAndListen(int listenPort) {
 
     /* this is for security on certain platforms (nonce generation) */
     srand((unsigned)(curTimeMicros64() ^ startupSrandTimer.micros()));
-
-    // The snapshot thread provides historical collection level and lock statistics for use
-    // by the web interface. Only needed when HTTP is enabled.
-    if (serverGlobalParams.isHttpInterfaceEnabled) {
-        statsSnapshotThread.go();
-
-        invariant(dbWebServer);
-        stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
-        web.detach();
-    }
 
     AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
@@ -659,8 +634,6 @@ ExitCode _initAndListen(int listenPort) {
 
         startFTDC();
 
-        getDeleter()->startWorkers();
-
         restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -699,7 +672,7 @@ ExitCode _initAndListen(int listenPort) {
             storageGlobalParams.engine != "devnull") {
             Lock::GlobalWrite lk(startupOpCtx.get());
             FeatureCompatibilityVersion::setIfCleanStartup(
-                startupOpCtx.get(), repl::StorageInterface::get(getGlobalServiceContext()));
+                startupOpCtx.get(), repl::StorageInterface::get(globalServiceContext));
         }
 
         if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||
@@ -716,7 +689,7 @@ ExitCode _initAndListen(int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
+    auto start = globalServiceContext->addAndStartTransportLayer(std::move(transportLayer));
     if (!start.isOK()) {
         error() << "Failed to start the listener: " << start.toString();
         return EXIT_NET_ERROR;
@@ -890,13 +863,15 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
     auto storageInterface = repl::StorageInterface::get(serviceContext);
 
+    repl::ReplicationProcess::set(serviceContext,
+                                  stdx::make_unique<repl::ReplicationProcess>(storageInterface));
+    auto replicationProcess = repl::ReplicationProcess::get(serviceContext);
+
     repl::TopologyCoordinatorImpl::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
@@ -910,6 +885,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         executor::makeNetworkInterface(
             "NetworkInterfaceASIO-Replication", nullptr, std::move(hookList)),
         stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),
+        replicationProcess,
         storageInterface,
         static_cast<int64_t>(curTimeMillis64()));
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
@@ -964,10 +940,9 @@ static void shutdownTask() {
     if (auto sr = grid.shardRegistry()) {  // TODO: race: sr is a naked pointer
         sr->shutdown();
     }
-#if __has_feature(address_sanitizer)
-    auto sep = static_cast<ServiceEntryPointMongod*>(serviceContext->getServiceEntryPoint());
 
-    if (sep) {
+#if __has_feature(address_sanitizer)
+    if (auto sep = checked_cast<ServiceEntryPointImpl*>(serviceContext->getServiceEntryPoint())) {
         // When running under address sanitizer, we get false positive leaks due to disorder around
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
         // harder to dry up the server from active connections before going on to really shut down.
@@ -1005,7 +980,6 @@ static void shutdownTask() {
                                         << " active workers to drain; continuing with shutdown... ";
         }
     }
-
 #endif
 
     // Shutdown Full-Time Data Capture
@@ -1025,9 +999,9 @@ static void shutdownTask() {
     // of this function to prevent any operations from running that need a lock.
     //
     DefaultLockerImpl* globalLocker = new DefaultLockerImpl();
-    LockResult result = globalLocker->lockGlobalBegin(MODE_X);
+    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Milliseconds::max());
     if (result == LOCK_WAITING) {
-        result = globalLocker->lockGlobalComplete(UINT_MAX);
+        result = globalLocker->lockGlobalComplete(Milliseconds::max());
     }
 
     invariant(LOCK_OK == result);

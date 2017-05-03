@@ -141,12 +141,6 @@ public:
     void setStoreLocalConfigDocumentStatus(Status status);
 
     /**
-     * Sets whether or not subsequent calls to storeLocalConfigDocument() should hang
-     * indefinitely or not based on the value of "hang".
-     */
-    void setStoreLocalConfigDocumentToHang(bool hang);
-
-    /**
      * Sets the return value for subsequent calls to storeLocalLastVoteDocument().
      * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
      */
@@ -196,13 +190,9 @@ private:
     bool _canAcquireGlobalSharedLock;
     Status _storeLocalConfigDocumentStatus;
     Status _storeLocalLastVoteDocumentStatus;
-    // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
-    stdx::mutex _shouldHangConfigMutex;
-    stdx::condition_variable _shouldHangConfigCondVar;
     // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
     stdx::mutex _shouldHangLastVoteMutex;
     stdx::condition_variable _shouldHangLastVoteCondVar;
-    bool _storeLocalConfigDocumentShouldHang;
     bool _storeLocalLastVoteDocumentShouldHang;
     bool _connectionsClosed;
     HostAndPort _clientHostAndPort;

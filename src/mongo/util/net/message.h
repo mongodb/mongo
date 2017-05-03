@@ -58,6 +58,7 @@ enum NetworkOp : int32_t {
     dbCommand = 2010,
     dbCommandReply = 2011,
     dbCompressed = 2012,
+    dbMsg = 2013,
 };
 
 inline bool isSupportedNetworkOp(NetworkOp op) {
@@ -72,6 +73,7 @@ inline bool isSupportedNetworkOp(NetworkOp op) {
         case dbCommand:
         case dbCommandReply:
         case dbCompressed:
+        case dbMsg:
             return true;
         default:
             return false;
@@ -104,6 +106,7 @@ inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
             return LogicalOp::opDelete;
         case dbKillCursors:
             return LogicalOp::opKillCursors;
+        case dbMsg:
         case dbCommand:
             return LogicalOp::opCommand;
         case dbCompressed:
@@ -139,6 +142,8 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "commandReply";
         case dbCompressed:
             return "compressed";
+        case dbMsg:
+            return "msg";
         default:
             int op = static_cast<int>(networkOp);
             massert(16141, str::stream() << "cannot translate opcode " << op, !op);

@@ -211,8 +211,9 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
     delete client;
 }
 
-ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
-    auto opCtx = _newOpCtx(client, _nextOpId.fetchAndAdd(1));
+ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(
+    Client* client, boost::optional<LogicalSessionId> lsid) {
+    auto opCtx = _newOpCtx(client, _nextOpId.fetchAndAdd(1), std::move(lsid));
     auto observer = _clientObservers.begin();
     try {
         for (; observer != _clientObservers.cend(); ++observer) {
@@ -293,7 +294,20 @@ void appendStorageEngineList(BSONObjBuilder* result) {
 
 void ServiceContext::setKillAllOperations() {
     stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+
+    // Ensure that all newly created operation contexts will immediately be in the interrupted state
     _globalKill.store(true);
+
+    // Interrupt all active operations
+    for (auto&& client : _clients) {
+        stdx::lock_guard<Client> lk(*client);
+        auto opCtxToKill = client->getOperationContext();
+        if (opCtxToKill) {
+            killOperation(opCtxToKill, ErrorCodes::InterruptedAtShutdown);
+        }
+    }
+
+    // Notify any listeners who need to reach to the server shutting down
     for (const auto listener : _killOpListeners) {
         try {
             listener->interruptAll();

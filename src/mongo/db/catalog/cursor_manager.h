@@ -76,24 +76,25 @@ public:
     CursorManager(NamespaceString nss);
 
     /**
-     * Destroys the CursorManager. Managed cursors which are not pinned are destroyed. Ownership of
-     * pinned cursors is transferred to the corresponding ClientCursorPin.
+     * Destroys the CursorManager. All cursors and PlanExecutors must be cleaned up via
+     * invalidateAll() before destruction.
      */
     ~CursorManager();
 
     /**
-     * Kills all managed query executors and ClientCursors.
+     * Kills all managed query executors and ClientCursors. Callers must have exclusive access to
+     * the collection (i.e. must have the collection, databse, or global resource locked in MODE_X).
      *
      * 'collectionGoingAway' indicates whether the Collection instance is being deleted.  This could
-     * be because the db is being closed, or the collection/db is being dropped. When passing
-     * a 'collectionGoingAway' value of true, callers must have exclusive access to the collection
-     * (i.e. must have the collection, database, or global resource locked in MODE_X).
+     * be because the db is being closed, or the collection/db is being dropped.
      *
      * The 'reason' is the motivation for invalidating all cursors. This will be used for error
      * reporting and logging when an operation finds that the cursor it was operating on has been
      * killed.
      */
-    void invalidateAll(bool collectionGoingAway, const std::string& reason);
+    void invalidateAll(OperationContext* opCtx,
+                       bool collectionGoingAway,
+                       const std::string& reason);
 
     /**
      * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
@@ -106,7 +107,7 @@ public:
      *
      * Returns the number of cursors that were timed out.
      */
-    std::size_t timeoutCursors(int millisSinceLastCall);
+    std::size_t timeoutCursors(OperationContext* opCtx, int millisSinceLastCall);
 
     /**
      * Register an executor so that it can be notified of deletion/invalidation during yields.
@@ -116,7 +117,8 @@ public:
     void registerExecutor(PlanExecutor* exec);
 
     /**
-     * Remove an executor from the registry.
+     * Remove an executor from the registry. It is legal to call this even if 'exec' is not
+     * registered.
      */
     void deregisterExecutor(PlanExecutor* exec);
 
@@ -124,30 +126,25 @@ public:
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
      * registered with the manager and returned in pinned state.
      */
-    ClientCursorPin registerCursor(ClientCursorParams&& cursorParams);
-
-    /**
-     * Constructs and pins a special ClientCursor used to track sharding state for the given
-     * collection. See range_preserver.h for more details.
-     */
-    ClientCursorPin registerRangePreserverCursor(const Collection* collection);
+    ClientCursorPin registerCursor(OperationContext* opCtx, ClientCursorParams&& cursorParams);
 
     /**
      * Pins and returns the cursor with the given id.
      *
-     * Returns ErrorCodes::CursorNotFound if the cursor does not exist.
+     * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
+     * ErrorCodes::QueryPlanKilled if the cursor was killed in between uses.
      *
      * Throws a UserException if the cursor is already pinned. Callers need not specially handle
      * this error, as it should only happen if a misbehaving client attempts to simultaneously issue
      * two operations against the same cursor id.
      */
-    StatusWith<ClientCursorPin> pinCursor(CursorId id);
+    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx, CursorId id);
 
     /**
      * Returns an OK status if the cursor was successfully erased.
      *
-     * Returns error code CursorNotFound if the cursor id is not owned by this manager. Returns
-     * error code OperationFailed if attempting to erase a pinned cursor.
+     * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager. Returns
+     * ErrorCodes::OperationFailed if attempting to erase a pinned cursor.
      *
      * If 'shouldAudit' is true, will perform audit logging.
      */
@@ -191,8 +188,6 @@ private:
 
     CursorId _allocateCursorId_inlock();
     void _deregisterCursor_inlock(ClientCursor* cc);
-    ClientCursorPin _registerCursor_inlock(
-        std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
     void deregisterCursor(ClientCursor* cc);
 

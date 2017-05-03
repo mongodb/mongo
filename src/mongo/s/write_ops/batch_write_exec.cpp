@@ -53,8 +53,6 @@ using std::stringstream;
 using std::vector;
 using std::map;
 
-BatchWriteExec::BatchWriteExec(NSTargeter* targeter) : _targeter(targeter) {}
-
 namespace {
 
 //
@@ -64,7 +62,6 @@ namespace {
 
 // TODO: Unordered map?
 typedef OwnedPointerMap<ShardId, TargetedWriteBatch> OwnedShardBatchMap;
-}
 
 static void buildErrorFrom(const Status& status, WriteErrorDetail* error) {
     error->setErrCode(status.code());
@@ -85,14 +82,17 @@ static void noteStaleResponses(const vector<ShardError*>& staleErrors, NSTargete
 // This only applies when no writes are occurring and metadata is not changing on reload
 static const int kMaxRoundsWithoutProgress(5);
 
+}  // namespace
+
 void BatchWriteExec::executeBatch(OperationContext* opCtx,
+                                  NSTargeter& targeter,
                                   const BatchedCommandRequest& clientRequest,
                                   BatchedCommandResponse* clientResponse,
                                   BatchWriteExecStats* stats) {
     LOG(4) << "starting execution of write batch of size "
            << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << clientRequest.getNS();
-    BatchWriteOp batchOp;
-    batchOp.initClientRequest(&clientRequest);
+
+    BatchWriteOp batchOp(clientRequest);
 
     // Current batch status
     bool refreshedTargeter = false;
@@ -132,10 +132,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         // record target errors definitively.
         bool recordTargetErrors = refreshedTargeter;
         Status targetStatus =
-            batchOp.targetBatch(opCtx, *_targeter, recordTargetErrors, &childBatches);
+            batchOp.targetBatch(opCtx, targeter, recordTargetErrors, &childBatches);
         if (!targetStatus.isOK()) {
             // Don't do anything until a targeter refresh
-            _targeter->noteCouldNotTarget();
+            targeter.noteCouldNotTarget();
             refreshedTargeter = true;
             ++stats->numTargetErrors;
             dassert(childBatches.size() == 0u);
@@ -242,7 +242,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     it->second = NULL;
                     continue;
                 }
-                ConnectionString shardHost(std::move(*response.shardHostAndPort));
+
+                auto shardHost(std::move(*response.shardHostAndPort));
 
 
                 // Then check if we successfully got a response.
@@ -272,7 +273,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                         trackedErrors.getErrors(ErrorCodes::StaleShardVersion);
 
                     if (staleErrors.size() > 0) {
-                        noteStaleResponses(staleErrors, _targeter);
+                        noteStaleResponses(staleErrors, &targeter);
                         ++stats->numStaleBatches;
                     }
 
@@ -318,7 +319,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         //
 
         bool targeterChanged = false;
-        Status refreshStatus = _targeter->refreshIfNeeded(opCtx, &targeterChanged);
+        Status refreshStatus = targeter.refreshIfNeeded(opCtx, &targeterChanged);
 
         if (!refreshStatus.isOK()) {
             // It's okay if we can't refresh, we'll just record errors for the ops if
@@ -362,13 +363,14 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
            << " for " << clientRequest.getNS();
 }
 
-void BatchWriteExecStats::noteWriteAt(const ConnectionString& host,
+void BatchWriteExecStats::noteWriteAt(const HostAndPort& host,
                                       repl::OpTime opTime,
                                       const OID& electionId) {
-    _writeOpTimes[host] = HostOpTime(opTime, electionId);
+    _writeOpTimes[ConnectionString(host)] = HostOpTime(opTime, electionId);
 }
 
 const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
     return _writeOpTimes;
 }
-}
+
+}  // namespace

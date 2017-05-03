@@ -90,4 +90,8 @@ bool SHA1Block::operator!=(const SHA1Block& other) const {
     return !(*this == other);
 }
 
+std::ostream& operator<<(std::ostream& os, const SHA1Block& sha1) {
+    return os << sha1.toString();
+}
+
 }  // namespace mongo

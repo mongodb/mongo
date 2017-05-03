@@ -51,7 +51,6 @@ public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    void dispose() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     bool isValidInitialSource() const final {
         return true;
@@ -75,6 +74,9 @@ public:
      * reported an error. This is a better form of DBClientCursor::nextSafe.
      */
     static Document nextSafeFrom(DBClientCursor* cursor);
+
+protected:
+    void doDispose() final;
 
 private:
     struct CursorAndConnection {

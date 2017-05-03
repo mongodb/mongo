@@ -56,7 +56,7 @@ public:
     void startup() override;
     void shutdown() override;
     void join() override;
-    std::string getDiagnosticString() const override;
+    void appendDiagnosticBSON(BSONObjBuilder* builder) const override;
     Date_t now() override;
     StatusWith<EventHandle> makeEvent() override;
     void signalEvent(const EventHandle& event) override;

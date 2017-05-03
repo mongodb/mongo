@@ -85,7 +85,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -132,7 +131,7 @@ public:
                 chunksArr.doneFast();
 
                 BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));
-                metadata->toBSONPending(pendingArr);
+                css->toBSONPending(pendingArr);
                 pendingArr.doneFast();
             }
             metadataBuilder.doneFast();

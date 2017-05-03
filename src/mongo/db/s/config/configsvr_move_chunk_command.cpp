@@ -81,7 +81,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         auto request = uassertStatusOK(BalanceChunkRequest::parseFromConfigCommand(cmdObj));

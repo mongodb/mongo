@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/s/collection_sharding_state.h"
 
@@ -46,6 +47,8 @@ struct OplogUpdateEntryArgs {
     // Name of the collection in which document is being updated.
     NamespaceString nss;
 
+    OptionalCollectionUUID uuid;
+
     // Fully updated document with damages (update modifiers) applied.
     BSONObj updatedDoc;
 
@@ -59,6 +62,12 @@ struct OplogUpdateEntryArgs {
     bool fromMigrate;
 };
 
+struct TTLCollModInfo {
+    Seconds expireAfterSeconds;
+    Seconds oldExpireAfterSeconds;
+    std::string indexName;
+};
+
 class OpObserver {
     MONGO_DISALLOW_COPYING(OpObserver);
 
@@ -67,17 +76,19 @@ public:
     virtual ~OpObserver() = default;
 
     virtual void onCreateIndex(OperationContext* opCtx,
-                               const NamespaceString& ns,
+                               const NamespaceString& nss,
+                               OptionalCollectionUUID uuid,
                                BSONObj indexDoc,
                                bool fromMigrate) = 0;
     virtual void onInserts(OperationContext* opCtx,
-                           const NamespaceString& ns,
+                           const NamespaceString& nss,
+                           OptionalCollectionUUID uuid,
                            std::vector<BSONObj>::const_iterator begin,
                            std::vector<BSONObj>::const_iterator end,
                            bool fromMigrate) = 0;
     virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
     virtual CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
-                                                               const NamespaceString& ns,
+                                                               const NamespaceString& nss,
                                                                const BSONObj& doc) = 0;
     /**
      * Handles logging before document is deleted.
@@ -89,20 +100,57 @@ public:
      * real delete.
      */
     virtual void onDelete(OperationContext* opCtx,
-                          const NamespaceString& ns,
+                          const NamespaceString& nss,
+                          OptionalCollectionUUID uuid,
                           CollectionShardingState::DeleteState deleteState,
                           bool fromMigrate) = 0;
     virtual void onOpMessage(OperationContext* opCtx, const BSONObj& msgObj) = 0;
     virtual void onCreateCollection(OperationContext* opCtx,
+                                    Collection* coll,
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex) = 0;
+    /**
+     * This function logs an oplog entry when a 'collMod' command on a collection is executed.
+     * Since 'collMod' commands can take a variety of different formats, the 'o' field of the
+     * oplog entry is populated with the 'collMod' command object. For TTL index updates, we
+     * transform key pattern index specifications into index name specifications, for uniformity.
+     * All other collMod fields are added to the 'o' object without modifications.
+     *
+     * To facilitate the rollback process, 'oldCollOptions' contains the previous state of all
+     * collection options i.e. the state prior to completion of the current collMod command.
+     * 'ttlInfo' contains the index name and previous expiration time of a TTL index. The old
+     * collection options will be stored in the 'o2.collectionOptions_old' field, and the old TTL
+     * expiration value in the 'o2.expireAfterSeconds_old' field.
+     *
+     * Oplog Entry Example ('o' and 'o2' fields shown):
+     *
+     *      {
+     *          ...
+     *          o: {
+     *              collMod: "test",
+     *              validationLevel: "off",
+     *              index: {name: "indexName_1", expireAfterSeconds: 600}
+     *          }
+     *          o2: {
+     *              collectionOptions_old: {
+     *                  validationLevel: "strict",
+     *              },
+     *              expireAfterSeconds_old: 300
+     *          }
+     *      }
+     *
+     */
     virtual void onCollMod(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           const BSONObj& collModCmd) = 0;
+                           OptionalCollectionUUID uuid,
+                           const BSONObj& collModCmd,
+                           const CollectionOptions& oldCollOptions,
+                           boost::optional<TTLCollModInfo> ttlInfo) = 0;
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
     virtual void onDropCollection(OperationContext* opCtx,
-                                  const NamespaceString& collectionName) = 0;
+                                  const NamespaceString& collectionName,
+                                  OptionalCollectionUUID uuid) = 0;
     /**
      * This function logs an oplog entry when an index is dropped. The namespace of the index,
      * the index name, and the index info from the index descriptor are used to create a
@@ -113,20 +161,27 @@ public:
      * oplog entry. This means it's possible to roll back half of the index drops.
      */
     virtual void onDropIndex(OperationContext* opCtx,
-                             const NamespaceString& ns,
+                             const NamespaceString& nss,
+                             OptionalCollectionUUID uuid,
                              const std::string& indexName,
                              const BSONObj& indexInfo) = 0;
     virtual void onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
+                                    OptionalCollectionUUID uuid,
                                     bool dropTarget,
+                                    OptionalCollectionUUID dropTargetUUID,
+                                    OptionalCollectionUUID dropSourceUUID,
                                     bool stayTemp) = 0;
     virtual void onApplyOps(OperationContext* opCtx,
                             const std::string& dbName,
                             const BSONObj& applyOpCmd) = 0;
-    virtual void onEmptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) = 0;
+    virtual void onEmptyCapped(OperationContext* opCtx,
+                               const NamespaceString& collectionName,
+                               OptionalCollectionUUID uuid) = 0;
     virtual void onConvertToCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
+                                   OptionalCollectionUUID uuid,
                                    double size) = 0;
 };
 

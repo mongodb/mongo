@@ -29,9 +29,12 @@
 #pragma once
 
 #include <iosfwd>
+#include <memory>
 #include <string>
+#include <type_traits>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
@@ -101,6 +104,11 @@ protected:
     executor::TaskExecutor* _getExecutor();
 
     /**
+     * Returns the name of the component passed in at construction.
+     */
+    std::string _getComponentName() const;
+
+    /**
      * Returns true if this component is currently running or in the process of shutting down.
      */
     bool _isActive_inlock() noexcept;
@@ -129,6 +137,9 @@ protected:
         const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
     Status _checkForShutdownAndConvertStatus_inlock(const Status& status,
                                                     const std::string& message);
+    Status _checkForShutdownAndConvertStatus(
+        const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
+    Status _checkForShutdownAndConvertStatus(const Status& status, const std::string& message);
 
     /**
      * Schedules work to be run by the task executor.
@@ -147,6 +158,24 @@ protected:
      * Cancels task executor callback handle if not null.
      */
     void _cancelHandle_inlock(executor::TaskExecutor::CallbackHandle handle);
+
+    /**
+     * Starts up a component, owned by us, and checks our shutdown state at the same time. If the
+     * component's startup() fails, resets the unique_ptr holding 'component' and return the error
+     * from startup().
+     */
+    template <typename T>
+    Status _startupComponent_inlock(std::unique_ptr<T>& component);
+    template <typename T>
+    Status _startupComponent(std::unique_ptr<T>& component);
+
+    /**
+     * Shuts down a component, owned by us, if not null.
+     */
+    template <typename T>
+    void _shutdownComponent_inlock(const std::unique_ptr<T>& component);
+    template <typename T>
+    void _shutdownComponent(const std::unique_ptr<T>& component);
 
 private:
     /**
@@ -206,6 +235,49 @@ private:
  * For testing only.
  */
 std::ostream& operator<<(std::ostream& os, const AbstractAsyncComponent::State& state);
+
+template <typename T>
+Status AbstractAsyncComponent::_startupComponent_inlock(std::unique_ptr<T>& component) {
+    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
+
+    if (_isShuttingDown_inlock()) {
+        // Save name of 'component' before resetting unique_ptr.
+        auto componentToStartUp = component->_componentName;
+        component.reset();
+        return Status(ErrorCodes::CallbackCanceled,
+                      str::stream() << "failed to start up " << componentToStartUp << ": "
+                                    << _componentName
+                                    << " is shutting down");
+    }
+
+    auto status = component->startup();
+    if (!status.isOK()) {
+        component.reset();
+    }
+    return status;
+}
+
+template <typename T>
+Status AbstractAsyncComponent::_startupComponent(std::unique_ptr<T>& component) {
+    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    return _startupComponent_inlock(component);
+}
+
+template <typename T>
+void AbstractAsyncComponent::_shutdownComponent_inlock(const std::unique_ptr<T>& component) {
+    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
+
+    if (!component) {
+        return;
+    }
+    component->shutdown();
+}
+
+template <typename T>
+void AbstractAsyncComponent::_shutdownComponent(const std::unique_ptr<T>& component) {
+    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
+    _shutdownComponent_inlock(component);
+}
 
 }  // namespace repl
 }  // namespace mongo

@@ -42,6 +42,7 @@ namespace mongo {
 const char ParsedDistinct::kKeyField[] = "key";
 const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
+const char ParsedDistinct::kCommentField[] = "comment";
 
 StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     BSONObjBuilder aggregationBuilder;
@@ -87,6 +88,23 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     pipelineBuilder.doneFast();
 
     aggregationBuilder.append(kCollationField, qr.getCollation());
+
+    if (qr.getMaxTimeMS() > 0) {
+        aggregationBuilder.append(QueryRequest::cmdOptionMaxTimeMS, qr.getMaxTimeMS());
+    }
+
+    if (!qr.getReadConcern().isEmpty()) {
+        aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName,
+                                  qr.getReadConcern());
+    }
+
+    if (!qr.getUnwrappedReadPref().isEmpty()) {
+        aggregationBuilder.append(QueryRequest::kUnwrappedReadPrefField, qr.getUnwrappedReadPref());
+    }
+
+    if (!qr.getComment().empty()) {
+        aggregationBuilder.append(kCommentField, qr.getComment());
+    }
 
     // Specify the 'cursor' option so that aggregation uses the cursor interface.
     aggregationBuilder.append("cursor", BSONObj());
@@ -135,6 +153,50 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                         << typeName(collationElt.type()));
         }
         qr->setCollation(collationElt.embeddedObject());
+    }
+
+    if (BSONElement readConcernElt = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
+        if (readConcernElt.type() != BSONType::Object) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << "\" had the wrong type. Expected "
+                                        << typeName(BSONType::Object)
+                                        << ", found "
+                                        << typeName(readConcernElt.type()));
+        }
+        qr->setReadConcern(readConcernElt.embeddedObject());
+    }
+
+    if (BSONElement commentElt = cmdObj[kCommentField]) {
+        if (commentElt.type() != BSONType::String) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "\"" << kCommentField
+                                        << "\" had the wrong type. Expected "
+                                        << typeName(BSONType::String)
+                                        << ", found "
+                                        << typeName(commentElt.type()));
+        }
+        qr->setComment(commentElt.str());
+    }
+
+    if (BSONElement queryOptionsElt = cmdObj[QueryRequest::kUnwrappedReadPrefField]) {
+        if (queryOptionsElt.type() != BSONType::Object) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "\"" << QueryRequest::kUnwrappedReadPrefField
+                                        << "\" had the wrong type. Expected "
+                                        << typeName(BSONType::Object)
+                                        << ", found "
+                                        << typeName(queryOptionsElt.type()));
+        }
+        qr->setUnwrappedReadPref(queryOptionsElt.embeddedObject());
+    }
+
+    if (BSONElement maxTimeMSElt = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
+        auto maxTimeMS = QueryRequest::parseMaxTimeMS(maxTimeMSElt);
+        if (!maxTimeMS.isOK()) {
+            return maxTimeMS.getStatus();
+        }
+        qr->setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
     }
 
     qr->setExplain(isExplain);

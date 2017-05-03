@@ -114,8 +114,6 @@ public:
 
     const NamespaceString& getSourceNamespace() const;
 
-    std::string getDiagnosticString() const override;
-
     bool isActive() const override;
 
     Status startup() noexcept override;

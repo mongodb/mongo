@@ -340,7 +340,8 @@ AtomizeAndCopyChars(ExclusiveContext* cx, const CharT* tbchars, size_t length, P
         return nullptr;
     }
 
-    JSAtom* atom = flat->morphAtomizedStringIntoAtom();
+    JSAtom* atom = flat->morphAtomizedStringIntoAtom(lookup.hash);
+    MOZ_ASSERT(atom->hash() == lookup.hash);
 
     // We have held the lock since looking up p, and the operations we've done
     // since then can't GC; therefore the atoms table has not been modified and

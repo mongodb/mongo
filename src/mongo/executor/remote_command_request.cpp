@@ -46,8 +46,8 @@ AtomicUInt64 requestIdCounter(0);
 
 }  // namespace
 
-const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
-const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
+constexpr Milliseconds RemoteCommandRequest::kNoTimeout;
+constexpr Date_t RemoteCommandRequest::kNoExpirationDate;
 
 RemoteCommandRequest::RemoteCommandRequest() : id(requestIdCounter.addAndFetch(1)) {}
 

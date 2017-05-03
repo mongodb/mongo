@@ -278,11 +278,11 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     // We can't use make_unique() here, since the branches have different types.
     std::unique_ptr<ParsedAggregationProjection> parsedProject(
         projectionType == ProjectionType::kInclusion
-            ? static_cast<ParsedAggregationProjection*>(new ParsedInclusionProjection())
-            : static_cast<ParsedAggregationProjection*>(new ParsedExclusionProjection()));
+            ? static_cast<ParsedAggregationProjection*>(new ParsedInclusionProjection(expCtx))
+            : static_cast<ParsedAggregationProjection*>(new ParsedExclusionProjection(expCtx)));
 
     // Actually parse the specification.
-    parsedProject->parse(expCtx, spec);
+    parsedProject->parse(spec);
     return parsedProject;
 }
 

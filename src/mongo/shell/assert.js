@@ -267,6 +267,22 @@ assert.retryNoExcept = function(func, msg, num_attempts, intervalMS) {
     assert.retry(safeFunc, msg, num_attempts, intervalMS);
 };
 
+/**
+ * Runs the given command on the 'admin' database of the provided node. Asserts that the command
+ * worked but allows network errors to occur.
+ */
+assert.adminCommandWorkedAllowingNetworkError = function(node, commandObj) {
+    try {
+        assert.commandWorked(node.adminCommand(commandObj));
+    } catch (e) {
+        // Ignore errors due to connection failures.
+        if (!isNetworkError(e)) {
+            throw e;
+        }
+        print("Caught network error: " + tojson(e));
+    }
+};
+
 assert.time = function(f, msg, timeout /*ms*/) {
     if (assert._debug && msg)
         print("in assert for: " + msg);

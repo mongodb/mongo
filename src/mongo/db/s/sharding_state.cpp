@@ -63,7 +63,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/local_sharding_info.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -111,37 +110,12 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
     }
 }
 
-bool haveLocalShardingInfo(OperationContext* opCtx, const string& ns) {
-    if (!ShardingState::get(opCtx)->enabled()) {
-        return false;
-    }
-
-    const auto& oss = OperationShardingState::get(opCtx);
-    if (oss.hasShardVersion()) {
-        return true;
-    }
-
-    const auto& sci = ShardedConnectionInfo::get(opCtx->getClient(), false);
-    if (sci && !sci->getVersion(ns).isStrictlyEqualTo(ChunkVersion::UNSHARDED())) {
-        return true;
-    }
-
-    return false;
-}
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(MongoDLocalShardingInfo, ("SetGlobalEnvironment"))
-(InitializerContext* context) {
-    enableLocalShardingInfo(getGlobalServiceContext(), &haveLocalShardingInfo);
-    return Status::OK();
-}
-
 }  // namespace
 
 ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
-      _globalInit(&initializeGlobalShardingStateForMongod),
-      _scheduleWorkFn([](NamespaceString nss) {}) {}
+      _globalInit(&initializeGlobalShardingStateForMongod) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -237,17 +211,10 @@ void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
     _globalInit = func;
 }
 
-void ShardingState::setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn) {
-    _scheduleWorkFn = fn;
-}
-
-void ShardingState::scheduleCleanup(const NamespaceString& nss) {
-    _scheduleWorkFn(nss);
-}
-
 Status ShardingState::onStaleShardVersion(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const ChunkVersion& expectedVersion) {
+    invariant(!opCtx->getClient()->isInDirectClient());
     invariant(!opCtx->lockState()->isLocked());
     invariant(enabled());
 
@@ -362,7 +329,6 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
         _shardName = shardIdentity.getShardName();
         _clusterId = shardIdentity.getClusterId();
 
-        _initializeRangeDeleterTaskExecutor();
 
         return status;
     } catch (const DBException& ex) {
@@ -620,16 +586,24 @@ Status ShardingState::updateShardIdentityConfigString(OperationContext* opCtx,
     return Status::OK();
 }
 
-void ShardingState::_initializeRangeDeleterTaskExecutor() {
-    invariant(!_rangeDeleterTaskExecutor);
-    auto net =
-        executor::makeNetworkInterface("NetworkInterfaceCollectionRangeDeleter-TaskExecutor");
-    auto netPtr = net.get();
-    _rangeDeleterTaskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        stdx::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net));
+executor::TaskExecutor* ShardingState::getRangeDeleterTaskExecutor() {
+    stdx::lock_guard<stdx::mutex> lk(_rangeDeleterExecutor.lock);
+    if (_rangeDeleterExecutor.taskExecutor.get() == nullptr) {
+        static const char kExecName[] = "NetworkInterfaceCollectionRangeDeleter-TaskExecutor";
+        auto net = executor::makeNetworkInterface(kExecName);
+        auto pool = stdx::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
+        _rangeDeleterExecutor.taskExecutor =
+            stdx::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+        _rangeDeleterExecutor.taskExecutor->startup();
+    }
+    return _rangeDeleterExecutor.taskExecutor.get();
 }
 
-executor::ThreadPoolTaskExecutor* ShardingState::getRangeDeleterTaskExecutor() {
-    return _rangeDeleterTaskExecutor.get();
+ShardingState::RangeDeleterExecutor::~RangeDeleterExecutor() {
+    if (taskExecutor) {
+        taskExecutor->shutdown();
+        taskExecutor->join();
+    }
 }
+
 }  // namespace mongo

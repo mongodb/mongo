@@ -31,7 +31,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/request_interface.h"
 
@@ -75,18 +74,6 @@ public:
      * The arguments to the command - this is passed to the command's run() method.
      */
     const BSONObj& getCommandArgs() const final;
-
-    /**
-     * A variable number of BSON documents to pass to the command. It is valid for
-     * the returned range to be empty.
-     *
-     * Example usage:
-     *
-     * for (auto&& doc : req.getInputDocs()) {
-     *    ... do stuff with doc
-     * }
-     */
-    DocumentRange getInputDocs() const final;
 
     Protocol getProtocol() const final;
 

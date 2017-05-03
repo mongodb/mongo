@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_set.h"
@@ -222,8 +224,11 @@ public:
      * Creates a new OperationContext on "client".
      *
      * "client" must not have an active operation context.
+     *
+     * If provided, the LogicalSessionId links this operation to a logical session.
      */
-    UniqueOperationContext makeOperationContext(Client* client);
+    UniqueOperationContext makeOperationContext(
+        Client* client, boost::optional<LogicalSessionId> lsid = boost::none);
 
     //
     // Storage
@@ -401,7 +406,9 @@ private:
     /**
      * Returns a new OperationContext. Private, for use by makeOperationContext.
      */
-    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
+    virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client,
+                                                        unsigned opId,
+                                                        boost::optional<LogicalSessionId>) = 0;
 
     /**
      * Kills the given operation.

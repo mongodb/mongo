@@ -37,10 +37,12 @@
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -205,6 +207,9 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         stdx::make_unique<BalancerConfiguration>(),
         std::move(executorPool),
         networkPtr);
+
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    LogicalClock::get(opCtx)->setTimeProofService(std::move(timeProofService));
 
     // must be started once the grid is initialized
     grid.shardRegistry()->startup(opCtx);

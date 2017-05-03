@@ -114,7 +114,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
         //
@@ -258,15 +257,14 @@ public:
             long long currCount = 0;
             long long numChunks = 0;
 
-            unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(opCtx,
-                                           collection,
-                                           idx,
-                                           min,
-                                           max,
-                                           BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::YIELD_MANUAL,
-                                           InternalPlanner::FORWARD));
+            auto exec = InternalPlanner::indexScan(opCtx,
+                                                   collection,
+                                                   idx,
+                                                   min,
+                                                   max,
+                                                   BoundInclusion::kIncludeStartKeyOnly,
+                                                   PlanExecutor::YIELD_AUTO,
+                                                   InternalPlanner::FORWARD);
 
             BSONObj currKey;
             PlanExecutor::ExecState state = exec->getNext(&currKey, NULL);
@@ -282,7 +280,6 @@ public:
             splitKeys.push_back(dotted_path_support::extractElementsBasedOnTemplate(
                 prettyKey(idx->keyPattern(), currKey.getOwned()), keyPattern));
 
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
             while (1) {
                 while (PlanExecutor::ADVANCED == state) {
                     currCount++;
@@ -341,10 +338,9 @@ public:
                                                   min,
                                                   max,
                                                   BoundInclusion::kIncludeStartKeyOnly,
-                                                  PlanExecutor::YIELD_MANUAL,
+                                                  PlanExecutor::YIELD_AUTO,
                                                   InternalPlanner::FORWARD);
 
-                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
                 state = exec->getNext(&currKey, NULL);
             }
 

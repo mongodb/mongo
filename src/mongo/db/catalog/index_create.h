@@ -1,32 +1,30 @@
-// index_create.h
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2017 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #pragma once
 
@@ -37,11 +35,13 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/record_id.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
-
 class BackgroundOperation;
 class BSONObj;
 class Collection;
@@ -59,14 +59,75 @@ class OperationContext;
  * (as it is itself essentially a form of rollback, you don't want to "rollback the rollback").
  */
 class MultiIndexBlock {
-    MONGO_DISALLOW_COPYING(MultiIndexBlock);
+public:
+    class Impl {
+    public:
+        virtual ~Impl() = 0;
+
+        virtual void allowBackgroundBuilding() = 0;
+
+        virtual void allowInterruption() = 0;
+
+        virtual void ignoreUniqueConstraint() = 0;
+
+        virtual void removeExistingIndexes(std::vector<BSONObj>* specs) const = 0;
+
+        virtual StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) = 0;
+
+        virtual StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) = 0;
+
+        virtual Status insertAllDocumentsInCollection(std::set<RecordId>* dupsOut = NULL) = 0;
+
+        virtual Status insert(const BSONObj& wholeDocument, const RecordId& loc) = 0;
+
+        virtual Status doneInserting(std::set<RecordId>* dupsOut = NULL) = 0;
+
+        virtual void commit() = 0;
+
+        virtual void abortWithoutCleanup() = 0;
+
+        virtual bool getBuildInBackground() const = 0;
+    };
+
+private:
+    std::unique_ptr<Impl> _pimpl;
+
+    // This structure exists to give us a customization point to decide how to force users of this
+    // class to depend upon the corresponding `index_create.cpp` Translation Unit (TU).  All public
+    // forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
+    struct TUHook {
+        static void hook() noexcept;
+
+        explicit inline TUHook() noexcept {
+            if (kDebugBuild)
+                this->hook();
+        }
+    };
+
+    inline const Impl& _impl() const {
+        TUHook{};
+        return *this->_pimpl;
+    }
+
+    inline Impl& _impl() {
+        TUHook{};
+        return *this->_pimpl;
+    }
+
+    static std::unique_ptr<Impl> makeImpl(OperationContext* opCtx, Collection* collection);
 
 public:
+    using factory_function_type = decltype(makeImpl);
+
+    static void registerFactory(stdx::function<factory_function_type> factory);
+
+    inline ~MultiIndexBlock() = default;
+
     /**
      * Neither pointer is owned.
      */
-    MultiIndexBlock(OperationContext* opCtx, Collection* collection);
-    ~MultiIndexBlock();
+    inline explicit MultiIndexBlock(OperationContext* const opCtx, Collection* const collection)
+        : _pimpl(makeImpl(opCtx, collection)) {}
 
     /**
      * By default we ignore the 'background' flag in specs when building an index. If this is
@@ -76,16 +137,16 @@ public:
      * indexes in the background, but there is a performance benefit to building all in the
      * foreground.
      */
-    void allowBackgroundBuilding() {
-        _buildInBackground = true;
+    inline void allowBackgroundBuilding() {
+        return this->_impl().allowBackgroundBuilding();
     }
 
     /**
      * Call this before init() to allow the index build to be interrupted.
      * This only affects builds using the insertAllDocumentsInCollection helper.
      */
-    void allowInterruption() {
-        _allowInterruption = true;
+    inline void allowInterruption() {
+        return this->_impl().allowInterruption();
     }
 
     /**
@@ -95,15 +156,17 @@ public:
      *
      * If this is called, any dupsOut sets passed in will never be filled.
      */
-    void ignoreUniqueConstraint() {
-        _ignoreUnique = true;
+    inline void ignoreUniqueConstraint() {
+        return this->_impl().ignoreUniqueConstraint();
     }
 
     /**
      * Removes pre-existing indexes from 'specs'. If this isn't done, init() may fail with
      * IndexAlreadyExists.
      */
-    void removeExistingIndexes(std::vector<BSONObj>* specs) const;
+    inline void removeExistingIndexes(std::vector<BSONObj>* const specs) const {
+        return this->_impl().removeExistingIndexes(specs);
+    }
 
     /**
      * Prepares the index(es) for building and returns the canonicalized form of the requested index
@@ -113,8 +176,13 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs);
-    StatusWith<std::vector<BSONObj>> init(const BSONObj& spec);
+    inline StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs) {
+        return this->_impl().init(specs);
+    }
+
+    inline StatusWith<std::vector<BSONObj>> init(const BSONObj& spec) {
+        return this->_impl().init(spec);
+    }
 
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.
@@ -130,7 +198,9 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    Status insertAllDocumentsInCollection(std::set<RecordId>* dupsOut = NULL);
+    inline Status insertAllDocumentsInCollection(std::set<RecordId>* const dupsOut = nullptr) {
+        return this->_impl().insertAllDocumentsInCollection(dupsOut);
+    }
 
     /**
      * Call this after init() for each document in the collection.
@@ -139,7 +209,9 @@ public:
      *
      * Should be called inside of a WriteUnitOfWork.
      */
-    Status insert(const BSONObj& wholeDocument, const RecordId& loc);
+    inline Status insert(const BSONObj& wholeDocument, const RecordId& loc) {
+        return this->_impl().insert(wholeDocument, loc);
+    }
 
     /**
      * Call this after the last insert(). This gives the index builder a chance to do any
@@ -153,7 +225,9 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    Status doneInserting(std::set<RecordId>* dupsOut = NULL);
+    inline Status doneInserting(std::set<RecordId>* const dupsOut = nullptr) {
+        return this->_impl().doneInserting(dupsOut);
+    }
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -164,7 +238,9 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    void commit();
+    inline void commit() {
+        return this->_impl().commit();
+    }
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
@@ -180,39 +256,12 @@ public:
      * Does not matter whether it is called inside of a WriteUnitOfWork. Will not be rolled
      * back.
      */
-    void abortWithoutCleanup();
-
-    bool getBuildInBackground() const {
-        return _buildInBackground;
+    inline void abortWithoutCleanup() {
+        return this->_impl().abortWithoutCleanup();
     }
 
-private:
-    class SetNeedToCleanupOnRollback;
-    class CleanupIndexesVectorOnRollback;
-
-    struct IndexToBuild {
-        std::unique_ptr<IndexCatalog::IndexBuildBlock> block;
-
-        IndexAccessMethod* real = NULL;           // owned elsewhere
-        const MatchExpression* filterExpression;  // might be NULL, owned elsewhere
-        std::unique_ptr<IndexAccessMethod::BulkBuilder> bulk;
-
-        InsertDeleteOptions options;
-    };
-
-    std::vector<IndexToBuild> _indexes;
-
-    std::unique_ptr<BackgroundOperation> _backgroundOperation;
-
-    // Pointers not owned here and must outlive 'this'
-    Collection* _collection;
-    OperationContext* _opCtx;
-
-    bool _buildInBackground;
-    bool _allowInterruption;
-    bool _ignoreUnique;
-
-    bool _needToCleanup;
+    inline bool getBuildInBackground() const {
+        return this->_impl().getBuildInBackground();
+    }
 };
-
 }  // namespace mongo

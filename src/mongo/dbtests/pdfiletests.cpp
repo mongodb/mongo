@@ -59,7 +59,7 @@ protected:
         return "unittests.pdfiletests.Insert";
     }
     Collection* collection() {
-        return _context.db()->getCollection(ns());
+        return _context.db()->getCollection(&_opCtx, ns());
     }
 
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
@@ -74,7 +74,8 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
-        Collection* collection = _context.db()->getOrCreateCollection(&_opCtx, ns());
+        Collection* collection =
+            _context.db()->getOrCreateCollection(&_opCtx, NamespaceString(ns()));
         OpDebug* const nullOpDebug = nullptr;
         ASSERT(!collection->insertDocument(&_opCtx, x, nullOpDebug, true).isOK());
 

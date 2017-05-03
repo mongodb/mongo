@@ -39,9 +39,11 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -70,10 +72,31 @@ private:
     bool _oldSupportsDocLocking;
 };
 
+/**
+ * A RAII object that instantiates a TicketHolder that limits number of allowed global lock
+ * acquisitions to numTickets. The opCtx must live as long as the UseGlobalThrottling instance.
+ */
+class UseGlobalThrottling {
+public:
+    explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets)
+        : _opCtx(opCtx), _holder(1) {
+        _opCtx->lockState()->setGlobalThrottling(&_holder, &_holder);
+    }
+    ~UseGlobalThrottling() {
+        // Reset the global setting as we're about to destroy the ticket holder.
+        _opCtx->lockState()->setGlobalThrottling(nullptr, nullptr);
+    }
+
+private:
+    OperationContext* _opCtx;
+    TicketHolder _holder;
+};
+
 
 class DConcurrencyTestFixture : public unittest::Test {
 public:
     DConcurrencyTestFixture() : _client(getGlobalServiceContext()->makeClient("testClient")) {}
+    ~DConcurrencyTestFixture() {}
 
     /**
      * Constructs and returns a new OperationContext.
@@ -692,6 +715,39 @@ TEST_F(DConcurrencyTestFixture, ResourceMutexLabels) {
     ASSERT(mutex.getName() == "label");
     Lock::ResourceMutex mutex2("label2");
     ASSERT(mutex2.getName() == "label2");
+}
+
+TEST_F(DConcurrencyTestFixture, Throttling) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    UseGlobalThrottling throttle(opctx1, 1);
+
+    bool overlongWait;
+    int tries = 0;
+    const int maxTries = 15;
+    const int timeoutMillis = 42;
+
+    do {
+        // Test that throttling will correctly handle timeouts.
+        Lock::GlobalRead R1(opctx1, 0);
+        ASSERT(R1.isLocked());
+
+        Date_t t1 = Date_t::now();
+        {
+            Lock::GlobalRead R2(opctx2, timeoutMillis);
+            ASSERT(!R2.isLocked());
+        }
+        Date_t t2 = Date_t::now();
+
+        // Test that the timeout did result in at least the requested wait.
+        ASSERT_GTE(t2 - t1, Milliseconds(timeoutMillis));
+
+        // Timeouts should be reasonably immediate. In maxTries attempts at least one test should be
+        // able to complete within a second, as the theoretical test duration is less than 50 ms.
+        overlongWait = t2 - t1 >= Seconds(1);
+    } while (overlongWait && ++tries < maxTries);
+    ASSERT(!overlongWait);
 }
 
 

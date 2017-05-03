@@ -47,7 +47,7 @@ namespace mongo {
 class PipelineProxyStage final : public PlanStage {
 public:
     PipelineProxyStage(OperationContext* opCtx,
-                       boost::intrusive_ptr<Pipeline> pipeline,
+                       std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline,
                        WorkingSet* ws);
 
     PlanStage::StageState doWork(WorkingSetID* out) final;
@@ -68,7 +68,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void doInvalidate(OperationContext* txn, const RecordId& rid, InvalidationType type) final {
+    void doInvalidate(OperationContext* opCtx, const RecordId& rid, InvalidationType type) final {
         // A PlanExecutor with a PipelineProxyStage should be registered with the global cursor
         // manager, so should not receive invalidations.
         MONGO_UNREACHABLE;
@@ -83,11 +83,14 @@ public:
 
     static const char* kStageType;
 
+protected:
+    void doDispose() final;
+
 private:
     boost::optional<BSONObj> getNextBson();
 
     // Things in the _stash should be returned before pulling items from _pipeline.
-    const boost::intrusive_ptr<Pipeline> _pipeline;
+    std::unique_ptr<Pipeline, Pipeline::Deleter> _pipeline;
     std::vector<BSONObj> _stash;
     const bool _includeMetaData;
 

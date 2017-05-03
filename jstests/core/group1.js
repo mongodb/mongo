@@ -103,7 +103,7 @@ p = {
     },
     initial: {count: 0},
     finalize: function(obj) {
-        ob;
+        throw new Error("Intentionally throwing exception in finalize function");
     }
 };
 assert.commandFailedWithCode(
@@ -117,7 +117,7 @@ p = {
     },
     initial: {count: 0},
     finalize: function(obj) {
-        ob;
+        throw new Error("Intentionally throwing exception in finalize function");
     }
 };
 assert.commandFailedWithCode(

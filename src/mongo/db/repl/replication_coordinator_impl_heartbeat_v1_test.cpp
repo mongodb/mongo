@@ -365,8 +365,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
     // Prepare heartbeat response.
     OID unexpectedId = OID::gen();
     OpTime opTime{Timestamp{10, 10}, 10};
-    ReplicationExecutor::ResponseStatus heartbeatResponse(ErrorCodes::InternalError,
-                                                          "not initialized");
+    RemoteCommandResponse heartbeatResponse(ErrorCodes::InternalError, "not initialized");
     {
         ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName(rsConfig.getReplSetName());

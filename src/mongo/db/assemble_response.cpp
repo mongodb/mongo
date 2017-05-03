@@ -55,10 +55,12 @@
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -69,13 +71,13 @@ MONGO_FP_DECLARE(rsStopGetMore);
 namespace {
 using logger::LogComponent;
 
-inline void opread(Message& m) {
+inline void opread(const Message& m) {
     if (_diaglog.getLevel() & 2) {
         _diaglog.readop(m.singleData().view2ptr(), m.header().getLen());
     }
 }
 
-inline void opwrite(Message& m) {
+inline void opwrite(const Message& m) {
     if (_diaglog.getLevel() & 1) {
         _diaglog.writeop(m.singleData().view2ptr(), m.header().getLen());
     }
@@ -143,14 +145,11 @@ void beginCommandOp(OperationContext* opCtx, const NamespaceString& nss, const B
     curop->setNS_inlock(nss.ns());
 }
 
-void receivedCommand(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     Client& client,
-                     DbResponse& dbResponse,
-                     Message& message) {
+DbResponse receivedCommand(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           Client& client,
+                           const Message& message) {
     invariant(nss.isCommand());
-
-    const int32_t responseToMsgId = message.header().getId();
 
     DbMessage dbMessage(message);
     QueryMessage queryMessage(dbMessage);
@@ -188,17 +187,53 @@ void receivedCommand(OperationContext* opCtx,
 
     op->debug().responseLength = response.header().dataLen();
 
-    dbResponse.response = std::move(response);
-    dbResponse.responseToMsgId = responseToMsgId;
+    return {std::move(response)};
 }
 
-void receivedRpc(OperationContext* opCtx,
-                 Client& client,
-                 DbResponse& dbResponse,
-                 Message& message) {
-    invariant(message.operation() == dbCommand);
+DbResponse receivedMsg(OperationContext* opCtx, Client& client, const Message& message) {
+    invariant(message.operation() == dbMsg);
 
-    const int32_t responseToMsgId = message.header().getId();
+    OpMsg requestOpMsg;
+    rpc::OpMsgReplyBuilder replyBuilder;
+    auto curOp = CurOp::get(opCtx);
+    try {
+        // Request is validated here.
+        // TODO If this fails we reply to an invalid request which isn't always safe. Unfortunately
+        // tests currently rely on this. Figure out what to do.
+        requestOpMsg = OpMsg::parse(message);
+        rpc::OpMsgRequest request(requestOpMsg);
+
+        // We construct a legacy $cmd namespace so we can fill in curOp using
+        // the existing logic that existed for OP_QUERY commands
+        NamespaceString nss(request.getDatabase(), "$cmd");
+        beginCommandOp(opCtx, nss, request.getCommandArgs());
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curOp->markCommand_inlock();
+        }
+
+        runCommands(opCtx, request, &replyBuilder);
+
+        curOp->debug().iscommand = true;
+    } catch (const DBException& exception) {
+        replyBuilder.reset();
+        Command::generateErrorResponse(opCtx, &replyBuilder, exception);
+    }
+
+    auto response = replyBuilder.done();
+
+    curOp->debug().responseLength = response.header().dataLen();
+
+    // TODO exhaust
+    if (requestOpMsg.isFlagSet(OpMsg::kMoreToCome)) {
+        return {};
+    }
+
+    return DbResponse{std::move(response)};
+}
+
+DbResponse receivedRpc(OperationContext* opCtx, Client& client, const Message& message) {
+    invariant(message.operation() == dbCommand);
 
     rpc::CommandReplyBuilder replyBuilder{};
 
@@ -229,19 +264,17 @@ void receivedRpc(OperationContext* opCtx,
 
     curOp->debug().responseLength = response.header().dataLen();
 
-    dbResponse.response = std::move(response);
-    dbResponse.responseToMsgId = responseToMsgId;
+    return {std::move(response)};
 }
 
 // In SERVER-7775 we reimplemented the pseudo-commands fsyncUnlock, inProg, and killOp
 // as ordinary commands. To support old clients for another release, this helper serves
 // to execute the real command from the legacy pseudo-command codepath.
 // TODO: remove after MongoDB 3.2 is released
-void receivedPseudoCommand(OperationContext* opCtx,
-                           Client& client,
-                           DbResponse& dbResponse,
-                           Message& message,
-                           StringData realCommandName) {
+DbResponse receivedPseudoCommand(OperationContext* opCtx,
+                                 Client& client,
+                                 const Message& message,
+                                 StringData realCommandName) {
     DbMessage originalDbm(message);
 
     auto originalNToSkip = originalDbm.pullInt();
@@ -288,23 +321,21 @@ void receivedPseudoCommand(OperationContext* opCtx,
     interposed.setData(dbQuery, cmdMsgBuf.buf(), cmdMsgBuf.len());
     interposed.header().setId(message.header().getId());
 
-    receivedCommand(opCtx, interposedNss, client, dbResponse, interposed);
+    return receivedCommand(opCtx, interposedNss, client, interposed);
 }
 
-void receivedQuery(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   Client& c,
-                   DbResponse& dbResponse,
-                   Message& m) {
+DbResponse receivedQuery(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         Client& c,
+                         const Message& m) {
     invariant(!nss.isCommand());
     globalOpCounters.gotQuery();
-
-    int32_t responseToMsgId = m.header().getId();
 
     DbMessage d(m);
     QueryMessage q(d);
 
     CurOp& op = *CurOp::get(opCtx);
+    DbResponse dbResponse;
 
     try {
         Client* client = opCtx->getClient();
@@ -315,7 +346,7 @@ void receivedQuery(OperationContext* opCtx,
         dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (e.getCode() == ErrorCodes::SendStaleConfig) {
+        if (!opCtx->getClient()->isInDirectClient() && e.getCode() == ErrorCodes::SendStaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
             ShardingState::get(opCtx)->onStaleShardVersion(
                 opCtx, NamespaceString(sce.getns()), sce.getVersionReceived());
@@ -326,10 +357,10 @@ void receivedQuery(OperationContext* opCtx,
     }
 
     op.debug().responseLength = dbResponse.response.header().dataLen();
-    dbResponse.responseToMsgId = responseToMsgId;
+    return dbResponse;
 }
 
-void receivedKillCursors(OperationContext* opCtx, Message& m) {
+void receivedKillCursors(OperationContext* opCtx, const Message& m) {
     LastError::get(opCtx->getClient()).disable();
     DbMessage dbmessage(m);
     int n = dbmessage.pullInt();
@@ -354,7 +385,7 @@ void receivedKillCursors(OperationContext* opCtx, Message& m) {
     }
 }
 
-void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, Message& m) {
+void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
     auto insertOp = parseLegacyInsert(m);
     invariant(insertOp.ns == nsString);
     for (const auto& obj : insertOp.documents) {
@@ -366,7 +397,7 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, Me
     performInserts(opCtx, insertOp);
 }
 
-void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, Message& m) {
+void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
     auto updateOp = parseLegacyUpdate(m);
     auto& singleUpdate = updateOp.updates[0];
     invariant(updateOp.ns == nsString);
@@ -387,7 +418,7 @@ void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, Me
     performUpdates(opCtx, updateOp);
 }
 
-void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, Message& m) {
+void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
     auto deleteOp = parseLegacyDelete(m);
     auto& singleDelete = deleteOp.deletes[0];
     invariant(deleteOp.ns == nsString);
@@ -400,7 +431,10 @@ void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, Me
     performDeletes(opCtx, deleteOp);
 }
 
-bool receivedGetMore(OperationContext* opCtx, DbResponse& dbresponse, Message& m, CurOp& curop) {
+DbResponse receivedGetMore(OperationContext* opCtx,
+                           const Message& m,
+                           CurOp& curop,
+                           bool* shouldLogOpDebug) {
     globalOpCounters.gotGetMore();
     DbMessage d(m);
 
@@ -421,6 +455,7 @@ bool receivedGetMore(OperationContext* opCtx, DbResponse& dbresponse, Message& m
     bool exhaust = false;
     bool isCursorAuthorized = false;
 
+    DbResponse dbresponse;
     try {
         const NamespaceString nsString(ns);
         uassert(ErrorCodes::InvalidNamespace,
@@ -454,33 +489,28 @@ bool receivedGetMore(OperationContext* opCtx, DbResponse& dbresponse, Message& m
 
         curop.debug().exceptionInfo = e.getInfo();
 
-        replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
+        dbresponse = replyToQuery(errObj, ResultFlag_ErrSet);
         curop.debug().responseLength = dbresponse.response.header().dataLen();
         curop.debug().nreturned = 1;
-        return false;
+        *shouldLogOpDebug = true;
+        return dbresponse;
     }
 
     curop.debug().responseLength = dbresponse.response.header().dataLen();
     auto queryResult = QueryResult::ConstView(dbresponse.response.buf());
     curop.debug().nreturned = queryResult.getNReturned();
 
-    dbresponse.responseToMsgId = m.header().getId();
-
     if (exhaust) {
         curop.debug().exhaust = true;
         dbresponse.exhaustNS = ns;
     }
 
-    return true;
+    return dbresponse;
 }
 
 }  // namespace
 
-// Returns false when request includes 'end'
-void assembleResponse(OperationContext* opCtx,
-                      Message& m,
-                      DbResponse& dbresponse,
-                      const HostAndPort& remote) {
+DbResponse assembleResponse(OperationContext* opCtx, const Message& m, const HostAndPort& remote) {
     // before we lock...
     NetworkOp op = m.operation();
     bool isCommand = false;
@@ -511,23 +541,20 @@ void assembleResponse(OperationContext* opCtx,
             opwrite(m);
 
             if (nsString.coll() == "$cmd.sys.inprog") {
-                receivedPseudoCommand(opCtx, c, dbresponse, m, "currentOp");
-                return;
+                return receivedPseudoCommand(opCtx, c, m, "currentOp");
             }
             if (nsString.coll() == "$cmd.sys.killop") {
-                receivedPseudoCommand(opCtx, c, dbresponse, m, "killOp");
-                return;
+                return receivedPseudoCommand(opCtx, c, m, "killOp");
             }
             if (nsString.coll() == "$cmd.sys.unlock") {
-                receivedPseudoCommand(opCtx, c, dbresponse, m, "fsyncUnlock");
-                return;
+                return receivedPseudoCommand(opCtx, c, m, "fsyncUnlock");
             }
         } else {
             opread(m);
         }
     } else if (op == dbGetMore) {
         opread(m);
-    } else if (op == dbCommand) {
+    } else if (op == dbCommand || op == dbMsg) {
         isCommand = true;
         opwrite(m);
     } else {
@@ -548,17 +575,16 @@ void assembleResponse(OperationContext* opCtx,
     long long logThresholdMs = serverGlobalParams.slowMS;
     bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
 
+    DbResponse dbresponse;
     if (op == dbQuery) {
-        if (isCommand) {
-            receivedCommand(opCtx, nsString, c, dbresponse, m);
-        } else {
-            receivedQuery(opCtx, nsString, c, dbresponse, m);
-        }
+        dbresponse = isCommand ? receivedCommand(opCtx, nsString, c, m)
+                               : receivedQuery(opCtx, nsString, c, m);
+    } else if (op == dbMsg) {
+        dbresponse = receivedMsg(opCtx, c, m);
     } else if (op == dbCommand) {
-        receivedRpc(opCtx, c, dbresponse, m);
+        dbresponse = receivedRpc(opCtx, c, m);
     } else if (op == dbGetMore) {
-        if (!receivedGetMore(opCtx, dbresponse, m, currentOp))
-            shouldLogOpDebug = true;
+        dbresponse = receivedGetMore(opCtx, m, currentOp, &shouldLogOpDebug);
     } else {
         // The remaining operations do not return any response. They are fire-and-forget.
         try {
@@ -628,7 +654,7 @@ void assembleResponse(OperationContext* opCtx,
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
-    if (shouldSample && currentOp.shouldDBProfile()) {
+    if (currentOp.shouldDBProfile(shouldSample)) {
         // Performance profiling is on
         if (opCtx->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";
@@ -644,6 +670,7 @@ void assembleResponse(OperationContext* opCtx,
     }
 
     recordCurOpMetrics(opCtx);
+    return dbresponse;
 }
 
 }  // namespace mongo

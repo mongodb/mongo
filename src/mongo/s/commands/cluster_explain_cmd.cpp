@@ -109,7 +109,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbName,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         auto verbosity = ExplainOptions::parseCmdBSON(cmdObj);
@@ -129,8 +128,7 @@ public:
                        str::stream() << "Explain failed due to unknown command: " << cmdName});
         }
 
-        auto readPref =
-            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        auto readPref = ClusterFind::extractUnwrappedReadPref(cmdObj);
         if (!readPref.isOK()) {
             return appendCommandStatus(result, readPref.getStatus());
         }

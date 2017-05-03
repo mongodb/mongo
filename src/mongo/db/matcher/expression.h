@@ -202,6 +202,15 @@ public:
     virtual bool matchesBSON(const BSONObj& doc, MatchDetails* details = 0) const;
 
     /**
+     * Determines if 'elem' would satisfy the predicate if wrapped with the top-level field name of
+     * the predicate. Does not check that the predicate has a single top-level field name. For
+     * example, given the object obj={a: [5]}, the predicate {i: {$gt: 0}} would match the element
+     * obj["a"]["0"] because it performs the match as if the element at "a.0" were the BSONObj {i:
+     * 5}.
+     */
+    virtual bool matchesBSONElement(BSONElement elem, MatchDetails* details = nullptr) const;
+
+    /**
      * Determines if the element satisfies the tree-predicate.
      * Not valid for all expressions (e.g. $where); in those cases, returns false.
      */

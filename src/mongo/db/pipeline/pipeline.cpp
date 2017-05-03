@@ -64,9 +64,14 @@ Pipeline::Pipeline(const intrusive_ptr<ExpressionContext>& pTheCtx) : pCtx(pTheC
 Pipeline::Pipeline(SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx)
     : _sources(stages), pCtx(expCtx) {}
 
-StatusWith<intrusive_ptr<Pipeline>> Pipeline::parse(
+Pipeline::~Pipeline() {
+    invariant(_disposed);
+}
+
+StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parse(
     const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
-    intrusive_ptr<Pipeline> pipeline(new Pipeline(expCtx));
+    std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(expCtx),
+                                                          Pipeline::Deleter(expCtx->opCtx));
 
     for (auto&& stageObj : rawPipeline) {
         auto parsedSources = DocumentSource::parse(expCtx, stageObj);
@@ -79,18 +84,19 @@ StatusWith<intrusive_ptr<Pipeline>> Pipeline::parse(
         return status;
     }
     pipeline->stitch();
-    return pipeline;
+    return std::move(pipeline);
 }
 
-StatusWith<intrusive_ptr<Pipeline>> Pipeline::create(
+StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::create(
     SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
-    intrusive_ptr<Pipeline> pipeline(new Pipeline(stages, expCtx));
+    std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(stages, expCtx),
+                                                          Pipeline::Deleter(expCtx->opCtx));
     auto status = pipeline->ensureAllStagesAreInLegalPositions();
     if (!status.isOK()) {
         return status;
     }
     pipeline->stitch();
-    return pipeline;
+    return std::move(pipeline);
 }
 
 Status Pipeline::ensureAllStagesAreInLegalPositions() const {
@@ -100,6 +106,12 @@ Status Pipeline::ensureAllStagesAreInLegalPositions() const {
             return {ErrorCodes::BadValue,
                     str::stream() << stage->getSourceName()
                                   << " is only valid as the first stage in a pipeline."};
+        }
+        auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get());
+        if (i != 0 && matchStage && matchStage->isTextQuery()) {
+            return {ErrorCodes::BadValue,
+                    "$match with $text is only allowed as the first pipeline stage",
+                    17313};
         }
 
         if (dynamic_cast<DocumentSourceOut*>(stage.get()) && i != _sources.size() - 1) {
@@ -115,6 +127,9 @@ void Pipeline::optimizePipeline() {
 
     SourceContainer::iterator itr = _sources.begin();
 
+    // We could be swapping around stages during this process, so disconnect the pipeline to prevent
+    // us from entering a state with dangling pointers.
+    unstitch();
     while (itr != _sources.end() && std::next(itr) != _sources.end()) {
         invariant((*itr).get());
         itr = (*itr).get()->optimizeAt(itr, &_sources);
@@ -165,11 +180,30 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-intrusive_ptr<Pipeline> Pipeline::splitForSharded() {
+void Pipeline::dispose(OperationContext* opCtx) {
+    try {
+        pCtx->opCtx = opCtx;
+
+        // Make sure all stages are connected, in case we are being disposed via an error path and
+        // were
+        // not stitched at the time of the error.
+        stitch();
+
+        if (!_sources.empty()) {
+            _sources.back()->dispose();
+        }
+        _disposed = true;
+    } catch (...) {
+        std::terminate();
+    }
+}
+
+std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
     // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
     // shards and all work being done in the merger. Optimizations can move operations between
     // the pipelines to be more efficient.
-    intrusive_ptr<Pipeline> shardPipeline(new Pipeline(pCtx));
+    std::unique_ptr<Pipeline, Pipeline::Deleter> shardPipeline(new Pipeline(pCtx),
+                                                               Pipeline::Deleter(pCtx->opCtx));
 
     // The order in which optimizations are applied can have significant impact on the
     // efficiency of the final pipeline. Be Careful!
@@ -295,12 +329,19 @@ vector<Value> Pipeline::serialize() const {
     return serializedSources;
 }
 
+void Pipeline::unstitch() {
+    for (auto&& stage : _sources) {
+        stage->setSource(nullptr);
+    }
+}
+
 void Pipeline::stitch() {
     if (_sources.empty()) {
         return;
     }
     // Chain together all the stages.
     DocumentSource* prevSource = _sources.front().get();
+    prevSource->setSource(nullptr);
     for (SourceContainer::iterator iter(++_sources.begin()), listEnd(_sources.end());
          iter != listEnd;
          ++iter) {

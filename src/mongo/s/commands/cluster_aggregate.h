@@ -37,7 +37,9 @@
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 
 namespace mongo {
 
@@ -75,16 +77,14 @@ public:
                                const Namespaces& namespaces,
                                const AggregationRequest& request,
                                BSONObj cmdObj,
-                               int options,
                                BSONObjBuilder* result);
 
 private:
     static std::vector<DocumentSourceMergeCursors::CursorDescriptor> parseCursors(
-        const std::vector<Strategy::CommandResult>& shardResults);
+        const std::vector<ClusterClientCursorParams::RemoteCursor>& cursors);
 
-    static void killAllCursors(const std::vector<Strategy::CommandResult>& shardResults);
     static void uassertAllShardsSupportExplain(
-        const std::vector<Strategy::CommandResult>& shardResults);
+        const std::vector<AsyncRequestsSender::Response>& shardResults);
 
     // These are temporary hacks because the runCommand method doesn't report the exact
     // host the command was run on which is necessary for cursor support. The exact host
@@ -92,19 +92,18 @@ private:
     // multiple servers such as for replica sets. These also take care of registering
     // returned cursors.
     static BSONObj aggRunCommand(OperationContext* opCtx,
+                                 const ShardId& shardId,
                                  DBClientBase* conn,
                                  const Namespaces& namespaces,
                                  const AggregationRequest& aggRequest,
-                                 BSONObj cmd,
-                                 int queryOptions);
+                                 BSONObj cmd);
 
     static Status aggPassthrough(OperationContext* opCtx,
                                  const Namespaces& namespaces,
                                  const ShardId& shardId,
                                  const AggregationRequest& aggRequest,
                                  BSONObj cmd,
-                                 BSONObjBuilder* result,
-                                 int queryOptions);
+                                 BSONObjBuilder* result);
 };
 
 }  // namespace mongo

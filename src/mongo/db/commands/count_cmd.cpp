@@ -40,7 +40,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
-#include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -148,7 +147,8 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        RangePreserver preserver(collection);
+        auto rangePreserver =
+            CollectionShardingState::get(opCtx, request.getValue().getNs())->getMetadata();
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
@@ -159,7 +159,7 @@ public:
             return statusWithPlanExecutor.getStatus();
         }
 
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         Explain::explainStages(exec.get(), collection, verbosity, out);
         return Status::OK();
@@ -168,7 +168,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const bool isExplain = false;
@@ -200,7 +199,7 @@ public:
 
             BSONObjBuilder aggResult;
             (void)Command::findCommand("aggregate")
-                ->run(opCtx, dbname, viewAggregation.getValue(), options, errmsg, aggResult);
+                ->run(opCtx, dbname, viewAggregation.getValue(), errmsg, aggResult);
 
             if (ResolvedView::isResolvedViewErrorResponse(aggResult.asTempObj())) {
                 result.appendElements(aggResult.obj());
@@ -217,7 +216,8 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        RangePreserver preserver(collection);
+        auto rangePreserver =
+            CollectionShardingState::get(opCtx, request.getValue().getNs())->getMetadata();
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
@@ -228,7 +228,7 @@ public:
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
         auto curOp = CurOp::get(opCtx);

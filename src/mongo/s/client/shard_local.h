@@ -64,11 +64,11 @@ public:
                                bool unique) override;
 
 private:
-    Shard::HostWithResponse _runCommand(OperationContext* opCtx,
-                                        const ReadPreferenceSetting& unused,
-                                        const std::string& dbName,
-                                        Milliseconds maxTimeMSOverrideUnused,
-                                        const BSONObj& cmdObj) final;
+    StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
+                                                   const ReadPreferenceSetting& unused,
+                                                   const std::string& dbName,
+                                                   Milliseconds maxTimeMSOverrideUnused,
+                                                   const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

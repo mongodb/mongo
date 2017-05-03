@@ -93,7 +93,7 @@ public:
         OldClientWriteContext ctx(&_opCtx, ns());
         WriteUnitOfWork wuow(&_opCtx);
 
-        Collection* c = ctx.db()->getCollection(ns());
+        Collection* c = ctx.db()->getCollection(&_opCtx, ns());
         if (!c) {
             c = ctx.db()->createCollection(&_opCtx, ns());
         }
@@ -148,7 +148,7 @@ protected:
         Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns());
+        Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
             WriteUnitOfWork wunit(&_opCtx);
             coll = db->createCollection(&_opCtx, ns());
@@ -195,7 +195,7 @@ protected:
         OldClientContext ctx(&_opCtx, ns);
 
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns);
+        Collection* coll = db->getCollection(&_opCtx, ns);
         if (!coll) {
             WriteUnitOfWork wunit(&_opCtx);
             coll = db->createCollection(&_opCtx, ns);
@@ -214,7 +214,7 @@ protected:
         OldClientContext ctx(&_opCtx, ns);
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns);
+        Collection* coll = db->getCollection(&_opCtx, ns);
         if (!coll) {
             coll = db->createCollection(&_opCtx, ns);
         }
@@ -227,7 +227,7 @@ protected:
         OldClientContext ctx(&_opCtx, ns());
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
-        Collection* coll = db->getCollection(ns());
+        Collection* coll = db->getCollection(&_opCtx, ns());
         if (!coll) {
             coll = db->createCollection(&_opCtx, ns());
         }

@@ -10,6 +10,8 @@ load('jstests/replsets/rslib.js');
                 oplogSize: 10,
             }
         },
+        verbose: 3,
+        other: {rsOptions: {verbose: 1}}
     });
     var replTest = st.rs0;
 

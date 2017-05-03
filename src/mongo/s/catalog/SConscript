@@ -11,6 +11,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/db/keys_collection_document',
     ],
 )
 
@@ -134,7 +135,7 @@ env.Library(
         # '$BUILD_DIR/mongo/s/coreshard', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
+        # TODO(ADAM, 2017-04-25): See `CYCLE` tags above
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )

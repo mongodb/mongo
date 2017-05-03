@@ -29,6 +29,8 @@
 #include "js/RootingAPI.h"
 #include "js/UbiNode.h"
 #include "vm/ObjectGroup.h"
+#include "vm/String.h"
+#include "vm/Symbol.h"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -516,10 +518,32 @@ struct StackBaseShape : public DefaultHasher<ReadBarriered<UnownedBaseShape*>>
     static inline bool match(ReadBarriered<UnownedBaseShape*> key, const Lookup& lookup);
 };
 
+static MOZ_ALWAYS_INLINE js::HashNumber
+HashId(jsid id)
+{
+    // HashGeneric alone would work, but bits of atom and symbol addresses
+    // could then be recovered from the hash code. See bug 1330769.
+    if (MOZ_LIKELY(JSID_IS_ATOM(id)))
+        return JSID_TO_ATOM(id)->hash();
+    if (JSID_IS_SYMBOL(id))
+        return JSID_TO_SYMBOL(id)->hash();
+    return mozilla::HashGeneric(JSID_BITS(id));
+}
+
+struct JsidHasher
+{
+    typedef jsid Lookup;
+    static HashNumber hash(jsid id) {
+        return HashId(id);
+    }
+    static bool match(jsid id1, jsid id2) {
+        return id1 == id2;
+    }
+};
+
 typedef HashSet<ReadBarriered<UnownedBaseShape*>,
                 StackBaseShape,
                 SystemAllocPolicy> BaseShapeSet;
-
 
 class Shape : public gc::TenuredCell
 {
@@ -1172,7 +1196,7 @@ struct StackShape : public JS::Traceable
         /* Accumulate from least to most random so the low bits are most random. */
         hash = mozilla::RotateLeft(hash, 4) ^ attrs;
         hash = mozilla::RotateLeft(hash, 4) ^ slot_;
-        hash = mozilla::RotateLeft(hash, 4) ^ JSID_BITS(propid);
+        hash = mozilla::RotateLeft(hash, 4) ^ HashId(propid);
         hash = mozilla::RotateLeft(hash, 4) ^ uintptr_t(rawGetter);
         hash = mozilla::RotateLeft(hash, 4) ^ uintptr_t(rawSetter);
         return hash;

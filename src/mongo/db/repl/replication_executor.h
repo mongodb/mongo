@@ -105,8 +105,8 @@ public:
      */
     virtual ~ReplicationExecutor();
 
-    std::string getDiagnosticString() const override;
     BSONObj getDiagnosticBSON() const;
+    void appendDiagnosticBSON(BSONObjBuilder* b) const override;
     Date_t now() override;
     void startup() override;
     void shutdown() override;
@@ -224,11 +224,6 @@ private:
      * A linked list of EventHandles.
      */
     typedef stdx::list<EventHandle> EventList;
-
-    /**
-     * Returns diagnostic info
-     */
-    std::string _getDiagnosticString_inlock() const;
 
     /**
      * Implementation of makeEvent() for use when _mutex is already held.
@@ -369,8 +364,6 @@ private:
     WorkQueue::iterator _iter;
     EventHandle _finishedEvent;
 };
-
-typedef ReplicationExecutor::ResponseStatus ResponseStatus;
 
 /**
  * Description of a scheduled but not-yet-run work item.

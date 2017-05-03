@@ -45,7 +45,7 @@ static const NamespaceString nss("unittests.oplogstarttests");
 class Base {
 public:
     Base() : _lk(&_opCtx), _context(&_opCtx, nss.ns()), _client(&_opCtx) {
-        Collection* c = _context.db()->getCollection(nss.ns());
+        Collection* c = _context.db()->getCollection(&_opCtx, nss);
         if (!c) {
             WriteUnitOfWork wuow(&_opCtx);
             c = _context.db()->createCollection(&_opCtx, nss.ns());
@@ -63,7 +63,7 @@ public:
 
 protected:
     Collection* collection() {
-        return _context.db()->getCollection(nss.ns());
+        return _context.db()->getCollection(&_opCtx, nss);
     }
 
     DBDirectClient* client() {

@@ -93,6 +93,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/metadata.h"
@@ -106,7 +107,6 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
@@ -123,6 +123,7 @@ using std::stringstream;
 using std::unique_ptr;
 
 namespace {
+
 void registerErrorImpl(OperationContext* opCtx, const DBException& exception) {
     CurOp::get(opCtx)->debug().exceptionInfo = exception.getInfo();
 }
@@ -135,7 +136,7 @@ MONGO_INITIALIZER(InitializeRegisterErrorHandler)(InitializerContext* const) {
  * For replica set members it returns the last known op time from opCtx. Otherwise will return
  * uninitialized logical time.
  */
-LogicalTime _getClientOperationTime(OperationContext* opCtx) {
+LogicalTime getClientOperationTime(OperationContext* opCtx) {
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
     const bool isReplSet =
@@ -156,9 +157,9 @@ LogicalTime _getClientOperationTime(OperationContext* opCtx) {
  *
  * TODO: SERVER-28419 Do not compute operationTime if replica set does not propagate clusterTime.
  */
-LogicalTime _computeOperationTime(OperationContext* opCtx,
-                                  LogicalTime startOperationTime,
-                                  repl::ReadConcernLevel level) {
+LogicalTime computeOperationTime(OperationContext* opCtx,
+                                 LogicalTime startOperationTime,
+                                 repl::ReadConcernLevel level) {
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
     const bool isReplSet =
@@ -168,7 +169,7 @@ LogicalTime _computeOperationTime(OperationContext* opCtx,
         return LogicalTime();
     }
 
-    auto operationTime = _getClientOperationTime(opCtx);
+    auto operationTime = getClientOperationTime(opCtx);
     invariant(operationTime >= startOperationTime);
 
     // If the last operationTime has not changed, consider this command a read, and, for replica set
@@ -183,6 +184,7 @@ LogicalTime _computeOperationTime(OperationContext* opCtx,
 
     return operationTime;
 }
+
 }  // namespace
 
 
@@ -200,7 +202,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
@@ -250,7 +251,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         // disallow dropping the config database
@@ -319,7 +319,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         BSONElement e = cmdObj.firstElement();
@@ -423,7 +422,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         BSONElement firstElement = cmdObj.firstElement();
@@ -506,7 +504,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         const char* deprecationWarning =
@@ -564,7 +561,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
@@ -616,7 +612,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
@@ -758,7 +753,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, jsobj));
@@ -818,9 +812,7 @@ public:
                 return 0;
             }
 
-            unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
-            // Process notifications when the lock is released/reacquired in the loop below
-            exec->registerExec(coll);
+            auto exec = std::move(statusWithPlanExecutor.getValue());
 
             BSONObj obj;
             PlanExecutor::ExecState state;
@@ -940,7 +932,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         Timer timer;
@@ -968,7 +959,7 @@ public:
 
         result.appendBool("estimate", estimate);
 
-        unique_ptr<PlanExecutor> exec;
+        unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         if (min.isEmpty() && max.isEmpty()) {
             if (estimate) {
                 result.appendNumber("size", static_cast<long long>(collection->dataSize(opCtx)));
@@ -976,8 +967,7 @@ public:
                 result.append("millis", timer.millis());
                 return 1;
             }
-            exec =
-                InternalPlanner::collectionScan(opCtx, ns, collection, PlanExecutor::YIELD_MANUAL);
+            exec = InternalPlanner::collectionScan(opCtx, ns, collection, PlanExecutor::NO_YIELD);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -1007,7 +997,7 @@ public:
                                               min,
                                               max,
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanExecutor::YIELD_MANUAL);
+                                              PlanExecutor::NO_YIELD);
         }
 
         long long avgObjSize = collection->dataSize(opCtx) / numRecords;
@@ -1085,7 +1075,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
@@ -1134,7 +1123,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
@@ -1170,7 +1158,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         int scale = 1;
@@ -1255,7 +1242,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
@@ -1282,7 +1268,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         result << "options" << QueryOption_AllSupported;
@@ -1328,7 +1313,8 @@ void appendReplyMetadata(OperationContext* opCtx,
         // Attach our own last opTime.
         repl::OpTime lastOpTimeFromClient =
             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-        replCoord->prepareReplMetadata(request.getMetadata(), lastOpTimeFromClient, metadataBob);
+        replCoord->prepareReplMetadata(
+            opCtx, request.getMetadata(), lastOpTimeFromClient, metadataBob);
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18236
         if (isShardingAware || isConfig) {
@@ -1336,8 +1322,11 @@ void appendReplyMetadata(OperationContext* opCtx,
                 .writeToMetadata(metadataBob);
         }
 
-        rpc::LogicalTimeMetadata logicalTimeMetadata(LogicalClock::get(opCtx)->getClusterTime());
-        logicalTimeMetadata.writeToMetadata(metadataBob);
+        if (LogicalClock::get(opCtx)->canVerifyAndSign()) {
+            rpc::LogicalTimeMetadata logicalTimeMetadata(
+                LogicalClock::get(opCtx)->getClusterTime());
+            logicalTimeMetadata.writeToMetadata(metadataBob);
+        }
     }
 
     // If we're a shard other than the config shard, attach the last configOpTime we know about.
@@ -1382,6 +1371,27 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const BSONObj& cmdObj,
     return readConcernArgs;
 }
 
+void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
+                                                 const std::string& commandName,
+                                                 BSONObjBuilder* commandResponseBuilder) {
+    WriteConcernResult res;
+    auto waitForWCStatus =
+        waitForWriteConcern(opCtx,
+                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                            opCtx->getWriteConcern(),
+                            &res);
+    Command::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
+
+    // SERVER-22421: This code is to ensure error response backwards compatibility with the
+    // user management commands. This can be removed in 3.6.
+    if (!waitForWCStatus.isOK() && Command::isUserManagementCommand(commandName)) {
+        BSONObj temp = commandResponseBuilder->asTempObj().copy();
+        commandResponseBuilder->resetToEmpty();
+        Command::appendCommandStatus(*commandResponseBuilder, waitForWCStatus);
+        commandResponseBuilder->appendElementsUnique(temp);
+    }
+}
+
 }  // namespace
 
 // This really belongs in commands.cpp, but we need to move it here so we can
@@ -1407,7 +1417,7 @@ bool Command::run(OperationContext* opCtx,
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
-    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
+    BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
     auto readConcernArgsStatus = _extractReadConcern(cmd, supportsReadConcern());
 
     if (!readConcernArgsStatus.isOK()) {
@@ -1435,7 +1445,7 @@ bool Command::run(OperationContext* opCtx,
 
     std::string errmsg;
     bool result;
-    auto startOperationTime = _getClientOperationTime(opCtx);
+    auto startOperationTime = getClientOperationTime(opCtx);
     if (!supportsWriteConcern(cmd)) {
         if (commandSpecifiesWriteConcern(cmd)) {
             auto result = appendCommandStatus(
@@ -1447,7 +1457,7 @@ bool Command::run(OperationContext* opCtx,
         }
 
         // TODO: remove queryOptions parameter from command's run method.
-        result = run(opCtx, db, cmd, 0, errmsg, inPlaceReplyBob);
+        result = run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
     } else {
         auto wcResult = extractWriteConcern(opCtx, cmd, db);
         if (!wcResult.isOK()) {
@@ -1461,29 +1471,15 @@ bool Command::run(OperationContext* opCtx,
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
         opCtx->setWriteConcern(wcResult.getValue());
+        ON_BLOCK_EXIT([&] {
+            _waitForWriteConcernAndAddToCommandResponse(opCtx, getName(), &inPlaceReplyBob);
+        });
 
-        result = run(opCtx, db, cmd, 0, errmsg, inPlaceReplyBob);
+        result = run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
                                                             wcResult.getValue().toBSON()));
-
-        WriteConcernResult res;
-        auto waitForWCStatus =
-            waitForWriteConcern(opCtx,
-                                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                                wcResult.getValue(),
-                                &res);
-        appendCommandWCStatus(inPlaceReplyBob, waitForWCStatus, res);
-
-        // SERVER-22421: This code is to ensure error response backwards compatibility with the
-        // user management commands. This can be removed in 3.6.
-        if (!waitForWCStatus.isOK() && isUserManagementCommand(getName())) {
-            BSONObj temp = inPlaceReplyBob.asTempObj().copy();
-            inPlaceReplyBob.resetToEmpty();
-            appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
-            inPlaceReplyBob.appendElementsUnique(temp);
-        }
     }
 
     // When a linearizable read command is passed in, check to make sure we're reading
@@ -1505,7 +1501,7 @@ bool Command::run(OperationContext* opCtx,
 
     appendCommandStatus(inPlaceReplyBob, result, errmsg);
 
-    auto operationTime = _computeOperationTime(
+    auto operationTime = computeOperationTime(
         opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel());
 
     // An uninitialized operation time means the cluster time is not propagated, so the operation
@@ -1549,9 +1545,12 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         uassertStatusOK(rpc::readRequestMetadata(opCtx, request.getMetadata()));
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
-
         std::string dbname = request.getDatabase().toString();
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid database name: '" << dbname << "'",
+            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+
         unique_ptr<MaintenanceModeSetter> mmSetter;
 
         BSONElement cmdOptionMaxTimeMSField;
@@ -1692,8 +1691,6 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         }
         retval = command->run(opCtx, request, replyBuilder);
 
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
-
         if (!retval) {
             command->_commandsFailed.increment();
         }
@@ -1703,20 +1700,22 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
             auto sce = dynamic_cast<const StaleConfigException*>(&e);
             invariant(sce);  // do not upcasts from DBException created by uassert variants.
 
-            ShardingState::get(opCtx)->onStaleShardVersion(
-                opCtx, NamespaceString(sce->getns()), sce->getVersionReceived());
+            if (!opCtx->getClient()->isInDirectClient()) {
+                ShardingState::get(opCtx)->onStaleShardVersion(
+                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived());
+            }
         }
 
         BSONObjBuilder metadataBob;
         appendReplyMetadata(opCtx, request, &metadataBob);
 
-        // Ideally this should be using _computeOperationTime, but with the code
+        // Ideally this should be using computeOperationTime, but with the code
         // structured as it currently is we don't know the startOperationTime or
         // readConcern at this point. Using the cluster time instead of the actual
         // operation time is correct, but can result in extra waiting on subsequent
         // afterClusterTime reads.
         //
-        // TODO: SERVER-28445 change this to use _computeOperationTime once the exception handling
+        // TODO: SERVER-28445 change this to use computeOperationTime once the exception handling
         // path is moved into Command::run()
         auto operationTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
 

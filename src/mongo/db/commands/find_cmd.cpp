@@ -211,7 +211,7 @@ public:
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
-        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Got the execution tree. Explain it.
         Explain::explainStages(exec.get(), collection, verbosity, out);
@@ -230,15 +230,9 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        if (!nss.isValid() || nss.isCommand() || nss.isSpecialCommand()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::InvalidNamespace,
-                                        str::stream() << "Invalid collection name: " << nss.ns()});
-        }
+        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
 
         // Although it is a command, a find command gets counted as a query.
         globalOpCounters.gotQuery();
@@ -312,7 +306,7 @@ public:
 
             Command* agg = Command::findCommand("aggregate");
             try {
-                agg->run(opCtx, dbname, viewAggregationCommand.getValue(), options, errmsg, result);
+                agg->run(opCtx, dbname, viewAggregationCommand.getValue(), errmsg, result);
             } catch (DBException& error) {
                 if (error.getCode() == ErrorCodes::InvalidPipelineOperator) {
                     return appendCommandStatus(
@@ -332,7 +326,7 @@ public:
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
-        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        auto exec = std::move(statusWithPlanExecutor.getValue());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -390,15 +384,10 @@ public:
         // Set up the cursor for getMore.
         CursorId cursorId = 0;
         if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
-            // Register the execution plan inside a ClientCursor. Ownership of the PlanExecutor is
-            // transferred to the ClientCursor.
-            //
-            // First unregister the PlanExecutor so it can be re-registered with ClientCursor.
-            exec->deregisterExec();
-
             // Create a ClientCursor containing this plan executor and register it with the cursor
             // manager.
             ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+                opCtx,
                 {std::move(exec),
                  nss,
                  AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),

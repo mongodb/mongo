@@ -7,13 +7,15 @@ var newVersion = "latest";
 
 var name = "multiversioninitsync";
 
-var multitest = function(replSetVersion, newNodeVersion) {
+var multitest = function(replSetVersion, newNodeVersion, configSettings) {
     var nodes = {n1: {binVersion: replSetVersion}, n2: {binVersion: replSetVersion}};
 
     print("Start up a two-node " + replSetVersion + " replica set.");
     var rst = new ReplSetTest({name: name, nodes: nodes});
     rst.startSet();
-    rst.initiate();
+    var conf = rst.getReplSetConfig();
+    conf.settings = configSettings;
+    rst.initiate(conf);
 
     // Wait for a primary node.
     var primary = rst.getPrimary();
@@ -50,4 +52,5 @@ multitest(oldVersion, newVersion);
 // Old Secondary is synced from a "latest"
 // version ReplSet.
 // *****************************************
-multitest(newVersion, oldVersion);
+// Hard-code catchup timeout. The default timeout on 3.5 is -1, which is invalid on 3.4.
+multitest(newVersion, oldVersion, {catchUpTimeoutMillis: 2000});

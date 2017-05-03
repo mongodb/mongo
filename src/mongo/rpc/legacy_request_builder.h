@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/net/message.h"
 
@@ -50,11 +49,6 @@ public:
     LegacyRequestBuilder& setCommandName(StringData commandName) final;
     LegacyRequestBuilder& setMetadata(BSONObj metadata) final;
     LegacyRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
-
-    LegacyRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
-    LegacyRequestBuilder& addInputDoc(BSONObj inputDoc) final;
-
-    State getState() const final;
 
     Protocol getProtocol() const final;
 

@@ -24,7 +24,7 @@ assert(result.hasOwnProperty('millis'));
 assert(result.hasOwnProperty('query'));
 assert.eq('string', typeof(result.query.$truncated));
 // String value is truncated.
-assert(result.query.$truncated.match(/filter: { a: "a+\.\.\." } }$/));
+assert(result.query.$truncated.match(/filter: { a: "a+\.\.\." }/));
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();

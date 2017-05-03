@@ -43,6 +43,7 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -80,12 +81,21 @@ using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using executor::ShardingTaskExecutor;
 using rpc::ShardingEgressMetadataHookForMongos;
 using unittest::assertGet;
 
 using std::string;
 using std::vector;
 using unittest::assertGet;
+
+namespace {
+std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
+    std::unique_ptr<NetworkInterfaceMock> net) {
+    auto testExecutor = makeThreadPoolTestExecutor(std::move(net));
+    return stdx::make_unique<ShardingTaskExecutor>(std::move(testExecutor));
+}
+}
 
 ShardingTestFixture::ShardingTestFixture() = default;
 
@@ -94,30 +104,37 @@ ShardingTestFixture::~ShardingTestFixture() = default;
 const Seconds ShardingTestFixture::kFutureTimeout{5};
 
 void ShardingTestFixture::setUp() {
-    _service = stdx::make_unique<ServiceContextNoop>();
-    _service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-    _service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-    _service->setTickSource(stdx::make_unique<TickSourceMock>());
-    auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
-    _transportLayer = tlMock.get();
-    _service->addAndStartTransportLayer(std::move(tlMock));
-    CollatorFactoryInterface::set(_service.get(), stdx::make_unique<CollatorFactoryMock>());
+    {
+        auto service = stdx::make_unique<ServiceContextNoop>();
+        service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+        service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+        service->setTickSource(stdx::make_unique<TickSourceMock>());
+        auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
+        _transportLayer = tlMock.get();
+        service->addAndStartTransportLayer(std::move(tlMock));
+
+        // Set the newly created service context to be the current global context so that tests,
+        // which invoke code still referencing getGlobalServiceContext will work properly.
+        setGlobalServiceContext(std::move(service));
+    }
+
+    CollatorFactoryInterface::set(serviceContext(), stdx::make_unique<CollatorFactoryMock>());
     _transportSession = transport::MockSession::create(_transportLayer);
-    _client = _service->makeClient("ShardingTestFixture", _transportSession);
+    _client = serviceContext()->makeClient("ShardingTestFixture", _transportSession);
     _opCtx = _client->makeOperationContext();
 
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
     fixedNet->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
     _mockNetwork = fixedNet.get();
-    auto fixedExec = makeThreadPoolTestExecutor(std::move(fixedNet));
+    auto fixedExec = makeShardingTestExecutor(std::move(fixedNet));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
     _executor = fixedExec.get();
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
     netForPool->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
     auto _mockNetworkForPool = netForPool.get();
-    auto execForPool = makeThreadPoolTestExecutor(std::move(netForPool));
+    auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =
         stdx::make_unique<NetworkTestEnv>(execForPool.get(), _mockNetworkForPool);
     std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;
@@ -174,7 +191,7 @@ void ShardingTestFixture::setUp() {
                nullptr,
                stdx::make_unique<CatalogCache>(),
                std::move(shardRegistry),
-               stdx::make_unique<ClusterCursorManager>(_service->getPreciseClockSource()),
+               stdx::make_unique<ClusterCursorManager>(serviceContext()->getPreciseClockSource()),
                stdx::make_unique<BalancerConfiguration>(),
                std::move(executorPool),
                _mockNetwork);
@@ -188,7 +205,6 @@ void ShardingTestFixture::tearDown() {
     _transportSession.reset();
     _opCtx.reset();
     _client.reset();
-    _service.reset();
 }
 
 void ShardingTestFixture::shutdownExecutor() {
@@ -239,9 +255,7 @@ DistLockManagerMock* ShardingTestFixture::distLock() const {
 }
 
 ServiceContext* ShardingTestFixture::serviceContext() const {
-    invariant(_service);
-
-    return _service.get();
+    return getGlobalServiceContext();
 }
 
 OperationContext* ShardingTestFixture::operationContext() const {

@@ -37,7 +37,6 @@ class Message;
 class StringData;
 
 namespace rpc {
-class DocumentRange;
 
 /**
  * An immutable view of an RPC message.
@@ -69,18 +68,6 @@ public:
      * Gets the arguments to the command - this is passed to the command's run() method.
      */
     virtual const BSONObj& getCommandArgs() const = 0;
-
-    /**
-     * A variable number of BSON documents to pass to the command. It is valid for
-     * the returned range to be empty.
-     *
-     * Example usage:
-     *
-     * for (auto&& doc : req.getInputDocs()) {
-     *    ... do stuff with doc
-     * }
-     */
-    virtual DocumentRange getInputDocs() const = 0;
 
     /**
      * Gets the RPC protocol used to deserialize this message. This should only be used for

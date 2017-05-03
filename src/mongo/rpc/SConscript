@@ -21,19 +21,6 @@ env.Library(
 
 env.Library(
     target=[
-        'document_range',
-    ],
-    source=[
-        'document_range.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core',
-    ],
-)
-
-env.Library(
-    target=[
         'protocol',
     ],
     source=[
@@ -88,7 +75,6 @@ env.Library(
         'command_request_builder.cpp',
     ],
     LIBDEPS=[
-        'document_range',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -102,7 +88,6 @@ env.Library(
         'legacy_request_builder.cpp',
     ],
     LIBDEPS=[
-        'document_range',
         'metadata',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/util/net/network',
@@ -119,7 +104,6 @@ env.Library(
         'reply_builder_interface.cpp',
     ],
     LIBDEPS=[
-        'document_range',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -134,7 +118,6 @@ env.Library(
     ],
     LIBDEPS=[
         'command_reply',
-        'document_range',
         'metadata',
         'object_check',
         '$BUILD_DIR/mongo/util/net/network',
@@ -194,7 +177,6 @@ env.CppUnitTest(
         'command_reply_test.cpp',
         'command_request_builder_test.cpp',
         'command_request_test.cpp',
-        'legacy_request_test.cpp',
         'object_check_test.cpp',
         'protocol_test.cpp',
         'reply_builder_test.cpp',

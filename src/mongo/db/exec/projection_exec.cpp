@@ -32,9 +32,9 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/ops/path_support.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

@@ -14,11 +14,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/s/sharding',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -45,6 +40,7 @@ env.CppUnitTest(
         'resolved_view_test.cpp',
         'view_catalog_test.cpp',
         'view_definition_test.cpp',
+        'view_graph_test.cpp',
     ],
     LIBDEPS=[
         'views',

@@ -69,7 +69,7 @@ const std::string& DurableViewCatalogImpl::getName() const {
 Status DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
     dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IS) ||
             opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
-    Collection* systemViews = _db->getCollection(_db->getSystemViewsName());
+    Collection* systemViews = _db->getCollection(opCtx, _db->getSystemViewsName());
     if (!systemViews)
         return Status::OK();
 
@@ -135,7 +135,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
                                     const BSONObj& view) {
     dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
     NamespaceString systemViewsNs(_db->getSystemViewsName());
-    Collection* systemViews = _db->getOrCreateCollection(opCtx, systemViewsNs.ns());
+    Collection* systemViews = _db->getOrCreateCollection(opCtx, systemViewsNs);
 
     const bool requireIndex = false;
     RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
@@ -168,7 +168,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
 
 void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceString& name) {
     dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
-    Collection* systemViews = _db->getCollection(_db->getSystemViewsName());
+    Collection* systemViews = _db->getCollection(opCtx, _db->getSystemViewsName());
     if (!systemViews)
         return;
     const bool requireIndex = false;

@@ -165,7 +165,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             continue;
         }
 
-        if (!db || db->getCollection(involvedNs.ns())) {
+        if (!db || db->getCollection(opCtx, involvedNs)) {
             // If the database exists and 'involvedNs' refers to a collection namespace, then we
             // resolve it as an empty pipeline in order to read directly from the underlying
             // collection. If the database doesn't exist, then we still resolve it as an empty
@@ -208,8 +208,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
  * Round trips the pipeline through serialization by calling serialize(), then Pipeline::parse().
  * fasserts if it fails to parse after being serialized.
  */
-boost::intrusive_ptr<Pipeline> reparsePipeline(
-    const boost::intrusive_ptr<Pipeline>& pipeline,
+std::unique_ptr<Pipeline, Pipeline::Deleter> reparsePipeline(
+    const Pipeline* pipeline,
     const AggregationRequest& request,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto serialized = pipeline->serialize();
@@ -231,7 +231,7 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
     }
 
     reparsedPipeline.getValue()->optimizePipeline();
-    return reparsedPipeline.getValue();
+    return std::move(reparsedPipeline.getValue());
 }
 
 /**
@@ -241,12 +241,12 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
 Status collatorCompatibleWithPipeline(OperationContext* opCtx,
                                       Database* db,
                                       const CollatorInterface* collator,
-                                      const intrusive_ptr<Pipeline> pipeline) {
+                                      const Pipeline* pipeline) {
     if (!db || !pipeline) {
         return Status::OK();
     }
     for (auto&& potentialViewNs : pipeline->getInvolvedCollections()) {
-        if (db->getCollection(potentialViewNs.ns())) {
+        if (db->getCollection(opCtx, potentialViewNs)) {
             continue;
         }
 
@@ -278,9 +278,9 @@ Status runAggregate(OperationContext* opCtx,
         : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                               ->makeFromBSON(request.getCollation()));
 
-    unique_ptr<PlanExecutor> exec;
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    boost::intrusive_ptr<Pipeline> pipeline;
+    Pipeline* unownedPipeline;
     auto curOp = CurOp::get(opCtx);
     {
         // This will throw if the sharding version for this connection is out of date. If the
@@ -368,12 +368,12 @@ Status runAggregate(OperationContext* opCtx,
         if (!statusWithPipeline.isOK()) {
             return statusWithPipeline.getStatus();
         }
-        pipeline = std::move(statusWithPipeline.getValue());
+        auto pipeline = std::move(statusWithPipeline.getValue());
 
         // Check that the view's collation matches the collation of any views involved
         // in the pipeline.
-        auto pipelineCollationStatus =
-            collatorCompatibleWithPipeline(opCtx, ctx.getDb(), expCtx->getCollator(), pipeline);
+        auto pipelineCollationStatus = collatorCompatibleWithPipeline(
+            opCtx, ctx.getDb(), expCtx->getCollator(), pipeline.get());
         if (!pipelineCollationStatus.isOK()) {
             return pipelineCollationStatus;
         }
@@ -385,22 +385,24 @@ Status runAggregate(OperationContext* opCtx,
             // re-parsing every command in debug builds. This is important because sharded
             // aggregations rely on this ability.  Skipping when inShard because this has
             // already been through the transformation (and this un-sets expCtx->inShard).
-            pipeline = reparsePipeline(pipeline, request, expCtx);
+            pipeline = reparsePipeline(pipeline.get(), request, expCtx);
         }
 
         // This does mongod-specific stuff like creating the input PlanExecutor and adding
         // it to the front of the pipeline if needed.
-        PipelineD::prepareCursorSource(collection, &request, pipeline);
+        PipelineD::prepareCursorSource(collection, &request, pipeline.get());
 
+        // Transfer ownership of the Pipeline to the PipelineProxyStage.
+        unownedPipeline = pipeline.get();
         auto ws = make_unique<WorkingSet>();
-        auto proxy = make_unique<PipelineProxyStage>(opCtx, pipeline, ws.get());
+        auto proxy = make_unique<PipelineProxyStage>(opCtx, std::move(pipeline), ws.get());
 
         // This PlanExecutor will simply forward requests to the Pipeline, so does not need to
         // yield or to be registered with any collection's CursorManager to receive invalidations.
         // The Pipeline may contain PlanExecutors which *are* yielding PlanExecutors and which *are*
         // registered with their respective collection's CursorManager
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::YIELD_MANUAL);
+        auto statusWithPlanExecutor =
+            PlanExecutor::make(opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::NO_YIELD);
         invariant(statusWithPlanExecutor.isOK());
         exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -417,6 +419,7 @@ Status runAggregate(OperationContext* opCtx,
     // notifications; the underlying PlanExecutor(s) used by the pipeline will be receiving
     // invalidations and kill notifications themselves, not the cursor we create here.
     auto pin = CursorManager::getGlobalCursorManager()->registerCursor(
+        opCtx,
         {std::move(exec),
          origNss,
          AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
@@ -426,7 +429,7 @@ Status runAggregate(OperationContext* opCtx,
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
-        result << "stages" << Value(pipeline->writeExplainOps(*expCtx->explain));
+        result << "stages" << Value(unownedPipeline->writeExplainOps(*expCtx->explain));
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor =

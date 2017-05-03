@@ -51,9 +51,11 @@ DBCollection.prototype.addIdIfNeeded = function(obj) {
 *
 *  { insertOne: { document: { a: 1 } } }
 *
-*  { updateOne: { filter: {a:2}, update: {$set: {a:2}}, upsert:true, collation: {locale: "fr"} } }
+*  { updateOne: { filter: {a:2}, update: {$set: {"a.$[i]":2}}, upsert:true, collation: {locale:
+* "fr"}, arrayFilters: [{i: 0}] } }
 *
-*  { updateMany: { filter: {a:2}, update: {$set: {a:2}}, upsert:true collation: {locale: "fr"} } }
+*  { updateMany: { filter: {a:2}, update: {$set: {"a.$[i]":2}}, upsert:true collation: {locale:
+* "fr"}, arrayFilters: [{i: 0}] } }
 *
 *  { deleteOne: { filter: {c:1}, collation: {locale: "fr"} } }
 *
@@ -117,6 +119,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
                 operation.collation(op.updateOne.collation);
             }
 
+            if (op.updateOne.arrayFilters) {
+                operation.arrayFilters(op.updateOne.arrayFilters);
+            }
+
             operation.updateOne(op.updateOne.update);
         } else if (op.updateMany) {
             if (!op.updateMany.filter) {
@@ -135,6 +141,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
 
             if (op.updateMany.collation) {
                 operation.collation(op.updateMany.collation);
+            }
+
+            if (op.updateMany.arrayFilters) {
+                operation.arrayFilters(op.updateMany.arrayFilters);
             }
 
             operation.update(op.updateMany.update);
@@ -551,6 +561,10 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
         op.collation(opts.collation);
     }
 
+    if (opts.arrayFilters) {
+        op.arrayFilters(opts.arrayFilters);
+    }
+
     op.updateOne(update);
 
     try {
@@ -628,6 +642,10 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 
     if (opts.collation) {
         op.collation(opts.collation);
+    }
+
+    if (opts.arrayFilters) {
+        op.arrayFilters(opts.arrayFilters);
     }
 
     op.update(update);
@@ -817,6 +835,10 @@ DBCollection.prototype.findOneAndUpdate = function(filter, update, options) {
 
     if (opts.collation) {
         cmd.collation = opts.collation;
+    }
+
+    if (opts.arrayFilters) {
+        cmd.arrayFilters = opts.arrayFilters;
     }
 
     // Set flags

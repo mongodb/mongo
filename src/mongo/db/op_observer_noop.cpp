@@ -32,10 +32,12 @@
 
 namespace mongo {
 
-void OpObserverNoop::onCreateIndex(OperationContext*, const NamespaceString&, BSONObj, bool) {}
+void OpObserverNoop::onCreateIndex(
+    OperationContext*, const NamespaceString&, OptionalCollectionUUID, BSONObj, bool) {}
 
 void OpObserverNoop::onInserts(OperationContext*,
                                const NamespaceString&,
+                               OptionalCollectionUUID,
                                std::vector<BSONObj>::const_iterator,
                                std::vector<BSONObj>::const_iterator,
                                bool) {}
@@ -50,34 +52,55 @@ CollectionShardingState::DeleteState OpObserverNoop::aboutToDelete(OperationCont
 
 void OpObserverNoop::onDelete(OperationContext*,
                               const NamespaceString&,
+                              OptionalCollectionUUID,
                               CollectionShardingState::DeleteState,
                               bool) {}
 
 void OpObserverNoop::onOpMessage(OperationContext*, const BSONObj&) {}
 
 void OpObserverNoop::onCreateCollection(OperationContext*,
+                                        Collection*,
                                         const NamespaceString&,
                                         const CollectionOptions&,
                                         const BSONObj&) {}
 
-void OpObserverNoop::onCollMod(OperationContext*, const NamespaceString&, const BSONObj&) {}
+void OpObserverNoop::onCollMod(OperationContext*,
+                               const NamespaceString&,
+                               OptionalCollectionUUID,
+                               const BSONObj&,
+                               const CollectionOptions& oldCollOptions,
+                               boost::optional<TTLCollModInfo> ttlInfo) {}
 
 void OpObserverNoop::onDropDatabase(OperationContext*, const std::string&) {}
 
-void OpObserverNoop::onDropCollection(OperationContext*, const NamespaceString&) {}
+void OpObserverNoop::onDropCollection(OperationContext*,
+                                      const NamespaceString&,
+                                      OptionalCollectionUUID) {}
 
 void OpObserverNoop::onDropIndex(OperationContext*,
                                  const NamespaceString&,
+                                 OptionalCollectionUUID,
                                  const std::string&,
                                  const BSONObj&) {}
 
-void OpObserverNoop::onRenameCollection(
-    OperationContext*, const NamespaceString&, const NamespaceString&, bool, bool) {}
+void OpObserverNoop::onRenameCollection(OperationContext*,
+                                        const NamespaceString&,
+                                        const NamespaceString&,
+                                        OptionalCollectionUUID,
+                                        bool,
+                                        OptionalCollectionUUID,
+                                        OptionalCollectionUUID,
+                                        bool) {}
 
 void OpObserverNoop::onApplyOps(OperationContext*, const std::string&, const BSONObj&) {}
 
-void OpObserverNoop::onConvertToCapped(OperationContext*, const NamespaceString&, double) {}
+void OpObserverNoop::onConvertToCapped(OperationContext*,
+                                       const NamespaceString&,
+                                       OptionalCollectionUUID,
+                                       double) {}
 
-void OpObserverNoop::onEmptyCapped(OperationContext*, const NamespaceString&) {}
+void OpObserverNoop::onEmptyCapped(OperationContext*,
+                                   const NamespaceString&,
+                                   OptionalCollectionUUID) {}
 
 }  // namespace mongo

@@ -38,13 +38,18 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -58,6 +63,36 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshot
     "testingSnapshotBehaviorInIsolation",
     &testingSnapshotBehaviorInIsolation);
 
+/**
+ *  Schedule a write via appendOplogNote command to the primary of this replica set.
+ */
+Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
+    repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto lastAppliedTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+    if (clusterTime > lastAppliedTime) {
+        auto shardingState = ShardingState::get(opCtx);
+        // standalone replica set, so there is no need to advance the OpLog on the primary.
+        if (!shardingState->enabled()) {
+            return Status::OK();
+        }
+
+        auto myShard =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->getShardName());
+        if (!myShard.isOK()) {
+            return myShard.getStatus();
+        }
+
+        auto swRes = myShard.getValue()->runCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            "admin",
+            BSON("appendOplogNote" << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
+                                   << BSON("noop write for afterClusterTime read concern" << 1)),
+            Shard::RetryPolicy::kIdempotent);
+        return swRes.getStatus();
+    }
+    return Status::OK();
+}
 }  // namespace
 
 Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs) {
@@ -89,9 +124,25 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
         }
     }
 
+    auto afterClusterTime = readConcernArgs.getArgsClusterTime();
+    if (afterClusterTime) {
+        auto currentTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
+        if (currentTime < *afterClusterTime) {
+            return {ErrorCodes::InvalidOptions,
+                    "readConcern afterClusterTime must not be greater than clusterTime value"};
+        }
+    }
+
     // Skip waiting for the OpTime when testing snapshot behavior
     if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
-        Status status = replCoord->waitUntilOpTimeForRead(opCtx, readConcernArgs);
+        if (afterClusterTime) {
+            auto status = makeNoopWriteIfNeeded(opCtx, *afterClusterTime);
+            if (!status.isOK()) {
+                LOG(1) << "failed noop write due to " << status.toString();
+            }
+        }
+
+        auto status = replCoord->waitUntilOpTimeForRead(opCtx, readConcernArgs);
         if (!status.isOK()) {
             return status;
         }

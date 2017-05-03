@@ -61,7 +61,7 @@ Status TextMatchExpression::init(OperationContext* opCtx,
                                   << nss.ns()
                                   << "')"};
         }
-        Collection* collection = db->getCollection(nss);
+        Collection* collection = db->getCollection(opCtx, nss);
         if (!collection) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "text index required for $text query (no such collection '"

@@ -99,7 +99,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         string fromhost = cmdObj.getStringField("fromhost");
@@ -173,7 +172,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const auto fromdbElt = cmdObj["fromdb"];

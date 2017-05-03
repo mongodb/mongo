@@ -24,6 +24,7 @@ executor:
       class: ReplicaSetFixture
       mongod_options:
         oplogSize: 511
+        bind_ip_all: ''
         verbose: ''
         set_parameters:
           logComponentVerbosity:

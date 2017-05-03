@@ -40,9 +40,8 @@ class OperationContext;
 // to indicate that the call is on behalf of a DBDirectClient.
 extern const HostAndPort kHostAndPortForDirectClient;
 
-void assembleResponse(OperationContext* opCtx,
-                      Message& m,
-                      DbResponse& dbresponse,
-                      const HostAndPort& client);
+DbResponse assembleResponse(OperationContext* opCtx,
+                            const Message& request,
+                            const HostAndPort& client);
 
 }  // namespace mongo

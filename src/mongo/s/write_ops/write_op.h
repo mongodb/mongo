@@ -30,8 +30,6 @@
 
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/write_error_detail.h"
@@ -42,7 +40,6 @@ struct TargetedWrite;
 struct ChildWriteOp;
 
 enum WriteOpState {
-
     // Item is ready to be targeted
     WriteOpState_Ready,
 
@@ -91,9 +88,7 @@ enum WriteOpState {
  */
 class WriteOp {
 public:
-    WriteOp(const BatchItemRef& itemRef) : _itemRef(itemRef), _state(WriteOpState_Ready) {}
-
-    ~WriteOp();
+    WriteOp(BatchItemRef itemRef) : _itemRef(std::move(itemRef)) {}
 
     /**
      * Returns the write item for this operation
@@ -167,22 +162,19 @@ private:
     /**
      * Updates the op state after new information is received.
      */
-    void updateOpState();
+    void _updateOpState();
 
     // Owned elsewhere, reference to a batch with a write item
     const BatchItemRef _itemRef;
 
     // What stage of the operation we are at
-    WriteOpState _state;
+    WriteOpState _state{WriteOpState_Ready};
 
     // filled when state == _Pending
-    std::vector<ChildWriteOp*> _childOps;
+    std::vector<ChildWriteOp> _childOps;
 
     // filled when state == _Error
     std::unique_ptr<WriteErrorDetail> _error;
-
-    // Finished child operations, for debugging
-    std::vector<ChildWriteOp*> _history;
 };
 
 /**
@@ -193,15 +185,15 @@ private:
  * (_Error) state.
  */
 struct ChildWriteOp {
-    ChildWriteOp(WriteOp* const parent)
-        : parentOp(parent), state(WriteOpState_Ready), pendingWrite(NULL) {}
+    ChildWriteOp(WriteOp* const parent) : parentOp(parent) {}
 
     const WriteOp* const parentOp;
-    WriteOpState state;
+
+    WriteOpState state{WriteOpState_Ready};
 
     // non-zero when state == _Pending
     // Not owned here but tracked for reporting
-    TargetedWrite* pendingWrite;
+    TargetedWrite* pendingWrite{nullptr};
 
     // filled when state > _Pending
     std::unique_ptr<ShardEndpoint> endpoint;
@@ -232,4 +224,5 @@ struct TargetedWrite {
     // we need to be able to cancel ops.
     WriteOpRef writeOpRef;
 };
-}
+
+}  // namespace mongo

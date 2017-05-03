@@ -70,8 +70,8 @@ const std::string kLegalUpdateInfoFieldNames[] = {
 }  // namespace
 
 Status OldUpdatePositionArgs::initialize(const BSONObj& argsObj) {
-    Status status =
-        bsonCheckOnlyHasFields("OldUpdatePositionArgs", argsObj, kLegalUpdatePositionFieldNames);
+    Status status = bsonCheckOnlyHasFieldsForCommand(
+        "OldUpdatePositionArgs", argsObj, kLegalUpdatePositionFieldNames);
 
     if (!status.isOK())
         return status;

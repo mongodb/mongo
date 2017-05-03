@@ -2757,6 +2757,47 @@ var authCommandsLib = {
           }]
         },
         {
+          testname: "listCollections_getMore",  // Tests for error described in SERVER-26577
+          command: {
+              getMore: null,  // These two values get filled in by authenticatedSetup()
+              collection: null
+          },
+          setup: function(db) {
+              db.x.insert({_id: 5});
+              db.y.insert({_id: 6});
+          },
+          authenticatedSetup: function(db) {
+              // For this test, we want to call getMore on a collections cursor, which we create
+              // in this setup function.
+              var listCollectionsCursor =
+                  db.runCommand({listCollections: 1, cursor: {batchSize: 0}});
+              this.command.getMore = listCollectionsCursor.cursor.id;
+              // Compute the "collections" property for our getMore:
+              // "roles_commands_1.$cmd.listCollections" -> "$cmd.listCollections"
+              this.command.collection = listCollectionsCursor.cursor.ns.replace(db + ".", "");
+          },
+          teardown: function(db) {
+              db.x.drop();
+              db.y.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                // Modern way to allow listCollections privileges
+                privileges:
+                    [{resource: {db: firstDbName, collection: ""}, actions: ["listCollections"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                // Deprecated way to allow listCollection privileges
+                privileges: [{
+                    resource: {db: firstDbName, collection: "system.namespaces"},
+                    actions: ["find"]
+                }]
+              }
+          ]
+        },
+        {
           testname: "getnonce",
           command: {getnonce: 1},
           testcases: [
@@ -3729,6 +3770,7 @@ var authCommandsLib = {
         {
           testname: "repairDatabase",
           command: {repairDatabase: 1},
+          skipSharded: true,
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -4384,6 +4426,12 @@ var authCommandsLib = {
             t.setup(runOnDb);
             runOnDb.getLastError();
             adminDb.logout();
+        }
+    },
+
+    authenticatedSetup: function(t, runOnDb) {
+        if (t.authenticatedSetup) {
+            t.authenticatedSetup(runOnDb);
         }
     },
 

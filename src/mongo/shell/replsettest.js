@@ -681,7 +681,8 @@ var ReplSetTest = function(opts) {
             return config;
         }
 
-        if (_isRunningWithoutJournaling(replNode)) {
+        // Check journaling by sending commands through the bridge if it's used.
+        if (_isRunningWithoutJournaling(this.nodes[0])) {
             config[wcMajorityJournalField] = false;
         }
 
@@ -781,6 +782,8 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             jsTest.authenticateNodes(this.nodes);
         }
+
+        this.awaitSecondaryNodes();
     };
 
     /**
@@ -813,7 +816,6 @@ var ReplSetTest = function(opts) {
      * Calls awaitReplication() which requires all connections in 'nodes' to be authenticated.
      */
     this.stepUp = function(node) {
-        this.awaitSecondaryNodes();
         this.awaitReplication();
         this.awaitNodesAgreeOnPrimary();
         if (this.getPrimary() === node) {
@@ -872,19 +874,15 @@ var ReplSetTest = function(opts) {
     };
 
     this.reInitiate = function() {
-        var config = this.getReplSetConfig();
-        var newVersion = this.getReplSetConfigFromNode().version + 1;
-        config.version = newVersion;
+        var config = this.getReplSetConfigFromNode();
+        var newConfig = this.getReplSetConfig();
+        // Only reset members.
+        config.members = newConfig.members;
+        config.version += 1;
 
         this._setDefaultConfigOptions(config);
 
-        try {
-            assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
-        } catch (e) {
-            if (!isNetworkError(e)) {
-                throw e;
-            }
-        }
+        assert.adminCommandWorkedAllowingNetworkError(this.getPrimary(), {replSetReconfig: config});
     };
 
     /**
@@ -1103,16 +1101,6 @@ var ReplSetTest = function(opts) {
 
     // Call the provided checkerFunction, after the replica set has been write locked.
     this.checkReplicaSet = function(checkerFunction, ...checkerFunctionArgs) {
-
-        function generateUniqueDbName(dbNames, prefix) {
-            var uniqueDbName;
-            Random.setRandomSeed();
-            do {
-                uniqueDbName = prefix + Random.randInt(100000);
-            } while (dbNames.has(uniqueDbName));
-            return uniqueDbName;
-        }
-
         assert.eq(typeof checkerFunction,
                   "function",
                   "Expected checkerFunction parameter to be a function");
@@ -1121,16 +1109,12 @@ var ReplSetTest = function(opts) {
         var primary = this.getPrimary();
         assert(primary, 'calling getPrimary() failed');
 
-        // Since we cannot determine if there is a background index in progress (SERVER-26624),
-        // we flush indexing as follows:
-        //  1. Iterate through all collections and run collMod against each (collMod will block
-        //     replication to wait for any active background index builds to complete)
-        //  2. Insert a document into a dummy collection with a writeConcern for all nodes (which
-        //     will block on completion of the background index build + collMod)
-        var dbNameSet = new Set(primary.getDBNames());
-        var uniqueDbName = generateUniqueDbName(dbNameSet, "flush_all_background_indexes_");
-
-        for (let dbName of dbNameSet.values()) {
+        // Since we cannot determine if there is a background index in progress (SERVER-26624), we
+        // use the "collMod" command to wait for any index builds that may be in progress on the
+        // primary or on one of the secondaries to complete. Running the "collMod" command with a
+        // write concern of w=<# nodes> on each collection will block until all background index
+        // builds have completed.
+        for (let dbName of primary.getDBNames()) {
             if (dbName === "local") {
                 continue;
             }
@@ -1143,28 +1127,28 @@ var ReplSetTest = function(opts) {
                     // skip view evaluation, and therefore won't fail on an invalid view.
                     if (!collInfo.name.startsWith('system.')) {
                         // 'usePowerOf2Sizes' is ignored by the server so no actual collection
-                        // modification takes place.
-                        assert.commandWorked(
-                            dbHandle.runCommand({collMod: collInfo.name, usePowerOf2Sizes: true}));
+                        // modification takes place. We intentionally await replication without
+                        // doing any I/O to avoid any overhead from allocating or deleting data
+                        // files when using the MMAPv1 storage engine.
+                        assert.commandWorked(dbHandle.runCommand({
+                            collMod: collInfo.name,
+                            usePowerOf2Sizes: true,
+                            writeConcern: {
+                                w: self.nodeList().length,
+                                wtimeout: self.kDefaultTimeoutMS,
+                            },
+                        }));
                     }
                 });
         }
 
-        let dummyDB = primary.getDB(uniqueDbName);
-        let dummyColl = dummyDB.dummy;
-        assert.writeOK(dummyColl.insert(
-            {x: 1}, {writeConcern: {w: this.nodeList().length, wtimeout: self.kDefaultTimeoutMS}}));
-
-        // We drop the dummy database for cleanup purposes only.
-        assert.commandWorked(dummyDB.dropDatabase());
-
         var activeException = false;
 
+        // Lock the primary to prevent the TTL monitor from deleting expired documents in
+        // the background while we are getting the dbhashes of the replica set members.
+        assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
+                             'failed to lock the primary');
         try {
-            // Lock the primary to prevent the TTL monitor from deleting expired documents in
-            // the background while we are getting the dbhashes of the replica set members.
-            assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
-                                 'failed to lock the primary');
             this.awaitReplication(60 * 1000 * 5);
             checkerFunction.apply(this, checkerFunctionArgs);
         } catch (e) {
@@ -1447,8 +1431,10 @@ var ReplSetTest = function(opts) {
             this.query = function(ts) {
                 var coll = this.getOplogColl();
                 var query = {ts: {$gte: ts ? ts : new Timestamp()}};
-                // Set the cursor to read backwards, from last to first.
-                this.cursor = coll.find(query).sort({$natural: -1});
+                // Set the cursor to read backwards, from last to first. We also set the cursor not
+                // to time out since it may take a while to process each batch and a test may have
+                // changed "cursorTimeoutMillis" to a short time period.
+                this.cursor = coll.find(query).sort({$natural: -1}).noCursorTimeout();
             };
 
             this.getFirstDoc = function() {

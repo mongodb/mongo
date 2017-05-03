@@ -99,7 +99,6 @@ using unittest::log;
 
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
-using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 struct CollectionCloneInfo {
@@ -153,12 +152,11 @@ public:
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
         RemoteCommandResponse response(obj, BSONObj(), millis);
-        executor::TaskExecutor::ResponseStatus responseStatus(response);
         log() << "Sending response for network request:";
         log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
         log() << "     resp:" << response;
 
-        net->scheduleResponse(noi, net->now(), responseStatus);
+        net->scheduleResponse(noi, net->now(), response);
     }
 
     void scheduleNetworkResponse(std::string cmdName, Status errorStatus) {
@@ -282,11 +280,7 @@ protected:
 
         launchExecutorThread();
 
-        _shouldFailRequest = [](const executor::RemoteCommandRequest&) { return false; };
-        _executorProxy = stdx::make_unique<TaskExecutorMock>(
-            &getExecutor(), [this](const executor::RemoteCommandRequest& request) {
-                return _shouldFailRequest(request);
-            });
+        _executorProxy = stdx::make_unique<TaskExecutorMock>(&getExecutor());
 
         _myLastOpTime = OpTime({3, 0}, 1);
 
@@ -392,7 +386,6 @@ protected:
         }
     }
 
-    TaskExecutorMock::ShouldFailRequestFn _shouldFailRequest;
     std::unique_ptr<TaskExecutorMock> _executorProxy;
 
     InitialSyncerOptions _options;
@@ -747,7 +740,7 @@ TEST_F(InitialSyncerTest,
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
-    _executorProxy->shouldFailScheduleWorkAt = true;
+    _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
@@ -773,7 +766,7 @@ TEST_F(InitialSyncerTest,
 
     // Last choose sync source attempt should now be scheduled. Advance clock so we fail last
     // choose sync source attempt which cause the next initial sync attempt to be scheduled.
-    _executorProxy->shouldFailScheduleWorkAt = true;
+    _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
     advanceClock(net, _options.syncSourceRetryWait);
 
     initialSyncer->join();
@@ -888,10 +881,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetRollbackIdScheduleError) 
     // replSetGetRBID is the first remote command to be scheduled by the initial syncer after
     // creating the oplog collection.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        request = requestToSend;
-        return true;
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            request = requestToSend;
+            return true;
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -996,10 +990,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
     // The last oplog entry fetcher is the first component that sends a find command so we reject
     // any find commands and save the request for inspection at the end of this test case.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        request = requestToSend;
-        return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData();
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            request = requestToSend;
+            return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData();
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1206,14 +1201,15 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
 
     // Make the tailable oplog query fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
-            requestToSend.cmdObj.getBoolField("tailable")) {
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
+                requestToSend.cmdObj.getBoolField("tailable")) {
+                request = requestToSend;
+                return true;
+            }
+            return false;
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1229,6 +1225,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
+        net->runReadyNetworkOperations();
     }
 
     initialSyncer->join();
@@ -1259,6 +1256,10 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
         // Last oplog entry.
         net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntry(1)}));
+        net->runReadyNetworkOperations();
+
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
 
         // Oplog tailing query.
@@ -1302,6 +1303,10 @@ TEST_F(InitialSyncerTest,
         ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
         net->runReadyNetworkOperations();
 
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // Oplog tailing query.
         // Simulate cursor closing on sync source.
         request =
@@ -1309,10 +1314,6 @@ TEST_F(InitialSyncerTest,
                                           net->scheduleSuccessfulResponse(makeCursorResponse(
                                               0LL, _options.localOplogNS, {makeOplogEntry(1)})));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->runReadyNetworkOperations();
-
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
@@ -1349,6 +1350,10 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // Oplog tailing query.
         // Simulate cursor closing on sync source.
         auto request = assertRemoteCommandNameEquals(
@@ -1358,10 +1363,6 @@ TEST_F(
                 _options.localOplogNS,
                 {makeOplogEntry(1), makeOplogEntry(2, "c"), makeOplogEntry(3, "c")})));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->runReadyNetworkOperations();
-
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
@@ -1398,6 +1399,10 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // Oplog tailing query.
         // Simulate cursor closing on sync source.
         auto request = assertRemoteCommandNameEquals(
@@ -1407,10 +1412,6 @@ TEST_F(
                 _options.localOplogNS,
                 {makeOplogEntry(1), makeOplogEntry(2, "c"), makeOplogEntry(3, "c")})));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->runReadyNetworkOperations();
-
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
@@ -1430,13 +1431,14 @@ TEST_F(InitialSyncerTest,
 
     // Make the listDatabases command fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
-    _shouldFailRequest = [&request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("listDatabases" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("listDatabases" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
+                request = requestToSend;
+                return true;
+            }
+            return false;
+        };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1490,12 +1492,6 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
-        // Oplog tailing query.
-        auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
-        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->blackHole(noi);
-
         // DatabasesCloner's first remote command - listDatabases
         assertRemoteCommandNameEquals(
             "listDatabases",
@@ -1530,17 +1526,17 @@ TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
-        // Oplog tailing query.
-        auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
-        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->blackHole(noi);
-
         // DatabasesCloner's first remote command - listDatabases
         assertRemoteCommandNameEquals(
             "listDatabases",
             net->scheduleSuccessfulResponse(makeListDatabasesResponse({"a", "local", "b"})));
         net->runReadyNetworkOperations();
+
+        // Oplog tailing query.
+        auto noi = net->getNextReadyRequest();
+        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
+        net->blackHole(noi);
 
         // DatabasesCloner should only send listCollections requests for databases 'a' and 'b'.
         request = assertRemoteCommandNameEquals(
@@ -1590,12 +1586,6 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
-        // Oplog tailing query.
-        auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
-        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->blackHole(noi);
-
         // DatabasesCloner's first remote command - listDatabases
         assertRemoteCommandNameEquals(
             "listDatabases",
@@ -1608,6 +1598,12 @@ TEST_F(InitialSyncerTest,
                                                              << "ok"
                                                              << 1)));
         net->runReadyNetworkOperations();
+
+        // Oplog tailing query.
+        auto noi = net->getNextReadyRequest();
+        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
+        net->blackHole(noi);
 
         // DatabasesCloner should only send listCollections requests for databases 'a' and 'b'.
         request = assertRemoteCommandNameEquals(
@@ -1673,19 +1669,20 @@ TEST_F(InitialSyncerTest,
     // scheduled.
     executor::RemoteCommandRequest request;
     bool first = true;
-    _shouldFailRequest = [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
-            requestToSend.cmdObj.hasField("sort") &&
-            1 == requestToSend.cmdObj.getIntField("limit")) {
-            if (first) {
-                first = false;
-                return false;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
+                requestToSend.cmdObj.hasField("sort") &&
+                1 == requestToSend.cmdObj.getIntField("limit")) {
+                if (first) {
+                    first = false;
+                    return false;
+                }
+                request = requestToSend;
+                return true;
             }
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+            return false;
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
@@ -1700,13 +1697,6 @@ TEST_F(InitialSyncerTest,
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
-
-        // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
-        // on to the DatabasesCloner's request.
-        auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
-        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->blackHole(noi);
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
@@ -1744,18 +1734,18 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         request = assertRemoteCommandNameEquals(
@@ -1796,18 +1786,18 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        auto request = assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        request = assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         noi = net->getNextReadyRequest();
@@ -1843,18 +1833,18 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // Save request for OplogFetcher's oplog tailing query. This request will be canceled.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         auto oplogFetcherNetworkOperationIterator = noi;
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         // Blackhole this request which will be canceled when oplog fetcher fails.
@@ -1901,6 +1891,12 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
@@ -1909,15 +1905,9 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
-
         // Second last oplog entry fetcher.
-        processSuccessfulLastOplogEntryFetcherResponse({BSON("h"
-                                                             << "not a hash")});
+        processSuccessfulLastOplogEntryFetcherResponse({BSON("ts" << Timestamp(1) << "t" << 1 << "h"
+                                                                  << "not a hash")});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
         // setting the completion status.
@@ -1949,18 +1939,18 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
@@ -2006,18 +1996,18 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2066,18 +2056,18 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2104,17 +2094,18 @@ TEST_F(
     // Make the second replSetGetRBID command fail. Allow all other requests to be scheduled.
     executor::RemoteCommandRequest request;
     bool first = true;
-    _shouldFailRequest = [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
-        if ("replSetGetRBID" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
-            if (first) {
-                first = false;
-                return false;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
+            if ("replSetGetRBID" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
+                if (first) {
+                    first = false;
+                    return false;
+                }
+                request = requestToSend;
+                return true;
             }
-            request = requestToSend;
-            return true;
-        }
-        return false;
-    };
+            return false;
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
@@ -2131,18 +2122,18 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2179,18 +2170,18 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2232,18 +2223,18 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2286,18 +2277,18 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // Save request for OplogFetcher's oplog tailing query. This request will be canceled.
         auto noi = net->getNextReadyRequest();
         auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         auto oplogFetcherNetworkOperationIterator = noi;
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2345,6 +2336,12 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
@@ -2352,12 +2349,6 @@ TEST_F(InitialSyncerTest,
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
@@ -2395,21 +2386,22 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({oplogEntry});
 
-        // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
-        // on to the DatabasesCloner's request.
-        auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
-        assertRemoteCommandNameEquals("find", request);
-        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
-        net->blackHole(noi);
-
         // Instead of fast forwarding to DatabasesCloner completion by returning an empty list of
         // database names, we'll simulate copying a single database with a single collection on the
         // sync source.
         NamespaceString nss("a.a");
-        request = net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        auto request =
+            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
         assertRemoteCommandNameEquals("listDatabases", request);
         net->runReadyNetworkOperations();
+
+        // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
+        // on to the DatabasesCloner's request.
+        auto noi = net->getNextReadyRequest();
+        request = noi->getRequest();
+        assertRemoteCommandNameEquals("find", request);
+        ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
+        net->blackHole(noi);
 
         // listCollections for "a"
         request = net->scheduleSuccessfulResponse(
@@ -2482,6 +2474,12 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
@@ -2490,16 +2488,10 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
-
         // Before processing scheduled last oplog entry fetcher response, set flag in
         // TaskExecutorMock so that InitialSyncer will fail to schedule
         // _getNextApplierBatchCallback().
-        _executorProxy->shouldFailScheduleWork = true;
+        _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2536,6 +2528,12 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
@@ -2544,16 +2542,10 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
-
         // Before processing scheduled last oplog entry fetcher response, set flag in
         // TaskExecutorMock so that InitialSyncer will fail to schedule second
         // _getNextApplierBatchCallback() at (now + options.getApplierBatchCallbackRetryWait).
-        _executorProxy->shouldFailScheduleWorkAt = true;
+        _executorProxy->shouldFailScheduleWorkAtRequest = []() { return true; };
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2590,6 +2582,12 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
@@ -2597,12 +2595,6 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2646,6 +2638,12 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Return bad oplog entry that will be added to the
         // oplog buffer and processed by _getNextApplierBatch_inlock().
         auto request = assertRemoteCommandNameEquals(
@@ -2654,18 +2652,6 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
                 1LL, _options.localOplogNS, {oplogEntry, oplogEntryWithInconsistentVersion})));
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
-
-        // OplogFetcher's getMore request. Black hole because we already got our bad oplog entry
-        // into the oplog buffer.
-        auto noi = net->getNextReadyRequest();
-        assertRemoteCommandNameEquals("getMore", noi->getRequest());
-        net->blackHole(noi);
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2716,6 +2702,12 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Return bad oplog entry that will be added to the
         // oplog buffer and processed by _getNextApplierBatch_inlock().
         auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
@@ -2723,19 +2715,6 @@ TEST_F(
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
-
-        // OplogFetcher's getMore request. Black hole because we already got our bad oplog entry
-        // into the oplog buffer.
-        auto noi = net->getNextReadyRequest();
-        request = noi->getRequest();
-        assertRemoteCommandNameEquals("getMore", request);
-        net->blackHole(noi);
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2755,65 +2734,6 @@ TEST_F(
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
-}
-
-TEST_F(InitialSyncerTest,
-       InitialSyncerReturnsNoSuchKeyIfApplierBatchContainsAnOplogEntryWithoutHash) {
-    auto initialSyncer = &getInitialSyncer();
-    auto opCtx = makeOpCtx();
-
-    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    ASSERT_TRUE(_storageInterface->getInitialSyncFlag(opCtx.get()));
-
-    // This oplog entry (without a required "h" field) will be read by OplogFetcher and inserted
-    // into OplogBuffer to be retrieved by _getNextApplierBatch_inlock().
-    auto oplogEntryWithoutHash = BSON("ts" << Timestamp(2, 2) << "v" << OplogEntry::kOplogVersion);
-
-    auto net = getNet();
-    int baseRollbackId = 1;
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
-        net->runReadyNetworkOperations();
-
-        // Last oplog entry.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
-
-        // OplogFetcher's oplog tailing query. Save for later.
-        auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
-            1LL, _options.localOplogNS, {makeOplogEntry(1), oplogEntryWithoutHash}));
-        assertRemoteCommandNameEquals("find", request);
-        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
-        net->runReadyNetworkOperations();
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
-
-        // Ignore OplogFetcher's getMore request.
-        auto noi = net->getNextReadyRequest();
-        request = noi->getRequest();
-        assertRemoteCommandNameEquals("getMore", request);
-        net->blackHole(noi);
-
-        // Second last oplog entry fetcher.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
-
-        // _getNextApplierBatchCallback() will shut down the OplogFetcher after setting the
-        // completion status.
-        // We call runReadyNetworkOperations() again to deliver the cancellation status to
-        // _oplogFetcherCallback().
-        net->runReadyNetworkOperations();
-    }
-
-    initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, _lastApplied);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
@@ -2837,18 +2757,18 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Save for later.
         auto noi = net->getNextReadyRequest();
         auto request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         auto oplogFetcherNoi = noi;
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2867,7 +2787,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         assertRemoteCommandNameEquals("getMore", request);
 
         // Make MultiApplier::startup() fail.
-        _executorProxy->shouldFailScheduleWork = true;
+        _executorProxy->shouldFailScheduleWorkRequest = []() { return true; };
 
         // Advance clock until _getNextApplierBatchCallback() runs.
         auto when = net->now() + _options.getApplierBatchCallbackRetryWait;
@@ -2907,23 +2827,18 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
-        // OplogFetcher's oplog tailing query. Provide enough operations to trigger MultiApplier.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(1LL, _options.localOplogNS, {makeOplogEntry(1), makeOplogEntry(2)}));
-        assertRemoteCommandNameEquals("find", request);
-        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
-        net->runReadyNetworkOperations();
-
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
         assertRemoteCommandNameEquals(
             "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
 
-        // Ignore OplogFetcher's getMore request.
-        auto noi = net->getNextReadyRequest();
-        request = noi->getRequest();
-        assertRemoteCommandNameEquals("getMore", request);
+        // OplogFetcher's oplog tailing query. Provide enough operations to trigger MultiApplier.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(1LL, _options.localOplogNS, {makeOplogEntry(1), makeOplogEntry(2)}));
+        assertRemoteCommandNameEquals("find", request);
+        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
+        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -2958,18 +2873,18 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Save for later.
         auto noi = net->getNextReadyRequest();
         auto request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         auto oplogFetcherNoi = noi;
-
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
 
         // Second last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
@@ -3011,6 +2926,12 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Response has enough operations to reach
         // end timestamp.
         auto request = net->scheduleSuccessfulResponse(
@@ -3019,20 +2940,14 @@ TEST_F(InitialSyncerTest,
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
 
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
+        // Second last oplog entry fetcher.
+        processSuccessfulLastOplogEntryFetcherResponse({lastOp});
 
         // Black hole OplogFetcher's getMore request.
         auto noi = net->getNextReadyRequest();
         request = noi->getRequest();
         assertRemoteCommandNameEquals("getMore", request);
         net->blackHole(noi);
-
-        // Second last oplog entry fetcher.
-        processSuccessfulLastOplogEntryFetcherResponse({lastOp});
 
         // Last rollback ID.
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
@@ -3076,32 +2991,33 @@ TEST_F(InitialSyncerTest,
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Instead of fast forwarding to DatabasesCloner completion by returning an empty list of
+        // database names, we'll simulate copying a single database with a single collection on the
+        // sync source.
+        NamespaceString nss("a.a");
+        auto request =
+            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        assertRemoteCommandNameEquals("listDatabases", request);
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Response has enough operations to reach
         // end timestamp.
-        auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
             1LL, _options.localOplogNS, {makeOplogEntry(1), makeOplogEntry(2), lastOp}));
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
 
-        // Instead of fast forwarding to DatabasesCloner completion by returning an empty list of
-        // database names, we'll simulate copying a single database with a single collection on the
-        // sync source.
-        NamespaceString nss("a.a");
-        request = net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
-        assertRemoteCommandNameEquals("listDatabases", request);
-        net->runReadyNetworkOperations();
+        // listCollections for "a"
+        request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, nss, {BSON("name" << nss.coll() << "options" << BSONObj())}));
+        assertRemoteCommandNameEquals("listCollections", request);
 
         // Black hole OplogFetcher's getMore request.
         auto noi = net->getNextReadyRequest();
         request = noi->getRequest();
         assertRemoteCommandNameEquals("getMore", request);
         net->blackHole(noi);
-
-        // listCollections for "a"
-        request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, nss, {BSON("name" << nss.coll() << "options" << BSONObj())}));
-        assertRemoteCommandNameEquals("listCollections", request);
 
         // count:a
         request = net->scheduleSuccessfulResponse(BSON("n" << 1 << "ok" << 1));
@@ -3193,6 +3109,12 @@ TEST_F(
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Quickest path to a successful DatabasesCloner completion is to respond to the
+        // listDatabases with an empty list of database names.
+        assertRemoteCommandNameEquals(
+            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
+        net->runReadyNetworkOperations();
+
         // OplogFetcher's oplog tailing query. Response has enough operations to reach
         // end timestamp.
         auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
@@ -3201,22 +3123,16 @@ TEST_F(
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
 
-        // Quickest path to a successful DatabasesCloner completion is to respond to the
-        // listDatabases with an empty list of database names.
-        assertRemoteCommandNameEquals(
-            "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
-        net->runReadyNetworkOperations();
+        // Second last oplog entry fetcher.
+        // Send oplog entry with timestamp 2. InitialSyncer will update this end timestamp after
+        // applying the first batch.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
 
         // Black hole OplogFetcher's getMore request.
         auto noi = net->getNextReadyRequest();
         request = noi->getRequest();
         assertRemoteCommandNameEquals("getMore", request);
         net->blackHole(noi);
-
-        // Second last oplog entry fetcher.
-        // Send oplog entry with timestamp 2. InitialSyncer will update this end timestamp after
-        // applying the first batch.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(2)});
 
         // Third last oplog entry fetcher.
         processSuccessfulLastOplogEntryFetcherResponse({lastOp});
@@ -3280,18 +3196,18 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 
+        // Ignore listDatabases request.
+        auto noi = net->getNextReadyRequest();
+        auto request = noi->getRequest();
+        assertRemoteCommandNameEquals("listDatabases", request);
+        net->blackHole(noi);
+
         // OplogFetcher's oplog tailing query.
-        auto request = net->scheduleSuccessfulResponse(
+        request = net->scheduleSuccessfulResponse(
             makeCursorResponse(1LL, _options.localOplogNS, {makeOplogEntry(1)}));
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         net->runReadyNetworkOperations();
-
-        // Ignore listDatabases request.
-        auto noi = net->getNextReadyRequest();
-        request = noi->getRequest();
-        assertRemoteCommandNameEquals("listDatabases", request);
-        net->blackHole(noi);
 
         // Ensure that OplogFetcher fails with an OplogOutOfOrder error by responding to the getMore
         // request with oplog entries containing the following timestamps (most recently processed
@@ -3350,14 +3266,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
-        // Ignore oplog tailing query.
-        auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
-        assertRemoteCommandNameEquals("find", request);
-        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
-        net->blackHole(noi);
-
-        request = net->scheduleErrorResponse(
+        auto request = net->scheduleErrorResponse(
             Status(ErrorCodes::FailedToParse, "fail on clone -- listDBs injected failure"));
         assertRemoteCommandNameEquals("listDatabases", request);
         net->runReadyNetworkOperations();
@@ -3415,37 +3324,36 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
-        // Ignore oplog tailing query.
-        auto request = net->scheduleSuccessfulResponse(makeCursorResponse(1LL,
-                                                                          _options.localOplogNS,
-                                                                          {makeOplogEntry(1),
-                                                                           makeOplogEntry(2),
-                                                                           makeOplogEntry(3),
-                                                                           makeOplogEntry(4),
-                                                                           makeOplogEntry(5),
-                                                                           makeOplogEntry(6),
-                                                                           makeOplogEntry(7)
-
-                                                                          }));
-        assertRemoteCommandNameEquals("find", request);
-        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
-        net->runReadyNetworkOperations();
-
         // listDatabases
         NamespaceString nss("a.a");
-        request = net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        auto request =
+            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
         assertRemoteCommandNameEquals("listDatabases", request);
         net->runReadyNetworkOperations();
 
-        auto noi = net->getNextReadyRequest();
-        request = noi->getRequest();
-        assertRemoteCommandNameEquals("getMore", request);
-        net->blackHole(noi);
+        // Ignore oplog tailing query.
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(1LL,
+                                                                     _options.localOplogNS,
+                                                                     {makeOplogEntry(1),
+                                                                      makeOplogEntry(2),
+                                                                      makeOplogEntry(3),
+                                                                      makeOplogEntry(4),
+                                                                      makeOplogEntry(5),
+                                                                      makeOplogEntry(6),
+                                                                      makeOplogEntry(7)}));
+        assertRemoteCommandNameEquals("find", request);
+        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
+        net->runReadyNetworkOperations();
 
         // listCollections for "a"
         request = net->scheduleSuccessfulResponse(
             makeCursorResponse(0LL, nss, {BSON("name" << nss.coll() << "options" << BSONObj())}));
         assertRemoteCommandNameEquals("listCollections", request);
+
+        auto noi = net->getNextReadyRequest();
+        request = noi->getRequest();
+        assertRemoteCommandNameEquals("getMore", request);
+        net->blackHole(noi);
 
         // count:a
         request = net->scheduleSuccessfulResponse(BSON("n" << 5 << "ok" << 1));

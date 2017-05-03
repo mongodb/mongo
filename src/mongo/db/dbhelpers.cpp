@@ -62,8 +62,8 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/data_protector.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -82,34 +82,6 @@ using std::string;
 using std::stringstream;
 
 using logger::LogComponent;
-
-void Helpers::ensureIndex(OperationContext* opCtx,
-                          Collection* collection,
-                          BSONObj keyPattern,
-                          IndexDescriptor::IndexVersion indexVersion,
-                          bool unique,
-                          const char* name) {
-    BSONObjBuilder b;
-    b.append("name", name);
-    b.append("ns", collection->ns().ns());
-    b.append("key", keyPattern);
-    b.append("v", static_cast<int>(indexVersion));
-    b.appendBool("unique", unique);
-    BSONObj o = b.done();
-
-    MultiIndexBlock indexer(opCtx, collection);
-
-    Status status = indexer.init(o).getStatus();
-    if (status.code() == ErrorCodes::IndexAlreadyExists)
-        return;
-    uassertStatusOK(status);
-
-    uassertStatusOK(indexer.insertAllDocumentsInCollection());
-
-    WriteUnitOfWork wunit(opCtx);
-    indexer.commit();
-    wunit.commit();
-}
 
 /* fetch a single object from collection ns that matches query
    set your db SavedContext first
@@ -147,12 +119,12 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
     auto statusWithPlanExecutor =
-        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_MANUAL, options);
+        getExecutor(opCtx, collection, std::move(cq), PlanExecutor::NO_YIELD, options);
     massert(17245,
             "Could not get executor for query " + query.toString(),
             statusWithPlanExecutor.isOK());
 
-    unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+    auto exec = std::move(statusWithPlanExecutor.getValue());
     PlanExecutor::ExecState state;
     BSONObj obj;
     RecordId loc;
@@ -174,7 +146,7 @@ bool Helpers::findById(OperationContext* opCtx,
                        bool* indexFound) {
     invariant(database);
 
-    Collection* collection = database->getCollection(ns);
+    Collection* collection = database->getCollection(opCtx, ns);
     if (!collection) {
         return false;
     }
@@ -210,8 +182,8 @@ RecordId Helpers::findById(OperationContext* opCtx,
 
 bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        opCtx, ns, ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
+    auto exec =
+        InternalPlanner::collectionScan(opCtx, ns, ctx.getCollection(), PlanExecutor::NO_YIELD);
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
     CurOp::get(opCtx)->done();
@@ -229,11 +201,8 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
 
 bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) {
     AutoGetCollectionForReadCommand autoColl(opCtx, NamespaceString(ns));
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(opCtx,
-                                                                  ns,
-                                                                  autoColl.getCollection(),
-                                                                  PlanExecutor::YIELD_MANUAL,
-                                                                  InternalPlanner::BACKWARD));
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, ns, autoColl.getCollection(), PlanExecutor::NO_YIELD, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
     // Non-yielding collection scans from InternalPlanner will never error.
@@ -302,202 +271,11 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     return kpBuilder.obj();
 }
 
-long long Helpers::removeRange(OperationContext* opCtx,
-                               const KeyRange& range,
-                               BoundInclusion boundInclusion,
-                               const WriteConcernOptions& writeConcern,
-                               RemoveSaver* callback,
-                               bool fromMigrate,
-                               bool onlyRemoveOrphanedDocs) {
-    Timer rangeRemoveTimer;
-    const NamespaceString nss(range.ns);
-
-    // The IndexChunk has a keyPattern that may apply to more than one index - we need to
-    // select the index and get the full index keyPattern here.
-    std::string indexName;
-    BSONObj min;
-    BSONObj max;
-
-    {
-        AutoGetCollectionForReadCommand ctx(opCtx, nss);
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            warning(LogComponent::kSharding)
-                << "collection deleted before cleaning data over range of type " << range.keyPattern
-                << " in " << nss.ns() << endl;
-            return -1;
-        }
-
-        // Allow multiKey based on the invariant that shard keys must be single-valued.
-        // Therefore, any multi-key index prefixed by shard key cannot be multikey over
-        // the shard key fields.
-        const IndexDescriptor* idx =
-            collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
-                                                                     range.keyPattern,
-                                                                     false);  // requireSingleKey
-        if (!idx) {
-            warning(LogComponent::kSharding) << "no index found to clean data over range of type "
-                                             << range.keyPattern << " in " << nss.ns() << endl;
-            return -1;
-        }
-
-        indexName = idx->indexName();
-        KeyPattern indexKeyPattern(idx->keyPattern());
-
-        // Extend bounds to match the index we found
-
-        invariant(IndexBounds::isStartIncludedInBound(boundInclusion));
-        // Extend min to get (min, MinKey, MinKey, ....)
-        min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.minKey, false));
-        // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
-        // If not included, extend max to get (max, MinKey, MinKey, ....)
-        const bool maxInclusive = IndexBounds::isEndIncludedInBound(boundInclusion);
-        max = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.maxKey, maxInclusive));
-    }
-
-
-    MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
-        << "begin removal of " << min << " to " << max << " in " << nss.ns()
-        << " with write concern: " << writeConcern.toBSON() << endl;
-
-    long long numDeleted = 0;
-
-    Milliseconds millisWaitingForReplication{0};
-
-    while (1) {
-        // Scoping for write lock.
-        {
-            AutoGetCollection ctx(opCtx, nss, MODE_IX, MODE_IX);
-            Collection* collection = ctx.getCollection();
-            if (!collection)
-                break;
-
-            IndexDescriptor* desc =
-                collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-
-            if (!desc) {
-                warning(LogComponent::kSharding) << "shard key index '" << indexName << "' on '"
-                                                 << nss.ns() << "' was dropped";
-                return -1;
-            }
-
-            unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(opCtx,
-                                           collection,
-                                           desc,
-                                           min,
-                                           max,
-                                           boundInclusion,
-                                           PlanExecutor::YIELD_MANUAL,
-                                           InternalPlanner::FORWARD,
-                                           InternalPlanner::IXSCAN_FETCH));
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
-
-            RecordId rloc;
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            // This may yield so we cannot touch nsd after this.
-            state = exec->getNext(&obj, &rloc);
-            if (PlanExecutor::IS_EOF == state) {
-                break;
-            }
-
-            if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-                warning(LogComponent::kSharding)
-                    << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                    << min << " to " << max << " in " << nss.ns() << ": "
-                    << WorkingSetCommon::toStatusString(obj)
-                    << ", stats: " << Explain::getWinningPlanStats(exec.get()) << endl;
-                break;
-            }
-
-            verify(PlanExecutor::ADVANCED == state);
-
-            WriteUnitOfWork wuow(opCtx);
-
-            if (onlyRemoveOrphanedDocs) {
-                // Do a final check in the write lock to make absolutely sure that our
-                // collection hasn't been modified in a way that invalidates our migration
-                // cleanup.
-
-                // We should never be able to turn off the sharding state once enabled, but
-                // in the future we might want to.
-                verify(ShardingState::get(opCtx)->enabled());
-
-                bool docIsOrphan;
-
-                // In write lock, so will be the most up-to-date version
-                auto metadataNow = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
-                if (metadataNow) {
-                    ShardKeyPattern kp(metadataNow->getKeyPattern());
-                    BSONObj key = kp.extractShardKeyFromDoc(obj);
-                    docIsOrphan =
-                        !metadataNow->keyBelongsToMe(key) && !metadataNow->keyIsPending(key);
-                } else {
-                    docIsOrphan = false;
-                }
-
-                if (!docIsOrphan) {
-                    warning(LogComponent::kSharding)
-                        << "aborting migration cleanup for chunk " << min << " to " << max
-                        << (metadataNow ? (string) " at document " + obj.toString() : "")
-                        << ", collection " << nss.ns() << " has changed " << endl;
-                    break;
-                }
-            }
-
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss)) {
-                warning() << "stepped down from primary while deleting chunk; "
-                          << "orphaning data in " << nss.ns() << " in range [" << redact(min)
-                          << ", " << redact(max) << ")";
-                return numDeleted;
-            }
-
-            if (callback)
-                callback->goingToDelete(obj);
-
-            OpDebug* const nullOpDebug = nullptr;
-            collection->deleteDocument(opCtx, rloc, nullOpDebug, fromMigrate);
-            wuow.commit();
-            numDeleted++;
-        }
-
-        // TODO remove once the yielding below that references this timer has been removed
-        Timer secondaryThrottleTime;
-
-        if (writeConcern.shouldWaitForOtherNodes() && numDeleted > 0) {
-            repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                repl::getGlobalReplicationCoordinator()->awaitReplication(
-                    opCtx,
-                    repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                    writeConcern);
-            if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
-                warning(LogComponent::kSharding) << "replication to secondaries for removeRange at "
-                                                    "least 60 seconds behind";
-            } else {
-                uassertStatusOK(replStatus.status);
-            }
-            millisWaitingForReplication += replStatus.duration;
-        }
-    }
-
-    if (writeConcern.shouldWaitForOtherNodes())
-        log(LogComponent::kSharding)
-            << "Helpers::removeRangeUnlocked time spent waiting for replication: "
-            << durationCount<Milliseconds>(millisWaitingForReplication) << "ms" << endl;
-
-    MONGO_LOG_COMPONENT(1, LogComponent::kSharding) << "end removal of " << min << " to " << max
-                                                    << " in " << nss.ns() << " (took "
-                                                    << rangeRemoveTimer.millis() << "ms)" << endl;
-
-    return numDeleted;
-}
-
 void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
     OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    Collection* collection = context.db() ? context.db()->getCollection(nss.ns()) : nullptr;
-    deleteObjects(opCtx, collection, nss, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
+    Collection* collection = context.db() ? context.db()->getCollection(opCtx, nss) : nullptr;
+    deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 
 Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {
@@ -516,19 +294,19 @@ Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string
     ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
     _file /= ss.str();
 
-    auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-    if (hooks->enabled()) {
-        _protector = hooks->getDataProtector();
-        _file += hooks->getProtectedPathSuffix();
+    auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+    if (encryptionHooks->enabled()) {
+        _protector = encryptionHooks->getDataProtector();
+        _file += encryptionHooks->getProtectedPathSuffix();
     }
 }
 
 Helpers::RemoveSaver::~RemoveSaver() {
     if (_protector && _out) {
-        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-        invariant(hooks->enabled());
+        auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+        invariant(encryptionHooks->enabled());
 
-        size_t protectedSizeMax = hooks->additionalBytesForProtectedBuffer();
+        size_t protectedSizeMax = encryptionHooks->additionalBytesForProtectedBuffer();
         std::unique_ptr<uint8_t[]> protectedBuffer(new uint8_t[protectedSizeMax]);
 
         size_t resultLen;
@@ -591,10 +369,10 @@ Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
 
     std::unique_ptr<uint8_t[]> protectedBuffer;
     if (_protector) {
-        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-        invariant(hooks->enabled());
+        auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+        invariant(encryptionHooks->enabled());
 
-        size_t protectedSizeMax = dataSize + hooks->additionalBytesForProtectedBuffer();
+        size_t protectedSizeMax = dataSize + encryptionHooks->additionalBytesForProtectedBuffer();
         protectedBuffer.reset(new uint8_t[protectedSizeMax]);
 
         size_t resultLen;

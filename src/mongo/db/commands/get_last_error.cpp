@@ -73,7 +73,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& db,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError::get(opCtx->getClient()).reset();
@@ -107,7 +106,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         //
@@ -203,9 +201,17 @@ public:
             }
         }
 
-        BSONObj writeConcernDoc = cmdObj;
+        BSONObj writeConcernDoc = ([&] {
+            BSONObjBuilder bob;
+            for (auto&& elem : cmdObj) {
+                if (!Command::isGenericArgument(elem.fieldNameStringData()))
+                    bob.append(elem);
+            }
+            return bob.obj();
+        }());
+
         // Use the default options if we have no gle options aside from wOpTime/wElectionId
-        const int nFields = cmdObj.nFields();
+        const int nFields = writeConcernDoc.nFields();
         bool useDefaultGLEOptions = (nFields == 1) || (nFields == 2 && lastOpTimePresent) ||
             (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
@@ -308,7 +314,6 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError* le = &LastError::get(opCtx->getClient());

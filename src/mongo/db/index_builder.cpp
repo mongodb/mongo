@@ -125,7 +125,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
                             Lock::DBLock* dbLock) const {
     const NamespaceString ns(_index["ns"].String());
 
-    Collection* c = db->getCollection(ns.ns());
+    Collection* c = db->getCollection(opCtx, ns);
 
     // Collections should not be implicitly created by the index builder.
     fassert(40409, c);
@@ -192,7 +192,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
                 dbLock->relockWithMode(MODE_X);
                 Database* reloadDb = dbHolder().get(opCtx, ns.db());
                 fassert(28553, reloadDb);
-                fassert(28554, reloadDb->getCollection(ns.ns()));
+                fassert(28554, reloadDb->getCollection(opCtx, ns));
             }
 
             if (status.code() == ErrorCodes::InterruptedAtShutdown) {

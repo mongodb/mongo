@@ -142,7 +142,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(
@@ -206,7 +205,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(

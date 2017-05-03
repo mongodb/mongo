@@ -188,30 +188,24 @@ void ThreadPoolTaskExecutor::join() {
     invariant(_unsignaledEvents.empty());
 }
 
-BSONObj ThreadPoolTaskExecutor::_getDiagnosticBSON() const {
+void ThreadPoolTaskExecutor::appendDiagnosticBSON(BSONObjBuilder* b) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    BSONObjBuilder builder;
 
     // ThreadPool details
     // TODO: fill in
-    BSONObjBuilder poolCounters(builder.subobjStart("pool"));
+    BSONObjBuilder poolCounters(b->subobjStart("pool"));
     poolCounters.appendIntOrLL("inProgressCount", _poolInProgressQueue.size());
     poolCounters.done();
 
     // Queues
-    BSONObjBuilder queues(builder.subobjStart("queues"));
+    BSONObjBuilder queues(b->subobjStart("queues"));
     queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
     queues.appendIntOrLL("sleepers", _sleepersQueue.size());
     queues.done();
 
-    builder.appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
-    builder.append("shuttingDown", _inShutdown);
-    builder.append("networkInterface", _net->getDiagnosticString());
-    return builder.obj();
-}
-
-std::string ThreadPoolTaskExecutor::getDiagnosticString() const {
-    return _getDiagnosticBSON().toString();
+    b->appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
+    b->append("shuttingDown", _inShutdown);
+    b->append("networkInterface", _net->getDiagnosticString());
 }
 
 Date_t ThreadPoolTaskExecutor::now() {
@@ -376,6 +370,9 @@ void ThreadPoolTaskExecutor::cancel(const CallbackHandle& cbHandle) {
     invariant(cbHandle.isValid());
     auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle));
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (_inShutdown) {
+        return;
+    }
     cbState->canceled.store(1);
     if (cbState->isNetworkOperation) {
         lk.unlock();

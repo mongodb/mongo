@@ -90,7 +90,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    Collection* collection = autoDb.getDb()->getCollection(NamespaceString(systemUsers));
+    Collection* collection = autoDb.getDb()->getCollection(opCtx, systemUsers);
     if (!collection) {
         return Status::OK();
     }

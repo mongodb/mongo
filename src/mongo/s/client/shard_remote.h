@@ -83,11 +83,11 @@ private:
     BSONObj _appendMetadataForCommand(OperationContext* opCtx,
                                       const ReadPreferenceSetting& readPref);
 
-    Shard::HostWithResponse _runCommand(OperationContext* opCtx,
-                                        const ReadPreferenceSetting& readPref,
-                                        const std::string& dbname,
-                                        Milliseconds maxTimeMSOverride,
-                                        const BSONObj& cmdObj) final;
+    StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
+                                                   const ReadPreferenceSetting& readPref,
+                                                   const std::string& dbname,
+                                                   Milliseconds maxTimeMSOverride,
+                                                   const BSONObj& cmdObj) final;
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

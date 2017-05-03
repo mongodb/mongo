@@ -14,7 +14,7 @@
             getSlaveOk: function() {
                 return true;
             },
-            runCommand: function(db, cmd, opts) {
+            runCausalConsistentCommand: function(db, cmd, opts) {
                 commandsRan.push({db: db, cmd: cmd, opts: opts});
                 return {ok: 1.0};
             },

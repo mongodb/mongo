@@ -5,8 +5,7 @@ function setupTest() {
     print("START auth1.js");
     baseName = "jstests_auth_auth1";
 
-    m = MongoRunner.runMongod(
-        {auth: "", nohttpinterface: "", bind_ip: "127.0.0.1", useHostname: false});
+    m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", useHostname: false});
     return m;
 }
 

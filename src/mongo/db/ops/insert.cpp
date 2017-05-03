@@ -241,6 +241,8 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
                 return Status::OK();
             if (coll == "system.backup_users")
                 return Status::OK();
+            if (coll == "system.keys")
+                return Status::OK();
         }
         if (db == "local") {
             if (coll == "system.replset")

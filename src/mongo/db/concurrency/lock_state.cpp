@@ -116,7 +116,7 @@ const ResourceId resourceIdMMAPV1Flush =
     ResourceId(RESOURCE_MMAPV1_FLUSH, ResourceId::SINGLETON_MMAPV1_FLUSH);
 
 // How often (in millis) to check for deadlock if a lock has not been granted for some time
-const unsigned DeadlockTimeoutMs = 500;
+const Milliseconds DeadlockTimeout = Milliseconds(500);
 
 // Dispenses unique LockerId identifiers
 AtomicUInt64 idCounter(0);
@@ -220,18 +220,12 @@ void CondVarLockGrantNotification::clear() {
     _result = LOCK_INVALID;
 }
 
-LockResult CondVarLockGrantNotification::wait(unsigned timeoutMs) {
+LockResult CondVarLockGrantNotification::wait(Milliseconds timeout) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    while (_result == LOCK_INVALID) {
-        if (stdx::cv_status::timeout ==
-            _cond.wait_for(lock,
-                           Milliseconds(static_cast<int64_t>(timeoutMs)).toSystemDuration())) {
-            // Timeout
-            return LOCK_TIMEOUT;
-        }
-    }
-
-    return _result;
+    return _cond.wait_for(
+               lock, timeout.toSystemDuration(), [this] { return _result != LOCK_INVALID; })
+        ? _result
+        : LOCK_TIMEOUT;
 }
 
 void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
@@ -293,10 +287,11 @@ Locker::ClientState LockerImpl<IsForMMAPV1>::getClientState() const {
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode, unsigned timeoutMs) {
-    LockResult result = lockGlobalBegin(mode);
+LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode) {
+    LockResult result = _lockGlobalBegin(mode, Milliseconds::max());
+
     if (result == LOCK_WAITING) {
-        result = lockGlobalComplete(timeoutMs);
+        result = lockGlobalComplete(Milliseconds::max());
     }
 
     if (result == LOCK_OK) {
@@ -307,14 +302,19 @@ LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode, unsigned timeoutMs
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockGlobalBegin(LockMode mode) {
+LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Milliseconds timeout) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
         const bool reader = isSharedLockMode(mode);
         auto holder = ticketHolders[mode];
         if (holder) {
             _clientState.store(reader ? kQueuedReader : kQueuedWriter);
-            holder->waitForTicket();
+            if (timeout == Milliseconds::max()) {
+                holder->waitForTicket();
+            } else if (!holder->waitForTicketUntil(Date_t::now() + timeout)) {
+                _clientState.store(kInactive);
+                return LOCK_TIMEOUT;
+            }
         }
         _clientState.store(reader ? kActiveReader : kActiveWriter);
         _modeForTicket = mode;
@@ -331,8 +331,8 @@ LockResult LockerImpl<IsForMMAPV1>::lockGlobalBegin(LockMode mode) {
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockGlobalComplete(unsigned timeoutMs) {
-    return lockComplete(resourceIdGlobal, getLockMode(resourceIdGlobal), timeoutMs, false);
+LockResult LockerImpl<IsForMMAPV1>::lockGlobalComplete(Milliseconds timeout) {
+    return lockComplete(resourceIdGlobal, getLockMode(resourceIdGlobal), timeout, false);
 }
 
 template <bool IsForMMAPV1>
@@ -430,7 +430,7 @@ void LockerImpl<IsForMMAPV1>::endWriteUnitOfWork() {
 template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lock(ResourceId resId,
                                          LockMode mode,
-                                         unsigned timeoutMs,
+                                         Milliseconds timeout,
                                          bool checkDeadlock) {
     const LockResult result = lockBegin(resId, mode);
 
@@ -442,7 +442,7 @@ LockResult LockerImpl<IsForMMAPV1>::lock(ResourceId resId,
     // unsuccessful result that the lock manager would return is LOCK_WAITING.
     invariant(result == LOCK_WAITING);
 
-    return lockComplete(resId, mode, timeoutMs, checkDeadlock);
+    return lockComplete(resId, mode, timeout, checkDeadlock);
 }
 
 template <bool IsForMMAPV1>
@@ -718,7 +718,7 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
 template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
                                                  LockMode mode,
-                                                 unsigned timeoutMs,
+                                                 Milliseconds timeout,
                                                  bool checkDeadlock) {
     // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
     // DB lock, while holding the flush lock, so it has to be released. This is only
@@ -734,14 +734,14 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
 
     // Don't go sleeping without bound in order to be able to report long waits or wake up for
     // deadlock detection.
-    unsigned waitTimeMs = std::min(timeoutMs, DeadlockTimeoutMs);
+    Milliseconds waitTime = std::min(timeout, DeadlockTimeout);
     const uint64_t startOfTotalWaitTime = curTimeMicros64();
     uint64_t startOfCurrentWaitTime = startOfTotalWaitTime;
 
     while (true) {
         // It is OK if this call wakes up spuriously, because we re-evaluate the remaining
         // wait time anyways.
-        result = _notify.wait(waitTimeMs);
+        result = _notify.wait(waitTime);
 
         // Account for the time spent waiting on the notification object
         const uint64_t curTimeMicros = curTimeMicros64();
@@ -768,16 +768,16 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
         }
 
         // If infinite timeout was requested, just keep waiting
-        if (timeoutMs == UINT_MAX) {
+        if (timeout == Milliseconds::max()) {
             continue;
         }
 
-        const unsigned totalBlockTimeMs = (curTimeMicros - startOfTotalWaitTime) / 1000;
-        waitTimeMs = (totalBlockTimeMs < timeoutMs)
-            ? std::min(timeoutMs - totalBlockTimeMs, DeadlockTimeoutMs)
-            : 0;
+        const auto totalBlockTime = duration_cast<Milliseconds>(
+            Microseconds(int64_t(curTimeMicros - startOfTotalWaitTime)));
+        waitTime = (totalBlockTime < timeout) ? std::min(timeout - totalBlockTime, DeadlockTimeout)
+                                              : Milliseconds(0);
 
-        if (waitTimeMs == 0) {
+        if (waitTime == Milliseconds(0)) {
             break;
         }
     }
@@ -877,7 +877,7 @@ AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker*
     // due to too much uncommitted in-memory journal, but won't have corruption.
 
     while (true) {
-        LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, UINT_MAX, true);
+        LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, Milliseconds::max(), true);
         if (result == LOCK_OK) {
             break;
         }
@@ -894,7 +894,7 @@ void AutoAcquireFlushLockForMMAPV1Commit::upgradeFlushLockToExclusive() {
     // This should not be able to deadlock, since we already hold the S journal lock, which
     // means all writers are kicked out. Readers always yield the journal lock if they block
     // waiting on any other lock.
-    invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX, false));
+    invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, Milliseconds::max(), false));
 
     // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
     // complain.

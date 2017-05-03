@@ -92,18 +92,9 @@ ClientCursor::ClientCursor(ClientCursorParams&& params,
     init();
 }
 
-ClientCursor::ClientCursor(const Collection* collection,
-                           CursorManager* cursorManager,
-                           CursorId cursorId)
-    : _cursorid(cursorId),
-      _nss(collection->ns()),
-      _cursorManager(cursorManager),
-      _queryOptions(QueryOption_NoCursorTimeout) {
-    init();
-}
-
 void ClientCursor::init() {
     invariant(_cursorManager);
+    invariant(_exec);
 
     cursorStatsOpen.increment();
 
@@ -117,7 +108,7 @@ void ClientCursor::init() {
 ClientCursor::~ClientCursor() {
     // Cursors must be unpinned and deregistered from their cursor manager before being deleted.
     invariant(!_isPinned);
-    invariant(!_cursorManager);
+    invariant(_disposed);
 
     cursorStatsOpen.decrement();
     if (isNoTimeout()) {
@@ -125,11 +116,17 @@ ClientCursor::~ClientCursor() {
     }
 }
 
-void ClientCursor::kill() {
-    if (_exec.get())
-        _exec->kill("cursor killed");
+void ClientCursor::markAsKilled(const std::string& reason) {
+    _exec->markAsKilled(reason);
+}
 
-    _cursorManager = nullptr;
+void ClientCursor::dispose(OperationContext* opCtx) {
+    if (_disposed) {
+        return;
+    }
+
+    _exec->dispose(opCtx, _cursorManager);
+    _disposed = true;
 }
 
 //
@@ -167,10 +164,12 @@ void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
 // Pin methods
 //
 
-ClientCursorPin::ClientCursorPin(ClientCursor* cursor) : _cursor(cursor) {
+ClientCursorPin::ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor)
+    : _opCtx(opCtx), _cursor(cursor) {
     invariant(_cursor);
     invariant(_cursor->_isPinned);
     invariant(_cursor->_cursorManager);
+    invariant(!_cursor->_disposed);
 
     // We keep track of the number of cursors currently pinned. The cursor can become unpinned
     // either by being released back to the cursor manager or by being deleted. A cursor may be
@@ -179,15 +178,16 @@ ClientCursorPin::ClientCursorPin(ClientCursor* cursor) : _cursor(cursor) {
     cursorStatsOpenPinned.increment();
 }
 
-ClientCursorPin::ClientCursorPin(ClientCursorPin&& other) : _cursor(other._cursor) {
+ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
+    : _opCtx(other._opCtx), _cursor(other._cursor) {
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
     invariant(other._cursor);
     invariant(other._cursor->_isPinned);
 
     // Be sure to set the 'other' pin's cursor to null in order to transfer ownership to ourself.
-    _cursor = other._cursor;
     other._cursor = nullptr;
+    other._opCtx = nullptr;
 }
 
 ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
@@ -206,6 +206,10 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
     // Be sure to set the 'other' pin's cursor to null in order to transfer ownership to ourself.
     _cursor = other._cursor;
     other._cursor = nullptr;
+
+    _opCtx = other._opCtx;
+    other._opCtx = nullptr;
+
     return *this;
 }
 
@@ -219,16 +223,16 @@ void ClientCursorPin::release() {
 
     invariant(_cursor->_isPinned);
 
-    if (!_cursor->_cursorManager) {
+    if (_cursor->getExecutor()->isMarkedAsKilled()) {
         // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
-        // delete it.
+        // call dispose() and delete it.
         deleteUnderlying();
     } else {
         // Unpin the cursor under the collection cursor manager lock.
         _cursor->_cursorManager->unpin(_cursor);
+        cursorStatsOpenPinned.decrement();
     }
 
-    cursorStatsOpenPinned.decrement();
     _cursor = nullptr;
 }
 
@@ -236,16 +240,19 @@ void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
     invariant(_cursor->_isPinned);
     // Note the following subtleties of this method's implementation:
-    // - We must unpin the cursor before destruction, since it is an error to destroy a pinned
+    // - We must unpin the cursor before destruction, since it is an error to delete a pinned
     //   cursor.
     // - In addition, we must deregister the cursor before unpinning, since it is an
     //   error to unpin a registered cursor without holding the cursor manager lock (note that
     //   we can't simply unpin with the cursor manager lock here, since we need to guarantee
     //   exclusive ownership of the cursor when we are deleting it).
-    if (_cursor->_cursorManager) {
+
+    if (!_cursor->getExecutor()->isMarkedAsKilled()) {
         _cursor->_cursorManager->deregisterCursor(_cursor);
-        _cursor->kill();
     }
+
+    // Make sure the cursor is disposed and unpinned before being destroyed.
+    _cursor->dispose(_opCtx);
     _cursor->_isPinned = false;
     delete _cursor;
 

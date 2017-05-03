@@ -16,7 +16,7 @@ var m2expected = {
     "parsed": {
         "config": "jstests/libs/testconfig",
         "storage": {"dbPath": m2.dbpath},
-        "net": {"port": m2.port},
+        "net": {"bindIp": "0.0.0.0", "port": m2.port},
         "help": false,
         "version": false,
         "sysinfo": false
@@ -40,7 +40,7 @@ var m3expected = {
     "parsed": {
         "config": "jstests/libs/testconfig",
         "storage": {"dbPath": m3.dbpath},
-        "net": {"port": m3.port},
+        "net": {"bindIp": "0.0.0.0", "port": m3.port},
         "help": false,
         "version": false,
         "sysinfo": false

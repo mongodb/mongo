@@ -75,7 +75,8 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishCursor
                 : response.swResponse.getStatus());
 
         if (swCursorResponse.isOK()) {
-            remoteCursors.emplace_back(std::move(*response.shardHostAndPort),
+            remoteCursors.emplace_back(std::move(response.shardId),
+                                       std::move(*response.shardHostAndPort),
                                        std::move(swCursorResponse.getValue()));
             continue;
         }
@@ -135,7 +136,8 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishCursor
                     : response.swResponse.getStatus());
 
             if (swCursorResponse.isOK()) {
-                remoteCursors.emplace_back(*response.shardHostAndPort,
+                remoteCursors.emplace_back(std::move(response.shardId),
+                                           *response.shardHostAndPort,
                                            std::move(swCursorResponse.getValue()));
             }
         }

@@ -36,10 +36,13 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -72,7 +75,6 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -137,18 +139,30 @@ public:
             }
         }
 
-        std::vector<Strategy::CommandResult> countResult;
-        Strategy::commandOp(opCtx,
-                            dbname,
-                            countCmdBuilder.done(),
-                            options,
-                            nss.ns(),
-                            filter,
-                            collation,
-                            &countResult);
+        auto countCmdObj = countCmdBuilder.done();
 
-        if (countResult.size() == 1 &&
-            ResolvedView::isResolvedViewErrorResponse(countResult[0].result)) {
+        BSONObj viewDefinition;
+        auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                          nss,
+                                                          countCmdObj,
+                                                          getReadPref(countCmdObj),
+                                                          filter,
+                                                          collation,
+                                                          true,  // do shard versioning
+                                                          &viewDefinition);
+
+        if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
+            if (viewDefinition.isEmpty()) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::InternalError,
+                     str::stream()
+                         << "Missing resolved view definition, but remote returned "
+                         << ErrorCodes::errorString(swShardResponses.getStatus().code())});
+            }
+
+            // Rewrite the count command as an aggregation.
+
             auto countRequest = CountRequest::parseFromBSON(dbname, cmdObj, false);
             if (!countRequest.isOK()) {
                 return appendCommandStatus(result, countRequest.getStatus());
@@ -164,14 +178,14 @@ public:
                 return appendCommandStatus(result, aggRequestOnView.getStatus());
             }
 
-            auto resolvedView = ResolvedView::fromBSON(countResult[0].result);
+            auto resolvedView = ResolvedView::fromBSON(viewDefinition);
             auto resolvedAggRequest =
                 resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
             BSONObjBuilder aggResult;
             Command::findCommand("aggregate")
-                ->run(opCtx, dbname, resolvedAggCmd, options, errmsg, aggResult);
+                ->run(opCtx, dbname, resolvedAggCmd, errmsg, aggResult);
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult.obj());
@@ -183,36 +197,43 @@ public:
             return true;
         }
 
+        std::vector<AsyncRequestsSender::Response> shardResponses;
+        if (ErrorCodes::NamespaceNotFound == swShardResponses.getStatus().code()) {
+            // If there's no collection with this name, the count aggregation behavior below
+            // will produce a total count of 0.
+            shardResponses = {};
+        } else {
+            uassertStatusOK(swShardResponses.getStatus());
+            shardResponses = std::move(swShardResponses.getValue());
+        }
+
         long long total = 0;
         BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
 
-        for (const auto& resultEntry : countResult) {
-            const ShardId& shardName = resultEntry.shardTargetId;
-            const auto resultBSON = resultEntry.result;
-
-            if (resultBSON["ok"].trueValue()) {
-                long long shardCount = resultBSON["n"].numberLong();
-
-                shardSubTotal.appendNumber(shardName.toString(), shardCount);
-                total += shardCount;
-            } else {
-                shardSubTotal.doneFast();
-
-                // Add error context so that you can see on which shard failed as well as details
-                // about that error.
-                auto shardError = getStatusFromCommandResult(resultBSON);
-                auto errorWithContext =
-                    Status(shardError.code(),
-                           str::stream() << "failed on: " << shardName.toString()
-                                         << causedBy(shardError.reason()));
-                return appendCommandStatus(result, errorWithContext);
+        for (const auto& response : shardResponses) {
+            auto status = response.swResponse.getStatus();
+            if (status.isOK()) {
+                status = getStatusFromCommandResult(response.swResponse.getValue().data);
+                if (status.isOK()) {
+                    long long shardCount = response.swResponse.getValue().data["n"].numberLong();
+                    shardSubTotal.appendNumber(response.shardId.toString(), shardCount);
+                    total += shardCount;
+                    continue;
+                }
             }
+
+            shardSubTotal.doneFast();
+            // Add error context so that you can see on which shard failed as well as details
+            // about that error.
+            auto errorWithContext = Status(status.code(),
+                                           str::stream() << "failed on: " << response.shardId
+                                                         << causedBy(status.reason()));
+            return appendCommandStatus(result, errorWithContext);
         }
 
         shardSubTotal.doneFast();
         total = applySkipLimit(total, cmdObj);
         result.appendNumber("n", total);
-
         return true;
     }
 
@@ -220,7 +241,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                   const rpc::ServerSelectionMetadata& ssm,
                    BSONObjBuilder* out) const override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
@@ -245,27 +266,29 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        int options = 0;
-        ClusterExplain::wrapAsExplain(
-            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
 
         // We will time how long it takes to run the commands on the shards
         Timer timer;
 
-        std::vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(opCtx,
-                            dbname,
-                            explainCmdBob.obj(),
-                            options,
-                            nss.ns(),
-                            targetingQuery,
-                            targetingCollation,
-                            &shardResults);
+        BSONObj viewDefinition;
+        auto swShardResponses = scatterGatherForNamespace(opCtx,
+                                                          nss,
+                                                          explainCmdBob.obj(),
+                                                          getReadPref(ssm),
+                                                          targetingQuery,
+                                                          targetingCollation,
+                                                          true,  // do shard versioning
+                                                          &viewDefinition);
 
         long long millisElapsed = timer.millis();
 
-        if (shardResults.size() == 1 &&
-            ResolvedView::isResolvedViewErrorResponse(shardResults[0].result)) {
+        if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
+            uassert(ErrorCodes::InternalError,
+                    str::stream() << "Missing resolved view definition, but remote returned "
+                                  << ErrorCodes::errorString(swShardResponses.getStatus().code()),
+                    !viewDefinition.isEmpty());
+
             auto countRequest = CountRequest::parseFromBSON(dbname, cmdObj, true);
             if (!countRequest.isOK()) {
                 return countRequest.getStatus();
@@ -282,7 +305,7 @@ public:
                 return aggRequestOnView.getStatus();
             }
 
-            auto resolvedView = ResolvedView::fromBSON(shardResults[0].result);
+            auto resolvedView = ResolvedView::fromBSON(viewDefinition);
             auto resolvedAggRequest =
                 resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
@@ -292,13 +315,21 @@ public:
             nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
 
             return ClusterAggregate::runAggregate(
-                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, 0, out);
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
         }
 
-        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
+        uassertStatusOK(swShardResponses.getStatus());
+        auto shardResponses = std::move(swShardResponses.getValue());
+
+        const char* mongosStageName =
+            ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResults, mongosStageName, millisElapsed, out);
+            opCtx,
+            ClusterExplain::downconvert(opCtx, shardResponses),
+            mongosStageName,
+            millisElapsed,
+            out);
     }
 
 private:

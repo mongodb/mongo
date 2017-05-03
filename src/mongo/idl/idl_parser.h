@@ -93,14 +93,25 @@ public:
     void throwDuplicateField(const BSONElement& element) const;
 
     /**
-     * Throw an error message about the required field missing form the document.
+     * Throw an error message about the required field missing from the document.
      */
     void throwMissingField(StringData fieldName) const;
 
     /**
-     * Throw an error message about the required field missing form the document.
+     * Throw an error message about an unknown field in a document.
      */
     void throwUnknownField(StringData fieldName) const;
+
+    /**
+     * Throw an error message about an array field name not being a valid unsigned integer.
+     */
+    void throwBadArrayFieldNumberValue(StringData value) const;
+
+    /**
+     * Throw an error message about the array field name not being the next number in the sequence.
+     */
+    void throwBadArrayFieldNumberSequence(std::uint32_t actualValue,
+                                          std::uint32_t expectedValue) const;
 
 private:
     /**
@@ -123,5 +134,26 @@ private:
     // field with an error.
     const IDLParserErrorContext* _predecessor;
 };
+
+/**
+ * Transform a vector of input type to a vector of output type.
+ *
+ * Used by the IDL generated code to transform between vectors of view, and non-view types.
+ */
+std::vector<StringData> transformVector(const std::vector<std::string>& input);
+std::vector<std::string> transformVector(const std::vector<StringData>& input);
+std::vector<ConstDataRange> transformVector(const std::vector<std::vector<std::uint8_t>>& input);
+std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDataRange>& input);
+
+/**
+ * Get a ConstDataRange from a vector or an array of bytes.
+ */
+inline ConstDataRange makeCDR(const std::vector<uint8_t>& value) {
+    return ConstDataRange(reinterpret_cast<const char*>(value.data()), value.size());
+}
+
+inline ConstDataRange makeCDR(const std::array<uint8_t, 16>& value) {
+    return ConstDataRange(reinterpret_cast<const char*>(value.data()), value.size());
+}
 
 }  // namespace mongo

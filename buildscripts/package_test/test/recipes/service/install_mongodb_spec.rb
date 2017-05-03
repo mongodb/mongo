@@ -145,13 +145,13 @@ end
 # - verify that findOne() returns a matching document
 ############################################################
 
-describe command('mongo --eval "db.smoke.insert({answer: 42})"') do
+describe command('sh -c "ulimit -v unlimited && mongo --eval \"db.smoke.insert({answer: 42})\""') do
   its('exit_status') { should eq 0 }
   its('stdout') { should match(/.+WriteResult\({ "nInserted" : 1 }\).+/m) }
 end
 
 # read a document from the db
-describe command('mongo --eval "db.smoke.findOne()"') do
+describe command('sh -c "ulimit -v unlimited && mongo --eval \"db.smoke.findOne()\""') do
   its('exit_status') { should eq 0 }
   its('stdout') { should match(/.+"answer" : 42.+/m) }
 end

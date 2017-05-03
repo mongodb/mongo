@@ -11,10 +11,8 @@
 
     var kDbName = 'db';
 
-    var shards = mongos.getCollection('config.shards').find().toArray();
-
-    var shard0 = shards[0]._id;
-    var shard1 = shards[1]._id;
+    var shard0 = st.shard0.shardName;
+    var shard1 = st.shard1.shardName;
 
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, shard0);

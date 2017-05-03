@@ -48,7 +48,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
@@ -74,10 +73,10 @@ void initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
     spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incoming.maxWireVersion = LATEST_WIRE_VERSION;
     // connect to any version
     spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 }
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
@@ -97,7 +96,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     Collection* coll;
     {
         WriteUnitOfWork wunit(opCtx);
-        coll = autoDb.getDb()->getOrCreateCollection(opCtx, ns);
+        coll = autoDb.getDb()->getOrCreateCollection(opCtx, NamespaceString(ns));
         invariant(coll);
         wunit.commit();
     }
@@ -132,8 +131,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     ServiceContext* service = getGlobalServiceContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
-    auto logicalClock = stdx::make_unique<LogicalClock>(service, std::move(timeProofService));
+    auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
 
     repl::setGlobalReplicationCoordinator(

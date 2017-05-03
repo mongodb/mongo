@@ -55,7 +55,6 @@ public:
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
-    void setSource(DocumentSource* Source) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
@@ -116,9 +115,14 @@ public:
      *
      * For example, {$match: {a: "foo", "b.c": 4}} split by "b" will return pointers to two stages:
      * {$match: {a: "foo"}}, and {$match: {"b.c": 4}}.
+     *
+     * The 'renames' structure maps from a field to an alias that should be used in the independent
+     * portion of the match. For example, suppose that we split by fields "a" with the rename "b" =>
+     * "c". The match {$match: {a: "foo", b: "bar", z: "baz"}} will split into {$match: {c: "bar",
+     * z: "baz"}} and {$match: {a: "foo"}}.
      */
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-    splitSourceBy(const std::set<std::string>& fields);
+    splitSourceBy(const std::set<std::string>& fields, const StringMap<std::string>& renames);
 
     /**
      * Given a document 'input', extract 'fields' and produce a BSONObj with those values.
@@ -154,7 +158,7 @@ private:
     DepsTracker _dependencies;
 
     BSONObj _predicate;
-    bool _isTextQuery;
+    const bool _isTextQuery;
 };
 
 }  // namespace mongo

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <memory>
 #include <set>
 #include <vector>
 
@@ -50,7 +49,15 @@ class TargetedWriteBatch;
 struct ShardError;
 struct ShardWCError;
 class TrackedErrors;
-struct BatchWriteStats;
+
+/**
+ * Compares endpoints in a map.
+ */
+struct EndpointComp {
+    bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
+};
+
+using TargetedBatchMap = std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp>;
 
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -82,14 +89,8 @@ class BatchWriteOp {
     MONGO_DISALLOW_COPYING(BatchWriteOp);
 
 public:
-    BatchWriteOp();
-
+    explicit BatchWriteOp(const BatchedCommandRequest& clientRequest);
     ~BatchWriteOp();
-
-    /**
-     * Initializes the BatchWriteOp from a client batch request.
-     */
-    void initClientRequest(const BatchedCommandRequest* clientRequest);
 
     /**
      * Targets one or more of the next write ops in this batch op using a NSTargeter.  The
@@ -154,20 +155,28 @@ public:
      */
     void buildClientResponse(BatchedCommandResponse* batchResp);
 
-    //
-    // Accessors
-    //
-
-    int numWriteOps() const;
-
+    /**
+     * Returns the number of write operations which are in the specified state. Runs in O(number of
+     * write operations).
+     */
     int numWriteOpsIn(WriteOpState state) const;
 
 private:
-    // Incoming client request, not owned here
-    const BatchedCommandRequest* _clientRequest;
+    /**
+     * Maintains the batch execution statistics when a response is received.
+     */
+    void _incBatchStats(const BatchedCommandResponse& response);
+
+    /**
+     * Helper function to cancel all the write ops of targeted batches in a map.
+     */
+    void _cancelBatches(const WriteErrorDetail& why, TargetedBatchMap&& batchMapToCancel);
+
+    // The incoming client request
+    const BatchedCommandRequest& _clientRequest;
 
     // Array of ops being processed from the client request
-    WriteOp* _writeOps;
+    std::vector<WriteOp> _writeOps;
 
     // Current outstanding batch op write requests
     // Not owned here but tracked for reporting
@@ -180,25 +189,11 @@ private:
     std::vector<std::unique_ptr<BatchedUpsertDetail>> _upsertedIds;
 
     // Stats for the entire batch op
-    std::unique_ptr<BatchWriteStats> _stats;
-};
-
-struct BatchWriteStats {
-    BatchWriteStats();
-
-    int numInserted;
-    int numUpserted;
-    int numMatched;
-    int numModified;
-    int numDeleted;
-
-    std::string toString() const {
-        StringBuilder str;
-        str << "numInserted: " << numInserted << " numUpserted: " << numUpserted
-            << " numMatched: " << numMatched << " numModified: " << numModified
-            << " numDeleted: " << numDeleted;
-        return str.str();
-    }
+    int _numInserted{0};
+    int _numUpserted{0};
+    int _numMatched{0};
+    int _numModified{0};
+    int _numDeleted{0};
 };
 
 /**
@@ -288,4 +283,5 @@ private:
     typedef unordered_map<int, std::vector<ShardError*>> TrackedErrorMap;
     TrackedErrorMap _errorMap;
 };
-}
+
+}  // namespace mongo

@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/collection_options.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -90,13 +91,6 @@ Status checkStorageEngineOptions(const BSONElement& elem) {
 
     return Status::OK();
 }
-
-// These are collection creation options which are handled elsewhere. If we encounter a field which
-// CollectionOptions doesn't know about, parsing the options should fail unless we find the field
-// name in this whitelist.
-const std::set<StringData> collectionOptionsWhitelist{
-    "maxTimeMS"_sd, "writeConcern"_sd,
-};
 
 }  // namespace
 
@@ -249,8 +243,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
             }
 
             pipeline = e.Obj().getOwned();
-        } else if (!createdOn24OrEarlier &&
-                   collectionOptionsWhitelist.find(fieldName) == collectionOptionsWhitelist.end()) {
+        } else if (!createdOn24OrEarlier && !Command::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
                                         << "' is not a valid collection option. Options: "

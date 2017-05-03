@@ -22,7 +22,7 @@ it follows the rules of the IDL, etc.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-# from typing import List, Union, Any, Optional, Tuple
+from typing import List, Union, Any, Optional, Tuple
 
 from . import common
 from . import errors
@@ -52,7 +52,23 @@ class IDLSpec(object):
         """Construct an IDL spec."""
         self.symbols = SymbolTable()  # type: SymbolTable
         self.globals = None  # type: Optional[Global]
-        #TODO self.imports = None # type: Optional[Imports]
+        self.imports = None  # type: Optional[Import]
+
+
+def parse_array_type(name):
+    # type: (unicode) -> unicode
+    """Parse a type name of the form 'array<type>' and extract type."""
+    if not name.startswith("array<") and not name.endswith(">"):
+        return None
+
+    name = name[len("array<"):]
+    name = name[:-1]
+
+    # V1 restriction, ban nested array types to reduce scope.
+    if name.startswith("array<") and name.endswith(">"):
+        return None
+
+    return name
 
 
 class SymbolTable(object):
@@ -103,19 +119,46 @@ class SymbolTable(object):
         # TODO: add commands
         pass
 
-    def resolve_field_type(self, ctxt, field):
-        # type: (errors.ParserContext, Field) -> Tuple[Optional[Struct], Optional[Type]]
+    def add_imported_symbol_table(self, ctxt, imported_symbols):
+        # type: (errors.ParserContext, SymbolTable) -> None
+        """
+        Merge all the symbols in the imported_symbols symbol table into the symbol table.
+
+        Marks imported structs as imported, and errors on duplicate symbols.
+        """
+        for struct in imported_symbols.structs:
+            if not self._is_duplicate(ctxt, struct, struct.name, "struct"):
+                struct.imported = True
+                self.structs.append(struct)
+
+        for idltype in imported_symbols.types:
+            self.add_type(ctxt, idltype)
+
+    def resolve_field_type(self, ctxt, location, field_name, type_name):
+        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Tuple[Optional[Struct], Optional[Type]]
+        """Find the type or struct a field refers to or log an error."""
+        return self._resolve_field_type(ctxt, location, field_name, type_name)
+
+    def _resolve_field_type(self, ctxt, location, field_name, type_name):
+        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Tuple[Optional[Struct], Optional[Type]]
         """Find the type or struct a field refers to or log an error."""
         for idltype in self.types:
-            if idltype.name == field.type:
+            if idltype.name == type_name:
                 return (None, idltype)
 
         for struct in self.structs:
-            if struct.name == field.type:
+            if struct.name == type_name:
                 return (struct, None)
 
-        # TODO: handle array
-        ctxt.add_unknown_type_error(field, field.name, field.type)
+        if type_name.startswith('array<'):
+            array_type_name = parse_array_type(type_name)
+            if not array_type_name:
+                ctxt.add_bad_array_type_name_error(location, field_name, type_name)
+                return (None, None)
+
+            return self._resolve_field_type(ctxt, location, field_name, array_type_name)
+
+        ctxt.add_unknown_type_error(location, field_name, type_name)
 
         return (None, None)
 
@@ -136,11 +179,21 @@ class Global(common.SourceLocation):
         super(Global, self).__init__(file_name, line, column)
 
 
-# TODO: add support for imports
 class Import(common.SourceLocation):
     """IDL imports object."""
 
-    pass
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct an Imports section."""
+        self.imports = []  # type: List[unicode]
+
+        # These are not part of the IDL syntax but are produced by the parser.
+        # List of imports with structs.
+        self.resolved_imports = []  # type: List[unicode]
+        # All imports directly or indirectly included
+        self.dependencies = []  # type: List[unicode]
+
+        super(Import, self).__init__(file_name, line, column)
 
 
 class Type(common.SourceLocation):
@@ -184,6 +237,7 @@ class Field(common.SourceLocation):
         # type: (unicode, int, int) -> None
         """Construct a Field."""
         self.name = None  # type: unicode
+        self.cpp_name = None  # type: unicode
         self.description = None  # type: unicode
         self.type = None  # type: unicode
         self.ignore = False  # type: bool
@@ -206,7 +260,14 @@ class Struct(common.SourceLocation):
         self.name = None  # type: unicode
         self.description = None  # type: unicode
         self.strict = True  # type: bool
+        self.chained_types = None  # type: List[unicode]
+        self.chained_structs = None  # type: List[unicode]
         self.fields = None  # type: List[Field]
+
+        # Internal property that is not represented as syntax. An imported struct is read from an
+        # imported file, and no code is generated for it.
+        self.imported = False  # type: bool
+
         super(Struct, self).__init__(file_name, line, column)
 
 

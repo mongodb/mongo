@@ -31,33 +31,21 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_entry_point_impl.h"
 
 namespace mongo {
 
-namespace transport {
-class Session;
-class TransportLayer;
-}  // namespace transport
-
 /**
- * The entry point from the TransportLayer into Mongos. startSession() spawns and
- * detaches a new thread for each incoming connection (transport::Session).
+ * The entry point from the TransportLayer into Mongos.
  */
-class ServiceEntryPointMongos final : public ServiceEntryPoint {
+class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
     MONGO_DISALLOW_COPYING(ServiceEntryPointMongos);
 
 public:
-    ServiceEntryPointMongos(transport::TransportLayer* tl);
-
-    virtual ~ServiceEntryPointMongos() = default;
-
-    void startSession(transport::SessionHandle session) override;
-
-private:
-    void _sessionLoop(const transport::SessionHandle& session);
-
-    transport::TransportLayer* _tl;
+    using ServiceEntryPointImpl::ServiceEntryPointImpl;
+    DbResponse handleRequest(OperationContext* opCtx,
+                             const Message& request,
+                             const HostAndPort& client) override;
 };
 
 }  // namespace mongo

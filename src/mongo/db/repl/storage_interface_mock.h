@@ -129,6 +129,9 @@ public:
     OpTime getMinValid(OperationContext* opCtx) const override;
     void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
     void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
+    StatusWith<int> getRollbackID(OperationContext* opCtx) override;
+    Status initializeRollbackID(OperationContext* opCtx) override;
+    Status incrementRollbackID(OperationContext* opCtx) override;
     void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) override;
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
@@ -197,6 +200,31 @@ public:
                                                      std::size_t limit) override {
         return deleteDocumentsFn(
             opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
+    }
+
+    StatusWith<BSONObj> findById(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const BSONElement& idKey) override {
+        return Status{ErrorCodes::IllegalOperation, "findById not implemented."};
+    }
+
+    StatusWith<BSONObj> deleteById(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const BSONElement& idKey) override {
+        return Status{ErrorCodes::IllegalOperation, "deleteById not implemented."};
+    }
+
+    Status upsertById(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const BSONElement& idKey,
+                      const BSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "upsertById not implemented."};
+    }
+
+    Status deleteByFilter(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& filter) override {
+        return Status{ErrorCodes::IllegalOperation, "deleteByFilter not implemented."};
     }
 
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
@@ -273,6 +301,8 @@ private:
     mutable stdx::mutex _minValidBoundariesMutex;
     OpTime _appliedThrough;
     OpTime _minValid;
+    int _rbid;
+    bool _rbidInitialized = false;
     Timestamp _oplogDeleteFromPoint;
 };
 

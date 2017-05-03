@@ -247,7 +247,7 @@ private:
         params.isMulti = true;
         params.canonicalQuery = canonicalQuery.getValue().get();
 
-        std::unique_ptr<PlanExecutor> exec =
+        auto exec =
             InternalPlanner::deleteWithIndexScan(opCtx,
                                                  collection,
                                                  params,

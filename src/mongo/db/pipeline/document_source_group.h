@@ -50,7 +50,6 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetNextResult getNext() final;
-    void dispose() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final;
 
@@ -61,7 +60,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<AccumulationStatement> accumulationStatements,
-        Variables::Id numVariables,
         size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     /**
@@ -95,6 +93,9 @@ public:
     // Virtuals for SplittableDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+protected:
+    void doDispose() final;
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -139,7 +140,7 @@ private:
     /**
      * Computes the internal representation of the group key.
      */
-    Value computeId(Variables* vars);
+    Value computeId(Document root);
 
     /**
      * Converts the internal representation of the group key to the _id shape specified by the
@@ -152,7 +153,6 @@ private:
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
     size_t _maxMemoryUsageBytes;
-    std::unique_ptr<Variables> _variables;
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
 

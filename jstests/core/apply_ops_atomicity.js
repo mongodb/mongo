@@ -34,4 +34,42 @@
     assert.commandWorked(newDB.runCommand(
         {applyOps: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}]}));
 
+    var sawTooManyLocksError = false;
+
+    function applyWithManyLocks(n) {
+        let cappedOps = [];
+        let multiOps = [];
+
+        for (let i = 0; i < n; i++) {
+            // Write to a capped collection, as that may require a lock for serialization.
+            let cappedName = "capped" + n + "-" + i;
+            assert.commandWorked(newDB.createCollection(cappedName, {capped: true, size: 100}));
+            cappedOps.push({op: 'i', ns: newDBName + "." + cappedName, o: {_id: 0}});
+
+            // Make an index multi-key, as that may require a lock for updating the catalog.
+            let multiName = "multi" + n + "-" + i;
+            assert.commandWorked(newDB[multiName].createIndex({x: 1}));
+            multiOps.push({op: 'i', ns: newDBName + "." + multiName, o: {_id: 0, x: [0, 1]}});
+        }
+
+        let res = [cappedOps, multiOps].map((applyOps) => newDB.runCommand({applyOps}));
+        sawTooManyLocksError |= res.some((res) => res.code === ErrorCodes.TooManyLocks);
+        // Transactions involving just two collections should succeed.
+        if (n <= 2)
+            res.every((res) => res.ok);
+        // All transactions should either completely succeed or completely fail.
+        assert(res.every((res) => res.results.every((result) => result == res.ok)));
+        assert(res.every((res) => !res.ok || res.applied == n));
+    }
+
+    //  Try requiring different numbers of collection accesses in a single operation to cover
+    //  all edge cases, so we run out of available locks in different code paths such as during
+    //  oplog application.
+    applyWithManyLocks(1);
+    applyWithManyLocks(2);
+
+    for (let i = 9; i < 16; i++) {
+        applyWithManyLocks(i);
+    }
+    assert(sawTooManyLocksError, "test no longer exhausts the max number of locks held at once");
 })();

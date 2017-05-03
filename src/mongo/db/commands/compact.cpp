@@ -89,7 +89,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& db,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         NamespaceString nss = parseNsCollectionRequired(db, cmdObj);
@@ -147,7 +146,7 @@ public:
         AutoGetDb autoDb(opCtx, db, MODE_X);
         Database* const collDB = autoDb.getDb();
 
-        Collection* collection = collDB ? collDB->getCollection(nss) : nullptr;
+        Collection* collection = collDB ? collDB->getCollection(opCtx, nss) : nullptr;
         auto view =
             collDB && !collection ? collDB->getViewCatalog()->lookup(opCtx, nss.ns()) : nullptr;
 

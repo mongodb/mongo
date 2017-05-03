@@ -39,6 +39,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/server_options.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logger/logger.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -77,8 +78,8 @@ public:
         _topo.reset(new TopologyCoordinatorImpl(_options));
         _now = Date_t();
         _selfIndex = -1;
-        _cbData.reset(new ReplicationExecutor::CallbackArgs(
-            NULL, ReplicationExecutor::CallbackHandle(), Status::OK()));
+        _cbData.reset(new executor::TaskExecutor::CallbackArgs(
+            NULL, executor::TaskExecutor::CallbackHandle(), Status::OK()));
     }
 
     virtual void tearDown() {
@@ -90,7 +91,7 @@ protected:
     TopologyCoordinatorImpl& getTopoCoord() {
         return *_topo;
     }
-    ReplicationExecutor::CallbackArgs cbData() {
+    executor::TaskExecutor::CallbackArgs cbData() {
         return *_cbData;
     }
     Date_t& now() {
@@ -243,7 +244,7 @@ private:
 
 private:
     unique_ptr<TopologyCoordinatorImpl> _topo;
-    unique_ptr<ReplicationExecutor::CallbackArgs> _cbData;
+    unique_ptr<executor::TaskExecutor::CallbackArgs> _cbData;
     ReplSetConfig _currentConfig;
     Date_t _now;
     int _selfIndex;
@@ -4134,7 +4135,7 @@ TEST_F(HeartbeatResponseTest, RelinquishPrimaryWhenMajorityOfVotersIsNoLongerVis
 class PrepareElectResponseTest : public TopoCoordTest {
 public:
     PrepareElectResponseTest()
-        : round(OID::gen()), cbData(NULL, ReplicationExecutor::CallbackHandle(), Status::OK()) {}
+        : round(OID::gen()), cbData(NULL, executor::TaskExecutor::CallbackHandle(), Status::OK()) {}
 
     virtual void setUp() {
         TopoCoordTest::setUp();
@@ -4161,7 +4162,7 @@ public:
 protected:
     Date_t now;
     OID round;
-    ReplicationExecutor::CallbackArgs cbData;
+    executor::TaskExecutor::CallbackArgs cbData;
 };
 
 TEST_F(PrepareElectResponseTest, RespondNegativelyWhenElectCommandHasTheWrongReplSetName) {

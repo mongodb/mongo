@@ -20,7 +20,7 @@ Utilities for validating bson types, etc.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-# from typing import Dict, List
+from typing import Dict, List
 
 # Dictionary of BSON type Information
 # scalar: True if the type is not an array or object
@@ -97,14 +97,16 @@ _BINDATA_SUBTYPE = {
         'scalar': True,
         'bindata_enum': 'Function'
     },
-    "binary": {
-        'scalar': False,
-        'bindata_enum': 'ByteArrayDeprecated'
-    },
-    "uuid_old": {
-        'scalar': False,
-        'bindata_enum': 'bdtUUID'
-    },
+    # Also simply known as type 2, deprecated, and requires special handling
+    #"binary": {
+    #    'scalar': False,
+    #    'bindata_enum': 'ByteArrayDeprecated'
+    #},
+    # Deprecated
+    # "uuid_old": {
+    #     'scalar': False,
+    #     'bindata_enum': 'bdtUUID'
+    # },
     "uuid": {
         'scalar': True,
         'bindata_enum': 'newUUID'

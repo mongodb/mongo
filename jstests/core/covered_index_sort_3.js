@@ -13,7 +13,7 @@ coll.drop();
 for (i = 0; i < 100; i++) {
     coll.insert({a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10)});
 }
-coll.insert;
+
 coll.ensureIndex({a: 1, b: -1, c: 1});
 
 // Test no query, sort on all fields in index order

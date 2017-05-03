@@ -54,7 +54,7 @@ void NumberIntInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto x = static_cast<int*>(JS_GetPrivate(obj));
 
     if (x)
-        delete x;
+        getScope(fop)->trackedDelete(x);
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleValue thisv) {
@@ -111,7 +111,7 @@ void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "NumberInt takes 0 or 1 arguments");
     }
 
-    JS_SetPrivate(thisv, new int(x));
+    JS_SetPrivate(thisv, scope->trackedNew<int>(x));
 
     args.rval().setObjectOrNull(thisv);
 }

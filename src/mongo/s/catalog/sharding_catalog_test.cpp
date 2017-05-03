@@ -2435,5 +2435,107 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(ShardingCatalogClientTest, GetNewKeys) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    std::string purpose("none");
+    LogicalTime currentTime(Timestamp(1234, 5678));
+    repl::ReadConcernLevel readConcernLevel(repl::ReadConcernLevel::kMajorityReadConcern);
+
+    auto future = launchAsync([this, purpose, currentTime, readConcernLevel] {
+        auto status =
+            catalogClient()->getNewKeys(operationContext(), purpose, currentTime, readConcernLevel);
+        ASSERT_OK(status.getStatus());
+        return status.getValue();
+    });
+
+    LogicalTime dummyTime(Timestamp(9876, 5432));
+    auto randomKey1 = TimeProofService::generateRandomKey();
+    KeysCollectionDocument key1(1, "none", randomKey1, dummyTime);
+
+    LogicalTime dummyTime2(Timestamp(123456, 789));
+    auto randomKey2 = TimeProofService::generateRandomKey();
+    KeysCollectionDocument key2(2, "none", randomKey2, dummyTime2);
+
+    onFindCommand([this, key1, key2](const RemoteCommandRequest& request) {
+        ASSERT_EQ("config:123", request.target.toString());
+        ASSERT_EQ("admin", request.dbname);
+
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(KeysCollectionDocument::ConfigNS, nss.ns());
+
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+
+        BSONObj expectedQuery(
+            fromjson("{purpose: 'none',"
+                     "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
+
+        ASSERT_EQ(KeysCollectionDocument::ConfigNS, query->ns());
+        ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
+        ASSERT_FALSE(query->getLimit().is_initialized());
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+
+        return vector<BSONObj>{key1.toBSON(), key2.toBSON()};
+    });
+
+    const auto keyDocs = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(2u, keyDocs.size());
+
+    const auto& key1Result = keyDocs.front();
+    ASSERT_EQ(1, key1Result.getKeyId());
+    ASSERT_EQ("none", key1Result.getPurpose());
+    ASSERT_EQ(randomKey1, key1Result.getKey());
+    ASSERT_EQ(Timestamp(9876, 5432), key1Result.getExpiresAt().asTimestamp());
+
+    const auto& key2Result = keyDocs.back();
+    ASSERT_EQ(2, key2Result.getKeyId());
+    ASSERT_EQ("none", key2Result.getPurpose());
+    ASSERT_EQ(randomKey2, key2Result.getKey());
+    ASSERT_EQ(Timestamp(123456, 789), key2Result.getExpiresAt().asTimestamp());
+}
+
+TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    std::string purpose("none");
+    LogicalTime currentTime(Timestamp(1234, 5678));
+    repl::ReadConcernLevel readConcernLevel(repl::ReadConcernLevel::kMajorityReadConcern);
+
+    auto future = launchAsync([this, purpose, currentTime, readConcernLevel] {
+        auto status =
+            catalogClient()->getNewKeys(operationContext(), purpose, currentTime, readConcernLevel);
+        ASSERT_OK(status.getStatus());
+        return status.getValue();
+    });
+
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQ("config:123", request.target.toString());
+        ASSERT_EQ("admin", request.dbname);
+
+        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(KeysCollectionDocument::ConfigNS, nss.ns());
+
+        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+
+        BSONObj expectedQuery(
+            fromjson("{purpose: 'none',"
+                     "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
+
+        ASSERT_EQ(KeysCollectionDocument::ConfigNS, query->ns());
+        ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
+        ASSERT_FALSE(query->getLimit().is_initialized());
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+
+        return vector<BSONObj>{};
+    });
+
+    const auto keyDocs = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(0u, keyDocs.size());
+}
+
 }  // namespace
 }  // namespace mongo

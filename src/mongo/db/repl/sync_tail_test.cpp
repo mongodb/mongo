@@ -1070,7 +1070,7 @@ std::string IdempotencyTest::validate() {
                                            BSONObj(),
                                            BSONObj(),
                                            BoundInclusion::kIncludeStartKeyOnly,
-                                           PlanExecutor::YIELD_MANUAL,
+                                           PlanExecutor::NO_YIELD,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH);
     ASSERT(NULL != exec.get());

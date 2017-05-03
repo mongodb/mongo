@@ -299,7 +299,8 @@ class JSTestCase(TestCase):
         def run(self):
             try:
                 threading.Thread.run(self)
-            except Exception as self.err:
+            except Exception as e1:
+                self.err = e1
                 raise
             else:
                 self.err = None

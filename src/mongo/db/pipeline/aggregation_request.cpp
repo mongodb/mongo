@@ -47,18 +47,18 @@
 
 namespace mongo {
 
-const StringData AggregationRequest::kCommandName = "aggregate"_sd;
-const StringData AggregationRequest::kCursorName = "cursor"_sd;
-const StringData AggregationRequest::kBatchSizeName = "batchSize"_sd;
-const StringData AggregationRequest::kFromRouterName = "fromRouter"_sd;
-const StringData AggregationRequest::kPipelineName = "pipeline"_sd;
-const StringData AggregationRequest::kCollationName = "collation"_sd;
-const StringData AggregationRequest::kExplainName = "explain"_sd;
-const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
-const StringData AggregationRequest::kHintName = "hint"_sd;
-const StringData AggregationRequest::kCommentName = "comment"_sd;
+constexpr StringData AggregationRequest::kCommandName;
+constexpr StringData AggregationRequest::kCursorName;
+constexpr StringData AggregationRequest::kBatchSizeName;
+constexpr StringData AggregationRequest::kFromRouterName;
+constexpr StringData AggregationRequest::kPipelineName;
+constexpr StringData AggregationRequest::kCollationName;
+constexpr StringData AggregationRequest::kExplainName;
+constexpr StringData AggregationRequest::kAllowDiskUseName;
+constexpr StringData AggregationRequest::kHintName;
+constexpr StringData AggregationRequest::kCommentName;
 
-const long long AggregationRequest::kDefaultBatchSize = 101;
+constexpr long long AggregationRequest::kDefaultBatchSize;
 
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
     : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
@@ -83,12 +83,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
     AggregationRequest request(std::move(nss), std::move(pipeline));
 
-    const std::initializer_list<StringData> optionsParsedElseWhere = {
-        QueryRequest::cmdOptionMaxTimeMS,
-        WriteConcernOptions::kWriteConcernField,
-        kPipelineName,
-        kCommandName,
-        repl::ReadConcernArgs::kReadConcernFieldName};
+    const std::initializer_list<StringData> optionsParsedElseWhere = {kPipelineName, kCommandName};
 
     bool hasCursorElem = false;
     bool hasExplainElem = false;
@@ -97,18 +92,14 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     for (auto&& elem : cmdObj) {
         auto fieldName = elem.fieldNameStringData();
 
-        // Ignore top-level fields prefixed with $. They are for the command processor, not us.
-        if (fieldName[0] == '$') {
-            continue;
-        }
-
-        // Ignore options that are parsed elsewhere.
-        if (std::find(optionsParsedElseWhere.begin(), optionsParsedElseWhere.end(), fieldName) !=
-            optionsParsedElseWhere.end()) {
-            continue;
-        }
-
-        if (kCursorName == fieldName) {
+        if (QueryRequest::kUnwrappedReadPrefField == fieldName) {
+            // We expect this field to be validated elsewhere.
+            request.setUnwrappedReadPref(elem.embeddedObject());
+        } else if (std::find(optionsParsedElseWhere.begin(),
+                             optionsParsedElseWhere.end(),
+                             fieldName) != optionsParsedElseWhere.end()) {
+            // Ignore options that are parsed elsewhere.
+        } else if (kCursorName == fieldName) {
             long long batchSize;
             auto status =
                 CursorRequest::parseCommandCursorOptions(cmdObj, kDefaultBatchSize, &batchSize);
@@ -125,6 +116,21 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                                       << typeName(elem.type())};
             }
             request.setCollation(elem.embeddedObject().getOwned());
+        } else if (QueryRequest::cmdOptionMaxTimeMS == fieldName) {
+            auto maxTimeMs = QueryRequest::parseMaxTimeMS(elem);
+            if (!maxTimeMs.isOK()) {
+                return maxTimeMs.getStatus();
+            }
+
+            request.setMaxTimeMS(maxTimeMs.getValue());
+        } else if (repl::ReadConcernArgs::kReadConcernFieldName == fieldName) {
+            if (elem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << repl::ReadConcernArgs::kReadConcernFieldName
+                                      << " must be an object, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setReadConcern(elem.embeddedObject().getOwned());
         } else if (kHintName == fieldName) {
             if (BSONType::Object == elem.type()) {
                 request.setHint(elem.embeddedObject());
@@ -175,7 +181,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             request.setAllowDiskUse(elem.Bool());
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
-        } else {
+        } else if (!Command::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
         }
@@ -198,7 +204,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                               << "' option is required, except for aggregation explain"};
     }
 
-    if (request.getExplain() && cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
+    if (request.getExplain() && !request.getReadConcern().isEmpty()) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Aggregation explain does not support the '"
                               << repl::ReadConcernArgs::kReadConcernFieldName
@@ -232,7 +238,16 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize a hint if one was specified.
         {kHintName, _hint.isEmpty() ? Value() : Value(_hint)},
         // Only serialize a comment if one was specified.
-        {kCommentName, _comment.empty() ? Value() : Value(_comment)}};
+        {kCommentName, _comment.empty() ? Value() : Value(_comment)},
+        // Only serialize readConcern if specified.
+        {repl::ReadConcernArgs::kReadConcernFieldName,
+         _readConcern.isEmpty() ? Value() : Value(_readConcern)},
+        // Only serialize the unwrapped read preference if specified.
+        {QueryRequest::kUnwrappedReadPrefField,
+         _unwrappedReadPref.isEmpty() ? Value() : Value(_unwrappedReadPref)},
+        // Only serialize maxTimeMs if specified.
+        {QueryRequest::cmdOptionMaxTimeMS,
+         _maxTimeMS == 0 ? Value() : Value(static_cast<int>(_maxTimeMS))}};
 }
 
 }  // namespace mongo

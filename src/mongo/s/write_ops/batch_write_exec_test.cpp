@@ -91,9 +91,6 @@ public:
         mockRanges.push_back(
             new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
         nsTargeter.init(mockRanges);
-
-        // Make the batch write executor use the mock backend.
-        exec.reset(new BatchWriteExec(&nsTargeter));
     }
 
     void expectInsertsReturnSuccess(const std::vector<BSONObj>& expected) {
@@ -168,8 +165,6 @@ public:
     NamespaceString nss{"foo.bar"};
 
     MockNSTargeter nsTargeter;
-
-    unique_ptr<BatchWriteExec> exec;
 };
 
 //
@@ -192,7 +187,7 @@ TEST_F(BatchWriteExecTest, SingleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        exec->executeBatch(operationContext(), request, &response, &stats);
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQUALS(stats.numRounds, 1);
     });
@@ -224,7 +219,7 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        exec->executeBatch(operationContext(), request, &response, &stats);
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQUALS(response.getN(), 0);
         ASSERT(response.isErrDetailsSet());
@@ -283,7 +278,7 @@ TEST_F(BatchWriteExecTest, StaleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        exec->executeBatch(operationContext(), request, &response, &stats);
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
 
         ASSERT_EQUALS(stats.numStaleBatches, 1);
@@ -313,7 +308,7 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        exec->executeBatch(operationContext(), request, &response, &stats);
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
 
         ASSERT_EQUALS(stats.numStaleBatches, 3);
@@ -352,7 +347,7 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        exec->executeBatch(operationContext(), request, &response, &stats);
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
         ASSERT_EQUALS(response.getN(), 0);
         ASSERT(response.isErrDetailsSet());

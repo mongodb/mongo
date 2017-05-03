@@ -84,17 +84,17 @@ Status renameCollection(OperationContext* opCtx,
     return db->renameCollection(opCtx, source.ns(), target.ns(), false);
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     return coll->truncate(opCtx);
 }
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(coll->insertDocument(opCtx, data, nullOpDebug, false));
 }
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     auto cursor = coll->getCursor(opCtx);
 
     auto record = cursor->next();
@@ -104,15 +104,15 @@ void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const
     ASSERT(!cursor->next());
 }
 void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     ASSERT(!coll->getCursor(opCtx)->next());
 }
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != NULL;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != NULL;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
@@ -120,7 +120,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
                           const string& idxName) {
     size_t numEntries = 0;
 
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     IndexCatalog* catalog = coll->getIndexCatalog();
     IndexDescriptor* desc = catalog->findIndexByName(opCtx, idxName, false);
 
@@ -136,7 +136,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 }
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(nss.ns());
+    Collection* coll = dbHolder().get(opCtx, nss.db())->getCollection(opCtx, nss);
     IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
     ASSERT_OK(coll->getIndexCatalog()->dropIndex(opCtx, desc));
@@ -506,7 +506,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(ns);
+        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -547,7 +547,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(ns);
+        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -600,7 +600,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(ns);
+        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -644,7 +644,7 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = autoDb.getDb()->getCollection(ns);
+        Collection* coll = autoDb.getDb()->getCollection(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -725,7 +725,7 @@ public:
             ASSERT_OK(userCreateNS(
                 &opCtx, ctx.db(), nss.ns(), BSONObj(), CollectionOptions::parseForCommand, false));
             ASSERT(collectionExists(&ctx, nss.ns()));
-            Collection* coll = ctx.db()->getCollection(ns);
+            Collection* coll = ctx.db()->getCollection(&opCtx, nss);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             ASSERT_OK(catalog->createIndexOnEmptyCollection(&opCtx, specA));

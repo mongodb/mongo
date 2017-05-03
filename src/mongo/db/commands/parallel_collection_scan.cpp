@@ -88,7 +88,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
@@ -116,7 +115,7 @@ public:
             numCursors = iterators.size();
         }
 
-        std::vector<std::unique_ptr<PlanExecutor>> execs;
+        std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
         for (size_t i = 0; i < numCursors; i++) {
             unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
             unique_ptr<MultiIteratorStage> mis =
@@ -140,16 +139,13 @@ public:
         {
             BSONArrayBuilder bucketsBuilder;
             for (auto&& exec : execs) {
-                // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
-                // We have to deregister it, as it will be registered with ClientCursor.
-                exec->deregisterExec();
-
                 // Need to save state while yielding locks between now and getMore().
                 exec->saveState();
                 exec->detachFromOperationContext();
 
                 // Create and register a new ClientCursor.
                 auto pinnedCursor = collection->getCursorManager()->registerCursor(
+                    opCtx,
                     {std::move(exec),
                      ns,
                      AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),

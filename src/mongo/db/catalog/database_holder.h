@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012-2014 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -33,12 +33,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-
 class Database;
 class OperationContext;
 
@@ -47,13 +47,43 @@ class OperationContext;
  */
 class DatabaseHolder {
 public:
-    DatabaseHolder() = default;
+    class Impl {
+    public:
+        virtual ~Impl() = 0;
+
+        virtual Database* get(OperationContext* opCtx, StringData ns) const = 0;
+
+        virtual Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated) = 0;
+
+        virtual void close(OperationContext* opCtx, StringData ns, const std::string& reason) = 0;
+
+        virtual bool closeAll(OperationContext* opCtx,
+                              BSONObjBuilder& result,
+                              bool force,
+                              const std::string& reason) = 0;
+
+        virtual std::set<std::string> getNamesWithConflictingCasing(StringData name) = 0;
+    };
+
+private:
+    static std::unique_ptr<Impl> makeImpl();
+
+public:
+    using factory_function_type = decltype(makeImpl);
+
+    static void registerFactory(stdx::function<factory_function_type> factory);
+
+    inline ~DatabaseHolder() = default;
+
+    inline explicit DatabaseHolder() : _pimpl(makeImpl()) {}
 
     /**
      * Retrieves an already opened database or returns NULL. Must be called with the database
      * locked in at least IS-mode.
      */
-    Database* get(OperationContext* opCtx, StringData ns) const;
+    inline Database* get(OperationContext* const opCtx, const StringData ns) const {
+        return this->_impl().get(opCtx, ns);
+    }
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been
@@ -62,33 +92,68 @@ public:
      * @param justCreated Returns whether the database was newly created (true) or it already
      *          existed (false). Can be NULL if this information is not necessary.
      */
-    Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = NULL);
+    inline Database* openDb(OperationContext* const opCtx,
+                            const StringData ns,
+                            bool* const justCreated = nullptr) {
+        return this->_impl().openDb(opCtx, ns, justCreated);
+    }
 
     /**
      * Closes the specified database. Must be called with the database locked in X-mode.
      */
-    void close(OperationContext* opCtx, StringData ns);
+    inline void close(OperationContext* const opCtx,
+                      const StringData ns,
+                      const std::string& reason) {
+        return this->_impl().close(opCtx, ns, reason);
+    }
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
      *
      * @param result Populated with the names of the databases, which were closed.
      * @param force Force close even if something underway - use at shutdown
+     * @param reason The reason for close.
      */
-    bool closeAll(OperationContext* opCtx, BSONObjBuilder& result, bool force);
+    inline bool closeAll(OperationContext* const opCtx,
+                         BSONObjBuilder& result,
+                         const bool force,
+                         const std::string& reason) {
+        return this->_impl().closeAll(opCtx, result, force, reason);
+    }
 
     /**
      * Returns the set of existing database names that differ only in casing.
      */
-    std::set<std::string> getNamesWithConflictingCasing(StringData name);
+    inline std::set<std::string> getNamesWithConflictingCasing(const StringData name) {
+        return this->_impl().getNamesWithConflictingCasing(name);
+    }
 
 private:
-    std::set<std::string> _getNamesWithConflictingCasing_inlock(StringData name);
+    // This structure exists to give us a customization point to decide how to force users of this
+    // class to depend upon the corresponding `database_holder.cpp` Translation Unit (TU).  All
+    // public forwarding functions call `_impl(), and `_impl` creates an instance of this structure.
+    struct TUHook {
+        static void hook() noexcept;
 
-    typedef StringMap<Database*> DBs;
-    mutable SimpleMutex _m;
-    DBs _dbs;
+        explicit inline TUHook() noexcept {
+            if (kDebugBuild)
+                this->hook();
+        }
+    };
+
+    inline const Impl& _impl() const {
+        TUHook{};
+        return *this->_pimpl;
+    }
+
+    inline Impl& _impl() {
+        TUHook{};
+        return *this->_pimpl;
+    }
+
+    std::unique_ptr<Impl> _pimpl;
 };
 
-DatabaseHolder& dbHolder();
-}
+extern DatabaseHolder& dbHolder();
+extern void registerDbHolderImpl(stdx::function<decltype(dbHolder)> impl);
+}  // namespace mongo

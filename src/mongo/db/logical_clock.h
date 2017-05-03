@@ -54,9 +54,20 @@ public:
         Seconds(365 * 24 * 60 * 60);  // 1 year
 
     /**
-     *  Creates an instance of LogicalClock. The TimeProofService must already be fully initialized.
+     *  Creates an instance of LogicalClock.
      */
-    LogicalClock(ServiceContext*, std::unique_ptr<TimeProofService>);
+    LogicalClock(ServiceContext*);
+
+    /**
+     * Attach a pointer to a TimeProofService to the logical clock. Will overwrite an existing
+     * pointer if a TimeProofService has already been attached.
+     */
+    void setTimeProofService(std::unique_ptr<TimeProofService>);
+
+    /**
+     * Returns true if a TimeProofService has been attached to the logical clock.
+     */
+    bool canVerifyAndSign();
 
     /**
      * The method sets clusterTime to the newTime if the newTime > _clusterTime and the newTime
@@ -67,7 +78,7 @@ public:
     Status advanceClusterTime(const SignedLogicalTime&);
 
     /**
-     * Similar to advaneClusterTime, but only does rate checking and not proof validation.
+     * Similar to advanceClusterTime, but only does rate checking and not proof validation.
      */
     Status advanceClusterTimeFromTrustedSource(SignedLogicalTime newTime);
 
@@ -100,7 +111,7 @@ private:
     /**
      * Utility to create valid SignedLogicalTime from LogicalTime.
      */
-    SignedLogicalTime _makeSignedLogicalTime(LogicalTime);
+    SignedLogicalTime _makeSignedLogicalTime_inlock(LogicalTime);
 
     Status _advanceClusterTime_inlock(SignedLogicalTime newTime);
 
@@ -111,11 +122,11 @@ private:
     Status _passesRateLimiter_inlock(LogicalTime newTime);
 
     ServiceContext* const _service;
-    std::unique_ptr<TimeProofService> _timeProofService;
 
-    // the mutex protects _clusterTime
+    // The mutex protects _clusterTime and _timeProofService.
     stdx::mutex _mutex;
     SignedLogicalTime _clusterTime;
+    std::unique_ptr<TimeProofService> _timeProofService;
 
     /**
      * Temporary key only used for unit tests.

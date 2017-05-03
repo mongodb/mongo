@@ -218,6 +218,10 @@ public:
     // is allowed to change his/her own password
     bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName);
 
+    // Returns true if the current session is authorized to list the collections in the given
+    // database.
+    bool isAuthorizedToListCollections(StringData dbname);
+
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own customData.
     bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName);

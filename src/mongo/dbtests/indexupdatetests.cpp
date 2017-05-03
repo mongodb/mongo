@@ -38,15 +38,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexUpdateTests {
-
-using std::unique_ptr;
 
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
@@ -413,28 +410,6 @@ public:
         getGlobalServiceContext()->unsetKillAllOperations();
         // The new index is listed in the index catalog because the index build succeeded.
         ASSERT(coll->getIndexCatalog()->findIndexByName(&_opCtx, "_id_"));
-    }
-};
-
-/** Helpers::ensureIndex() is not interrupted. */
-class HelpersEnsureIndexInterruptDisallowed : public IndexBuildBase {
-public:
-    void run() {
-        // Insert some documents.
-        int32_t nDocs = 1000;
-        for (int32_t i = 0; i < nDocs; ++i) {
-            _client.insert(_ns, BSON("a" << i));
-        }
-        // Start with just _id
-        ASSERT_EQUALS(1U, _client.getIndexSpecs(_ns).size());
-        // Request an interrupt.
-        getGlobalServiceContext()->setKillAllOperations();
-        // The call is not interrupted.
-        Helpers::ensureIndex(&_opCtx, collection(), BSON("a" << 1), kIndexVersion, false, "a_1");
-        // only want to interrupt the index build
-        getGlobalServiceContext()->unsetKillAllOperations();
-        // The new index is listed in getIndexSpecs because the index build completed.
-        ASSERT_EQUALS(2U, _client.getIndexSpecs(_ns).size());
     }
 };
 
@@ -834,7 +809,6 @@ public:
         add<InsertBuildIndexInterruptDisallowed>();
         add<InsertBuildIdIndexInterrupt>();
         add<InsertBuildIdIndexInterruptDisallowed>();
-        add<HelpersEnsureIndexInterruptDisallowed>();
         add<SameSpecDifferentOption>();
         add<SameSpecSameOptions>();
         add<DifferentSpecSameName>();

@@ -32,6 +32,8 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
@@ -53,7 +55,7 @@ public:
         _service = stdx::make_unique<ServiceContextNoop>();
         _service.get()->setFastClockSource(stdx::make_unique<ClockSourceMock>());
         _client = _service.get()->makeClient("test");
-        _opCtxNoop.reset(new OperationContextNoop(_client.get(), 0));
+        _opCtxNoop.reset(new OperationContextNoop(_client.get(), 0, boost::none));
         _opCtx = _opCtxNoop.get();
     }
 

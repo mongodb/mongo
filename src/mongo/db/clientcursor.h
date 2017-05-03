@@ -51,7 +51,7 @@ class RecoveryUnit;
  * constructed and managed using a CursorManager. See cursor_manager.h for more details.
  */
 struct ClientCursorParams {
-    ClientCursorParams(std::unique_ptr<PlanExecutor> planExecutor,
+    ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
                        bool isReadCommitted,
@@ -68,7 +68,7 @@ struct ClientCursorParams {
         }
     }
 
-    std::unique_ptr<PlanExecutor> exec;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
     std::vector<UserName> authenticatedUsers;
     bool isReadCommitted = false;
@@ -112,6 +112,10 @@ public:
         return _isReadCommitted;
     }
 
+    /**
+     * Returns a pointer to the underlying query plan executor. All cursors manage a PlanExecutor,
+     * so this method never returns a null pointer.
+     */
     PlanExecutor* getExecutor() const {
         return _exec.get();
     }
@@ -234,11 +238,6 @@ private:
     ClientCursor(ClientCursorParams&& params, CursorManager* cursorManager, CursorId cursorId);
 
     /**
-     * Constructs a special ClientCursor used to track sharding state for the given collection.
-     */
-    ClientCursor(const Collection* collection, CursorManager* cursorManager, CursorId cursorId);
-
-    /**
      * Destroys a ClientCursor. This is private, since only the CursorManager or the ClientCursorPin
      * is allowed to destroy a cursor.
      *
@@ -250,9 +249,17 @@ private:
     void init();
 
     /**
-     * Marks the cursor, and its underlying query plan, as killed.
+     * Marks this cursor as killed, so any future uses will return an error status including
+     * 'reason'.
      */
-    void kill();
+    void markAsKilled(const std::string& reason);
+
+    /**
+     * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to
+     * ensure it has a chance to clean up any resources it is using. Can be called multiple times.
+     * It is an error to call any other method after calling dispose().
+     */
+    void dispose(OperationContext* opCtx);
 
     bool isNoTimeout() const {
         return (_queryOptions & QueryOption_NoCursorTimeout);
@@ -271,11 +278,11 @@ private:
 
     // A pointer to the CursorManager which owns this cursor. This must be filled out when the
     // cursor is constructed via the CursorManager.
-    //
-    // If '_cursorManager' is destroyed while this cursor is pinned, then ownership of the cursor is
-    // transferred to the ClientCursorPin. In this case, '_cursorManager' set back to null in order
-    // to indicate the ownership transfer.
     CursorManager* _cursorManager = nullptr;
+
+    // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
+    // an error to use a ClientCursor once it has been disposed.
+    bool _disposed = false;
 
     // Tracks the number of results returned by this cursor so far.
     long long _pos = 0;
@@ -301,8 +308,8 @@ private:
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();
 
-    // The underlying query execution machinery.
-    std::unique_ptr<PlanExecutor> _exec;
+    // The underlying query execution machinery. Must be non-null.
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
 /**
@@ -322,10 +329,10 @@ private:
  *
  * Example usage:
  * {
- *     StatusWith<ClientCursorPin> pin = cursorManager->pinCursor(cursorid);
+ *     StatusWith<ClientCursorPin> pin = cursorManager->pinCursor(opCtx, cursorid);
  *     if (!pin.isOK()) {
- *         // No cursor with id 'cursorid' exists. Handle the error here. Pin automatically released
- *         // on block exit.
+ *         // No cursor with id 'cursorid' exists, or it was killed while inactive. Handle the error
+ *         here.
  *         return pin.getStatus();
  *     }
  *
@@ -384,8 +391,9 @@ public:
 private:
     friend class CursorManager;
 
-    ClientCursorPin(ClientCursor* cursor);
+    ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor);
 
+    OperationContext* _opCtx = nullptr;
     ClientCursor* _cursor = nullptr;
 };
 

@@ -107,11 +107,6 @@ void runSingleNodeElection(ServiceContext::UniqueOperationContext opCtx,
     replCoord->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
     ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
     replCoord->waitForElectionFinish_forTest();
-    // Wait for primary catch-up
-    net->enterNetwork();
-    net->runReadyNetworkOperations();
-    net->exitNetwork();
-
 
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
@@ -195,7 +190,7 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     startCapturingLogMessages();
     start();
     stopCapturingLogMessages();
-    ASSERT_EQUALS(2, countLogLinesContaining("Did not find local "));
+    ASSERT_EQUALS(3, countLogLinesContaining("Did not find local "));
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
@@ -362,8 +357,9 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
     ASSERT_EQUALS("admin", noi->getRequest().dbname);
     ASSERT_BSONOBJ_EQ(hbArgs.toBSON(), noi->getRequest().cmdObj);
-    getNet()->scheduleResponse(
-        noi, startDate + Milliseconds(10), ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
+    getNet()->scheduleResponse(noi,
+                               startDate + Milliseconds(10),
+                               RemoteCommandResponse(ErrorCodes::NoSuchKey, "No response"));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
@@ -398,7 +394,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     getNet()->scheduleResponse(
         noi,
         startDate + Milliseconds(10),
-        ResponseStatus(RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8))));
+        RemoteCommandResponse(hbResp.toBSON(false), BSONObj(), Milliseconds(8)));
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
     ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
@@ -585,19 +581,6 @@ TEST_F(ReplCoordTest, NodeReturnsOkWhenCheckReplEnabledForCommandAfterReceivingA
     Status status = getReplCoord()->checkReplEnabledForCommand(&result);
     ASSERT_EQUALS(status, Status::OK());
     ASSERT_TRUE(result.obj().isEmpty());
-}
-
-TEST_F(ReplCoordTest, RollBackIDShouldIncreaseByOneWhenIncrementRollbackIDIsCalled) {
-    start();
-    BSONObjBuilder result;
-    getReplCoord()->processReplSetGetRBID(&result);
-    long long initialValue = result.obj()["rbid"].Int();
-    getReplCoord()->incrementRollbackID();
-
-    BSONObjBuilder result2;
-    getReplCoord()->processReplSetGetRBID(&result2);
-    long long incrementedValue = result2.obj()["rbid"].Int();
-    ASSERT_EQUALS(incrementedValue, initialValue + 1);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstAStandaloneNode) {
@@ -1531,11 +1514,8 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 
     // Prevent _stepDownFinish() from running and becoming secondary by blocking in this
     // exclusive task.
-    unittest::Barrier barrier(2U);
-    auto stepDownFinishBlocker = [&barrier](const executor::TaskExecutor::CallbackArgs& args) {
-        barrier.countDownAndWait();
-    };
-    replExec->scheduleWorkWithGlobalExclusiveLock(stepDownFinishBlocker);
+    const auto opCtx = makeOperationContext();
+    boost::optional<Lock::GlobalWrite> globalExclusiveLock(opCtx.get());
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
@@ -1545,8 +1525,8 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
     ASSERT(updateTermEvh3.isValid());
 
-    // Unblock 'stepDownFinishBlocker'. Tasks for updateTerm and _stepDownFinish should proceed.
-    barrier.countDownAndWait();
+    // Unblock the tasks for updateTerm and _stepDownFinish.
+    globalExclusiveLock.reset();
 
     // Both _updateTerm_incallback tasks should be scheduled.
     replExec->waitForEvent(updateTermEvh2);
@@ -2420,13 +2400,9 @@ TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection)
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
 
     // This cancels the actual election.
-    bool success = false;
-    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
     // We do not need to respond to any pending network operations because setFollowerMode() will
     // cancel the vote requester.
-    getReplCoord()->waitForElectionFinish_forTest();
-    getReplExec()->waitForEvent(event);
-    ASSERT_TRUE(success);
+    ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK));
 }
 
 TEST_F(ReplCoordTest,
@@ -4082,13 +4058,11 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     getReplCoord()->advanceCommitPoint(optime1);
     getReplCoord()->setMyLastAppliedOpTime(optime2);
 
-    // Get current rbid to check against.
-    BSONObjBuilder result;
-    getReplCoord()->processReplSetGetRBID(&result);
-    int initialValue = result.obj()["rbid"].Int();
+    auto opCtx = makeOperationContext();
 
     BSONObjBuilder metadataBob;
     getReplCoord()->prepareReplMetadata(
+        opCtx.get(),
         BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
         OpTime(),
         &metadataBob);
@@ -4100,7 +4074,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     ASSERT_OK(oqMetadata.getStatus());
     ASSERT_EQ(oqMetadata.getValue().getLastOpCommitted(), optime1);
     ASSERT_EQ(oqMetadata.getValue().getLastOpApplied(), optime2);
-    ASSERT_EQ(oqMetadata.getValue().getRBID(), initialValue);
+    ASSERT_EQ(oqMetadata.getValue().getRBID(), 100);
     ASSERT_EQ(oqMetadata.getValue().getSyncSourceIndex(), -1);
     ASSERT_EQ(oqMetadata.getValue().getPrimaryIndex(), -1);
 
@@ -5000,11 +4974,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     }
     getNet()->exitNetwork();
 
-    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
-    auto exec = getReplExec();
-    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
-    exec->wait(unittest::assertGet(exec->scheduleWorkWithGlobalExclusiveLock(work)));
-    ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Hours{1}));
 }
 
 TEST_F(ReplCoordTest, WaitForMemberState) {
@@ -5063,7 +5033,6 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
 
     // Single node cluster - this node should start election on setFollowerMode() completion.
     replCoord->waitForElectionFinish_forTest();
-    simulateCatchUpTimeout();
 
     // Successful dry run election increases term.
     ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());

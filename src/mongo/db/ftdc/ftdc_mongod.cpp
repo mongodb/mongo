@@ -259,7 +259,7 @@ public:
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         std::string errmsg;
 
-        bool ret = _command->run(opCtx, _ns, _cmdObj, 0, errmsg, builder);
+        bool ret = _command->run(opCtx, _ns, _cmdObj, errmsg, builder);
 
         // Some commands return errmsgs when they return false (collstats)
         // Some commands return bson objs when they return false (replGetStatus)

@@ -236,7 +236,7 @@ DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const
     if (_indexPath) {
         modifiedFields.insert(_indexPath->fullPath());
     }
-    return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields)};
+    return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields), {}};
 }
 
 Value DocumentSourceUnwind::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {

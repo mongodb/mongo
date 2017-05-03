@@ -50,6 +50,10 @@
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 using namespace mongoutils;
 
 namespace mongo {
@@ -96,6 +100,8 @@ bool closeToMaxMemory() {
 }
 }  // namespace
 
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope::ASANHandles* kCurrentASANHandles =
+    nullptr;
 MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope = nullptr;
 
 struct MozJSImplScope::MozJSEntry {
@@ -245,11 +251,41 @@ void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
           << " total: " << mongo::sm::get_total_bytes() << " limit: " << mongo::sm::get_max_bytes();
 }
 
-MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
-    // While we're initializing the runtime/scope, calling MozJSImplScope::getThreadScope() should
-    // return a nullptr.
-    kCurrentScope = nullptr;
+#if __has_feature(address_sanitizer)
 
+MozJSImplScope::ASANHandles::ASANHandles() {
+    kCurrentASANHandles = this;
+}
+
+MozJSImplScope::ASANHandles::~ASANHandles() {
+    invariant(kCurrentASANHandles == this);
+    kCurrentASANHandles = nullptr;
+}
+
+void MozJSImplScope::ASANHandles::addPointer(void* ptr) {
+    bool inserted;
+    std::tie(std::ignore, inserted) = _handles.insert(ptr);
+    invariant(inserted);
+}
+
+void MozJSImplScope::ASANHandles::removePointer(void* ptr) {
+    invariant(_handles.erase(ptr));
+}
+
+#else
+
+MozJSImplScope::ASANHandles::ASANHandles() {}
+
+MozJSImplScope::ASANHandles::~ASANHandles() {}
+
+void MozJSImplScope::ASANHandles::addPointer(void* ptr) {}
+
+void MozJSImplScope::ASANHandles::removePointer(void* ptr) {}
+
+#endif
+
+
+MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
     /**
      * The maximum amount of memory to be given out per thread to mozilla. We
      * manage this by trapping all calls to malloc, free, etc. and keeping track of
@@ -365,7 +401,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _pendingGC(false),
       _connectState(ConnectState::Not),
       _status(Status::OK()),
-      _quickExit(false),
       _generation(0),
       _hasOutOfMemoryException(false),
       _binDataProto(_context),
@@ -405,6 +440,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
     JS_SetInterruptCallback(_runtime, _interruptCallback);
     JS_SetGCCallback(_runtime, _gcCallback, this);
     JS_SetContextPrivate(_context, this);
+    JS_SetRuntimePrivate(_runtime, this);
     JSAutoRequest ar(_context);
 
     JS_SetErrorReporter(_runtime, _reportError);
@@ -435,6 +471,8 @@ MozJSImplScope::~MozJSImplScope() {
     }
 
     unregisterOperation();
+
+    kCurrentScope = nullptr;
 }
 
 bool MozJSImplScope::hasOutOfMemoryException() {
@@ -533,11 +571,20 @@ BSONObj MozJSImplScope::getObject(const char* field) {
 void MozJSImplScope::newFunction(StringData raw, JS::MutableHandleValue out) {
     MozJSEntry entry(this);
 
-    std::string code = str::stream() << "____MongoToSM_newFunction_temp = " << raw;
+    _MozJSCreateFunction(raw, std::move(out));
+}
+
+void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue fun) {
+    std::string code = str::stream()
+        << "(" << parseJSFunctionOrExpression(_context, StringData(raw)) << ")";
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
-    _checkErrorState(JS::Evaluate(_context, co, code.c_str(), code.length(), out));
+
+    _checkErrorState(JS::Evaluate(_context, co, code.c_str(), code.length(), fun));
+    uassert(10232,
+            "not a function",
+            fun.isObject() && JS_ObjectIsFunction(_context, fun.toObjectOrNull()));
 }
 
 BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
@@ -584,39 +631,20 @@ bool hasFunctionIdentifier(StringData code) {
     return code[8] == ' ' || code[8] == '(';
 }
 
-void MozJSImplScope::_MozJSCreateFunction(const char* raw,
-                                          ScriptingFunction functionNumber,
-                                          JS::MutableHandleValue fun) {
-    std::string code = str::stream() << "_funcs" << functionNumber << " = "
-                                     << parseJSFunctionOrExpression(_context, StringData(raw));
-
-    JS::CompileOptions co(_context);
-    setCompileOptions(&co);
-
-    _checkErrorState(JS::Evaluate(_context, co, code.c_str(), code.length(), fun));
-    uassert(10232,
-            "not a function",
-            fun.isObject() && JS_ObjectIsFunction(_context, fun.toObjectOrNull()));
-}
-
-ScriptingFunction MozJSImplScope::_createFunction(const char* raw,
-                                                  ScriptingFunction functionNumber) {
+ScriptingFunction MozJSImplScope::_createFunction(const char* raw) {
     MozJSEntry entry(this);
 
     JS::RootedValue fun(_context);
-    _MozJSCreateFunction(raw, functionNumber, &fun);
+    _MozJSCreateFunction(raw, &fun);
     _funcs.emplace_back(_context, fun.get());
-
-    return functionNumber;
+    return _funcs.size();
 }
 
 void MozJSImplScope::setFunction(const char* field, const char* code) {
     MozJSEntry entry(this);
 
     JS::RootedValue fun(_context);
-
-    _MozJSCreateFunction(code, getFunctionCache().size() + 1, &fun);
-
+    _MozJSCreateFunction(code, &fun);
     ObjectWrapper(_context, _global).setValue(field, fun);
 }
 
@@ -766,6 +794,11 @@ void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* 
     // NOTE: order is important here.  the following methods must be called after
     //       the above conditional statements.
 
+    _connectState = ConnectState::Local;
+    _localDBName = dbName;
+
+    loadStored(opCtx);
+
     // install db access functions in the global object
     installDBAccess();
 
@@ -773,16 +806,11 @@ void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* 
     _mongoLocalProto.install(_global);
     execCoreFiles();
 
-    const char* const makeMongo = "_mongo = new Mongo()";
+    const char* const makeMongo = "const _mongo = new Mongo()";
     exec(makeMongo, "local connect 2", false, true, true, 0);
 
-    std::string makeDB = str::stream() << "db = _mongo.getDB(\"" << dbName << "\");";
+    std::string makeDB = str::stream() << "const db = _mongo.getDB(\"" << dbName << "\");";
     exec(makeDB, "local connect 3", false, true, true, 0);
-
-    _connectState = ConnectState::Local;
-    _localDBName = dbName;
-
-    loadStored(opCtx);
 }
 
 void MozJSImplScope::externalSetup() {
@@ -853,9 +881,6 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     if (success)
         return false;
 
-    if (_quickExit)
-        return false;
-
     if (_status.isOK()) {
         JS::RootedValue excn(_context);
         if (JS_GetPendingException(_context, &excn) && excn.isObject()) {
@@ -904,17 +929,8 @@ MozJSImplScope* MozJSImplScope::getThreadScope() {
     return kCurrentScope;
 }
 
-void MozJSImplScope::setQuickExit(int exitCode) {
-    _quickExit = true;
-    _exitCode = exitCode;
-}
-
-bool MozJSImplScope::getQuickExit(int* exitCode) {
-    if (_quickExit) {
-        *exitCode = _exitCode;
-    }
-
-    return _quickExit;
+auto MozJSImplScope::ASANHandles::getThreadASANHandles() -> ASANHandles* {
+    return kCurrentASANHandles;
 }
 
 void MozJSImplScope::setOOM() {

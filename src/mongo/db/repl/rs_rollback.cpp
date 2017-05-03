@@ -59,6 +59,7 @@
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
@@ -456,7 +457,7 @@ void syncFixUp(OperationContext* opCtx,
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
             auto db = dbHolder().openDb(opCtx, nss.db().toString());
             invariant(db);
-            auto collection = db->getCollection(ns);
+            auto collection = db->getCollection(opCtx, nss);
             invariant(collection);
             auto cce = collection->getCatalogEntry();
 
@@ -539,8 +540,8 @@ void syncFixUp(OperationContext* opCtx,
             Helpers::RemoveSaver removeSaver("rollback", "", *it);
 
             // perform a collection scan and write all documents in the collection to disk
-            std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                opCtx, *it, db->getCollection(*it), PlanExecutor::YIELD_AUTO));
+            auto exec = InternalPlanner::collectionScan(
+                opCtx, *it, db->getCollection(opCtx, *it), PlanExecutor::YIELD_AUTO);
             BSONObj curObj;
             PlanExecutor::ExecState execState;
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
@@ -582,7 +583,7 @@ void syncFixUp(OperationContext* opCtx,
         if (!db) {
             continue;
         }
-        auto collection = db->getCollection(nss.toString());
+        auto collection = db->getCollection(opCtx, nss);
         if (!collection) {
             continue;
         }
@@ -640,7 +641,7 @@ void syncFixUp(OperationContext* opCtx,
                 Lock::DBLock docDbLock(opCtx, docNss.db(), MODE_X);
                 OldClientContext ctx(opCtx, doc.ns);
 
-                Collection* collection = ctx.db()->getCollection(doc.ns);
+                Collection* collection = ctx.db()->getCollection(opCtx, docNss);
 
                 // Add the doc to our rollback file if the collection was not dropped while
                 // rolling back createCollection operations.
@@ -720,7 +721,6 @@ void syncFixUp(OperationContext* opCtx,
                                           collection,
                                           docNss,
                                           pattern,
-                                          PlanExecutor::YIELD_MANUAL,
                                           true,   // justone
                                           true);  // god
                         }
@@ -758,7 +758,7 @@ void syncFixUp(OperationContext* opCtx,
         Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
         OldClientContext ctx(opCtx, rsOplogName);
-        Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
+        Collection* oplogCollection = ctx.db()->getCollection(opCtx, oplogNss);
         if (!oplogCollection) {
             fassertFailedWithStatusNoTrace(13423,
                                            Status(ErrorCodes::UnrecoverableRollbackError,
@@ -827,7 +827,10 @@ Status _syncRollback(OperationContext* opCtx,
     log() << "rollback common point is " << how.commonPoint;
     log() << "rollback 3 fixup";
     try {
-        ON_BLOCK_EXIT([&] { replCoord->incrementRollbackID(); });
+        ON_BLOCK_EXIT([&] {
+            auto status = ReplicationProcess::get(opCtx)->incrementRollbackID(opCtx);
+            fassertStatusOK(40425, status);
+        });
         syncFixUp(opCtx, how, rollbackSource, replCoord, storageInterface);
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what(), 18753);

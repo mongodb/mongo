@@ -1,5 +1,3 @@
-// mmap.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -44,7 +42,7 @@ namespace mongo {
 typedef int HANDLE;
 #endif
 
-extern const size_t g_minOSPageSizeBytes;
+extern std::size_t getMinOSPageSizeBytes();
 void minOSPageSizeBytesTest(size_t minOSPageSizeBytes);  // lame-o
 
 // call this if syncing data fails

@@ -111,7 +111,7 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplainForOP_COMMAND(cmdObj, verbosity, &explainCmdBob);
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -132,7 +132,6 @@ public:
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      BSONObj& cmdObj,
-                     int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
         BatchedCommandRequest request(_writeType);
@@ -190,7 +189,8 @@ public:
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work
         if (haveClient()) {
-            ClusterLastErrorInfo::get(cc()).addHostOpTimes(writer.getStats().getWriteOpTimes());
+            ClusterLastErrorInfo::get(opCtx->getClient())
+                ->addHostOpTimes(writer.getStats().getWriteOpTimes());
         }
 
         // TODO

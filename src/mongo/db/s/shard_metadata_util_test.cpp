@@ -28,12 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/s/shard_metadata_util.h"
+
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard_collection.h"
@@ -48,52 +49,48 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 using unittest::assertGet;
+using namespace shardmetadatautil;
 
-const HostAndPort kConfigHostAndPort = HostAndPort("dummy", 123);
 const NamespaceString kNss = NamespaceString("test.foo");
 const NamespaceString kChunkMetadataNss = NamespaceString("config.chunks.test.foo");
 const ShardId kShardId = ShardId("shard0");
+const bool kUnique = false;
 
 class ShardMetadataUtilTest : public ShardServerTestFixture {
 protected:
     /**
-     * Call this after setUpChunks()! Both functions use the private _maxCollVersion variable. To
-     * set the lastConsistentCollectionVersion correctly this must be called second.
-     *
-     * Inserts a config.collections entry.
+     * Inserts a collections collection entry for 'kNss'.
      */
-    void setUpCollection() {
+    ShardCollectionType setUpCollection() {
         BSONObjBuilder builder;
         builder.append(ShardCollectionType::uuid(), kNss.ns());
         builder.append(ShardCollectionType::ns(), kNss.ns());
+        builder.append(ShardCollectionType::epoch(), _maxCollVersion.epoch());
         builder.append(ShardCollectionType::keyPattern(), _keyPattern.toBSON());
-        _maxCollVersion.appendWithFieldForCommands(
-            &builder, ShardCollectionType::lastConsistentCollectionVersion());
-        ShardCollectionType shardCollType = assertGet(ShardCollectionType::fromBSON(builder.obj()));
+        builder.append(ShardCollectionType::defaultCollation(), _defaultCollation);
+        builder.append(ShardCollectionType::unique(), kUnique);
+        ShardCollectionType shardCollectionType =
+            assertGet(ShardCollectionType::fromBSON(builder.obj()));
 
-        try {
-            DBDirectClient client(operationContext());
-            auto insert(stdx::make_unique<BatchedInsertRequest>());
-            insert->addToDocuments(shardCollType.toBSON());
-
-            BatchedCommandRequest insertRequest(insert.release());
-            insertRequest.setNS(NamespaceString(ShardCollectionType::ConfigNS));
-            const BSONObj insertCmdObj = insertRequest.toBSON();
-
-            rpc::UniqueReply commandResponse =
-                client.runCommandWithMetadata("config",
-                                              insertCmdObj.firstElementFieldName(),
-                                              rpc::makeEmptyMetadata(),
-                                              insertCmdObj);
-            ASSERT_OK(getStatusFromCommandResult(commandResponse->getCommandReply()));
-        } catch (const DBException& ex) {
-            ASSERT(false);
-        }
+        ASSERT_OK(updateShardCollectionsEntry(operationContext(),
+                                              BSON(ShardCollectionType::uuid(kNss.ns())),
+                                              shardCollectionType.toBSON(),
+                                              BSONObj(),
+                                              true /*upsert*/));
+        return shardCollectionType;
     }
 
     /**
-     * Helper to make a number of chunks that can then be manipulated in various ways in the tests.
-     * Chunks have the shard server's config.chunks.ns schema.
+     * Inserts 'chunks' into the shard's chunks collection for 'nss'.
+     */
+    void setUpChunks(const NamespaceString& nss, const std::vector<ChunkType> chunks) {
+        NamespaceString chunkMetadataNss(ChunkType::ShardNSPrefix + nss.ns());
+
+        ASSERT_OK(updateShardChunks(operationContext(), kNss, chunks, _maxCollVersion.epoch()));
+    }
+
+    /**
+     * Helper to make four chunks that can then be manipulated in various ways in the tests.
      */
     std::vector<ChunkType> makeFourChunks() {
         std::vector<ChunkType> chunks;
@@ -116,39 +113,13 @@ protected:
     }
 
     /**
-     * Inserts 'chunks' into the config.chunks.ns collection 'chunkMetadataNss'.
+     * Sets up persisted chunk metadata. Inserts four chunks and a collections entry for kNss.
      */
-    void setUpChunks(const NamespaceString& chunkMetadataNss, const std::vector<ChunkType> chunks) {
-        try {
-            DBDirectClient client(operationContext());
-            auto insert(stdx::make_unique<BatchedInsertRequest>());
-
-            for (auto& chunk : chunks) {
-                insert->addToDocuments(chunk.toShardBSON());
-            }
-
-            BatchedCommandRequest insertRequest(insert.release());
-            insertRequest.setNS(NamespaceString(chunkMetadataNss));
-            const BSONObj insertCmdObj = insertRequest.toBSON();
-
-            rpc::UniqueReply commandResponse =
-                client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
-                                              insertCmdObj.firstElementFieldName(),
-                                              rpc::makeEmptyMetadata(),
-                                              insertCmdObj);
-            ASSERT_OK(getStatusFromCommandResult(commandResponse->getCommandReply()));
-        } catch (const DBException& ex) {
-            ASSERT(false);
-        }
-    }
-
-    /**
-     * Sets up persisted chunk metadata. Inserts four chunks for kNss into kChunkMetadataNss and a
-     * corresponding collection entry in config.collections.
-     */
-    void setUpShardingMetadata() {
-        setUpChunks(kChunkMetadataNss, makeFourChunks());
+    std::vector<ChunkType> setUpShardChunkMetadata() {
+        std::vector<ChunkType> fourChunks = makeFourChunks();
+        setUpChunks(kChunkMetadataNss, fourChunks);
         setUpCollection();
+        return fourChunks;
     }
 
     /**
@@ -197,65 +168,87 @@ protected:
         return _maxCollVersion;
     }
 
-    const KeyPattern& getKeyPattern() const {
-        return _keyPattern;
+    const BSONObj& getKeyPattern() const {
+        return _keyPattern.toBSON();
+    }
+
+    const BSONObj& getDefaultCollation() const {
+        return _defaultCollation;
     }
 
 private:
     ChunkVersion _maxCollVersion{0, 0, OID::gen()};
     const KeyPattern _keyPattern{BSON("a" << 1)};
+    const BSONObj _defaultCollation{BSON("locale"
+                                         << "fr_CA")};
 };
 
-TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsDocument) {
-    // Insert document
-    BSONObj shardCollectionTypeObj =
-        BSON(ShardCollectionType::uuid(kNss.ns())
-             << ShardCollectionType::ns(kNss.ns())
-             << ShardCollectionType::keyPattern(getKeyPattern().toBSON()));
-    ASSERT_OK(
-        shardmetadatautil::updateShardCollectionEntry(operationContext(),
-                                                      kNss,
-                                                      BSON(ShardCollectionType::uuid(kNss.ns())),
-                                                      shardCollectionTypeObj));
-
+TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsEntry) {
+    ShardCollectionType updateShardCollectionType = setUpCollection();
     ShardCollectionType readShardCollectionType =
-        assertGet(shardmetadatautil::readShardCollectionEntry(operationContext(), kNss));
-    ASSERT_BSONOBJ_EQ(shardCollectionTypeObj, readShardCollectionType.toBSON());
+        assertGet(readShardCollectionsEntry(operationContext(), kNss));
 
-    // Update document
-    BSONObjBuilder updateBuilder;
-    getCollectionVersion().appendWithFieldForCommands(
-        &updateBuilder, ShardCollectionType::lastConsistentCollectionVersion());
-    ASSERT_OK(shardmetadatautil::updateShardCollectionEntry(
-        operationContext(), kNss, BSON(ShardCollectionType::uuid(kNss.ns())), updateBuilder.obj()));
+    // updateShardCollectionsEntry initializes 'refreshSequenceNumber' that isn't present in
+    // 'insertedShardCollectionType', so must compare fields.
 
-    readShardCollectionType =
-        assertGet(shardmetadatautil::readShardCollectionEntry(operationContext(), kNss));
-
-    ShardCollectionType updatedShardCollectionType =
-        assertGet(ShardCollectionType::fromBSON(shardCollectionTypeObj));
-    updatedShardCollectionType.setLastConsistentCollectionVersion(getCollectionVersion());
-
-    ASSERT_BSONOBJ_EQ(updatedShardCollectionType.toBSON(), readShardCollectionType.toBSON());
+    ASSERT_EQUALS(updateShardCollectionType.getUUID(), readShardCollectionType.getUUID());
+    ASSERT_EQUALS(updateShardCollectionType.getNss(), readShardCollectionType.getNss());
+    ASSERT_EQUALS(updateShardCollectionType.getEpoch(), readShardCollectionType.getEpoch());
+    ASSERT_BSONOBJ_EQ(updateShardCollectionType.getKeyPattern().toBSON(),
+                      readShardCollectionType.getKeyPattern().toBSON());
+    ASSERT_BSONOBJ_EQ(updateShardCollectionType.getDefaultCollation(),
+                      readShardCollectionType.getDefaultCollation());
+    ASSERT_EQUALS(updateShardCollectionType.getUnique(), readShardCollectionType.getUnique());
+    ASSERT_EQUALS(updateShardCollectionType.hasRefreshing(),
+                  readShardCollectionType.hasRefreshing());
+    ASSERT(!updateShardCollectionType.hasRefreshSequenceNumber());
+    ASSERT(!readShardCollectionType.hasRefreshSequenceNumber());
 }
 
-TEST_F(ShardMetadataUtilTest, WriteNewChunks) {
-    std::vector<ChunkType> chunks = makeFourChunks();
-    shardmetadatautil::writeNewChunks(
-        operationContext(), kNss, chunks, getCollectionVersion().epoch());
-    checkChunks(kChunkMetadataNss, chunks);
+TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
+    setUpCollection();
+
+    // Signal refresh start
+    ASSERT_OK(setPersistedRefreshFlags(operationContext(), kNss));
+
+    ShardCollectionType shardCollectionsEntry =
+        assertGet(readShardCollectionsEntry(operationContext(), kNss));
+
+    ASSERT_EQUALS(shardCollectionsEntry.getUUID(), kNss);
+    ASSERT_EQUALS(shardCollectionsEntry.getNss(), kNss);
+    ASSERT_EQUALS(shardCollectionsEntry.getEpoch(), getCollectionVersion().epoch());
+    ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getKeyPattern().toBSON(), getKeyPattern());
+    ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getDefaultCollation(), getDefaultCollation());
+    ASSERT_EQUALS(shardCollectionsEntry.getUnique(), kUnique);
+    ASSERT_EQUALS(shardCollectionsEntry.getRefreshing(), true);
+    ASSERT(!shardCollectionsEntry.hasRefreshSequenceNumber());
+
+    // Signal refresh start again to make sure nothing changes
+    ASSERT_OK(setPersistedRefreshFlags(operationContext(), kNss));
+
+    RefreshState state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
+
+    ASSERT_EQUALS(state.epoch, getCollectionVersion().epoch());
+    ASSERT_EQUALS(state.refreshing, true);
+    ASSERT_EQUALS(state.sequenceNumber, 0LL);
+
+    // Signal refresh finish
+    ASSERT_OK(unsetPersistedRefreshFlags(operationContext(), kNss));
+
+    state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
+
+    ASSERT_EQUALS(state.epoch, getCollectionVersion().epoch());
+    ASSERT_EQUALS(state.refreshing, false);
+    ASSERT_EQUALS(state.sequenceNumber, 1LL);
 }
 
 TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
-    setUpCollection();
-
     std::vector<ChunkType> chunks = makeFourChunks();
-    shardmetadatautil::writeNewChunks(
-        operationContext(), kNss, chunks, getCollectionVersion().epoch());
+    ASSERT_OK(updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()));
     checkChunks(kChunkMetadataNss, chunks);
 
     // read all the chunks
-    std::vector<ChunkType> readChunks = assertGet(shardmetadatautil::readShardChunks(
+    std::vector<ChunkType> readChunks = assertGet(readShardChunks(
         operationContext(), kNss, ChunkVersion(0, 0, getCollectionVersion().epoch())));
     for (auto chunkIt = chunks.begin(), readChunkIt = readChunks.begin();
          chunkIt != chunks.end() && readChunkIt != readChunks.end();
@@ -264,19 +257,36 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     }
 
     // read only the highest version chunk
-    readChunks = assertGet(
-        shardmetadatautil::readShardChunks(operationContext(), kNss, getCollectionVersion()));
+    readChunks = assertGet(readShardChunks(operationContext(), kNss, getCollectionVersion()));
 
     ASSERT_TRUE(readChunks.size() == 1);
     ASSERT_BSONOBJ_EQ(chunks.back().toShardBSON(), readChunks.front().toShardBSON());
+}
+
+TEST_F(ShardMetadataUtilTest, UpdatingChunksFindsNewEpochAndClearsMetadata) {
+    // Set up a collections document so we can make sure it's deleted correctly.
+    setUpCollection();
+
+    std::vector<ChunkType> chunks = makeFourChunks();
+    ASSERT_OK(updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()));
+    checkChunks(kChunkMetadataNss, chunks);
+
+    chunks.back().setVersion(ChunkVersion(1, 0, OID::gen()));
+    ASSERT_EQUALS(
+        updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()).code(),
+        ErrorCodes::ConflictingOperationInProgress);
+
+    // Finding a new epoch should have caused the metadata to be cleared for that namespace.
+    checkCollectionIsEmpty(kChunkMetadataNss);
+    // Collections collection should be empty because it only had one entry.
+    checkCollectionIsEmpty(NamespaceString(ShardCollectionType::ConfigNS));
 }
 
 TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     // Load some chunk metadata.
 
     std::vector<ChunkType> chunks = makeFourChunks();
-    ASSERT_OK(shardmetadatautil::writeNewChunks(
-        operationContext(), kNss, chunks, getCollectionVersion().epoch()));
+    ASSERT_OK(updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()));
     checkChunks(kChunkMetadataNss, chunks);
 
     // Load some changes and make sure it's applied correctly.
@@ -319,8 +329,7 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     frontChunkControl.setVersion(collVersion);
     newChunks.push_back(frontChunkControl);
 
-    ASSERT_OK(shardmetadatautil::writeNewChunks(
-        operationContext(), kNss, newChunks, collVersion.epoch()));
+    ASSERT_OK(updateShardChunks(operationContext(), kNss, newChunks, collVersion.epoch()));
 
     chunks.push_back(splitChunkOne);
     chunks.push_back(splitChunkTwoMoved);
@@ -329,10 +338,11 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
 }
 
 TEST_F(ShardMetadataUtilTest, DropChunksAndDeleteCollectionsEntry) {
-    setUpShardingMetadata();
-    ASSERT_OK(shardmetadatautil::dropChunksAndDeleteCollectionsEntry(operationContext(), kNss));
-    checkCollectionIsEmpty(NamespaceString(ShardCollectionType::ConfigNS));
+    setUpShardChunkMetadata();
+    ASSERT_OK(dropChunksAndDeleteCollectionsEntry(operationContext(), kNss));
     checkCollectionIsEmpty(kChunkMetadataNss);
+    // Collections collection should be empty because it only had one entry.
+    checkCollectionIsEmpty(NamespaceString(ShardCollectionType::ConfigNS));
 }
 
 }  // namespace

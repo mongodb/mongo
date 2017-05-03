@@ -110,14 +110,13 @@ void HaystackAccessMethod::searchCommand(OperationContext* opCtx,
             unordered_set<RecordId, RecordId::Hasher> thisPass;
 
 
-            unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(opCtx,
-                                           collection,
-                                           _descriptor,
-                                           key,
-                                           key,
-                                           BoundInclusion::kIncludeBothStartAndEndKeys,
-                                           PlanExecutor::YIELD_MANUAL));
+            auto exec = InternalPlanner::indexScan(opCtx,
+                                                   collection,
+                                                   _descriptor,
+                                                   key,
+                                                   key,
+                                                   BoundInclusion::kIncludeBothStartAndEndKeys,
+                                                   PlanExecutor::NO_YIELD);
             PlanExecutor::ExecState state;
             BSONObj obj;
             RecordId loc;

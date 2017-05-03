@@ -44,13 +44,13 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -70,7 +70,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
                                                 opCtx);
 
     const NamespaceString& nsString = request.getNamespaceString();
-    Collection* collection = db->getCollection(nsString.ns());
+    Collection* collection = db->getCollection(opCtx, nsString);
 
     // If this is the local database, don't set last op.
     if (db->name() == "local") {
@@ -111,8 +111,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;
-    std::unique_ptr<PlanExecutor> exec =
-        uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
+    auto exec = uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
 
     uassertStatusOK(exec->executePlan());
     if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {

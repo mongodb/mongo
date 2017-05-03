@@ -59,29 +59,7 @@ class RemoveRange {
 public:
     RemoveRange() : _min(4), _max(8) {}
 
-    void run() {
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        DBDirectClient client(&opCtx);
-
-        for (int i = 0; i < 10; ++i) {
-            client.insert(ns, BSON("_id" << i));
-        }
-
-        {
-            // Remove _id range [_min, _max).
-            Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(ns), MODE_X);
-            OldClientContext ctx(&opCtx, ns);
-
-            KeyRange range(ns, BSON("_id" << _min), BSON("_id" << _max), BSON("_id" << 1));
-            mongo::WriteConcernOptions dummyWriteConcern;
-            Helpers::removeRange(
-                &opCtx, range, BoundInclusion::kIncludeStartKeyOnly, dummyWriteConcern);
-        }
-
-        // Check that the expected documents remain.
-        ASSERT_BSONOBJ_EQ(expected(), docs(&opCtx));
-    }
+    void run() {}
 
 private:
     BSONArray expected() const {

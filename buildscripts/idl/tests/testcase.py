@@ -17,6 +17,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import unittest
+from typing import Any
 
 if __name__ == 'testcase':
     import sys
@@ -35,15 +36,34 @@ def errors_to_str(errors):
     return "<empty>"
 
 
+class NothingImportResolver(idl.parser.ImportResolverBase):
+    """An import resolver that does nothing."""
+
+    def __init__(self):
+        # type: () -> None
+        """Construct a NothingImportResolver."""
+        super(NothingImportResolver, self).__init__()
+
+    def resolve(self, base_file, imported_file_name):
+        # type: (unicode, unicode) -> unicode
+        """Return the complete path to an imported file name."""
+        raise NotImplementedError()
+
+    def open(self, imported_file_name):
+        # type: (unicode) -> Any
+        """Return an io.Stream for the requested file."""
+        raise NotImplementedError()
+
+
 class IDLTestcase(unittest.TestCase):
     """IDL Test case base class."""
 
-    def _parse(self, doc_str):
-        # type: (unicode) -> idl.syntax.IDLParsedSpec
+    def _parse(self, doc_str, resolver):
+        # type: (unicode, idl.parser.ImportResolverBase) -> idl.syntax.IDLParsedSpec
         """Parse a document and throw a unittest failure if it fails to parse as a valid YAML document."""
 
         try:
-            return idl.parser.parse(doc_str)
+            return idl.parser.parse(doc_str, "unknown", resolver)
         except:  # pylint: disable=bare-except
             self.fail("Failed to parse document:\n%s" % (doc_str))
 
@@ -55,20 +75,21 @@ class IDLTestcase(unittest.TestCase):
                           (doc_str, errors_to_str(parsed_doc.errors)))
         self.assertIsNotNone(parsed_doc.spec, "Expected a parsed doc")
 
-    def assert_parse(self, doc_str):
-        # type: (unicode) -> None
+    def assert_parse(self, doc_str, resolver=NothingImportResolver()):
+        # type: (unicode, idl.parser.ImportResolverBase) -> None
         """Assert a document parsed correctly by the IDL compiler and returned no errors."""
-        parsed_doc = self._parse(doc_str)
+        parsed_doc = self._parse(doc_str, resolver)
         self._assert_parse(doc_str, parsed_doc)
 
-    def assert_parse_fail(self, doc_str, error_id, multiple=False):
-        # type: (unicode, unicode, bool) -> None
+    def assert_parse_fail(self, doc_str, error_id, multiple=False,
+                          resolver=NothingImportResolver()):
+        # type: (unicode, unicode, bool, idl.parser.ImportResolverBase) -> None
         """
         Assert a document parsed correctly by the YAML parser, but not the by the IDL compiler.
 
         Asserts only one error is found in the document to make future IDL changes easier.
         """
-        parsed_doc = self._parse(doc_str)
+        parsed_doc = self._parse(doc_str, resolver)
 
         self.assertIsNone(parsed_doc.spec, "Expected no parsed doc")
         self.assertIsNotNone(parsed_doc.errors, "Expected parser errors")
@@ -85,10 +106,10 @@ class IDLTestcase(unittest.TestCase):
             "For document:\n%s\nExpected error message '%s' but received only errors:\n %s" %
             (doc_str, error_id, errors_to_str(parsed_doc.errors)))
 
-    def assert_bind(self, doc_str):
-        # type: (unicode) -> idl.ast.IDLBoundSpec
+    def assert_bind(self, doc_str, resolver=NothingImportResolver()):
+        # type: (unicode, idl.parser.ImportResolverBase) -> idl.ast.IDLBoundSpec
         """Assert a document parsed and bound correctly by the IDL compiler and returned no errors."""
-        parsed_doc = self._parse(doc_str)
+        parsed_doc = self._parse(doc_str, resolver)
         self._assert_parse(doc_str, parsed_doc)
 
         bound_doc = idl.binder.bind(parsed_doc.spec)
@@ -100,14 +121,14 @@ class IDLTestcase(unittest.TestCase):
 
         return bound_doc.spec
 
-    def assert_bind_fail(self, doc_str, error_id):
-        # type: (unicode, unicode) -> None
+    def assert_bind_fail(self, doc_str, error_id, resolver=NothingImportResolver()):
+        # type: (unicode, unicode, idl.parser.ImportResolverBase) -> None
         """
         Assert a document parsed correctly by the YAML parser and IDL parser, but not bound by the IDL binder.
 
         Asserts only one error is found in the document to make future IDL changes easier.
         """
-        parsed_doc = self._parse(doc_str)
+        parsed_doc = self._parse(doc_str, resolver)
         self._assert_parse(doc_str, parsed_doc)
 
         bound_doc = idl.binder.bind(parsed_doc.spec)

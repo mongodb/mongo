@@ -104,7 +104,7 @@ public:
           _s(this),
           _tracker(nullptr),
           _doneCalled(false) {
-        invariant(_b.len() >= BSONObj::kMinBSONLength);
+        invariant(_b.len() - offset >= BSONObj::kMinBSONLength);
         _b.setlen(_b.len() - 1);  // get rid of the previous EOO.
         // Reserve space for our EOO.
         _b.reserveBytes(1);

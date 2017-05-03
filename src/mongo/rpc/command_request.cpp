@@ -39,7 +39,6 @@
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -50,9 +49,6 @@ namespace rpc {
 
 namespace {
 // None of these include null byte
-const std::size_t kMaxDatabaseLength = 63;
-const std::size_t kMinDatabaseLength = 1;
-
 const std::size_t kMinCommandNameLength = 1;
 const std::size_t kMaxCommandNameLength = 128;
 
@@ -72,20 +68,6 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     Terminated<'\0', StringData> str;
     uassertStatusOK(cur.readAndAdvance<>(&str));
     _database = std::move(str.value);
-
-    uassert(28636,
-            str::stream() << "Database parsed in OP_COMMAND message must be between "
-                          << kMinDatabaseLength
-                          << " and "
-                          << kMaxDatabaseLength
-                          << " bytes. Got: "
-                          << _database,
-            (_database.size() >= kMinDatabaseLength) && (_database.size() <= kMaxDatabaseLength));
-
-    uassert(
-        ErrorCodes::InvalidNamespace,
-        str::stream() << "Invalid database name: '" << _database << "'",
-        NamespaceString::validDBName(_database, NamespaceString::DollarInDbNameBehavior::Allow));
 
     uassertStatusOK(cur.readAndAdvance<>(&str));
     _commandName = std::move(str.value);
@@ -110,10 +92,21 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
                           << '\'',
             _commandArgs.firstElementFieldName() == _commandName);
 
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
     uassertStatusOK(cur.readAndAdvance<>(&obj));
-    _metadata = std::move(obj.val);
+    BSONObjBuilder metadataBuilder;
+    for (auto elem : obj.val) {
+        if (elem.fieldNameStringData() == "configsvr") {
+            metadataBuilder.appendAs(elem, "$configServerState");
+        } else {
+            metadataBuilder.append(elem);
+        }
+    }
+    _metadata = metadataBuilder.obj();
 
-    _inputDocs = DocumentRange{cur.data(), messageEnd};
+    uassert(40419, "OP_COMMAND request contains trailing bytes following metadata", cur.empty());
 }
 
 StringData CommandRequest::getDatabase() const {
@@ -132,15 +125,10 @@ const BSONObj& CommandRequest::getCommandArgs() const {
     return _commandArgs;
 }
 
-DocumentRange CommandRequest::getInputDocs() const {
-    return _inputDocs;
-}
-
 bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
     return (lhs._database == rhs._database) && (lhs._commandName == rhs._commandName) &&
         SimpleBSONObjComparator::kInstance.evaluate(lhs._metadata == rhs._metadata) &&
-        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs) &&
-        (lhs._inputDocs == rhs._inputDocs);
+        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs);
 }
 
 bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {

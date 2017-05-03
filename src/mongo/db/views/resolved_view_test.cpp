@@ -113,6 +113,48 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesAllowDiskUse) {
     ASSERT_TRUE(result.shouldAllowDiskUse());
 }
 
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesHint) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline};
+    AggregationRequest aggRequest(viewNss, {});
+    aggRequest.setHint(BSON("a" << 1));
+
+    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_BSONOBJ_EQ(result.getHint(), BSON("a" << 1));
+}
+
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadPreference) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline};
+    AggregationRequest aggRequest(viewNss, {});
+    aggRequest.setUnwrappedReadPref(BSON("$readPreference"
+                                         << "nearest"));
+
+    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_BSONOBJ_EQ(result.getUnwrappedReadPref(),
+                      BSON("$readPreference"
+                           << "nearest"));
+}
+
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesReadConcern) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline};
+    AggregationRequest aggRequest(viewNss, {});
+    aggRequest.setReadConcern(BSON("level"
+                                   << "linearizable"));
+
+    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_BSONOBJ_EQ(result.getReadConcern(),
+                      BSON("level"
+                           << "linearizable"));
+}
+
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesMaxTimeMS) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline};
+    AggregationRequest aggRequest(viewNss, {});
+    aggRequest.setMaxTimeMS(100u);
+
+    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_EQ(result.getMaxTimeMS(), 100u);
+}
+
 TEST(ResolvedViewTest, ExpandingAggRequestPreservesCollation) {
     const ResolvedView resolvedView{backingNss, emptyPipeline};
     AggregationRequest aggRequest(viewNss, {});

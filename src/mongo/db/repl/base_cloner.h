@@ -49,11 +49,6 @@ public:
     virtual ~BaseCloner() {}
 
     /**
-     * Returns diagnostic information.
-     */
-    virtual std::string getDiagnosticString() const = 0;
-
-    /**
      * Returns true if the cloner has been started (but has not completed).
      */
     virtual bool isActive() const = 0;

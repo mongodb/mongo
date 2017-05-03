@@ -91,9 +91,12 @@ public:
     bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
+        uassert(ErrorCodes::IllegalOperation,
+                "can't issue setShardVersion from 'eval'",
+                !opCtx->getClient()->isInDirectClient());
+
         auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
@@ -226,7 +229,7 @@ public:
             }
 
             // Views do not require a shard version check.
-            if (autoDb->getDb() && !autoDb->getDb()->getCollection(nss.ns()) &&
+            if (autoDb->getDb() && !autoDb->getDb()->getCollection(opCtx, nss) &&
                 autoDb->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
                 return true;
             }

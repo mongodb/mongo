@@ -63,11 +63,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/rpc/command_reply.h"
-#include "mongo/rpc/command_reply_builder.h"
-#include "mongo/rpc/command_request.h"
-#include "mongo/rpc/command_request_builder.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -119,7 +116,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
             log() << curOp->debug().report(opCtx->getClient(), *curOp, lockerInfo.stats);
         }
 
-        if (shouldSample && curOp->shouldDBProfile()) {
+        if (curOp->shouldDBProfile(shouldSample)) {
             profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
         }
     } catch (const DBException& ex) {
@@ -182,7 +179,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
         assertCanWrite_inlock(opCtx, ns);
-        if (!db.getDb()->getCollection(ns.ns())) {  // someone else may have beat us to it.
+        if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
             WriteUnitOfWork wuow(opCtx);
             uassertStatusOK(userCreateNS(opCtx, db.getDb(), ns.ns(), BSONObj()));
             wuow.commit();
@@ -221,8 +218,10 @@ bool handleError(OperationContext* opCtx,
                                    << demangleName(typeid(ex)));
         }
 
-        ShardingState::get(opCtx)->onStaleShardVersion(
-            opCtx, wholeOp.ns, staleConfigException->getVersionReceived());
+        if (!opCtx->getClient()->isInDirectClient()) {
+            ShardingState::get(opCtx)->onStaleShardVersion(
+                opCtx, wholeOp.ns, staleConfigException->getVersionReceived());
+        }
         out->staleConfigException =
             stdx::make_unique<SendStaleConfigException>(*staleConfigException);
         return false;
@@ -254,20 +253,15 @@ static WriteResult::SingleResult createIndex(OperationContext* opCtx,
     BSONObjBuilder cmdBuilder;
     cmdBuilder << "createIndexes" << ns.coll();
     cmdBuilder << "indexes" << BSON_ARRAY(spec);
-    BSONObj cmd = cmdBuilder.done();
+    cmdBuilder << "$db" << systemIndexes.db();
 
-    rpc::CommandRequestBuilder requestBuilder;
-    auto cmdRequestMsg = requestBuilder.setDatabase(ns.db())
-                             .setCommandName("createIndexes")
-                             .setCommandArgs(cmd)
-                             .setMetadata(rpc::makeEmptyMetadata())
-                             .done();
-    rpc::CommandRequest cmdRequest(&cmdRequestMsg);
-    rpc::CommandReplyBuilder cmdReplyBuilder;
+    OpMsg request;
+    request.body = cmdBuilder.done();
+    rpc::OpMsgRequest cmdRequest(request);
+    rpc::OpMsgReplyBuilder cmdReplyBuilder;
     Command::findCommand("createIndexes")->run(opCtx, cmdRequest, &cmdReplyBuilder);
     auto cmdReplyMsg = cmdReplyBuilder.done();
-    rpc::CommandReply cmdReply(&cmdReplyMsg);
-    auto cmdResult = cmdReply.getCommandReply();
+    auto cmdResult = OpMsg::parse(cmdReplyMsg).body;
     uassertStatusOK(getStatusFromCommandResult(cmdResult));
 
     // Unlike normal inserts, it is not an error to "insert" a duplicate index.
@@ -499,6 +493,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* opCtx,
     request.setQuery(op.query);
     request.setCollation(op.collation);
     request.setUpdates(op.update);
+    request.setArrayFilters(op.arrayFilters);
     request.setMulti(op.multi);
     request.setUpsert(op.upsert);
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);  // ParsedUpdate overrides this for $isolated.

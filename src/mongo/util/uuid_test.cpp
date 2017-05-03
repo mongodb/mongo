@@ -136,9 +136,9 @@ TEST(UUIDTest, toAndFromString) {
     ASSERT_NOT_EQUALS(UUID::parse(s4).getValue(), UUID::parse(s5).getValue());
 
     // UUIDs cannot be constructed from invalid strings
-    ASSERT_NOT_OK(UUID::parse("00000000000040008000000000000000"));
-    ASSERT_NOT_OK(UUID::parse("d-d-d-dddddeeee4fffaaaa-bbbbbbbbbbbb"));
-    ASSERT_NOT_OK(UUID::parse("samsamsa-sams-4sam-8sam-samsamsamsam"));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse("00000000000040008000000000000000"));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse("d-d-d-dddddeeee4fffaaaa-bbbbbbbbbbbb"));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse("samsamsa-sams-4sam-8sam-samsamsamsam"));
 }
 
 TEST(UUIDTest, toAndFromBSONTest) {
@@ -162,12 +162,23 @@ TEST(UUIDTest, toAndFromBSONTest) {
     // UUIDs cannot be constructed from invalid BSON elements
     auto bson2 = BSON("uuid"
                       << "sam");
-    ASSERT_NOT_OK(UUID::parse(bson2.getField("uuid")));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson2.getField("uuid")));
     auto bson3 = BSON("uuid"
                       << "dddddddd-eeee-4fff-aaaa-bbbbbbbbbbbb");
-    ASSERT_NOT_OK(UUID::parse(bson3.getField("uuid")));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson3.getField("uuid")));
     auto bson4 = BSON("uuid" << 14);
-    ASSERT_NOT_OK(UUID::parse(bson4.getField("uuid")));
+    ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson4.getField("uuid")));
+}
+
+TEST(UUIDTest, toBSONUsingBSONMacroTest) {
+    auto uuid = UUID::gen();
+    auto bson = BSON("myuuid" << uuid);
+
+    BSONObjBuilder bob;
+    uuid.appendToBuilder(&bob, "myuuid");
+    auto expectedBson = bob.obj();
+
+    ASSERT_BSONOBJ_EQ(expectedBson, bson);
 }
 
 }  // namespace

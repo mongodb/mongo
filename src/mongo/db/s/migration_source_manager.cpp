@@ -375,7 +375,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     if (refreshStatus.isOK()) {
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
 
-        auto refreshedMetadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
+        auto css = CollectionShardingState::get(opCtx, getNss());
+        auto refreshedMetadata = css->getMetadata();
 
         if (!refreshedMetadata) {
             return {ErrorCodes::NamespaceNotSharded,
@@ -391,6 +392,10 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                   << migrationCommitStatus.reason()};
         }
 
+        // Schedule clearing out orphaned documents when they are no longer in active use.
+        const auto orphans = ChunkRange(_args.getMinKey(), _args.getMaxKey());
+        uassertStatusOK(css->cleanUpRange(orphans));
+
         // Migration succeeded
         log() << "Migration succeeded and updated collection version to "
               << refreshedMetadata->getCollVersion();
@@ -405,7 +410,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
         // We don't know whether migration succeeded or failed
         return {migrationCommitStatus.code(),
-                str::stream() << "Failed to refresh metadata after migration commit due to "
+                str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
+                                 " migration commit due to "
                               << refreshStatus.toString()};
     }
 

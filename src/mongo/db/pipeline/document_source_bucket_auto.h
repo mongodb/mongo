@@ -46,7 +46,6 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetNextResult getNext() final;
-    void dispose() final;
     const char* getSourceName() const final;
 
     /**
@@ -70,7 +69,6 @@ public:
     static boost::intrusive_ptr<DocumentSourceBucketAuto> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
-        Variables::Id numVariables,
         int numBuckets,
         std::vector<AccumulationStatement> accumulationStatements = {},
         const boost::intrusive_ptr<GranularityRounder>& granularityRounder = nullptr,
@@ -82,10 +80,12 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+protected:
+    void doDispose() final;
+
 private:
     DocumentSourceBucketAuto(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                              const boost::intrusive_ptr<Expression>& groupByExpression,
-                             Variables::Id numVariables,
                              int numBuckets,
                              std::vector<AccumulationStatement> accumulationStatements,
                              const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
@@ -146,7 +146,6 @@ private:
     bool _populated = false;
     std::vector<Bucket> _buckets;
     std::vector<Bucket>::iterator _bucketsIterator;
-    std::unique_ptr<Variables> _variables;
     boost::intrusive_ptr<Expression> _groupByExpression;
     boost::intrusive_ptr<GranularityRounder> _granularityRounder;
     long long _nDocuments = 0;

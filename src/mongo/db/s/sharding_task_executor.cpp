@@ -38,6 +38,8 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -62,8 +64,8 @@ void ShardingTaskExecutor::join() {
     _executor->join();
 }
 
-std::string ShardingTaskExecutor::getDiagnosticString() const {
-    return _executor->getDiagnosticString();
+void ShardingTaskExecutor::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
+    _executor->appendDiagnosticBSON(builder);
 }
 
 Date_t ShardingTaskExecutor::now() {
@@ -111,26 +113,46 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         OperationTimeTracker::set(request.opCtx, timeTracker);
     }
 
-    auto shardingCb = [timeTracker, cb](const TaskExecutor::RemoteCommandCallbackArgs& args) {
+    auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
+
+    auto shardingCb = [timeTracker, clusterGLE, request, cb](
+        const TaskExecutor::RemoteCommandCallbackArgs& args) {
         cb(args);
 
-        invariant(timeTracker);
-
         if (!args.response.isOK()) {
-            LOG(1) << "Error processing the remote request"
-                   << "do not update operationTime";
+            LOG(1) << "Error processing the remote request, not updating operationTime or gLE";
             return;
         }
 
+        // Update the logical clock.
+        invariant(timeTracker);
         auto operationTime = args.response.data[kOperationTimeField];
-        if (operationTime.eoo()) {
-            LOG(1) << "No operationTime in the response";
-            return;
+        if (!operationTime.eoo()) {
+            invariant(operationTime.type() == BSONType::bsonTimestamp);
+            timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
         }
 
-        invariant(operationTime.type() == BSONType::bsonTimestamp);
+        // Update getLastError info for the client if we're tracking it.
+        if (clusterGLE) {
+            auto swShardingMetadata =
+                rpc::ShardingMetadata::readFromMetadata(args.response.metadata);
+            if (swShardingMetadata.isOK()) {
+                auto shardingMetadata = std::move(swShardingMetadata.getValue());
 
-        timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
+                auto shardConn = ConnectionString::parse(request.target.toString());
+                if (!shardConn.isOK()) {
+                    severe() << "got bad host string in saveGLEStats: " << request.target;
+                }
+
+                clusterGLE->addHostOpTime(shardConn.getValue(),
+                                          HostOpTime(shardingMetadata.getLastOpTime(),
+                                                     shardingMetadata.getLastElectionId()));
+            } else if (swShardingMetadata.getStatus() != ErrorCodes::NoSuchKey) {
+                warning() << "Got invalid sharding metadata "
+                          << redact(swShardingMetadata.getStatus()) << " metadata object was '"
+                          << redact(args.response.metadata) << "'";
+            }
+        }
     };
 
     return _executor->scheduleRemoteCommand(request, shardingCb);

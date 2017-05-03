@@ -136,28 +136,31 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
 }
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs)
-    : GlobalLock(opCtx, lockMode, EnqueueOnly()) {
+    : GlobalLock(opCtx, lockMode, timeoutMs, EnqueueOnly()) {
     waitForLock(timeoutMs);
 }
 
-Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, EnqueueOnly enqueueOnly)
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
+                             LockMode lockMode,
+                             unsigned timeoutMs,
+                             EnqueueOnly enqueueOnly)
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode) {
-    _enqueue(lockMode);
+    _enqueue(lockMode, timeoutMs);
 }
 
-void Lock::GlobalLock::_enqueue(LockMode lockMode) {
+void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
     if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
-    _result = _opCtx->lockState()->lockGlobalBegin(lockMode);
+    _result = _opCtx->lockState()->lockGlobalBegin(lockMode, Milliseconds(timeoutMs));
 }
 
 void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
     if (_result == LOCK_WAITING) {
-        _result = _opCtx->lockState()->lockGlobalComplete(timeoutMs);
+        _result = _opCtx->lockState()->lockGlobalComplete(Milliseconds(timeoutMs));
     }
 
     if (_result != LOCK_OK && _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {

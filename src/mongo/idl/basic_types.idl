@@ -1,0 +1,106 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# IDL Basic Types
+global:
+    cpp_namespace: "mongo"
+        
+types:
+    string:
+        bson_serialization_type: string
+        description: "A BSON UTF-8 string"
+        cpp_type: "std::string"
+        deserializer: "mongo::BSONElement::str"
+
+    int:
+        bson_serialization_type: int
+        description: "A BSON 32-bit integer"
+        cpp_type: "std::int32_t"
+        deserializer: "mongo::BSONElement::_numberInt"
+
+    long:
+        bson_serialization_type: long
+        description: "A BSON 64-bit integer"
+        cpp_type: "std::int64_t"
+        deserializer: "mongo::BSONElement::_numberLong"
+
+    double:
+        bson_serialization_type: double
+        description: "A BSON 64-bit floating point number"
+        cpp_type: "double"
+        deserializer: "mongo::BSONElement::_numberDouble"
+
+    decimal:
+        bson_serialization_type: double
+        description: "A BSON 128-bit floating point decimal number"
+        cpp_type: "mongo::Decimal128"
+        deserializer: "mongo::BSONElement::_numberDecimal"
+
+    bool:
+        bson_serialization_type: bool
+        description: "A BSON bool"
+        cpp_type: "bool"
+        deserializer: "mongo::BSONElement::boolean"
+
+    bindata_generic:
+        bson_serialization_type: bindata
+        bindata_subtype: generic
+        description: "A BSON bindata of "
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+
+    bindata_function:
+        bson_serialization_type: bindata
+        bindata_subtype: function
+        description: "A BSON bindata of function sub type"
+        cpp_type: "std::vector<std::uint8_t>"
+        deserializer: "mongo::BSONElement::_binDataVector"
+
+    bindata_uuid:
+        bson_serialization_type: bindata
+        bindata_subtype: uuid
+        description: "A BSON bindata of uuid sub type"
+        cpp_type: "std::array<std::uint8_t, 16>"
+        deserializer: "mongo::BSONElement::uuid"
+
+    bindata_md5:
+        bson_serialization_type: bindata
+        bindata_subtype: md5
+        description: "A BSON bindata of uuid sub type"
+        cpp_type: "std::array<std::uint8_t, 16>"
+        deserializer: "mongo::BSONElement::md5"
+
+    objectid:
+        bson_serialization_type: objectid
+        description: "A BSON ObjectID"
+        cpp_type: "mongo::OID"
+        deserializer: "mongo::BSONElement::OID"
+
+    object:
+        bson_serialization_type: object
+        description: "A BSONObj without custom deserialization or serialization"
+        cpp_type: "mongo::BSONObj"
+
+    date:
+        bson_serialization_type: date
+        description: "A BSON UTC DateTime"
+        cpp_type: "mongo::Date_t"
+        deserializer: "mongo::BSONElement::date"
+
+    timestamp:
+        bson_serialization_type: timestamp
+        description: "A BSON TimeStamp"
+        cpp_type: "mongo::Timestamp"
+        deserializer: "mongo::BSONElement::timestamp"
