@@ -67,16 +67,17 @@ namespace {
 /**
  * Constructs the BSON specification document for the given namespace, index key and options.
  */
-BSONObj createIndexDoc(const std::string& ns,
-                       const BSONObj& keys,
-                       const BSONObj& collation,
-                       bool unique) {
-    BSONObjBuilder indexDoc;
-    indexDoc.append("ns", ns);
-    indexDoc.append("key", keys);
+BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
+                             const BSONObj& keys,
+                             const BSONObj& collation,
+                             bool unique) {
+    BSONObjBuilder index;
+
+    // Required fields for an index.
+
+    index.append("key", keys);
 
     StringBuilder indexName;
-
     bool isFirstKey = true;
     for (BSONObjIterator keyIter(keys); keyIter.more();) {
         BSONElement currentKey = keyIter.next();
@@ -94,46 +95,27 @@ BSONObj createIndexDoc(const std::string& ns,
             indexName << currentKey.str();  // this should match up with shell command
         }
     }
+    index.append("name", indexName.str());
 
-    indexDoc.append("name", indexName.str());
+    // Index options.
 
     if (!collation.isEmpty()) {
         // Creating an index with the "collation" option requires a v=2 index.
-        indexDoc.append("v", static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-        indexDoc.append("collation", collation);
+        index.append("v", static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+        index.append("collation", collation);
     }
 
     if (unique && !IndexDescriptor::isIdIndexPattern(keys)) {
-        indexDoc.appendBool("unique", unique);
+        index.appendBool("unique", unique);
     }
 
-    return indexDoc.obj();
-}
+    // The outer createIndexes command.
 
-/**
- * Used only for writes to the config server, config and admin databases.
- */
-Status clusterCreateIndex(OperationContext* opCtx,
-                          const std::string& ns,
-                          const BSONObj& keys,
-                          const BSONObj& collation,
-                          bool unique) {
-    const NamespaceString nss(ns);
-
-    // Go through the shard insert path
-    std::unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
-    insert->addToDocuments(createIndexDoc(ns, keys, collation, unique));
-
-    BatchedCommandRequest request(insert.release());
-    request.setNS(NamespaceString(nss.getSystemIndexesCollection()));
-    request.setWriteConcern(WriteConcernOptions::Acknowledged);
-
-    BatchedCommandResponse response;
-
-    ClusterWriter writer(false, 0);
-    writer.write(opCtx, request, &response);
-
-    return response.toStatus();
+    BSONObjBuilder createIndexes;
+    createIndexes.append("createIndexes", nss.coll());
+    createIndexes.append("indexes", BSON_ARRAY(index.obj()));
+    createIndexes.append("writeConcern", WriteConcernOptions::Majority);
+    return createIndexes.obj();
 }
 
 class ShardCollectionCmd : public Command {
@@ -277,7 +259,8 @@ public:
         }
 
         // The rest of the checks require a connection to the primary db
-        ScopedDbConnection conn(routingInfo.primary()->getConnString());
+        auto primaryShard = routingInfo.primary();
+        ScopedDbConnection conn(primaryShard->getConnString());
 
         // Retrieve the collection metadata in order to verify that it is legal to shard this
         // collection.
@@ -492,13 +475,28 @@ public:
             //    receiving shard whenever a migrate occurs.
             //    If the collection has a default collation, explicitly send the simple
             //    collation as part of the createIndex request.
-            BSONObj collationArg =
+            BSONObj collation =
                 !defaultCollation.isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
-            Status status =
-                clusterCreateIndex(opCtx, nss.ns(), proposedKey, collationArg, careAboutUnique);
-            if (!status.isOK()) {
+
+            auto createIndexesCmd =
+                makeCreateIndexesCmd(nss, proposedKey, collation, careAboutUnique);
+
+            const auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                nss.db().toString(),
+                createIndexesCmd,
+                Shard::RetryPolicy::kNotIdempotent);
+            auto createIndexesStatus = swResponse.getStatus();
+            if (createIndexesStatus.isOK()) {
+                const auto response = swResponse.getValue();
+                createIndexesStatus = (!response.commandStatus.isOK())
+                    ? response.commandStatus
+                    : response.writeConcernStatus;
+            }
+            if (!createIndexesStatus.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
-                                       << "primary shard: " << status.reason();
+                                       << "primary shard: " << createIndexesStatus.reason();
                 conn.done();
                 return false;
             }
