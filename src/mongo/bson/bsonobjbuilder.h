@@ -129,7 +129,7 @@ public:
         : _b(&other._b == &other._buf ? _buf : other._b),
           _buf(std::move(other._buf)),
           _offset(std::move(other._offset)),
-          _s(std::move(other._s)),
+          _s(this),  // Don't move from other._s because that will leave it pointing to other.
           _tracker(std::move(other._tracker)),
           _doneCalled(std::move(other._doneCalled)) {
         other.abandon();

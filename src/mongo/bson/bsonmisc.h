@@ -204,6 +204,8 @@ inline BSONObj OR(const BSONObj& a,
 
 // Utility class to implement BSON( key << val ) as described above.
 class BSONObjBuilderValueStream {
+    MONGO_DISALLOW_COPYING(BSONObjBuilderValueStream);
+
 public:
     friend class Labeler;
     BSONObjBuilderValueStream(BSONObjBuilder* builder);
