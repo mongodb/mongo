@@ -134,13 +134,13 @@ class SymbolTable(object):
         for idltype in imported_symbols.types:
             self.add_type(ctxt, idltype)
 
-    def resolve_field_type(self, ctxt, field):
-        # type: (errors.ParserContext, Field) -> Tuple[Optional[Struct], Optional[Type]]
+    def resolve_field_type(self, ctxt, location, field_name, type_name):
+        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Tuple[Optional[Struct], Optional[Type]]
         """Find the type or struct a field refers to or log an error."""
-        return self._resolve_field_type(ctxt, field, field.type)
+        return self._resolve_field_type(ctxt, location, field_name, type_name)
 
-    def _resolve_field_type(self, ctxt, field, type_name):
-        # type: (errors.ParserContext, Field, unicode) -> Tuple[Optional[Struct], Optional[Type]]
+    def _resolve_field_type(self, ctxt, location, field_name, type_name):
+        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Tuple[Optional[Struct], Optional[Type]]
         """Find the type or struct a field refers to or log an error."""
         for idltype in self.types:
             if idltype.name == type_name:
@@ -153,12 +153,12 @@ class SymbolTable(object):
         if type_name.startswith('array<'):
             array_type_name = parse_array_type(type_name)
             if not array_type_name:
-                ctxt.add_bad_array_type_name(field, field.name, type_name)
+                ctxt.add_bad_array_type_name_error(location, field_name, type_name)
                 return (None, None)
 
-            return self._resolve_field_type(ctxt, field, array_type_name)
+            return self._resolve_field_type(ctxt, location, field_name, array_type_name)
 
-        ctxt.add_unknown_type_error(field, field.name, type_name)
+        ctxt.add_unknown_type_error(location, field_name, type_name)
 
         return (None, None)
 
@@ -260,6 +260,8 @@ class Struct(common.SourceLocation):
         self.name = None  # type: unicode
         self.description = None  # type: unicode
         self.strict = True  # type: bool
+        self.chained_types = None  # type: List[unicode]
+        self.chained_structs = None  # type: List[unicode]
         self.fields = None  # type: List[Field]
 
         # Internal property that is not represented as syntax. An imported struct is read from an

@@ -97,6 +97,27 @@ types:
 
 ##################################################################################################
 #
+# Test types used in parser chaining testing
+#
+##################################################################################################
+
+    ChainedType:
+        bson_serialization_type: chain
+        description: "An Chain Type to test chaining"
+        cpp_type: "mongo::ChainedType"
+        serializer: mongo::ChainedType::serialize
+        deserializer: mongo::ChainedType::parse
+
+    AnotherChainedType:
+        bson_serialization_type: chain
+        description: "Another Chain Type to test chaining"
+        cpp_type: "mongo::AnotherChainedType"
+        serializer: mongo::AnotherChainedType::serialize
+        deserializer: mongo::AnotherChainedType::parse
+
+
+##################################################################################################
+#
 # Unit test structs for a single value to ensure type validation works correctly
 #
 ##################################################################################################
@@ -368,4 +389,55 @@ structs:
             field6o:
                 type: array<one_string>
                 optional: true
-#  
+
+##################################################################################################
+#
+# Test Chained Types
+#
+##################################################################################################
+
+    chained_string_basic_type:
+        description: Base struct type for a chained string
+        strict: false
+        fields:
+            stringField: string
+
+    chained_any_basic_type:
+        description: Base struct type for a chained any
+        strict: false
+        fields:
+            anyField: any_basic_type
+
+    chained_object_basic_type:
+        description: Base struct type for a chained object
+        strict: false
+        fields:
+            objectField: object_basic_type
+
+    chained_struct_only:
+        description: UnitTest for chained struct with only chained types
+        strict: false
+        chained_types:
+            - ChainedType
+            - AnotherChainedType
+
+    chained_struct_mixed:
+        description: Chained struct with chained structs and fields
+        strict: true
+        chained_structs:
+            - chained_any_basic_type
+            - chained_object_basic_type
+        fields:
+            field3: string
+
+    chained_struct_type_mixed:
+        description: Chained struct with chained types, structs, and fields
+        strict: false
+        chained_types:
+            - ChainedType
+            - AnotherChainedType
+        chained_structs:
+            - chained_string_basic_type
+        fields:
+            field3:
+                type: int

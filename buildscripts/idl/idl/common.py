@@ -20,6 +20,7 @@ Classes which are shared among both the IDL idl.syntax and idl.AST trees.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import os
 import string
 from typing import Mapping
 
@@ -63,3 +64,14 @@ class SourceLocation(object):
         self.file_name = file_name
         self.line = line
         self.column = column
+
+    def __str__(self):
+        # type: () -> str
+        """
+        Return a formatted location.
+
+        Example location message:
+        test.idl: (17, 4)
+        """
+        msg = "%s: (%d, %d)" % (os.path.basename(self.file_name), self.line, self.column)
+        return msg  # type: ignore

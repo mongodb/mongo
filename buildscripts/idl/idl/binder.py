@@ -12,15 +12,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+# pylint: disable=too-many-lines
 """Transform idl.syntax trees from the parser into well-defined idl.ast trees."""
 
 from __future__ import absolute_import, print_function, unicode_literals
 
 import re
-from typing import Union
+from typing import List, Union
 
 from . import ast
 from . import bson
+from . import common
 from . import cpp_types
 from . import errors
 from . import syntax
@@ -31,8 +33,8 @@ def _validate_single_bson_type(ctxt, idl_type, syntax_type):
     """Validate bson serialization type is correct for a type."""
     bson_type = idl_type.bson_serialization_type[0]
 
-    # Any is only valid if it is the only bson type specified
-    if bson_type == "any":
+    # Any and Chain are only valid if they are the only bson types specified
+    if bson_type in ["any", "chain"]:
         return True
 
     if not bson.is_valid_bson_type(bson_type):
@@ -64,8 +66,8 @@ def _validate_bson_types_list(ctxt, idl_type, syntax_type):
         return _validate_single_bson_type(ctxt, idl_type, syntax_type)
 
     for bson_type in bson_types:
-        if bson_type == "any":
-            ctxt.add_bad_any_type_use_error(idl_type, syntax_type, idl_type.name)
+        if bson_type in ["any", "chain"]:
+            ctxt.add_bad_any_type_use_error(idl_type, bson_type, syntax_type, idl_type.name)
             return False
 
         if not bson.is_valid_bson_type(bson_type):
@@ -141,8 +143,24 @@ def _validate_cpp_type(ctxt, idl_type, syntax_type):
             return
 
 
+def _validate_chain_type_properties(ctxt, idl_type, syntax_type):
+    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> None
+    """Validate a chained type has both a deserializer and serializer."""
+    assert len(
+        idl_type.bson_serialization_type) == 1 and idl_type.bson_serialization_type[0] == 'chain'
+
+    if idl_type.deserializer is None:
+        ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
+                                                  "deserializer")
+
+    if idl_type.serializer is None:
+        ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
+                                                  "serializer")
+
+
 def _validate_type_properties(ctxt, idl_type, syntax_type):
     # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> None
+    # pylint: disable=too-many-branches
     """Validate each type or field is correct."""
 
     # Validate bson type restrictions
@@ -153,11 +171,14 @@ def _validate_type_properties(ctxt, idl_type, syntax_type):
         bson_type = idl_type.bson_serialization_type[0]
 
         if bson_type == "any":
-            # For any, a deserializer is required but the user can try to get away with the default
+            # For 'any', a deserializer is required but the user can try to get away with the default
             # serialization for their C++ type.
             if idl_type.deserializer is None:
                 ctxt.add_missing_ast_required_field_error(idl_type, syntax_type, idl_type.name,
                                                           "deserializer")
+        elif bson_type == "chain":
+            _validate_chain_type_properties(ctxt, idl_type, syntax_type)
+
         elif bson_type == "string":
             # Strings support custom serialization unlike other non-object scalar types
             if idl_type.deserializer is None:
@@ -197,6 +218,22 @@ def _validate_types(ctxt, parsed_spec):
         _validate_type(ctxt, idl_type)
 
 
+def _is_duplicate_field(ctxt, field_container, fields, ast_field):
+    # type: (errors.ParserContext, unicode, List[ast.Field], ast.Field) -> bool
+    """Return True if there is a naming conflict for a given field."""
+
+    # This is normally tested in the parser as part of duplicate detection in a map
+    if ast_field.name in [field.name for field in fields]:
+        for field in fields:
+            if field.name == ast_field.name:
+                duplicate_field = field
+
+        ctxt.add_duplicate_field_error(ast_field, field_container, ast_field.name, duplicate_field)
+        return True
+
+    return False
+
+
 def _bind_struct(ctxt, parsed_spec, struct):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Struct) -> ast.Struct
     """
@@ -215,9 +252,26 @@ def _bind_struct(ctxt, parsed_spec, struct):
     if ast_struct.name.startswith("array<"):
         ctxt.add_array_not_valid_error(ast_struct, "struct", ast_struct.name)
 
-    for field in struct.fields:
+    # Merge chained types as chained fields
+    if struct.chained_types:
+        if ast_struct.strict:
+            ctxt.add_chained_type_no_strict_error(ast_struct, ast_struct.name)
+
+        for chained_type in struct.chained_types:
+            ast_field = _bind_chained_type(ctxt, parsed_spec, ast_struct, chained_type)
+            if ast_field and not _is_duplicate_field(ctxt, chained_type, ast_struct.fields,
+                                                     ast_field):
+                ast_struct.fields.append(ast_field)
+
+    # Merge chained structs as a chained struct and ignored fields
+    for chained_struct in struct.chained_structs or []:
+        _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct)
+
+    # Parse the fields last so that they are serialized after chained stuff.
+    for field in struct.fields or []:
         ast_field = _bind_field(ctxt, parsed_spec, field)
-        if ast_field:
+        if ast_field and not _is_duplicate_field(ctxt, ast_struct.name, ast_struct.fields,
+                                                 ast_field):
             ast_struct.fields.append(ast_field)
 
     return ast_struct
@@ -265,7 +319,7 @@ def _bind_field(ctxt, parsed_spec, field):
         _validate_ignored_field(ctxt, field)
         return ast_field
 
-    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, field)
+    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, field, field.name, field.type)
     if not struct and not idltype:
         return None
 
@@ -274,7 +328,7 @@ def _bind_field(ctxt, parsed_spec, field):
         ast_field.array = True
 
         if field.default or (idltype and idltype.default):
-            ctxt.add_array_no_default(field, field.name)
+            ctxt.add_array_no_default_error(field, field.name)
 
     # Copy over only the needed information if this a struct or a type
     if struct:
@@ -299,6 +353,77 @@ def _bind_field(ctxt, parsed_spec, field):
         _validate_type_properties(ctxt, ast_field, "field")
 
     return ast_field
+
+
+def _bind_chained_type(ctxt, parsed_spec, location, chained_type):
+    # type: (errors.ParserContext, syntax.IDLSpec, common.SourceLocation, unicode) -> ast.Field
+    """Bind the specified chained type."""
+    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, location, chained_type,
+                                                               chained_type)
+    if not idltype:
+        if struct:
+            ctxt.add_chained_type_not_found_error(location, chained_type)
+
+        return None
+
+    if len(idltype.bson_serialization_type) != 1 or idltype.bson_serialization_type[0] != 'chain':
+        ctxt.add_chained_type_wrong_type_error(location, chained_type,
+                                               idltype.bson_serialization_type[0])
+        return None
+
+    ast_field = ast.Field(location.file_name, location.line, location.column)
+    ast_field.name = idltype.name
+    ast_field.cpp_name = idltype.name
+    ast_field.description = idltype.description
+    ast_field.chained = True
+
+    ast_field.cpp_type = idltype.cpp_type
+    ast_field.bson_serialization_type = idltype.bson_serialization_type
+    ast_field.serializer = idltype.serializer
+    ast_field.deserializer = idltype.deserializer
+
+    return ast_field
+
+
+def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
+    # type: (errors.ParserContext, syntax.IDLSpec, ast.Struct, unicode) -> None
+    """Bind the specified chained struct."""
+    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, ast_struct, chained_struct,
+                                                               chained_struct)
+    if not struct:
+        if idltype:
+            ctxt.add_chained_struct_not_found_error(ast_struct, chained_struct)
+
+        return None
+
+    if struct.strict:
+        ctxt.add_chained_nested_struct_no_strict_error(ast_struct, ast_struct.name, chained_struct)
+
+    if struct.chained_types or struct.chained_structs:
+        ctxt.add_chained_nested_struct_no_nested_error(ast_struct, ast_struct.name, chained_struct)
+
+    # Configure a field for the chained struct.
+    ast_field = ast.Field(ast_struct.file_name, ast_struct.line, ast_struct.column)
+    ast_field.name = struct.name
+    ast_field.cpp_name = struct.name
+    ast_field.description = struct.description
+    ast_field.struct_type = struct.name
+    ast_field.bson_serialization_type = ["object"]
+
+    ast_field.chained = True
+
+    if not _is_duplicate_field(ctxt, chained_struct, ast_struct.fields, ast_field):
+        ast_struct.fields.append(ast_field)
+    else:
+        return
+
+    # Merge all the fields from resolved struct into this ast struct as 'ignored'.
+    for field in struct.fields or []:
+        ast_field = _bind_field(ctxt, parsed_spec, field)
+        if ast_field and not _is_duplicate_field(ctxt, chained_struct, ast_struct.fields,
+                                                 ast_field):
+            ast_field.ignore = True
+            ast_struct.fields.append(ast_field)
 
 
 def _bind_globals(parsed_spec):

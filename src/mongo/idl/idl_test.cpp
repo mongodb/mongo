@@ -227,6 +227,8 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
     ASSERT_EQUALS(element.type(), String);
 
     auto testStruct = One_namespacestring::parse(ctxt, testDoc);
+    assert_same_types<decltype(testStruct.getValue()), const NamespaceString&>();
+
     ASSERT_EQUALS(testStruct.getValue(), NamespaceString("foo.bar"));
 
     // Positive: Test we can roundtrip from the just parsed document
@@ -1077,6 +1079,231 @@ TEST(IDLCustomType, TestDerivedParser) {
         ClassDerivedFromStruct one_new;
         one_new.setField1(3);
         one_new.setField2(5);
+        one_new.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+// Chained type testing
+// Check each of types
+// Check for round-tripping of fields and documents
+
+// Positive: demonstrate a class struct chained types
+TEST(IDLChainedType, TestChainedType) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1"
+                        << "abc"
+                        << "field2"
+                        << 5);
+
+    auto testStruct = Chained_struct_only::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getChainedType()), const mongo::ChainedType&>();
+    assert_same_types<decltype(testStruct.getAnotherChainedType()),
+                      const mongo::AnotherChainedType&>();
+
+    ASSERT_EQUALS(testStruct.getChainedType().getField1(), "abc");
+    ASSERT_EQUALS(testStruct.getAnotherChainedType().getField2(), 5);
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        Chained_struct_only one_new;
+        ChainedType ct;
+        ct.setField1("abc");
+        one_new.setChainedType(ct);
+        AnotherChainedType act;
+        act.setField2(5);
+        one_new.setAnotherChainedType(act);
+        one_new.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+// Positive: demonstrate a struct with chained types ignoring extra fields
+TEST(IDLChainedType, TestExtraFields) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1"
+                        << "abc"
+                        << "field2"
+                        << 5
+                        << "field3"
+                        << 123456);
+
+    auto testStruct = Chained_struct_only::parse(ctxt, testDoc);
+    ASSERT_EQUALS(testStruct.getChainedType().getField1(), "abc");
+    ASSERT_EQUALS(testStruct.getAnotherChainedType().getField2(), 5);
+}
+
+
+// Negative: demonstrate a struct with chained types with duplicate fields
+TEST(IDLChainedType, TestDuplicateFields) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1"
+                        << "abc"
+                        << "field2"
+                        << 5
+                        << "field2"
+                        << 123456);
+
+    ASSERT_THROWS(Chained_struct_only::parse(ctxt, testDoc), UserException);
+}
+
+
+// Positive: demonstrate a struct with chained structs
+TEST(IDLChainedType, TestChainedStruct) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("anyField" << 123.456 << "objectField" << BSON("random"
+                                                                       << "pair")
+                                   << "field3"
+                                   << "abc");
+
+    auto testStruct = Chained_struct_mixed::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getChained_any_basic_type()),
+                      const Chained_any_basic_type&>();
+    assert_same_types<decltype(testStruct.getChained_object_basic_type()),
+                      const Chained_object_basic_type&>();
+
+    ASSERT_EQUALS(testStruct.getField3(), "abc");
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+}
+
+// Negative: demonstrate a struct with chained structs and extra fields
+TEST(IDLChainedType, TestChainedStructWithExtraFields) {
+    IDLParserErrorContext ctxt("root");
+
+    // Extra field
+    {
+        auto testDoc = BSON("field3"
+                            << "abc"
+                            << "anyField"
+                            << 123.456
+                            << "objectField"
+                            << BSON("random"
+                                    << "pair")
+                            << "extraField"
+                            << 787);
+        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), UserException);
+    }
+
+
+    // Duplicate any
+    {
+        auto testDoc = BSON("field3"
+                            << "abc"
+                            << "anyField"
+                            << 123.456
+                            << "objectField"
+                            << BSON("random"
+                                    << "pair")
+                            << "anyField"
+                            << 787);
+        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), UserException);
+    }
+
+    // Duplicate object
+    {
+        auto testDoc = BSON("objectField" << BSON("fake"
+                                                  << "thing")
+                                          << "field3"
+                                          << "abc"
+                                          << "anyField"
+                                          << 123.456
+                                          << "objectField"
+                                          << BSON("random"
+                                                  << "pair"));
+        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), UserException);
+    }
+
+    // Duplicate field3
+    {
+        auto testDoc = BSON("field3"
+                            << "abc"
+                            << "anyField"
+                            << 123.456
+                            << "objectField"
+                            << BSON("random"
+                                    << "pair")
+                            << "field3"
+                            << "def");
+        ASSERT_THROWS(Chained_struct_mixed::parse(ctxt, testDoc), UserException);
+    }
+}
+
+
+// Positive: demonstrate a struct with chained structs and types
+TEST(IDLChainedType, TestChainedMixedStruct) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1"
+                        << "abc"
+                        << "field2"
+                        << 5
+                        << "stringField"
+                        << "def"
+                        << "field3"
+                        << 456);
+
+    auto testStruct = Chained_struct_type_mixed::parse(ctxt, testDoc);
+
+    assert_same_types<decltype(testStruct.getChainedType()), const mongo::ChainedType&>();
+    assert_same_types<decltype(testStruct.getAnotherChainedType()),
+                      const mongo::AnotherChainedType&>();
+
+    ASSERT_EQUALS(testStruct.getChainedType().getField1(), "abc");
+    ASSERT_EQUALS(testStruct.getAnotherChainedType().getField2(), 5);
+    ASSERT_EQUALS(testStruct.getChained_string_basic_type().getStringField(), "def");
+    ASSERT_EQUALS(testStruct.getField3(), 456);
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        Chained_struct_type_mixed one_new;
+        ChainedType ct;
+        ct.setField1("abc");
+        one_new.setChainedType(ct);
+        AnotherChainedType act;
+        act.setField2(5);
+        one_new.setAnotherChainedType(act);
+        one_new.setField3(456);
+        Chained_string_basic_type csbt;
+        csbt.setStringField("def");
+        one_new.setChained_string_basic_type(csbt);
         one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();

@@ -54,8 +54,11 @@ def _get_bson_type_check(bson_element, ctxt_name, field):
     """Get the C++ bson type check for a field."""
     bson_types = field.bson_serialization_type
     if len(bson_types) == 1:
-        if bson_types[0] == 'any':
-            # Skip BSON valiation when any
+        if bson_types[0] in ['any', 'chain']:
+            # Skip BSON validation for 'any' types since they are required to validate the
+            # BSONElement.
+            # Skip BSON validation for 'chain' types since they process the raw BSONObject the
+            # encapsulating IDL struct parser is passed.
             return None
 
         if not bson_types[0] == 'bindata':
@@ -121,7 +124,7 @@ class _FieldUsageChecker(object):
         # type: () -> None
         """Output the code to check for missing fields."""
         for field in self.fields:
-            if (not field.optional) and (not field.ignore):
+            if (not field.optional) and (not field.ignore) and (not field.chained):
                 with writer.IndentedScopedBlock(self._writer,
                                                 'if (usedFields.find("%s") == usedFields.end()) {' %
                                                 (field.name), '}'):
@@ -507,11 +510,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._gen_array_deserializer(field)
             return
 
-        # May be an empty block if the type is any
-        with self._predicate(_get_bson_type_check('element', 'ctxt', field)):
+        if field.chained:
+            # Do not generate a predicate check since we always call these deserializers.
 
-            object_value = self._gen_field_deserializer_expression('element', field)
-            self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
+            if field.struct_type:
+                # Do not generate a new parser context, reuse the current one since we are not
+                # entering a nested document.
+                expression = '%s::parse(ctxt, bsonObject)' % (common.title_case(field.struct_type))
+            else:
+                method_name = writer.get_method_name_from_qualified_method_name(field.deserializer)
+                expression = "%s(bsonObject)" % (method_name)
+
+            self._writer.write_line('%s = %s;' % (_get_field_member_name(field), expression))
+        else:
+            # May be an empty block if the type is 'any'
+            with self._predicate(_get_bson_type_check('element', 'ctxt', field)):
+                object_value = self._gen_field_deserializer_expression('element', field)
+                self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
 
     def gen_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -543,6 +558,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 first_field = True
                 for field in struct.fields:
+                    # Do not parse chained fields as fields since they are actually chained types.
+                    if field.chained:
+                        continue
+
                     field_predicate = 'fieldName == "%s"' % (field.name)
                     field_usage_check.add(field)
 
@@ -561,6 +580,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     with self._block('else {', '}'):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
 
+            self._writer.write_empty_line()
+
+            # Parse chained types
+            for field in struct.fields:
+                if not field.chained:
+                    continue
+
+                # Simply generate deserializers since these are all 'any' types
+                self.gen_field_deserializer(field)
             self._writer.write_empty_line()
 
             # Check for required fields
@@ -638,7 +666,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         with self._with_template(template_params):
 
-            if field.array:
+            if field.chained:
+                # Just directly call the serializer for chained structs without opening up a nested
+                # document.
+                self._writer.write_template('${access_member}.serialize(builder);')
+            elif field.array:
                 self._writer.write_template(
                     'BSONArrayBuilder arrayBuilder(builder->subarrayStart("${field_name}"));')
                 with self._block('for (const auto& item : ${access_member}) {', '}'):

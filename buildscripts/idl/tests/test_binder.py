@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+# pylint: disable=too-many-lines
 """Test cases for IDL binder."""
 
 from __future__ import absolute_import, print_function, unicode_literals
@@ -137,7 +138,7 @@ class TestBinder(testcase.IDLTestcase):
                 default: foo
             """))
 
-        # Test object
+        # Test 'any'
         self.assert_bind(
             textwrap.dedent("""
         types:
@@ -145,6 +146,19 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 cpp_type: foo
                 bson_serialization_type: any
+                serializer: foo
+                deserializer: foo
+                default: foo
+            """))
+
+        # Test 'chain'
+        self.assert_bind(
+            textwrap.dedent("""
+        types:
+            foofoo:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: chain
                 serializer: foo
                 deserializer: foo
                 default: foo
@@ -342,7 +356,7 @@ class TestBinder(testcase.IDLTestcase):
                                 - string
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
-        # Test any in list of types
+        # Test 'any' in list of types
         self.assert_bind_fail(
             textwrap.dedent("""
             types:
@@ -378,6 +392,18 @@ class TestBinder(testcase.IDLTestcase):
                                 - fake
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
+        # Test 'chain' in list of types
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            types:
+                foofoo:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type:
+                                - chain
+                                - int
+            """), idl.errors.ERROR_ID_BAD_ANY_TYPE_USE)
+
         # Test unsupported serialization
         for bson_type in [
                 "bool", "date", "null", "decimal", "double", "int", "long", "objectid", "regex",
@@ -406,7 +432,7 @@ class TestBinder(testcase.IDLTestcase):
                     """ % (bson_type)),
                 idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED)
 
-        # Test any serialization needs deserializer
+        # Test 'any' serialization needs deserializer
         self.assert_bind_fail(
             textwrap.dedent("""
             types:
@@ -414,6 +440,28 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: any
+            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+
+        # Test 'chain' serialization needs deserializer
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            types:
+                foofoo:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type: chain
+                    serializer: bar
+            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+
+        # Test 'chain' serialization needs serializer
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            types:
+                foofoo:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type: chain
+                    deserializer: bar
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test list of bson types needs deserializer
@@ -688,6 +736,342 @@ class TestBinder(testcase.IDLTestcase):
                             ignore: true
                             %s
                 """ % (test_value)), idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED)
+
+    def test_chained_type_positive(self):
+        # type: () -> None
+        """Positive parser chaining test cases."""
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+
+            foo1:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: chain
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+        """)
+
+        # Chaining only
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - foo1
+        """))
+
+    def test_chained_type_negative(self):
+        # type: () -> None
+        """Negative parser chaining test cases."""
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+
+            foo1:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: chain
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+        """)
+
+        # Chaining with strict struct
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: true
+                chained_types:
+                    - foo1
+        """), idl.errors.ERROR_ID_CHAINED_NO_TYPE_STRICT)
+
+        # Non-'any' type as chained type
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - string
+        """), idl.errors.ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE)
+
+        # Duplicate chained types
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - foo1
+                    - foo1
+        """), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+
+        # Chaining and fields only with same name
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - foo1
+                fields:
+                    foo1: string
+        """), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+
+    def test_chained_struct_positive(self):
+        # type: () -> None
+        """Positive parser chaining test cases."""
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+
+            foo1:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: chain
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+        structs:
+            chained:
+                description: foo
+                strict: false
+                chained_types:
+                    - foo1
+
+            chained2:
+                description: foo
+                strict: false
+                fields:
+                    field1: string
+        """)
+
+        # A struct with only chaining
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                chained_structs:
+                    - chained2
+        """)))
+
+        # Chaining struct's fields and explicit fields
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                chained_structs:
+                    - chained2
+                fields:
+                    str1: string
+        """)))
+
+        # Chained types and structs
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - foo1
+                chained_structs:
+                    - chained2
+                fields:
+                    str1: string
+        """)))
+
+        # Non-strict chained struct
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_structs:
+                    - chained2
+                fields:
+                    foo1: string
+        """)))
+
+    def test_chained_struct_negative(self):
+        # type: () -> None
+        """Negative parser chaining test cases."""
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+
+            foo1:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: chain
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+        structs:
+            chained:
+                description: foo
+                strict: false
+                fields:
+                    field1: string
+
+            chained2:
+                description: foo
+                strict: false
+                fields:
+                    field1: string
+        """)
+
+        # Type as chained struct
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                chained_structs:
+                    - foo1
+        """)), idl.errors.ERROR_ID_CHAINED_STRUCT_NOT_FOUND)
+
+        # Struct as chained type
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - chained
+        """)), idl.errors.ERROR_ID_CHAINED_TYPE_NOT_FOUND)
+
+        # Duplicated field names across chained struct's fields and fields
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_structs:
+                    - chained
+                fields:
+                    field1: string
+        """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+
+        # Duplicated field names across chained structs
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_structs:
+                    - chained
+                    - chained2
+        """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+
+        # Duplicate chained structs
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                chained_structs:
+                    - chained
+                    - chained
+        """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+
+        # Chained struct with strict true
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                fields:
+                    field1: string
+
+            foobar:
+                description: foo
+                strict: false
+                chained_structs:
+                    - bar1
+                fields:
+                    f1: string
+
+        """)), idl.errors.ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT)
+
+        # Chained struct with nested chained struct
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_structs:
+                    - chained
+
+            foobar:
+                description: foo
+                strict: false
+                chained_structs:
+                    - bar1
+                fields:
+                    f1: string
+
+        """)), idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED)
+
+        # Chained struct with nested chained type
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - foo1
+
+            foobar:
+                description: foo
+                strict: false
+                chained_structs:
+                    - bar1
+                fields:
+                    f1: bar1
+
+        """)), idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED)
 
 
 if __name__ == '__main__':

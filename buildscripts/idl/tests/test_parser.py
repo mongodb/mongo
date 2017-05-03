@@ -125,6 +125,13 @@ class TestParser(testcase.IDLTestcase):
             cpp_includes:
                 inc1: 'foo'"""), idl.errors.ERROR_ID_IS_NODE_TYPE_SCALAR_OR_SEQUENCE)
 
+        # cpp_includes as a sequence of tuples
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        global:
+            cpp_includes:
+               - inc1: 'foo'"""), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
         # Unknown scalar
         self.assert_parse_fail(
             textwrap.dedent("""
@@ -445,6 +452,80 @@ class TestParser(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+    def test_chained_type_positive(self):
+        # type: () -> None
+        """Positive parser chaining test cases."""
+        self.assert_parse(
+            textwrap.dedent("""
+        structs:
+            foo1:
+                description: foo
+                chained_types:
+                    - foo1
+                    - foo2
+        """))
+
+    def test_chained_type_negative(self):
+        # type: () -> None
+        """Negative parser chaining test cases."""
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo1:
+                description: foo
+                chained_types: foo1
+                fields:
+                    foo: bar
+        """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo1:
+                description: foo
+                chained_types:
+                    foo1: bar
+                fields:
+                    foo: bar
+        """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+    def test_chained_struct_positive(self):
+        # type: () -> None
+        """Positive parser chaining test cases."""
+        self.assert_parse(
+            textwrap.dedent("""
+        structs:
+            foo1:
+                description: foo
+                chained_structs:
+                    - foo1
+                    - foo2
+        """))
+
+    def test_chained_struct_negative(self):
+        # type: () -> None
+        """Negative parser chaining test cases."""
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo1:
+                description: foo
+                chained_structs: foo1
+                fields:
+                    foo: bar
+        """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo1:
+                description: foo
+                chained_structs:
+                    foo1: bar
+                fields:
+                    foo: bar
+        """), idl.errors.ERROR_ID_IS_NODE_TYPE)
 
 
 if __name__ == '__main__':

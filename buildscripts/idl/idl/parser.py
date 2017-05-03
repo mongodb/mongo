@@ -85,7 +85,10 @@ def _generic_parser(
                 if ctxt.is_scalar_bool_node(second_node, first_name):
                     syntax_node.__dict__[first_name] = ctxt.get_bool(second_node)
             elif rule_desc.node_type == "scalar_or_sequence":
-                if ctxt.is_sequence_or_scalar_node(second_node, first_name):
+                if ctxt.is_scalar_sequence_or_scalar_node(second_node, first_name):
+                    syntax_node.__dict__[first_name] = ctxt.get_list(second_node)
+            elif rule_desc.node_type == "sequence":
+                if ctxt.is_scalar_sequence(second_node, first_name):
                     syntax_node.__dict__[first_name] = ctxt.get_list(second_node)
             elif rule_desc.node_type == "mapping":
                 if ctxt.is_mapping_node(second_node, first_name):
@@ -138,7 +141,7 @@ def _parse_global(ctxt, spec, node):
 def _parse_imports(ctxt, spec, node):
     # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse an imports section in the IDL file."""
-    if not ctxt.is_sequence_node(node, "imports"):
+    if not ctxt.is_scalar_sequence(node, "imports"):
         return
 
     if spec.imports:
@@ -250,10 +253,13 @@ def _parse_struct(ctxt, spec, name, node):
     _generic_parser(ctxt, node, "struct", struct, {
         "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
         "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
+        "chained_types": _RuleDesc('sequence'),
+        "chained_structs": _RuleDesc('sequence'),
         "strict": _RuleDesc("bool_scalar"),
     })
 
-    if struct.fields is None:
+    # TODO: SHOULD WE ALLOW STRUCTS ONLY WITH CHAINED STUFF and no fields???
+    if struct.fields is None and struct.chained_types is None and struct.chained_structs is None:
         ctxt.add_empty_struct_error(node, struct.name)
 
     spec.symbols.add_struct(ctxt, struct)

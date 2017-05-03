@@ -113,4 +113,54 @@ private:
     std::vector<std::uint8_t> _vec;
 };
 
+/**
+ * Simple class that demonstrates the contract a class must implement to parse an IDL  "chain" type
+ * from the IDL parser.
+ */
+class ChainedType {
+public:
+    static ChainedType parse(const BSONObj& obj) {
+        ChainedType object;
+        object._str = obj["field1"].str();
+        return object;
+    }
+
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("field1", _str);
+    }
+
+    StringData getField1() const {
+        return _str;
+    }
+    void setField1(StringData value) {
+        _str = value.toString();
+    }
+
+private:
+    std::string _str;
+};
+
+class AnotherChainedType {
+public:
+    static AnotherChainedType parse(const BSONObj& obj) {
+        AnotherChainedType object;
+        object._num = obj["field2"].numberLong();
+        return object;
+    }
+
+    void serialize(BSONObjBuilder* builder) const {
+        builder->append("field2", _num);
+    }
+
+    std::int64_t getField2() const {
+        return _num;
+    }
+    void setField2(std::int64_t value) {
+        _num = value;
+    }
+
+private:
+    std::int64_t _num;
+};
+
 }  // namespace mongo

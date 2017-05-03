@@ -85,7 +85,7 @@ class TestImport(testcase.IDLTestcase):
 
         self.assert_parse_fail(
             textwrap.dedent("""
-        imports: 
+        imports:
             a: "a.idl"
             b: "b.idl"
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
