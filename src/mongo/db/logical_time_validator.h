@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,49 +28,48 @@
 
 #pragma once
 
-#include "mongo/s/sharding_mongod_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include <memory>
+
+#include "mongo/db/signed_logical_time.h"
+#include "mongo/db/time_proof_service.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class ClockSourceMock;
-class DBDirectClient;
-class LogicalClock;
-class LogicalTime;
+class OperationContext;
+class ServiceContext;
 
 /**
- * A test fixture that installs a LogicalClock instance with a TimeProofService onto a service
- * context, in addition to the mock storage engine, network, and OpObserver provided by
- * ShardingMongodTestFixture.
+ * This is responsible for signing logical times that can be used to sent to other servers and
+ * verifying signatures of signed logical times.
  */
-class LogicalClockTestFixture : public ShardingMongodTestFixture {
+class LogicalTimeValidator {
 public:
-    LogicalClockTestFixture();
-    ~LogicalClockTestFixture();
+    // Decorate ServiceContext with LogicalTimeValidator instance.
+    static LogicalTimeValidator* get(ServiceContext* service);
+    static LogicalTimeValidator* get(OperationContext* ctx);
+    static void set(ServiceContext* service, std::unique_ptr<LogicalTimeValidator> validator);
 
-protected:
     /**
-     * Sets up this fixture as the primary node in a shard server replica set with a LogicalClock
-     * (with a TimeProofService), storage engine, DBClient, OpObserver, and a mocked clock source.
+     * Returns the newTime with a valid signature.
      */
-    void setUp() override;
+    SignedLogicalTime signLogicalTime(const LogicalTime& newTime);
 
-    void tearDown() override;
+    /**
+     * Returns true if the signature of newTime is valid.
+     */
+    Status validate(const SignedLogicalTime& newTime);
 
-    LogicalClock* getClock() const;
-
-    ClockSourceMock* getMockClockSource() const;
-
-    void setMockClockSourceTime(Date_t time) const;
-
-    Date_t getMockClockSourceTime() const;
-
-    DBDirectClient* getDBClient() const;
+    /**
+     * Saves the newTime if it is newer than the last seen valid LogicalTime without performing
+     * validation.
+     */
+    void updateCacheTrustedSource(const SignedLogicalTime& newTime);
 
 private:
-    LogicalClock* _clock;
-    std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
-    std::unique_ptr<DBDirectClient> _dbDirectClient;
+    stdx::mutex _mutex;
+    SignedLogicalTime _lastSeenValidTime;
+    TimeProofService _timeProofService;
 };
 
 }  // namespace mongo

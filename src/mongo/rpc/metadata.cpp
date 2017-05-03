@@ -38,6 +38,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
@@ -131,7 +132,7 @@ Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) 
 
     auto logicalClock = LogicalClock::get(opCtx);
     if (logicalClock) {
-        auto logicalTimeMetadata = LogicalTimeMetadata::readFromMetadata(logicalTimeElem);
+        auto logicalTimeMetadata = rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem);
         if (!logicalTimeMetadata.isOK()) {
             return logicalTimeMetadata.getStatus();
         }
@@ -143,19 +144,24 @@ Status readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) 
             return Status::OK();
         }
 
+        auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
         if (isAuthorizedToAdvanceClock(opCtx)) {
-            auto advanceClockStatus = logicalClock->advanceClusterTimeFromTrustedSource(signedTime);
-
-            if (!advanceClockStatus.isOK()) {
-                return advanceClockStatus;
+            if (logicalTimeValidator) {
+                logicalTimeValidator->updateCacheTrustedSource(signedTime);
             }
+        } else if (!logicalTimeValidator) {
+            return Status(ErrorCodes::CannotVerifyAndSignLogicalTime,
+                          "Cannot accept logicalTime: " + signedTime.getTime().toString() +
+                              ". May not be a part of a sharded cluster");
         } else {
-            auto advanceClockStatus = logicalClock->advanceClusterTime(signedTime);
+            auto advanceClockStatus = logicalTimeValidator->validate(signedTime);
 
             if (!advanceClockStatus.isOK()) {
                 return advanceClockStatus;
             }
         }
+
+        logicalClock->advanceClusterTime(signedTime.getTime());
     }
 
     return Status::OK();

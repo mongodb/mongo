@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_time_tracker.h"
@@ -149,30 +150,29 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
     }
 
     auto authSession = AuthorizationSession::get(opCtx->getClient());
+    auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
+    const auto& signedTime = logicalTimeMetadata.getValue().getSignedTime();
+
     if (authSession->getAuthorizationManager().isAuthEnabled()) {
-        auto advanceClockStatus =
-            logicalClock->advanceClusterTime(logicalTimeMetadata.getValue().getSignedTime());
+        auto advanceClockStatus = logicalTimeValidator->validate(signedTime);
 
         if (!advanceClockStatus.isOK()) {
             return advanceClockStatus;
         }
     } else {
-        auto advanceClockStatus = logicalClock->advanceClusterTimeFromTrustedSource(
-            logicalTimeMetadata.getValue().getSignedTime());
-
-        if (!advanceClockStatus.isOK()) {
-            return advanceClockStatus;
-        }
+        logicalTimeValidator->updateCacheTrustedSource(signedTime);
     }
 
-    return Status::OK();
+    return logicalClock->advanceClusterTime(signedTime.getTime());
 }
 
 /**
  * Append required fields to command response.
  */
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
-    rpc::LogicalTimeMetadata logicalTimeMetadata(LogicalClock::get(opCtx)->getClusterTime());
+    auto validator = LogicalTimeValidator::get(opCtx);
+    auto currentTime = validator->signLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
     logicalTimeMetadata.writeToMetadata(responseBuilder);
     auto tracker = OperationTimeTracker::get(opCtx);
     if (tracker) {
