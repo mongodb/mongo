@@ -53,8 +53,8 @@ namespace mongo {
  */
 template <typename K,
           typename V,
-          typename Hash = std::hash<K>,
-          typename KeyEqual = std::equal_to<K>>
+          typename Hash = typename stdx::unordered_map<K, V>::hasher,
+          typename KeyEqual = typename stdx::unordered_map<K, V, Hash>::key_equal>
 class LRUCache {
     MONGO_DISALLOW_COPYING(LRUCache);
 
