@@ -55,6 +55,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/processinfo.h"
 
 using namespace std;
 using namespace mongo;
