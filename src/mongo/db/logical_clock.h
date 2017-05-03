@@ -38,7 +38,10 @@ class OperationContext;
 
 /**
  * LogicalClock maintain the clusterTime for a clusterNode. Every cluster node in a replica set has
- * an instance of the LogicalClock installed as a ServiceContext decoration.
+ * an instance of the LogicalClock installed as a ServiceContext decoration. LogicalClock owns the
+ * TimeProofService that allows it to generate proofs to sign LogicalTime values and to validate the
+ * proofs of SignedLogicalTime values.LogicalClock instance must be created before the instance
+ * starts up.
  */
 class LogicalClock {
 public:
@@ -56,17 +59,40 @@ public:
     LogicalClock(ServiceContext*);
 
     /**
-     * The method sets current time to newTime if the newTime > current time and it passes the rate
-     * check.
-     *
-     * Returns an error if the newTime does not pass the rate check.
+     * Attach a pointer to a TimeProofService to the logical clock. Will overwrite an existing
+     * pointer if a TimeProofService has already been attached.
      */
-    Status advanceClusterTime(const LogicalTime newTime);
+    void setTimeProofService(std::unique_ptr<TimeProofService>);
+
+    /**
+     * Returns true if a TimeProofService has been attached to the logical clock.
+     */
+    bool canVerifyAndSign();
+
+    /**
+     * The method sets clusterTime to the newTime if the newTime > _clusterTime and the newTime
+     * passes the rate check and proof validation.
+     * Returns an error if the newTime does not pass the rate check or proof validation,
+     * OK otherwise.
+     */
+    Status advanceClusterTime(const SignedLogicalTime&);
+
+    /**
+     * Similar to advanceClusterTime, but only does rate checking and not proof validation.
+     */
+    Status advanceClusterTimeFromTrustedSource(SignedLogicalTime newTime);
+
+    /**
+     * Similar to advanceClusterTimeFromTrustedSource, but also signs the new time. Note that this
+     * should only be used on trusted LogicalTime (for example, LogicalTime extracted from local
+     * oplog entry).
+     */
+    Status signAndAdvanceClusterTime(LogicalTime newTime);
 
     /**
      * Returns the current clusterTime.
      */
-    LogicalTime getClusterTime();
+    SignedLogicalTime getClusterTime();
 
     /**
      * Returns the next clusterTime value and provides a guarantee that any future call to
@@ -76,12 +102,19 @@ public:
     LogicalTime reserveTicks(uint64_t nTicks);
 
     /**
-     * Resets current time to newTime. Should only be used for initializing this clock from an
-     * oplog timestamp.
+     * Resets _clusterTime to the signed time created from newTime. Should be used at the
+     * initialization after reading the oplog. Must not be called on already initialized clock.
      */
-    void setClusterTimeFromTrustedSource(LogicalTime newTime);
+    void initClusterTimeFromTrustedSource(LogicalTime newTime);
 
 private:
+    /**
+     * Utility to create valid SignedLogicalTime from LogicalTime.
+     */
+    SignedLogicalTime _makeSignedLogicalTime_inlock(LogicalTime);
+
+    Status _advanceClusterTime_inlock(SignedLogicalTime newTime);
+
     /**
      * Rate limiter for advancing logical time. Rejects newTime if its seconds value is more than
      * kMaxAcceptableLogicalClockDrift seconds ahead of this node's wall clock.
@@ -90,9 +123,18 @@ private:
 
     ServiceContext* const _service;
 
-    // The mutex protects _clusterTime.
+    // The mutex protects _clusterTime and _timeProofService.
     stdx::mutex _mutex;
-    LogicalTime _clusterTime;
+    SignedLogicalTime _clusterTime;
+    std::unique_ptr<TimeProofService> _timeProofService;
+
+    /**
+     * Temporary key only used for unit tests.
+     *
+     * TODO: SERVER-28436 Implement KeysCollectionManager
+     * Remove _tempKey and its uses from logical clock, and pass actual key from key manager.
+     */
+    TimeProofService::Key _tempKey = {};
 };
 
 }  // namespace mongo

@@ -31,7 +31,6 @@
 #include "mongo/db/logical_time_metadata_hook.h"
 
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/stdx/memory.h"
 
@@ -43,13 +42,11 @@ LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _ser
 
 Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                      BSONObjBuilder* metadataBob) {
-    auto validator = LogicalTimeValidator::get(_service);
-    if (!validator) {
+    if (!LogicalClock::get(_service)->canVerifyAndSign()) {
         return Status::OK();
     }
 
-    auto newTime = LogicalClock::get(_service)->getClusterTime();
-    LogicalTimeMetadata metadata(validator->signLogicalTime(newTime));
+    LogicalTimeMetadata metadata(LogicalClock::get(_service)->getClusterTime());
     metadata.writeToMetadata(metadataBob);
     return Status::OK();
 }
@@ -60,21 +57,14 @@ Status LogicalTimeMetadataHook::readReplyMetadata(StringData replySource,
     if (!parseStatus.isOK()) {
         return parseStatus.getStatus();
     }
-
     auto& signedTime = parseStatus.getValue().getSignedTime();
-
     // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
     // default constructed SignedLogicalTime should be ignored.
     if (signedTime.getTime() == LogicalTime::kUninitialized) {
         return Status::OK();
     }
 
-    auto validator = LogicalTimeValidator::get(_service);
-    if (validator) {
-        validator->updateCacheTrustedSource(signedTime);
-    }
-
-    return LogicalClock::get(_service)->advanceClusterTime(signedTime.getTime());
+    return LogicalClock::get(_service)->advanceClusterTimeFromTrustedSource(signedTime);
 }
 
 }  // namespace rpc

@@ -78,7 +78,7 @@ KeysCollectionCacheReaderAndUpdater::KeysCollectionCacheReaderAndUpdater(
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
     OperationContext* opCtx) {
 
-    auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
+    auto currentTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
     auto keyStatus = Grid::get(opCtx)->catalogClient(opCtx)->getNewKeys(
         opCtx, _purpose, currentTime, repl::ReadConcernLevel::kLocalReadConcern);
 

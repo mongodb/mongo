@@ -973,21 +973,11 @@ env.Library(
         'logical_clock.cpp',
     ],
     LIBDEPS=[
-        'logical_time',
         'server_parameters',
-        'service_context',
-    ],
-)
-
-env.Library(
-    target='logical_time_validator',
-    source=[
-        'logical_time_validator.cpp',
-    ],
-    LIBDEPS=[
         'service_context',
         'signed_logical_time',
         'time_proof_service',
+        '$BUILD_DIR/mongo/util/clock_source_mock'
     ],
 )
 
@@ -1033,23 +1023,12 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='logical_time_validator_test',
-    source=[
-        'logical_time_validator_test.cpp',
-    ],
-    LIBDEPS=[
-        'logical_time_validator',
-    ],
-)
-
 env.Library(
     target= 'logical_time_metadata_hook',
     source= [
         'logical_time_metadata_hook.cpp',
     ],
     LIBDEPS= [
-        'logical_time_validator',
         'signed_logical_time',
         '$BUILD_DIR/mongo/rpc/metadata',
     ],
@@ -1064,7 +1043,6 @@ env.Library(
         'logical_clock',
         'signed_logical_time',
         '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
-        '$BUILD_DIR/mongo/util/clock_source_mock'
     ],
 )
 

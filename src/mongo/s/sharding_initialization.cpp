@@ -38,7 +38,6 @@
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -209,6 +208,9 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         std::move(executorPool),
         networkPtr);
 
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    LogicalClock::get(opCtx)->setTimeProofService(std::move(timeProofService));
+
     // must be started once the grid is initialized
     grid.shardRegistry()->startup(opCtx);
 
@@ -224,9 +226,6 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
             return status;
         }
     }
-
-    LogicalTimeValidator::set(opCtx->getServiceContext(),
-                              stdx::make_unique<LogicalTimeValidator>());
 
     return Status::OK();
 }

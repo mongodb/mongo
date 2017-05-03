@@ -105,7 +105,7 @@ void LogicalTimeMetadata::writeToMetadata(BSONObjBuilder* metadataBuilder) const
     _clusterTime.getTime().asTimestamp().append(subObjBuilder.bb(), kClusterTimeFieldName);
 
     BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart(kSignatureFieldName));
-    // Logical time metadata is only written when the LogicalTimeValidator is set, which
+    // Logical time metadata is only written when LogicalClock::canVerifyAndSign returns true, which
     // means the cluster time should always have a proof.
     invariant(_clusterTime.getProof());
     _clusterTime.getProof()->appendAsBinData(signatureObjBuilder, kSignatureHashFieldName);

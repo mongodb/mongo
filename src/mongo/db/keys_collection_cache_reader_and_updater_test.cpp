@@ -66,7 +66,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysFromEmpty) {
     KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+    LogicalClock::get(operationContext())->initClusterTimeFromTrustedSource(currentTime);
 
     {
         auto keyStatus = updater.refresh(operationContext());
@@ -99,7 +99,7 @@ TEST_F(CacheUpdaterTest, ShouldPropagateWriteError) {
     KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 2)));
-    LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
+    LogicalClock::get(operationContext())->initClusterTimeFromTrustedSource(currentTime);
 
     FailPointEnableBlock failWriteBlock("failCollectionInserts");
 
@@ -111,7 +111,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
     KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
 
     LogicalClock::get(operationContext())
-        ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(100, 2)));
+        ->initClusterTimeFromTrustedSource(LogicalTime(Timestamp(100, 2)));
 
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
@@ -129,7 +129,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
         ASSERT_EQ(Timestamp(105, 0), key1.getExpiresAt().asTimestamp());
     }
 
-    auto currentTime = LogicalClock::get(operationContext())->getClusterTime();
+    auto currentTime = LogicalClock::get(operationContext())->getClusterTime().getTime();
 
     {
         auto keyStatus = updater.refresh(operationContext());
@@ -165,7 +165,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
     KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
 
     LogicalClock::get(operationContext())
-        ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(108, 2)));
+        ->initClusterTimeFromTrustedSource(LogicalTime(Timestamp(108, 2)));
 
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
@@ -193,7 +193,7 @@ TEST_F(CacheUpdaterTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
         ASSERT_EQ(Timestamp(110, 0), key2.getExpiresAt().asTimestamp());
     }
 
-    auto currentTime = LogicalClock::get(operationContext())->getClusterTime();
+    auto currentTime = LogicalClock::get(operationContext())->getClusterTime().getTime();
 
     {
         auto keyStatus = updater.refresh(operationContext());
@@ -256,7 +256,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
     KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
 
     LogicalClock::get(operationContext())
-        ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(120, 2)));
+        ->initClusterTimeFromTrustedSource(LogicalTime(Timestamp(120, 2)));
 
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
@@ -284,7 +284,7 @@ TEST_F(CacheUpdaterTest, ShouldCreate2KeysIfAllKeysAreExpired) {
         ASSERT_EQ(Timestamp(110, 0), key2.getExpiresAt().asTimestamp());
     }
 
-    auto currentTime = LogicalClock::get(operationContext())->getClusterTime();
+    auto currentTime = LogicalClock::get(operationContext())->getClusterTime().getTime();
 
     {
         auto keyStatus = updater.refresh(operationContext());
@@ -360,7 +360,7 @@ TEST_F(CacheUpdaterTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
     KeysCollectionCacheReaderAndUpdater updater("dummy", Seconds(5));
 
     LogicalClock::get(operationContext())
-        ->setClusterTimeFromTrustedSource(LogicalTime(Timestamp(100, 2)));
+        ->initClusterTimeFromTrustedSource(LogicalTime(Timestamp(100, 2)));
 
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));

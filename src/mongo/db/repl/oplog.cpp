@@ -1127,7 +1127,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
 void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
-    LogicalClock::get(service)->setClusterTimeFromTrustedSource(LogicalTime(newTime));
+    LogicalClock::get(service)->signAndAdvanceClusterTime(LogicalTime(newTime));
     lastSetTimestamp = newTime;
     newTimestampNotifier.notify_all();
 }

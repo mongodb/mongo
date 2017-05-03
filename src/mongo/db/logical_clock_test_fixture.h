@@ -37,6 +37,8 @@ class ClockSourceMock;
 class DBDirectClient;
 class LogicalClock;
 class LogicalTime;
+class SignedLogicalTime;
+class TimeProofService;
 
 /**
  * A test fixture that installs a LogicalClock instance with a TimeProofService onto a service
@@ -65,10 +67,17 @@ protected:
 
     Date_t getMockClockSourceTime() const;
 
+    SignedLogicalTime makeSignedLogicalTime(LogicalTime logicalTime) const;
+
+    void resetTimeProofService();
+
+    void unsetTimeProofService() const;
+
     DBDirectClient* getDBClient() const;
 
 private:
     LogicalClock* _clock;
+    TimeProofService* _timeProofService;
     std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
     std::unique_ptr<DBDirectClient> _dbDirectClient;
 };

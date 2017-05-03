@@ -243,7 +243,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
         if (latestKeyStatusWith.getStatus().isOK()) {
             const auto& latestKey = latestKeyStatusWith.getValue();
-            auto currentTime = LogicalClock::get(service)->getClusterTime();
+            auto currentTime = LogicalClock::get(service)->getClusterTime().getTime();
 
             nextWakeup =
                 howMuchSleepNeedFor(currentTime, latestKey.getExpiresAt(), refreshInterval);

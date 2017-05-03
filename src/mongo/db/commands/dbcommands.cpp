@@ -76,7 +76,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -1323,12 +1322,9 @@ void appendReplyMetadata(OperationContext* opCtx,
                 .writeToMetadata(metadataBob);
         }
 
-        auto validator = LogicalTimeValidator::get(opCtx);
-        if (validator) {
-
-            auto currentTime =
-                validator->signLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+        if (LogicalClock::get(opCtx)->canVerifyAndSign()) {
+            rpc::LogicalTimeMetadata logicalTimeMetadata(
+                LogicalClock::get(opCtx)->getClusterTime());
             logicalTimeMetadata.writeToMetadata(metadataBob);
         }
     }
@@ -1721,7 +1717,7 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         //
         // TODO: SERVER-28445 change this to use computeOperationTime once the exception handling
         // path is moved into Command::run()
-        auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+        auto operationTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
 
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.

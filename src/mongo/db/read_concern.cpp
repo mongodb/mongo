@@ -126,7 +126,7 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
 
     auto afterClusterTime = readConcernArgs.getArgsClusterTime();
     if (afterClusterTime) {
-        auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
+        auto currentTime = LogicalClock::get(opCtx)->getClusterTime().getTime();
         if (currentTime < *afterClusterTime) {
             return {ErrorCodes::InvalidOptions,
                     "readConcern afterClusterTime must not be greater than clusterTime value"};

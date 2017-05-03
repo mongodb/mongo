@@ -86,26 +86,97 @@ void LogicalClock::set(ServiceContext* service, std::unique_ptr<LogicalClock> cl
 
 LogicalClock::LogicalClock(ServiceContext* service) : _service(service) {}
 
-LogicalTime LogicalClock::getClusterTime() {
+SignedLogicalTime LogicalClock::getClusterTime() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _clusterTime;
 }
 
-Status LogicalClock::advanceClusterTime(const LogicalTime newTime) {
+void LogicalClock::setTimeProofService(std::unique_ptr<TimeProofService> tps) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _timeProofService = std::move(tps);
+
+    // Ensure a clock with a time proof service cannot have a cluster time without a proof to
+    // simplify reasoning about signed logical times.
+    if (!_clusterTime.getProof()) {
+        _clusterTime = _makeSignedLogicalTime_inlock(_clusterTime.getTime());
+    }
+}
+
+bool LogicalClock::canVerifyAndSign() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return !!_timeProofService;
+}
+
+SignedLogicalTime LogicalClock::_makeSignedLogicalTime_inlock(LogicalTime logicalTime) {
+    if (_timeProofService) {
+        // TODO: SERVER-28436 Implement KeysCollectionManager
+        // Replace dummy keyId with real id from key manager.
+        return SignedLogicalTime(
+            logicalTime, _timeProofService->getProof(logicalTime, _tempKey), 0);
+    }
+    return SignedLogicalTime(logicalTime, 0);
+}
+
+Status LogicalClock::advanceClusterTime(const SignedLogicalTime& newTime) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (!_timeProofService) {
+        return Status(ErrorCodes::CannotVerifyAndSignLogicalTime,
+                      "Cannot accept logicalTime: " + newTime.getTime().toString() +
+                          ". May not be a part of a sharded cluster");
+    }
+
+    const auto& newLogicalTime = newTime.getTime();
+
+    // No need to check proof if no time was given.
+    if (newLogicalTime == LogicalTime::kUninitialized) {
+        return Status::OK();
+    }
+
+    const auto newProof = newTime.getProof();
+    // Logical time is only sent if a server's clock can verify and sign logical times, so any
+    // received logical times should have proofs.
+    invariant(newProof);
+
+    auto res = _timeProofService->checkProof(newLogicalTime, newProof.get(), _tempKey);
+    if (res != Status::OK()) {
+        return res;
+    }
 
     // The rate limiter check cannot be moved into _advanceClusterTime_inlock to avoid code
     // repetition because it shouldn't be called on direct oplog operations.
-    auto rateLimitStatus = _passesRateLimiter_inlock(newTime);
+    auto rateLimitStatus = _passesRateLimiter_inlock(newTime.getTime());
     if (!rateLimitStatus.isOK()) {
         return rateLimitStatus;
     }
 
-    if (newTime > _clusterTime) {
+    return _advanceClusterTime_inlock(std::move(newTime));
+}
+
+Status LogicalClock::_advanceClusterTime_inlock(SignedLogicalTime newTime) {
+    if (newTime.getTime() > _clusterTime.getTime()) {
         _clusterTime = newTime;
     }
 
     return Status::OK();
+}
+
+Status LogicalClock::advanceClusterTimeFromTrustedSource(SignedLogicalTime newTime) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // The rate limiter check cannot be moved into _advanceClusterTime_inlock to avoid code
+    // repetition because it shouldn't be called on direct oplog operations.
+    auto rateLimitStatus = _passesRateLimiter_inlock(newTime.getTime());
+    if (!rateLimitStatus.isOK()) {
+        return rateLimitStatus;
+    }
+
+    return _advanceClusterTime_inlock(std::move(newTime));
+}
+
+Status LogicalClock::signAndAdvanceClusterTime(LogicalTime newTime) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    auto newSignedTime = _makeSignedLogicalTime_inlock(newTime);
+
+    return _advanceClusterTime_inlock(std::move(newSignedTime));
 }
 
 LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
@@ -114,7 +185,8 @@ LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    LogicalTime clusterTime = _clusterTime;
+    LogicalTime clusterTime = _clusterTime.getTime();
+    LogicalTime nextClusterTime;
 
     const unsigned wallClockSecs =
         durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
@@ -140,25 +212,23 @@ LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
 
     // Save the next cluster time.
     clusterTime.addTicks(1);
-    _clusterTime = clusterTime;
+    nextClusterTime = clusterTime;
 
     // Add the rest of the requested ticks if needed.
     if (nTicks > 1) {
-        _clusterTime.addTicks(nTicks - 1);
+        clusterTime.addTicks(nTicks - 1);
     }
 
-    return clusterTime;
+    _clusterTime = _makeSignedLogicalTime_inlock(clusterTime);
+    return nextClusterTime;
 }
 
-void LogicalClock::setClusterTimeFromTrustedSource(LogicalTime newTime) {
+void LogicalClock::initClusterTimeFromTrustedSource(LogicalTime newTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
+    invariant(_clusterTime.getTime() == LogicalTime::kUninitialized);
     // Rate limit checks are skipped here so a server with no activity for longer than
     // maxAcceptableLogicalClockDrift seconds can still have its cluster time initialized.
-
-    if (newTime > _clusterTime) {
-        _clusterTime = newTime;
-    }
+    _clusterTime = _makeSignedLogicalTime_inlock(newTime);
 }
 
 Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
