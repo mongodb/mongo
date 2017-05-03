@@ -1032,8 +1032,8 @@ TEST(IDLBinData, TestCustomType) {
  */
 class ClassDerivedFromStruct : public DerivedBaseStruct {
 public:
-    static ClassDerivedFromStruct parse(const IDLParserErrorContext& ctxt,
-                                        const BSONObj& bsonObject) {
+    static ClassDerivedFromStruct parseFromBSON(const IDLParserErrorContext& ctxt,
+                                                const BSONObj& bsonObject) {
         ClassDerivedFromStruct o;
         o.parseProtected(ctxt, bsonObject);
         o._done = true;
@@ -1058,7 +1058,7 @@ TEST(IDLCustomType, TestDerivedParser) {
 
     auto testDoc = BSON("field1" << 3 << "field2" << 5);
 
-    auto testStruct = ClassDerivedFromStruct::parse(ctxt, testDoc);
+    auto testStruct = ClassDerivedFromStruct::parseFromBSON(ctxt, testDoc);
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), 5);
 

@@ -41,7 +41,7 @@ namespace mongo {
  */
 class AnyBasicType {
 public:
-    static AnyBasicType parse(const BSONElement& element) {
+    static AnyBasicType parseFromBSON(const BSONElement& element) {
         AnyBasicType any;
         any._element = element;
         return any;
@@ -50,14 +50,14 @@ public:
     /**
      * Serialize this class as a field in a document.
      */
-    void serialize(StringData fieldName, BSONObjBuilder* builder) const {
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
         builder->appendAs(_element, fieldName);
     }
 
     /**
      * Serialize this class as an element of a BSON array.
      */
-    void serialize(BSONArrayBuilder* builder) const {
+    void serializeToBSON(BSONArrayBuilder* builder) const {
         builder->append(_element);
     }
 
@@ -71,13 +71,13 @@ private:
  */
 class ObjectBasicType {
 public:
-    static ObjectBasicType parse(const BSONObj& obj) {
+    static ObjectBasicType parseFromBSON(const BSONObj& obj) {
         ObjectBasicType object;
         object._obj = obj.getOwned();
         return object;
     }
 
-    const BSONObj serialize() const {
+    const BSONObj serializeToBSON() const {
         return _obj;
     }
 
@@ -95,13 +95,13 @@ public:
     BinDataCustomType() {}
     BinDataCustomType(std::vector<std::uint8_t>& vec) : _vec(std::move(vec)) {}
 
-    static BinDataCustomType parse(const std::vector<std::uint8_t> vec) {
+    static BinDataCustomType parseFromBSON(const std::vector<std::uint8_t> vec) {
         BinDataCustomType b;
         b._vec = std::move(vec);
         return b;
     }
 
-    ConstDataRange serialize() const {
+    ConstDataRange serializeToBSON() const {
         return makeCDR(_vec);
     }
 
@@ -119,13 +119,13 @@ private:
  */
 class ChainedType {
 public:
-    static ChainedType parse(const BSONObj& obj) {
+    static ChainedType parseFromBSON(const BSONObj& obj) {
         ChainedType object;
         object._str = obj["field1"].str();
         return object;
     }
 
-    void serialize(BSONObjBuilder* builder) const {
+    void serializeToBSON(BSONObjBuilder* builder) const {
         builder->append("field1", _str);
     }
 
@@ -142,13 +142,13 @@ private:
 
 class AnotherChainedType {
 public:
-    static AnotherChainedType parse(const BSONObj& obj) {
+    static AnotherChainedType parseFromBSON(const BSONObj& obj) {
         AnotherChainedType object;
         object._num = obj["field2"].numberLong();
         return object;
     }
 
-    void serialize(BSONObjBuilder* builder) const {
+    void serializeToBSON(BSONObjBuilder* builder) const {
         builder->append("field2", _num);
     }
 

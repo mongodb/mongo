@@ -50,8 +50,8 @@ types:
         bindata_subtype: generic
         description: "A MongoDB BinDataCustomType"
         cpp_type: "mongo::BinDataCustomType"
-        serializer: mongo::BinDataCustomType::serialize
-        deserializer: mongo::BinDataCustomType::parse
+        serializer: mongo::BinDataCustomType::serializeToBSON
+        deserializer: mongo::BinDataCustomType::parseFromBSON
 
 ##################################################################################################
 #
@@ -63,8 +63,8 @@ types:
         bson_serialization_type: any
         description: "An Any Type"
         cpp_type: "mongo::AnyBasicType"
-        serializer: mongo::AnyBasicType::serialize
-        deserializer: mongo::AnyBasicType::parse
+        serializer: mongo::AnyBasicType::serializeToBSON
+        deserializer: mongo::AnyBasicType::parseFromBSON
 
 ##################################################################################################
 #
@@ -76,8 +76,8 @@ types:
         bson_serialization_type: object
         description: "An object Type"
         cpp_type: "mongo::ObjectBasicType"
-        serializer: mongo::ObjectBasicType::serialize
-        deserializer: mongo::ObjectBasicType::parse
+        serializer: mongo::ObjectBasicType::serializeToBSON
+        deserializer: mongo::ObjectBasicType::parseFromBSON
 
 ##################################################################################################
 #
@@ -105,15 +105,15 @@ types:
         bson_serialization_type: chain
         description: "An Chain Type to test chaining"
         cpp_type: "mongo::ChainedType"
-        serializer: mongo::ChainedType::serialize
-        deserializer: mongo::ChainedType::parse
+        serializer: mongo::ChainedType::serializeToBSON
+        deserializer: mongo::ChainedType::parseFromBSON
 
     AnotherChainedType:
         bson_serialization_type: chain
         description: "Another Chain Type to test chaining"
         cpp_type: "mongo::AnotherChainedType"
-        serializer: mongo::AnotherChainedType::serialize
-        deserializer: mongo::AnotherChainedType::parse
+        serializer: mongo::AnotherChainedType::serializeToBSON
+        deserializer: mongo::AnotherChainedType::parseFromBSON
 
 
 ##################################################################################################

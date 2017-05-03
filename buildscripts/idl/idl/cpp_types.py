@@ -562,9 +562,12 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
 
     def gen_serializer_expression(self, indented_writer, expression):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
+        method_name = writer.get_method_name(self._field.serializer)
         indented_writer.write_line(
             common.template_args(
-                'const BSONObj localObject = ${expression}.serialize();', expression=expression))
+                'const BSONObj localObject = ${expression}.${method_name}();',
+                expression=expression,
+                method_name=method_name))
         return "localObject"
 
 
