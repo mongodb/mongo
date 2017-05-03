@@ -583,7 +583,7 @@ void fillWriterVectors(OperationContext* opCtx,
     CachedCollectionProperties collPropertiesCache;
 
     for (auto&& op : *ops) {
-        StringMapTraits::HashedKey hashedNs(op.ns);
+        StringMapTraits::HashedKey hashedNs(op.getNamespace().ns());
         uint32_t hash = hashedNs.hash();
 
         if (op.isCrudOpType()) {
@@ -602,7 +602,7 @@ void fillWriterVectors(OperationContext* opCtx,
                 MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
             }
 
-            if (op.opType == "i" && collProperties.isCapped) {
+            if (op.getOpType() == "i" && collProperties.isCapped) {
                 // Mark capped collection ops before storing them to ensure we do not attempt to
                 // bulk insert them.
                 op.isForCappedCollection = true;
@@ -871,14 +871,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
 
     if (!entry.raw.isEmpty()) {
         // check for oplog version change
-        int curVersion = 0;
-        if (entry.version.eoo()) {
-            // missing version means version 1
-            curVersion = 1;
-        } else {
-            curVersion = entry.version.Int();
-        }
-
+        int curVersion = entry.getVersion();
         if (curVersion != OplogEntry::kOplogVersion) {
             severe() << "expected oplog version " << OplogEntry::kOplogVersion
                      << " but found version " << curVersion
@@ -887,8 +880,8 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
         }
     }
 
-    if (limits.slaveDelayLatestTimestamp &&
-        entry.ts.timestampTime() > *limits.slaveDelayLatestTimestamp) {
+    auto entryTime = Date_t::fromDurationSinceEpoch(Seconds(entry.getTimestamp().getSecs()));
+    if (limits.slaveDelayLatestTimestamp && entryTime > *limits.slaveDelayLatestTimestamp) {
 
         ops->pop_back();  // Don't do this op yet.
         if (ops->empty()) {
@@ -900,11 +893,11 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     }
 
     // Check for ops that must be processed one at a time.
-    if (entry.raw.isEmpty() ||       // sentinel that network queue is drained.
-        (entry.opType[0] == 'c') ||  // commands.
+    if (entry.raw.isEmpty() ||            // sentinel that network queue is drained.
+        (entry.getOpType()[0] == 'c') ||  // commands.
         // Index builds are achieved through the use of an insert op, not a command op.
         // The following line is the same as what the insert code uses to detect an index build.
-        (!entry.ns.empty() && nsToCollectionSubstring(entry.ns) == "system.indexes")) {
+        (!entry.getNamespace().isEmpty() && entry.getNamespace().coll() == "system.indexes")) {
         if (ops->getCount() == 1) {
             // apply commands one-at-a-time
             _networkQueue->consume(opCtx);
@@ -1070,7 +1063,9 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     if (oplogEntryPointers->size() > 1) {
         std::stable_sort(oplogEntryPointers->begin(),
                          oplogEntryPointers->end(),
-                         [](const OplogEntry* l, const OplogEntry* r) { return l->ns < r->ns; });
+                         [](const OplogEntry* l, const OplogEntry* r) {
+                             return l->getNamespace() < r->getNamespace();
+                         });
     }
 
     // This function is only called in steady state replication.
@@ -1084,7 +1079,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
          oplogEntriesIterator != oplogEntryPointers->end();
          ++oplogEntriesIterator) {
         auto entry = *oplogEntriesIterator;
-        if (entry->opType[0] == 'i' && !entry->isForCappedCollection &&
+        if (entry->getOpType()[0] == 'i' && !entry->isForCappedCollection &&
             oplogEntriesIterator > doNotGroupBeforePoint) {
             // Attempt to group inserts if possible.
             std::vector<BSONObj> toInsert;
@@ -1094,10 +1089,11 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                 oplogEntriesIterator + 1,
                 oplogEntryPointers->end(),
                 [&](const OplogEntry* nextEntry) {
-                    return nextEntry->opType[0] != 'i' ||  // Must be an insert.
-                        nextEntry->ns != entry->ns ||      // Must be the same namespace.
+                    return nextEntry->getOpType()[0] != 'i' ||  // Must be an insert.
+                        nextEntry->getNamespace() !=
+                        entry->getNamespace() ||  // Must be the same namespace.
                         // Must not create too large an object.
-                        (batchSize += nextEntry->o.Obj().objsize()) > insertVectorMaxBytes ||
+                        (batchSize += nextEntry->getObject().objsize()) > insertVectorMaxBytes ||
                         ++batchCount >= 64;  // Or have too many entries.
                 });
 
@@ -1117,7 +1113,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                 for (auto groupingIterator = oplogEntriesIterator;
                      groupingIterator != endOfGroupableOpsIterator;
                      ++groupingIterator) {
-                    insertArrayBuilder.append((*groupingIterator)->o.Obj());
+                    insertArrayBuilder.append((*groupingIterator)->getObject());
                 }
                 insertArrayBuilder.done();
 
@@ -1280,7 +1276,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
-        storage->setOplogDeleteFromPoint(opCtx, ops.front().ts.timestamp());
+        storage->setOplogDeleteFromPoint(opCtx, ops.front().getTimestamp());
         scheduleWritesToOplog(opCtx, workerPool, ops);
         fillWriterVectors(opCtx, &ops, &writerVectors);
 

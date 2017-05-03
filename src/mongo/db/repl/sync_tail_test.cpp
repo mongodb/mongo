@@ -718,9 +718,9 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     auto insertOp1b = makeOp(nss1);
     auto insertOp2a = makeOp(nss2);
     auto insertOp2b = makeOp(nss2);
-    MultiApplier::Operations operationsApplied;
+    std::vector<BSONObj> operationsApplied;
     auto syncApply = [&operationsApplied](OperationContext*, const BSONObj& op, bool) {
-        operationsApplied.push_back(OplogEntry(op));
+        operationsApplied.push_back(op.copy());
         return Status::OK();
     };
 
@@ -729,26 +729,26 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
 
     ASSERT_EQUALS(4U, operationsApplied.size());
-    ASSERT_EQUALS(createOp1, operationsApplied[0]);
-    ASSERT_EQUALS(createOp2, operationsApplied[1]);
+    ASSERT_BSONOBJ_EQ(createOp1.raw, operationsApplied[0]);
+    ASSERT_BSONOBJ_EQ(createOp2.raw, operationsApplied[1]);
 
     // Check grouped insert operations in namespace "nss1".
-    ASSERT_EQUALS(insertOp1a.getOpTime(), operationsApplied[2].getOpTime());
-    ASSERT_EQUALS(insertOp1a.ns, operationsApplied[2].ns);
-    ASSERT_EQUALS(BSONType::Array, operationsApplied[2].o.type());
-    auto group1 = operationsApplied[2].o.Array();
+    ASSERT_EQUALS(insertOp1a.getOpTime(), OpTime::parseFromOplogEntry(operationsApplied[2]));
+    ASSERT_EQUALS(insertOp1a.getNamespace().ns(), operationsApplied[2]["ns"].valuestrsafe());
+    ASSERT_EQUALS(BSONType::Array, operationsApplied[2]["o"].type());
+    auto group1 = operationsApplied[2]["o"].Array();
     ASSERT_EQUALS(2U, group1.size());
-    ASSERT_BSONOBJ_EQ(insertOp1a.o.Obj(), group1[0].Obj());
-    ASSERT_BSONOBJ_EQ(insertOp1b.o.Obj(), group1[1].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp1a.getObject(), group1[0].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp1b.getObject(), group1[1].Obj());
 
     // Check grouped insert operations in namespace "nss2".
-    ASSERT_EQUALS(insertOp2a.getOpTime(), operationsApplied[3].getOpTime());
-    ASSERT_EQUALS(insertOp2a.ns, operationsApplied[3].ns);
-    ASSERT_EQUALS(BSONType::Array, operationsApplied[3].o.type());
-    auto group2 = operationsApplied[3].o.Array();
+    ASSERT_EQUALS(insertOp2a.getOpTime(), OpTime::parseFromOplogEntry(operationsApplied[3]));
+    ASSERT_EQUALS(insertOp2a.getNamespace().ns(), operationsApplied[3]["ns"].valuestrsafe());
+    ASSERT_EQUALS(BSONType::Array, operationsApplied[3]["o"].type());
+    auto group2 = operationsApplied[3]["o"].Array();
     ASSERT_EQUALS(2U, group2.size());
-    ASSERT_BSONOBJ_EQ(insertOp2a.o.Obj(), group2[0].Obj());
-    ASSERT_BSONOBJ_EQ(insertOp2b.o.Obj(), group2[1].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp2a.getObject(), group2[0].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp2b.getObject(), group2[1].Obj());
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
@@ -770,9 +770,9 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
     MultiApplier::Operations operationsToApply;
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
-    MultiApplier::Operations operationsApplied;
+    std::vector<BSONObj> operationsApplied;
     auto syncApply = [&operationsApplied](OperationContext*, const BSONObj& op, bool) {
-        operationsApplied.push_back(OplogEntry(op));
+        operationsApplied.push_back(op.copy());
         return Status::OK();
     };
 
@@ -785,21 +785,21 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesLimitWhenGroupingInsertOperation) {
     // multiSyncApply should combine operations as follows:
     // {create}, {grouped_insert}, {insert_(limit+1)}
     ASSERT_EQUALS(3U, operationsApplied.size());
-    ASSERT_EQUALS(createOp, operationsApplied[0]);
+    ASSERT_BSONOBJ_EQ(createOp.raw, operationsApplied[0]);
 
     const auto& groupedInsertOp = operationsApplied[1];
-    ASSERT_EQUALS(insertOps.front().getOpTime(), groupedInsertOp.getOpTime());
-    ASSERT_EQUALS(insertOps.front().ns, groupedInsertOp.ns);
-    ASSERT_EQUALS(BSONType::Array, groupedInsertOp.o.type());
-    auto groupedInsertDocuments = groupedInsertOp.o.Array();
+    ASSERT_EQUALS(insertOps.front().getOpTime(), OpTime::parseFromOplogEntry(groupedInsertOp));
+    ASSERT_EQUALS(insertOps.front().getNamespace().ns(), groupedInsertOp["ns"].valuestrsafe());
+    ASSERT_EQUALS(BSONType::Array, groupedInsertOp["o"].type());
+    auto groupedInsertDocuments = groupedInsertOp["o"].Array();
     ASSERT_EQUALS(limit, groupedInsertDocuments.size());
     for (std::size_t i = 0; i < limit; ++i) {
         const auto& insertOp = insertOps[i];
-        ASSERT_BSONOBJ_EQ(insertOp.o.Obj(), groupedInsertDocuments[i].Obj());
+        ASSERT_BSONOBJ_EQ(insertOp.getObject(), groupedInsertDocuments[i].Obj());
     }
 
     // (limit + 1)-th insert operations should not be included in group of first (limit) inserts.
-    ASSERT_EQUALS(insertOps.back(), operationsApplied[2]);
+    ASSERT_BSONOBJ_EQ(insertOps.back().raw, operationsApplied[2]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGroupedInsertFails) {
