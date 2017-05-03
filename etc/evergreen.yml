@@ -149,6 +149,8 @@ variables:
 #            Functions                #
 #######################################
 
+stepback: true
+
 functions:
 
   "fetch artifacts" : &fetch_artifacts
