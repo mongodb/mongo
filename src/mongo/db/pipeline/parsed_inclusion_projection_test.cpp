@@ -643,6 +643,104 @@ TEST(InclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
 
+//
+// Detection of subset projection.
+//
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForIdenticalProjection) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a" << true << "b" << true));
+
+    auto proj = BSON("_id" << false << "a" << true << "b" << true);
+
+    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForSupersetProjection) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a" << true << "b" << true));
+
+    auto proj = BSON("_id" << false << "a" << true << "b" << true << "c" << true);
+
+    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForIdenticalNestedProjection) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a.b" << true));
+
+    auto proj = BSON("_id" << false << "a.b" << true);
+
+    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectSubsetForSupersetProjectionWithNestedFields) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a" << true << "c" << BSON("d" << true)));
+
+    auto proj = BSON("_id" << false << "a" << true << "b" << true << "c.d" << true);
+
+    ASSERT_TRUE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissingFields) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a" << true << "b" << true));
+
+    auto proj = BSON("_id" << false << "a" << true);
+    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+
+    proj = BSON("_id" << false << "a" << true << "c" << true);
+    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest,
+     ShouldDetectNonSubsetForSupersetProjectionWithoutComputedFields) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a" << true << "b" << true << "c" << BSON("$literal" << 1)));
+
+    auto proj = BSON("_id" << false << "a" << true << "b" << true);
+
+    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissingNestedFields) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a.b" << true << "a.c" << true));
+
+    auto proj = BSON("_id" << false << "a.b" << true);
+
+    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithRenamedFields) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a"
+                         << "$b"));
+
+    auto proj = BSON("_id" << false << "b" << true);
+
+    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+}
+
+TEST(InclusionProjectionSubsetTest, ShouldDetectNonSubsetForProjectionWithMissingIdField) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedInclusionProjection inclusion(expCtx);
+    inclusion.parse(BSON("a" << true));
+
+    auto proj = BSON("a" << true);
+
+    ASSERT_FALSE(inclusion.isSubsetOfProjection(proj));
+}
+
 }  // namespace
 }  // namespace parsed_aggregation_projection
 }  // namespace mongo

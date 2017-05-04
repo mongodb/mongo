@@ -100,8 +100,8 @@ public:
     ParsedExclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ParsedAggregationProjection(expCtx), _root(new ExclusionNode()) {}
 
-    ProjectionType getType() const final {
-        return ProjectionType::kExclusion;
+    TransformerType getType() const final {
+        return TransformerType::kExclusionProjection;
     }
 
     Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;

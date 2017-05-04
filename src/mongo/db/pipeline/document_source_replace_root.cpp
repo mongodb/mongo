@@ -52,6 +52,10 @@ public:
     ReplaceRootTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : _expCtx(expCtx) {}
 
+    TransformerType getType() const final {
+        return TransformerType::kReplaceRoot;
+    }
+
     Document applyTransformation(const Document& input) final {
         // Extract subdocument in the form of a Value.
         Value newRoot = _newRoot->evaluate(input);

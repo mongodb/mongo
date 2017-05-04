@@ -187,8 +187,8 @@ public:
     ParsedInclusionProjection(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ParsedAggregationProjection(expCtx), _root(new InclusionNode()) {}
 
-    ProjectionType getType() const final {
-        return ProjectionType::kInclusion;
+    TransformerType getType() const final {
+        return TransformerType::kInclusionProjection;
     }
 
     /**
@@ -243,6 +243,13 @@ public:
      * each element in the array.
      */
     Document applyProjection(const Document& inputDoc) const final;
+
+    /*
+     * Checks whether the inclusion projection represented by the InclusionNode
+     * tree is a subset of the object passed in. Projections that have any
+     * computed or renamed fields are not considered a subset.
+     */
+    bool isSubsetOfProjection(const BSONObj& proj) const final;
 
 private:
     /**

@@ -46,6 +46,9 @@
 namespace mongo {
 namespace parsed_aggregation_projection {
 
+using TransformerType =
+    DocumentSourceSingleDocumentTransformation::TransformerInterface::TransformerType;
+
 //
 // ProjectionSpecValidator
 //
@@ -151,7 +154,7 @@ public:
      * fields (ones which are defined by an expression or a literal) are treated as inclusion
      * projections for in this context of the$project stage.
      */
-    static ProjectionType parse(const BSONObj& spec) {
+    static TransformerType parse(const BSONObj& spec) {
         ProjectTypeParser parser(spec);
         parser.parse();
         invariant(parser._parsedType);
@@ -177,13 +180,14 @@ private:
             BSONElement elem = _rawObj.firstElement();
             if (elem.fieldNameStringData() == "_id" && (elem.isBoolean() || elem.isNumber()) &&
                 !elem.trueValue()) {
-                _parsedType = ProjectionType::kExclusion;
+                _parsedType = TransformerType::kExclusionProjection;
             }
         }
 
         // Default to inclusion if nothing (except maybe '_id') is explicitly included or excluded.
         if (!_parsedType) {
-            _parsedType = ProjectionType::kInclusion;
+            _parsedType = DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                TransformerType::kInclusionProjection;
         }
     }
 
@@ -208,8 +212,12 @@ private:
                         str::stream() << "Bad projection specification, cannot exclude fields "
                                          "other than '_id' in an inclusion projection: "
                                       << _rawObj.toString(),
-                        !_parsedType || (*_parsedType == ProjectionType::kExclusion));
-                _parsedType = ProjectionType::kExclusion;
+                        !_parsedType ||
+                            (*_parsedType ==
+                             DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                                 TransformerType::kExclusionProjection));
+                _parsedType = DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                    TransformerType::kExclusionProjection;
             }
         } else {
             // A boolean true, a truthy numeric value, or any expression can only be used with an
@@ -219,8 +227,12 @@ private:
                     str::stream() << "Bad projection specification, cannot include fields or "
                                      "add computed fields during an exclusion projection: "
                                   << _rawObj.toString(),
-                    !_parsedType || (*_parsedType == ProjectionType::kInclusion));
-            _parsedType = ProjectionType::kInclusion;
+                    !_parsedType ||
+                        (*_parsedType ==
+                         DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                             TransformerType::kInclusionProjection));
+            _parsedType = DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                TransformerType::kInclusionProjection;
         }
     }
 
@@ -241,8 +253,12 @@ private:
                         str::stream() << "Bad projection specification, cannot include fields or "
                                          "add computed fields during an exclusion projection: "
                                       << _rawObj.toString(),
-                        !_parsedType || _parsedType == ProjectionType::kInclusion);
-                _parsedType = ProjectionType::kInclusion;
+                        !_parsedType ||
+                            _parsedType ==
+                                DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                                    TransformerType::kInclusionProjection);
+                _parsedType = DocumentSourceSingleDocumentTransformation::TransformerInterface::
+                    TransformerType::kInclusionProjection;
                 continue;
             }
             parseElement(elem, FieldPath::getFullyQualifiedPath(prefix.fullPath(), fieldName));
@@ -253,7 +269,7 @@ private:
     const BSONObj& _rawObj;
 
     // This will be populated during parse().
-    boost::optional<ProjectionType> _parsedType;
+    boost::optional<TransformerType> _parsedType;
 };
 
 }  // namespace
@@ -273,11 +289,11 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     auto projectionType = ProjectTypeParser::parse(spec);
     // kComputed is a projection type reserved for $addFields, and should never be detected by the
     // ProjectTypeParser.
-    invariant(projectionType != ProjectionType::kComputed);
+    invariant(projectionType != TransformerType::kComputedProjection);
 
     // We can't use make_unique() here, since the branches have different types.
     std::unique_ptr<ParsedAggregationProjection> parsedProject(
-        projectionType == ProjectionType::kInclusion
+        projectionType == TransformerType::kInclusionProjection
             ? static_cast<ParsedAggregationProjection*>(new ParsedInclusionProjection(expCtx))
             : static_cast<ParsedAggregationProjection*>(new ParsedExclusionProjection(expCtx)));
 

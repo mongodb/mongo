@@ -62,8 +62,8 @@ public:
     static std::unique_ptr<ParsedAddFields> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec);
 
-    ProjectionType getType() const final {
-        return ProjectionType::kComputed;
+    TransformerType getType() const final {
+        return TransformerType::kComputedProjection;
     }
 
     /**

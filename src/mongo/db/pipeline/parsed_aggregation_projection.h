@@ -45,8 +45,6 @@ class ExpressionContext;
 
 namespace parsed_aggregation_projection {
 
-enum class ProjectionType { kExclusion, kInclusion, kComputed };
-
 /**
  * This class ensures that the specification was valid: that none of the paths specified conflict
  * with one another, that there is at least one field, etc. Here "projection" includes both
@@ -121,11 +119,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec);
 
     virtual ~ParsedAggregationProjection() = default;
-
-    /**
-     * Returns the type of projection represented by this ParsedAggregationProjection.
-     */
-    virtual ProjectionType getType() const = 0;
 
     /**
      * Parse the user-specified BSON object 'spec'. By the time this is called, 'spec' has already
