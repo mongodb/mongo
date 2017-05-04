@@ -890,8 +890,10 @@ env.Library(
     target='logical_session_id',
     source=[
         'logical_session_id.cpp',
+        env.Idlc('logical_session_id.idl')[0],
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/uuid',
         '$BUILD_DIR/mongo/base',
     ],

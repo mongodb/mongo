@@ -30,11 +30,23 @@
 
 #include "mongo/db/logical_session_id.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_session_id_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-LogicalSessionId::LogicalSessionId(UUID id) : _id(id) {}
+LogicalSessionId::LogicalSessionId() {
+    setId(UUID::gen());
+}
+
+LogicalSessionId::LogicalSessionId(UUID id) {
+    setId(std::move(id));
+}
+
+LogicalSessionId LogicalSessionId::gen() {
+    return {UUID::gen()};
+}
 
 StatusWith<LogicalSessionId> LogicalSessionId::parse(const TxnId& txnId) {
     // TODO: the TxnId class is not yet implemented.
@@ -50,8 +62,21 @@ StatusWith<LogicalSessionId> LogicalSessionId::parse(const std::string& s) {
     return LogicalSessionId{std::move(res.getValue())};
 }
 
+LogicalSessionId LogicalSessionId::parse(const BSONObj& doc) {
+    IDLParserErrorContext ctx("logical session id");
+    LogicalSessionId lsid;
+    lsid.parseProtected(ctx, doc);
+    return lsid;
+}
+
+BSONObj LogicalSessionId::toBSON() const {
+    BSONObjBuilder builder;
+    serialize(&builder);
+    return builder.obj();
+}
+
 std::string LogicalSessionId::toString() const {
-    return _id.toString();
+    return getId().toString();
 }
 
 }  // namespace mongo

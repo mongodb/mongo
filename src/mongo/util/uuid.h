@@ -48,7 +48,10 @@ class UUID {
     using UUIDStorage = std::array<unsigned char, 16>;
 
 public:
-    UUID() = delete;
+    /**
+     * This constructor exists for IDL only.
+     */
+    UUID() = default;
 
     /**
      * The number of bytes contained in a UUID.
@@ -71,6 +74,13 @@ public:
      * otherwise returns an error.
      */
     static StatusWith<UUID> parse(BSONElement from);
+
+    /**
+     * Parse a BSON document of the form { uuid: BinData(4, "...") }.
+     *
+     * For IDL.
+     */
+    static UUID parse(const BSONObj& obj);
 
     /**
      * Returns whether this string represents a valid UUID.

@@ -30,6 +30,10 @@
 
 #include <string>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
@@ -51,6 +55,29 @@ TEST(LogicalSessionIdTest, ToAndFromStringTest) {
     // Test with a bad string
     res = LogicalSessionId::parse("not a session id!");
     ASSERT(!res.isOK());
+}
+
+TEST(LogicalSessionIdTest, FromBSONTest) {
+    auto uuid = UUID::gen();
+    auto bson = BSON("id" << uuid.toBSON());
+
+    auto lsid = LogicalSessionId::parse(bson);
+    ASSERT_EQUALS(lsid.toString(), uuid.toString());
+
+    // Dump back to BSON, make sure we get the same thing
+    auto bsonDump = lsid.toBSON();
+    ASSERT_EQ(bsonDump.woCompare(bson), 0);
+
+    // Try parsing mal-formatted bson objs
+    ASSERT_THROWS(LogicalSessionId::parse(BSON("hi"
+                                               << "there")),
+                  UserException);
+
+    // TODO: use these and add more once there is bindata
+    ASSERT_THROWS(LogicalSessionId::parse(BSON("id"
+                                               << "not a session id!")),
+                  UserException);
+    ASSERT_THROWS(LogicalSessionId::parse(BSON("id" << 14)), UserException);
 }
 
 }  // namespace

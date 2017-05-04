@@ -31,18 +31,26 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/logical_session_id_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
+class BSONObjBuilder;
 class TxnId;
 
 /**
  * A 128-bit identifier for a logical session.
  */
-class LogicalSessionId {
+class LogicalSessionId : public Logical_session_id {
 public:
-    LogicalSessionId() = delete;
+    friend class Logical_session_id;
+    friend class Logical_session_record;
+
+    /**
+     * Create and return a new LogicalSessionId with a random UUID.
+     */
+    static LogicalSessionId gen();
 
     /**
      * Construct a new LogicalSessionId out of a txnId received with an operation.
@@ -56,12 +64,22 @@ public:
     static StatusWith<LogicalSessionId> parse(const std::string& s);
 
     /**
+     * Constructs a new LogicalSessionId out of a BSONObj. For IDL.
+     */
+    static LogicalSessionId parse(const BSONObj& doc);
+
+    /**
      * Returns a string representation of this session id.
      */
     std::string toString() const;
 
+    /**
+     * Serialize this object to BSON.
+     */
+    BSONObj toBSON() const;
+
     inline bool operator==(const LogicalSessionId& rhs) const {
-        return _id == rhs._id;
+        return getId() == rhs.getId();
     }
 
     inline bool operator!=(const LogicalSessionId& rhs) const {
@@ -75,7 +93,7 @@ public:
      */
     struct Hash {
         std::size_t operator()(const LogicalSessionId& lsid) const {
-            return _hasher(lsid._id);
+            return _hasher(lsid.getId());
         }
 
     private:
@@ -84,7 +102,10 @@ public:
 
 
 private:
-    UUID _id;
+    /**
+     * This constructor exists for IDL only.
+     */
+    LogicalSessionId();
 
     /**
      * Construct a LogicalSessionId from a UUID.
