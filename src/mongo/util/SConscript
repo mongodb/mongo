@@ -315,6 +315,15 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target="periodic_runner",
+    source=[
+        "periodic_runner.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
     target='background_job',
     source=[
         "background.cpp",
