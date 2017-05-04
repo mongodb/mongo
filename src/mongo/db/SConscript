@@ -911,6 +911,32 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='logical_session_record',
+    source=[
+        'logical_session_record.cpp',
+        env.Idlc('logical_session_record.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'logical_session_id'
+    ],
+)
+
+env.CppUnitTest(
+    target='logical_session_record_test',
+    source=[
+        'logical_session_record_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'logical_session_id',
+        'logical_session_record',
+    ],
+)
+
+env.Library(
     target='logical_time',
     source=[
         'logical_time.cpp',
