@@ -68,10 +68,10 @@ public:
     const HostAndPort& getSyncSource() const {
         return _lastResponse.getSyncingTo();
     }
-    OpTime getHeartbeatAppliedOpTime() const {
+    OpTime getAppliedOpTime() const {
         return _lastResponse.getAppliedOpTime();
     }
-    OpTime getHeartbeatDurableOpTime() const {
+    OpTime getDurableOpTime() const {
         return _lastResponse.hasDurableOpTime() ? _lastResponse.getDurableOpTime() : OpTime();
     }
     int getConfigVersion() const {
@@ -105,49 +105,10 @@ public:
         return _health != 0;
     }
 
-    OpTime getLastAppliedOpTime() const {
-        return _lastAppliedOpTime;
-    }
-
-    OpTime getLastDurableOpTime() const {
-        return _lastDurableOpTime;
-    }
-
-    // When was the last time this data was updated via any means?
-    Date_t getLastUpdate() const {
-        return _lastUpdate;
-    }
-    // Was the last update stale as of the last check?
-    bool lastUpdateStale() const {
-        return _lastUpdateStale;
-    }
-
-    // Index of this member in the replica set config member list.
-    int getConfigIndex() const {
-        return _configIndex;
-    }
-
-    int getMemberId() const {
-        return _memberId;
-    }
-
-    OID getRid() const {
-        return _rid;
-    }
-
-    bool isSelf() const {
-        return _isSelf;
-    }
-
-    HostAndPort getHostAndPort() const {
-        return _hostAndPort;
-    }
-
     /**
      * Sets values in this object from the results of a successful heartbeat command.
-     * Returns whether or not the optimes advanced as a result of this heartbeat response.
      */
-    bool setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse&& hbResponse);
+    void setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse&& hbResponse);
 
     /**
      * Sets values in this object from the results of a erroring/failed heartbeat command.
@@ -173,66 +134,6 @@ public:
         return _updatedSinceRestart;
     }
 
-    /**
-     * Sets the last applied op time (not the heartbeat applied op time) and updates the
-     * lastUpdate time.
-     */
-    void setLastAppliedOpTime(OpTime opTime, Date_t now);
-
-    /**
-     * Sets the last durable op time (not the heartbeat durable op time)
-     */
-    void setLastDurableOpTime(OpTime opTime, Date_t now);
-
-    /**
-     * Sets the last applied op time (not the heartbeat applied op time) iff the new optime is
-     * later than the current optime, and updates the lastUpdate time.  Returns true if the
-     * optime was advanced.
-     */
-    bool advanceLastAppliedOpTime(OpTime opTime, Date_t now);
-
-    /**
-     * Sets the last durable op time (not the heartbeat applied op time) iff the new optime is
-     * later than the current optime, and updates the lastUpdate time.  Returns true if the
-     * optime was advanced.
-     */
-    bool advanceLastDurableOpTime(OpTime opTime, Date_t now);
-
-    /*
-     * Indicates that this data is stale, based on _lastUpdateTime.
-     */
-    void markLastUpdateStale() {
-        _lastUpdateStale = true;
-    }
-
-    /*
-     * Updates the _lastUpdateTime and clears staleness without changing anything else.
-     */
-    void updateLiveness(Date_t now) {
-        _lastUpdate = now;
-        _lastUpdateStale = false;
-    }
-
-    void setConfigIndex(int configIndex) {
-        _configIndex = configIndex;
-    }
-
-    void setIsSelf(bool isSelf) {
-        _isSelf = isSelf;
-    }
-
-    void setHostAndPort(HostAndPort hostAndPort) {
-        _hostAndPort = hostAndPort;
-    }
-
-    void setMemberId(int memberId) {
-        _memberId = memberId;
-    }
-
-    void setRid(OID rid) {
-        _rid = rid;
-    }
-
 private:
     // -1 = not checked yet, 0 = member is down/unreachable, 1 = member is up
     int _health;
@@ -252,38 +153,6 @@ private:
 
     // Have we received heartbeats since the last restart?
     bool _updatedSinceRestart = false;
-
-    // Last time we got any information about this member, whether heartbeat
-    // or replSetUpdatePosition.
-    Date_t _lastUpdate;
-
-    // Set when lastUpdate time exceeds the election timeout.  Implies that the member is down
-    // on the primary, but not the secondaries.
-    bool _lastUpdateStale = false;
-
-    // Last known OpTime that the replica has applied and journaled to.
-    OpTime _lastDurableOpTime;
-
-    // Last known OpTime that the replica has applied, whether journaled or unjournaled.
-    OpTime _lastAppliedOpTime;
-
-    // TODO(russotto): Since memberHeartbeatData is kept in config order, _configIndex
-    // and _isSelf may not be necessary.
-    // Index of this member in the replica set configuration.
-    int _configIndex;
-
-    // Is this the data for this member?
-    bool _isSelf;
-
-    // This member's RID, used only in master/slave replication.
-    OID _rid;
-
-    // This member's member ID.  memberId and hostAndPort duplicate information in the
-    // configuration for replica sets, but are required to be here for master/slave replication.
-    int _memberId = -1;
-
-    // Client address of this member.
-    HostAndPort _hostAndPort;
 };
 
 }  // namespace repl
