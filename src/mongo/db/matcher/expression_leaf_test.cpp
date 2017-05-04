@@ -1320,19 +1320,6 @@ TEST(ExistsMatchExpression, Equivalent) {
     ASSERT(!e1.equivalent(&e2));
 }
 
-/**
-   TEST( ExistsMatchExpression, MatchesIndexKey ) {
-   BSONObj operand = BSON( "$exists" << true );
-   ExistsMatchExpression exists;
-   ASSERT( exists.init( "a", operand[ "$exists" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   BSONObj indexKey = BSON( "" << 1 );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   exists.matchesIndexKey( indexKey, indexSpec ) );
-   }
-*/
-
-
 TEST(TypeMatchExpression, MatchesElementStringType) {
     BSONObj match = BSON("a"
                          << "abc");
@@ -1394,16 +1381,15 @@ TEST(TypeMatchExpression, MatchesArray) {
     ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(BSON_ARRAY(4))), NULL));
 }
 
-TEST(TypeMatchExpression, MatchesOuterArray) {
+TEST(TypeMatchExpression, TypeArrayMatchesOuterAndInnerArray) {
     TypeMatchExpression type;
     ASSERT(type.initWithBSONType("a", Array).isOK());
-    // The outer array is not matched.
-    ASSERT(!type.matchesBSON(BSON("a" << BSONArray()), NULL));
-    ASSERT(!type.matchesBSON(BSON("a" << BSON_ARRAY(4 << "a")), NULL));
-    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSONArray() << 2)), NULL));
+    ASSERT(type.matchesBSON(BSON("a" << BSONArray()), nullptr));
+    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(4 << "a")), nullptr));
+    ASSERT(type.matchesBSON(BSON("a" << BSON_ARRAY(BSONArray() << 2)), nullptr));
     ASSERT(!type.matchesBSON(BSON("a"
                                   << "bar"),
-                             NULL));
+                             nullptr));
 }
 
 TEST(TypeMatchExpression, MatchesObject) {
@@ -1481,20 +1467,6 @@ TEST(TypeMatchExpression, Equivalent) {
     ASSERT(!e1.equivalent(&e2));
     ASSERT(!e1.equivalent(&e3));
 }
-
-
-/**
-   TEST( TypeMatchExpression, MatchesIndexKey ) {
-   BSONObj operand = BSON( "$type" << 2 );
-   TypeMatchExpression type;
-   ASSERT( type.init( "a", operand[ "$type" ] ).isOK() );
-   IndexSpec indexSpec( BSON( "a" << 1 ) );
-   BSONObj indexKey = BSON( "" << "q" );
-   ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-   type.matchesIndexKey( indexKey, indexSpec ) );
-   }
-*/
-
 
 TEST(InMatchExpression, MatchesElementSingle) {
     BSONArray operand = BSON_ARRAY(1);

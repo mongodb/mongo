@@ -50,14 +50,10 @@ void ElementIterator::Context::reset() {
     _element = BSONElement();
 }
 
-void ElementIterator::Context::reset(BSONElement element,
-                                     BSONElement arrayOffset,
-                                     bool outerArray) {
+void ElementIterator::Context::reset(BSONElement element, BSONElement arrayOffset) {
     _element = element;
     _arrayOffset = arrayOffset;
-    _outerArray = outerArray;
 }
-
 
 // ------
 
@@ -72,12 +68,12 @@ bool SimpleArrayElementIterator::more() {
 ElementIterator::Context SimpleArrayElementIterator::next() {
     if (_iterator.more()) {
         Context e;
-        e.reset(_iterator.next(), BSONElement(), false);
+        e.reset(_iterator.next(), BSONElement());
         return e;
     }
     _returnArrayLast = false;
     Context e;
-    e.reset(_theArray, BSONElement(), true);
+    e.reset(_theArray, BSONElement());
     return e;
 }
 
@@ -191,7 +187,7 @@ bool BSONElementIterator::subCursorHasMore() {
             if (_arrayIterationState.nextEntireRest()) {
                 // Our path terminates at the array offset.  _next should point at the current
                 // array element.
-                _next.reset(_arrayIterationState._current, _arrayIterationState._current, true);
+                _next.reset(_arrayIterationState._current, _arrayIterationState._current);
                 _arrayIterationState._current = BSONElement();
                 return true;
             }
@@ -229,7 +225,7 @@ bool BSONElementIterator::more() {
 
     if (_state == BEGIN) {
         if (_traversalStart.type() != Array) {
-            _next.reset(_traversalStart, BSONElement(), false);
+            _next.reset(_traversalStart, BSONElement());
             _state = DONE;
             return true;
         }
@@ -244,7 +240,7 @@ bool BSONElementIterator::more() {
             return false;
         } else if (!_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray()) {
             // Return the leaf array.
-            _next.reset(_traversalStart, BSONElement(), true);
+            _next.reset(_traversalStart, BSONElement());
             _state = DONE;
             return true;
         }
@@ -263,7 +259,7 @@ bool BSONElementIterator::more() {
             if (!_arrayIterationState.hasMore) {
                 // Our path terminates at this array.  _next should point at the current array
                 // element.
-                _next.reset(eltInArray, eltInArray, false);
+                _next.reset(eltInArray, eltInArray);
                 return true;
             }
 
@@ -290,7 +286,7 @@ bool BSONElementIterator::more() {
                 if (_arrayIterationState.nextEntireRest()) {
                     // Our path terminates at the array offset.  _next should point at the
                     // current array element.
-                    _next.reset(eltInArray, eltInArray, false);
+                    _next.reset(eltInArray, eltInArray);
                     return true;
                 }
 
@@ -320,7 +316,7 @@ bool BSONElementIterator::more() {
             return false;
         }
 
-        _next.reset(_arrayIterationState._theArray, BSONElement(), true);
+        _next.reset(_arrayIterationState._theArray, BSONElement());
         _state = DONE;
         return true;
     }

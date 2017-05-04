@@ -71,7 +71,7 @@ public:
     public:
         void reset();
 
-        void reset(BSONElement element, BSONElement arrayOffset, bool outerArray);
+        void reset(BSONElement element, BSONElement arrayOffset);
 
         void setArrayOffset(BSONElement e) {
             _arrayOffset = e;
@@ -83,14 +83,10 @@ public:
         BSONElement arrayOffset() const {
             return _arrayOffset;
         }
-        bool outerArray() const {
-            return _outerArray;
-        }
 
     private:
         BSONElement _element;
         BSONElement _arrayOffset;
-        bool _outerArray;
     };
 
     virtual ~ElementIterator();
@@ -104,8 +100,9 @@ public:
 class SingleElementElementIterator : public ElementIterator {
 public:
     explicit SingleElementElementIterator(BSONElement e) : _seen(false) {
-        _element.reset(e, BSONElement(), false);
+        _element.reset(e, BSONElement());
     }
+
     virtual ~SingleElementElementIterator() {}
 
     virtual bool more() {
