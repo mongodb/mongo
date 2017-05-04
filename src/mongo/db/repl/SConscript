@@ -504,6 +504,7 @@ env.CppUnitTest(
 env.Library('topology_coordinator',
             [
                 'heartbeat_response_action.cpp',
+                'member_heartbeat_data.cpp',
                 'topology_coordinator.cpp',
             ],
             LIBDEPS=[
@@ -513,7 +514,6 @@ env.Library('topology_coordinator',
 
 env.Library('topology_coordinator_impl',
             [
-                'member_heartbeat_data.cpp',
                 'topology_coordinator_impl.cpp',
             ],
             LIBDEPS=[

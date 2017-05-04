@@ -39,6 +39,7 @@
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
+#include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -191,7 +192,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         }
     }
     const Date_t now = _replExecutor->now();
-    const OpTime lastApplied = _getMyLastAppliedOpTime_inlock();
     Milliseconds networkTime(0);
     StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -213,21 +213,14 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
     }
 
-    HeartbeatResponseAction action = _topCoord->processHeartbeatResponse(
-        now, networkTime, target, hbStatusResponse, lastApplied);
+    HeartbeatResponseAction action =
+        _topCoord->processHeartbeatResponse(now, networkTime, target, hbStatusResponse);
 
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
-        targetIndex >= 0 && hbStatusResponse.getValue().hasState() &&
-        hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
-        ReplSetHeartbeatResponse hbResp = hbStatusResponse.getValue();
-        if (hbResp.hasAppliedOpTime()) {
-            if (hbResp.getConfigVersion() == _rsConfig.getConfigVersion()) {
-                _updateOpTimesFromHeartbeat_inlock(
-                    targetIndex,
-                    hbResp.hasDurableOpTime() ? hbResp.getDurableOpTime() : OpTime(),
-                    hbResp.getAppliedOpTime());
-            }
-        }
+        hbStatusResponse.getValue().hasState() &&
+        hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
+        action.getAdvancedOpTime()) {
+        _updateLastCommittedOpTimeAndWake_inlock();
     }
 
     // Wake the stepdown waiter when our updated OpTime allows it to finish stepping down.
@@ -242,21 +235,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         target, targetIndex, std::max(now, action.getNextHeartbeatStartDate()));
 
     _handleHeartbeatResponseAction_inlock(action, hbStatusResponse, std::move(lk));
-}
-
-void ReplicationCoordinatorImpl::_updateOpTimesFromHeartbeat_inlock(int targetIndex,
-                                                                    const OpTime& durableOpTime,
-                                                                    const OpTime& appliedOpTime) {
-    invariant(_selfIndex >= 0);
-    invariant(targetIndex >= 0);
-
-    SlaveInfo& slaveInfo = _slaveInfo[targetIndex];
-    if (appliedOpTime > slaveInfo.lastAppliedOpTime) {
-        _updateSlaveInfoAppliedOpTime_inlock(&slaveInfo, appliedOpTime);
-    }
-    if (durableOpTime > slaveInfo.lastDurableOpTime) {
-        _updateSlaveInfoDurableOpTime_inlock(&slaveInfo, durableOpTime);
-    }
 }
 
 stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatResponseAction_inlock(
@@ -673,10 +651,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
     _topCoord->restartHeartbeats();
 
     if (isV1ElectionProtocol()) {
-        for (auto&& slaveInfo : _slaveInfo) {
-            slaveInfo.lastUpdate = _replExecutor->now();
-            slaveInfo.down = false;
-        }
+        _topCoord->resetAllMemberTimeouts(_replExecutor->now());
         _scheduleNextLivenessUpdate_inlock();
     }
 }
@@ -696,37 +671,12 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     }
 
     // Scan liveness table for problems and mark nodes as down by calling into topocoord.
-    auto now(_replExecutor->now());
-    for (auto&& slaveInfo : _slaveInfo) {
-        if (slaveInfo.self) {
-            continue;
-        }
-        if (slaveInfo.down) {
-            continue;
-        }
+    HeartbeatResponseAction action = _topCoord->checkMemberTimeouts(_replExecutor->now());
+    // Don't mind potential asynchronous stepdown as this is the last step of
+    // liveness check.
+    lk = _handleHeartbeatResponseAction_inlock(
+        action, makeStatusWith<ReplSetHeartbeatResponse>(), std::move(lk));
 
-        if (now - slaveInfo.lastUpdate >= _rsConfig.getElectionTimeoutPeriod()) {
-            int memberIndex = _rsConfig.findMemberIndexByConfigId(slaveInfo.memberId);
-            if (memberIndex == -1) {
-                continue;
-            }
-
-            slaveInfo.down = true;
-
-            if (_memberState.primary()) {
-                // Only adjust hbdata if we are primary, since only the primary has a full view
-                // of the entire cluster.
-                // Secondaries might not see other secondaries in the cluster if they are not
-                // downstream.
-                HeartbeatResponseAction action =
-                    _topCoord->setMemberAsDown(now, memberIndex, _getMyLastDurableOpTime_inlock());
-                // Don't mind potential asynchronous stepdown as this is the last step of
-                // liveness check.
-                lk = _handleHeartbeatResponseAction_inlock(
-                    action, makeStatusWith<ReplSetHeartbeatResponse>(), std::move(lk));
-            }
-        }
-    }
     _scheduleNextLivenessUpdate_inlock();
 }
 
@@ -736,23 +686,10 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
     }
     // Scan liveness table for earliest date; schedule a run at (that date plus election
     // timeout).
-    Date_t earliestDate = Date_t::max();
-    int earliestMemberId = -1;
-    for (auto&& slaveInfo : _slaveInfo) {
-        if (slaveInfo.self) {
-            continue;
-        }
-        if (slaveInfo.down) {
-            // Already down.
-            continue;
-        }
-        LOG(3) << "slaveinfo lastupdate is: " << slaveInfo.lastUpdate;
-        if (earliestDate > slaveInfo.lastUpdate) {
-            earliestDate = slaveInfo.lastUpdate;
-            earliestMemberId = slaveInfo.memberId;
-        }
-    }
-    LOG(3) << "earliest member " << earliestMemberId << " date: " << earliestDate;
+    Date_t earliestDate;
+    int earliestMemberId;
+    std::tie(earliestMemberId, earliestDate) = _topCoord->getStalestLiveMember();
+
     if (earliestMemberId == -1 || earliestDate == Date_t::max()) {
         _earliestMemberId = -1;
         // Nobody here but us.
@@ -856,10 +793,8 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(StartElectionV1Reas
         }
     }
 
-    const auto status =
-        _topCoord->becomeCandidateIfElectable(_replExecutor->now(),
-                                              _getMyLastAppliedOpTime_inlock(),
-                                              reason == StartElectionV1Reason::kPriorityTakeover);
+    const auto status = _topCoord->becomeCandidateIfElectable(
+        _replExecutor->now(), reason == StartElectionV1Reason::kPriorityTakeover);
     if (!status.isOK()) {
         switch (reason) {
             case StartElectionV1Reason::kElectionTimeout:

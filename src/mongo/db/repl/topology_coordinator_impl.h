@@ -157,51 +157,49 @@ public:
     virtual void unblacklistSyncSource(const HostAndPort& host, Date_t now);
     virtual void clearSyncSourceBlacklist();
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const OpTime& myLastOpTime,
                                         const rpc::ReplSetMetadata& replMetadata,
                                         boost::optional<rpc::OplogQueryMetadata> oqMetadata,
                                         Date_t now) const;
     virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
     virtual void setElectionSleepUntil(Date_t newTime);
     virtual void setFollowerMode(MemberState::MS newMode);
+    virtual bool updateLastCommittedOpTime();
+    virtual bool advanceLastCommittedOpTime(const OpTime& committedOpTime);
+    virtual OpTime getLastCommittedOpTime() const;
+    virtual void setFirstOpTimeOfMyTerm(const OpTime& newOpTime);
     virtual void adjustMaintenanceCountBy(int inc);
     virtual void prepareSyncFromResponse(const HostAndPort& target,
-                                         const OpTime& lastOpApplied,
                                          BSONObjBuilder* response,
                                          Status* result);
     virtual void prepareFreshResponse(const ReplicationCoordinator::ReplSetFreshArgs& args,
                                       Date_t now,
-                                      const OpTime& lastOpApplied,
                                       BSONObjBuilder* response,
                                       Status* result);
     virtual void prepareElectResponse(const ReplicationCoordinator::ReplSetElectArgs& args,
                                       Date_t now,
-                                      const OpTime& lastOpApplied,
                                       BSONObjBuilder* response,
                                       Status* result);
     virtual Status prepareHeartbeatResponse(Date_t now,
                                             const ReplSetHeartbeatArgs& args,
                                             const std::string& ourSetName,
-                                            const OpTime& lastOpApplied,
-                                            const OpTime& lastOpDurable,
                                             ReplSetHeartbeatResponse* response);
     virtual Status prepareHeartbeatResponseV1(Date_t now,
                                               const ReplSetHeartbeatArgsV1& args,
                                               const std::string& ourSetName,
-                                              const OpTime& lastOpApplied,
-                                              const OpTime& lastOpDurable,
                                               ReplSetHeartbeatResponse* response);
     virtual void prepareStatusResponse(const ReplSetStatusArgs& rsStatusArgs,
                                        BSONObjBuilder* response,
                                        Status* result);
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
+        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle,
+        OpTime currentCommittedSnapshotOpTime) const;
+
     virtual void fillIsMasterForReplSet(IsMasterResponse* response);
+    virtual void fillMemberData(BSONObjBuilder* result);
     virtual StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(Date_t now,
                                                                           int secs,
                                                                           BSONObjBuilder* response);
-    virtual void updateConfig(const ReplSetConfig& newConfig,
-                              int selfIndex,
-                              Date_t now,
-                              const OpTime& lastOpApplied);
+    virtual void updateConfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
     virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
         Date_t now, const std::string& ourSetName, const HostAndPort& target);
     virtual std::pair<ReplSetHeartbeatArgsV1, Milliseconds> prepareHeartbeatRequestV1(
@@ -210,37 +208,46 @@ public:
         Date_t now,
         Milliseconds networkRoundTripTime,
         const HostAndPort& target,
-        const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
-        const OpTime& myLastOpApplied);
+        const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
     virtual bool voteForMyself(Date_t now);
     virtual void setElectionInfo(OID electionId, Timestamp electionOpTime);
     virtual void processWinElection(OID electionId, Timestamp electionOpTime);
     virtual void processLoseElection();
-    virtual Status checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;
+    virtual Status checkShouldStandForElection(Date_t now) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
-    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
+    virtual bool stepDown(Date_t until, bool force);
     virtual bool stepDownIfPending();
     virtual bool isStepDownPending() const;
     virtual Date_t getStepDownTime() const;
-    virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime,
-                                                        const OpTime& lastCommitttedOpTime) const;
-    virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(const OpTime& lastCommittedOpTime,
-                                                              const OpTime& lastAppliedOpTime,
-                                                              int rbid) const;
+    virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime) const;
+    virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(int rbid) const;
     virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
-                                            ReplSetRequestVotesResponse* response,
-                                            const OpTime& lastAppliedOpTime);
+                                            ReplSetRequestVotesResponse* response);
     virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
     virtual void loadLastVote(const LastVote& lastVote);
     virtual void voteForMyselfV1();
     virtual void prepareForStepDown();
     virtual void setPrimaryIndex(long long primaryIndex);
-    virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
-                                                    const int memberIndex,
-                                                    const OpTime& myLastOpApplied);
-    virtual Status becomeCandidateIfElectable(const Date_t now,
-                                              const OpTime& lastOpApplied,
-                                              bool isPriorityTakeover);
+    virtual bool haveNumNodesReachedOpTime(const OpTime& opTime, int numNodes, bool durablyWritten);
+    virtual bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
+                                              const ReplSetTagPattern& tagPattern,
+                                              bool durablyWritten);
+    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
+                                                       bool durablyWritten,
+                                                       bool skipSelf);
+    virtual HeartbeatResponseAction setMemberAsDown(Date_t now, const int memberIndex);
+    virtual std::pair<int, Date_t> getStalestLiveMember() const;
+    virtual HeartbeatResponseAction checkMemberTimeouts(Date_t now);
+    virtual void resetAllMemberTimeouts(Date_t now);
+    virtual void resetMemberTimeouts(Date_t now,
+                                     const stdx::unordered_set<HostAndPort>& member_set);
+    virtual OpTime getMyLastAppliedOpTime() const;
+    virtual OpTime getMyLastDurableOpTime() const;
+    virtual MemberHeartbeatData* getMyMemberHeartbeatData();
+    virtual MemberHeartbeatData* findMemberHeartbeatDataByMemberId(const int memberId);
+    virtual MemberHeartbeatData* findMemberHeartbeatDataByRid(const OID rid);
+    virtual MemberHeartbeatData* addSlaveMemberData(const OID rid);
+    virtual Status becomeCandidateIfElectable(const Date_t now, bool isPriorityTakeover);
     virtual void setStorageEngineSupportsReadCommitted(bool supported);
 
     virtual void restartHeartbeats();
@@ -297,12 +304,10 @@ private:
     // Returns the current "ping" value for the given member by their address
     Milliseconds _getPing(const HostAndPort& host);
 
-    // Determines if we will veto the member specified by "args.id", given that the last op
-    // we have applied locally is "lastOpApplied".
+    // Determines if we will veto the member specified by "args.id".
     // If we veto, the errmsg will be filled in with a reason
     bool _shouldVetoMember(const ReplicationCoordinator::ReplSetFreshArgs& args,
                            const Date_t& now,
-                           const OpTime& lastOpApplied,
                            std::string* errmsg) const;
 
     // Returns the index of the member with the matching id, or -1 if none match.
@@ -317,19 +322,16 @@ private:
 
     // Is otherOpTime close enough (within 10 seconds) to the latest known optime to qualify
     // for an election
-    bool _isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime,
-                                             const OpTime& ourLastOpApplied) const;
+    bool _isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime) const;
 
     // Is our optime close enough to the latest known optime to call for a priority takeover.
-    bool _amIFreshEnoughForPriorityTakeover(const OpTime& ourLastOpApplied) const;
+    bool _amIFreshEnoughForPriorityTakeover() const;
 
     // Returns reason why "self" member is unelectable
-    UnelectableReasonMask _getMyUnelectableReason(const Date_t now,
-                                                  const OpTime& lastOpApplied,
-                                                  bool isPriorityTakeover) const;
+    UnelectableReasonMask _getMyUnelectableReason(const Date_t now, bool isPriorityTakeover) const;
 
     // Returns reason why memberIndex is unelectable
-    UnelectableReasonMask _getUnelectableReason(int memberIndex, const OpTime& lastOpApplied) const;
+    UnelectableReasonMask _getUnelectableReason(int memberIndex) const;
 
     // Returns the nice text of why the node is unelectable
     std::string _getUnelectableReasonString(UnelectableReasonMask ur) const;
@@ -338,16 +340,22 @@ private:
     bool _iAmPrimary() const;
 
     // Scans through all members that are 'up' and return the latest known optime.
-    OpTime _latestKnownOpTime(const OpTime& ourLastOpApplied) const;
+    OpTime _latestKnownOpTime() const;
 
     // Scans the electable set and returns the highest priority member index
-    int _getHighestPriorityElectableIndex(Date_t now, const OpTime& lastOpApplied) const;
+    int _getHighestPriorityElectableIndex(Date_t now) const;
 
     // Returns true if "one" member is higher priority than "two" member
     bool _isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const;
 
     // Helper shortcut to self config
     const MemberConfig& _selfConfig() const;
+
+    // Helper shortcut to self member data
+    const MemberHeartbeatData& _selfMemberHeartbeatData() const;
+
+    // Index of self member in member heartbeat data.
+    const int _selfMemberHeartbeatDataIndex() const;
 
     // Returns NULL if there is no primary, or the MemberConfig* for the current primary
     const MemberConfig* _currentPrimaryMember() const;
@@ -360,12 +368,10 @@ private:
      */
     HeartbeatResponseAction _updatePrimaryFromHBData(int updatedConfigIndex,
                                                      const MemberState& originalState,
-                                                     Date_t now,
-                                                     const OpTime& lastOpApplied);
+                                                     Date_t now);
     HeartbeatResponseAction _updatePrimaryFromHBDataV1(int updatedConfigIndex,
                                                        const MemberState& originalState,
-                                                       Date_t now,
-                                                       const OpTime& lastOpApplied);
+                                                       Date_t now);
 
     /**
      * Updates _hbdata based on the newConfig, ensuring that every member in the newConfig
@@ -440,6 +446,13 @@ private:
     // In protocol version 1, this is used to prevent running for election after seeing
     // a new term.
     Date_t _electionSleepUntil;
+
+    // OpTime of the latest committed operation.
+    OpTime _lastCommittedOpTime;
+
+    // OpTime representing our transition to PRIMARY and the start of our term.
+    // _lastCommittedOpTime cannot be set to an earlier OpTime.
+    OpTime _firstOpTimeOfMyTerm;
 
     // The number of calls we have had to enter maintenance mode
     int _maintenanceModeCalls;

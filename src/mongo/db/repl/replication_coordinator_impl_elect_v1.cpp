@@ -275,16 +275,10 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     // Mark all nodes that responded to our vote request as up to avoid immediately
     // relinquishing primary.
     Date_t now = _replExecutor->now();
-    const unordered_set<HostAndPort> liveNodes = _voteRequester->getResponders();
-    for (auto& nodeInfo : _slaveInfo) {
-        if (liveNodes.count(nodeInfo.hostAndPort)) {
-            nodeInfo.down = false;
-            nodeInfo.lastUpdate = now;
-        }
-    }
+    _topCoord->resetMemberTimeouts(now, _voteRequester->getResponders());
 
     // Prevent last committed optime from updating until we finish draining.
-    _setFirstOpTimeOfMyTerm_inlock(
+    _topCoord->setFirstOpTimeOfMyTerm(
         OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max()));
 
     _voteRequester.reset();
