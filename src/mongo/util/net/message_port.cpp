@@ -173,9 +173,22 @@ bool MessagingPort::recv(Message& m) {
                 psock->setHandshakeReceived();
                 goto again;
             }
+
+            auto sslMode = sslGlobalParams.sslMode.load();
+
             uassert(17189,
                     "The server is configured to only allow SSL connections",
-                    sslGlobalParams.sslMode.load() != SSLParams::SSLMode_requireSSL);
+                    sslMode != SSLParams::SSLMode_requireSSL);
+
+            // For users attempting to upgrade their applications from no SSL to SSL, provide
+            // information about connections that still aren't using SSL (but only once per
+            // connection)
+            if (!sslGlobalParams.disableNonSSLConnectionLogging &&
+                (sslMode == SSLParams::SSLMode_preferSSL)) {
+                LOG(0) << "SSL mode is set to 'preferred' and connection " << connectionId()
+                       << " to " << remote() << " is not using SSL.";
+            }
+
 #endif  // MONGO_CONFIG_SSL
         }
         if (static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
