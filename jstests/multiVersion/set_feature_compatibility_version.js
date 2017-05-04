@@ -342,7 +342,16 @@
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 0.0);
 
     // featureCompatibilityVersion can be set to 3.2 on mongos.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
+    // This is run through assert.soon() because we've just caused a network interruption
+    // by discarding messages in the bridge.
+    assert.soon(function() {
+        var res = mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"});
+        if (res.ok == 0) {
+            print("Failed to set feature compatibility version: " + tojson(res));
+            return false;
+        }
+        return true;
+    });
 
     // featureCompatibilityVersion propagates to config and shard.
     res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
