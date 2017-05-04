@@ -825,8 +825,10 @@ Status RecordStoreV1Base::validate(OperationContext* opCtx,
             results->valid = false;
         }
 
-    } catch (AssertionException) {
-        results->errors.push_back("exception during validate");
+    } catch (const AssertionException& e) {
+        StringBuilder sb;
+        sb << "exception during validate: " << e.what();
+        results->errors.push_back(sb.str());
         results->valid = false;
     }
 
