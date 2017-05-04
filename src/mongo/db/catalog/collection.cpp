@@ -84,10 +84,11 @@ void Collection::registerFactory(decltype(factory) newFactory) {
 auto Collection::makeImpl(Collection* _this,
                           OperationContext* const opCtx,
                           const StringData fullNS,
+                          OptionalCollectionUUID uuid,
                           CollectionCatalogEntry* const details,
                           RecordStore* const recordStore,
                           DatabaseCatalogEntry* const dbce) -> std::unique_ptr<Impl> {
-    return factory(_this, opCtx, fullNS, details, recordStore, dbce);
+    return factory(_this, opCtx, fullNS, uuid, details, recordStore, dbce);
 }
 
 void Collection::TUHook::hook() noexcept {}

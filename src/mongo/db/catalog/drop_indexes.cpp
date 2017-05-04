@@ -70,7 +70,7 @@ Status wrappedRun(OperationContext* opCtx,
             // We log one op for every dropped index so that we can roll them back if necessary.
             for (auto const& idx : droppedIndexes) {
                 opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-                    opCtx, collection->ns(), collection->uuid(opCtx), idx.first, idx.second);
+                    opCtx, collection->ns(), collection->uuid(), idx.first, idx.second);
             }
 
             anObjBuilder->append("msg", "non-_id indexes dropped for collection");
@@ -94,7 +94,7 @@ Status wrappedRun(OperationContext* opCtx,
         }
 
         opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, collection->ns(), collection->uuid(opCtx), desc->indexName(), desc->infoObj());
+            opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }
@@ -128,7 +128,7 @@ Status wrappedRun(OperationContext* opCtx,
         }
 
         opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-            opCtx, collection->ns(), collection->uuid(opCtx), desc->indexName(), desc->infoObj());
+            opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
 
         return Status::OK();
     }

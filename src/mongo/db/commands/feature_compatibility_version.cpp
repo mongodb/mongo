@@ -233,7 +233,7 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
 
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wuow(opCtx);
-                auto uuid = autoDB.getDb()->getCollection(opCtx, nss)->uuid(opCtx);
+                auto uuid = autoDB.getDb()->getCollection(opCtx, nss)->uuid();
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                     opCtx, nss, uuid, k32IncompatibleIndexSpec, false);
                 wuow.commit();

@@ -587,11 +587,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
             for (auto&& infoObj : indexInfoObjs.getValue()) {
                 // make sure to create index on secondaries as well
-                getGlobalServiceContext()->getOpObserver()->onCreateIndex(opCtx,
-                                                                          collection->ns(),
-                                                                          collection->uuid(opCtx),
-                                                                          infoObj,
-                                                                          true /* fromMigrate */);
+                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                    opCtx, collection->ns(), collection->uuid(), infoObj, true /* fromMigrate */);
             }
 
             wunit.commit();

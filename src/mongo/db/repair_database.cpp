@@ -143,7 +143,8 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
         // open a bad index and fail.
         // TODO see if MultiIndexBlock can be made to work without a Collection.
         const StringData ns = cce->ns().ns();
-        collection.reset(new Collection(opCtx, ns, cce, dbce->getRecordStore(ns), dbce));
+        const auto uuid = cce->getCollectionOptions(opCtx).uuid;
+        collection.reset(new Collection(opCtx, ns, uuid, cce, dbce->getRecordStore(ns), dbce));
 
         indexer.reset(new MultiIndexBlock(opCtx, collection.get()));
         Status status = indexer->init(indexSpecs).getStatus();

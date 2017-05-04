@@ -515,7 +515,7 @@ void State::prepTempCollection() {
                 uassertStatusOK(status);
             }
             // Log the createIndex operation.
-            auto uuid = tempColl->uuid(_opCtx);
+            auto uuid = tempColl->uuid();
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(
                 _opCtx, _config.tempNamespace, uuid, *it, false);
         }

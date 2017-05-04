@@ -199,7 +199,7 @@ public:
         virtual const CollectionInfoCache* infoCache() const = 0;
 
         virtual const NamespaceString& ns() const = 0;
-        virtual OptionalCollectionUUID uuid(OperationContext* opCtx) const = 0;
+        virtual OptionalCollectionUUID uuid() const = 0;
 
         virtual const IndexCatalog* getIndexCatalog() const = 0;
         virtual IndexCatalog* getIndexCatalog() = 0;
@@ -322,6 +322,7 @@ private:
     static std::unique_ptr<Impl> makeImpl(Collection* _this,
                                           OperationContext* opCtx,
                                           StringData fullNS,
+                                          OptionalCollectionUUID uuid,
                                           CollectionCatalogEntry* details,
                                           RecordStore* recordStore,
                                           DatabaseCatalogEntry* dbce);
@@ -333,10 +334,11 @@ public:
 
     explicit inline Collection(OperationContext* const opCtx,
                                const StringData fullNS,
+                               OptionalCollectionUUID uuid,
                                CollectionCatalogEntry* const details,  // does not own
                                RecordStore* const recordStore,         // does not own
                                DatabaseCatalogEntry* const dbce)       // does not own
-        : _pimpl(makeImpl(this, opCtx, fullNS, details, recordStore, dbce)) {
+        : _pimpl(makeImpl(this, opCtx, fullNS, uuid, details, recordStore, dbce)) {
         this->_impl().init(opCtx);
     }
 
@@ -369,8 +371,8 @@ public:
         return this->_impl().ns();
     }
 
-    inline OptionalCollectionUUID uuid(OperationContext* opCtx) const {
-        return this->_impl().uuid(opCtx);
+    inline OptionalCollectionUUID uuid() const {
+        return this->_impl().uuid();
     }
 
     inline const IndexCatalog* getIndexCatalog() const {

@@ -80,11 +80,12 @@ MONGO_INITIALIZER(InitializeCollectionFactory)(InitializerContext* const) {
         [](Collection* const _this,
            OperationContext* const opCtx,
            const StringData fullNS,
+           OptionalCollectionUUID uuid,
            CollectionCatalogEntry* const details,
            RecordStore* const recordStore,
            DatabaseCatalogEntry* const dbce) -> std::unique_ptr<Collection::Impl> {
             return stdx::make_unique<CollectionImpl>(
-                _this, opCtx, fullNS, details, recordStore, dbce);
+                _this, opCtx, fullNS, uuid, details, recordStore, dbce);
         });
     return Status::OK();
 }
@@ -237,10 +238,12 @@ bool CappedInsertNotifier::isDead() {
 CollectionImpl::CollectionImpl(Collection* _this_init,
                                OperationContext* opCtx,
                                StringData fullNS,
+                               OptionalCollectionUUID uuid,
                                CollectionCatalogEntry* details,
                                RecordStore* recordStore,
                                DatabaseCatalogEntry* dbce)
     : _ns(fullNS),
+      _uuid(uuid),
       _details(details),
       _recordStore(recordStore),
       _dbce(dbce),
@@ -444,7 +447,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
 
     getGlobalServiceContext()->getOpObserver()->onInserts(
-        opCtx, ns(), uuid(opCtx), begin, end, fromMigrate);
+        opCtx, ns(), uuid(), begin, end, fromMigrate);
 
     opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -507,7 +510,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     docs.push_back(doc);
 
     getGlobalServiceContext()->getOpObserver()->onInserts(
-        opCtx, ns(), uuid(opCtx), docs.begin(), docs.end(), false);
+        opCtx, ns(), uuid(), docs.begin(), docs.end(), false);
 
     opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -622,7 +625,7 @@ void CollectionImpl::deleteDocument(
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(opCtx), std::move(deleteState), fromMigrate);
+        opCtx, ns(), uuid(), std::move(deleteState), fromMigrate);
 }
 
 Counter64 moveCounter;

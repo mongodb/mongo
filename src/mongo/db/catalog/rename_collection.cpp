@@ -144,7 +144,7 @@ Status renameCollection(OperationContext* opCtx,
                       str::stream() << "a view already exists with that name: " << target.ns());
     }
 
-    auto sourceUUID = sourceColl->uuid(opCtx);
+    auto sourceUUID = sourceColl->uuid();
     // If we are renaming in the same database, just rename the namespace and we're done.
     if (sourceDB == targetDB) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -153,7 +153,7 @@ Status renameCollection(OperationContext* opCtx,
             if (targetColl) {
                 // No logOp necessary because the entire renameCollection command is one logOp.
                 repl::UnreplicatedWritesBlock uwb(opCtx);
-                dropTargetUUID = targetColl->uuid(opCtx);
+                dropTargetUUID = targetColl->uuid();
                 Status s = targetDB->dropCollection(opCtx, target.ns());
                 if (!s.isOK()) {
                     return s;
@@ -280,7 +280,7 @@ Status renameCollection(OperationContext* opCtx,
             repl::UnreplicatedWritesBlock uwb(opCtx);
             Status status = Status::OK();
             if (targetColl) {
-                dropTargetUUID = targetColl->uuid(opCtx);
+                dropTargetUUID = targetColl->uuid();
                 status = targetDB->dropCollection(opCtx, target.ns());
             }
             if (status.isOK())

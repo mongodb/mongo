@@ -388,7 +388,7 @@ Status collMod(OperationContext* opCtx,
     // Only observe non-view collMods, as view operations are observed as operations on the
     // system.views collection.
     getGlobalServiceContext()->getOpObserver()->onCollMod(
-        opCtx, nss, coll->uuid(opCtx), oplogEntryBuilder.obj(), oldCollOptions, ttlInfo);
+        opCtx, nss, coll->uuid(), oplogEntryBuilder.obj(), oldCollOptions, ttlInfo);
 
     wunit.commit();
 

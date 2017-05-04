@@ -269,7 +269,7 @@ public:
         std::abort();
     }
 
-    OptionalCollectionUUID uuid(OperationContext* opCtx) const {
+    OptionalCollectionUUID uuid() const {
         std::abort();
     }
 };

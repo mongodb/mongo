@@ -390,7 +390,7 @@ public:
 
             for (auto&& infoObj : indexInfoObjs) {
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, ns, collection->uuid(opCtx), infoObj, false);
+                    opCtx, ns, collection->uuid(), infoObj, false);
             }
 
             wunit.commit();

@@ -103,7 +103,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     }
 
     getGlobalServiceContext()->getOpObserver()->onEmptyCapped(
-        opCtx, collection->ns(), collection->uuid(opCtx));
+        opCtx, collection->ns(), collection->uuid());
 
     wuow.commit();
 
@@ -282,7 +282,7 @@ Status convertToCapped(OperationContext* opCtx,
         }
     }
 
-    OptionalCollectionUUID uuid = db->getCollection(opCtx, longTmpName)->uuid(opCtx);
+    OptionalCollectionUUID uuid = db->getCollection(opCtx, longTmpName)->uuid();
 
     {
         WriteUnitOfWork wunit(opCtx);

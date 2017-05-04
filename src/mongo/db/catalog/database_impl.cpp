@@ -211,13 +211,13 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     }
 
     unique_ptr<CollectionCatalogEntry> cce(_dbEntry->getCollectionCatalogEntry(nss.ns()));
-    invariant(cce.get());
+    auto uuid = cce->getCollectionOptions(opCtx).uuid;
 
     unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
     invariant(rs.get());  // if cce exists, so should this
 
     // Not registering AddCollectionChange since this is for collections that already exist.
-    Collection* c = new Collection(opCtx, nss.ns(), cce.release(), rs.release(), _dbEntry);
+    Collection* c = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
     return c;
 }
 
@@ -439,7 +439,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // We want to destroy the Collection object before telling the StorageEngine to destroy the
     // RecordStore.
-    auto uuid = collection->uuid(opCtx);
+    auto uuid = collection->uuid();
     _clearCollectionCache(opCtx, fullns.toString(), "collection dropped");
 
     s = _dbEntry->dropCollection(opCtx, fullns.toString());

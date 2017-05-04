@@ -696,7 +696,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 OplogUpdateEntryArgs args;
                 args.nss = _collection->ns();
-                args.uuid = _collection->uuid(getOpCtx());
+                args.uuid = _collection->uuid();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
