@@ -7,6 +7,8 @@ Import("use_system_version_of_library")
 
 env = env.Clone()
 
+env.InjectThirdPartyIncludePaths('asio')
+
 env.SConscript(
     dirs=[
         'cmdline_utils',
@@ -320,6 +322,28 @@ env.Library(
         "periodic_runner.cpp",
     ],
     LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target="periodic_runner_asio",
+    source=[
+        "periodic_runner_asio.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/third_party/shim_asio",
+        "periodic_runner",
+    ],
+)
+
+env.CppUnitTest(
+    target="periodic_runner_asio_test",
+    source=[
+        "periodic_runner_asio_test.cpp",
+    ],
+    LIBDEPS=[
+        "periodic_runner_asio",
+        "$BUILD_DIR/mongo/executor/async_timer_mock",
     ],
 )
 
