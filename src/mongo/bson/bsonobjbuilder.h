@@ -777,8 +777,6 @@ private:
 };
 
 class BSONArrayBuilder {
-    MONGO_DISALLOW_COPYING(BSONArrayBuilder);
-
 public:
     BSONArrayBuilder() : _i(0), _b() {}
     BSONArrayBuilder(BufBuilder& _b) : _i(0), _b(_b) {}
