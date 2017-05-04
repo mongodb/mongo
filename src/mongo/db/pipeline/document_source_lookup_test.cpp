@@ -99,6 +99,106 @@ TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnSuffixOfAsField) {
     ASSERT_EQUALS(outputSort.size(), 1U);
 }
 
+TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from"
+                               << "coll"
+                               << "pipeline"
+                               << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                               << "as"
+                               << "as"))
+            .firstElement(),
+        expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+}
+
+TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpecified) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    try {
+        auto lookupStage = DocumentSourceLookUp::createFromBson(
+            BSON("$lookup" << BSON("from"
+                                   << "coll"
+                                   << "pipeline"
+                                   << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                   << "localField"
+                                   << "a"
+                                   << "foreignField"
+                                   << "b"
+                                   << "as"
+                                   << "as"))
+                .firstElement(),
+            expCtx);
+
+        FAIL(str::stream()
+             << "Expected creation of the "
+             << lookupStage->getSourceName()
+             << " stage to uassert on mix of localField/foreignField and pipeline options");
+    } catch (const UserException& ex) {
+        ASSERT_EQ(40450, ex.getCode());
+    }
+}
+
+TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from"
+                               << "coll"
+                               << "pipeline"
+                               << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                               << "as"
+                               << "as"))
+            .firstElement(),
+        expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
+    vector<Value> serialization;
+    lookupStage->serializeToArray(serialization);
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+
+    // The fields are in no guaranteed order, so we can't perform a simple Document comparison.
+    auto serializedDoc = serialization[0].getDocument();
+    ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
+
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage.size(), 3UL);
+    ASSERT_VALUE_EQ(serializedStage["from"], Value(std::string("coll")));
+    ASSERT_VALUE_EQ(serializedStage["as"], Value(std::string("as")));
+
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 1UL);
+
+    ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
+    ASSERT_DOCUMENT_EQ(serializedStage["pipeline"][0]["$match"].getDocument(),
+                       Document(fromjson("{x: 1}")));
+
+    //
+    // Create a new $lookup stage from the serialization. Serialize the new stage and confirm that
+    // it is equivalent to the original serialization.
+    //
+    auto serializedBson = serializedDoc.toBson();
+    auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBson.firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
 TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {
     auto input = Document{{"local", 1}};
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(

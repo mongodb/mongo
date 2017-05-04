@@ -227,6 +227,21 @@ TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAs) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldCoalesceWithUnwindOnAs) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', pipeline: []}}"
+        ",{$unwind: {path: '$same'}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', pipeline: [], "
+        "unwinding: {preserveNullAndEmptyArrays: false}}}]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', pipeline: []}}"
+        ",{$unwind: {path: '$same'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty) {
     string inputPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
@@ -276,6 +291,18 @@ TEST(PipelineOptimizationTest, LookupShouldNotCoalesceWithUnwindNotOnAs) {
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldNotCoalesceWithUnwindNotOnAs) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', pipeline: []}}"
+        ",{$unwind: {path: '$from'}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', pipeline: []}}"
+        ",{$unwind: {path: '$from'}}"
+        "]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
 TEST(PipelineOptimizationTest, LookupShouldSwapWithMatch) {
     string inputPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
@@ -285,6 +312,16 @@ TEST(PipelineOptimizationTest, LookupShouldSwapWithMatch) {
         "[{$match: {independent: 0}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldSwapWithMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', pipeline: []}}, "
+        " {$match: {'independent': 0}}]";
+    string outputPipe =
+        "[{$match: {independent: 0}}, "
+        " {$lookup: {from: 'lookupColl', as: 'asField', pipeline: []}}]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
@@ -328,6 +365,22 @@ TEST(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
         "'z'}}, "
         "{$unwind: {path: '$asField'}}, "
         "{$match: {'asField.subfield': {$eq: 1}}}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldAbsorbUnwindMatch) {
+    string inputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', pipeline: []}}, "
+        "{$unwind: '$asField'}, "
+        "{$match: {'asField.subfield': {$eq: 1}}}]";
+    string outputPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', pipeline: [{$match: {subfield: {$eq: "
+        "1}}}], "
+        "unwinding: {preserveNullAndEmptyArrays: false} } } ]";
+    string serializedPipe =
+        "[{$lookup: {from: 'lookupColl', as: 'asField', pipeline: [{$match: {subfield: {$eq: "
+        "1}}}]}}, "
+        "{$unwind: {path: '$asField'}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 

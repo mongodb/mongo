@@ -63,16 +63,13 @@ constexpr long long AggregationRequest::kDefaultBatchSize;
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
     : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
 
-StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
-    NamespaceString nss,
-    const BSONObj& cmdObj,
-    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    // Parse required parameters.
-    auto pipelineElem = cmdObj[kPipelineName];
+StatusWith<std::vector<BSONObj>> AggregationRequest::parsePipelineFromBSON(
+    BSONElement pipelineElem) {
+    std::vector<BSONObj> pipeline;
     if (pipelineElem.eoo() || pipelineElem.type() != BSONType::Array) {
         return {ErrorCodes::TypeMismatch, "'pipeline' option must be specified as an array"};
     }
-    std::vector<BSONObj> pipeline;
+
     for (auto elem : pipelineElem.Obj()) {
         if (elem.type() != BSONType::Object) {
             return {ErrorCodes::TypeMismatch,
@@ -81,7 +78,21 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
         pipeline.push_back(elem.embeddedObject().getOwned());
     }
 
-    AggregationRequest request(std::move(nss), std::move(pipeline));
+    return std::move(pipeline);
+}
+
+StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+    // Parse required parameters.
+    auto pipelineElem = cmdObj[kPipelineName];
+    auto pipeline = AggregationRequest::parsePipelineFromBSON(pipelineElem);
+    if (!pipeline.isOK()) {
+        return pipeline.getStatus();
+    }
+
+    AggregationRequest request(std::move(nss), std::move(pipeline.getValue()));
 
     const std::initializer_list<StringData> optionsParsedElseWhere = {kPipelineName, kCommandName};
 

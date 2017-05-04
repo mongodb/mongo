@@ -103,9 +103,16 @@ public:
      * Helper to absorb an $unwind stage. Only used for testing this special behavior.
      */
     void setUnwindStage(const boost::intrusive_ptr<DocumentSourceUnwind>& unwind) {
-        invariant(!_handlingUnwind);
+        invariant(!_unwindSrc);
         _unwindSrc = unwind;
-        _handlingUnwind = true;
+    }
+
+    /**
+     * Returns true if DocumentSourceLookup was constructed with pipeline syntax (as opposed to
+     * localField/foreignField syntax).
+     */
+    bool wasConstructedWithPipelineSyntax() const {
+        return !static_cast<bool>(_localField);
     }
 
 protected:
@@ -119,25 +126,56 @@ protected:
                                                      Pipeline::SourceContainer* container) final;
 
 private:
+    /**
+     * Target constructor. Handles common-field initialization for the syntax-specific delegating
+     * constructors.
+     */
+    DocumentSourceLookUp(NamespaceString fromNs,
+                         std::string as,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
+     * Constructor used for a $lookup stage specified using the {from: ..., localField: ...,
+     * foreignField: ..., as: ...} syntax.
+     */
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,
                          std::string localField,
                          std::string foreignField,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    /**
+     * Constructor used for a $lookup stage specified using the {from: ..., pipeline: [...], as:
+     * ...} syntax.
+     */
+    DocumentSourceLookUp(NamespaceString fromNs,
+                         std::string as,
+                         std::vector<BSONObj> pipeline,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
+     * Should not be called; use serializeToArray instead.
+     */
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE;
     }
 
     GetNextResult unwindResult();
 
+    /**
+     * The pipeline supplied via the $lookup 'pipeline' argument. This may differ from pipeline that
+     * is executed in that it will not include optimizations or resolved views.
+     */
+    std::string getUserPipelineDefinition();
+
     NamespaceString _fromNs;
+    NamespaceString _resolvedNs;
     FieldPath _as;
-    FieldPath _localField;
-    FieldPath _foreignField;
-    std::string _foreignFieldFieldName;
     boost::optional<BSONObj> _additionalFilter;
+
+    // For use when $lookup is specified with localField/foreignField syntax.
+    boost::optional<FieldPath> _localField;
+    boost::optional<FieldPath> _foreignField;
 
     // The ExpressionContext used when performing aggregation pipelines against the '_fromNs'
     // namespace.
@@ -145,15 +183,15 @@ private:
 
     // The aggregation pipeline to perform against the '_fromNs' namespace.
     std::vector<BSONObj> _fromPipeline;
+    // The pipeline defined with the user request, prior to optimization and addition of any view
+    // definitions.
+    std::vector<BSONObj> _userPipeline;
 
     boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;
     boost::intrusive_ptr<DocumentSourceUnwind> _unwindSrc;
 
-    bool _handlingUnwind = false;
-    bool _handlingMatch = false;
-
-    // The following members are used to hold onto state across getNext() calls when
-    // '_handlingUnwind' is true.
+    // The following members are used to hold onto state across getNext() calls when '_unwindSrc' is
+    // not null.
     long long _cursorIndex = 0;
     std::unique_ptr<Pipeline, Pipeline::Deleter> _pipeline;
     boost::optional<Document> _input;

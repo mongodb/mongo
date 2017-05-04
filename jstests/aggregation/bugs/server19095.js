@@ -377,7 +377,7 @@ load("jstests/aggregation/extras/utils.js");
         assertErrorCode(coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], 4572);
         assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], 40320);
         assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: "b", from: "from"}}], 4572);
+            coll, [{$lookup: {localField: "a", foreignField: "b", from: "from"}}], 40449);
 
         // All four field's values must be strings.
         assertErrorCode(

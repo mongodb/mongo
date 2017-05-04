@@ -61,6 +61,12 @@ public:
     static constexpr long long kDefaultBatchSize = 101;
 
     /**
+     * Parse an aggregation pipeline definition from 'pipelineElem'. Returns a non-OK status if
+     * pipeline is not an array or if any of the array elements are not objects.
+     */
+    static StatusWith<std::vector<BSONObj>> parsePipelineFromBSON(BSONElement pipelineElem);
+
+    /**
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a
      * non-OK status if a required field was missing, if there was an unrecognized field name or if
      * there was a bad value for one of the fields.
