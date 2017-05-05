@@ -68,6 +68,8 @@ ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshot
  */
 Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    invariant(replCoord->isReplEnabled());
+
     auto lastAppliedTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
     if (clusterTime > lastAppliedTime) {
         auto shardingState = ShardingState::get(opCtx);
@@ -97,6 +99,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
 
 Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    invariant(replCoord);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
@@ -135,16 +138,18 @@ Status waitForReadConcern(OperationContext* opCtx, const repl::ReadConcernArgs& 
 
     // Skip waiting for the OpTime when testing snapshot behavior
     if (!testingSnapshotBehaviorInIsolation && !readConcernArgs.isEmpty()) {
-        if (afterClusterTime) {
+        if (replCoord->isReplEnabled() && afterClusterTime) {
             auto status = makeNoopWriteIfNeeded(opCtx, *afterClusterTime);
             if (!status.isOK()) {
                 LOG(1) << "failed noop write due to " << status.toString();
             }
         }
 
-        auto status = replCoord->waitUntilOpTimeForRead(opCtx, readConcernArgs);
-        if (!status.isOK()) {
-            return status;
+        if (replCoord->isReplEnabled() || !afterClusterTime) {
+            auto status = replCoord->waitUntilOpTimeForRead(opCtx, readConcernArgs);
+            if (!status.isOK()) {
+                return status;
+            }
         }
     }
 
