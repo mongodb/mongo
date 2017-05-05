@@ -58,6 +58,7 @@
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 
@@ -162,6 +163,8 @@ public:
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
+        auto shardCollRequest =
+            ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -181,14 +184,7 @@ public:
                 str::stream() << "sharding already enabled for collection " << nss.ns(),
                 !routingInfo.cm());
 
-        // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj becomes
-        // corrupt as soon as the command ends.
-        BSONObj proposedKey = cmdObj.getObjectField("key").getOwned();
-        if (proposedKey.isEmpty()) {
-            errmsg = "no shard key";
-            return false;
-        }
-
+        auto proposedKey(shardCollRequest.getKey().getOwned());
         ShardKeyPattern proposedKeyPattern(proposedKey);
         if (!proposedKeyPattern.isValid()) {
             errmsg = str::stream() << "Unsupported shard key pattern. Pattern must"
@@ -199,7 +195,9 @@ public:
 
         bool isHashedShardKey = proposedKeyPattern.isHashedPattern();
 
-        if (isHashedShardKey && cmdObj["unique"].trueValue()) {
+        bool careAboutUnique = shardCollRequest.getUnique();
+
+        if (isHashedShardKey && careAboutUnique) {
             dassert(proposedKey.nFields() == 1);
 
             // it's possible to ensure uniqueness on the hashed field by
@@ -211,33 +209,25 @@ public:
 
         uassert(ErrorCodes::IllegalOperation, "can't shard system namespaces", !nss.isSystem());
 
+        // Ensure that the collation is valid. Currently we only allow the simple collation.
         bool simpleCollationSpecified = false;
-        {
-            BSONElement collationElement;
-            Status collationStatus =
-                bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
-            if (collationStatus.isOK()) {
-                // Ensure that the collation is valid. Currently we only allow the simple collation.
-                auto collator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                    ->makeFromBSON(collationElement.Obj());
-                if (!collator.getStatus().isOK()) {
-                    return appendCommandStatus(result, collator.getStatus());
-                }
-
-                if (collator.getValue()) {
-                    return appendCommandStatus(
-                        result,
-                        {ErrorCodes::BadValue,
-                         str::stream()
-                             << "The collation for shardCollection must be {locale: 'simple'}, "
-                             << "but found: "
-                             << collationElement.Obj()});
-                }
-
-                simpleCollationSpecified = true;
-            } else if (collationStatus != ErrorCodes::NoSuchKey) {
-                return appendCommandStatus(result, collationStatus);
+        if (shardCollRequest.getCollation()) {
+            auto& collation = *shardCollRequest.getCollation();
+            auto collator =
+                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
+            if (!collator.getStatus().isOK()) {
+                return appendCommandStatus(result, collator.getStatus());
             }
+            if (collator.getValue()) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::BadValue,
+                     str::stream()
+                         << "The collation for shardCollection must be {locale: 'simple'}, "
+                         << "but found: "
+                         << collation});
+            }
+            simpleCollationSpecified = true;
         }
 
         std::vector<ShardId> shardIds;
@@ -250,7 +240,7 @@ public:
         // danger of an OOM error.
         const int maxNumInitialChunksForShards = numShards * 8192;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = cmdObj["numInitialChunks"].numberInt();
+        int numChunks = shardCollRequest.getNumInitialChunks();
         if (numChunks > maxNumInitialChunksForShards || numChunks > maxNumInitialChunksTotal) {
             errmsg = str::stream()
                 << "numInitialChunks cannot be more than either: " << maxNumInitialChunksForShards
@@ -417,7 +407,6 @@ public:
         }
 
         // 3. If proposed key is required to be unique, additionally check for exact match.
-        bool careAboutUnique = cmdObj["unique"].trueValue();
 
         if (hasUsefulIndexForKey && careAboutUnique) {
             BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
