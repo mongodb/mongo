@@ -42,6 +42,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/commands/sharded_command_processing.h"
@@ -167,6 +168,8 @@ public:
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
+        uassertStatusOK(createShardDatabase(opCtx, nss.db()));
+
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         if (!routingInfo.cm()) {
