@@ -735,12 +735,14 @@ var DB;
             throw _getErrorWithCode(ret, "getlasterror failed: " + tojson(res));
         return res.err;
     };
-    DB.prototype.getLastErrorObj = function(w, wtimeout) {
+    DB.prototype.getLastErrorObj = function(w, wtimeout, j) {
         var cmd = {getlasterror: 1};
         if (w) {
             cmd.w = w;
             if (wtimeout)
                 cmd.wtimeout = wtimeout;
+            if (j != null)
+                cmd.j = j;
         }
         var res = this.runCommand(cmd);
 
