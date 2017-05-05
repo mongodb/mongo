@@ -715,7 +715,8 @@ void KeyString::_appendNumberDecimal(const Decimal128 dec, bool invert) {
         bool isNegative = truncated.isNegative();
         bool has8bytes = integerPart >= (1LL << 55);
         uint64_t preshifted = integerPart << 1;
-        _appendPreshiftedIntegerPortion(preshifted | hasFraction, isNegative, invert);
+        _appendPreshiftedIntegerPortion(
+            preshifted | static_cast<uint64_t>(hasFraction), isNegative, invert);
         if (!hasFraction)
             return;
         if (!has8bytes) {
