@@ -38,6 +38,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -87,8 +88,10 @@ public:
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique)
-            return stdx::make_unique<WiredTigerIndexUnique>(&opCtx, uri, &desc);
-        return stdx::make_unique<WiredTigerIndexStandard>(&opCtx, uri, &desc);
+            return stdx::make_unique<WiredTigerIndexUnique>(
+                &opCtx, uri, &desc, KVPrefix::kNotPrefixed);
+        return stdx::make_unique<WiredTigerIndexStandard>(
+            &opCtx, uri, &desc, KVPrefix::kNotPrefixed);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

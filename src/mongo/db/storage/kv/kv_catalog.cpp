@@ -337,7 +337,8 @@ void KVCatalog::getAllCollections(std::vector<std::string>* out) const {
 
 Status KVCatalog::newCollection(OperationContext* opCtx,
                                 StringData ns,
-                                const CollectionOptions& options) {
+                                const CollectionOptions& options,
+                                KVPrefix prefix) {
     invariant(opCtx->lockState() == NULL ||
               opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
 
@@ -359,6 +360,7 @@ Status KVCatalog::newCollection(OperationContext* opCtx,
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = ns.toString();
         md.options = options;
+        md.prefix = prefix;
         b.append("md", md.toBSON());
         obj = b.obj();
     }

@@ -35,6 +35,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
@@ -93,6 +94,8 @@ public:
         virtual void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) = 0;
 
         virtual bool isReady(OperationContext* opCtx) const = 0;
+
+        virtual KVPrefix getPrefix() const = 0;
 
         virtual boost::optional<SnapshotName> getMinimumVisibleSnapshot() = 0;
 
@@ -219,6 +222,10 @@ public:
     // if this ready is ready for queries
     bool isReady(OperationContext* const opCtx) const {
         return this->_impl().isReady(opCtx);
+    }
+
+    KVPrefix getPrefix() const {
+        return this->_impl().getPrefix();
     }
 
     /**

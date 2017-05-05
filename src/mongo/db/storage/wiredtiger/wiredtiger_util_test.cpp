@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"

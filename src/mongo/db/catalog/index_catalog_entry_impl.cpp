@@ -99,7 +99,8 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
       _infoCache(infoCache),
       _headManager(stdx::make_unique<HeadManagerImpl>(this_)),
       _ordering(Ordering::make(_descriptor->keyPattern())),
-      _isReady(false) {
+      _isReady(false),
+      _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
     _descriptor->_cachedEntry = this_;
 
     _isReady = _catalogIsReady(opCtx);
@@ -323,4 +324,9 @@ bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                MultikeyPaths* multikeyPaths) const {
     return _collection->isIndexMultikey(opCtx, _descriptor->indexName(), multikeyPaths);
 }
+
+KVPrefix IndexCatalogEntryImpl::_catalogGetPrefix(OperationContext* opCtx) const {
+    return _collection->getIndexPrefix(opCtx, _descriptor->indexName());
+}
+
 }  // namespace mongo

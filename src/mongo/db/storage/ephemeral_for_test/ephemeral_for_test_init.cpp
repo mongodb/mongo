@@ -46,6 +46,10 @@ public:
     virtual ~EphemeralForTestFactory() {}
     virtual StorageEngine* create(const StorageGlobalParams& params,
                                   const StorageEngineLockFile* lockFile) const {
+        uassert(ErrorCodes::InvalidOptions,
+                "ephemeralForTest does not support --groupCollections",
+                !params.groupCollections);
+
         KVStorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;

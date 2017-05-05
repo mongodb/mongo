@@ -31,6 +31,7 @@
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 
 #include <algorithm>
+#include <numeric>
 
 #include "mongo/db/field_ref.h"
 
@@ -175,6 +176,14 @@ bool BSONCollectionCatalogEntry::isIndexReady(OperationContext* opCtx, StringDat
     return md.indexes[offset].ready;
 }
 
+KVPrefix BSONCollectionCatalogEntry::getIndexPrefix(OperationContext* opCtx,
+                                                    StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].prefix;
+}
+
 // --------------------------
 
 void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newExpireSeconds) {
@@ -228,6 +237,15 @@ void BSONCollectionCatalogEntry::MetaData::rename(StringData toNS) {
     }
 }
 
+KVPrefix BSONCollectionCatalogEntry::MetaData::getMaxPrefix() const {
+    // Use the collection prefix as the initial max value seen. Then compare it with each index
+    // prefix. Note the oplog has no indexes so the vector of 'IndexMetaData' may be empty.
+    return std::accumulate(
+        indexes.begin(), indexes.end(), prefix, [](KVPrefix max, IndexMetaData index) {
+            return max < index.prefix ? index.prefix : max;
+        });
+}
+
 BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
     BSONObjBuilder b;
     b.append("ns", ns);
@@ -249,10 +267,12 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             }
 
             sub.append("head", static_cast<long long>(indexes[i].head.repr()));
+            sub.append("prefix", indexes[i].prefix.toBSONValue());
             sub.doneFast();
         }
         arr.doneFast();
     }
+    b.append("prefix", prefix.toBSONValue());
     return b.obj();
 }
 
@@ -282,8 +302,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
                 parseMultikeyPathsFromBytes(multikeyPathsElem.Obj(), &imd.multikeyPaths);
             }
 
+            imd.prefix = KVPrefix::fromBSONElement(idx["prefix"]);
             indexes.push_back(imd);
         }
     }
+
+    prefix = KVPrefix::fromBSONElement(obj["prefix"]);
 }
 }

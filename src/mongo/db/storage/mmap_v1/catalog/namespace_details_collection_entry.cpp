@@ -186,6 +186,11 @@ bool NamespaceDetailsCollectionCatalogEntry::isIndexReady(OperationContext* opCt
     return idxNo < getCompletedIndexCount(opCtx);
 }
 
+KVPrefix NamespaceDetailsCollectionCatalogEntry::getIndexPrefix(OperationContext* opCtx,
+                                                                StringData indexName) const {
+    return KVPrefix::kNotPrefixed;
+}
+
 int NamespaceDetailsCollectionCatalogEntry::_findIndexNumber(OperationContext* opCtx,
                                                              StringData idxName) const {
     NamespaceDetails::IndexIterator i = _details->ii(true);

@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -65,7 +66,10 @@ public:
     /**
      * @return error or ident for instance
      */
-    Status newCollection(OperationContext* opCtx, StringData ns, const CollectionOptions& options);
+    Status newCollection(OperationContext* opCtx,
+                         StringData ns,
+                         const CollectionOptions& options,
+                         KVPrefix prefix);
 
     std::string getCollectionIdent(StringData ns) const;
 
