@@ -445,45 +445,44 @@ var ReplSetTest = function(opts) {
 
     /**
      * Blocks until all nodes agree on who the primary is.
+     * If 'expectedPrimaryNodeId' is provided, ensure that every node is seeing this node as the
+     * primary. Otherwise, ensure that all the nodes in the set agree with the first node on the
+     * identity of the primary.
      */
-    this.awaitNodesAgreeOnPrimary = function(timeout) {
+    this.awaitNodesAgreeOnPrimary = function(timeout, nodes, expectedPrimaryNodeId) {
         timeout = timeout || self.kDefaultTimeoutMS;
+        nodes = nodes || self.nodes;
+        expectedPrimaryNodeId = expectedPrimaryNodeId || -1;
 
-        assert.soon(function() {
-            try {
-                var primary = -1;
+        assert.soonNoExcept(function() {
+            var primary = expectedPrimaryNodeId;
 
-                for (var i = 0; i < self.nodes.length; i++) {
-                    var replSetGetStatus =
-                        self.nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
-                    var nodesPrimary = -1;
-                    for (var j = 0; j < replSetGetStatus.members.length; j++) {
-                        if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
-                            // Node sees two primaries.
-                            if (nodesPrimary !== -1) {
-                                return false;
-                            }
-                            nodesPrimary = j;
+            for (var i = 0; i < nodes.length; i++) {
+                var replSetGetStatus = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+                var nodesPrimary = -1;
+                for (var j = 0; j < replSetGetStatus.members.length; j++) {
+                    if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
+                        // Node sees two primaries.
+                        if (nodesPrimary !== -1) {
+                            return false;
                         }
-                    }
-                    // Node doesn't see a primary.
-                    if (nodesPrimary < 0) {
-                        return false;
-                    }
-
-                    if (primary < 0) {
-                        // If we haven't seen a primary yet, set it to this.
-                        primary = nodesPrimary;
-                    } else if (primary !== nodesPrimary) {
-                        return false;
+                        nodesPrimary = j;
                     }
                 }
+                // Node doesn't see a primary.
+                if (nodesPrimary < 0) {
+                    return false;
+                }
 
-                return true;
-            } catch (e) {
-                print("caught exception " + e);
-                return false;
+                if (primary < 0) {
+                    // If we haven't seen a primary yet, set it to this.
+                    primary = nodesPrimary;
+                } else if (primary !== nodesPrimary) {
+                    return false;
+                }
             }
+
+            return true;
         }, "Awaiting nodes to agree on primary", timeout);
     };
 
