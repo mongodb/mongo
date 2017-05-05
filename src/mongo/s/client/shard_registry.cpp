@@ -261,7 +261,11 @@ bool ShardRegistry::reload(OperationContext* txn) {
         // simultaneously because there is no good way to determine which of the threads has the
         // more recent version of the data.
         do {
-            _inReloadCV.wait(reloadLock);
+            auto waitStatus = txn->waitForConditionOrInterruptNoAssert(_inReloadCV, reloadLock);
+            if (!waitStatus.isOK()) {
+                LOG(1) << "ShardRegistry reload is interrupted due to: " << redact(waitStatus);
+                return false;
+            }
         } while (_reloadState == ReloadState::Reloading);
 
         if (_reloadState == ReloadState::Idle) {
@@ -283,7 +287,6 @@ bool ShardRegistry::reload(OperationContext* txn) {
         _reloadState = nextReloadState;
         _inReloadCV.notify_all();
     });
-
 
     ShardRegistryData currData(txn, _shardFactory.get());
     currData.addConfigShard(_data.getConfigShard());
