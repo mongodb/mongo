@@ -62,7 +62,9 @@ assert.eq(gle.wtime, null);
 assert.gte(gle.waited, 5);
 assert.eq(gle.wtimeout, true);
 
-gle = mdb.getLastErrorObj("majority", 50);
+// Wait with { j: false }. { w: "majority" } waits for journaling by default,
+// so we override the behavior to make it the same as the previous getLastError command.
+gle = mdb.getLastErrorObj("majority", 50, false);
 print('Trying w=majority, 50ms timeout.');
 printjson(gle);
 assert.eq(gle.ok, 1);
