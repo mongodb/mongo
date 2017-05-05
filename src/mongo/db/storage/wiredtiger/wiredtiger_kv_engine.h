@@ -85,50 +85,20 @@ public:
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options) {
-        return createGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
-    }
+                                     const CollectionOptions& options);
 
     virtual std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                         StringData ns,
                                                         StringData ident,
-                                                        const CollectionOptions& options) {
-        return getGroupedRecordStore(opCtx, ns, ident, options, KVPrefix::kNotPrefixed);
-    }
+                                                        const CollectionOptions& options);
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              StringData ident,
-                                             const IndexDescriptor* desc) {
-        return createGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
-    }
+                                             const IndexDescriptor* desc);
 
     virtual SortedDataInterface* getSortedDataInterface(OperationContext* opCtx,
                                                         StringData ident,
-                                                        const IndexDescriptor* desc) {
-        return getGroupedSortedDataInterface(opCtx, ident, desc, KVPrefix::kNotPrefixed);
-    }
-
-    virtual Status createGroupedRecordStore(OperationContext* opCtx,
-                                            StringData ns,
-                                            StringData ident,
-                                            const CollectionOptions& options,
-                                            KVPrefix prefix);
-
-    virtual std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
-                                                               StringData ns,
-                                                               StringData ident,
-                                                               const CollectionOptions& options,
-                                                               KVPrefix prefix);
-
-    virtual Status createGroupedSortedDataInterface(OperationContext* opCtx,
-                                                    StringData ident,
-                                                    const IndexDescriptor* desc,
-                                                    KVPrefix prefix);
-
-    virtual SortedDataInterface* getGroupedSortedDataInterface(OperationContext* opCtx,
-                                                               StringData ident,
-                                                               const IndexDescriptor* desc,
-                                                               KVPrefix prefix);
+                                                        const IndexDescriptor* desc);
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 

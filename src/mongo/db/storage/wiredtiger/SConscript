@@ -45,6 +45,7 @@ if wiredtiger:
             'wiredtiger_util.cpp',
             ],
         LIBDEPS= [
+            'storage_wiredtiger_customization_hooks',
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/bson/dotted_path_support',
             '$BUILD_DIR/mongo/db/catalog/collection',
@@ -57,16 +58,14 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/db/storage/journal_listener',
             '$BUILD_DIR/mongo/db/storage/key_string',
-            '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
             '$BUILD_DIR/mongo/db/storage/oplog_hack',
             '$BUILD_DIR/mongo/db/storage/storage_options',
             '$BUILD_DIR/mongo/util/concurrency/ticketholder',
             '$BUILD_DIR/mongo/util/elapsed_tracker',
             '$BUILD_DIR/mongo/util/processinfo',
-            '$BUILD_DIR/third_party/shim_snappy',
             '$BUILD_DIR/third_party/shim_wiredtiger',
+            '$BUILD_DIR/third_party/shim_snappy',
             '$BUILD_DIR/third_party/shim_zlib',
-            'storage_wiredtiger_customization_hooks',
             ],
         )
 
@@ -116,9 +115,8 @@ if wiredtiger:
             source=['wiredtiger_record_store_test.cpp',
                     ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-                '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
                 'storage_wiredtiger_mock',
+                '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
                 ],
             )
 
@@ -127,9 +125,8 @@ if wiredtiger:
             source=['wiredtiger_index_test.cpp',
                     ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-                '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
                 'storage_wiredtiger_mock',
+                '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
                 ],
             )
 
@@ -149,7 +146,6 @@ if wiredtiger:
                     ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/service_context',
-                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
                 'storage_wiredtiger_mock',
                 ],
             )

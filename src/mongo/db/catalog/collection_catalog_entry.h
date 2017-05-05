@@ -35,7 +35,6 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/kv/kv_prefix.h"
 
 namespace mongo {
 
@@ -100,8 +99,6 @@ public:
                               const RecordId& newHead) = 0;
 
     virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const = 0;
-
-    virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const = 0;
 
     virtual Status removeIndex(OperationContext* opCtx, StringData indexName) = 0;
 

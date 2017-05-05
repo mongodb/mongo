@@ -459,11 +459,10 @@ void WiredTigerKVEngine::setSortedDataInterfaceExtraOptions(const std::string& o
     _indexOptions = options;
 }
 
-Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
-                                                    StringData ns,
-                                                    StringData ident,
-                                                    const CollectionOptions& options,
-                                                    KVPrefix prefix) {
+Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
+                                             StringData ns,
+                                             StringData ident,
+                                             const CollectionOptions& options) {
     _checkIdentPath(ident);
     WiredTigerSession session(_conn);
 
@@ -480,12 +479,10 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
 
-std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
-    OperationContext* opCtx,
-    StringData ns,
-    StringData ident,
-    const CollectionOptions& options,
-    KVPrefix prefix) {
+std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
+                                                                StringData ns,
+                                                                StringData ident,
+                                                                const CollectionOptions& options) {
     if (options.capped) {
         return stdx::make_unique<WiredTigerRecordStore>(
             opCtx,
@@ -497,8 +494,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
             options.cappedSize ? options.cappedSize : 4096,
             options.cappedMaxDocs ? options.cappedMaxDocs : -1,
             nullptr,
-            _sizeStorer.get(),
-            prefix);
+            _sizeStorer.get());
     } else {
         return stdx::make_unique<WiredTigerRecordStore>(opCtx,
                                                         ns,
@@ -509,8 +505,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
                                                         -1,
                                                         -1,
                                                         nullptr,
-                                                        _sizeStorer.get(),
-                                                        prefix);
+                                                        _sizeStorer.get());
     }
 }
 
@@ -518,10 +513,9 @@ string WiredTigerKVEngine::_uri(StringData ident) const {
     return string("table:") + ident.toString();
 }
 
-Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* opCtx,
-                                                            StringData ident,
-                                                            const IndexDescriptor* desc,
-                                                            KVPrefix prefix) {
+Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
+                                                     StringData ident,
+                                                     const IndexDescriptor* desc) {
     _checkIdentPath(ident);
 
     std::string collIndexOptions;
@@ -554,13 +548,12 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
     return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
 }
 
-SortedDataInterface* WiredTigerKVEngine::getGroupedSortedDataInterface(OperationContext* opCtx,
-                                                                       StringData ident,
-                                                                       const IndexDescriptor* desc,
-                                                                       KVPrefix prefix) {
+SortedDataInterface* WiredTigerKVEngine::getSortedDataInterface(OperationContext* opCtx,
+                                                                StringData ident,
+                                                                const IndexDescriptor* desc) {
     if (desc->unique())
-        return new WiredTigerIndexUnique(opCtx, _uri(ident), desc, prefix);
-    return new WiredTigerIndexStandard(opCtx, _uri(ident), desc, prefix);
+        return new WiredTigerIndexUnique(opCtx, _uri(ident), desc);
+    return new WiredTigerIndexStandard(opCtx, _uri(ident), desc);
 }
 
 Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {

@@ -62,8 +62,7 @@ IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* opCtx,
     std::string ident =
         _engine->getCatalog()->getIndexIdent(opCtx, collection->ns().ns(), desc->indexName());
 
-    SortedDataInterface* sdi =
-        _engine->getEngine()->getGroupedSortedDataInterface(opCtx, ident, desc, index->getPrefix());
+    SortedDataInterface* sdi = _engine->getEngine()->getSortedDataInterface(opCtx, ident, desc);
 
     if ("" == type)
         return new BtreeAccessMethod(index, sdi);

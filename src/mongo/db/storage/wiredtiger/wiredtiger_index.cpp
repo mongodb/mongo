@@ -221,14 +221,12 @@ int WiredTigerIndex::Create(OperationContext* opCtx,
 
 WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  const std::string& uri,
-                                 const IndexDescriptor* desc,
-                                 KVPrefix prefix)
+                                 const IndexDescriptor* desc)
     : _ordering(Ordering::make(desc->keyPattern())),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),
       _collectionNamespace(desc->parentNS()),
-      _indexName(desc->indexName()),
-      _prefix(prefix) {
+      _indexName(desc->indexName()) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         ctx, uri, kMinimumIndexVersion, kMaximumIndexVersion);
     if (!version.isOK()) {
@@ -1005,9 +1003,8 @@ public:
 
 WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const std::string& uri,
-                                             const IndexDescriptor* desc,
-                                             KVPrefix prefix)
-    : WiredTigerIndex(ctx, uri, desc, prefix), _partial(desc->isPartial()) {}
+                                             const IndexDescriptor* desc)
+    : WiredTigerIndex(ctx, uri, desc), _partial(desc->isPartial()) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexUnique::newCursor(
     OperationContext* opCtx, bool forward) const {
@@ -1191,9 +1188,8 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
 
 WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  const std::string& uri,
-                                                 const IndexDescriptor* desc,
-                                                 KVPrefix prefix)
-    : WiredTigerIndex(ctx, uri, desc, prefix) {}
+                                                 const IndexDescriptor* desc)
+    : WiredTigerIndex(ctx, uri, desc) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
     OperationContext* opCtx, bool forward) const {

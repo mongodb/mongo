@@ -32,7 +32,6 @@
 
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
@@ -207,16 +206,14 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceExists, "collection already exists");
     }
 
-    KVPrefix prefix = KVPrefix::getNextPrefix(NamespaceString(ns));
-
     // need to create it
-    Status status = _engine->getCatalog()->newCollection(opCtx, ns, options, prefix);
+    Status status = _engine->getCatalog()->newCollection(opCtx, ns, options);
     if (!status.isOK())
         return status;
 
     string ident = _engine->getCatalog()->getCollectionIdent(ns);
 
-    status = _engine->getEngine()->createGroupedRecordStore(opCtx, ns, ident, options, prefix);
+    status = _engine->getEngine()->createRecordStore(opCtx, ns, ident, options);
     if (!status.isOK())
         return status;
 
@@ -232,7 +229,7 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
 
     opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns, ident, true));
 
-    auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, options, prefix);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, ns, ident, options);
     invariant(rs);
 
     _collections[ns.toString()] = new KVCollectionCatalogEntry(
@@ -255,7 +252,7 @@ void KVDatabaseCatalogEntryBase::initCollection(OperationContext* opCtx,
         rs = nullptr;
     } else {
         BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
-        rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, md.options, md.prefix);
+        rs = _engine->getEngine()->getRecordStore(opCtx, ns, ident, md.options);
         invariant(rs);
     }
 
@@ -321,8 +318,7 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
     opCtx->recoveryUnit()->registerChange(
         new AddCollectionChange(opCtx, this, toNS, identTo, false));
 
-    auto rs =
-        _engine->getEngine()->getGroupedRecordStore(opCtx, toNS, identTo, md.options, md.prefix);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, toNS, identTo, md.options);
 
     _collections[toNS.toString()] = new KVCollectionCatalogEntry(
         _engine->getEngine(), _engine->getCatalog(), toNS, identTo, std::move(rs));
