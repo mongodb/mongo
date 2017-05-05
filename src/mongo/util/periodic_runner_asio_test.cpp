@@ -39,9 +39,9 @@ namespace {
 class PeriodicRunnerASIOTest : public unittest::Test {
 public:
     void setUp() override {
-        auto timerFactory = std::make_unique<executor::AsyncTimerFactoryMock>();
+        auto timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
         _timerFactory = timerFactory.get();
-        _runner = std::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
+        _runner = stdx::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
         _runner->startup();
     }
 
