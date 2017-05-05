@@ -137,21 +137,39 @@ var TagsTest = function(options) {
         assert.commandWorked(replTest.getPrimary().getDB('foo').createCollection('bar'));
         replTest.awaitReplication();
 
-        var ensurePrimary = function(nodeId, expectedWritableNodes) {
-            jsTestLog('Node ' + nodeId + ' (' + replTest.nodes[nodeId].host +
+        // nodeId is the index of the node that we expect to see as primary.
+        // expectedNodesAgreeOnPrimary is a set of nodes that should agree that 'nodeId' is the
+        // primary.
+        // expectedWritableNodesCount is the number of nodes we can expect to write to. Defaults to
+        //     expectedNodesAgreeOnPrimary.length.
+        var ensurePrimary = function(
+            nodeId, expectedNodesAgreeOnPrimary, expectedWritableNodesCount) {
+            expectedWritableNodesCount =
+                expectedWritableNodesCount || expectedNodesAgreeOnPrimary.length;
+            jsTestLog('ensurePrimary - Node ' + nodeId + ' (' + replTest.nodes[nodeId].host +
                       ') should be primary.');
-            replTest.waitForState(replTest.nodes[nodeId], ReplSetTest.State.PRIMARY, 60 * 1000);
+            replTest.awaitNodesAgreeOnPrimary(
+                replTest.kDefaultTimeoutMS, expectedNodesAgreeOnPrimary, nodeId);
+            jsTestLog('ensurePrimary - Nodes ' + tojson(expectedNodesAgreeOnPrimary) +
+                      ' agree that ' + nodeId + ' (' + replTest.nodes[nodeId].host +
+                      ') should be primary.');
             primary = replTest.getPrimary();
             if (options.forceWriteMode) {
                 primary.forceWriteMode(options.forceWriteMode);
             }
-            var writeConcern = {writeConcern: {w: expectedWritableNodes, wtimeout: 30 * 1000}};
+            var writeConcern = {
+                writeConcern:
+                    {w: expectedWritableNodesCount, wtimeout: replTest.kDefaultTimeoutMS}
+            };
             assert.writeOK(primary.getDB('foo').bar.insert({x: 100}, writeConcern));
+            jsTestLog('ensurePrimary - Successfully written a document to primary node (' +
+                      replTest.nodes[nodeId].host + ') using a write concern of w:' +
+                      expectedWritableNodesCount);
             return primary;
         };
 
         // 2 should eventually stage a priority takeover from the primary.
-        var primary = ensurePrimary(2, 3);
+        var primary = ensurePrimary(2, replTest.nodes);
 
         jsTestLog('primary is now 2');
         var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
@@ -183,7 +201,7 @@ var TagsTest = function(options) {
         var timeout = 20 * 1000;
 
         jsTestLog('test1');
-        primary = ensurePrimary(2, 3);
+        primary = ensurePrimary(2, replTest.nodes.slice(0, 3));
 
         jsTestLog('Non-existent write concern should be rejected.');
         options = {writeConcern: {w: 'blahblah', wtimeout: timeout}};
@@ -204,7 +222,7 @@ var TagsTest = function(options) {
         conns[1].reconnect(conns[4]);
         jsTestLog('partitions: [0-1-2] [1-4] [3] ' +
                   '(all nodes besides node 3 can replicate from primary node 2)');
-        primary = ensurePrimary(2, 4);
+        primary = ensurePrimary(2, replTest.nodes.slice(0, 3), 4);
 
         jsTestLog('Write concern "3 or 4" should work - 4 is now connected to the primary ' +
                   primary.host + ' via node 1 ' + replTest.nodes[1].host);
@@ -223,7 +241,7 @@ var TagsTest = function(options) {
         conns[3].reconnect(conns[4]);
         jsTestLog('partitions: [0-1-2] [1-4] [3-4] ' +
                   '(all secondaries can replicate from primary node 2)');
-        primary = ensurePrimary(2, 5);
+        primary = ensurePrimary(2, replTest.nodes.slice(0, 3), replTest.nodes.length);
 
         jsTestLog('Write concern "3 and 4" should work - ' +
                   'nodes 3 and 4 are connected to primary via node 1.');
@@ -242,7 +260,7 @@ var TagsTest = function(options) {
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
         jsTestLog('Write concern "2 dc and 3 server"');
-        primary = ensurePrimary(2, 5);
+        primary = ensurePrimary(2, replTest.nodes.slice(0, 3), replTest.nodes.length);
         options = {writeConcern: {w: '2 dc and 3 server', wtimeout: timeout}};
         assert.writeOK(primary.getDB('foo').bar.insert(doc));
         assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
@@ -260,7 +278,7 @@ var TagsTest = function(options) {
         // Node 1 with slightly higher priority will take over.
         jsTestLog('1 must become primary here because otherwise the other members will take too ' +
                   'long timing out their old sync threads');
-        primary = ensurePrimary(1, 4);
+        primary = ensurePrimary(1, replTest.nodes.slice(0, 2), 4);
 
         jsTestLog('Write concern "3 and 4" should still work with new primary node 1 ' +
                   primary.host);

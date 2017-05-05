@@ -34,11 +34,12 @@
         node.adminCommand(verbosity);
     });
 
-    function stepUp(node) {
-        assert.soon(function() {
-            node.adminCommand({replSetStepUp: 1});
+    function stepUpNode(node) {
+        assert.soonNoExcept(function() {
+            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+            rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, rst.getNodeId(node));
             return node.adminCommand('replSetGetStatus').myState == ReplSetTest.State.PRIMARY;
-        });
+        }, 'failed to step up node ' + node.host, rst.kDefaultTimeoutMS);
 
         return node;
     }
@@ -67,8 +68,7 @@
 
     jsTest.log("Case 1: The primary is up-to-date after freshness scan.");
     // Should complete transition to primary immediately.
-    var newPrimary = stepUp(rst.getSecondary());
-    rst.awaitNodesAgreeOnPrimary();
+    var newPrimary = stepUpNode(rst.getSecondary());
     // Should win an election and finish the transition very quickly.
     assert.eq(newPrimary, rst.getPrimary());
     rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
@@ -80,8 +80,7 @@
     doWrites(rst.getPrimary());
     var latestOp = getLatestOp(rst.getPrimary());
     // New primary wins immediately, but needs to catch up.
-    newPrimary = stepUp(rst.getSecondary());
-    rst.awaitNodesAgreeOnPrimary();
+    newPrimary = stepUpNode(rst.getSecondary());
     // Check this node is not writable.
     assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
     // Disable fail point to allow replication.
@@ -101,8 +100,7 @@
     var oldPrimary = rst.getPrimary();
     originalSecondaries = rst.getSecondaries();
     latestOp = getLatestOp(oldPrimary);
-    newPrimary = stepUp(originalSecondaries[0]);
-    rst.awaitNodesAgreeOnPrimary();
+    newPrimary = stepUpNode(originalSecondaries[0]);
     // Disable fail point on one of the other secondaries.
     // Wait until it catches up with the old primary.
     restartServerReplication(originalSecondaries[1]);
@@ -134,8 +132,7 @@
     latestOp = getLatestOp(rst.getPrimary());
 
     // New primary wins immediately, but needs to catch up.
-    newPrimary = stepUp(originalSecondaries[0]);
-    rst.awaitNodesAgreeOnPrimary();
+    newPrimary = stepUpNode(originalSecondaries[0]);
     var latestOpOnNewPrimary = getLatestOp(newPrimary);
     // Wait until the new primary completes the transition to primary and writes a no-op.
     checkLog.contains(newPrimary, "Cannot catch up oplog after becoming primary");

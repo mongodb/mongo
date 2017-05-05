@@ -50,8 +50,13 @@ load("jstests/replsets/rslib.js");
             node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
     }
 
-    function stepUp(node) {
-        assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+    function stepUpNode(node) {
+        assert.soonNoExcept(function() {
+            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+            replSet.awaitNodesAgreeOnPrimary(
+                replSet.kDefaultTimeoutMS, replSet.nodes, replSet.getNodeId(node));
+            return node.adminCommand('replSetGetStatus').myState == ReplSetTest.State.PRIMARY;
+        }, 'failed to step up node ' + node.host, replSet.kDefaultTimeoutMS);
     }
 
     // Do an initial insert to prevent the secondary from going into recovery
@@ -85,9 +90,7 @@ load("jstests/replsets/rslib.js");
         1000);
 
     reconnect(secondary);
-    stepUp(secondary);
-    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
-    replSet.awaitNodesAgreeOnPrimary();
+    stepUpNode(secondary);
 
     // Secondary doesn't allow writes yet.
     var res = secondary.getDB("admin").runCommand({"isMaster": 1});
@@ -103,14 +106,10 @@ load("jstests/replsets/rslib.js");
 
     // Original primary steps up.
     reconnect(primary);
-    stepUp(primary);
-    replSet.waitForState(primary, ReplSetTest.State.PRIMARY);
-    replSet.awaitNodesAgreeOnPrimary();
+    stepUpNode(primary);
 
     reconnect(secondary);
-    stepUp(secondary);
-    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
-    replSet.awaitNodesAgreeOnPrimary();
+    stepUpNode(secondary);
 
     // Disable fail point to allow replication.
     secondaries.forEach(disableFailPoint);
