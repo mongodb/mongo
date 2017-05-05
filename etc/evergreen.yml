@@ -502,25 +502,64 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
+        preamble="PATH='$path_value'   \
+                  ${gcov_environment}  \
+                  ${rlp_environment}   \
+                  ${san_options}       \
+                  ${san_symbolizer}    \
+                  ${snmp_config_path}"
         # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
-        # invocation. It doesn't set any environment variables and should therefore come last in
-        # this list of expansions.
-        PATH="$path_value"   \
-        ${gcov_environment}  \
-        ${rlp_environment}   \
-        ${san_options}       \
-        ${san_symbolizer}    \
-        ${snmp_config_path}  \
-        ${resmoke_wrapper}   \
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py \
-          ${resmoke_args}                   \
-          $extra_args                       \
-          ${test_flags}                     \
-          --log=buildlogger                 \
-          --reportFile=report.json          \
-          --staggerJobs=on                  \
-          --tagFile=etc/test_lifecycle.yml  \
-          --taskId=${task_id}
+        # invocation. It must be placed between $preamble and $resmoke.
+        wrapper="${resmoke_wrapper}"
+        resmoke_report_file="--reportFile=report.json"
+        resmoke="${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py \
+                 ${resmoke_args}                   \
+                 $extra_args                       \
+                 ${test_flags}                     \
+                 --log=buildlogger                 \
+                 --staggerJobs=on                  \
+                 --tagFile=etc/test_lifecycle.yml  \
+                 --taskId=${task_id}"
+
+        # For patch builds, we run reliable and then unreliable tests and combine the reports.
+        if [ "${is_patch|}" = "true" ]; then
+          # Disable errexit, until we run combine_reports, so we can execute the reliable and
+          # unreliable tests.
+          set +o errexit
+          # If the "resmoke_wrapper" expansion is used for 'burn_in_tests' then add the reportFile.
+          echo "$wrapper" | grep -q burn_in_tests
+          add_report_file=$?
+          resmoke_tags="unreliable,                                \
+                        unreliable|${task_name},                   \
+                        unreliable|${task_name}|${build_variant},  \
+                        unreliable|${task_name}|${build_variant}|${distro_id}"
+          # Remove spaces from the tags argument.
+          resmoke_tags=$(echo $resmoke_tags| tr -d " ")
+          report_file=report_reliable.json
+          resmoke_base="$resmoke                         \
+                   --excludeWithAnyTags='$resmoke_tags'  \
+                   --reportFailureStatus=fail            \
+                   --reportFile=$report_file"
+          wrapper_report_file=""
+          if [ $add_report_file -eq 0 ]; then
+            wrapper_report_file="--reportFile=$report_file"
+          fi
+          eval $preamble $wrapper $wrapper_report_file $resmoke_base
+          report_file=report_unreliable.json
+          resmoke_base="$resmoke                         \
+                   --includeWithAnyTags='$resmoke_tags'  \
+                   --reportFailureStatus=silentfail      \
+                   --reportFile=$report_file"
+          if [ $add_report_file -eq 0 ]; then
+            wrapper_report_file="--reportFile=$report_file"
+          fi
+          eval $preamble $wrapper $wrapper_report_file  $resmoke_base
+          #  Reenable errexit, as the return from combine_reports will return the cumulative error.
+          set -o errexit
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
+        else
+          eval $preamble $wrapper $resmoke $resmoke_report_file
+        fi
 
 
   "do jepsen setup" :
@@ -927,9 +966,17 @@ pre:
 
 
 post:
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ -f report_reliable.json ]; then
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
+        fi
   - command: attach.results
     params:
       file_location: src/report.json
+
   - func: "kill processes"
   # Print out any Out of Memory killed process messages.
   - command: shell.exec
