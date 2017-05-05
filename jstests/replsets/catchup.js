@@ -36,10 +36,11 @@
     });
 
     function stepUpNode(node) {
-        assert.soon(function() {
-            node.adminCommand({replSetStepUp: 1});
+        assert.soonNoExcept(function() {
+            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+            rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, rst.nodes, rst.getNodeId(node));
             return node.adminCommand('replSetGetStatus').myState == ReplSetTest.State.PRIMARY;
-        });
+        }, 'failed to step up node ' + node.host, rst.kDefaultTimeoutMS);
 
         return node;
     }
@@ -66,7 +67,6 @@
         var latestOpOnOldPrimary = getLatestOp(oldPrimary);
         // New primary wins immediately, but needs to catch up.
         var newPrimary = stepUpNode(oldSecondaries[0]);
-        rst.awaitNodesAgreeOnPrimary();
         var latestOpOnNewPrimary = getLatestOp(newPrimary);
         // Check this node is not writable.
         assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
@@ -98,7 +98,6 @@
     jsTest.log("Case 1: The primary is up-to-date after refreshing heartbeats.");
     // Should complete transition to primary immediately.
     var newPrimary = stepUpNode(rst.getSecondary());
-    rst.awaitNodesAgreeOnPrimary();
     // Should win an election and finish the transition very quickly.
     assert.eq(newPrimary, rst.getPrimary());
     rst.awaitReplication();
