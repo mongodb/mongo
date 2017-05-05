@@ -134,14 +134,16 @@ public:
 
         AutoGetCollectionForRead autoColl(txn, ns);
         if (!autoColl.getDb()) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::NamespaceNotFound, "no database"));
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::NamespaceNotFound, "Database " + ns.db() + " doesn't exist"));
         }
 
         const Collection* collection = autoColl.getCollection();
         if (!collection) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::NamespaceNotFound, "no collection"));
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::NamespaceNotFound, "Collection " + ns.ns() + " doesn't exist"));
         }
 
         const CollectionCatalogEntry* cce = collection->getCatalogEntry();
