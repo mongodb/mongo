@@ -2,7 +2,7 @@
  * This test causes node 2 to enter rollback, reach the common point, and exit rollback, but before
  * it can apply operations to bring it back to a consistent state, switch sync sources to the node
  * that originally gave it the ops it is now rolling back (node 0).  This test then verifies that
- * node 2 refuses to use node0 as a sync source because it doesn't contain the minValid document
+ * node 2 refuses to use node 0 as a sync source because it doesn't contain the minValid document
  * it needs to reach consistency.  Node 2 is then allowed to reconnect to the node it was
  * originally rolling back against (node 1) and finish its rollback.  This is a regression test
  * against the case where we *did* allow node 2 to sync from node 0 which gave it the very ops
@@ -106,6 +106,10 @@
     checkLog.contains(
         nodes[2], "remote oplog does not contain entry with optime matching our required optime");
 
+    // Ensure our connection to node 0 is re-established, since our
+    // original connection should have gotten killed after node 0 stepped down.
+    reconnect(nodes[0]);
+
     var node0RBID = assert.commandWorked(nodes[0].adminCommand('replSetGetRBID')).rbid;
     var node1RBID = assert.commandWorked(nodes[1].adminCommand('replSetGetRBID')).rbid;
 
@@ -121,6 +125,10 @@
     waitForState(nodes[0], ReplSetTest.State.SECONDARY);
     waitForState(nodes[2], ReplSetTest.State.SECONDARY);
     rst.awaitReplication();
+
+    // Ensure our connection to node 0 is re-established, since our connection should have gotten
+    // killed during node 0's transition to ROLLBACK.
+    reconnect(nodes[0]);
 
     // Check that rollback happened on node 0, but not on node 2 since it had already rolled back
     // and just needed to finish applying ops to reach minValid.

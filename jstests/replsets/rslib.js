@@ -52,19 +52,32 @@ var getLastOpTime;
         rst.awaitSyncSource(syncingNode, desiredSyncSource);
     };
 
-    wait = function(f, msg) {
+    /**
+     * Calls a function 'f' once a second until it returns true. Throws an exception once 'f' has
+     * been called more than 'retries' times without returning true. If 'retries' is not given,
+     * it defaults to 200. 'retries' must be an integer greater than or equal to zero.
+     */
+    wait = function(f, msg, retries) {
         w++;
         var n = 0;
+        var default_retries = 200;
+        var delay_interval_ms = 1000;
+
+        // Set default value if 'retries' was not given.
+        if (retries === undefined) {
+            retries = default_retries;
+        }
         while (!f()) {
-            if (n % 4 == 0)
-                print("waiting " + w);
+            if (n % 4 == 0) {
+                print("Waiting " + w);
+            }
             if (++n == 4) {
                 print("" + f);
             }
-            if (n >= 200) {
-                throw new Error('tried 200 times, giving up on ' + msg);
+            if (n >= retries) {
+                throw new Error('Tried ' + retries + ' times, giving up on ' + msg);
             }
-            sleep(1000);
+            sleep(delay_interval_ms);
         }
     };
 
@@ -85,19 +98,32 @@ var getLastOpTime;
         count++;
     };
 
-    reconnect = function(a) {
+    /**
+     * Attempt to re-establish and re-authenticate a Mongo connection if it was dropped, with
+     * multiple retries.
+     *
+     * Returns upon successful re-connnection. If connection cannot be established after 200
+     * retries, throws an exception.
+     *
+     * @param conn - a Mongo connection object or DB object.
+     */
+    reconnect = function(conn) {
+        var retries = 200;
         wait(function() {
             var db;
             try {
-                // make this work with either dbs or connections
-                if (typeof(a.getDB) == "function") {
-                    db = a.getDB('foo');
+                // Make this work with either dbs or connections.
+                if (typeof(conn.getDB) == "function") {
+                    db = conn.getDB('foo');
                 } else {
-                    db = a;
+                    db = conn;
                 }
+
+                // Run a simple command to re-establish connection.
                 db.bar.stats();
-                if (jsTest.options().keyFile) {  // SERVER-4241: Shell connections don't
-                                                 // re-authenticate on reconnect
+
+                // SERVER-4241: Shell connections don't re-authenticate on reconnect.
+                if (jsTest.options().keyFile) {
                     return jsTest.authenticate(db.getMongo());
                 }
                 return true;
@@ -105,7 +131,7 @@ var getLastOpTime;
                 print(e);
                 return false;
             }
-        });
+        }, retries);
     };
 
     getLatestOp = function(server) {
