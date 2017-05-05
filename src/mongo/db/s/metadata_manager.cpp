@@ -137,6 +137,7 @@ MetadataManager::~MetadataManager() {
     {
         // drain any threads that might remove _metadataInUse entries, push to deleter
         stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
+        _clearAllCleanups_inlock();
         inUse = std::move(_metadataInUse);
     }
 
@@ -149,15 +150,23 @@ MetadataManager::~MetadataManager() {
         stdx::lock_guard<stdx::mutex> scopedLock(_activeMetadataTracker->trackerLock);
         _activeMetadataTracker->manager = nullptr;
     }
+}
 
-    // still need to block the deleter thread:
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
+// call locked
+void MetadataManager::_clearAllCleanups_inlock() {
     Status status{ErrorCodes::InterruptedDueToReplStateChange,
                   "tracking orphaned range deletion abandoned because the"
                   " collection was dropped or became unsharded"};
-    if (!*_notification) {  // check just because test driver triggers it
+    if (_activeMetadataTracker->orphans) {
+        _activeMetadataTracker->orphans = boost::none;
+    }
+    for (auto& tracker : _metadataInUse) {
+        tracker->orphans = boost::none;
+    }
+    if (!*_notification) {  //  check because the test driver triggers it
         _notification->set(status);
     }
+    _notification = std::make_shared<Notification<Status>>();
     _rangesToClean.clear(status);
 }
 
@@ -192,9 +201,8 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
               << _activeMetadataTracker->metadata->toStringBasic() << " as no longer sharded";
 
         _receivingChunks.clear();
-        _rangesToClean.clear(Status{ErrorCodes::InterruptedDueToReplStateChange,
-                                    "Collection sharding metadata destroyed"});
         _setActiveMetadata_inlock(nullptr);
+        _clearAllCleanups_inlock();
         return;
     }
 
@@ -223,9 +231,8 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
               << remoteMetadata->toStringBasic() << " due to epoch change";
 
         _receivingChunks.clear();
-        _rangesToClean.clear(Status::OK());
-        _metadataInUse.clear();
         _setActiveMetadata_inlock(std::move(remoteMetadata));
+        _clearAllCleanups_inlock();
         return;
     }
 
@@ -268,6 +275,7 @@ void MetadataManager::_setActiveMetadata_inlock(std::unique_ptr<CollectionMetada
         _metadataInUse.push_back(std::move(_activeMetadataTracker));
     }
     _activeMetadataTracker = std::make_shared<Tracker>(std::move(newMetadata), this);
+    _retireExpiredMetadata();
 }
 
 // call locked

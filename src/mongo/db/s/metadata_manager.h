@@ -139,6 +139,14 @@ private:
     struct Tracker;
 
     /**
+     * Cancel all scheduled deletions of orphan ranges, notifying listeners with status
+     * InterruptedDueToReplStateChange.
+     *
+     * Must be called locked.
+     */
+    void _clearAllCleanups_inlock();
+
+    /**
      * Retires any metadata that has fallen out of use, and pushes any orphan ranges found in them
      * to the list of ranges actively being cleaned up.
      */
