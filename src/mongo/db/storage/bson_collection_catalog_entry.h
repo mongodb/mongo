@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 
 namespace mongo {
 
@@ -66,12 +67,14 @@ public:
 
     virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const;
 
+    virtual KVPrefix getIndexPrefix(OperationContext* opCtx, StringData indexName) const;
+
     // ------ for implementors
 
     struct IndexMetaData {
         IndexMetaData() {}
-        IndexMetaData(BSONObj s, bool r, RecordId h, bool m)
-            : spec(s), ready(r), head(h), multikey(m) {}
+        IndexMetaData(BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix)
+            : spec(s), ready(r), head(h), multikey(m), prefix(prefix) {}
 
         void updateTTLSetting(long long newExpireSeconds);
 
@@ -83,6 +86,7 @@ public:
         bool ready;
         RecordId head;
         bool multikey;
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
 
         // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
         // the index key pattern. Each element in the vector is an ordered set of positions
@@ -105,9 +109,12 @@ public:
 
         void rename(StringData toNS);
 
+        KVPrefix getMaxPrefix() const;
+
         std::string ns;
         CollectionOptions options;
         std::vector<IndexMetaData> indexes;
+        KVPrefix prefix = KVPrefix::kNotPrefixed;
     };
 
 protected:

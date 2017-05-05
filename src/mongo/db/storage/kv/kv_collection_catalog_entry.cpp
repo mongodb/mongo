@@ -179,7 +179,9 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
 Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
                                                       const IndexDescriptor* spec) {
     MetaData md = _getMetaData(opCtx);
-    IndexMetaData imd(spec->infoObj(), false, RecordId(), false);
+
+    KVPrefix prefix = KVPrefix::getNextPrefix(ns());
+    IndexMetaData imd(spec->infoObj(), false, RecordId(), false, prefix);
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
         const auto feature =
             KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
@@ -202,7 +204,7 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
 
     string ident = _catalog->getIndexIdent(opCtx, ns().ns(), spec->indexName());
 
-    const Status status = _engine->createSortedDataInterface(opCtx, ident, spec);
+    const Status status = _engine->createGroupedSortedDataInterface(opCtx, ident, spec, prefix);
     if (status.isOK()) {
         opCtx->recoveryUnit()->registerChange(new AddIndexChange(opCtx, this, ident));
     }

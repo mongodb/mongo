@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
@@ -74,7 +75,10 @@ public:
      */
     static int Create(OperationContext* opCtx, const std::string& uri, const std::string& config);
 
-    WiredTigerIndex(OperationContext* ctx, const std::string& uri, const IndexDescriptor* desc);
+    WiredTigerIndex(OperationContext* ctx,
+                    const std::string& uri,
+                    const IndexDescriptor* desc,
+                    KVPrefix prefix);
 
     virtual Status insert(OperationContext* opCtx,
                           const BSONObj& key,
@@ -153,6 +157,7 @@ protected:
     uint64_t _tableId;
     std::string _collectionNamespace;
     std::string _indexName;
+    KVPrefix _prefix;
 };
 
 
@@ -160,7 +165,8 @@ class WiredTigerIndexUnique : public WiredTigerIndex {
 public:
     WiredTigerIndexUnique(OperationContext* ctx,
                           const std::string& uri,
-                          const IndexDescriptor* desc);
+                          const IndexDescriptor* desc,
+                          KVPrefix prefix);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;
@@ -183,7 +189,8 @@ class WiredTigerIndexStandard : public WiredTigerIndex {
 public:
     WiredTigerIndexStandard(OperationContext* ctx,
                             const std::string& uri,
-                            const IndexDescriptor* desc);
+                            const IndexDescriptor* desc,
+                            KVPrefix prefix);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool forward) const override;

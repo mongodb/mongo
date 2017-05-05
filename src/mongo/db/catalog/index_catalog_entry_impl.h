@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -142,6 +143,10 @@ public:
     // if this ready is ready for queries
     bool isReady(OperationContext* opCtx) const final;
 
+    KVPrefix getPrefix() const final {
+        return _prefix;
+    }
+
     /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
@@ -167,6 +172,8 @@ private:
      * See CollectionCatalogEntry::isIndexMultikey() for more details.
      */
     bool _catalogIsMultikey(OperationContext* opCtx, MultikeyPaths* multikeyPaths) const;
+
+    KVPrefix _catalogGetPrefix(OperationContext* opCtx) const;
 
     // -----
 
@@ -212,6 +219,10 @@ private:
     // at 0) into the corresponding indexed field that represent what prefixes of the indexed field
     // causes the index to be multikey.
     MultikeyPaths _indexMultikeyPaths;
+
+    // KVPrefix used to differentiate between index entries in different logical indexes sharing the
+    // same underlying sorted data interface.
+    const KVPrefix _prefix;
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<SnapshotName> _minVisibleSnapshot;

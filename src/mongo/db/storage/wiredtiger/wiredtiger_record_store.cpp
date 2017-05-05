@@ -770,7 +770,8 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
                                              int64_t cappedMaxSize,
                                              int64_t cappedMaxDocs,
                                              CappedCallback* cappedCallback,
-                                             WiredTigerSizeStorer* sizeStorer)
+                                             WiredTigerSizeStorer* sizeStorer,
+                                             KVPrefix prefix)
     : RecordStore(ns),
       _uri(uri.toString()),
       _tableId(WiredTigerSession::genTableId()),
@@ -788,6 +789,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
       _useOplogHack(shouldUseOplogHack(ctx, _uri)),
       _sizeStorer(sizeStorer),
       _sizeStorerCounter(0),
+      _prefix(prefix),
       _shuttingDown(false) {
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
                                ctx, uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)

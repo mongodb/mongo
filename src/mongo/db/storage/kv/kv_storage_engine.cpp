@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
+#include <algorithm>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -90,8 +92,8 @@ KVStorageEngine::KVStorageEngine(
     if (!catalogExists) {
         WriteUnitOfWork uow(&opCtx);
 
-        Status status =
-            _engine->createRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions());
+        Status status = _engine->createGroupedRecordStore(
+            &opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
         if (status.code() == ErrorCodes::BadValue) {
@@ -101,8 +103,8 @@ KVStorageEngine::KVStorageEngine(
         uow.commit();
     }
 
-    _catalogRecordStore =
-        _engine->getRecordStore(&opCtx, catalogInfo, catalogInfo, CollectionOptions());
+    _catalogRecordStore = _engine->getGroupedRecordStore(
+        &opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
     _catalog.reset(new KVCatalog(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
     _catalog->init(&opCtx);
@@ -110,6 +112,7 @@ KVStorageEngine::KVStorageEngine(
     std::vector<std::string> collections;
     _catalog->getAllCollections(&collections);
 
+    KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
     for (size_t i = 0; i < collections.size(); i++) {
         std::string coll = collections[i];
         NamespaceString nss(coll);
@@ -122,8 +125,11 @@ KVStorageEngine::KVStorageEngine(
         }
 
         db->initCollection(&opCtx, coll, options.forRepair);
+        auto maxPrefixForCollection = _catalog->getMetaData(&opCtx, coll).getMaxPrefix();
+        maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
     }
 
+    KVPrefix::setLargestPrefix(maxSeenPrefix);
     opCtx.recoveryUnit()->abandonSnapshot();
 
     // now clean up orphaned idents

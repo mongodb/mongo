@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -102,7 +103,8 @@ public:
                           int64_t cappedMaxSize = -1,
                           int64_t cappedMaxDocs = -1,
                           CappedCallback* cappedCallback = nullptr,
-                          WiredTigerSizeStorer* sizeStorer = nullptr);
+                          WiredTigerSizeStorer* sizeStorer = nullptr,
+                          KVPrefix prefix = KVPrefix::kNotPrefixed);
 
     virtual ~WiredTigerRecordStore();
 
@@ -319,6 +321,8 @@ private:
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     int _sizeStorerCounter;
+
+    KVPrefix _prefix;
 
     bool _shuttingDown;
 

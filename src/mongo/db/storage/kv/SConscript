@@ -4,6 +4,14 @@ Import("env")
 
 env = env.Clone()
 
+env.Library(
+    target='kv_prefix',
+    source=['kv_prefix.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+    ],
+)
+
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_engine_core',
@@ -18,6 +26,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        'kv_prefix',
         ],
     )
 
@@ -85,6 +94,7 @@ env.Library(
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'kv_engine_mock',
+        'kv_prefix',
         ],
     )
 

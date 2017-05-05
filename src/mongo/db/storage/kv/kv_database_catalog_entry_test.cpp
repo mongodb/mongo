@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
