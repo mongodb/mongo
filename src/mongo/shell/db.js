@@ -111,7 +111,7 @@ var DB;
 
     // runCommand uses this impl to actually execute the command
     DB.prototype._runCommandImpl = function(name, obj, options) {
-        return this.getMongo().runCausalConsistentCommand(name, obj, options);
+        return this.getMongo().runCommand(name, obj, options);
     };
 
     DB.prototype.runCommand = function(obj, extra, queryOptions) {
@@ -136,7 +136,7 @@ var DB;
     };
 
     DB.prototype.runCommandWithMetadata = function(commandName, commandArgs, metadata) {
-        return this.getMongo().runCausalConsistentCommandWithMetadata(
+        return this.getMongo().runCommandWithMetadata(
             this._name, commandName, metadata, commandArgs);
     };
 

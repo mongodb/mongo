@@ -11,10 +11,20 @@ if (!Mongo.prototype) {
     throw Error("Mongo.prototype not defined");
 }
 
-if (!Mongo.prototype.find)
-    Mongo.prototype.find = function(ns, query, fields, limit, skip, batchSize, options) {
-        throw Error("find not implemented");
+(function(original) {
+    Mongo.prototype.find = function find(ns, query, fields, limit, skip, batchSize, options) {
+        const self = this;
+        const res = original.call(this, ns, query, fields, limit, skip, batchSize, options);
+        const origNext = res.next;
+        res.next = function next() {
+            const ret = origNext.call(this);
+            self._setLogicalTimeFromReply(ret);
+            return ret;
+        };
+        return res;
     };
+})(Mongo.prototype.find);
+
 if (!Mongo.prototype.insert)
     Mongo.prototype.insert = function(ns, obj) {
         throw Error("insert not implemented");
@@ -151,29 +161,33 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
 /**
  *  Adds afterClusterTime to the readConcern if its supported and runs the command.
  */
-Mongo.prototype.runCausalConsistentCommandWithMetadata = function(
-    dbName, cmdName, metadata, cmdObj) {
-    if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
-        cmdObj = this._injectAfterClusterTime(cmdObj);
-    }
-    const res = this.runCommandWithMetadata(dbName, cmdName, metadata, cmdObj);
-    this._setLogicalTimeFromReply(res);
-    return res;
-};
+(function(original) {
+    Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
+        dbName, cmdName, metadata, cmdObj) {
+        if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
+            cmdObj = this._injectAfterClusterTime(cmdObj);
+        }
+        const res = original.call(this, dbName, cmdName, metadata, cmdObj);
+        this._setLogicalTimeFromReply(res);
+        return res;
+    };
+})(Mongo.prototype.runCommandWithMetadata);
 
 /**
  *  Adds afterClusterTime to the readConcern if its supported and runs the command.
  */
-Mongo.prototype.runCausalConsistentCommand = function(dbName, cmdObj, options) {
-    const cmdName = Object.keys(cmdObj)[0];
+(function(original) {
+    Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
+        const cmdName = Object.keys(cmdObj)[0];
 
-    if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
-        cmdObj = this._injectAfterClusterTime(cmdObj);
-    }
-    const res = this.runCommand(dbName, cmdObj, options);
-    this._setLogicalTimeFromReply(res);
-    return res;
-};
+        if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
+            cmdObj = this._injectAfterClusterTime(cmdObj);
+        }
+        const res = original.call(this, dbName, cmdObj, options);
+        this._setLogicalTimeFromReply(res);
+        return res;
+    };
+})(Mongo.prototype.runCommand);
 
 Mongo.prototype.adminCommand = function(cmd) {
     return this.getDB("admin").runCommand(cmd);

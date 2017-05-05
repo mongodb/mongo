@@ -17,7 +17,7 @@
             getReadPref: function() {
                 return mongo.getReadPref();
             },
-            runCausalConsistentCommand: function(db, cmd, opts) {
+            runCommand: function(db, cmd, opts) {
                 commandsRan.push({db: db, cmd: cmd, opts: opts});
             }
         };
