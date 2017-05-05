@@ -611,7 +611,7 @@ public:
         const char* data = nullptr;
         if (type() == BinData && binDataType() == BinDataType::MD5Type)
             data = binData(len);
-        uassert(550418, "md5 must be a 16-byte binary field with MD5 (5) subtype", len == 16);
+        uassert(40437, "md5 must be a 16-byte binary field with MD5 (5) subtype", len == 16);
         std::array<unsigned char, 16> result;
         memcpy(&result, data, len);
         return result;

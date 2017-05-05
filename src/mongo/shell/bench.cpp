@@ -215,7 +215,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
         } else if (name == "context") {
             myOp.context = arg.Obj();
         } else if (name == "cpuFactor") {
-            uassert(550420,
+            uassert(40436,
                     str::stream() << "Field 'cpuFactor' should be a number, instead it's type: "
                                   << typeName(arg.type()),
                     arg.isNumber());

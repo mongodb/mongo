@@ -214,7 +214,7 @@ void RollbackImpl::_finishCallback(OperationContext* opCtx, StatusWith<OpTime> l
     if (ErrorCodes::UnrecoverableRollbackError == lastApplied.getStatus().code()) {
         severe() << "Unable to complete rollback. A full resync may be needed: "
                  << redact(lastApplied.getStatus());
-        fassertFailedNoTrace(550419);
+        fassertFailedNoTrace(40435);
     }
 
     // After running callback function '_onCompletion', clear '_onCompletion' to release any
