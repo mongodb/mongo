@@ -73,7 +73,8 @@
         assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
         assert(planHasStage(explain.queryPlanner.winningPlan, "IXSCAN"));
     } else {
-        assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+        // This can't be covered in versions which do not implement SERVER-3173.
+        assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
         assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
     }
 
@@ -100,7 +101,8 @@
         assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
         assert(planHasStage(explain.queryPlanner.winningPlan, "IXSCAN"));
     } else {
-        assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+        // This can't be covered in versions which do not implement SERVER-3173.
+        assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
         assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
     }
 
@@ -120,7 +122,8 @@
         assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
         assert(planHasStage(explain.queryPlanner.winningPlan, "IXSCAN"));
     } else {
-        assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+        // This can't be covered in versions which do not implement SERVER-3173.
+        assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
         assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
     }
 }());
