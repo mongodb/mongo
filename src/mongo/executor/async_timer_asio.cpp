@@ -55,7 +55,7 @@ void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
 }
 
 void AsyncTimerASIO::expireAfter(Milliseconds expiration) {
-    _timer.expires_after(std::chrono::milliseconds(expiration.count()));
+    _timer.expires_after(stdx::chrono::milliseconds(expiration.count()));
 }
 
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_service::strand* strand,

@@ -30,6 +30,7 @@
 
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/async_timer_mock.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/periodic_runner_asio.h"
 
