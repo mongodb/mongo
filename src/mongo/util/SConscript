@@ -331,6 +331,7 @@ env.Library(
         "periodic_runner_asio.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/third_party/shim_asio",
         "periodic_runner",
     ],
