@@ -41,10 +41,8 @@
             assert(bsonWoCompare(mongo.getOperationTime(), operationTime) == 0,
                    "expected the shell's operationTime to not change after running command: " +
                        tojson(cmdObj));
-            assert(
-                bsonWoCompare(mongo.getClusterTime().clusterTime, clusterTimeObj.clusterTime) == 0,
-                "expected the shell's clusterTime value to not change after running command: " +
-                    tojson(cmdObj));
+            // Don't check clusterTime, because during a slow operation clusterTime may be
+            // incremented by unrelated activity in the cluster.
         }
     }
 
