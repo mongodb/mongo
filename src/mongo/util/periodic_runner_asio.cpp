@@ -51,27 +51,28 @@ PeriodicRunnerASIO::~PeriodicRunnerASIO() {
 }
 
 Status PeriodicRunnerASIO::scheduleJob(PeriodicJob job) {
-    stdx::unique_lock<stdx::mutex> lk(_runningMutex);
-    if (!_running) {
-        return {ErrorCodes::ShutdownInProgress, "The runner has been shut down."};
+    {
+        stdx::unique_lock<stdx::mutex> lk(_runningMutex);
+        if (!_running) {
+            return {ErrorCodes::ShutdownInProgress, "The runner has been shut down."};
+        }
     }
 
     // The interval we use here will get written over by _scheduleJob_inlock.
     auto uniqueTimer = _timerFactory->make(&_strand, Milliseconds{0});
     std::shared_ptr<executor::AsyncTimerInterface> timer{std::move(uniqueTimer)};
 
-    PeriodicJobASIO asioJob(std::move(job));
+    PeriodicJobASIO asioJob(std::move(job), _timerFactory->now());
 
-    _scheduleJob_inlock(std::move(asioJob), std::move(timer), lk);
+    _scheduleJob(std::move(asioJob), std::move(timer));
 
     return Status::OK();
 }
 
-void PeriodicRunnerASIO::_scheduleJob_inlock(PeriodicJobASIO job,
-                                             std::shared_ptr<executor::AsyncTimerInterface> timer,
-                                             const stdx::unique_lock<stdx::mutex>& lk) {
+void PeriodicRunnerASIO::_scheduleJob(PeriodicJobASIO job,
+                                      std::shared_ptr<executor::AsyncTimerInterface> timer) {
     // Adjust the timer to expire at the correct time.
-    auto adjustedMS = job.start + job.interval - Date_t::now();
+    auto adjustedMS = job.start + job.interval - _timerFactory->now();
     timer->expireAfter(adjustedMS);
     timer->asyncWait([ timer, this, job = std::move(job) ](std::error_code ec) mutable {
         if (ec) {
@@ -84,14 +85,11 @@ void PeriodicRunnerASIO::_scheduleJob_inlock(PeriodicJobASIO job,
             return;
         }
 
-        job.start = Date_t::now();
+        job.start = _timerFactory->now();
         job.job();
 
         _io_service.post([ timer, this, job = std::move(job) ]() mutable {
-            stdx::unique_lock<stdx::mutex> lk(_runningMutex);
-            if (_running) {
-                _scheduleJob_inlock(std::move(job), timer, lk);
-            }
+            _scheduleJob(std::move(job), timer);
         });
     });
 }

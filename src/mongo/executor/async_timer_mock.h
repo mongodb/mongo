@@ -138,7 +138,7 @@ public:
     Date_t now() override;
 
 private:
-    stdx::mutex _timersMutex;
+    stdx::recursive_mutex _timersMutex;
     stdx::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> _timers;
     Milliseconds _curTime;
 };

@@ -71,16 +71,14 @@ public:
 
 private:
     struct PeriodicJobASIO {
-        explicit PeriodicJobASIO(PeriodicJob callable)
-            : job(std::move(callable.job)), interval(callable.interval), start(Date_t::now()) {}
+        explicit PeriodicJobASIO(PeriodicJob callable, Date_t startTime)
+            : job(std::move(callable.job)), interval(callable.interval), start(startTime) {}
         Job job;
         Milliseconds interval;
         Date_t start;
     };
 
-    void _scheduleJob_inlock(PeriodicJobASIO job,
-                             std::shared_ptr<executor::AsyncTimerInterface> timer,
-                             const stdx::unique_lock<stdx::mutex>& lk);
+    void _scheduleJob(PeriodicJobASIO job, std::shared_ptr<executor::AsyncTimerInterface> timer);
 
     asio::io_service _io_service;
     asio::io_service::strand _strand;

@@ -30,7 +30,10 @@
 
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/async_timer_mock.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/periodic_runner_asio.h"
 
@@ -67,26 +70,36 @@ TEST_F(PeriodicRunnerASIOTest, OneJobTest) {
     int count = 0;
     Milliseconds interval{5};
 
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
     // Add a job, ensure that it runs once
-    PeriodicRunner::PeriodicJob job([&count] { count++; }, interval);
+    PeriodicRunner::PeriodicJob job(
+        [&count, &mutex, &cv] {
+            {
+                stdx::unique_lock<stdx::mutex> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+        },
+        interval);
+
     ASSERT_OK(runner()->scheduleJob(std::move(job)));
 
     // Ensure nothing happens until we fastForward
-    ASSERT_EQ(count, 0);
-
-    // Fast forward, we should run once, and only once
-    timerFactory().fastForward(interval);
-    sleepmillis(10);
-    ASSERT_EQ(count, 1);
-
-    // Fast forward again, we should run all ten times.
-    for (int i = 0; i < 9; i++) {
-        timerFactory().fastForward(interval);
-        // Give asio time to execute
-        sleepmillis(10);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        ASSERT_EQ(count, 0);
     }
 
-    ASSERT_EQ(count, 10);
+    // Fast forward ten times, we should run all ten times.
+    for (int i = 0; i < 10; i++) {
+        timerFactory().fastForward(interval);
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            cv.wait(lk, [&count, &i] { return count > i; });
+        }
+    }
 }
 
 TEST_F(PeriodicRunnerASIOTest, ScheduleAfterShutdownTest) {
@@ -112,20 +125,41 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsTest) {
     Milliseconds intervalA{5};
     Milliseconds intervalB{10};
 
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
     // Add two jobs, ensure they both run the proper number of times
-    PeriodicRunner::PeriodicJob jobA([&countA] { countA++; }, intervalA);
-    PeriodicRunner::PeriodicJob jobB([&countB] { countB++; }, intervalB);
+    PeriodicRunner::PeriodicJob jobA(
+        [&countA, &mutex, &cv] {
+            {
+                stdx::unique_lock<stdx::mutex> lk(mutex);
+                countA++;
+            }
+            cv.notify_all();
+        },
+        intervalA);
+
+    PeriodicRunner::PeriodicJob jobB(
+        [&countB, &mutex, &cv] {
+            {
+                stdx::unique_lock<stdx::mutex> lk(mutex);
+                countB++;
+            }
+            cv.notify_all();
+        },
+        intervalB);
 
     ASSERT_OK(runner()->scheduleJob(std::move(jobA)));
     ASSERT_OK(runner()->scheduleJob(std::move(jobB)));
 
-    for (int i = 0; i < 10; i++) {
+    // Fast forward and wait for both jobs to run the right number of times
+    for (int i = 0; i <= 10; i++) {
         timerFactory().fastForward(intervalA);
-        sleepmillis(10);
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            cv.wait(lk, [&countA, &countB, &i] { return (countA > i && countB >= i / 2); });
+        }
     }
-
-    ASSERT_EQ(countA, 10);
-    ASSERT_EQ(countB, 5);
 }
 
 }  // namespace

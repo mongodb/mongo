@@ -131,13 +131,13 @@ std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(Milliseconds ex
 
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(asio::io_service::strand* strand,
                                                                  Milliseconds expiration) {
-    stdx::lock_guard<stdx::mutex> lk(_timersMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
     auto elem = _timers.emplace(std::make_shared<AsyncTimerMockImpl>(expiration));
     return stdx::make_unique<AsyncTimerMock>(*elem.first);
 }
 
 void AsyncTimerFactoryMock::fastForward(Milliseconds time) {
-    stdx::lock_guard<stdx::mutex> lk(_timersMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
 
     _curTime += time;
 
@@ -149,7 +149,7 @@ void AsyncTimerFactoryMock::fastForward(Milliseconds time) {
 }
 
 Date_t AsyncTimerFactoryMock::now() {
-    stdx::lock_guard<stdx::mutex> lk(_timersMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
     return Date_t::fromDurationSinceEpoch(_curTime);
 }
 
