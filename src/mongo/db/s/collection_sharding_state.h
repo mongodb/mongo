@@ -58,6 +58,8 @@ class CollectionShardingState {
     MONGO_DISALLOW_COPYING(CollectionShardingState);
 
 public:
+    using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
+
     /**
      * Instantiates a new per-collection sharding state as unsharded.
      */
@@ -118,9 +120,10 @@ public:
     /**
      * Schedules any documents in the range for immediate cleanup iff no running queries can depend
      * on them, and adds the range to the list of pending ranges. Otherwise, returns false.  Does
-     * not block.
+     * not block.  Call get() on the return value to wait for the deletion to complete or fail.
+     * After that, call waitForClean to ensure no other deletions are pending for the range.
      */
-    bool beginReceive(ChunkRange const& range);
+    auto beginReceive(ChunkRange const& range) -> CleanupNotification;
 
     /*
      * Removes the range from the list of pending ranges, and schedules any documents in the range
@@ -130,10 +133,12 @@ public:
 
     /**
      * Schedules documents in the range for cleanup after any running queries that may depend on
-     * them have terminated.  Does not block. Use waitForClean to block pending completion.
-     * Fails if range overlaps any current local shard chunk.
+     * them have terminated.  Does not block. Fails if range overlaps any current local shard chunk.
+     * Call `result->get(opCtx)` on the return value `result` to wait for the deletion to complete
+     * or fail. If that succeeds, call waitForClean to ensure no other deletions are pending for the
+     * range.
      */
-    Status cleanUpRange(ChunkRange const& range);
+    auto cleanUpRange(ChunkRange const& range) -> CleanupNotification;
 
     /**
      * Returns the active migration source manager, if one is available.
@@ -177,15 +182,14 @@ public:
      */
     static Status waitForClean(OperationContext*, NamespaceString, OID const& epoch, ChunkRange);
 
-    using CleanupNotification = MetadataManager::CleanupNotification;
     /**
-     * Reports whether any part of the argument range is still scheduled for deletion. If not,
-     * returns nullptr. Otherwise, returns a notification n such that n->get(opCtx) will wake when
-     * deletion of a range (possibly the one of interest) is completed.  This should be called
-     * again after each wakeup until it returns nullptr, because there can be more than one range
-     * scheduled for deletion that overlaps its argument.
+     * Reports whether any range still scheduled for deletion overlaps the argument range. If so,
+     * it returns a notification n such that n->get(opCtx) will wake when the newest overlapping
+     * range's deletion (possibly the one of interest) completes or fails. This should be called
+     * again after each wakeup until it returns boost::none, because there can be more than one
+     * range scheduled for deletion that overlaps its argument.
      */
-    CleanupNotification trackOrphanedDataCleanup(ChunkRange const& range) const;
+    auto trackOrphanedDataCleanup(ChunkRange const& range) -> boost::optional<CleanupNotification>;
 
     /**
      * Returns a range _not_ owned by this shard that starts no lower than the specified

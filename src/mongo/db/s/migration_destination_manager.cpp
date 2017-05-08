@@ -602,15 +602,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // being moved, and wait for completion
 
         auto footprint = ChunkRange(min, max);
-        Status status = _notePending(opCtx, _nss, epoch, footprint);
-        if (!status.isOK()) {
-            setStateFail(status.reason());
+        auto notification = _notePending(opCtx, _nss, epoch, footprint);
+        // wait for the range deletion to report back
+        if (!notification.waitStatus(opCtx).isOK()) {
+            setStateFail(notification.waitStatus(opCtx).reason());
             return;
         }
 
-        _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
-
-        status = CollectionShardingState::waitForClean(opCtx, _nss, epoch, footprint);
+        // wait for any other, overlapping queued deletions to drain
+        auto status = CollectionShardingState::waitForClean(opCtx, _nss, epoch, footprint);
         if (!status.isOK()) {
             setStateFail(status.reason());
             return;
@@ -625,6 +625,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         setState(CLONE);
 
         const BSONObj migrateCloneRequest = createMigrateCloneRequest(_nss, *_sessionId);
+
+        _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
 
         while (true) {
             BSONObj res;
@@ -964,10 +966,12 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
     return true;
 }
 
-Status MigrationDestinationManager::_notePending(OperationContext* opCtx,
-                                                 NamespaceString const& nss,
-                                                 OID const& epoch,
-                                                 ChunkRange const& range) {
+auto MigrationDestinationManager::_notePending(OperationContext* opCtx,
+                                               NamespaceString const& nss,
+                                               OID const& epoch,
+                                               ChunkRange const& range)
+    -> CollectionShardingState::CleanupNotification {
+
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
     auto metadata = css->getMetadata();
@@ -975,21 +979,22 @@ Status MigrationDestinationManager::_notePending(OperationContext* opCtx,
     // This can currently happen because drops aren't synchronized with in-migrations.  The idea
     // for checking this here is that in the future we shouldn't have this problem.
     if (!metadata || metadata->getCollVersion().epoch() != epoch) {
-        return {ErrorCodes::StaleShardVersion,
-                str::stream() << "not noting chunk " << redact(range.toString())
-                              << " as pending because the epoch of "
-                              << nss.ns()
-                              << " changed"};
+        return Status{ErrorCodes::StaleShardVersion,
+                      str::stream() << "not noting chunk " << redact(range.toString())
+                                    << " as pending because the epoch of "
+                                    << nss.ns()
+                                    << " changed"};
     }
 
     // start clearing any leftovers that would be in the new chunk
-    if (!css->beginReceive(range)) {
-        return {ErrorCodes::RangeOverlapConflict,
-                str::stream() << "Collection " << nss.ns() << " range " << redact(range.toString())
-                              << " migration aborted; documents in range may still be in use on the"
-                                 " destination shard."};
+    auto notification = css->beginReceive(range);
+    if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
+        return Status{notification.waitStatus(opCtx).code(),
+                      str::stream() << "Collection " << nss.ns() << " range " << range.toString()
+                                    << " migration aborted: "
+                                    << notification.waitStatus(opCtx).reason()};
     }
-    return Status::OK();
+    return notification;
 }
 
 void MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
@@ -1013,7 +1018,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
         return;
     }
 
-    css->forgetReceive(range);
+    (void)css->forgetReceive(range);
 }
 
 }  // namespace mongo

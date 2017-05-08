@@ -82,6 +82,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
     BSONObj startingFromKey = startingFromKeyConst;
     boost::optional<ChunkRange> targetRange;
+    CollectionShardingState::CleanupNotification notifn;
     OID epoch;
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
@@ -118,20 +119,23 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         orphanRange->ns = ns.ns();
         *stoppedAtKey = orphanRange->maxKey;
 
-        LOG(0) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
-               << redact(startingFromKey) << ", removing next orphan range"
-               << " [" << redact(orphanRange->minKey) << "," << redact(orphanRange->maxKey) << ")";
-
         targetRange.emplace(
             ChunkRange(orphanRange->minKey.getOwned(), orphanRange->maxKey.getOwned()));
-        uassertStatusOK(css->cleanUpRange(*targetRange));
+        notifn = css->cleanUpRange(*targetRange);
     }
-    if (targetRange) {
-        auto result = CollectionShardingState::waitForClean(opCtx, ns, epoch, *targetRange);
-        if (!result.isOK()) {
-            warning() << redact(result.reason());
-            return CleanupResult_Error;
-        }
+
+    // Sleep waiting for our own deletion. We don't actually care about any others, so there is no
+    // need to call css::waitForClean() here.
+
+    LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
+           << redact(startingFromKey) << ", removing next orphan range "
+           << redact(targetRange->toString()) << "; waiting...";
+    Status result = notifn.waitStatus(opCtx);
+    LOG(1) << "Finished waiting for last " << ns.toString() << " orphan range cleanup";
+    if (!result.isOK()) {
+        log() << redact(result.reason());
+        *errMsg = result.reason();
+        return CleanupResult_Error;
     }
     return CleanupResult_Continue;
 }

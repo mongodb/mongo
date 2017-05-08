@@ -37,6 +37,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/condition_variable.h"
@@ -161,7 +162,8 @@ private:
      * it schedules deletion of any documents in the range, so that process must be seen to be
      * complete before migrating any new documents in.
      */
-    Status _notePending(OperationContext*, NamespaceString const&, OID const&, ChunkRange const&);
+    auto _notePending(OperationContext*, NamespaceString const&, OID const&, ChunkRange const&)
+        -> CollectionShardingState::CleanupNotification;
 
     /**
      * Stops tracking a chunk range between 'min' and 'max' that previously was having data

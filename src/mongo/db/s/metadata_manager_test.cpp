@@ -179,11 +179,16 @@ TEST_F(MetadataManagerTest, CleanUpForMigrateIn) {
     MetadataManager manager(getServiceContext(), kNss, executor());
     manager.refreshActiveMetadata(makeEmptyMetadata());
 
+    ChunkRange range1(BSON("key" << 0), BSON("key" << 10));
     ChunkRange range2(BSON("key" << 10), BSON("key" << 20));
-    ASSERT(manager.beginReceive(ChunkRange(BSON("key" << 0), BSON("key" << 10))));
-    ASSERT(manager.beginReceive(ChunkRange(BSON("key" << 10), BSON("key" << 20))));
+    auto notif1 = manager.beginReceive(range1);
+    ASSERT_TRUE(!notif1.ready());
+    auto notif2 = manager.beginReceive(range2);
+    ASSERT_TRUE(!notif2.ready());
     ASSERT_EQ(manager.numberOfRangesToClean(), 2UL);
     ASSERT_EQ(manager.numberOfRangesToCleanStillInUse(), 0UL);
+    notif1.abandon();
+    notif2.abandon();
 }
 
 TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
@@ -191,21 +196,23 @@ TEST_F(MetadataManagerTest, AddRangeNotificationsBlockAndYield) {
     manager.refreshActiveMetadata(makeEmptyMetadata());
 
     ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
-    ASSERT_OK(manager.cleanUpRange(cr1));
+    auto notifn1 = manager.cleanUpRange(cr1);
+    ASSERT_FALSE(notifn1.ready());
     ASSERT_EQ(manager.numberOfRangesToClean(), 1UL);
-    auto notification = manager.trackOrphanedDataCleanup(cr1);
-    ASSERT(notification != nullptr && !bool(*notification));
-    notification->set(Status::OK());
-    ASSERT(bool(*notification));
-    ASSERT_OK(notification->get(operationContext()));
+    auto optNotifn = manager.trackOrphanedDataCleanup(cr1);
+    ASSERT_FALSE(notifn1.ready());
+    ASSERT_FALSE(optNotifn->ready());
+    ASSERT(notifn1 == *optNotifn);
+    notifn1.abandon();
+    optNotifn->abandon();
 }
 
 TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
     ChunkRange cr1(BSON("key" << 20), BSON("key" << 30));
     MetadataManager manager(getServiceContext(), kNss, executor());
     manager.refreshActiveMetadata(makeEmptyMetadata());
-    auto notif = manager.trackOrphanedDataCleanup(cr1);
-    ASSERT(notif.get() == nullptr);
+    auto optNotif = manager.trackOrphanedDataCleanup(cr1);
+    ASSERT_FALSE(optNotif);  // nothing to track yet
     {
         ASSERT_EQ(manager.numberOfMetadataSnapshots(), 0UL);
         ASSERT_EQ(manager.numberOfRangesToClean(), 0UL);
@@ -217,17 +224,19 @@ TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
         ASSERT_EQ(manager.numberOfMetadataSnapshots(), 1UL);
         ASSERT_EQ(manager.numberOfRangesToClean(), 0UL);  // not yet...
 
-        manager.cleanUpRange(cr1);
+        optNotif = manager.cleanUpRange(cr1);
         ASSERT_EQ(manager.numberOfMetadataSnapshots(), 1UL);
         ASSERT_EQ(manager.numberOfRangesToClean(), 1UL);
-
-        notif = manager.trackOrphanedDataCleanup(cr1);  // will wake when scm goes away
     }  // scm destroyed, refcount of tracker goes to zero
     ASSERT_EQ(manager.numberOfMetadataSnapshots(), 0UL);
     ASSERT_EQ(manager.numberOfRangesToClean(), 1UL);
-    ASSERT(bool(notif));                            // woke
-    notif = manager.trackOrphanedDataCleanup(cr1);  // now tracking the range in _rangesToClean
-    ASSERT(notif.get() != nullptr);
+    ASSERT_FALSE(optNotif->ready());
+    auto optNotif2 = manager.trackOrphanedDataCleanup(cr1);  // now tracking it in _rangesToClean
+    ASSERT_TRUE(optNotif && !optNotif->ready());
+    ASSERT_TRUE(optNotif2 && !optNotif2->ready());
+    ASSERT(*optNotif == *optNotif2);
+    optNotif->abandon();
+    optNotif2->abandon();
 }
 
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
@@ -335,9 +344,10 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
     ASSERT(manager.numberOfRangesToClean() == 0UL);
 
     ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-    ASSERT_OK(manager.cleanUpRange(cr1));
-
+    auto notifn = manager.cleanUpRange(cr1);
+    ASSERT(!notifn.ready());
     ASSERT(manager.numberOfRangesToClean() == 1UL);
+    notifn.abandon();
 }
 
 }  // namespace

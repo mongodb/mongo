@@ -43,6 +43,54 @@ class CollectionRangeDeleter {
     MONGO_DISALLOW_COPYING(CollectionRangeDeleter);
 
 public:
+    /**
+      * This is an object n that asynchronously changes state when a scheduled range deletion
+      * completes or fails. Call n.ready() to discover if the event has already occurred.  Call
+      * n.waitStatus(opCtx) to sleep waiting for the event, and get its result.
+      *
+      * It is an error to destroy a returned CleanupNotification object n unless either n.ready()
+      * is true or n.abandon() has been called.  After n.abandon(), n is in a moved-from state.
+      */
+    struct DeleteNotification {
+        DeleteNotification();
+        DeleteNotification(Status status);
+
+        // The following default declarations are needed because the presence of a non-trivial
+        // destructor forbids the compiler to generate the declarations itself, but the definitions
+        // it generates are fine.
+        DeleteNotification(DeleteNotification&& notifn) = default;
+        DeleteNotification& operator=(DeleteNotification&& notifn) = default;
+        DeleteNotification(DeleteNotification const& notifn) = default;
+        DeleteNotification& operator=(DeleteNotification const& notifn) = default;
+
+        ~DeleteNotification();
+
+        void notify(Status status) const {
+            notification->set(status);
+        }
+        Status waitStatus(OperationContext* opCtx) const {
+            return notification->get(opCtx);
+        }
+        bool ready() const {
+            return bool(*notification);
+        }
+        void abandon() {
+            notification = nullptr;
+        }
+        bool operator==(DeleteNotification const& other) const {
+            return notification == other.notification;
+        }
+
+    private:
+        std::shared_ptr<Notification<Status>> notification;
+    };
+
+    struct Deletion {
+        Deletion(ChunkRange r) : range(std::move(r)) {}
+        ChunkRange range;
+        DeleteNotification notification{};
+    };
+
     //
     // All of the following members must be called only while the containing MetadataManager's lock
     // is held (or in its destructor), except cleanUpNextRange.
@@ -54,23 +102,21 @@ public:
     CollectionRangeDeleter() = default;
     ~CollectionRangeDeleter();
 
-    using DeleteNotification = std::shared_ptr<Notification<Status>>;
-
     /**
-     * Adds a new range to be cleaned up by the cleaner thread.
+     * Splices range's elements to the list to be cleaned up by the deleter thread. Returns true
+     * if the list is newly non-empty, so the caller knows to schedule a deletion task.
      */
-    void add(const ChunkRange& range);
+    bool add(std::list<Deletion> ranges);
 
     /**
      * Reports whether the argument range overlaps any of the ranges to clean.  If there is overlap,
-     * it returns a notification that will be completed when the currently newest overlapping
-     * range is no longer scheduled.  Its value indicates whether it has been successfully removed.
-     * If there is no overlap, the result is nullptr.  After a successful removal, the caller
-     * should call again to ensure no other range overlaps the argument.
+     * it returns a notification that will be signaled when the currently newest overlapping range
+     * completes or fails. If there is no overlap, the result is boost::none.  After a successful
+     * removal, the caller should call again to ensure no other range overlaps the argument.
      * (See CollectionShardingState::waitForClean and MetadataManager::trackOrphanedDataCleanup for
      * an example use.)
      */
-    DeleteNotification overlaps(ChunkRange const& range) const;
+    boost::optional<DeleteNotification> overlaps(ChunkRange const& range) const;
 
     /**
      * Reports the number of ranges remaining to be cleaned up.
@@ -131,10 +177,6 @@ private:
      * Ranges scheduled for deletion.  The front of the list will be in active process of deletion.
      * As each range is completed, its notification is signaled before it is popped.
      */
-    struct Deletion {
-        ChunkRange const range;
-        DeleteNotification const notification;
-    };
     std::list<Deletion> _orphans;
 };
 
