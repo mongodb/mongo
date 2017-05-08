@@ -343,7 +343,8 @@ void BtreeKeyGeneratorV1::getKeysImpl(std::vector<const char*> fieldNames,
         invariant(multikeyPaths->empty());
         multikeyPaths->resize(fieldNames.size());
     }
-    getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, _emptyPositionalInfo, multikeyPaths);
+    getKeysImplWithArray(
+        std::move(fieldNames), std::move(fixed), obj, keys, 0, _emptyPositionalInfo, multikeyPaths);
 }
 
 void BtreeKeyGeneratorV1::getKeysImplWithArray(
