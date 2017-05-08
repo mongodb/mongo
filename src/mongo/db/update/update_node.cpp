@@ -26,38 +26,41 @@
  * then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/update/update_leaf_node.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/update/update_node.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/update/update_object_node.h"
 
 namespace mongo {
 
-/**
- * Represents the application of a $set to the value at the end of a path.
- */
-class SetNode : public UpdateLeafNode {
-public:
-    Status init(BSONElement modExpr, const CollatorInterface* collator) final;
-
-    std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<SetNode>(*this);
+// static
+StatusWith<std::unique_ptr<UpdateNode>> UpdateNode::createUpdateNodeByMerging(
+    const UpdateNode& leftNode, const UpdateNode& rightNode, FieldRef* pathTaken) {
+    try {
+        return performMerge(leftNode, rightNode, pathTaken);
+    } catch (const ConflictingUpdateException& e) {
+        return e.toStatus();
     }
+}
 
-    void setCollator(const CollatorInterface* collator) final {}
+// static
+std::unique_ptr<UpdateNode> UpdateNode::performMerge(const UpdateNode& leftNode,
+                                                     const UpdateNode& rightNode,
+                                                     FieldRef* pathTaken) {
+    if (leftNode.type == UpdateNode::Type::Object && rightNode.type == UpdateNode::Type::Object) {
+        return UpdateObjectNode::performMerge(static_cast<const UpdateObjectNode&>(leftNode),
+                                              static_cast<const UpdateObjectNode&>(rightNode),
+                                              pathTaken);
+    } else {
+        throw ConflictingUpdateException(*pathTaken);
+    }
+}
 
-    Status apply(mutablebson::Element element,
-                 FieldRef* pathToCreate,
-                 FieldRef* pathTaken,
-                 StringData matchedField,
-                 bool fromReplication,
-                 const UpdateIndexData* indexData,
-                 LogBuilder* logBuilder,
-                 bool* indexesAffected,
-                 bool* noop) final;
-
-private:
-    BSONElement _val;
-};
+UpdateNode::ConflictingUpdateException::ConflictingUpdateException(const FieldRef& conflictingPath)
+    : DBException(str::stream() << "Update created a conflict at '" << conflictingPath.dottedField()
+                                << "'",
+                  ErrorCodes::ConflictingUpdateOperators) {}
 
 }  // namespace mongo

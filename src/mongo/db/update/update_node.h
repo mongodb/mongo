@@ -28,9 +28,14 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 class CollatorInterface;
+class FieldRef;
 
 /**
  * Update modifier expressions are stored as a prefix tree of UpdateNodes, where two modifiers that
@@ -54,6 +59,8 @@ public:
     explicit UpdateNode(Type type) : type(type) {}
     virtual ~UpdateNode() = default;
 
+    virtual std::unique_ptr<UpdateNode> clone() const = 0;
+
     /**
      * Set the collation on the node and all descendants. This is a noop if no leaf nodes require a
      * collator. If setCollator() is called, it is required that the current collator of all leaf
@@ -63,7 +70,31 @@ public:
      */
     virtual void setCollator(const CollatorInterface* collator) = 0;
 
+    /**
+     * Creates a new node by merging the contents of two input nodes. The semantics of the merge
+     * operation depend on the types of the input nodes. When the nodes have the same type, this
+     * function dispatches the merge to a performMerge implementation defined for that subtype.
+     * Returns a ConflictingUpdateOperators status when the types of the input nodes differ or when
+     * any of the child nodes fail to merge.
+     */
+    static StatusWith<std::unique_ptr<UpdateNode>> createUpdateNodeByMerging(
+        const UpdateNode& leftNode, const UpdateNode& rightNode, FieldRef* pathTaken);
+
     const Type type;
+
+protected:
+    /**
+     * Does the actual work of merging for UpdateNode::createUpdateByMerging. Throws a
+     * ConflictingUpdateException when a conflict occurs.
+     */
+    static std::unique_ptr<UpdateNode> performMerge(const UpdateNode& leftNode,
+                                                    const UpdateNode& rightNode,
+                                                    FieldRef* pathTaken);
+
+    class ConflictingUpdateException : public DBException {
+    public:
+        ConflictingUpdateException(const FieldRef& conflictingPath);
+    };
 };
 
 }  // namespace mongo

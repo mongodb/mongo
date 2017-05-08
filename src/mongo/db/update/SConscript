@@ -57,7 +57,8 @@ env.Library(
     source=[
         'modifier_table.cpp',
         'set_node.cpp',
-        'update_object_node.cpp'
+        'update_node.cpp',
+        'update_object_node.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/update',

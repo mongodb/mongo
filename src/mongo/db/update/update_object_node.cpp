@@ -128,6 +128,62 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(UpdateObjectNode* root,
     return positional;
 }
 
+// static
+std::unique_ptr<UpdateNode> UpdateObjectNode::copyOrMergeAsNecessary(UpdateNode* leftNode,
+                                                                     UpdateNode* rightNode,
+                                                                     FieldRef* pathTaken,
+                                                                     const std::string& nextField) {
+    if (!leftNode && !rightNode) {
+        return nullptr;
+    } else if (!leftNode) {
+        return rightNode->clone();
+    } else if (!rightNode) {
+        return leftNode->clone();
+    } else {
+        std::unique_ptr<FieldRef> updatedFieldRef(
+            new FieldRef(pathTaken->dottedField() + "." + nextField));
+        return UpdateNode::performMerge(*leftNode, *rightNode, updatedFieldRef.get());
+    }
+}
+
+// static
+std::unique_ptr<UpdateNode> UpdateObjectNode::performMerge(const UpdateObjectNode& leftNode,
+                                                           const UpdateObjectNode& rightNode,
+                                                           FieldRef* pathTaken) {
+    auto mergedNode = stdx::make_unique<UpdateObjectNode>();
+
+    // Get the union of the field names we know about among the leftNode and rightNode children.
+    stdx::unordered_set<std::string> allFields;
+    for (const auto& child : leftNode._children) {
+        allFields.insert(child.first);
+    }
+    for (const auto& child : rightNode._children) {
+        allFields.insert(child.first);
+    }
+
+    // Create an entry in mergedNode->children for all the fields we found.
+    mergedNode->_children.reserve(allFields.size());
+    for (const std::string& fieldName : allFields) {
+        auto leftChildIt = leftNode._children.find(fieldName);
+        auto rightChildIt = rightNode._children.find(fieldName);
+        UpdateNode* leftChildPtr =
+            (leftChildIt != leftNode._children.end()) ? leftChildIt->second.get() : nullptr;
+        UpdateNode* rightChildPtr =
+            (rightChildIt != rightNode._children.end()) ? rightChildIt->second.get() : nullptr;
+        invariant(leftChildPtr || rightChildPtr);
+        mergedNode->_children.insert(std::make_pair(
+            fieldName, copyOrMergeAsNecessary(leftChildPtr, rightChildPtr, pathTaken, fieldName)));
+    }
+
+    // The "positional" field ("$" notation) lives outside of the _children map, so we merge it
+    // separately.
+    mergedNode->_positionalChild = copyOrMergeAsNecessary(
+        leftNode._positionalChild.get(), rightNode._positionalChild.get(), pathTaken, "$");
+
+    // In Clang-3.9, we can just return mergedNode directly, but in 3.7, we need a std::move
+    return std::move(mergedNode);
+}
+
 UpdateNode* UpdateObjectNode::getChild(const std::string& field) const {
     if (isPositionalElement(field)) {
         return _positionalChild.get();

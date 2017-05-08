@@ -28,9 +28,12 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_node.h"
+#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -52,7 +55,23 @@ public:
                                           BSONElement modExpr,
                                           const CollatorInterface* collator);
 
+    /**
+     * Creates a new UpdateObjectNode by merging two input UpdateObjectNode objects and their
+     * children. Each field that lives on one side of the merge but not the other (according to
+     * field name) is cloned to the newly created UpdateObjectNode. Fields that exist on both sides
+     * of the merge get merged recursively before being added to the resulting UpdateObjectNode.
+     * This merge operation is a deep copy: the new UpdateObjectNode is a brand new tree that does
+     * not contain any references to the objects in the original input trees.
+     */
+    static std::unique_ptr<UpdateNode> performMerge(const UpdateObjectNode& leftNode,
+                                                    const UpdateObjectNode& rightNode,
+                                                    FieldRef* pathTaken);
+
     UpdateObjectNode() : UpdateNode(Type::Object) {}
+
+    std::unique_ptr<UpdateNode> clone() const final {
+        return stdx::make_unique<UpdateObjectNode>(*this);
+    }
 
     void setCollator(const CollatorInterface* collator) final {
         for (auto&& child : _children) {
@@ -73,8 +92,19 @@ public:
     void setChild(std::string field, std::unique_ptr<UpdateNode> child);
 
 private:
-    std::map<std::string, std::unique_ptr<UpdateNode>> _children;
-    std::unique_ptr<UpdateNode> _positionalChild;
+    /**
+    * Helper for when performMerge wants to create a merged child from children that exist in two
+    * merging nodes. If there is only one child (leftNode or rightNode is NULL), we clone it. If
+    * there are two different children, we merge them recursively. If there are no children
+    * (leftNode and rightNode are null), we return nullptr.
+    */
+    static std::unique_ptr<UpdateNode> copyOrMergeAsNecessary(UpdateNode* leftNode,
+                                                              UpdateNode* rightNode,
+                                                              FieldRef* pathTaken,
+                                                              const std::string& nextField);
+
+    stdx::unordered_map<std::string, clonable_ptr<UpdateNode>> _children;
+    clonable_ptr<UpdateNode> _positionalChild;
 };
 
 }  // namespace mongo

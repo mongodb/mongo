@@ -330,4 +330,278 @@ TEST(UpdateObjectNodeTest, SecondModifierFieldPrefixOfSecondParsesSuccessfully) 
         &root, modifiertable::ModifierType::MOD_SET, update["$set"]["a"], collator));
 }
 
+/**
+ * Used to test if the fields in an input UpdateObjectNode match an expected set of fields.
+ */
+static bool fieldsMatch(const std::vector<std::string>& expectedFields,
+                        const UpdateObjectNode& node) {
+    for (const std::string& fieldName : expectedFields) {
+        if (!node.getChild(fieldName)) {
+            return false;
+        }
+    }
+
+    // There are no expected fields that aren't in the UpdateObjectNode. There is no way to check
+    // if UpdateObjectNodes contains any fields that are not in the expected set, because the
+    // UpdateObjectNodes API does not expose its list of child fields in any way other than
+    // getChild().
+    return true;
+}
+
+TEST(UpdateObjectNodeTest, DistinctFieldsMergeCorrectly) {
+    auto setUpdate1 = fromjson("{$set: {'a': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'ab': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["ab"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(fieldsMatch(std::vector<std::string>{"a", "ab"}, *mergedRootNode));
+}
+
+TEST(UpdateObjectNodeTest, NestedMergeSucceeds) {
+    auto setUpdate1 = fromjson("{$set: {'a.c': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.d': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.d"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(fieldsMatch({"a"}, *mergedRootNode));
+
+    ASSERT_TRUE(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(mergedRootNode->getChild("a")->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*mergedRootNode->getChild("a")) == typeid(UpdateObjectNode&));
+    auto aNode = static_cast<UpdateObjectNode*>(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(fieldsMatch({"c", "d"}, *aNode));
+}
+
+TEST(UpdateObjectNodeTest, DoublyNestedMergeSucceeds) {
+    auto setUpdate1 = fromjson("{$set: {'a.b.c': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.b.d': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.b.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b.d"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(fieldsMatch({"a"}, *mergedRootNode));
+
+    ASSERT_TRUE(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(mergedRootNode->getChild("a")->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*mergedRootNode->getChild("a")) == typeid(UpdateObjectNode&));
+    auto aNode = static_cast<UpdateObjectNode*>(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(fieldsMatch({"b"}, *aNode));
+
+    ASSERT_TRUE(aNode->getChild("b"));
+    ASSERT_TRUE(aNode->getChild("b")->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*aNode->getChild("b")) == typeid(UpdateObjectNode&));
+    auto bNode = static_cast<UpdateObjectNode*>(aNode->getChild("b"));
+    ASSERT_TRUE(fieldsMatch({"c", "d"}, *bNode));
+}
+
+TEST(UpdateObjectNodeTest, FieldAndPositionalMergeCorrectly) {
+    auto setUpdate1 = fromjson("{$set: {'a.b': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(fieldsMatch(std::vector<std::string>{"a"}, *mergedRootNode));
+
+    ASSERT_TRUE(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(mergedRootNode->getChild("a")->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*mergedRootNode->getChild("a")) == typeid(UpdateObjectNode&));
+    auto aNode = static_cast<UpdateObjectNode*>(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(aNode->getChild("$"));
+    ASSERT_TRUE(fieldsMatch({"b"}, *aNode));
+}
+
+TEST(UpdateObjectNodeTest, MergeThroughPositionalSucceeds) {
+    auto setUpdate1 = fromjson("{$set: {'a.$.b': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.$.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$.c"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_OK(result.getStatus());
+
+    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(fieldsMatch({"a"}, *mergedRootNode));
+
+    ASSERT_TRUE(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(mergedRootNode->getChild("a")->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*mergedRootNode->getChild("a")) == typeid(UpdateObjectNode&));
+    auto aNode = static_cast<UpdateObjectNode*>(mergedRootNode->getChild("a"));
+    ASSERT_TRUE(fieldsMatch({}, *aNode));
+
+    ASSERT_TRUE(aNode->getChild("$"));
+    ASSERT_TRUE(aNode->getChild("$")->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*aNode->getChild("$")) == typeid(UpdateObjectNode&));
+    auto positionalNode = static_cast<UpdateObjectNode*>(aNode->getChild("$"));
+    ASSERT_TRUE(fieldsMatch({"b", "c"}, *positionalNode));
+}
+
+TEST(UpdateObjectNodeTest, TopLevelConflictFails) {
+    auto setUpdate1 = fromjson("{$set: {'a': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a'");
+}
+
+TEST(UpdateObjectNodeTest, NestedConflictFails) {
+    auto setUpdate1 = fromjson("{$set: {'a.b': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.b'");
+}
+
+TEST(UpdateObjectNodeTest, LeftPrefixMergeFails) {
+    auto setUpdate1 = fromjson("{$set: {'a.b': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.b.c': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b.c"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.b'");
+}
+
+TEST(UpdateObjectNodeTest, RightPrefixMergeFails) {
+    auto setUpdate1 = fromjson("{$set: {'a.b.c': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.b': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.b.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.b'");
+}
+
+TEST(UpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
+    auto setUpdate1 = fromjson("{$set: {'a.$.c': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.$.c.d': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.$.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$.c.d"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.$.c'");
+}
+
+TEST(UpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
+    auto setUpdate1 = fromjson("{$set: {'a.$.c.d': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.$.c': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.$.c.d"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$.c"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.$.c'");
+}
+
+TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
+    auto setUpdate1 = fromjson("{$set: {'a.$': 5}}");
+    auto setUpdate2 = fromjson("{$set: {'a.$': 6}}");
+    FieldRef fakeFieldRef("root");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode setRoot1, setRoot2;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot1, modifiertable::ModifierType::MOD_SET, setUpdate1["$set"]["a.$"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$"], collator));
+
+    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
+    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.$'");
+}
+
 }  // namespace
