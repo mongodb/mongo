@@ -65,10 +65,6 @@ public:
     StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
                                                            const std::string& dbName) override;
 
-    Status updateCollection(OperationContext* opCtx,
-                            const std::string& collNs,
-                            const CollectionType& coll) override;
-
     StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
                                                                const std::string& collNs) override;
 

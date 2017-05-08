@@ -438,7 +438,8 @@ void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
 }
 
 void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost,
-                                                 const CollectionType& coll) {
+                                                 const CollectionType& coll,
+                                                 bool expectUpsert) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(expectedHost, request.target);
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
@@ -453,7 +454,7 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
         ASSERT_EQUALS(1U, updates.size());
         auto update = updates.front();
 
-        ASSERT_TRUE(update->getUpsert());
+        ASSERT_EQ(expectUpsert, update->getUpsert());
         ASSERT_FALSE(update->getMulti());
         ASSERT_BSONOBJ_EQ(update->getQuery(),
                           BSON(CollectionType::fullNs(coll.getNs().toString())));

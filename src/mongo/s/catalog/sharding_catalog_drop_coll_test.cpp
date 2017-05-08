@@ -129,7 +129,7 @@ public:
         coll.setEpoch(ChunkVersion::DROPPED().epoch());
         coll.setUpdatedAt(network()->now());
 
-        expectUpdateCollection(configHost(), coll);
+        expectUpdateCollection(configHost(), coll, false);
     }
 
     void expectSetShardVersionZero(const ShardType& shard) {

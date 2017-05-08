@@ -251,16 +251,17 @@ void ShardingCatalogClientImpl::shutDown(OperationContext* opCtx) {
     _distLockManager->shutDown(opCtx);
 }
 
-Status ShardingCatalogClientImpl::updateCollection(OperationContext* opCtx,
-                                                   const std::string& collNs,
-                                                   const CollectionType& coll) {
+Status ShardingCatalogClientImpl::_updateCollection(OperationContext* opCtx,
+                                                    const std::string& collNs,
+                                                    const CollectionType& coll,
+                                                    bool upsert) {
     fassert(28634, coll.validate());
 
     auto status = updateConfigDocument(opCtx,
                                        CollectionType::ConfigNS,
                                        BSON(CollectionType::fullNs(collNs)),
                                        coll.toBSON(),
-                                       true,
+                                       upsert,
                                        ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
         return {status.getStatus().code(),
@@ -314,7 +315,7 @@ Status ShardingCatalogClientImpl::createDatabase(OperationContext* opCtx,
     }
 
     // Database does not exist, pick a shard and create a new entry
-    auto newShardIdStatus = _selectShardForNewDatabase(opCtx, grid.shardRegistry());
+    auto newShardIdStatus = _selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry());
     if (!newShardIdStatus.isOK()) {
         return newShardIdStatus.getStatus();
     }
@@ -446,7 +447,8 @@ Status ShardingCatalogClientImpl::enableSharding(OperationContext* opCtx,
     Status status = _checkDbDoesNotExist(opCtx, dbName, &db);
     if (status.isOK()) {
         // Database does not exist, create a new entry
-        auto newShardIdStatus = _selectShardForNewDatabase(opCtx, grid.shardRegistry());
+        auto newShardIdStatus =
+            _selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry());
         if (!newShardIdStatus.isOK()) {
             return newShardIdStatus.getStatus();
         }
@@ -609,7 +611,8 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* opCtx,
         coll.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON() : BSONObj());
         coll.setUnique(unique);
 
-        Status updateCollStatus = updateCollection(opCtx, ns, coll);
+        const bool upsert = true;
+        Status updateCollStatus = _updateCollection(opCtx, ns, coll, upsert);
         if (!updateCollStatus.isOK()) {
             return updateCollStatus;
         }
@@ -688,6 +691,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
         return countStatus.getStatus();
     }
 
+    auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
     if (countStatus.getValue() == 0) {
         log() << "going to start draining shard: " << name;
 
@@ -703,7 +708,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
             return updateStatus.getStatus();
         }
 
-        grid.shardRegistry()->reload(opCtx);
+        shardRegistry->reload(opCtx);
 
         // Record start in changelog
         logChange(opCtx,
@@ -711,6 +716,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
                   "",
                   BSON("shard" << name),
                   ShardingCatalogClientImpl::kMajorityWriteConcern);
+
         return ShardDrainingStatus::STARTED;
     }
 
@@ -752,7 +758,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
     shardConnectionPool.removeHost(name);
     ReplicaSetMonitor::remove(name);
 
-    grid.shardRegistry()->reload(opCtx);
+    shardRegistry->reload(opCtx);
 
     // Record finish in changelog
     logChange(opCtx,
@@ -939,29 +945,46 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
 
     LOG(1) << "dropCollection " << ns << " locked";
 
-    std::map<string, BSONObj> errors;
-    auto* shardRegistry = grid.shardRegistry();
+    const auto dropCommandBSON = [opCtx, &ns] {
+        BSONObjBuilder builder;
+        builder.append("drop", ns.coll());
+
+        if (!opCtx->getWriteConcern().usedDefault) {
+            builder.append(WriteConcernOptions::kWriteConcernField,
+                           opCtx->getWriteConcern().toBSON());
+        }
+
+        return builder.obj();
+    }();
+
+    std::map<std::string, BSONObj> errors;
+    auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        auto shardStatus = shardRegistry->getShard(opCtx, shardEntry.getName());
-        if (!shardStatus.isOK()) {
-            return shardStatus.getStatus();
+        auto swShard = shardRegistry->getShard(opCtx, shardEntry.getName());
+        if (!swShard.isOK()) {
+            return swShard.getStatus();
         }
-        auto dropResult = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+
+        const auto& shard = swShard.getValue();
+
+        auto swDropResult = shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             ns.db().toString(),
-            BSON("drop" << ns.coll() << WriteConcernOptions::kWriteConcernField
-                        << opCtx->getWriteConcern().toBSON()),
+            dropCommandBSON,
             Shard::RetryPolicy::kIdempotent);
 
-        if (!dropResult.isOK()) {
-            return Status(dropResult.getStatus().code(),
-                          dropResult.getStatus().reason() + " at " + shardEntry.getName());
+        if (!swDropResult.isOK()) {
+            return {swDropResult.getStatus().code(),
+                    str::stream() << swDropResult.getStatus().reason() << " at "
+                                  << shardEntry.getName()};
         }
 
-        auto dropStatus = std::move(dropResult.getValue().commandStatus);
-        auto wcStatus = std::move(dropResult.getValue().writeConcernStatus);
+        auto& dropResult = swDropResult.getValue();
+
+        auto dropStatus = std::move(dropResult.commandStatus);
+        auto wcStatus = std::move(dropResult.writeConcernStatus);
         if (!dropStatus.isOK() || !wcStatus.isOK()) {
             if (dropStatus.code() == ErrorCodes::NamespaceNotFound && wcStatus.isOK()) {
                 // Generally getting NamespaceNotFound is okay to ignore as it simply means that
@@ -974,7 +997,7 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
                 continue;
             }
 
-            errors.emplace(shardEntry.getHost(), std::move(dropResult.getValue().response));
+            errors.emplace(shardEntry.getHost(), std::move(dropResult.response));
         }
     }
 
@@ -1013,7 +1036,8 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
     coll.setEpoch(ChunkVersion::DROPPED().epoch());
     coll.setUpdatedAt(Grid::get(opCtx)->getNetwork()->now());
 
-    result = updateCollection(opCtx, ns.ns(), coll);
+    const bool upsert = false;
+    result = _updateCollection(opCtx, ns.ns(), coll, upsert);
     if (!result.isOK()) {
         return result;
     }
@@ -1021,19 +1045,20 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
     LOG(1) << "dropCollection " << ns << " collection marked as dropped";
 
     for (const auto& shardEntry : allShards) {
+        auto swShard = shardRegistry->getShard(opCtx, shardEntry.getName());
+        if (!swShard.isOK()) {
+            return swShard.getStatus();
+        }
+
+        const auto& shard = swShard.getValue();
+
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-            grid.shardRegistry()->getConfigServerConnectionString(),
+            shardRegistry->getConfigServerConnectionString(),
             shardEntry.getName(),
             fassertStatusOK(28781, ConnectionString::parse(shardEntry.getHost())),
             ns,
             ChunkVersion::DROPPED(),
             true);
-
-        auto shardStatus = shardRegistry->getShard(opCtx, shardEntry.getName());
-        if (!shardStatus.isOK()) {
-            return shardStatus.getStatus();
-        }
-        auto shard = shardStatus.getValue();
 
         auto ssvResult = shard->runCommandWithFixedRetryAttempts(
             opCtx,

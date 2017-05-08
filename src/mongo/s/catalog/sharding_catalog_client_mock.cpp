@@ -93,12 +93,6 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabas
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::updateCollection(OperationContext* opCtx,
-                                                   const string& collNs,
-                                                   const CollectionType& coll) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientMock::getCollection(
     OperationContext* opCtx, const string& collNs) {
     return {ErrorCodes::InternalError, "Method not implemented"};

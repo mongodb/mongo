@@ -182,13 +182,6 @@ public:
                                                                    const std::string& dbName) = 0;
 
     /**
-     * Updates or creates the metadata for a given collection.
-     */
-    virtual Status updateCollection(OperationContext* opCtx,
-                                    const std::string& collNs,
-                                    const CollectionType& coll) = 0;
-
-    /**
      * Retrieves the metadata for a given collection, if it exists.
      *
      * @param collectionNs fully qualified name of the collection (case sensitive)

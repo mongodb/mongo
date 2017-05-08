@@ -181,11 +181,12 @@ protected:
                                const BSONObj& detail);
 
     /**
-     * Expects an update call, which changes the specified collection's namespace contents to
-     * match
+     * Expects an update call, which changes the specified collection's namespace contents to match
      * those of the input argument.
      */
-    void expectUpdateCollection(const HostAndPort& expectedHost, const CollectionType& coll);
+    void expectUpdateCollection(const HostAndPort& expectedHost,
+                                const CollectionType& coll,
+                                bool expectUpsert = true);
 
     /**
      * Expects a setShardVersion command to be executed on the specified shard.

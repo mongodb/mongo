@@ -66,10 +66,6 @@ public:
                           const std::string& dbName,
                           const DatabaseType& db) override;
 
-    Status updateCollection(OperationContext* opCtx,
-                            const std::string& collNs,
-                            const CollectionType& coll) override;
-
     Status createDatabase(OperationContext* opCtx, const std::string& dbName) override;
 
     Status logAction(OperationContext* opCtx,
@@ -228,6 +224,14 @@ private:
     StatusWith<long long> _runCountCommandOnConfig(OperationContext* opCtx,
                                                    const NamespaceString& ns,
                                                    BSONObj query);
+
+    /**
+     * Updates the metadata for the specified collection.
+     */
+    Status _updateCollection(OperationContext* opCtx,
+                             const std::string& collNs,
+                             const CollectionType& coll,
+                             bool upsert);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
