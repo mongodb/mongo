@@ -248,9 +248,9 @@ if (0) {
         })();
     };
 
-    var mongo = MongoRunner.runMongod({verbose: 5, setParameter: 'logUserIds=1'});
-    doTest(mongo, new Mongo(mongo.host));
-    MongoRunner.stopMongod(mongo.port);
+    var conn = MongoRunner.runMongod({verbose: 5, setParameter: 'logUserIds=1'});
+    doTest(conn, new Mongo(conn.host));
+    MongoRunner.stopMongod(conn);
 
     var st = new ShardingTest(
         {shards: 1, verbose: 5, other: {mongosOptions: {setParameter: 'logUserIds=1'}}});

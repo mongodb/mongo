@@ -73,7 +73,7 @@
     st.rs0.stop(0);
     st.rs0.stop(1);
 
-    MongoRunner.stopMongod(newNode.port);
+    MongoRunner.stopMongod(newNode);
 
     replConfig = st.configRS.getReplSetConfigFromNode();
     replConfig.version += 1;

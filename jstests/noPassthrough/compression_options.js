@@ -32,7 +32,7 @@
         output = JSON.parse(output);
 
         assert.eq(output.compression, expected);
-        MongoRunner.stopMongod(mongo.port);
+        MongoRunner.stopMongod(mongo);
     };
 
     assert.isnull(MongoRunner.runMongod({networkMessageCompressors: "snappy,disabled"}));

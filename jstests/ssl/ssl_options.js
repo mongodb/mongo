@@ -36,6 +36,6 @@ assert.eq(getCmdLineOptsResult.parsed.net.ssl.clusterPassword,
           "<password>",
           "Password not properly censored: " + tojson(getCmdLineOptsResult));
 
-MongoRunner.stopMongod(mongodSource.port);
+MongoRunner.stopMongod(mongodSource);
 
 print(baseName + " succeeded.");

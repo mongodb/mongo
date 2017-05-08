@@ -26,8 +26,6 @@
     var master = replTest.getPrimary();
     var second = replTest.getSecondary();
 
-    var secondId = replTest.getNodeId(second);
-
     var masterDB = master.getDB('bgIndexNoRetrySec');
     var secondDB = second.getDB('bgIndexNoRetrySec');
 
@@ -58,7 +56,8 @@
     // the oplog entry so it isn't replayed. If (A) is present without (B), then there are two ways
     // that the index can be rebuilt on startup and this test is only for the one triggered by (A).
     secondDB.adminCommand({fsync: 1});
-    replTest.restart(secondId, {}, /*signal=*/9, /*wait=*/true);
+    replTest.stop(second, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    replTest.start(second, {}, /*restart*/ true, /*wait=*/true);
 
     // Make sure secondary comes back.
     assert.soon(function() {

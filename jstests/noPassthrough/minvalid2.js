@@ -90,4 +90,4 @@ assert.soon(function() {
         'it does not contain the necessary operations for us to reach a consistent state');
 });
 
-replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+replTest.stopSet();

@@ -17,7 +17,7 @@
 
     // Kill all secondaries, forcing the current primary to step down.
     st.configRS.getSecondaries().forEach(function(secondaryConn) {
-        MongoRunner.stopMongod(secondaryConn.port);
+        MongoRunner.stopMongod(secondaryConn);
     });
 
     // Test authenticate through a fresh connection.

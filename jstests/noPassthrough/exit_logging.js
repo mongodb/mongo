@@ -48,7 +48,7 @@
             crashFn(conn);
             checkOutput();
         } finally {
-            launcher.stop(conn, undefined, {allowedExitCodes: [expectedExitCode]});
+            launcher.stop(conn, undefined, {allowedExitCode: expectedExitCode});
         }
     }
 

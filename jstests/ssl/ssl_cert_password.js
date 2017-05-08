@@ -168,6 +168,6 @@ assert.eq(md5, md5_stored, "hash of stored file does not match the expected valu
 
 if (!_isWindows()) {
     // Stop the server
-    var exitCode = MongoRunner.stopMongod(md.port, 15);
+    var exitCode = MongoRunner.stopMongod(md);
     assert(exitCode == 0);
 }

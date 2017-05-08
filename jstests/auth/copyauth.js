@@ -78,7 +78,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAut
         } else if (clusterType === "repl") {
             replSetTest.stopSet();
         } else {
-            MongoRunner.stopMongod(this.conn.port);
+            MongoRunner.stopMongod(this.conn);
         }
     };
 }

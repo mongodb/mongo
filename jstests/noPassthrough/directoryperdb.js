@@ -39,7 +39,7 @@
     files = listFiles(files[0].name);
     assert(files.length > 0);
 
-    MongoRunner.stopMongod(m.port);
+    MongoRunner.stopMongod(m);
 
     // Subsequent attempt to start server using same dbpath without directoryperdb should fail.
     assert.isnull(MongoRunner.runMongod({dbpath: dbpath, restart: true}));

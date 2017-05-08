@@ -28,7 +28,7 @@ function withMongod(extraMongodArgs, operation) {
     try {
         operation(mongod);
     } finally {
-        MongoRunner.stopMongod(mongod.port);
+        MongoRunner.stopMongod(mongod);
     }
 }
 

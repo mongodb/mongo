@@ -120,7 +120,7 @@ var authenticate = function(mongo) {
 
 var shutdown = function(conn) {
     print("============ shutting down.");
-    MongoRunner.stopMongod(conn.port, /*signal*/ false, {auth: {user: username, pwd: password}});
+    MongoRunner.stopMongod(conn, /*signal*/ false, {auth: {user: username, pwd: password}});
 };
 
 var runTest = function(useHostName) {

@@ -58,6 +58,6 @@ ensureSetParameterFailure(dbConn, "journalCommitInterval", 0);
 ensureSetParameterFailure(dbConn, "syncdelay", 10 * 1000 * 1000);
 ensureSetParameterFailure(dbConn, "syncdelay", -10 * 1000 * 1000);
 
-MongoRunner.stopMongod(dbConn.port);
+MongoRunner.stopMongod(dbConn);
 
 jsTest.log("noPassthrough_parameters_test succeeded!");

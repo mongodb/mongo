@@ -81,7 +81,7 @@ function MongoBridge(options) {
     this.connectToBridge = function connectToBridge() {
         var failedToStart = false;
         assert.soon(() => {
-            if (!checkProgram(pid)) {
+            if (!checkProgram(pid).alive) {
                 failedToStart = true;
                 return true;
             }

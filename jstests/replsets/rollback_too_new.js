@@ -66,6 +66,6 @@
         }
     }, "node C failed to fassert", 60 * 1000);
 
-    replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
-
+    replTest.stop(CID, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    replTest.stopSet();
 }());

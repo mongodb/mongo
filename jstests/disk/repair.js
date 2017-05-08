@@ -27,7 +27,7 @@ function check() {
     assert.eq.automsg("1", "db[ baseName ].count()");
 }
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 resetDbpath(repairpath);
 m = MongoRunner.runMongod({
@@ -38,7 +38,7 @@ m = MongoRunner.runMongod({
 db = m.getDB(baseName);
 assert.commandWorked(db.runCommand({repairDatabase: 1}));
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 resetDbpath(repairpath);
 rc = runMongoProgram(
@@ -51,7 +51,7 @@ m = MongoRunner.runMongod({
 });
 db = m.getDB(baseName);
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 resetDbpath(repairpath);
 rc = runMongoProgram("mongod", "--repair", "--port", m.port, "--dbpath", dbpath);

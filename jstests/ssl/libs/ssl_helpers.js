@@ -50,7 +50,7 @@ var replShouldFail = function(name, opt1, opt2) {
     assert.throws(load, [replSetTestFile], "This setup should have failed");
     // clean up to continue running...
     if (replTest) {
-        replTest.stopSet(15);
+        replTest.stopSet();
     }
 };
 

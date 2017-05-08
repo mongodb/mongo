@@ -32,7 +32,7 @@
     assert.commandWorked(viewsDB.runCommand({drop: "view1", writeConcern: {j: 1}}));
 
     // Hard kill the mongod to ensure the data was indeed synced to durable storage.
-    MongoRunner.stopMongod(conn, 9);
+    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
     // Restart the mongod.
     conn = MongoRunner.runMongod(mongodArgs);

@@ -44,7 +44,7 @@
     checkShardingStateInitialized(standaloneConn, st.configRS.getURL(), newShardName, clusterId);
     checkShardMarkedAsShardAware(st.s, newShardName);
 
-    MongoRunner.stopMongod(standaloneConn.port);
+    MongoRunner.stopMongod(standaloneConn);
 
     // Add a shard that is a replica set.
 

@@ -37,14 +37,14 @@
         var restartAndFixShardIdentityDoc = function(startOptions) {
             var options = Object.extend({}, startOptions);
             delete options.shardsvr;
-            mongodConn = MongoRunner.runMongod(options);
+            var mongodConn = MongoRunner.runMongod(options);
             waitForMaster(mongodConn);
 
             var res = mongodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
                                                                       shardIdentityDoc);
             assert.eq(1, res.nModified);
 
-            MongoRunner.stopMongod(mongodConn.port);
+            MongoRunner.stopMongod(mongodConn);
 
             newMongodOptions.shardsvr = '';
             mongodConn = MongoRunner.runMongod(newMongodOptions);
@@ -87,8 +87,7 @@
         //
 
         var newMongodOptions = Object.extend(mongodConn.savedOptions, {restart: true});
-
-        MongoRunner.stopMongod(mongodConn.port);
+        MongoRunner.stopMongod(mongodConn);
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForMaster(mongodConn);
 
@@ -104,7 +103,7 @@
         //
 
         // Note: modification of the shardIdentity is allowed only when not running with --shardsvr
-        MongoRunner.stopMongod(mongodConn.port);
+        MongoRunner.stopMongod(mongodConn);
         delete newMongodOptions.shardsvr;
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForMaster(mongodConn);
@@ -112,7 +111,7 @@
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
             {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
 
-        MongoRunner.stopMongod(mongodConn.port);
+        MongoRunner.stopMongod(mongodConn);
 
         newMongodOptions.shardsvr = '';
         assert.throws(function() {
@@ -124,14 +123,10 @@
         // Test that it is possible to fix the invalid shardIdentity doc by not passing --shardsvr
         //
 
-        try {
-            // The server was terminated not by calling stopMongod earlier, this will cleanup
-            // the process from registry in shell_utils_launcher.
-            MongoRunner.stopMongod(newMongodOptions.port);
-        } catch (ex) {
-            if (!(ex instanceof (MongoRunner.StopError))) {
-                throw ex;
-            }
+        // If mongodConn is not null, the server terminated after MongoRunner.runMongod() had
+        // returned. So we call stopMongod again to clean up the registry in shell_util_launcher.cpp
+        if (mongodConn) {
+            MongoRunner.stopMongod(mongodConn);
         }
 
         mongodConn = restartAndFixShardIdentityDoc(newMongodOptions);
@@ -145,7 +140,7 @@
 
     runTest(mongod, st.configRS.getURL());
 
-    MongoRunner.stopMongod(mongod.port);
+    MongoRunner.stopMongod(mongod);
 
     var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet({shardsvr: ''});

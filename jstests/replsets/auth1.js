@@ -40,7 +40,6 @@ load("jstests/replsets/rslib.js");
     print("should fail with wrong permissions");
     assert.eq(
         m, _isWindows() ? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
-    MongoRunner.stopMongod(port[0]);
 
     // Pre-populate the data directory for the first replica set node, to be started later, with
     // a user's credentials.

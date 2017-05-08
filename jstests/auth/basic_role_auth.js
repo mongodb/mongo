@@ -486,7 +486,7 @@ var runTests = function(conn) {
 
 var conn = MongoRunner.runMongod({auth: ''});
 runTests(conn);
-MongoRunner.stopMongod(conn.port);
+MongoRunner.stopMongod(conn);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 1, keyFile: 'jstests/libs/key1'});

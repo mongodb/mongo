@@ -57,7 +57,9 @@ for (var test = 0; test < 2; test++) {
         // Flush writes to disk, since sometimes we're killing uncleanly
         assert(mongos.getDB("admin").runCommand({fsync: 1}).ok);
 
-        MongoRunner.stopMongod(st.shard0, killWith);
+        var exitCode = killWith === 9 ? MongoRunner.EXIT_SIGKILL : MongoRunner.EXIT_CLEAN;
+
+        MongoRunner.stopMongod(st.shard0, killWith, {allowedExitCode: exitCode});
 
         jsTest.log("Restart shard...");
 

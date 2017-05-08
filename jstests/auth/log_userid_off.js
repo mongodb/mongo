@@ -32,7 +32,7 @@ var doTest = function(mongo, callSetParam) {
 
 var mongo = MongoRunner.runMongod({verbose: 5});
 doTest(mongo);
-MongoRunner.stopMongod(mongo.port);
+MongoRunner.stopMongod(mongo);
 
 var st = new ShardingTest({shards: 1, verbose: 5});
 doTest(st.s);

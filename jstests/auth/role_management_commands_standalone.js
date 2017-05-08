@@ -5,5 +5,5 @@
 
     var conn = MongoRunner.runMongod({auth: '', useHostname: false});
     runAllRoleManagementCommandsTests(conn);
-    MongoRunner.stopMongod(conn.port);
+    MongoRunner.stopMongod(conn);
 })();

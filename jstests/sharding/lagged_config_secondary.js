@@ -26,7 +26,7 @@
     assert.writeOK(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
 
     st.configRS.stopMaster();
-    MongoRunner.stopMongod(configSecondaryToKill.port);
+    MongoRunner.stopMongod(configSecondaryToKill);
 
     // Clears all cached info so mongos will be forced to query from the config.
     st.s.adminCommand({flushRouterConfig: 1});

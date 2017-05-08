@@ -146,7 +146,7 @@ for (var i = 0; i < 3; ++i) {
 
     // kill the process hard
     log("hard kill");
-    MongoRunner.stopMongod(conn, /*signal*/ 9);
+    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
     sleep(5000);
 }
@@ -204,7 +204,7 @@ for (var i = 0; i < 5; ++i) {
 
     // kill the process hard
     log("hard kill");
-    MongoRunner.stopMongod(conn, /*signal*/ 9);
+    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
     sleep(5000);
 }

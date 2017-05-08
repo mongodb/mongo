@@ -33,5 +33,5 @@ if (ss.storageEngine.name !== "wiredTiger") {
     assert.commandFailed(reconfigure("eviction_target=a"));
     assert.commandFailed(reconfigure("fake_config_key=1"));
 
-    MongoRunner.stopMongod(conn.port);
+    MongoRunner.stopMongod(conn);
 }

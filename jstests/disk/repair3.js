@@ -47,7 +47,7 @@ if (doIt) {
     }
 
     check();
-    MongoRunner.stopMongod(m.port);
+    MongoRunner.stopMongod(m);
 
     resetDbpath(repairpath);
     var rc = runMongoProgram("mongod",
@@ -73,5 +73,5 @@ if (doIt) {
     });
     db = m.getDB(baseName);
     check();
-    MongoRunner.stopMongod(m.port);
+    MongoRunner.stopMongod(m);
 }

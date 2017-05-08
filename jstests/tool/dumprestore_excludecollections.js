@@ -114,7 +114,7 @@ destDB.dropDatabase();
 // times, but that is not tested here because right now MongoRunners can only be configured using
 // javascript objects which do not allow duplicate keys.  See SERVER-14220.
 
-MongoRunner.stopMongod(mongodDest.port);
-MongoRunner.stopMongod(mongodSource.port);
+MongoRunner.stopMongod(mongodDest);
+MongoRunner.stopMongod(mongodSource);
 
 print(testBaseName + " success!");

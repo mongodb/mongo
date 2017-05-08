@@ -35,7 +35,7 @@
         } else {
             assert.commandFailed(res, "Add shard");
         }
-        return m.port;
+        return m;
     };
 
     var findEmptyShard = function(st, ns) {
@@ -201,22 +201,22 @@
         // information.  Therefore, we'll do this manually for now.
 
         for (var i = 0; i < st._mongos.length; i++) {
-            var port = st["s" + i].port;
-            MongoRunner.stopMongos(port,
+            var conn = st["s" + i];
+            MongoRunner.stopMongos(conn,
                                    /*signal*/ false,
                                    {auth: {user: username, pwd: password}});
         }
 
         for (var i = 0; i < st._connections.length; i++) {
-            var port = st["shard" + i].port;
-            MongoRunner.stopMongod(port,
+            var conn = st["shard" + i];
+            MongoRunner.stopMongod(conn,
                                    /*signal*/ false,
                                    {auth: {user: username, pwd: password}});
         }
 
         for (var i = 0; i < st._configServers.length; i++) {
-            var c = st["config" + i].port;
-            MongoRunner.stopMongod(port,
+            var conn = st["config" + i];
+            MongoRunner.stopMongod(conn,
                                    /*signal*/ false,
                                    {auth: {user: username, pwd: password}});
         }

@@ -347,9 +347,16 @@ var BackupRestoreTest = function(options) {
         rst.waitForState(hiddenNode, [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
 
         // Stop CRUD client and FSM client.
-        assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
-        assert(checkProgram(fsmPid), testName + ' FSM client was not running at end of test');
+        var crudStatus = checkProgram(crudPid);
+        assert(crudStatus.alive,
+               testName + ' CRUD client was not running at end of test and exited with code: ' +
+                   crudStatus.exitCode);
         stopMongoProgramByPid(crudPid);
+
+        var fsmStatus = checkProgram(fsmPid);
+        assert(fsmStatus.alive,
+               testName + ' FSM client was not running at end of test and exited with code: ' +
+                   fsmStatus.exitCode);
         stopMongoProgramByPid(fsmPid);
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.

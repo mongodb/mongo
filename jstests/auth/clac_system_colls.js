@@ -57,7 +57,7 @@ function runTest(admindb) {
 jsTest.log('Test standalone');
 var conn = MongoRunner.runMongod({auth: ''});
 runTest(conn.getDB("admin"));
-MongoRunner.stopMongod(conn.port);
+MongoRunner.stopMongod(conn);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});

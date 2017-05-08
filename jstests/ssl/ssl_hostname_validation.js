@@ -58,7 +58,7 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
         assert.eq(
             1, mongo, "Connection attempt succeeded when it should fail certPath: " + certPath);
     }
-    MongoRunner.stopMongod(mongod.port);
+    MongoRunner.stopMongod(mongod);
 }
 
 // 1. Test client connections with different server certificates

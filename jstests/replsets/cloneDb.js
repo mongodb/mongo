@@ -117,7 +117,7 @@
             'cloneDatabase from standalone to SECONDARY succeeded and should not accept writes');
 
         jsTest.log("Shut down replica set and standalone server");
-        MongoRunner.stopMongod(standalone.port);
+        MongoRunner.stopMongod(standalone);
 
         replTest.stopSet();
     }

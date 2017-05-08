@@ -40,7 +40,7 @@
 
     assert.neq(null, configDB.databases.findOne({_id: 'unshardedDB'}));
 
-    MongoRunner.stopMongod(newShardConn.port);
+    MongoRunner.stopMongod(newShardConn);
     st.stop();
 
 })();

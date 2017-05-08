@@ -19,7 +19,7 @@ var primeSystemReplset = function() {
 };
 
 var restartWithConfig = function() {
-    MongoRunner.stopMongod(conn.port, 15);
+    MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: conn.dbpath});
     testDB = conn.getDB("test");
     var n = 100;
@@ -37,7 +37,7 @@ var restartWithoutConfig = function() {
     var localDB = conn.getDB("local");
     assert.writeOK(localDB.system.replset.remove({}));
 
-    MongoRunner.stopMongod(conn.port, 15);
+    MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: conn.dbpath});
 
@@ -45,7 +45,7 @@ var restartWithoutConfig = function() {
         return conn.getDB("test").foo.count() < 100;
     }, "never deleted", 75000);
 
-    MongoRunner.stopMongod(conn.port, 15);
+    MongoRunner.stopMongod(conn);
 };
 
 print("Create a TTL collection and put doc in local.system.replset");

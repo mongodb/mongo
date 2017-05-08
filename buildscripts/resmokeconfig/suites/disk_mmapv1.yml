@@ -4,6 +4,10 @@ selector:
     - jstests/disk/*.js
     exclude_files:
     - jstests/disk/repair2.js  # SERVER-18256
+    # The following tests require a dedicated disk partition to be set up. Otherwise they will
+    # silently be no-ops.
+    - jstests/disk/repair3.js
+    - jstests/disk/repair4.js
 
 executor:
   js_test:

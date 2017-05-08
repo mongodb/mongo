@@ -51,7 +51,7 @@
         function() {
             var count = conn.getDB('test').nojournal.count({journaled: {$exists: true}});
             if (count >= 100) {
-                MongoRunner.stopMongod(conn, 9);
+                MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
                 return true;
             }
             return false;

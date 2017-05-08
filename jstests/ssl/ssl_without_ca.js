@@ -32,7 +32,7 @@ var exitStatus = runMongoProgram('mongo',
 
 assert.eq(exitStatus, 0, "authentication via MONGODB-X509 without CA succeeded");
 
-MongoRunner.stopMongod(conn.port);
+MongoRunner.stopMongod(conn);
 
 jsTest.log("Assert mongod doesn\'t start with CA file missing and clusterAuthMode=x509.");
 

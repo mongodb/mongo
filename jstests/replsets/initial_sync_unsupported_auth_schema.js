@@ -19,7 +19,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     assert.writeOK(res);
 
     // Add another node to the replica set to allow an initial sync to occur
-    rst.add();
+    var init_sync_node = rst.add();
 
     clearRawMongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(rst);
@@ -45,9 +45,8 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
                     ' authSchema version: ' + tojson(schema),
                 60000);
 
-    rst.stopSet(undefined,
-                undefined,
-                {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
+    rst.stop(init_sync_node, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    rst.stopSet();
 }
 
 function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
@@ -66,7 +65,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     assert.writeOK(res);
 
     // Add another node to the replica set to allow an initial sync to occur
-    rst.add();
+    var init_sync_node = rst.add();
 
     clearRawMongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(rst);
@@ -88,9 +87,8 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
                     ' a missing auth schema',
                 60000);
 
-    rst.stopSet(undefined,
-                undefined,
-                {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
+    rst.stop(init_sync_node, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    rst.stopSet();
 }
 
 testInitialSyncAbortsWithUnsupportedAuthSchema({_id: 'authSchema'});

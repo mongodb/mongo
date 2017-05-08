@@ -18,7 +18,7 @@ function writeDataAndRestart(doFsync) {
     }
 
     jsTestLog("kill -9");
-    MongoRunner.stopMongod(conn, /*signal*/ 9);
+    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
     jsTestLog("restart node");
     conn = MongoRunner.runMongod({

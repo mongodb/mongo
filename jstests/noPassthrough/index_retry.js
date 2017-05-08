@@ -61,5 +61,5 @@
               indexes.length,
               'unexpected number of indexes in listIndexes result: ' + tojson(indexes));
 
-    MongoRunner.stopMongod(conn.port);
+    MongoRunner.stopMongod(conn);
 }());

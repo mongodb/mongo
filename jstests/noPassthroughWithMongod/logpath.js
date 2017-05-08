@@ -57,7 +57,7 @@ var m = MongoRunner.runMongod({port: port[0], dbpath: dbdir, logpath: logdir + l
 
 // log should now exist (and no rotations should exist)
 assert.eq(logCount(logs[0], true), 1);
-MongoRunner.stopMongod(port[0]);
+MongoRunner.stopMongod(m /*port[0]*/);
 
 print("------ Start mongod with logpath set to existing file");
 m = MongoRunner.runMongod({port: port[1], dbpath: dbdir, logpath: logdir + logs[0]});
@@ -69,7 +69,7 @@ assert.eq(logCount(logs[0]), 1);
 assert.eq(logCount(logs[0], true), 2);
 cleanupFiles();
 
-MongoRunner.stopMongod(port[1]);
+MongoRunner.stopMongod(m /*port[1]*/);
 
 // Blocking on SERVER-5117:
 // MongoRunner currently hangs if mongod fails to start so these tests don't work
@@ -85,7 +85,7 @@ if (false) {
 
         // log should now exist (and no rotations should exist)
         assert.eq(logCount(logs[1], true), 1);
-        MongoRunner.stopMongod(port[2]);
+        MongoRunner.stopMongod(m /*port[2]*/);
 
         print("------ Start mongod with logpath set to existing file, fork");
         m = MongoRunner.runMongod(
@@ -98,7 +98,7 @@ if (false) {
         assert.eq(logCount(logs[1], true), 2);
         cleanupFiles();
 
-        MongoRunner.stopMongod(port[3]);
+        MongoRunner.stopMongod(m /*port[3]*/);
     }
 
     // the following tests depend on undefined behavior; assume that MongoRunner raises exception on

@@ -111,7 +111,7 @@ printjson(conn.getDB('admin').runCommand({getlasterror: 1, fsync: 1}));
 
 // kill the process hard
 log("kill 9");
-MongoRunner.stopMongod(conn, /*signal*/ 9);
+MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
 // journal file should be present, and non-empty as we killed hard
 

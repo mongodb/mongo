@@ -60,5 +60,5 @@
     var indexes = t.getIndexes();
     assert.eq(1, indexes.length, 'unfinished indexes in listIndexes result: ' + tojson(indexes));
 
-    MongoRunner.stopMongod(conn.port);
+    MongoRunner.stopMongod(conn);
 }());

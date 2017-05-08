@@ -226,9 +226,9 @@
     }
 
     // Run the test on a standalone.
-    let mongod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    let conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+    runTest(conn);
+    MongoRunner.stopMongod(conn);
 
     // Run the test on a sharded cluster.
     let cluster = new ShardingTest(

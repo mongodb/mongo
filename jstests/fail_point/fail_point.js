@@ -69,7 +69,7 @@ var runTest = function(adminDB) {
 
 var conn = MongoRunner.runMongod();
 runTest(conn.getDB('admin'));
-MongoRunner.stopMongod(conn.port);
+MongoRunner.stopMongod(conn);
 
 ///////////////////////////////////////////////////////////
 // Test mongos

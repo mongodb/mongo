@@ -48,7 +48,7 @@ for (f in files) {
 assert(fileCount > 0, "Expected more than zero nondirectory files in the database directory");
 
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 resetDbpath(repairpath);
 m = MongoRunner.runMongod({
@@ -60,7 +60,7 @@ m = MongoRunner.runMongod({
 db = m.getDB(baseName);
 assert.commandWorked(db.runCommand({repairDatabase: 1}));
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 // Test long database names
 resetDbpath(repairpath);
@@ -73,7 +73,7 @@ m = MongoRunner.runMongod({
 db = m.getDB(longDBName);
 assert.writeOK(db[baseName].save({}));
 assert.commandWorked(db.runCommand({repairDatabase: 1}));
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 // Test long repairPath
 resetDbpath(longRepairPath);
@@ -87,7 +87,7 @@ m = MongoRunner.runMongod({
 db = m.getDB(longDBName);
 assert.commandWorked(db.runCommand({repairDatabase: 1, backupOriginalFiles: true}));
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 // Test database name and repairPath with --repair
 resetDbpath(longRepairPath);
@@ -109,7 +109,7 @@ m = MongoRunner.runMongod({
 });
 db = m.getDB(longDBName);
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 resetDbpath(repairpath);
 returnCode = runMongoProgram("mongod",
@@ -131,7 +131,7 @@ m = MongoRunner.runMongod({
 });
 db = m.getDB(baseName);
 check();
-MongoRunner.stopMongod(m.port);
+MongoRunner.stopMongod(m);
 
 resetDbpath(repairpath);
 returnCode =

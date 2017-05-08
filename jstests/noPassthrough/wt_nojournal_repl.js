@@ -61,7 +61,7 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
     assert.commandWorked(secondary1.getDB("admin").runCommand({fsync: 1}));
 
     jsTestLog("kill -9 secondary 1");
-    MongoRunner.stopMongod(secondary1.port, /*signal*/ 9);
+    MongoRunner.stopMongod(secondary1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
     jsTestLog("add some data to a new collection bar");
     for (var i = 0; i < 100; i++) {

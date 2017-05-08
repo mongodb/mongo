@@ -1715,11 +1715,11 @@ var ReplSetTest = function(opts) {
 
         n = this.getNodeId(n);
 
-        var port = _useBridge ? _unbridgedPorts[n] : this.ports[n];
-        print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
-        var ret = MongoRunner.stopMongod(port, signal, opts);
+        var conn = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
+        print('ReplSetTest stop *** Shutting down mongod in port ' + conn.port + ' ***');
+        var ret = MongoRunner.stopMongod(conn, signal, opts);
 
-        print('ReplSetTest stop *** Mongod in port ' + port + ' shutdown with code (' + ret +
+        print('ReplSetTest stop *** Mongod in port ' + conn.port + ' shutdown with code (' + ret +
               ') ***');
 
         if (_useBridge) {

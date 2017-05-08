@@ -95,7 +95,7 @@ function multiVersionDumpRestoreTest(configObj) {
             host: serverSource.host,
             db: testBaseName
         });
-        MongoRunner.stopMongod(serverSource.port);
+        MongoRunner.stopMongod(serverSource);
     } else { /* "mongos" */
         MongoRunner.runMongoTool("mongodump", {
             out: configObj.dumpDir,
@@ -161,7 +161,7 @@ function multiVersionDumpRestoreTest(configObj) {
     if (configObj.restoreType === "mongos") {
         shardingTest.stop();
     } else {
-        MongoRunner.stopMongod(serverDest.port);
+        MongoRunner.stopMongod(serverDest);
     }
 }
 

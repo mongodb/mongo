@@ -38,8 +38,6 @@
     };
     assert.soon(assertFn, "Replication should have aborted on invalid index specification", 60000);
 
-    replTest.stopSet(undefined,
-                     undefined,
-                     {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
-
+    replTest.stop(replTest.getSecondary(), undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    replTest.stopSet();
 })();

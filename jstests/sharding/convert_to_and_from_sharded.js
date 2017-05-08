@@ -88,7 +88,7 @@
         return res.state == 'completed';
     });
 
-    MongoRunner.stopMongod(newMongod.port);
+    MongoRunner.stopMongod(newMongod);
 
     checkBasicCRUD(st.s.getDB('test').unsharded);
     checkBasicCRUD(st.s.getDB('test').sharded);

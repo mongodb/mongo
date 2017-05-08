@@ -88,7 +88,7 @@ var x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile
 var mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
 
 authAndTest(mongo);
-MongoRunner.stopMongod(mongo.port);
+MongoRunner.stopMongod(mongo);
 
 print("2. Testing x.509 auth to mongos");
 

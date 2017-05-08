@@ -52,7 +52,7 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
         var getCmdLineOptsBaseMongod = baseMongod.adminCommand("getCmdLineOpts");
 
         // Stop the mongod we used to get the options
-        MongoRunner.stopMongod(baseMongod.port);
+        MongoRunner.stopMongod(baseMongod);
 
         return getCmdLineOptsBaseMongod;
     }
@@ -114,7 +114,7 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
 
     // Cleanup
     mongod.getDB("admin").logout();
-    MongoRunner.stopMongod(mongod.port);
+    MongoRunner.stopMongod(mongod);
 }
 
 // Test that the parsed result of setting certain command line options has the correct format in

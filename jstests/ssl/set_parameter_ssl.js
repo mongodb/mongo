@@ -13,7 +13,7 @@ function testSSLTransition(oldMode, newMode, shouldSucceed) {
     var res = adminDB.runCommand({"setParameter": 1, "sslMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(conn.port);
+    MongoRunner.stopMongod(conn);
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
@@ -30,7 +30,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
     var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(conn.port);
+    MongoRunner.stopMongod(conn);
 }
 
 testSSLTransition("allowSSL", "invalid", false);

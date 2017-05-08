@@ -13,7 +13,7 @@ if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wired
     assert(listFiles(dbpath + "/index").length > 0);
     assert(listFiles(dbpath + "/collection").length > 0);
 
-    MongoRunner.stopMongod(m.port);
+    MongoRunner.stopMongod(m);
 
     // Subsequent attempts to start server using same dbpath but different
     // wiredTigerDirectoryForIndexes and directoryperdb options should fail.

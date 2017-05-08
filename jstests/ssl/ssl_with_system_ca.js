@@ -31,7 +31,7 @@
         var exitStatus = runMongoProgram.apply(null, argv);
         assert.eq(exitStatus, 0, "successfully connected with SSL");
 
-        MongoRunner.stopMongod(conn.port);
+        MongoRunner.stopMongod(conn);
     };
 
     assert.throws(function() {

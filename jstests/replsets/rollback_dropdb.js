@@ -64,4 +64,5 @@ assert.soon(function() {
         "rollback : can't rollback drop database full resync will be required");
 }, "B failed to fassert");
 
-replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+replTest.stop(BID, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+replTest.stopSet();

@@ -61,5 +61,5 @@
               "If the Timestamps differ, the server may be filling in the null timestamps");
 
     assert.throws(() => rst.restart(0));  // Restart in replSet mode again.
-    print('\n\n\t\t^^^^^^^^  This was supposed to fassert ^^^^^^^^^^^\n\n');
+    rst.stopSet();
 })();

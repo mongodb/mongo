@@ -64,4 +64,5 @@ assert.soon(function() {
     return rawMongoProgramOutput().match("cannot rollback a collMod command");
 }, "B failed to fassert");
 
-replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+replTest.stop(BID, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+replTest.stopSet();

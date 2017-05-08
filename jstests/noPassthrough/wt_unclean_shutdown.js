@@ -83,7 +83,7 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
 
     // Mongod needs an unclean shutdown so that WT recovery is forced on restart and we can detect
     // any missing records.
-    MongoRunner.stopMongod(conn, 9);
+    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
 
     // Retrieve the start and end data from each thread.
     var retData = [];
