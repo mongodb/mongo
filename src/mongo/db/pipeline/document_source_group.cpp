@@ -490,7 +490,10 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             _memoryUsageBytes = 0;
         }
 
-        Value id = computeId(input.getDocument());
+        // We release the result document here so that it does not outlive the end of this loop
+        // iteration. Not releasing could lead to an array copy when this group follows an unwind.
+        auto rootDocument = input.releaseDocument();
+        Value id = computeId(rootDocument);
 
         // Look for the _id value in the map. If it's not there, add a new entry with a blank
         // accumulator. This is done in a somewhat odd way in order to avoid hashing 'id' and
@@ -518,7 +521,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         dassert(numAccumulators == group.size());
 
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(_accumulatedFields[i].expression->evaluate(input.getDocument()),
+            group[i]->process(_accumulatedFields[i].expression->evaluate(rootDocument),
                               _doingMerge);
 
             _memoryUsageBytes += group[i]->memUsageForSorter();
@@ -767,7 +770,7 @@ BSONObjSet DocumentSourceGroup::getOutputSorts() {
 }
 
 
-Value DocumentSourceGroup::computeId(Document root) {
+Value DocumentSourceGroup::computeId(const Document& root) {
     // If only one expression, return result directly
     if (_idExpressions.size() == 1) {
         Value retValue = _idExpressions[0]->evaluate(root);

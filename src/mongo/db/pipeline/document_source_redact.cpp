@@ -96,7 +96,7 @@ Pipeline::SourceContainer::iterator DocumentSourceRedact::doOptimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceRedact::redactValue(const Value& in, Document root) {
+Value DocumentSourceRedact::redactValue(const Value& in, const Document& root) {
     const BSONType valueType = in.getType();
     if (valueType == Object) {
         pExpCtx->variables.setValue(_currentId, in);
@@ -126,7 +126,7 @@ Value DocumentSourceRedact::redactValue(const Value& in, Document root) {
     }
 }
 
-boost::optional<Document> DocumentSourceRedact::redactObject(Document root) {
+boost::optional<Document> DocumentSourceRedact::redactObject(const Document& root) {
     auto& variables = pExpCtx->variables;
     const Value expressionResult = _expression->evaluate(root);
 

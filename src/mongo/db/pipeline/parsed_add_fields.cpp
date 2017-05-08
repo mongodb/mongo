@@ -84,7 +84,7 @@ void ParsedAddFields::parse(const BSONObj& spec) {
     }
 }
 
-Document ParsedAddFields::applyProjection(Document inputDoc) const {
+Document ParsedAddFields::applyProjection(const Document& inputDoc) const {
     // The output doc is the same as the input doc, with the added fields.
     MutableDocument output(inputDoc);
     _root->addComputedFields(&output, inputDoc);

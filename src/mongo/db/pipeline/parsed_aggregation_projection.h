@@ -150,7 +150,7 @@ public:
     /**
      * Apply the projection transformation.
      */
-    Document applyTransformation(Document input) {
+    Document applyTransformation(const Document& input) {
         return applyProjection(input);
     }
 
@@ -161,7 +161,7 @@ protected:
     /**
      * Apply the projection to 'input'.
      */
-    virtual Document applyProjection(Document input) const = 0;
+    virtual Document applyProjection(const Document& input) const = 0;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };

@@ -47,7 +47,7 @@ namespace document_path_support {
  * For example, 'callback' will be invoked on the values 1, 1, {a: 1}, 2 and 3 are on the path "x.y"
  * in the document {x: [{y: 1}, {y: 1}, {y: {a: 1}}, {y: [2, 3]}, 3, 4]}.
  */
-void visitAllValuesAtPath(Document doc,
+void visitAllValuesAtPath(const Document& doc,
                           const FieldPath& path,
                           stdx::function<void(const Value&)> callback);
 

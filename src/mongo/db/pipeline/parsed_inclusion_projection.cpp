@@ -103,7 +103,7 @@ void InclusionNode::addDependencies(DepsTracker* deps) const {
     }
 }
 
-void InclusionNode::applyInclusions(Document inputDoc, MutableDocument* outputDoc) const {
+void InclusionNode::applyInclusions(const Document& inputDoc, MutableDocument* outputDoc) const {
     auto it = inputDoc.fieldIterator();
     while (it.more()) {
         auto fieldPair = it.next();
@@ -141,7 +141,7 @@ Value InclusionNode::applyInclusionsToValue(Value inputValue) const {
     }
 }
 
-void InclusionNode::addComputedFields(MutableDocument* outputDoc, Document root) const {
+void InclusionNode::addComputedFields(MutableDocument* outputDoc, const Document& root) const {
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
@@ -155,7 +155,7 @@ void InclusionNode::addComputedFields(MutableDocument* outputDoc, Document root)
     }
 }
 
-Value InclusionNode::addComputedFields(Value inputValue, Document root) const {
+Value InclusionNode::addComputedFields(Value inputValue, const Document& root) const {
     if (inputValue.getType() == BSONType::Object) {
         MutableDocument outputDoc(inputValue.getDocument());
         addComputedFields(&outputDoc, root);
@@ -349,7 +349,7 @@ void ParsedInclusionProjection::parse(const BSONObj& spec) {
             atLeastOneFieldInOutput);
 }
 
-Document ParsedInclusionProjection::applyProjection(Document inputDoc) const {
+Document ParsedInclusionProjection::applyProjection(const Document& inputDoc) const {
     // All expressions will be evaluated in the context of the input document, before any
     // transformations have been applied.
     MutableDocument output;

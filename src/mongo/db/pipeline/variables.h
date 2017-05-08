@@ -81,13 +81,13 @@ public:
      * Gets the value of a user-defined or system variable. If the 'id' provided represents the
      * special ROOT variable, then we return 'root' in Value form.
      */
-    Value getValue(Variables::Id id, Document root) const;
+    Value getValue(Variables::Id id, const Document& root) const;
 
     /**
      * Returns Document() for non-document values, but otherwise identical to getValue(). If the
      * 'id' provided represents the special ROOT variable, then we return 'root'.
      */
-    Document getDocument(Variables::Id id, Document root) const;
+    Document getDocument(Variables::Id id, const Document& root) const;
 
     IdGenerator* useIdGenerator() {
         return &_idGenerator;

@@ -258,7 +258,8 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long lo
     return true;
 }
 
-void DocumentSourceGraphLookUp::addToCache(Document result, const ValueUnorderedSet& queried) {
+void DocumentSourceGraphLookUp::addToCache(const Document& result,
+                                           const ValueUnorderedSet& queried) {
     document_path_support::visitAllValuesAtPath(
         result, _connectToField, [this, &queried, &result](const Value& connectToValue) {
             // It is possible that 'connectToValue' is a single value, but was not queried for. For

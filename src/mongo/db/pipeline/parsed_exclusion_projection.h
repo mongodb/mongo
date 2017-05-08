@@ -64,7 +64,7 @@ public:
     /**
      * Applies this tree of exclusions to the input document.
      */
-    Document applyProjection(Document input) const;
+    Document applyProjection(const Document& input) const;
 
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted.
@@ -116,7 +116,7 @@ public:
     /**
      * Exclude the fields specified.
      */
-    Document applyProjection(Document inputDoc) const final;
+    Document applyProjection(const Document& inputDoc) const final;
 
     DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         return DocumentSource::SEE_NEXT;

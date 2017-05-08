@@ -110,7 +110,7 @@ public:
      * in the array "a". If there is an element in "a" that is not an object, it will be replaced
      * with {"0": "hello"}. See SERVER-25200 for more details.
      */
-    Document applyProjection(Document inputDoc) const final;
+    Document applyProjection(const Document& inputDoc) const final;
 
 private:
     /**

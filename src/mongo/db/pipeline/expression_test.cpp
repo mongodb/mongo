@@ -172,7 +172,7 @@ public:
 /** A dummy child of ExpressionNary used for testing. */
 class Testable : public ExpressionNary {
 public:
-    virtual Value evaluate(Document root) const {
+    virtual Value evaluate(const Document& root) const {
         // Just put all the values in a list.
         // By default, this is not associative/commutative so the results will change if
         // instantiated as commutative or associative and operations are reordered.

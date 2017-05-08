@@ -65,7 +65,7 @@ void ExclusionNode::excludePath(FieldPath path) {
     addOrGetChild(path.getFieldName(0))->excludePath(path.tail());
 }
 
-Document ExclusionNode::applyProjection(Document input) const {
+Document ExclusionNode::applyProjection(const Document& input) const {
     MutableDocument output(input);
     for (auto&& field : _excludedFields) {
         output.remove(field);
@@ -140,7 +140,7 @@ Document ParsedExclusionProjection::serialize(
     return _root->serialize();
 }
 
-Document ParsedExclusionProjection::applyProjection(Document inputDoc) const {
+Document ParsedExclusionProjection::applyProjection(const Document& inputDoc) const {
     return _root->applyProjection(inputDoc);
 }
 

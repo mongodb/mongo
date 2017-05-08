@@ -53,7 +53,7 @@ public:
     class TransformerInterface {
     public:
         virtual ~TransformerInterface() = default;
-        virtual Document applyTransformation(Document input) = 0;
+        virtual Document applyTransformation(const Document& input) = 0;
         virtual void optimize() = 0;
         virtual Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
         virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;

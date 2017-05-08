@@ -132,10 +132,10 @@ void visitAllValuesAtPathHelper(Document doc,
 
 }  // namespace
 
-void visitAllValuesAtPath(Document doc,
+void visitAllValuesAtPath(const Document& doc,
                           const FieldPath& path,
                           stdx::function<void(const Value&)> callback) {
-    visitAllValuesAtPathHelper(std::move(doc), path, 0, callback);
+    visitAllValuesAtPathHelper(doc, path, 0, callback);
 }
 
 }  // namespace document_path_support

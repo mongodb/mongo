@@ -83,12 +83,12 @@ public:
      * and an empty 'outputDoc' will leave 'outputDoc' representing the document
      *   {a: [{b: 1}, {b: 2}], d: [{}, {}]}.
      */
-    void applyInclusions(Document inputDoc, MutableDocument* outputDoc) const;
+    void applyInclusions(const Document& inputDoc, MutableDocument* outputDoc) const;
 
     /**
      * Add computed fields to 'outputDoc'.
      */
-    void addComputedFields(MutableDocument* outputDoc, Document root) const;
+    void addComputedFields(MutableDocument* outputDoc, const Document& root) const;
 
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted.
@@ -139,7 +139,7 @@ private:
     // Helpers for the Document versions above. These will apply the transformation recursively to
     // each element of any arrays, and ensure non-documents are handled appropriately.
     Value applyInclusionsToValue(Value inputVal) const;
-    Value addComputedFields(Value inputVal, Document root) const;
+    Value addComputedFields(Value inputVal, const Document& root) const;
 
     /**
      * Returns nullptr if no such child exists.
@@ -242,7 +242,7 @@ public:
      * Arrays will be traversed, with any dotted/nested exclusions or computed fields applied to
      * each element in the array.
      */
-    Document applyProjection(Document inputDoc) const final;
+    Document applyProjection(const Document& inputDoc) const final;
 
 private:
     /**
