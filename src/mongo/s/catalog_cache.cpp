@@ -40,9 +40,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -156,6 +154,9 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
 }  // namespace
 
 CatalogCache::CatalogCache() : _cacheLoader(stdx::make_unique<ConfigServerCatalogCacheLoader>()) {}
+
+CatalogCache::CatalogCache(std::unique_ptr<CatalogCacheLoader> cacheLoader)
+    : _cacheLoader(std::move(cacheLoader)) {}
 
 CatalogCache::~CatalogCache() = default;
 

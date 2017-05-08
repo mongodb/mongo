@@ -248,8 +248,14 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     checkChunks(kChunkMetadataNss, chunks);
 
     // read all the chunks
-    std::vector<ChunkType> readChunks = assertGet(readShardChunks(
-        operationContext(), kNss, ChunkVersion(0, 0, getCollectionVersion().epoch())));
+    QueryAndSort allChunkDiff =
+        createShardChunkDiffQuery(ChunkVersion(0, 0, getCollectionVersion().epoch()));
+    std::vector<ChunkType> readChunks = assertGet(readShardChunks(operationContext(),
+                                                                  kNss,
+                                                                  allChunkDiff.query,
+                                                                  allChunkDiff.sort,
+                                                                  boost::none,
+                                                                  getCollectionVersion().epoch()));
     for (auto chunkIt = chunks.begin(), readChunkIt = readChunks.begin();
          chunkIt != chunks.end() && readChunkIt != readChunks.end();
          ++chunkIt, ++readChunkIt) {
@@ -257,29 +263,32 @@ TEST_F(ShardMetadataUtilTest, WriteAndReadChunks) {
     }
 
     // read only the highest version chunk
-    readChunks = assertGet(readShardChunks(operationContext(), kNss, getCollectionVersion()));
+    QueryAndSort oneChunkDiff = createShardChunkDiffQuery(getCollectionVersion());
+    readChunks = assertGet(readShardChunks(operationContext(),
+                                           kNss,
+                                           oneChunkDiff.query,
+                                           oneChunkDiff.sort,
+                                           boost::none,
+                                           getCollectionVersion().epoch()));
 
     ASSERT_TRUE(readChunks.size() == 1);
     ASSERT_BSONOBJ_EQ(chunks.back().toShardBSON(), readChunks.front().toShardBSON());
 }
 
-TEST_F(ShardMetadataUtilTest, UpdatingChunksFindsNewEpochAndClearsMetadata) {
-    // Set up a collections document so we can make sure it's deleted correctly.
-    setUpCollection();
-
+TEST_F(ShardMetadataUtilTest, UpdatingChunksFindsNewEpoch) {
     std::vector<ChunkType> chunks = makeFourChunks();
     ASSERT_OK(updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()));
     checkChunks(kChunkMetadataNss, chunks);
 
+    ChunkVersion originalChunkVersion = chunks.back().getVersion();
     chunks.back().setVersion(ChunkVersion(1, 0, OID::gen()));
     ASSERT_EQUALS(
         updateShardChunks(operationContext(), kNss, chunks, getCollectionVersion().epoch()).code(),
         ErrorCodes::ConflictingOperationInProgress);
 
-    // Finding a new epoch should have caused the metadata to be cleared for that namespace.
-    checkCollectionIsEmpty(kChunkMetadataNss);
-    // Collections collection should be empty because it only had one entry.
-    checkCollectionIsEmpty(NamespaceString(ShardCollectionType::ConfigNS));
+    // Check that the chunk with a different epoch did not get written.
+    chunks.back().setVersion(std::move(originalChunkVersion));
+    checkChunks(kChunkMetadataNss, chunks);
 }
 
 TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {

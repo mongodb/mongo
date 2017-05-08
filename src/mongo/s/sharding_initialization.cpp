@@ -160,6 +160,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      const ConnectionString& configCS,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
+                                     std::unique_ptr<CatalogCache> catalogCache,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder) {
     if (configCS.type() == ConnectionString::INVALID) {
@@ -202,7 +203,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     grid.init(
         std::move(catalogClient),
         std::move(catalogManager),
-        stdx::make_unique<CatalogCache>(),
+        std::move(catalogCache),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
         stdx::make_unique<BalancerConfiguration>(),

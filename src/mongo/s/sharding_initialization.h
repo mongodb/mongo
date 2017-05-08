@@ -41,12 +41,14 @@ namespace executor {
 class TaskExecutor;
 }  // namespace executor
 
+class CatalogCache;
 class ConnectionString;
 class OperationContext;
 class ShardFactory;
 class Status;
 class ShardingCatalogClient;
 class ShardingCatalogManager;
+
 using ShardingCatalogManagerBuilder = stdx::function<std::unique_ptr<ShardingCatalogManager>(
     ShardingCatalogClient*, std::unique_ptr<executor::TaskExecutor>)>;
 
@@ -73,6 +75,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      const ConnectionString& configCS,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
+                                     std::unique_ptr<CatalogCache> catalogCache,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder);
 

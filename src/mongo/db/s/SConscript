@@ -5,17 +5,16 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='metadata',
+    target='collection_metadata',
     source=[
         'collection_metadata.cpp',
     ],
     LIBDEPS=[
-        'shard_metadata_util',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/range_arithmetic',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/s/common',
     ],
 )
 
@@ -85,6 +84,7 @@ env.Library(
         'move_timing_helper.cpp',
         'operation_sharding_state.cpp',
         'shard_identity_rollback_notifier.cpp',
+        'shard_server_catalog_cache_loader.cpp',
         'sharded_connection_info.cpp',
         'sharding_egress_metadata_hook_for_mongod.cpp',
         'sharding_initialization_mongod.cpp',
@@ -106,8 +106,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
-        'metadata',
+        'collection_metadata',
         'migration_types',
+        'shard_metadata_util',
         'sharding_task_executor',
         'type_shard_identity',
         #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
@@ -198,7 +199,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         'balancer',
-        'metadata',
+        'collection_metadata',
         'sharding',
     ],
 )
@@ -227,7 +228,6 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='shard_test',
     source=[
-        'shard_metadata_util_test.cpp',
         'active_migrations_registry_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'sharding_state_test.cpp',
@@ -265,3 +265,13 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='shard_metadata_util_test',
+    source=[
+        'shard_metadata_util_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
+        'shard_metadata_util',
+    ],
+)

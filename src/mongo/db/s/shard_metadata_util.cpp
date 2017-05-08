@@ -50,35 +50,13 @@ const WriteConcernOptions kLocalWriteConcern(1,
                                              WriteConcernOptions::SyncMode::UNSET,
                                              Milliseconds(0));
 
-/**
- * Structure representing the generated query and sort order for a chunk diffing operation.
- */
-struct QueryAndSort {
-    const BSONObj query;
-    const BSONObj sort;
-};
+}  // namespace
 
-/**
- * Returns the query needed to find incremental changes to the chunks collection on a shard server.
- *
- * The query has to find all the chunks $gte the current max version. Currently, any splits, merges
- * and moves will increment the current max version. Querying by lastmod is essential because we
- * want to use the {lastmod} index on the chunks collection. This makes potential cursor yields to
- * apply split/merge/move updates safe: updates always move or insert documents at the end of the
- * index (because the document updates always have higher lastmod), so changed always come *after*
- * our current cursor position and are seen when the cursor recommences.
- *
- * The sort must be by ascending version so that the updates can be applied in-memory in order. This
- * is important because it is possible for a cursor to read updates to the same _id document twice,
- * due to the yield described above. If updates are applied in ascending version order, the later
- * update is applied last and remains.
- */
 QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion) {
-    return {BSON(ChunkType::DEPRECATED_lastmod() << GTE << Timestamp(collectionVersion.toLong())),
+    return {BSON(ChunkType::DEPRECATED_lastmod()
+                 << BSON("$gte" << Timestamp(collectionVersion.toLong()))),
             BSON(ChunkType::DEPRECATED_lastmod() << 1)};
 }
-
-}  // namespace
 
 bool RefreshState::operator==(RefreshState& other) {
     return (other.epoch == epoch) && (other.refreshing == refreshing) &&
@@ -123,8 +101,9 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
+
     Query fullQuery(BSON(ShardCollectionType::uuid() << nss.ns()));
-    fullQuery.readPref(ReadPreference::SecondaryOnly, BSONArray());
+
     try {
         DBDirectClient client(opCtx);
         std::unique_ptr<DBClientCursor> cursor =
@@ -214,18 +193,20 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
 
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const ChunkVersion& collectionVersion) {
+                                                   const BSONObj& query,
+                                                   const BSONObj& sort,
+                                                   boost::optional<long long> limit,
+                                                   const OID& epoch) {
     // Query to retrieve the chunks.
-    QueryAndSort diffQuery = createShardChunkDiffQuery(collectionVersion);
-    Query fullQuery(diffQuery.query);
-    fullQuery.sort(diffQuery.sort);
-    fullQuery.readPref(ReadPreference::SecondaryOnly, BSONArray());
+    Query fullQuery(query);
+    fullQuery.sort(sort);
 
     try {
         DBDirectClient client(opCtx);
 
         std::string chunkMetadataNs = ChunkType::ShardNSPrefix + nss.ns();
-        std::unique_ptr<DBClientCursor> cursor = client.query(chunkMetadataNs, fullQuery, 0LL);
+        std::unique_ptr<DBClientCursor> cursor =
+            client.query(chunkMetadataNs, fullQuery, limit.get_value_or(0));
 
         if (!cursor) {
             return {ErrorCodes::OperationFailed,
@@ -236,7 +217,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
         std::vector<ChunkType> chunks;
         while (cursor->more()) {
             BSONObj document = cursor->nextSafe().getOwned();
-            auto statusWithChunk = ChunkType::fromShardBSON(document, collectionVersion.epoch());
+            auto statusWithChunk = ChunkType::fromShardBSON(document, epoch);
             if (!statusWithChunk.isOK()) {
                 return {statusWithChunk.getStatus().code(),
                         str::stream() << "Failed to parse chunk '" << document.toString()
@@ -288,13 +269,6 @@ Status updateShardChunks(OperationContext* opCtx,
         for (auto& chunk : chunks) {
             // Check for a different epoch.
             if (!chunk.getVersion().hasEqualEpoch(currEpoch)) {
-                // This means the collection was dropped and recreated. Drop the chunk metadata
-                // and return.
-                Status status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-                if (!status.isOK()) {
-                    return status;
-                }
-
                 return Status{ErrorCodes::ConflictingOperationInProgress,
                               str::stream() << "Invalid chunks found when reloading '"
                                             << nss.toString()

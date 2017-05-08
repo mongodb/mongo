@@ -863,7 +863,7 @@ env.Library(
         "run_commands",
         "rw_concern_d",
         "s/commands",
-        "s/metadata",
+        "s/collection_metadata",
         "s/sharding",
         "service_context_d",
         "startup_warnings_mongod",

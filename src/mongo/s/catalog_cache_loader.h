@@ -68,7 +68,7 @@ public:
 
     /**
      * Non-blocking call, which requests the chunks changed since the specified version to be
-     * fetched from the persistent matadata store and invokes the callback function with the result.
+     * fetched from the persistent metadata store and invokes the callback function with the result.
      * The callback function must never throw - it is a fatal error to do so.
      *
      * If for some reason the asynchronous fetch operation cannot be dispatched (for example on

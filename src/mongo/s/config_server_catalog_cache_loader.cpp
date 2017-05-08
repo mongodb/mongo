@@ -47,7 +47,7 @@ namespace {
  */
 ThreadPool::Options makeDefaultThreadPoolOptions() {
     ThreadPool::Options options;
-    options.poolName = "CatalogCacheLoader";
+    options.poolName = "ConfigServerCatalogCacheLoader";
     options.minThreads = 0;
     options.maxThreads = 6;
 

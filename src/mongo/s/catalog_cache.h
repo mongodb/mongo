@@ -34,6 +34,8 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/string_map.h"
@@ -55,7 +57,13 @@ class CatalogCache {
     MONGO_DISALLOW_COPYING(CatalogCache);
 
 public:
+    /**
+     * Defaults to instantiating a ConfigServerCatalogCacheLoader.
+     */
     CatalogCache();
+
+    CatalogCache(std::unique_ptr<CatalogCacheLoader> cacheLoader);
+
     ~CatalogCache();
 
     /**

@@ -79,6 +79,13 @@ public:
     static const BSONField<bool> refreshing;
     static const BSONField<long long> refreshSequenceNumber;
 
+    explicit ShardCollectionType(const NamespaceString& uuid,
+                                 const NamespaceString& nss,
+                                 const OID& epoch,
+                                 const KeyPattern& keyPattern,
+                                 const BSONObj& defaultCollation,
+                                 const bool& unique);
+
     /**
      * Constructs a new ShardCollectionType object from BSON. Also does validation of the contents.
      */
@@ -145,13 +152,6 @@ public:
     }
 
 private:
-    ShardCollectionType(const NamespaceString& uuid,
-                        const NamespaceString& nss,
-                        const OID& epoch,
-                        const KeyPattern& keyPattern,
-                        const BSONObj& defaultCollation,
-                        const bool& unique);
-
     // Will become the UUID when available. Currently a duplicate of '_nss'.
     NamespaceString _uuid;
 

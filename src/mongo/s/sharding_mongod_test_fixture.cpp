@@ -65,6 +65,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_registry.h"
@@ -235,7 +236,12 @@ std::unique_ptr<ShardingCatalogManager> ShardingMongodTestFixture::makeShardingC
     return nullptr;
 }
 
-std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache() {
+std::unique_ptr<CatalogCacheLoader> ShardingMongodTestFixture::makeCatalogCacheLoader() {
+    return nullptr;
+}
+
+std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache(
+    std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
     return nullptr;
 }
 
@@ -269,7 +275,9 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     auto catalogClientPtr = makeShardingCatalogClient(std::move(distLockManagerPtr));
     auto catalogManagerPtr = makeShardingCatalogManager(catalogClientPtr.get());
-    auto catalogCachePtr = makeCatalogCache();
+
+    auto catalogCacheLoaderPtr = makeCatalogCacheLoader();
+    auto catalogCachePtr = makeCatalogCache(std::move(catalogCacheLoaderPtr));
 
     auto clusterCursorManagerPtr = makeClusterCursorManager();
 

@@ -132,7 +132,10 @@ protected:
     std::unique_ptr<ShardingCatalogManager> makeShardingCatalogManager(
         ShardingCatalogClient* catalogClient) override;
 
-    std::unique_ptr<CatalogCache> makeCatalogCache() override;
+    std::unique_ptr<CatalogCacheLoader> makeCatalogCacheLoader() override;
+
+    std::unique_ptr<CatalogCache> makeCatalogCache(
+        std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) override;
 
     std::unique_ptr<ClusterCursorManager> makeClusterCursorManager() override;
 

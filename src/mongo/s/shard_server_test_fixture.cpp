@@ -33,9 +33,11 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -104,6 +106,17 @@ std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatal
     std::unique_ptr<DistLockManager> distLockManager) {
     invariant(distLockManager);
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+}
+
+std::unique_ptr<CatalogCacheLoader> ShardServerTestFixture::makeCatalogCacheLoader() {
+    return stdx::make_unique<ShardServerCatalogCacheLoader>(
+        stdx::make_unique<ConfigServerCatalogCacheLoader>());
+}
+
+std::unique_ptr<CatalogCache> ShardServerTestFixture::makeCatalogCache(
+    std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
+    invariant(catalogCacheLoader);
+    return stdx::make_unique<CatalogCache>(std::move(catalogCacheLoader));
 }
 
 }  // namespace mongo

@@ -40,6 +40,7 @@ namespace mongo {
 
 class BalancerConfiguration;
 class CatalogCache;
+class CatalogCacheLoader;
 class ConnectionString;
 class ClusterCursorManager;
 class DistLockCatalog;
@@ -229,7 +230,13 @@ protected:
     /**
      * Base class returns nullptr.
      */
-    virtual std::unique_ptr<CatalogCache> makeCatalogCache();
+    virtual std::unique_ptr<CatalogCacheLoader> makeCatalogCacheLoader();
+
+    /**
+     * Base class returns nullptr.
+     */
+    virtual std::unique_ptr<CatalogCache> makeCatalogCache(
+        std::unique_ptr<CatalogCacheLoader> catalogCacheLoader);
 
     /**
      * Base class returns nullptr.

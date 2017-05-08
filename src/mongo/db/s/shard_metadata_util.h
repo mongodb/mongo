@@ -32,11 +32,11 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 
 namespace mongo {
 
-class BSONObj;
 struct ChunkVersion;
 class ChunkType;
 class CollectionMetadata;
@@ -52,6 +52,14 @@ class StatusWith;
 namespace shardmetadatautil {
 
 /**
+ * Structure representing the generated query and sort order for a chunk diffing operation.
+ */
+struct QueryAndSort {
+    const BSONObj query;
+    const BSONObj sort;
+};
+
+/**
  * Subset of the shard's collections collection related to refresh state.
  */
 struct RefreshState {
@@ -61,6 +69,23 @@ struct RefreshState {
     bool refreshing;
     long long sequenceNumber;
 };
+
+/**
+ * Returns the query needed to find incremental changes to the chunks collection on a shard server.
+ *
+ * The query has to find all the chunks $gte the current max version. Currently, any splits, merges
+ * and moves will increment the current max version. Querying by lastmod is essential because we
+ * want to use the {lastmod} index on the chunks collection. This makes potential cursor yields to
+ * apply split/merge/move updates safe: updates always move or insert documents at the end of the
+ * index (because the document updates always have higher lastmod), so changed always come *after*
+ * our current cursor position and are seen when the cursor recommences.
+ *
+ * The sort must be by ascending version so that the updates can be applied in-memory in order. This
+ * is important because it is possible for a cursor to read updates to the same _id document twice,
+ * due to the yield described above. If updates are applied in ascending version order, the newer
+ * update is applied last.
+ */
+QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion);
 
 /**
  * Writes a persisted signal to indicate that the chunks collection is being updated. It is
@@ -118,18 +143,22 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const bool upsert);
 
 /**
- * Reads the shard server's chunks collection corresponding to 'nss' for chunks with lastmod $gte
- * 'collectionVersion'.
+ * Reads the shard server's chunks collection corresponding to 'nss' for chunks matching 'query',
+ * returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks' version
+ * fields, because we do not yet have UUIDs to replace epoches nor UUIDs associated with namespaces.
  */
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const ChunkVersion& collectionVersion);
+                                                   const BSONObj& query,
+                                                   const BSONObj& sort,
+                                                   boost::optional<long long> limit,
+                                                   const OID& epoch);
 
 /**
  * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss'. Any chunk
  * documents in config.chunks.ns that overlap with a chunk in 'chunks' is removed as the updated
- * chunk document is inserted. If the epoch of any chunk in 'chunks' does not match 'currEpoch',
- * the chunk metadata is dropped and a ConflictingOperationInProgress error is returned.
+ * chunk document is inserted. If the epoch of a chunk in 'chunks' does not match 'currEpoch',
+ * a ConflictingOperationInProgress error is returned and no more updates are applied.
  *
  * Note: two threads running this function in parallel for the same collection can corrupt the
  * collection data!

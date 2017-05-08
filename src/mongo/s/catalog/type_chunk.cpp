@@ -343,10 +343,6 @@ std::string ChunkType::genID(StringData ns, const BSONObj& o) {
 }
 
 Status ChunkType::validate() const {
-    if (!_ns.is_initialized() || _ns->empty()) {
-        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << ns.name() << " field");
-    }
-
     if (!_min.is_initialized() || _min->isEmpty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << min.name() << " field");
     }

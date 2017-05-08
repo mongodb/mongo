@@ -255,7 +255,7 @@ public:
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
-    // (M)(C)     collection this chunk is in
+    // (O)(C)     collection this chunk is in
     boost::optional<std::string> _ns;
     // (M)(C)(S)  first key of the range, inclusive
     boost::optional<BSONObj> _min;

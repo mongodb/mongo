@@ -67,6 +67,7 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
@@ -203,6 +204,7 @@ static Status initializeSharding(OperationContext* opCtx) {
         mongosGlobalParams.configdbs,
         generateDistLockProcessId(opCtx),
         std::move(shardFactory),
+        stdx::make_unique<CatalogCache>(),
         [opCtx]() {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
