@@ -379,6 +379,8 @@ def main():
         tests_by_task = _load_tests_file(values.test_list_file)
         # If there are no tests to run, carry on.
         if tests_by_task is None:
+            test_results = {"failures": 0, "results": []}
+            _write_report_file(test_results, values.report_file)
             sys.exit(0)
 
     # Run the executor finder.
@@ -399,6 +401,7 @@ def main():
         # If there are no changed tests, exit cleanly.
         if not changed_tests:
             print "No new or modified tests found."
+            _write_report_file({}, values.test_list_outfile)
             sys.exit(0)
         suites = resmokelib.parser.get_suites(values, changed_tests)
         tests_by_executor = create_executor_list(suites, exclude_suites)
