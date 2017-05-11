@@ -87,6 +87,7 @@
 "replSetHeartbeat",
 "replSetReconfig",  # Not used for permissions checks, but to id the event in logs.
 "replSetStateChange",
+"resizeOplog",
 "resync",
 "revokeRole",
 "revokePrivilegesFromRole",  # Not used for permissions checks, but to id the event in logs.

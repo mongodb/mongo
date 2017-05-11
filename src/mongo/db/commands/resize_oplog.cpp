@@ -62,16 +62,32 @@ using std::stringstream;
 
 class CmdResizeOplog : public Command {
 public:
-    virtual bool slaveOk() const {
+    CmdResizeOplog() : Command("resizeOplog") {}
+
+    virtual bool slaveOk() const final {
         return true;
     }
+
+    bool adminOnly() const final {
+        return true;
+    }
+
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     virtual void help(stringstream& help) const {
         help << "resize oplog size";
     }
-    CmdResizeOplog() : Command("resizeOplog") {}
+
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::resizeOplog);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+
     bool run(OperationContext* opCtx,
             const string& dbname,
             BSONObj& jsobj,
@@ -83,10 +99,10 @@ public:
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection("local.oplog.rs") : nullptr;
         if (!coll) {
-            return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotFound, "ns does not exist"));
+            return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotFound, "oplog does not exist"));
         }
         if (!coll->isCapped()) {
-            return appendCommandStatus(result, Status(ErrorCodes::InternalError, "ns does not exist"));
+            return appendCommandStatus(result, Status(ErrorCodes::IllegalOperation, "oplog isn't capped"));
         }
         if (!jsobj["size"].isNumber()) {
             return appendCommandStatus(result, Status(ErrorCodes::InvalidOptions, "invalid size field, size should be a number"));
@@ -104,7 +120,7 @@ public:
         CollectionCatalogEntry* entry = coll->getCatalogEntry();
         entry->updateCappedSize(opCtx, size);
         wunit.commit();
-        LOG(1) << "resizeOplog success, currentSize:" << size;
+        LOG(0) << "resizeOplog success, currentSize:" << size;
         return appendCommandStatus(result, Status::OK());
     }
 } cmdResizeOplog;
