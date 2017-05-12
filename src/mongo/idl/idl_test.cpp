@@ -100,6 +100,13 @@ void TestLoopback(TestT test_value) {
         ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
     }
 
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        auto loopbackDoc = testStruct.toBSON();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
     // Positive: Test we can serialize from nothing the same document
     {
         BSONObjBuilder builder;

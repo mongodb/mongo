@@ -248,6 +248,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'static %s parse(const IDLParserErrorContext& ctxt, const BSONObj& object);' %
             (common.title_case(class_name)))
         self._writer.write_line('void serialize(BSONObjBuilder* builder) const;')
+        self._writer.write_line('BSONObj toBSON() const;')
         self._writer.write_empty_line()
 
     def gen_protected_serializer_methods(self):
@@ -767,6 +768,20 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # Add a blank line after each block
                 self._writer.write_empty_line()
 
+    def gen_to_bson_serializer_method(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the toBSON method definition."""
+        self._writer.write_line(
+            common.template_args(
+                """\
+            BSONObj ${class_name}::toBSON() const {
+                BSONObjBuilder builder;
+                serialize(&builder);
+                return builder.obj();
+            }
+            """,
+                class_name=common.title_case(struct.name)))
+
     def gen_string_constants_definitions(self, struct):
         # type: (ast.Struct) -> None
         # pylint: disable=invalid-name
@@ -830,6 +845,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 # Write serializer
                 self.gen_serializer_method(struct)
+                self.write_empty_line()
+
+                # Write toBSON
+                self.gen_to_bson_serializer_method(struct)
                 self.write_empty_line()
 
 
