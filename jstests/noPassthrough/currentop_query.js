@@ -72,6 +72,9 @@
 
                     if (result.inprog.length === 1) {
                         assert.eq(result.inprog[0].appName, "MongoDB Shell", tojson(result));
+                        assert.eq(result.inprog[0].clientMetadata.application.name,
+                                  "MongoDB Shell",
+                                  tojson(result));
 
                         return true;
                     }

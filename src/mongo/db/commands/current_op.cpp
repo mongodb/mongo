@@ -150,6 +150,9 @@ public:
                 if (!appName.empty()) {
                     infoBuilder.append("appName", appName);
                 }
+
+                auto clientMetadataDocument = clientMetadata.get().getDocument();
+                infoBuilder.append("clientMetadata", clientMetadataDocument);
             }
 
             // Operation context specific information
