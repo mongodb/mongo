@@ -102,9 +102,10 @@ else
 	fi
 
 	# If we don't have matching pack-begin and pack-end calls, we don't get
-	# an error, we just get a Windows performance regression.
+	# an error, we just get a Windows performance regression. Using awk and
+	# not wc to ensure there's no whitespace in the assignment.
 	egrep WT_PACKED_STRUCT $f > $t
-	cnt=`wc -l < $t`
+	cnt=`awk 'BEGIN { line = 0 } { ++line } END { print line }' < $t`
 	test `expr "$cnt" % 2` -ne 0 && {
 		echo "$f: mismatched WT_PACKED_STRUCT_BEGIN/END lines"
 		cat $t
