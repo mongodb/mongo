@@ -212,7 +212,14 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
             // Wait on the notification outside of the mutex
             ul.unlock();
 
-            auto refreshStatus = refreshNotification->get(opCtx);
+            auto refreshStatus = [&]() {
+                try {
+                    return refreshNotification->get(opCtx);
+                } catch (const DBException& ex) {
+                    return ex.toStatus();
+                }
+            }();
+
             if (!refreshStatus.isOK()) {
                 return refreshStatus;
             }
