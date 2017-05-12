@@ -118,6 +118,26 @@ def _generic_parser(
                                   (rule_desc.node_type))
 
 
+def _parse_mapping(
+        ctxt,  # type: errors.ParserContext
+        spec,  # type: syntax.IDLSpec
+        node,  # type: Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]
+        syntax_node_name,  # type: unicode
+        func # type: Callable[[errors.ParserContext,syntax.IDLSpec,unicode,Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]], None]
+):
+    """Parse a top-level mapping section in the IDL file."""
+    if not ctxt.is_mapping_node(node, syntax_node_name):
+        return
+
+    for node_pair in node.value:
+        first_node = node_pair[0]
+        second_node = node_pair[1]
+
+        first_name = first_node.value
+
+        func(ctxt, spec, first_name, second_node)
+
+
 def _parse_global(ctxt, spec, node):
     # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a global section in the IDL file."""
@@ -173,21 +193,6 @@ def _parse_type(ctxt, spec, name, node):
     })
 
     spec.symbols.add_type(ctxt, idltype)
-
-
-def _parse_types(ctxt, spec, node):
-    # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
-    """Parse a types section in the IDL file."""
-    if not ctxt.is_mapping_node(node, "types"):
-        return
-
-    for node_pair in node.value:
-        first_node = node_pair[0]
-        second_node = node_pair[1]
-
-        first_name = first_node.value
-
-        _parse_type(ctxt, spec, first_name, second_node)
 
 
 def _parse_field(ctxt, name, node):
@@ -265,21 +270,6 @@ def _parse_struct(ctxt, spec, name, node):
     spec.symbols.add_struct(ctxt, struct)
 
 
-def _parse_structs(ctxt, spec, node):
-    # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
-    """Parse a structs section in the IDL file."""
-    if not ctxt.is_mapping_node(node, "structs"):
-        return
-
-    for node_pair in node.value:
-        first_node = node_pair[0]
-        second_node = node_pair[1]
-
-        first_name = first_node.value
-
-        _parse_struct(ctxt, spec, first_name, second_node)
-
-
 def _parse(stream, error_file_name):
     # type: (Any, unicode) -> syntax.IDLParsedSpec
     """
@@ -322,9 +312,9 @@ def _parse(stream, error_file_name):
         elif first_name == "imports":
             _parse_imports(ctxt, spec, second_node)
         elif first_name == "types":
-            _parse_types(ctxt, spec, second_node)
+            _parse_mapping(ctxt, spec, second_node, 'types', _parse_type)
         elif first_name == "structs":
-            _parse_structs(ctxt, spec, second_node)
+            _parse_mapping(ctxt, spec, second_node, 'structs', _parse_struct)
         else:
             ctxt.add_unknown_root_node_error(first_node)
 
