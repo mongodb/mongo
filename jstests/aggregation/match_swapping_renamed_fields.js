@@ -26,6 +26,13 @@
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "IXSCAN"));
 
+    // Test that a $match with $type can result in index usage after moving past a field renamed by
+    // $project.
+    pipeline = [{$project: {_id: 0, z: "$a", c: 1}}, {$match: {z: {$type: "number"}}}];
+    assert.eq(3, coll.aggregate(pipeline).itcount());
+    explain = coll.explain().aggregate(pipeline);
+    assert.neq(null, getAggPlanStage(explain, "IXSCAN"));
+
     // Test that a partially dependent match can split, with a rename applied, resulting in index
     // usage.
     pipeline =

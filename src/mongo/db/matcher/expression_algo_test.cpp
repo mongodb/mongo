@@ -1064,7 +1064,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchValueAcrossRename) {
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$elemMatch: {$eq: 3}}}"));
 }
 
-TEST(SplitMatchExpression, ShouldNotMoveTypeAcrossRename) {
+TEST(SplitMatchExpression, ShouldMoveTypeAcrossRename) {
     BSONObj matchPredicate = fromjson("{a: {$type: 16}}");
     const CollatorInterface* collator = nullptr;
     auto matcher = MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
@@ -1074,12 +1074,12 @@ TEST(SplitMatchExpression, ShouldNotMoveTypeAcrossRename) {
     std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
         expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
 
-    ASSERT_FALSE(splitExpr.first.get());
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{c: {$type: 16}}"));
 
-    ASSERT_TRUE(splitExpr.second.get());
-    BSONObjBuilder secondBob;
-    splitExpr.second->serialize(&secondBob);
-    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$type: 16}}"));
+    ASSERT_FALSE(splitExpr.second.get());
 }
 
 TEST(SplitMatchExpression, ShouldNotMoveSizeAcrossRename) {

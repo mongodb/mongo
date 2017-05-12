@@ -275,7 +275,7 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
 }
 
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
-    if (expr->isArray() || expr->matchType() == MatchExpression::TYPE_OPERATOR) {
+    if (expr->isArray()) {
         return;
     }
 
@@ -419,8 +419,8 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
         return true;
     }
 
-    // Certain kinds of match expressions are never considered independent.
-    if (expr.isArray() || expr.matchType() == MatchExpression::TYPE_OPERATOR) {
+    // Array match expressions are never considered independent.
+    if (expr.isArray()) {
         return false;
     }
 

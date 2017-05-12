@@ -837,6 +837,12 @@ TEST(PipelineOptimizationTest, MatchCannotMoveAcrossProjectRenameOfDottedPath) {
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
 
+TEST(PipelineOptimizationTest, MatchWithTypeShouldMoveAcrossRename) {
+    string inputPipe = "[{$addFields: {a: '$b'}}, {$match: {a: {$type: 4}}}]";
+    string outputPipe = "[{$match: {b: {$type: 4}}}, {$addFields: {a: '$b'}}]";
+    assertPipelineOptimizesTo(inputPipe, outputPipe);
+}
+
 }  // namespace Local
 
 namespace Sharded {
