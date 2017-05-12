@@ -196,11 +196,16 @@ var bindataConstructors = {
 
 var uuidConstructors = {
     "valid": [
-        'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+        'UUID("0123456789abcdef0123456789ABCDEF")',
+        'UUID("0a1A2b3B-4c5C-6d7D-8e9E-AfBFC0D1E3F4")',
+        'UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")',
+        'UUID()',
+        UUID().toString(),
     ],
     "invalid": [
         'UUID("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0)',
-        'UUID()',
+        'UUID("aaaaaaaa-aaaa-aaaa-aaaaaaaa-aaaaaaaa")',
+        'UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaa-aaaaaaa")',
         'UUID("aa")',
         'UUID("invalidhex")',
         'UUID("invalidhexbutstilltherequiredlen")',

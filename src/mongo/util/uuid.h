@@ -87,6 +87,13 @@ public:
      */
     static UUID parse(const BSONObj& obj);
 
+    static UUID fromCDR(ConstDataRange cdr) {
+        UUID uuid;
+        invariant(cdr.length() == uuid._uuid.size());
+        memcpy(uuid._uuid.data(), cdr.data(), uuid._uuid.size());
+        return uuid;
+    }
+
     /**
      * Returns whether this string represents a valid UUID.
      */

@@ -60,7 +60,7 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
 
 StatusWith<UUID> UUID::parse(const std::string& s) {
     if (!isUUIDString(s)) {
-        return {ErrorCodes::InvalidUUID, "Invalid uuid string"};
+        return {ErrorCodes::InvalidUUID, "Invalid UUID string: " + s};
     }
 
     UUIDStorage uuid;

@@ -141,7 +141,14 @@ TEST(UUIDTest, toAndFromString) {
     ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse("samsamsa-sams-4sam-8sam-samsamsamsam"));
 }
 
-TEST(UUIDTest, toAndFromBSONTest) {
+TEST(UUIDTest, toAndFromCDR) {
+    UUID uuid = UUID::gen();
+    ConstDataRange cdr = uuid.toCDR();
+    UUID roundtripped = UUID::fromCDR(cdr);
+    ASSERT_EQUALS(roundtripped, uuid);
+}
+
+TEST(UUIDTest, toAndFromBSON) {
     // UUID -> BSON -> UUID
     UUID uuid = UUID::gen();
     auto uuidBSON = uuid.toBSON();
@@ -170,7 +177,7 @@ TEST(UUIDTest, toAndFromBSONTest) {
     ASSERT_EQUALS(ErrorCodes::InvalidUUID, UUID::parse(bson4.getField("uuid")));
 }
 
-TEST(UUIDTest, toBSONUsingBSONMacroTest) {
+TEST(UUIDTest, toBSONUsingBSONMacro) {
     auto uuid = UUID::gen();
     auto bson = BSON("myuuid" << uuid);
 

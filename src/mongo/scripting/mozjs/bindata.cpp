@@ -33,6 +33,7 @@
 #include <cctype>
 #include <iomanip>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -42,6 +43,7 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace mozjs {
@@ -114,16 +116,30 @@ void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
 }
 
 void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
-    if (args.length() != 1)
-        uasserted(ErrorCodes::BadValue, "UUID needs 1 argument");
+    boost::optional<mongo::UUID> uuid;
 
-    auto arg = args.get(0);
-    auto str = ValueWriter(cx, arg).toString();
+    if (args.length() == 0) {
+        uuid = mongo::UUID::gen();
+    } else {
+        uassert(ErrorCodes::BadValue, "UUID needs 0 or 1 arguments", args.length() == 1);
+        auto arg = args.get(0);
+        std::string str = ValueWriter(cx, arg).toString();
 
-    if (str.length() != 32)
-        uasserted(ErrorCodes::BadValue, "UUID string must have 32 characters");
+        // For backward compatibility quietly accept and convert 32-character hex strings to
+        // BinData(3, ...) as used for the deprecated UUID v3 BSON type.
+        if (str.length() == 32) {
+            hexToBinData(cx, bdtUUID, arg, args.rval());
+            return;
+        }
+        uuid = uassertStatusOK(mongo::UUID::parse(str));
+    };
+    ConstDataRange cdr = uuid->toCDR();
+    std::string encoded = mongo::base64::encode(cdr.data(), cdr.length());
 
-    hexToBinData(cx, bdtUUID, arg, args.rval());
+    JS::AutoValueArray<2> newArgs(cx);
+    newArgs[0].setInt32(newUUID);
+    ValueReader(cx, newArgs[1]).fromStringData(encoded);
+    getScope(cx)->getProto<BinDataInfo>().newInstance(newArgs, args.rval());
 }
 
 void BinDataInfo::Functions::MD5::call(JSContext* cx, JS::CallArgs args) {
@@ -158,9 +174,21 @@ void BinDataInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     auto str = getEncoded(args.thisv());
 
     str::stream ss;
+    auto binType = o.getNumber(InternedString::type);
 
-    ss << "BinData(" << o.getNumber(InternedString::type) << ",\"" << *str << "\")";
+    if (binType == newUUID) {
+        auto decoded = mongo::base64::decode(*str);
 
+        // If this is in fact a UUID, use a more friendly string representation.
+        if (decoded.length() == mongo::UUID::kNumBytes) {
+            mongo::UUID uuid = mongo::UUID::fromCDR({decoded.data(), decoded.length()});
+            ss << "UUID(\"" << uuid.toString() << "\")";
+            ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
+            return;
+        }
+    }
+
+    ss << "BinData(" << binType << ",\"" << *str << "\")";
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
 }
 
