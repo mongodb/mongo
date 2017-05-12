@@ -75,6 +75,7 @@ env.Library(
         'command_request_builder.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
