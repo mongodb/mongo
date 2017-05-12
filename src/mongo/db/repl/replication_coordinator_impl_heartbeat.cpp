@@ -404,14 +404,15 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     switch (_rsConfigState) {
         case kConfigUninitialized:
         case kConfigSteady:
-            LOG(1) << "Received new config via heartbeat with version "
-                   << newConfig.getConfigVersion();
+            LOG_FOR_HEARTBEATS(1) << "Received new config via heartbeat with version "
+                                  << newConfig.getConfigVersion();
             break;
         case kConfigInitiating:
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
-            LOG(1) << "Ignoring new configuration with version " << newConfig.getConfigVersion()
-                   << " because already in the midst of a configuration process";
+            LOG_FOR_HEARTBEATS(1) << "Ignoring new configuration with version "
+                                  << newConfig.getConfigVersion()
+                                  << " because already in the midst of a configuration process.";
             return;
         case kConfigPreStart:
         case kConfigStartingUp:
@@ -424,6 +425,9 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+        LOG_FOR_HEARTBEATS(2) << "Rescheduling heartbeat reconfig to version "
+                              << newConfig.getConfigVersion()
+                              << " to be processed after election is cancelled.";
         _replExecutor->onEvent(
             electionFinishedEvent,
             stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled,
@@ -474,8 +478,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         // transitioning into the RS_REMOVED state.  See SERVER-15740.
         if (!_rsConfig.isInitialized()) {
             invariant(_rsConfigState == kConfigHBReconfiguring);
-            LOG(1) << "Ignoring new configuration in heartbeat response because we are "
-                      "uninitialized and not a member of the new configuration";
+            LOG_FOR_HEARTBEATS(1) << "Ignoring new configuration in heartbeat response because we "
+                                     "are uninitialized and not a member of the new configuration";
             _setConfigState_inlock(kConfigUninitialized);
             return;
         }
@@ -486,6 +490,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                      "it is invalid: "
                   << myIndex.getStatus();
     } else {
+        LOG_FOR_HEARTBEATS(2) << "Config with version " << newConfig.getConfigVersion()
+                              << " validated for reconfig; persisting to disk.";
         Status status = _externalState->storeLocalConfigDocument(cbd.opCtx, newConfig.toBSON());
         bool isFirstConfig;
         {
@@ -512,6 +518,10 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             _startDataReplication(cbd.opCtx);
         }
     }
+
+    LOG_FOR_HEARTBEATS(2)
+        << "New configuration with version " << newConfig.getConfigVersion()
+        << " persisted to local storage; scheduling work to install new config in memory.";
 
     const CallbackFn reconfigFinishFn(
         stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
@@ -544,6 +554,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     }
 
     if (MONGO_FAIL_POINT(blockHeartbeatReconfigFinish)) {
+        LOG_FOR_HEARTBEATS(0) << "blockHeartbeatReconfigFinish fail point enabled. Rescheduling "
+                                 "_heartbeatReconfigFinish until fail point is disabled.";
         _replExecutor->scheduleWorkAt(
             _replExecutor->now() + Milliseconds{10},
             stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
@@ -561,6 +573,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
 
     if (_getMemberState_inlock().primary() && !cbData.opCtx) {
+        LOG_FOR_HEARTBEATS(2) << "Attempting to install new config without locks but we are "
+                                 "primary; Rescheduling work with global exclusive lock to finish "
+                                 "reconfig.";
         // Not having an OperationContext in the CallbackData means we definitely aren't holding
         // the global lock.  Since we're primary and this reconfig could cause us to stepdown,
         // reschedule this work with the global exclusive lock so the stepdown is safe.
@@ -577,6 +592,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+        LOG_FOR_HEARTBEATS(0)
+            << "Waiting for election to complete before finishing reconfig to version "
+            << newConfig.getConfigVersion();
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor->onEvent(electionFinishedEvent,
                                stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
