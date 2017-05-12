@@ -49,6 +49,16 @@ class TaskExecutor;
  */
 class ShardingCatalogClientImpl final : public ShardingCatalogClient {
 public:
+    /*
+     * Updates (or if "upsert" is true, creates) catalog data for the sharded collection "collNs" by
+     * writing a document to the "config.collections" collection with the catalog information
+     * described by "coll."
+     */
+    static Status updateShardingCatalogEntryForCollection(OperationContext* opCtx,
+                                                          const std::string& collNs,
+                                                          const CollectionType& coll,
+                                                          const bool upsert);
+
     explicit ShardingCatalogClientImpl(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~ShardingCatalogClientImpl();
 
@@ -78,14 +88,6 @@ public:
                      const std::string& ns,
                      const BSONObj& detail,
                      const WriteConcernOptions& writeConcern) override;
-
-    Status shardCollection(OperationContext* opCtx,
-                           const std::string& ns,
-                           const ShardKeyPattern& fieldsAndOrder,
-                           const BSONObj& defaultCollation,
-                           bool unique,
-                           const std::vector<BSONObj>& initPoints,
-                           const std::set<ShardId>& initShardsIds) override;
 
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
                                                 const ShardId& name) override;
@@ -196,6 +198,25 @@ private:
                                                           ShardRegistry* shardRegistry);
 
     /**
+     * Updates a single document in the specified namespace on the config server. The document must
+     * have an _id index. Must only be used for updates to the 'config' database.
+     *
+     * This method retries the operation on NotMaster or network errors, so it should only be used
+     * with modifications which are idempotent.
+     *
+     * Returns non-OK status if the command failed to run for some reason. If the command was
+     * successful, returns true if a document was actually modified (that is, it did not exist and
+     * was upserted or it existed and any of the fields changed) and false otherwise (basically
+     * returns whether the update command's response update.n value is > 0).
+     */
+    static StatusWith<bool> _updateConfigDocument(OperationContext* opCtx,
+                                                  const std::string& ns,
+                                                  const BSONObj& query,
+                                                  const BSONObj& update,
+                                                  bool upsert,
+                                                  const WriteConcernOptions& writeConcern);
+
+    /**
      * Checks that the given database name doesn't already exist in the config.databases
      * collection, including under different casing. Optional db can be passed and will
      * be set with the database details if the given dbName exists.
@@ -224,14 +245,6 @@ private:
     StatusWith<long long> _runCountCommandOnConfig(OperationContext* opCtx,
                                                    const NamespaceString& ns,
                                                    BSONObj query);
-
-    /**
-     * Updates the metadata for the specified collection.
-     */
-    Status _updateCollection(OperationContext* opCtx,
-                             const std::string& collNs,
-                             const CollectionType& coll,
-                             bool upsert);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,

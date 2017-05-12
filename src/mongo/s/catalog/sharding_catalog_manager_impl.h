@@ -96,6 +96,15 @@ public:
                                              const ShardId& fromShard,
                                              const ShardId& toShard) override;
 
+    void shardCollection(OperationContext* opCtx,
+                         const std::string& ns,
+                         const ShardKeyPattern& fieldsAndOrder,
+                         const BSONObj& defaultCollation,
+                         bool unique,
+                         const std::vector<BSONObj>& initPoints,
+                         const bool distributeInitialChunks) override;
+
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
     StatusWith<std::string> addShard(OperationContext* opCtx,

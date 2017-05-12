@@ -51,8 +51,10 @@
 #include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -608,7 +610,6 @@ private:
                                                                      const BSONObjSet& splitPts) {
         auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
-        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         // Enable sharding on the output db
         Status status = catalogClient->enableSharding(opCtx, nss.db().toString());
@@ -624,37 +625,36 @@ private:
         // Points will be properly sorted using the set
         const std::vector<BSONObj> sortedSplitPts(splitPts.begin(), splitPts.end());
 
-        // Pre-split the collection onto all the shards for this database. Note that
-        // it's not completely safe to pre-split onto non-primary shards using the
-        // shardcollection method (a conflict may result if multiple map-reduces are
-        // writing to the same output collection, for instance).
+        // Specifying the initial split points explicitly will cause _configsvrShardCollection to
+        // distribute the initial chunks evenly across shards.
+        // Note that it's not safe to pre-split onto non-primary shards through shardCollection:
+        // a conflict may result if multiple map-reduces are writing to the same output collection,
         //
         // TODO: pre-split mapReduce output in a safer way.
 
-        const std::set<ShardId> outShardIds = [&]() {
-            std::vector<ShardId> shardIds;
-            shardRegistry->getAllShardIds(&shardIds);
-            uassert(ErrorCodes::ShardNotFound,
-                    str::stream() << "Unable to find shards on which to place output collection "
-                                  << nss.ns(),
-                    !shardIds.empty());
+        // Invalidate the routing table cache entry for this collection so that we reload the
+        // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
+        ON_BLOCK_EXIT([catalogCache, nss] { catalogCache->invalidateShardedCollection(nss); });
 
-            return std::set<ShardId>(shardIds.begin(), shardIds.end());
-        }();
+        ConfigsvrShardCollection configShardCollRequest;
+        configShardCollRequest.set_configsvrShardCollection(nss);
+        configShardCollRequest.setKey(BSON("_id" << 1));
+        configShardCollRequest.setUnique(true);
+        // TODO (SERVER-29622): Setting the numInitialChunks to 0 will be unnecessary once the
+        // constructor automatically respects default values specified in the .idl.
+        configShardCollRequest.setNumInitialChunks(0);
+        configShardCollRequest.setInitialSplitPoints(sortedSplitPts);
 
-
-        BSONObj sortKey = BSON("_id" << 1);
-        ShardKeyPattern sortKeyPattern(sortKey);
-
-        // The collection default collation for the output collection. This is empty,
-        // representing the simple binary comparison collation.
-        BSONObj defaultCollation;
-
-        uassertStatusOK(Grid::get(opCtx)->catalogClient(opCtx)->shardCollection(
-            opCtx, nss.ns(), sortKeyPattern, defaultCollation, true, sortedSplitPts, outShardIds));
+        auto cmdResponse = uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                configShardCollRequest.toBSON(),
+                Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(cmdResponse.commandStatus);
 
         // Make sure the cached metadata for the collection knows that we are now sharded
-        catalogCache->invalidateShardedCollection(nss);
         return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
     }
 

@@ -69,6 +69,7 @@
         _configsvrMoveChunk: {skip: isAnInternalCommand},
         _configsvrMovePrimary: {skip: isAnInternalCommand},
         _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
+        _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrSetFeatureCompatibilityVersion: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
         _getUserCacheGeneration: {skip: isAnInternalCommand},

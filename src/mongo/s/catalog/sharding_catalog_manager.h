@@ -44,6 +44,7 @@ class OperationContext;
 class ShardId;
 class ShardType;
 class ChunkType;
+class ShardKeyPattern;
 class Status;
 template <typename T>
 class StatusWith;
@@ -85,6 +86,10 @@ public:
      */
     virtual void shutDown(OperationContext* opCtx) = 0;
 
+    //
+    // Shard Operations
+    //
+
     /**
      *
      * Adds a new shard. It expects a standalone mongod process or replica set to be running
@@ -102,6 +107,18 @@ public:
                                              const std::string* shardProposedName,
                                              const ConnectionString& shardConnectionString,
                                              const long long maxSize) = 0;
+    /**
+     * Returns a BSON representation of an update request that can be used to insert a
+     * shardIdentity doc into the shard for the given shardType (or update the shard's existing
+     * shardIdentity doc's configsvrConnString if the _id, shardName, and clusterId do not
+     * conflict).
+     */
+    virtual BSONObj createShardIdentityUpsertForAddShard(OperationContext* opCtx,
+                                                         const std::string& shardName) = 0;
+
+    //
+    // Zone Operations
+    //
 
     /**
      * Adds the shard to the zone.
@@ -138,6 +155,10 @@ public:
                                           const NamespaceString& ns,
                                           const ChunkRange& range) = 0;
 
+    //
+    // Chunk Operations
+    //
+
     /**
      * Updates metadata in config.chunks collection to show the given chunk as split
      * into smaller chunks at the specified split points.
@@ -170,10 +191,35 @@ public:
                                                      const ShardId& fromShard,
                                                      const ShardId& toShard) = 0;
 
+    //
+    // Collection Operations
+    //
+
     /**
-     * Append information about the connection pools owned by the CatalogManager.
+     * Shards a collection. Assumes that the database is enabled for sharding.
+     *
+     * @param ns: namespace of collection to shard
+     * @param fieldsAndOrder: shardKey pattern
+     * @param defaultCollation: the default collation for the collection, to be written to
+     *     config.collections. If empty, the collection default collation is simple binary
+     *     comparison. Note the the shard key collation will always be simple binary comparison,
+     *     even if the collection default collation is non-simple.
+     * @param unique: if true, ensure underlying index enforces a unique constraint.
+     * @param initPoints: create chunks based on a set of specified split points.
+     * @param initShardIds: If non-empty, specifies the set of shards to assign chunks between.
+     *     Otherwise all chunks will be assigned to the primary shard for the database.
      */
-    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
+    virtual void shardCollection(OperationContext* opCtx,
+                                 const std::string& ns,
+                                 const ShardKeyPattern& fieldsAndOrder,
+                                 const BSONObj& defaultCollation,
+                                 bool unique,
+                                 const std::vector<BSONObj>& initPoints,
+                                 const bool distributeInitialChunks) = 0;
+
+    //
+    // Cluster Identity Operations
+    //
 
     /**
      * Initializes the collections that live in the config server.  Mostly this involves building
@@ -189,20 +235,24 @@ public:
      */
     virtual void discardCachedConfigDatabaseInitializationState() = 0;
 
-    /**
-     * Returns a BSON representation of an update request that can be used to insert a
-     * shardIdentity doc into the shard for the given shardType (or update the shard's existing
-     * shardIdentity doc's configsvrConnString if the _id, shardName, and clusterId do not
-     * conflict).
-     */
-    virtual BSONObj createShardIdentityUpsertForAddShard(OperationContext* opCtx,
-                                                         const std::string& shardName) = 0;
+    //
+    // Cluster Upgrade Operations
+    //
 
     /**
      * Runs the setFeatureCompatibilityVersion command on all shards.
      */
     virtual Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,
                                                           const std::string& version) = 0;
+
+    //
+    // For Diagnostics
+    //
+
+    /**
+     * Append information about the connection pools owned by the CatalogManager.
+     */
+    virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) = 0;
 
 protected:
     ShardingCatalogManager() = default;

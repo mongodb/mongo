@@ -91,12 +91,10 @@ env.Library(
         'move_chunk_request.cpp',
         'set_shard_version_request.cpp',
         'shard_key_pattern.cpp',
-        env.Idlc('request_types/move_primary.idl')[0],
-        env.Idlc('request_types/shard_collection.idl')[0],
     ],
     LIBDEPS=[
         'shard_id',
-        '$BUILD_DIR/mongo/base',
+        'sharding_request_types',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/matcher/expressions',
@@ -104,9 +102,20 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/update/update_common',
-        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/metadata',
     ]
+)
+
+env.Library(
+    target='sharding_request_types',
+    source=[
+        env.Idlc('request_types/move_primary.idl')[0],
+        env.Idlc('request_types/shard_collection.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
 )
 
 env.Library(

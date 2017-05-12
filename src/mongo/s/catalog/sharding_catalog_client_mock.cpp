@@ -67,16 +67,6 @@ Status ShardingCatalogClientMock::enableSharding(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::shardCollection(OperationContext* opCtx,
-                                                  const string& ns,
-                                                  const ShardKeyPattern& fieldsAndOrder,
-                                                  const BSONObj& defaultCollation,
-                                                  bool unique,
-                                                  const vector<BSONObj>& initPoints,
-                                                  const std::set<ShardId>& initShardIds) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<ShardDrainingStatus> ShardingCatalogClientMock::removeShard(OperationContext* opCtx,
                                                                        const ShardId& name) {
     return ShardDrainingStatus::COMPLETED;

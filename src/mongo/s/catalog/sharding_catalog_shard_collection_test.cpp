@@ -42,15 +42,16 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/dist_lock_manager_mock.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
+#include "mongo/s/catalog/dist_lock_catalog_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager_impl.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -58,6 +59,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -79,184 +81,103 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
-class ShardCollectionTest : public ShardingCatalogTestFixture {
+class ShardCollectionTest : public ConfigServerTestFixture {
 public:
-    void setUp() override {
-        ShardingCatalogTestFixture::setUp();
-        configTargeter()->setFindHostReturnValue(configHost);
-        configTargeter()->setConnectionStringReturnValue(configCS);
-        setRemote(clientHost);
-    }
+    void expectCount(const HostAndPort& receivingHost,
+                     const NamespaceString& expectedNs,
+                     const BSONObj& expectedQuery,
+                     const StatusWith<long long>& response) {
+        onCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(receivingHost, request.target);
+            string cmdName = request.cmdObj.firstElement().fieldName();
 
-    void expectGetDatabase(const DatabaseType& expectedDb) {
-        onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
-                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
+            ASSERT_EQUALS("count", cmdName);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
+            ASSERT_EQUALS(expectedNs.toString(), nss.toString());
 
-            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+            if (expectedQuery.isEmpty()) {
+                auto queryElem = request.cmdObj["query"];
+                ASSERT_TRUE(queryElem.eoo() || queryElem.Obj().isEmpty());
+            } else {
+                ASSERT_BSONOBJ_EQ(expectedQuery, request.cmdObj["query"].Obj());
+            }
 
-            ASSERT_EQ(DatabaseType::ConfigNS, query->ns());
-            ASSERT_BSONOBJ_EQ(BSON(DatabaseType::name(expectedDb.getName())), query->getFilter());
-            ASSERT_BSONOBJ_EQ(BSONObj(), query->getSort());
-            ASSERT_EQ(1, query->getLimit().get());
+            if (response.isOK()) {
+                return BSON("ok" << 1 << "n" << response.getValue());
+            }
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-            return vector<BSONObj>{expectedDb.toBSON()};
+            BSONObjBuilder responseBuilder;
+            Command::appendCommandStatus(responseBuilder, response.getStatus());
+            return responseBuilder.obj();
         });
     }
 
-    // Intercepts network request to upsert a new chunk definition to the config.chunks collection.
-    // Since the catalog manager cannot predict the epoch that will be assigned the new chunk,
-    // returns the chunk version that is sent in the upsert.
-    ChunkVersion expectCreateChunk(const ChunkType& expectedChunk) {
-        ChunkVersion actualVersion;
-
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS("config", request.dbname);
-
-            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
-                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-            BatchedInsertRequest actualBatchedInsert;
-            actualBatchedInsert.parseRequest(
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-            ASSERT_EQUALS(ChunkType::ConfigNS, actualBatchedInsert.getNS().ns());
-            auto inserts = actualBatchedInsert.getDocuments();
-            ASSERT_EQUALS(1U, inserts.size());
-
-            BSONObj chunkObj = inserts.front();
-            ASSERT_EQUALS(expectedChunk.getName(), chunkObj["_id"].String());
-            ASSERT_EQUALS(Timestamp(expectedChunk.getVersion().toLong()),
-                          chunkObj[ChunkType::DEPRECATED_lastmod()].timestamp());
-            // Can't check the chunk version's epoch b/c they won't match since it's a randomly
-            // generated OID so just check that the field exists and is *a* OID.
-            ASSERT_EQUALS(jstOID, chunkObj[ChunkType::DEPRECATED_epoch()].type());
-            ASSERT_EQUALS(expectedChunk.getNS(), chunkObj[ChunkType::ns()].String());
-            ASSERT_BSONOBJ_EQ(expectedChunk.getMin(), chunkObj[ChunkType::min()].Obj());
-            ASSERT_BSONOBJ_EQ(expectedChunk.getMax(), chunkObj[ChunkType::max()].Obj());
-            ASSERT_EQUALS(expectedChunk.getShard(), chunkObj[ChunkType::shard()].String());
-
-            actualVersion = ChunkVersion::fromBSON(chunkObj);
-
-            BatchedCommandResponse response;
-            response.setOk(true);
-            response.setNModified(1);
-
-            return response.toBSON();
-        });
-
-        return actualVersion;
-    }
-
-    void expectUpdateCollection(const CollectionType& expectedCollection) {
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS("config", request.dbname);
-
-            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
-                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-            BatchedUpdateRequest actualBatchedUpdate;
-            actualBatchedUpdate.parseRequest(
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-            ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
-            auto updates = actualBatchedUpdate.getUpdates();
-            ASSERT_EQUALS(1U, updates.size());
-            auto update = updates.front();
-
-            ASSERT_TRUE(update->getUpsert());
-            ASSERT_FALSE(update->getMulti());
-            ASSERT_BSONOBJ_EQ(BSON(CollectionType::fullNs(expectedCollection.getNs().toString())),
-                              update->getQuery());
-            ASSERT_BSONOBJ_EQ(expectedCollection.toBSON(), update->getUpdateExpr());
-
-            BatchedCommandResponse response;
-            response.setOk(true);
-            response.setNModified(1);
-
-            return response.toBSON();
-        });
-    }
-
-protected:
+private:
     const HostAndPort configHost{"configHost1"};
     const ConnectionString configCS{ConnectionString::forReplicaSet("configReplSet", {configHost})};
     const HostAndPort clientHost{"clientHost1"};
 };
 
 TEST_F(ShardCollectionTest, distLockFails) {
-    distLock()->expectLock(
-        [](StringData name, StringData whyMessage, Milliseconds waitFor) {
-            ASSERT_EQUALS("test.foo", name);
-            ASSERT_EQUALS("shardCollection", whyMessage);
-        },
-        Status(ErrorCodes::LockBusy, "lock already held"));
+    auto nss = NamespaceString("test.foo");
+
+    // Manually take the distlock on the collection so that shardCollection gets a conflict.
+    ASSERT_OK(distLockCatalog()
+                  ->grabLock(operationContext(),
+                             nss.ns(),
+                             OID::gen(),
+                             "dummyWho",
+                             "dummyProcessId",
+                             Date_t::now(),
+                             "dummyReason")
+                  .getStatus());
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
     BSONObj defaultCollation;
-    ASSERT_EQUALS(ErrorCodes::LockBusy,
-                  catalogClient()->shardCollection(operationContext(),
-                                                   "test.foo",
-                                                   keyPattern,
-                                                   defaultCollation,
-                                                   false,
-                                                   vector<BSONObj>{},
-                                                   set<ShardId>{}));
+    ASSERT_THROWS_CODE(catalogManager()->shardCollection(operationContext(),
+                                                         nss.ns(),
+                                                         keyPattern,
+                                                         defaultCollation,
+                                                         false,
+                                                         vector<BSONObj>{},
+                                                         false),
+                       UserException,
+                       ErrorCodes::LockBusy);
 }
 
 TEST_F(ShardCollectionTest, anotherMongosSharding) {
+    const auto nss = NamespaceString("db1.foo");
+
     ShardType shard;
     shard.setName("shard0");
     shard.setHost("shardHost");
+    ASSERT_OK(setupShards(vector<ShardType>{shard}));
 
-    setupShards(vector<ShardType>{shard});
+    setupDatabase(nss.db().toString(), shard.getName(), true);
 
-    DatabaseType db;
-    db.setName("db1");
-    db.setPrimary(shard.getName());
-    db.setSharded(true);
+    // Set up chunks in the collection, indicating that another mongos must have already started
+    // sharding the collection.
+    ChunkType chunk;
+    chunk.setNS(nss.ns());
+    chunk.setVersion(ChunkVersion(2, 0, OID::gen()));
+    chunk.setShard(shard.getName());
+    chunk.setMin(BSON("_id" << 1));
+    chunk.setMax(BSON("_id" << 5));
+    ASSERT_OK(setupChunks({chunk}));
 
-    string ns = "db1.foo";
-
-    ShardKeyPattern keyPattern(BSON("_id" << 1));
+    ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     BSONObj defaultCollation;
 
-    distLock()->expectLock(
-        [&](StringData name, StringData whyMessage, Milliseconds waitFor) {
-            ASSERT_EQUALS(ns, name);
-            ASSERT_EQUALS("shardCollection", whyMessage);
-        },
-        Status::OK());
-
-    auto future = launchAsync([&] {
-        auto client = serviceContext()->makeClient(
-            "Test",
-            transport::MockSession::create(
-                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
-        auto opCtx = client->makeOperationContext();
-        ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
-                      catalogClient()->shardCollection(opCtx.get(),
-                                                       ns,
-                                                       keyPattern,
-                                                       defaultCollation,
-                                                       false,
-                                                       vector<BSONObj>{},
-                                                       set<ShardId>{}));
-    });
-
-    expectGetDatabase(db);
-
-    // Report that chunks exist for the given collection, indicating that another mongos must have
-    // already started sharding the collection.
-    expectCount(configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::ns(ns)), 1);
-
-    future.timed_get(kFutureTimeout);
+    ASSERT_THROWS_CODE(catalogManager()->shardCollection(operationContext(),
+                                                         nss.ns(),
+                                                         shardKeyPattern,
+                                                         defaultCollation,
+                                                         false,
+                                                         vector<BSONObj>{},
+                                                         false),
+                       UserException,
+                       ErrorCodes::ManualInterventionRequired);
 }
 
 TEST_F(ShardCollectionTest, noInitialChunksOrData) {
@@ -272,119 +193,37 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    setupShards(vector<ShardType>{shard});
+    ASSERT_OK(setupShards(vector<ShardType>{shard}));
 
-    string ns = "db1.foo";
+    const auto nss = NamespaceString("db1.foo");
 
-    DatabaseType db;
-    db.setName("db1");
-    db.setPrimary(shard.getName());
-    db.setSharded(true);
+    setupDatabase(nss.db().toString(), shard.getName(), true);
 
-    ShardKeyPattern keyPattern(BSON("_id" << 1));
-
-    ChunkType expectedChunk;
-    expectedChunk.setNS(ns);
-    expectedChunk.setMin(keyPattern.getKeyPattern().globalMin());
-    expectedChunk.setMax(keyPattern.getKeyPattern().globalMax());
-    expectedChunk.setShard(shard.getName());
-    expectedChunk.setVersion(ChunkVersion(1, 0, OID::gen()));
-
-    distLock()->expectLock(
-        [&](StringData name, StringData whyMessage, Milliseconds waitFor) {
-            ASSERT_EQUALS(ns, name);
-            ASSERT_EQUALS("shardCollection", whyMessage);
-        },
-        Status::OK());
-
-    BSONObj defaultCollation = BSON("locale"
-                                    << "mock_reverse_string"
-                                    << "caseLevel"
-                                    << false
-                                    << "caseFirst"
-                                    << "off"
-                                    << "strength"
-                                    << 3
-                                    << "numericOrdering"
-                                    << false
-                                    << "alternate"
-                                    << "non-ignorable"
-                                    << "maxVariable"
-                                    << "punct"
-                                    << "normalization"
-                                    << false
-                                    << "backwards"
-                                    << false
-                                    << "version"
-                                    << "mock_version");
+    ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+    BSONObj defaultCollation;
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        auto client = serviceContext()->makeClient(
-            "Test",
-            transport::MockSession::create(
-                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
-        auto opCtx = client->makeOperationContext();
-        ASSERT_OK(catalogClient()->shardCollection(opCtx.get(),
-                                                   ns,
-                                                   keyPattern,
-                                                   defaultCollation,
-                                                   false,
-                                                   vector<BSONObj>{},
-                                                   set<ShardId>{}));
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+        catalogManager()->shardCollection(opCtx.get(),
+                                          nss.ns(),
+                                          shardKeyPattern,
+                                          defaultCollation,
+                                          false,
+                                          vector<BSONObj>{},
+                                          false);
     });
 
-    expectGetDatabase(db);
-
-    // Report that no chunks exist for the given collection
-    expectCount(configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::ns(ns)), 0);
-
-    // Respond to write to change log
-    {
-        BSONObj logChangeDetail =
-            BSON("shardKey" << keyPattern.toBSON() << "collection" << ns << "primary"
-                            << shard.getName() + ":" + shard.getHost()
-                            << "initShards"
-                            << BSONArray()
-                            << "numChunks"
-                            << 1);
-        expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(
-            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
-    }
-
     // Report that no documents exist for the given collection on the primary shard
-    expectCount(shardHost, NamespaceString(ns), BSONObj(), 0);
+    expectCount(shardHost, nss, BSONObj(), 0);
 
-    // Handle the write to create the initial chunk.
-    ChunkVersion actualVersion = expectCreateChunk(expectedChunk);
-
-    // Since the generated epoch OID will not match the one we initialized expectedChunk with,
-    // update the stored version in expectedChunk so that it matches what was actually
-    // written, to avoid problems relating to non-matching epochs down the road.
-    expectedChunk.setVersion(actualVersion);
-
-    CollectionType expectedCollection;
-    expectedCollection.setNs(NamespaceString(ns));
-    expectedCollection.setEpoch(expectedChunk.getVersion().epoch());
-    expectedCollection.setUpdatedAt(
-        Date_t::fromMillisSinceEpoch(expectedChunk.getVersion().toLong()));
-    expectedCollection.setKeyPattern(keyPattern.toBSON());
-    expectedCollection.setDefaultCollation(defaultCollation);
-    expectedCollection.setUnique(false);
-
-    // Handle the update to the collection entry in config.collectinos.
-    expectUpdateCollection(expectedCollection);
-
-    // Expect the set shard version for that namespace
-    expectSetShardVersion(shardHost, shard, NamespaceString(ns), actualVersion);
-
-    // Respond to request to write final changelog entry indicating success.
-    expectChangeLogInsert(configHost,
-                          network()->now(),
-                          "shardCollection.end",
-                          ns,
-                          BSON("version" << actualVersion.toString()));
+    // Expect the set shard version for that namespace.
+    // We do not check for a specific ChunkVersion, because we cannot easily know the OID that was
+    // generated by shardCollection for the first chunk.
+    // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
+    expectSetShardVersion(shardHost, shard, nss, boost::none /* expected ChunkVersion */);
 
     future.timed_get(kFutureTimeout);
 }
@@ -423,14 +262,16 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     targeter2->setFindHostReturnValue(shard2Host);
     targeterFactory()->addTargeterToReturn(ConnectionString(shard2Host), std::move(targeter2));
 
-    setupShards(vector<ShardType>{shard0, shard1, shard2});
+    ASSERT_OK(setupShards(vector<ShardType>{shard0, shard1, shard2}));
 
+    const auto nss = NamespaceString("db1.foo");
     string ns = "db1.foo";
 
     DatabaseType db;
     db.setName("db1");
     db.setPrimary(shard0.getName());
     db.setSharded(true);
+    setupDatabase(nss.db().toString(), shard0.getName(), true);
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
 
@@ -483,102 +324,32 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     vector<ChunkType> expectedChunks{
         expectedChunk0, expectedChunk1, expectedChunk2, expectedChunk3, expectedChunk4};
 
-    distLock()->expectLock(
-        [&](StringData name, StringData whyMessage, Milliseconds waitFor) {
-            ASSERT_EQUALS(ns, name);
-            ASSERT_EQUALS("shardCollection", whyMessage);
-        },
-        Status::OK());
-
-    BSONObj defaultCollation = BSON("locale"
-                                    << "mock_reverse_string"
-                                    << "caseLevel"
-                                    << false
-                                    << "caseFirst"
-                                    << "off"
-                                    << "strength"
-                                    << 3
-                                    << "numericOrdering"
-                                    << false
-                                    << "alternate"
-                                    << "non-ignorable"
-                                    << "maxVariable"
-                                    << "punct"
-                                    << "normalization"
-                                    << false
-                                    << "backwards"
-                                    << false
-                                    << "version"
-                                    << "mock_version");
+    BSONObj defaultCollation;
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        auto client = serviceContext()->makeClient(
-            "Test",
-            transport::MockSession::create(
-                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
-        auto opCtx = client->makeOperationContext();
+        // TODO: can we mock the ShardRegistry to return these?
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
-        ASSERT_OK(catalogClient()->shardCollection(
+
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+        catalogManager()->shardCollection(
             opCtx.get(),
             ns,
             keyPattern,
             defaultCollation,
             true,
             vector<BSONObj>{splitPoint0, splitPoint1, splitPoint2, splitPoint3},
-            shards));
+            true);
     });
 
-    expectGetDatabase(db);
-
-    // Report that no chunks exist for the given collection
-    expectCount(configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::ns(ns)), 0);
-
-    // Respond to write to change log
-    {
-        BSONObj logChangeDetail =
-            BSON("shardKey" << keyPattern.toBSON() << "collection" << ns << "primary"
-                            << shard0.getName() + ":" + shard0.getHost()
-                            << "initShards"
-                            << BSON_ARRAY(shard0.getName() << shard1.getName() << shard2.getName())
-                            << "numChunks"
-                            << (int)expectedChunks.size());
-        expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(
-            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
-    }
-
-    for (auto& expectedChunk : expectedChunks) {
-        // Handle the write to create the initial chunk.
-        ChunkVersion actualVersion = expectCreateChunk(expectedChunk);
-
-        // Since the generated epoch OID will not match the one we initialized expectedChunk with
-        // update the stored version in expectedChunk so that it matches what was actually
-        // written, to avoid problems relating to non-matching epochs down the road.
-        expectedChunk.setVersion(actualVersion);
-    }
-
-    CollectionType expectedCollection;
-    expectedCollection.setNs(NamespaceString(ns));
-    expectedCollection.setEpoch(expectedChunks[4].getVersion().epoch());
-    expectedCollection.setUpdatedAt(
-        Date_t::fromMillisSinceEpoch(expectedChunks[4].getVersion().toLong()));
-    expectedCollection.setKeyPattern(keyPattern.toBSON());
-    expectedCollection.setDefaultCollation(defaultCollation);
-    expectedCollection.setUnique(true);
-
-    // Handle the update to the collection entry in config.collectinos.
-    expectUpdateCollection(expectedCollection);
-
     // Expect the set shard version for that namespace
-    expectSetShardVersion(shard0Host, shard0, NamespaceString(ns), expectedChunks[4].getVersion());
-
-    // Respond to request to write final changelog entry indicating success.
-    expectChangeLogInsert(configHost,
-                          network()->now(),
-                          "shardCollection.end",
-                          ns,
-                          BSON("version" << expectedChunks[4].getVersion().toString()));
+    // We do not check for a specific ChunkVersion, because we cannot easily know the OID that was
+    // generated by shardCollection for the first chunk.
+    // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
+    expectSetShardVersion(
+        shard0Host, shard0, NamespaceString(ns), boost::none /* expected ChunkVersion */);
 
     future.timed_get(kFutureTimeout);
 }
@@ -596,14 +367,12 @@ TEST_F(ShardCollectionTest, withInitialData) {
     targeter->setFindHostReturnValue(shardHost);
     targeterFactory()->addTargeterToReturn(ConnectionString(shardHost), std::move(targeter));
 
-    setupShards(vector<ShardType>{shard});
+    ASSERT_OK(setupShards(vector<ShardType>{shard}));
 
+    const auto nss = NamespaceString("db1.foo");
     string ns = "db1.foo";
 
-    DatabaseType db;
-    db.setName("db1");
-    db.setPrimary(shard.getName());
-    db.setSharded(true);
+    setupDatabase(nss.db().toString(), shard.getName(), true);
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));
 
@@ -656,68 +425,16 @@ TEST_F(ShardCollectionTest, withInitialData) {
     vector<ChunkType> expectedChunks{
         expectedChunk0, expectedChunk1, expectedChunk2, expectedChunk3, expectedChunk4};
 
-    distLock()->expectLock(
-        [&](StringData name, StringData whyMessage, Milliseconds waitFor) {
-            ASSERT_EQUALS(ns, name);
-            ASSERT_EQUALS("shardCollection", whyMessage);
-        },
-        Status::OK());
-
-    BSONObj defaultCollation = BSON("locale"
-                                    << "mock_reverse_string"
-                                    << "caseLevel"
-                                    << false
-                                    << "caseFirst"
-                                    << "off"
-                                    << "strength"
-                                    << 3
-                                    << "numericOrdering"
-                                    << false
-                                    << "alternate"
-                                    << "non-ignorable"
-                                    << "maxVariable"
-                                    << "punct"
-                                    << "normalization"
-                                    << false
-                                    << "backwards"
-                                    << false
-                                    << "version"
-                                    << "mock_version");
+    BSONObj defaultCollation;
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        auto client = serviceContext()->makeClient(
-            "Test",
-            transport::MockSession::create(
-                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
-        auto opCtx = client->makeOperationContext();
-        ASSERT_OK(catalogClient()->shardCollection(opCtx.get(),
-                                                   ns,
-                                                   keyPattern,
-                                                   defaultCollation,
-                                                   false,
-                                                   vector<BSONObj>{},
-                                                   set<ShardId>{}));
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto opCtx = cc().makeOperationContext();
+        catalogManager()->shardCollection(
+            opCtx.get(), ns, keyPattern, defaultCollation, false, vector<BSONObj>{}, false);
     });
-
-    expectGetDatabase(db);
-
-    // Report that no chunks exist for the given collection
-    expectCount(configHost, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::ns(ns)), 0);
-
-    // Respond to write to change log
-    {
-        BSONObj logChangeDetail =
-            BSON("shardKey" << keyPattern.toBSON() << "collection" << ns << "primary"
-                            << shard.getName() + ":" + shard.getHost()
-                            << "initShards"
-                            << BSONArray()
-                            << "numChunks"
-                            << 1);
-        expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(
-            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
-    }
 
     // Report that documents exist for the given collection on the primary shard, so that calling
     // splitVector is required for calculating the initial split points.
@@ -746,37 +463,11 @@ TEST_F(ShardCollectionTest, withInitialData) {
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));
     });
 
-    for (auto& expectedChunk : expectedChunks) {
-        // Handle the write to create the initial chunk.
-        ChunkVersion actualVersion = expectCreateChunk(expectedChunk);
-
-        // Since the generated epoch OID will not match the one we initialized expectedChunk with
-        // update the stored version in expectedChunk so that it matches what was actually
-        // written, to avoid problems relating to non-matching epochs down the road.
-        expectedChunk.setVersion(actualVersion);
-    }
-
-    CollectionType expectedCollection;
-    expectedCollection.setNs(NamespaceString(ns));
-    expectedCollection.setEpoch(expectedChunks[4].getVersion().epoch());
-    expectedCollection.setUpdatedAt(
-        Date_t::fromMillisSinceEpoch(expectedChunks[4].getVersion().toLong()));
-    expectedCollection.setKeyPattern(keyPattern.toBSON());
-    expectedCollection.setDefaultCollation(defaultCollation);
-    expectedCollection.setUnique(false);
-
-    // Handle the update to the collection entry in config.collectinos.
-    expectUpdateCollection(expectedCollection);
-
     // Expect the set shard version for that namespace
-    expectSetShardVersion(shardHost, shard, NamespaceString(ns), expectedChunks[4].getVersion());
-
-    // Respond to request to write final changelog entry indicating success.
-    expectChangeLogInsert(configHost,
-                          network()->now(),
-                          "shardCollection.end",
-                          ns,
-                          BSON("version" << expectedChunks[4].getVersion().toString()));
+    // We do not check for a specific ChunkVersion, because we cannot easily know the OID that was
+    // generated by shardCollection for the first chunk.
+    // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
+    expectSetShardVersion(shardHost, shard, NamespaceString(ns), boost::none);
 
     future.timed_get(kFutureTimeout);
 }

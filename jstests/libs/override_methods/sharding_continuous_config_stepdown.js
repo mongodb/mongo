@@ -258,4 +258,53 @@ tracking: {verbosity: 0} }";
 
     Object.extend(ShardingTest, originalShardingTest);
 
+    /**
+     * If the config primary steps down during a metadata command, mongos will internally retry the
+     * command. On the retry, the command may fail with the error "ManualInterventionRequired" if
+     * the earlier try left the config database in an inconsistent state.
+     *
+     * This override allows for automating the manual cleanup by catching the
+     * "ManualInterventionRequired" error, performing the cleanup, and transparently retrying the
+     * command.
+     */
+    (function(original) {
+        Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
+            const cmdName = Object.keys(cmdObj)[0];
+            const commandsToRetry = new Set(["shardCollection", "shardcollection"]);
+
+            if (!commandsToRetry.has(cmdName)) {
+                return original.apply(this, arguments);
+            }
+
+            const maxAttempts = 10;
+            let numAttempts = 0;
+            let res;
+
+            while (numAttempts < maxAttempts) {
+                res = original.apply(this, arguments);
+                ++numAttempts;
+
+                if (res.ok === 1 || res.code !== ErrorCodes.ManualInterventionRequired ||
+                    numAttempts === maxAttempts) {
+                    break;
+                }
+
+                if (cmdName === "shardCollection" || cmdName === "shardcollection") {
+                    const ns = cmdObj.shardCollection;
+
+                    print(
+                        "shardCollection command " + tojson(cmdObj) + " failed after " +
+                        numAttempts +
+                        " attempts due to partially written chunks. Manually deleting chunks for " +
+                        ns + " from config.chunks and retrying the shardCollection command.");
+
+                    // Remove the partially written chunks.
+                    assert.writeOK(this.getDB("config").chunks.remove(
+                        {ns: ns}, {writeConcern: {w: "majority"}}));
+                }
+            }
+            return res;
+        };
+    })(Mongo.prototype.runCommand);
+
 })();

@@ -124,33 +124,6 @@ public:
     virtual Status enableSharding(OperationContext* opCtx, const std::string& dbName) = 0;
 
     /**
-     * Shards a collection. Assumes that the database is enabled for sharding.
-     *
-     * @param ns: namespace of collection to shard
-     * @param fieldsAndOrder: shardKey pattern
-     * @param defaultCollation: the default collation for the collection, to be written to
-     *     config.collections. If empty, the collection default collation is simple binary
-     *     comparison. Note the the shard key collation will always be simple binary comparison,
-     *     even if the collection default collation is non-simple.
-     * @param unique: if true, ensure underlying index enforces a unique constraint.
-     * @param initPoints: create chunks based on a set of specified split points.
-     * @param initShardIds: If non-empty, specifies the set of shards to assign chunks between.
-     *     Otherwise all chunks will be assigned to the primary shard for the database.
-     *
-     * WARNING: It's not completely safe to place initial chunks onto non-primary
-     *          shards using this method because a conflict may result if multiple map-reduce
-     *          operations are writing to the same output collection, for instance.
-     *
-     */
-    virtual Status shardCollection(OperationContext* opCtx,
-                                   const std::string& ns,
-                                   const ShardKeyPattern& fieldsAndOrder,
-                                   const BSONObj& defaultCollation,
-                                   bool unique,
-                                   const std::vector<BSONObj>& initPoints,
-                                   const std::set<ShardId>& initShardIds) = 0;
-
-    /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
      * the data residing in that shard must be moved to the remaining shards in the
      * cluster by "draining" chunks from that shard.

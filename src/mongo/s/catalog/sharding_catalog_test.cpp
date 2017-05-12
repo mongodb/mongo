@@ -178,7 +178,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
-        ASSERT_EQ(query->getLimit().get(), 1);
+        ASSERT(!query->getLimit());
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 

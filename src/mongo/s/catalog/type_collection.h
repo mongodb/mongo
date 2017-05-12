@@ -146,6 +146,8 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
+    bool hasSameOptions(CollectionType& other);
+
 private:
     // Required full namespace (with the database prefix).
     boost::optional<NamespaceString> _fullNs;

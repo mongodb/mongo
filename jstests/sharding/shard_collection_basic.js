@@ -81,10 +81,19 @@
     assert.commandFailed(
         mongos.adminCommand({shardCollection: kDbName + '.foo', key: {aKey: "hahahashed"}}));
 
-    // Error if a collection is already sharded.
+    // Succeed if a collection is already sharded with the same options.
+    assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
     assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
 
-    assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
+    // Fail if the collection is already sharded with different options.
+    // different shard key
+    assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {x: 1}}));
+    // different collation
+    assert.commandFailed(mongos.adminCommand(
+        {shardCollection: kDbName + '.foo', key: {_id: 1}, collation: {locale: "simple"}}));
+    // different 'unique'
+    assert.commandFailed(
+        mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}, unique: true}));
 
     mongos.getDB(kDbName).dropDatabase();
 

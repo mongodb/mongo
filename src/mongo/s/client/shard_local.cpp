@@ -56,7 +56,7 @@ ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
 }
 
 const ConnectionString ShardLocal::getConnString() const {
-    MONGO_UNREACHABLE;
+    return repl::getGlobalReplicationCoordinator()->getConfig().getConnectionString();
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {

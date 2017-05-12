@@ -51,6 +51,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
@@ -59,8 +60,10 @@
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_registry.h"
@@ -69,6 +72,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -274,6 +278,19 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
     return ChunkType::fromConfigBSON(doc.getValue());
 }
 
+void ConfigServerTestFixture::setupDatabase(const std::string& dbName,
+                                            const ShardId primaryShard,
+                                            const bool sharded) {
+    DatabaseType db;
+    db.setName(dbName);
+    db.setPrimary(primaryShard);
+    db.setSharded(sharded);
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    DatabaseType::ConfigNS,
+                                                    db.toBSON(),
+                                                    ShardingCatalogClient::kMajorityWriteConcern));
+}
+
 StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* opCtx,
                                                                      const NamespaceString& ns) {
     auto configShard = getConfigShard();
@@ -319,6 +336,32 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     }
 
     return keys;
+}
+
+void ConfigServerTestFixture::expectSetShardVersion(
+    const HostAndPort& expectedHost,
+    const ShardType& expectedShard,
+    const NamespaceString& expectedNs,
+    boost::optional<ChunkVersion> expectedChunkVersion) {
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(expectedHost, request.target);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        SetShardVersionRequest ssv =
+            assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
+
+        ASSERT(!ssv.isInit());
+        ASSERT(ssv.isAuthoritative());
+        ASSERT_EQ(expectedShard.getHost(), ssv.getShardConnectionString().toString());
+        ASSERT_EQ(expectedNs.toString(), ssv.getNS().ns());
+
+        if (expectedChunkVersion) {
+            ASSERT_EQ(*expectedChunkVersion, ssv.getNSVersion());
+        }
+
+        return BSON("ok" << true);
+    });
 }
 
 }  // namespace mongo

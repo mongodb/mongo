@@ -60,3 +60,31 @@ structs:
                 type: object
                 description: "The collation to use for the shard key index."
                 optional: true
+
+    ConfigsvrShardCollection:
+        description: "The internal shardCollection command on the config server"
+        strict: false
+        fields:
+            _configsvrShardCollection:
+                type: namespacestring
+                description: "The namespace of the collection to shard in the form <database>.<collection>."
+                optional: true
+            key:
+                type: object
+                description: "The index specification document to use as the shard key."
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint"
+                default: false
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
+                default: 0
+            initialSplitPoints:
+                type: array<object>
+                description: "A specific set of points to create initial splits at, currently used only by mapReduce"
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true

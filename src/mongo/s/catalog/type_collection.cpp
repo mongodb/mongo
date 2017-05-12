@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 
@@ -251,6 +252,18 @@ void CollectionType::setUpdatedAt(Date_t updatedAt) {
 void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
     invariant(!keyPattern.toBSON().isEmpty());
     _keyPattern = keyPattern;
+}
+
+bool CollectionType::hasSameOptions(CollectionType& other) {
+    // The relevant options must have been set on this CollectionType.
+    invariant(_fullNs && _keyPattern && _unique);
+
+    return *_fullNs == other.getNs() &&
+        SimpleBSONObjComparator::kInstance.evaluate(_keyPattern->toBSON() ==
+                                                    other.getKeyPattern().toBSON()) &&
+        SimpleBSONObjComparator::kInstance.evaluate(_defaultCollation ==
+                                                    other.getDefaultCollation()) &&
+        *_unique == other.getUnique();
 }
 
 }  // namespace mongo

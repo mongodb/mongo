@@ -93,6 +93,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -660,6 +661,7 @@ ExitCode _initAndListen(int listenPort) {
                 uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            ShardedConnectionInfo::addHook(startupOpCtx->getServiceContext());
             uassertStatusOK(
                 initializeGlobalShardingStateForMongod(startupOpCtx.get(),
                                                        ConnectionString::forLocal(),
