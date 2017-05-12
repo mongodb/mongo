@@ -18,12 +18,13 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import re
-from typing import List, Union
+from typing import List, Set, Union
 
 from . import ast
 from . import bson
 from . import common
 from . import cpp_types
+from . import enum_types
 from . import errors
 from . import syntax
 
@@ -290,7 +291,14 @@ def _validate_field_of_type_struct(ctxt, field):
     # type: (errors.ParserContext, syntax.Field) -> None
     """Validate that for fields with a type of struct, no other properties are set."""
     if field.default is not None:
-        ctxt.add_ignored_field_must_be_empty_error(field, field.name, "default")
+        ctxt.add_struct_field_must_be_empty_error(field, field.name, "default")
+
+
+def _validate_field_of_type_enum(ctxt, field):
+    # type: (errors.ParserContext, syntax.Field) -> None
+    """Validate that for fields with a type of enum, no other properties are set."""
+    if field.default is not None:
+        ctxt.add_enum_field_must_be_empty_error(field, field.name, "default")
 
 
 def _bind_field(ctxt, parsed_spec, field):
@@ -319,8 +327,9 @@ def _bind_field(ctxt, parsed_spec, field):
         _validate_ignored_field(ctxt, field)
         return ast_field
 
-    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, field, field.name, field.type)
-    if not struct and not idltype:
+    (idl_enum, struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, field, field.name,
+                                                                         field.type)
+    if not idl_enum and not struct and not idltype:
         return None
 
     # If the field type is an array, mark the AST version as such.
@@ -330,11 +339,24 @@ def _bind_field(ctxt, parsed_spec, field):
         if field.default or (idltype and idltype.default):
             ctxt.add_array_no_default_error(field, field.name)
 
+        if idl_enum:
+            ctxt.add_array_enum_error(ast_field, ast_field.name)
+
     # Copy over only the needed information if this a struct or a type
     if struct:
         ast_field.struct_type = struct.name
         ast_field.bson_serialization_type = ["object"]
         _validate_field_of_type_struct(ctxt, field)
+    elif idl_enum:
+        enum_type_info = enum_types.get_type_info(idl_enum)
+
+        ast_field.enum_type = True
+        ast_field.cpp_type = enum_type_info.get_cpp_type_name()
+        ast_field.bson_serialization_type = enum_type_info.get_bson_types()
+        ast_field.serializer = enum_type_info.get_enum_serializer_name()
+        ast_field.deserializer = enum_type_info.get_enum_deserializer_name()
+
+        _validate_field_of_type_enum(ctxt, field)
     else:
         # Produce the union of type information for the type and this field.
 
@@ -358,10 +380,10 @@ def _bind_field(ctxt, parsed_spec, field):
 def _bind_chained_type(ctxt, parsed_spec, location, chained_type):
     # type: (errors.ParserContext, syntax.IDLSpec, common.SourceLocation, unicode) -> ast.Field
     """Bind the specified chained type."""
-    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, location, chained_type,
-                                                               chained_type)
+    (idl_enum, struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, location,
+                                                                         chained_type, chained_type)
     if not idltype:
-        if struct:
+        if struct or idl_enum:
             ctxt.add_chained_type_not_found_error(location, chained_type)
 
         return None
@@ -388,10 +410,10 @@ def _bind_chained_type(ctxt, parsed_spec, location, chained_type):
 def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     # type: (errors.ParserContext, syntax.IDLSpec, ast.Struct, unicode) -> None
     """Bind the specified chained struct."""
-    (struct, idltype) = parsed_spec.symbols.resolve_field_type(ctxt, ast_struct, chained_struct,
-                                                               chained_struct)
+    (idl_enum, struct, idltype) = parsed_spec.symbols.resolve_field_type(
+        ctxt, ast_struct, chained_struct, chained_struct)
     if not struct:
-        if idltype:
+        if idltype or idl_enum:
             ctxt.add_chained_struct_not_found_error(ast_struct, chained_struct)
 
         return None
@@ -443,6 +465,70 @@ def _bind_globals(parsed_spec):
     return ast_global
 
 
+def _validate_enum_int(ctxt, idl_enum):
+    # type: (errors.ParserContext, syntax.Enum) -> None
+    """Validate an integer enumeration."""
+
+    # Check they are all ints
+    int_values_set = set()  # type: Set[int]
+
+    for enum_value in idl_enum.values:
+        try:
+            int_values_set.add(int(enum_value.value))
+        except ValueError as value_error:
+            ctxt.add_enum_value_not_int_error(idl_enum, idl_enum.name, enum_value.value,
+                                              str(value_error))
+            return
+
+    # Check the values are continuous so they can be static_cast.
+    min_value = min(int_values_set)
+    max_value = max(int_values_set)
+
+    valid_int = {x for x in xrange(min_value, max_value + 1)}
+
+    if valid_int != int_values_set:
+        ctxt.add_enum_non_continuous_range_error(idl_enum, idl_enum.name)
+
+
+def _bind_enum(ctxt, idl_enum):
+    # type: (errors.ParserContext, syntax.Enum) -> ast.Enum
+    """
+    Bind an enum.
+
+    - Validating an enum and values.
+    - Create the idl.ast version from the idl.syntax tree.
+    """
+
+    ast_enum = ast.Enum(idl_enum.file_name, idl_enum.line, idl_enum.column)
+    ast_enum.name = idl_enum.name
+    ast_enum.description = idl_enum.description
+    ast_enum.type = idl_enum.type
+
+    enum_type_info = enum_types.get_type_info(idl_enum)
+    if not enum_type_info:
+        ctxt.add_enum_bad_type_error(idl_enum, idl_enum.name, idl_enum.type)
+        return None
+
+    for enum_value in idl_enum.values:
+        ast_enum_value = ast.EnumValue(enum_value.file_name, enum_value.line, enum_value.column)
+        ast_enum_value.name = enum_value.name
+        ast_enum_value.value = enum_value.value
+        ast_enum.values.append(ast_enum_value)
+
+    values_set = set()  # type: Set[unicode]
+    for enum_value in idl_enum.values:
+        values_set.add(enum_value.value)
+
+    # Check the values are unique
+    if len(idl_enum.values) != len(values_set):
+        ctxt.add_enum_value_not_unique_error(idl_enum, idl_enum.name)
+
+    if ast_enum.type == 'int':
+        _validate_enum_int(ctxt, idl_enum)
+
+    return ast_enum
+
+
 def bind(parsed_spec):
     # type: (syntax.IDLSpec) -> ast.IDLBoundSpec
     """Read an idl.syntax, create an idl.ast tree, and validate the final IDL Specification."""
@@ -454,6 +540,10 @@ def bind(parsed_spec):
     bound_spec.globals = _bind_globals(parsed_spec)
 
     _validate_types(ctxt, parsed_spec)
+
+    for idl_enum in parsed_spec.symbols.enums:
+        if not idl_enum.imported:
+            bound_spec.enums.append(_bind_enum(ctxt, idl_enum))
 
     for struct in parsed_spec.symbols.structs:
         if not struct.imported:

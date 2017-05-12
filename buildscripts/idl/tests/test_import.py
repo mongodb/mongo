@@ -343,6 +343,15 @@ class TestImport(testcase.IDLTestcase):
                     strict: false
                     fields:
                         foo: string
+
+            enums:
+                IntEnum:
+                    description: "An example int enum"
+                    type: int
+                    values:
+                        a0: 0
+                        b1: 1
+
             """)
         }
 
@@ -413,6 +422,23 @@ class TestImport(testcase.IDLTestcase):
                 description: foo
                 cpp_type: foo
                 bson_serialization_type: string
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
+            resolver=resolver)
+
+        # Duplicate enums
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        imports:
+            - "basetypes.idl"
+
+        enums:
+            IntEnum:
+                description: "An example int enum"
+                type: int
+                values:
+                    a0: 0
+                    b1: 1
             """),
             idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
             resolver=resolver)

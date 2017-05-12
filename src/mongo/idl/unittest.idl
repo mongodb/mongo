@@ -121,6 +121,23 @@ types:
 # Unit test structs for a single value to ensure type validation works correctly
 #
 ##################################################################################################
+enums:
+
+    IntEnum:
+        description: "An example int enum"
+        type: int
+        values:
+            a0: 0
+            b1: 1
+            c2: 2
+
+    StringEnum:
+        description: "An example string enum"
+        type: string
+        values:
+            s0: "zero"
+            s1: "one"
+            s2: "two"
 
 structs:
 
@@ -441,3 +458,31 @@ structs:
         fields:
             field3:
                 type: int
+
+
+##################################################################################################
+#
+# Test struct with enum
+#
+##################################################################################################
+    one_int_enum:
+        description: mock
+        fields:
+            value: IntEnum
+
+    one_string_enum:
+        description: mock
+        fields:
+            value: StringEnum
+
+    StructWithEnum:
+        description: mock
+        fields:
+            field1: IntEnum
+            field2: StringEnum
+            field1o:
+                type: IntEnum
+                optional: true
+            field2o:
+                type: StringEnum
+                optional: true

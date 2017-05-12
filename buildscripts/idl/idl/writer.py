@@ -44,6 +44,17 @@ def _indent_text(count, unindented_text):
     return '\n'.join(fill + line for line in lines)
 
 
+def is_function(name):
+    # type: (unicode) -> bool
+    """
+    Return True if a serializer/deserializer is function.
+
+    A function is prefixed with '::' so that the IDL generated code calls it as a function instead
+    of as a class method.
+    """
+    return name.startswith("::")
+
+
 def get_method_name(name):
     # type: (unicode) -> unicode
     """Get a method name from a fully qualified method name."""
@@ -58,6 +69,10 @@ def get_method_name_from_qualified_method_name(name):
     # pylint: disable=invalid-name
     """Get a method name from a fully qualified method name."""
     # TODO: in the future, we may want to support full-qualified calls to static methods
+    # Strip the global prefix from enum functions
+    if name.startswith("::"):
+        name = name[2:]
+
     prefix = 'mongo::'
     pos = name.find(prefix)
     if pos == -1:

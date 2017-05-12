@@ -527,6 +527,178 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
         """), idl.errors.ERROR_ID_IS_NODE_TYPE)
 
+    def test_enum_positive(self):
+        # type: () -> None
+        """Positive enum test cases."""
+
+        # Test all positive fields works
+        self.assert_parse(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: foo
+                values:
+                    v1: 0
+            """))
+
+    def test_enum_negative(self):
+        # type: () -> None
+        """Negative enum test cases."""
+
+        # Test duplicate enums
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: test
+                type: int
+                values:
+                    v1: 0
+
+            foo:
+                description: test
+                type: int
+                values:
+                    v1: 0
+                """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+        # Test scalar fails
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            enums:
+                foo: 'bar'"""), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # Test unknown field
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                bogus: foo
+                description: foo
+                type: foo
+                values:
+                    v1: 0
+                """), idl.errors.ERROR_ID_UNKNOWN_NODE)
+
+        # test duplicate field
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                description: test
+                type: foo
+                values:
+                    v1: 0
+                """), idl.errors.ERROR_ID_DUPLICATE_NODE)
+
+        # test list instead of scalar
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            - foo:
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+            multiple=True)
+
+        # test list instead of scalar
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                - bar
+            """),
+            idl.errors.ERROR_ID_IS_NODE_TYPE,
+            multiple=True)
+
+        # test missing type field
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                values:
+                    v1: 0
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+        # test missing values field
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: foo
+            """), idl.errors.ERROR_ID_BAD_EMPTY_ENUM)
+
+        # Test no values
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+            """), idl.errors.ERROR_ID_BAD_EMPTY_ENUM)
+
+        # Name collision with types
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        types:
+            foo:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+        enums:
+            foo:
+                description: foo
+                type: foo
+                values:
+                    v1: 0
+            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+        # Name collision with structs
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+
+        structs: 
+            foo:
+                description: foo
+                strict: true
+                fields:
+                    foo: string
+
+        enums:
+            foo:
+                description: foo
+                type: foo
+                values:
+                    v1: 0
+            """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+        # Test int - duplicate names
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1: 0
+                    v1: 1
+            """), idl.errors.ERROR_ID_DUPLICATE_NODE)
+
 
 if __name__ == '__main__':
 

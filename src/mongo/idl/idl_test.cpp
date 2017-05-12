@@ -1310,6 +1310,84 @@ TEST(IDLChainedType, TestChainedMixedStruct) {
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
     }
 }
+// Positive: demonstrate a class derived from an IDL parser.
+TEST(IDLEnum, TestEnum) {
+
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("field1" << 2 << "field2"
+                                 << "zero");
+    auto testStruct = StructWithEnum::parse(ctxt, testDoc);
+    ASSERT_TRUE(testStruct.getField1() == IntEnum::c2);
+    ASSERT_TRUE(testStruct.getField2() == StringEnumEnum::s0);
+
+    assert_same_types<decltype(testStruct.getField1()), IntEnum>();
+    assert_same_types<decltype(testStruct.getField1o()), const boost::optional<IntEnum>>();
+    assert_same_types<decltype(testStruct.getField2()), StringEnumEnum>();
+    assert_same_types<decltype(testStruct.getField2o()), const boost::optional<StringEnumEnum>>();
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        StructWithEnum one_new;
+        one_new.setField1(IntEnum::c2);
+        one_new.setField2(StringEnumEnum::s0);
+        one_new.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+
+// Negative: test bad values
+TEST(IDLEnum, TestIntEnumNegative) {
+    IDLParserErrorContext ctxt("root");
+
+    //  Test string
+    {
+        auto testDoc = BSON("value"
+                            << "2");
+        ASSERT_THROWS(One_int_enum::parse(ctxt, testDoc), UserException);
+    }
+
+    // Test a value out of range
+    {
+        auto testDoc = BSON("value" << 4);
+        ASSERT_THROWS(One_int_enum::parse(ctxt, testDoc), UserException);
+    }
+
+    // Test a negative number
+    {
+        auto testDoc = BSON("value" << -1);
+        ASSERT_THROWS(One_int_enum::parse(ctxt, testDoc), UserException);
+    }
+}
+
+TEST(IDLEnum, TestStringEnumNegative) {
+    IDLParserErrorContext ctxt("root");
+
+    //  Test int
+    {
+        auto testDoc = BSON("value" << 2);
+        ASSERT_THROWS(One_string_enum::parse(ctxt, testDoc), UserException);
+    }
+
+    // Test a value out of range
+    {
+        auto testDoc = BSON("value"
+                            << "foo");
+        ASSERT_THROWS(One_string_enum::parse(ctxt, testDoc), UserException);
+    }
+}
 
 }  // namespace
 }  // namespace mongo

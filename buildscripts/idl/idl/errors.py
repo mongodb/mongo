@@ -67,6 +67,13 @@ ERROR_ID_CHAINED_NO_TYPE_STRICT = "ID0030"
 ERROR_ID_CHAINED_STRUCT_NOT_FOUND = "ID0031"
 ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT = "ID0032"
 ERROR_ID_CHAINED_NO_NESTED_CHAINED = "ID0033"
+ERROR_ID_BAD_EMPTY_ENUM = "ID0034"
+ERROR_ID_NO_ARRAY_ENUM = "ID0035"
+ERROR_ID_ENUM_BAD_TYPE = "ID0036"
+ERROR_ID_ENUM_BAD_INT_VAUE = "ID0037"
+ERROR_ID_ENUM_NON_UNIQUE_VALUES = "ID0038"
+ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
+ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM = "ID0040"
 
 
 class IDLError(Exception):
@@ -379,7 +386,7 @@ class ParserContext(object):
         # type: (common.SourceLocation, unicode, unicode) -> None
         """Add an error about field must be empty for fields of type struct."""
         # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED, (
+        self._add_error(location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_STRUCT, (
             "Field '%s' cannot contain a value for property '%s' when a field's type is a struct") %
                         (name, field_name))
 
@@ -491,6 +498,54 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_CHAINED_NO_NESTED_CHAINED,
                         ("Struct '%s' is not allowed to nest struct '%s' since it has chained" +
                          " structs and/or types.") % (struct_name, chained_name))
+
+    def add_empty_enum_error(self, node, name):
+        # type: (yaml.nodes.Node, unicode) -> None
+        """Add an error about an enum without values."""
+        self._add_node_error(node, ERROR_ID_BAD_EMPTY_ENUM,
+                             "Enum '%s' must have values specified but no values were found" %
+                             (name))
+
+    def add_array_enum_error(self, location, field_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error for a field being an array of enums."""
+        self._add_error(location, ERROR_ID_NO_ARRAY_ENUM,
+                        "Field '%s' cannot be an array of enums" % (field_name))
+
+    def add_enum_bad_type_error(self, location, enum_name, enum_type):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error for an enum having the wrong type."""
+        self._add_error(location, ERROR_ID_ENUM_BAD_TYPE,
+                        "Enum '%s' type '%s' is not a supported enum type" % (enum_name, enum_type))
+
+    def add_enum_value_not_int_error(self, location, enum_name, enum_value, err_msg):
+        # type: (common.SourceLocation, unicode, unicode, unicode) -> None
+        """Add an error for an enum value not being an integer."""
+        self._add_error(location, ERROR_ID_ENUM_BAD_INT_VAUE,
+                        "Enum '%s' value '%s' is not an integer, exception '%s'" %
+                        (enum_name, enum_value, err_msg))
+
+    def add_enum_value_not_unique_error(self, location, enum_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error for an enum having duplicate values."""
+        self._add_error(location, ERROR_ID_ENUM_NON_UNIQUE_VALUES,
+                        "Enum '%s' has duplicate values, all values must be unique" % (enum_name))
+
+    def add_enum_non_continuous_range_error(self, location, enum_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error for an enum having duplicate values."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_ENUM_NON_CONTINUOUS_RANGE,
+                        ("Enum '%s' has non-continuous integer variables, enums must have a " +
+                         "continuous range of integer variables.") % (enum_name))
+
+    def add_enum_field_must_be_empty_error(self, location, name, field_name):
+        # type: (common.SourceLocation, unicode, unicode) -> None
+        """Add an error about field must be empty for fields of type enum."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM, (
+            "Field '%s' cannot contain a value for property '%s' when a field's type is a enum") %
+                        (name, field_name))
 
 
 def _assert_unique_error_messages():
