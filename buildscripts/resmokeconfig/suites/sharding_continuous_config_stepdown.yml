@@ -88,6 +88,14 @@ selector:
     # for this command
     - jstests/sharding/major_version_check.js
     - jstests/sharding/replset_config/ssv_config_check.js
+    # Runs replSetGetStatus -- via awaitLastOpCommitted -- directly against the config server:
+    # retries aren't supported.
+    - jstests/sharding/coll_epoch_test1.js
+    - jstests/sharding/move_stale_mongos.js
+    - jstests/sharding/shard4.js
+    - jstests/sharding/shard5.js
+    - jstests/sharding/split_stale_mongos.js
+    - jstests/sharding/zero_shard_version.js
     # Already stop or blackholes the primary of the CSRS config shard
     - jstests/sharding/all_config_hosts_down.js
     - jstests/sharding/all_config_servers_blackholed_from_mongos.js
