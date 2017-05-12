@@ -989,6 +989,7 @@ TEST(IDLBinData, TestParse) {
     TestBinDataParser<One_function, Function>();
     TestBinDataParser<One_uuid, newUUID>();
     TestBinDataParser<One_md5, MD5Type>();
+    TestBinDataParser<One_UUID, newUUID>();
 }
 
 // Mixed: test a type that accepts a custom bindata type
@@ -1020,6 +1021,41 @@ TEST(IDLBinData, TestCustomType) {
         BSONObjBuilder builder;
         One_bindata_custom one_new;
         one_new.setValue(testVector);
+        one_new.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+// Positive: test a type that accepts a custom UUID type
+TEST(IDLBinData, TestUUIDclass) {
+    IDLParserErrorContext ctxt("root");
+
+    auto uuid = UUID::gen();
+    auto testDoc = BSON("value" << uuid);
+
+    auto element = testDoc.firstElement();
+    ASSERT_EQUALS(element.type(), BinData);
+    ASSERT_EQUALS(element.binDataType(), newUUID);
+
+    auto testStruct = One_UUID::parse(ctxt, testDoc);
+    ASSERT_TRUE(testStruct.getValue() == uuid);
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        One_UUID one_new;
+        one_new.setValue(uuid);
         one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();

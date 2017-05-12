@@ -33,6 +33,7 @@
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -47,12 +48,11 @@ namespace mongo {
 class UUID {
     using UUIDStorage = std::array<unsigned char, 16>;
 
-public:
-    /**
-     * This constructor exists for IDL only.
-     */
-    UUID() = default;
+    // Make the IDL generated parser a friend
+    friend class One_UUID;
+    friend class Logical_session_id;
 
+public:
     /**
      * The number of bytes contained in a UUID.
      */
@@ -86,6 +86,13 @@ public:
      * Returns whether this string represents a valid UUID.
      */
     static bool isUUIDString(const std::string& s);
+
+    /**
+     * Returns a ConstDataRange view of the UUID.
+     */
+    ConstDataRange toCDR() const {
+        return ConstDataRange(reinterpret_cast<const char*>(_uuid.data()), _uuid.size());
+    }
 
     /**
      * Append to builder as BinData(4, "...") element with the given name.
@@ -127,6 +134,8 @@ public:
     };
 
 private:
+    UUID() = default;
+
     UUID(const UUIDStorage& uuid) : _uuid(uuid) {}
 
     UUIDStorage _uuid;  // UUID in network byte order

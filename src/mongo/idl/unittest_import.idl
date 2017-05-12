@@ -92,3 +92,8 @@ structs:
         description: UnitTest for a single timestamp
         fields:
             value: timestamp
+
+    one_UUID:
+        description: UnitTest for a single UUID
+        fields:
+            value: uuid

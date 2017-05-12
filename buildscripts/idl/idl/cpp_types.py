@@ -599,8 +599,12 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
 
     def gen_deserializer_expression(self, indented_writer, object_instance):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
-        return common.template_args(
-            '${object_instance}._binDataVector()', object_instance=object_instance)
+        if self._field.bindata_subtype == 'uuid':
+            return common.template_args(
+                '${object_instance}.uuid()', object_instance=object_instance)
+        else:
+            return common.template_args(
+                '${object_instance}._binDataVector()', object_instance=object_instance)
 
     def has_serializer(self):
         # type: () -> bool

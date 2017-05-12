@@ -18,7 +18,6 @@ global:
     # Use a nested namespace simply to exercise nested namespace support for the code generator.
     cpp_namespace: "mongo::idl::test"
     cpp_includes:
-        - "mongo/db/namespace_string.h"
         - "mongo/idl/idl_test_types.h"
 
 imports:
@@ -26,18 +25,6 @@ imports:
     - "mongo/idl/unittest_import.idl"
 
 types:
-##################################################################################################
-#
-# Test a custom non-BSONElement deserialization and serialization methods for a string type
-#
-##################################################################################################
-
-    namespacestring:
-        bson_serialization_type: string
-        description: "A MongoDB NamespaceString"
-        cpp_type: "mongo::NamespaceString"
-        serializer: mongo::NamespaceString::toString
-        deserializer: mongo::NamespaceString
 
 ##################################################################################################
 #

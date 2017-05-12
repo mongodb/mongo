@@ -465,6 +465,11 @@ def parse(stream, input_file_name, resolver):
             imports += [(parsed_doc.spec.imports, resolved_file_name, import_file_name)
                         for import_file_name in parsed_doc.spec.imports.imports]
 
+        # Merge cpp_includes as needed
+        if parsed_doc.spec.globals and parsed_doc.spec.globals.cpp_includes:
+            root_doc.spec.globals.cpp_includes = list(
+                set(root_doc.spec.globals.cpp_includes + parsed_doc.spec.globals.cpp_includes))
+
         # Merge symbol tables together
         root_doc.spec.symbols.add_imported_symbol_table(ctxt, parsed_doc.spec.symbols)
         if ctxt.errors.has_errors():
