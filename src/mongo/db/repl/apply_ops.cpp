@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/apply_ops.h"
+#include "mongo/db/repl/apply_ops.h"
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"

@@ -123,7 +123,6 @@ env.Library(
 env.Library(
     target='catalog',
     source=[
-        "apply_ops.cpp",
         "capped_utils.cpp",
         "coll_mod.cpp",
         "collection_compact.cpp",
