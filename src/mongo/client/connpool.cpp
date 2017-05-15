@@ -93,6 +93,7 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
               << " due to bad connection status; " << openConnections()
               << " connections to that host remain open";
         pool->onDestroy(c);
+        delete c;
     } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
         log() << "Ending idle connection to host " << _hostName << "(with timeout of "
