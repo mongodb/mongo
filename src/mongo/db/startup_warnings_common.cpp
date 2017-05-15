@@ -114,14 +114,16 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
 
     if (serverParams.bind_ip.empty()) {
         log() << startupWarningsLog;
-        log() << "** ATTENTION: The server is bound to localhost." << startupWarningsLog;
+        log() << "** WARNING: This server is bound to localhost." << startupWarningsLog;
         log() << "**          Remote systems will be unable to connect to this server. "
               << startupWarningsLog;
         log() << "**          Start the server with --bind_ip <address> to specify which IP "
-                 "addresses it"
               << startupWarningsLog;
-        log() << "**          should serve responses from, or with --bind_ip_all to bind to all "
-                 "interfaces."
+        log() << "**          addressses it should serve responses from, or with --bind_ip_all to"
+              << startupWarningsLog;
+        log() << "**          bind to all interfaces. If this behavior is desired, start the"
+              << startupWarningsLog;
+        log() << "**          server with --bind_ip 127.0.0.1 to disable this warning."
               << startupWarningsLog;
         warned = true;
     }
