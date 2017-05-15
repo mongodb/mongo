@@ -45,6 +45,7 @@ class Timestamp;
 namespace repl {
 
 class HeartbeatResponseAction;
+class MemberHeartbeatData;
 class OpTime;
 class ReplSetHeartbeatArgs;
 class ReplSetConfig;
@@ -169,7 +170,6 @@ public:
      * TODO (SERVER-27668): Make OplogQueryMetadata non-optional in mongodb 3.8.
      */
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const OpTime& myLastOpTime,
                                         const rpc::ReplSetMetadata& replMetadata,
                                         boost::optional<rpc::OplogQueryMetadata> oqMetadata,
                                         Date_t now) const = 0;
@@ -199,6 +199,34 @@ public:
     virtual void setFollowerMode(MemberState::MS newMode) = 0;
 
     /**
+     * Scan the memberHeartbeatData and determine the highest last applied or last
+     * durable optime present on a majority of servers; set _lastCommittedOpTime to this
+     * new entry.
+     * Whether the last applied or last durable op time is used depends on whether
+     * the config getWriteConcernMajorityShouldJournal is set.
+     * Returns true if the _lastCommittedOpTime was changed.
+     */
+    virtual bool updateLastCommittedOpTime() = 0;
+
+    /**
+     * Updates _lastCommittedOpTime to be "committedOpTime" if it is more recent than the
+     * current last committed OpTime.  Returns true if _lastCommittedOpTime is changed.
+     */
+    virtual bool advanceLastCommittedOpTime(const OpTime& committedOpTime) = 0;
+
+    /**
+     * Returns the OpTime of the latest majority-committed op known to this server.
+     */
+    virtual OpTime getLastCommittedOpTime() const = 0;
+
+    /**
+     * This is used to set a floor of "newOpTime" on the OpTimes we will consider committed.
+     * This prevents entries from before our election from counting as committed in our view,
+     * until our election (the "newOpTime" op) has been committed.
+     */
+    virtual void setFirstOpTimeOfMyTerm(const OpTime& newOpTime) = 0;
+
+    /**
      * Adjusts the maintenance mode count by "inc".
      *
      * It is an error to call this method if getRole() does not return Role::follower.
@@ -214,21 +242,18 @@ public:
 
     // produces a reply to a replSetSyncFrom command
     virtual void prepareSyncFromResponse(const HostAndPort& target,
-                                         const OpTime& lastOpApplied,
                                          BSONObjBuilder* response,
                                          Status* result) = 0;
 
     // produce a reply to a replSetFresh command
     virtual void prepareFreshResponse(const ReplicationCoordinator::ReplSetFreshArgs& args,
                                       Date_t now,
-                                      const OpTime& lastOpApplied,
                                       BSONObjBuilder* response,
                                       Status* result) = 0;
 
     // produce a reply to a received electCmd
     virtual void prepareElectResponse(const ReplicationCoordinator::ReplSetElectArgs& args,
                                       Date_t now,
-                                      const OpTime& lastOpApplied,
                                       BSONObjBuilder* response,
                                       Status* result) = 0;
 
@@ -236,24 +261,17 @@ public:
     virtual Status prepareHeartbeatResponse(Date_t now,
                                             const ReplSetHeartbeatArgs& args,
                                             const std::string& ourSetName,
-                                            const OpTime& lastOpApplied,
-                                            const OpTime& lastOpDurable,
                                             ReplSetHeartbeatResponse* response) = 0;
 
     // produce a reply to a V1 heartbeat
     virtual Status prepareHeartbeatResponseV1(Date_t now,
                                               const ReplSetHeartbeatArgsV1& args,
                                               const std::string& ourSetName,
-                                              const OpTime& lastOpApplied,
-                                              const OpTime& lastOpDurable,
                                               ReplSetHeartbeatResponse* response) = 0;
 
     struct ReplSetStatusArgs {
         Date_t now;
         unsigned selfUptime;
-        const OpTime& lastOpApplied;
-        const OpTime& lastOpDurable;
-        const OpTime& lastCommittedOpTime;
         const OpTime& readConcernMajorityOpTime;
         const BSONObj& initialSyncStatus;
     };
@@ -263,9 +281,17 @@ public:
                                        BSONObjBuilder* response,
                                        Status* result) = 0;
 
+    // Produce a replSetUpdatePosition command to be sent to the node's sync source.
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
+        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle,
+        OpTime currentCommittedSnapshotOpTime) const = 0;
+
     // produce a reply to an ismaster request.  It is only valid to call this if we are a
     // replset.
     virtual void fillIsMasterForReplSet(IsMasterResponse* response) = 0;
+
+    // Produce member data for the serverStatus command and diagnostic logging.
+    virtual void fillMemberData(BSONObjBuilder* result) = 0;
 
     enum class PrepareFreezeResponseResult { kNoAction, kElectSelf };
 
@@ -294,10 +320,7 @@ public:
      * newConfig.isInitialized() should be true, though implementations may accept
      * configurations where this is not true, for testing purposes.
      */
-    virtual void updateConfig(const ReplSetConfig& newConfig,
-                              int selfIndex,
-                              Date_t now,
-                              const OpTime& lastOpApplied) = 0;
+    virtual void updateConfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now) = 0;
 
     /**
      * Prepares a heartbeat request appropriate for sending to "target", assuming the
@@ -346,16 +369,99 @@ public:
         Date_t now,
         Milliseconds networkRoundTripTime,
         const HostAndPort& target,
-        const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
-        const OpTime& myLastOpApplied) = 0;
+        const StatusWith<ReplSetHeartbeatResponse>& hbResponse) = 0;
+
+    /**
+     *  Returns whether or not at least 'numNodes' have reached the given opTime.
+     * "durablyWritten" indicates whether the operation has to be durably applied.
+     */
+    virtual bool haveNumNodesReachedOpTime(const OpTime& opTime,
+                                           int numNodes,
+                                           bool durablyWritten) = 0;
+
+    /**
+     * Returns whether or not at least one node matching the tagPattern has reached
+     * the given opTime.
+     * "durablyWritten" indicates whether the operation has to be durably applied.
+     */
+    virtual bool haveTaggedNodesReachedOpTime(const OpTime& opTime,
+                                              const ReplSetTagPattern& tagPattern,
+                                              bool durablyWritten) = 0;
+
+    /**
+     * Returns a vector of members that have applied the operation with OpTime 'op'.
+     * "durablyWritten" indicates whether the operation has to be durably applied.
+     * "skipSelf" means to exclude this node whether or not the op has been applied.
+     */
+    virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
+                                                       bool durablyWritten,
+                                                       bool skipSelf) = 0;
 
     /**
      * Marks a member has down from our persepctive and returns a HeartbeatResponseAction, which
      * will be StepDownSelf if we can no longer see a majority of the nodes.
      */
-    virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
-                                                    const int memberIndex,
-                                                    const OpTime& myLastOpApplied) = 0;
+    virtual HeartbeatResponseAction setMemberAsDown(Date_t now, const int memberIndex) = 0;
+
+    /**
+     * Goes through the memberHeartbeatData and determines which member that is currently live
+     * has the stalest (earliest) last update time.  Returns (-1, Date_t::max()) if there are
+     * no other members.
+     */
+    virtual std::pair<int, Date_t> getStalestLiveMember() const = 0;
+
+    /**
+     * Go through the memberHeartbeatData, and mark nodes which haven't been updated
+     * recently (within an election timeout) as "down".  Returns a HeartbeatResponseAction, which
+     * will be StepDownSelf if we can no longer see a majority of the nodes, otherwise NoAction.
+     */
+    virtual HeartbeatResponseAction checkMemberTimeouts(Date_t now) = 0;
+
+    /**
+     * Set all nodes in memberHeartbeatData to not stale with a lastUpdate of "now".
+     */
+    virtual void resetAllMemberTimeouts(Date_t now) = 0;
+
+    /**
+     * Set all nodes in memberHeartbeatData that are present in member_set
+     * to not stale with a lastUpdate of "now".
+     */
+    virtual void resetMemberTimeouts(Date_t now,
+                                     const stdx::unordered_set<HostAndPort>& member_set) = 0;
+
+    /*
+     * Returns the last optime that this node has applied, whether or not it has been journaled.
+     */
+    virtual OpTime getMyLastAppliedOpTime() const = 0;
+
+    /*
+     * Returns the last optime that this node has applied and journaled.
+     */
+    virtual OpTime getMyLastDurableOpTime() const = 0;
+
+    /*
+     * Returns information we have on the state of this node.
+     */
+    virtual MemberHeartbeatData* getMyMemberHeartbeatData() = 0;
+
+    /*
+     * Returns information we have on the state of the node identified by memberId.  Returns
+     * nullptr if memberId is not found in the configuration.
+     */
+    virtual MemberHeartbeatData* findMemberHeartbeatDataByMemberId(const int memberId) = 0;
+
+    /*
+     * Returns information we have on the state of the node identified by rid.  Returns
+     * nullptr if rid is not found in the heartbeat data.  This method is used only for
+     * master/slave replication.
+     */
+    virtual MemberHeartbeatData* findMemberHeartbeatDataByRid(const OID rid) = 0;
+
+    /*
+     * Adds and returns a memberHeartbeatData entry for the given RID.
+     * Used only in master/slave mode.
+     */
+    virtual MemberHeartbeatData* addSlaveMemberData(const OID rid) = 0;
 
     /**
      * If getRole() == Role::candidate and this node has not voted too recently, updates the
@@ -412,7 +518,7 @@ public:
      *
      * NOTE: It is illegal to call this method if the node is not a primary.
      */
-    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied) = 0;
+    virtual bool stepDown(Date_t until, bool force) = 0;
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
@@ -433,7 +539,7 @@ public:
      * Considers whether or not this node should stand for election, and returns true
      * if the node has transitioned to candidate role as a result of the call.
      */
-    virtual Status checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const = 0;
+    virtual Status checkShouldStandForElection(Date_t now) const = 0;
 
     /**
      * Set the outgoing heartbeat message from self
@@ -444,16 +550,13 @@ public:
      * Prepares a ReplSetMetadata object describing the current term, primary, and lastOp
      * information.
      */
-    virtual rpc::ReplSetMetadata prepareReplSetMetadata(
-        const OpTime& lastVisibleOpTime, const OpTime& lastCommittedOpTime) const = 0;
+    virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime) const = 0;
 
     /**
      * Prepares an OplogQueryMetadata object describing the current sync source, rbid, primary,
      * lastOpApplied, and lastOpCommitted.
      */
-    virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(const OpTime& lastCommittedOpTime,
-                                                              const OpTime& lastAppliedOpTime,
-                                                              int rbid) const = 0;
+    virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(int rbid) const = 0;
 
     /**
      * Writes into 'output' all the information needed to generate a summary of the current
@@ -465,8 +568,7 @@ public:
      * Prepares a ReplSetRequestVotesResponse.
      */
     virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
-                                            ReplSetRequestVotesResponse* response,
-                                            const OpTime& lastAppliedOpTime) = 0;
+                                            ReplSetRequestVotesResponse* response) = 0;
 
     /**
      * Loads an initial LastVote document, which was read from local storage.
@@ -488,9 +590,7 @@ public:
     /**
      * Transitions to the candidate role if the node is electable.
      */
-    virtual Status becomeCandidateIfElectable(const Date_t now,
-                                              const OpTime& lastOpApplied,
-                                              bool isPriorityTakeover) = 0;
+    virtual Status becomeCandidateIfElectable(const Date_t now, bool isPriorityTakeover) = 0;
 
     /**
      * Updates the storage engine read committed support in the TopologyCoordinator options after

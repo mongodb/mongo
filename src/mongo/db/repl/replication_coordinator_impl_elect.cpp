@@ -278,12 +278,11 @@ void ReplicationCoordinatorImpl::_recoverFromElectionTie(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto now = _replExecutor->now();
-    auto lastOpApplied = _getMyLastAppliedOpTime_inlock();
-    const auto status = _topCoord->checkShouldStandForElection(now, lastOpApplied);
+    const auto status = _topCoord->checkShouldStandForElection(now);
     if (!status.isOK()) {
         LOG(2) << "ReplicationCoordinatorImpl::_recoverFromElectionTie -- " << status.reason();
     } else {
-        fassertStatusOK(28817, _topCoord->becomeCandidateIfElectable(now, lastOpApplied, false));
+        fassertStatusOK(28817, _topCoord->becomeCandidateIfElectable(now, false));
         _startElectSelf_inlock();
     }
 }

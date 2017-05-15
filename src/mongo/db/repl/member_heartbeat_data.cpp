@@ -39,13 +39,14 @@
 namespace mongo {
 namespace repl {
 
-MemberHeartbeatData::MemberHeartbeatData() : _health(-1), _authIssue(false) {
+MemberHeartbeatData::MemberHeartbeatData()
+    : _health(-1), _authIssue(false), _configIndex(-1), _isSelf(false) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTime(OpTime());
 }
 
-void MemberHeartbeatData::setUpValues(Date_t now,
+bool MemberHeartbeatData::setUpValues(Date_t now,
                                       const HostAndPort& host,
                                       ReplSetHeartbeatResponse&& hbResponse) {
     _health = 1;
@@ -54,6 +55,8 @@ void MemberHeartbeatData::setUpValues(Date_t now,
     }
     _authIssue = false;
     _lastHeartbeat = now;
+    _lastUpdate = now;
+    _lastUpdateStale = false;
     _updatedSinceRestart = true;
 
     if (!hbResponse.hasState()) {
@@ -71,7 +74,11 @@ void MemberHeartbeatData::setUpValues(Date_t now,
               << hbResponse.getState().toString() << rsLog;
     }
 
+    bool opTimeAdvanced = advanceLastAppliedOpTime(hbResponse.getAppliedOpTime(), now);
+    auto durableOpTime = hbResponse.hasDurableOpTime() ? hbResponse.getDurableOpTime() : OpTime();
+    opTimeAdvanced = advanceLastDurableOpTime(durableOpTime, now) || opTimeAdvanced;
     _lastResponse = std::move(hbResponse);
+    return opTimeAdvanced;
 }
 
 void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
@@ -87,6 +94,9 @@ void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeat
     _lastResponse.setAppliedOpTime(OpTime());
     _lastResponse.setHbMsg(heartbeatMessage);
     _lastResponse.setSyncingTo(HostAndPort());
+
+    // The _lastAppliedOpTime/_lastDurableOpTime fields don't get cleared merely by missing a
+    // heartbeat.
 }
 
 void MemberHeartbeatData::setAuthIssue(Date_t now) {
@@ -102,6 +112,48 @@ void MemberHeartbeatData::setAuthIssue(Date_t now) {
     _lastResponse.setAppliedOpTime(OpTime());
     _lastResponse.setHbMsg("");
     _lastResponse.setSyncingTo(HostAndPort());
+}
+
+void MemberHeartbeatData::setLastAppliedOpTime(OpTime opTime, Date_t now) {
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    _lastAppliedOpTime = opTime;
+}
+
+void MemberHeartbeatData::setLastDurableOpTime(OpTime opTime, Date_t now) {
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    if (_lastAppliedOpTime < opTime) {
+        // TODO(russotto): We think this should never happen, rollback or no rollback.  Make this an
+        // invariant and see what happens.
+        log() << "Durable progress (" << opTime << ") is ahead of the applied progress ("
+              << _lastAppliedOpTime << ". This is likely due to a "
+                                       "rollback."
+              << " memberid: " << _memberId << " rid: " << _rid << " host "
+              << _hostAndPort.toString() << " previous durable progress: " << _lastDurableOpTime;
+    } else {
+        _lastDurableOpTime = opTime;
+    }
+}
+
+bool MemberHeartbeatData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    if (_lastAppliedOpTime < opTime) {
+        setLastAppliedOpTime(opTime, now);
+        return true;
+    }
+    return false;
+}
+
+bool MemberHeartbeatData::advanceLastDurableOpTime(OpTime opTime, Date_t now) {
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    if (_lastDurableOpTime < opTime) {
+        setLastDurableOpTime(opTime, now);
+        return true;
+    }
+    return false;
 }
 
 }  // namespace repl

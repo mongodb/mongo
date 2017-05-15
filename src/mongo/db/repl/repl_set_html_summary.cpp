@@ -187,7 +187,7 @@ const std::string ReplSetHtmlSummary::toHtmlString() const {
             // TODO(dannenberg): change timestamp to optime in V1
             memberTable << td(memberHB.getLastHeartbeat() == Date_t()
                                   ? "?"
-                                  : memberHB.getAppliedOpTime().toString());
+                                  : memberHB.getHeartbeatAppliedOpTime().toString());
         }
         memberTable << _tr();
     }
@@ -201,7 +201,7 @@ const std::string ReplSetHtmlSummary::toHtmlString() const {
     const MemberConfig& selfConfig = _config.getMemberAt(_selfIndex);
 
     if (_primaryIndex >= 0 && _primaryIndex != _selfIndex && !selfConfig.isArbiter()) {
-        int lag = _hbData[_primaryIndex].getAppliedOpTime().getTimestamp().getSecs() -
+        int lag = _hbData[_primaryIndex].getHeartbeatAppliedOpTime().getTimestamp().getSecs() -
             _selfOptime.getTimestamp().getSecs();
         s << tr("Lag: ", str::stream() << lag << " secs");
     }

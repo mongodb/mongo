@@ -75,5 +75,9 @@ void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
     _nextHeartbeatStartDate = when;
 }
 
+void HeartbeatResponseAction::setAdvancedOpTime(bool advanced) {
+    _advancedOpTime = advanced;
+}
+
 }  // namespace repl
 }  // namespace mongo

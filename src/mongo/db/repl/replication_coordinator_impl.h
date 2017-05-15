@@ -535,28 +535,6 @@ private:
         std::vector<WaiterType> _list;
     };
 
-    // Struct that holds information about nodes in this replication group, mainly used for
-    // tracking replication progress for write concern satisfaction.
-    struct SlaveInfo {
-        // Our last known OpTime that this slave has applied and journaled to.
-        OpTime lastDurableOpTime;
-        // Our last known OpTime that this slave has applied, whether journaled or unjournaled.
-        OpTime lastAppliedOpTime;
-        HostAndPort hostAndPort;  // Client address of the slave.
-        int memberId =
-            -1;   // Id of the node in the replica set config, or -1 if we're not a replSet.
-        OID rid;  // RID of the node.
-        bool self = false;  // Whether this SlaveInfo stores the information about ourself
-        Date_t lastUpdate =
-            Date_t::max();  // The last time we heard from this node; used for liveness detection
-        bool down = false;  // Indicator set when lastUpdate time exceeds the election timeout.
-
-        BSONObj toBSON() const;
-        std::string toString() const;
-    };
-
-    typedef std::vector<SlaveInfo> SlaveInfoVector;
-
     typedef std::vector<executor::TaskExecutor::CallbackHandle> HeartbeatHandles;
 
     // The state and logic of primary catchup.
@@ -597,50 +575,6 @@ private:
         std::unique_ptr<CallbackWaiter> _waiter;
     };
 
-    /**
-     * Appends a "replicationProgress" section with data for each member in set.
-     */
-    void _appendSlaveInfoData_inlock(BSONObjBuilder* result);
-
-    /**
-     * Looks up the SlaveInfo in _slaveInfo associated with the given RID and returns a pointer
-     * to it, or returns NULL if there is no SlaveInfo with the given RID.
-     */
-    SlaveInfo* _findSlaveInfoByRID_inlock(const OID& rid);
-
-    /**
-     * Looks up the SlaveInfo in _slaveInfo associated with the given member ID and returns a
-     * pointer to it, or returns NULL if there is no SlaveInfo with the given member ID.
-     */
-    SlaveInfo* _findSlaveInfoByMemberID_inlock(int memberID);
-
-    /**
-     * Adds the given SlaveInfo to _slaveInfo and wakes up any threads waiting for replication
-     * that now have their write concern satisfied.  Only valid to call in master/slave setups.
-     */
-    void _addSlaveInfo_inlock(const SlaveInfo& slaveInfo);
-
-    /**
-     * Updates the durableOpTime field on the item in _slaveInfo pointed to by 'slaveInfo' with the
-     * given OpTime 'opTime' and wakes up any threads waiting for replication that now have their
-     * write concern satisfied.
-     */
-    void _updateSlaveInfoDurableOpTime_inlock(SlaveInfo* slaveInfo, const OpTime& opTime);
-
-    /**
-     * Updates the appliedOpTime field on the item in _slaveInfo pointed to by 'slaveInfo' with the
-     * given OpTime 'opTime' and wakes up any threads waiting for replication that now have their
-     * write concern satisfied.
-     */
-    void _updateSlaveInfoAppliedOpTime_inlock(SlaveInfo* slaveInfo, const OpTime& opTime);
-
-    /**
-     * Returns the index into _slaveInfo where data corresponding to ourself is stored.
-     * For more info on the rules about how we know where our entry is, see the comment for
-     * _slaveInfo.
-     */
-    size_t _getMyIndexInSlaveInfo_inlock() const;
-
     void _resetMyLastOpTimes_inlock();
 
     /**
@@ -664,14 +598,6 @@ private:
     Status _validateReadConcern(OperationContext* opCtx, const ReadConcernArgs& readConcern);
 
     /**
-     * Helper method that removes entries from _slaveInfo if they correspond to a node
-     * with a member ID that is not in the current replica set config.  Will always leave an
-     * entry for ourself at the beginning of _slaveInfo, even if we aren't present in the
-     * config.
-     */
-    void _updateSlaveInfoFromConfig_inlock();
-
-    /**
      * Helper to update our saved config, cancel any pending heartbeats, and kick off sending
      * new heartbeats based on the new config.
      *
@@ -680,12 +606,6 @@ private:
      */
     PostMemberStateUpdateAction _setCurrentRSConfig_inlock(const ReplSetConfig& newConfig,
                                                            int myIndex);
-
-    /**
-     * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
-     * current last committed OpTime.
-     */
-    void _advanceCommitPoint_inlock(const OpTime& committedOpTime);
 
     /**
      * Helper to wake waiters in _replicationWaiterList that are doneWaitingForReplication.
@@ -718,21 +638,6 @@ private:
     bool _doneWaitingForReplication_inlock(const OpTime& opTime,
                                            SnapshotName minSnapshot,
                                            const WriteConcernOptions& writeConcern);
-
-    /**
-     * Helper for _doneWaitingForReplication_inlock that takes an integer write concern.
-     * "durablyWritten" indicates whether the operation has to be durably applied.
-     */
-    bool _haveNumNodesReachedOpTime_inlock(const OpTime& opTime, int numNodes, bool durablyWritten);
-
-    /**
-     * Helper for _doneWaitingForReplication_inlock that takes a tag pattern representing a
-     * named write concern mode.
-     * "durablyWritten" indicates whether the operation has to be durably applied.
-     */
-    bool _haveTaggedNodesReachedOpTime_inlock(const OpTime& opTime,
-                                              const ReplSetTagPattern& tagPattern,
-                                              bool durablyWritten);
 
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
 
@@ -1048,17 +953,28 @@ private:
         stdx::unique_lock<stdx::mutex> lock);
 
     /**
-     * Scan the SlaveInfoVector and determine the highest OplogEntry present on a majority of
-     * servers; set _lastCommittedOpTime to this new entry, if greater than the current entry.
+     * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
+     * current last committed OpTime.
      */
-    void _updateLastCommittedOpTime_inlock();
+    void _advanceCommitPoint_inlock(const OpTime& committedOpTime);
 
     /**
-     * This is used to set a floor of "newOpTime" on the OpTimes we will consider committed.
-     * This prevents entries from before our election from counting as committed in our view,
-     * until our election (the "newOpTime" op) has been committed.
+     * Helper for advanceCommitPoint and updateLastCommittedOpTime. Notifies external waiters
+     * waiting on oplog metadata changes (not read or write concerns) of a change in
+     * lastCommittedOpTime and updates our committed snapshot.
      */
-    void _setFirstOpTimeOfMyTerm_inlock(const OpTime& newOpTime);
+    void _updateCommitPoint_inlock();
+
+    /**
+     * Scan the memberHeartbeatData and determine the highest last applied or last
+     * durable optime present on a majority of servers; set _lastCommittedOpTime to this
+     * new entry.  Wake any threads waiting for replication that now have their
+     * write concern satisfied.
+     *
+     * Whether the last applied or last durable op time is used depends on whether
+     * the config getWriteConcernMajorityShouldJournal is set.
+     */
+    void _updateLastCommittedOpTime_inlock();
 
     /**
      * Callback that attempts to set the current term in topology coordinator and
@@ -1302,16 +1218,6 @@ private:
     // Election ID of the last election that resulted in this node becoming primary.
     OID _electionId;  // (M)
 
-    // Vector containing known information about each member (such as replication
-    // progress and member ID) in our replica set or each member replicating from
-    // us in a master-slave deployment.  In master/slave, the first entry is
-    // guaranteed to correspond to ourself.  In replica sets where we don't have a
-    // valid config or are in state REMOVED then the vector will be a single element
-    // just with info about ourself.  In replica sets with a valid config the elements
-    // will be in the same order as the members in the replica set config, thus
-    // the entry for ourself will be at _thisMemberConfigIndex.
-    SlaveInfoVector _slaveInfo;  // (M)
-
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _memberStateChange;  // (M)
 
@@ -1374,13 +1280,6 @@ private:
     // providing the prior value for a limited period of time is acceptable.  Also unlike
     // _canAcceptNonLocalWrites, its value is only meaningful on replica set secondaries.
     AtomicUInt32 _canServeNonLocalReads;  // (S)
-
-    // OpTime of the latest committed operation. Matches the concurrency level of _slaveInfo.
-    OpTime _lastCommittedOpTime;  // (M)
-
-    // OpTime representing our transition to PRIMARY and the start of our term.
-    // _lastCommittedOpTime cannot be set to an earlier OpTime.
-    OpTime _firstOpTimeOfMyTerm;  // (M)
 
     // ReplicationProcess used to hold information related to the replication and application of
     // operations from the sync source.
