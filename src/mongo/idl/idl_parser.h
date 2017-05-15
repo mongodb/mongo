@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -118,6 +119,11 @@ public:
      */
     MONGO_COMPILER_NORETURN void throwBadEnumValue(StringData enumValue) const;
     MONGO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
+
+    /**
+     * Equivalent to Command::parseNsCollectionRequired
+     */
+    static NamespaceString parseNSCollectionRequired(StringData dbName, const BSONElement& element);
 
 private:
     /**

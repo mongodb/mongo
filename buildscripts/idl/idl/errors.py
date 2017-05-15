@@ -74,6 +74,8 @@ ERROR_ID_ENUM_BAD_INT_VAUE = "ID0037"
 ERROR_ID_ENUM_NON_UNIQUE_VALUES = "ID0038"
 ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
 ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM = "ID0040"
+ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
+ERROR_ID_FIELD_NO_COMMAND = "ID0042"
 
 
 class IDLError(Exception):
@@ -546,6 +548,22 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM, (
             "Field '%s' cannot contain a value for property '%s' when a field's type is a enum") %
                         (name, field_name))
+
+    def add_bad_command_namespace_error(self, location, command_name, command_namespace,
+                                        valid_commands):
+        # type: (common.SourceLocation, unicode, unicode, List[unicode]) -> None
+        """Add an error about the namespace value not being a valid choice."""
+        self._add_error(
+            location, ERROR_ID_BAD_COMMAND_NAMESPACE,
+            "Command namespace '%s' for command '%s' is not a valid choice. Valid options are '%s'."
+            % (command_namespace, command_name, valid_commands))
+
+    def add_bad_command_as_field_error(self, location, command_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about using a command for a field."""
+        self._add_error(location, ERROR_ID_FIELD_NO_COMMAND,
+                        ("Command '%s' cannot be used as a field type'. Commands must be top-level"
+                         + " types due to their serialization rules.") % (command_name))
 
 
 def _assert_unique_error_messages():

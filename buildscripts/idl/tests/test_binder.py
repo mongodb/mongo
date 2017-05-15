@@ -453,6 +453,27 @@ class TestBinder(testcase.IDLTestcase):
                     serializer: bar
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
+        # Test 'string' serialization needs deserializer
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            types:
+                foofoo:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type: string
+                    serializer: bar
+            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+
+        # Test 'date' serialization needs deserializer
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            types:
+                foofoo:
+                    description: foo
+                    cpp_type: foo
+                    bson_serialization_type: date
+            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+
         # Test 'chain' serialization needs serializer
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -840,6 +861,18 @@ class TestBinder(testcase.IDLTestcase):
                     foo1: string
         """), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
 
+        # Non-existent chained type
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            bar1:
+                description: foo
+                strict: false
+                chained_types:
+                    - foobar1
+                fields:
+                    foo1: string
+        """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+
     def test_chained_struct_positive(self):
         # type: () -> None
         """Positive parser chaining test cases."""
@@ -961,6 +994,16 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     field1: string
         """)
+
+        # Non-existing chained struct
+        self.assert_bind_fail(test_preamble + indent_text(1,
+                                                          textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                chained_structs:
+                    - foobar1
+        """)), idl.errors.ERROR_ID_UNKNOWN_TYPE)
 
         # Type as chained struct
         self.assert_bind_fail(test_preamble + indent_text(1,
@@ -1199,6 +1242,80 @@ class TestBinder(testcase.IDLTestcase):
                         type: foo
                         default: 1
             """), idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM)
+
+    def test_command_positive(self):
+        # type: () -> None
+        """Positive command tests."""
+
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+        """)
+
+        self.assert_bind(test_preamble + textwrap.dedent("""
+            commands: 
+                foo:
+                    description: foo
+                    namespace: ignored
+                    strict: true
+                    fields:
+                        foo: string
+            """))
+
+    def test_command_negative(self):
+        # type: () -> None
+        """Negative command tests."""
+
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+        """)
+
+        # Commands cannot be fields in other commands
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+            commands: 
+                foo:
+                    description: foo
+                    namespace: ignored
+                    fields:
+                        foo: string
+
+                bar:
+                    description: foo
+                    namespace: ignored
+                    fields:
+                        foo: foo
+            """), idl.errors.ERROR_ID_FIELD_NO_COMMAND)
+
+        # Commands cannot be fields in structs
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+            commands: 
+                foo:
+                    description: foo
+                    namespace: ignored
+                    fields:
+                        foo: string
+
+            structs:
+                bar:
+                    description: foo
+                    fields:
+                        foo: foo
+            """), idl.errors.ERROR_ID_FIELD_NO_COMMAND)
 
 
 if __name__ == '__main__':

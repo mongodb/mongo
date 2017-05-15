@@ -1432,5 +1432,163 @@ TEST(IDLEnum, TestStringEnumNegative) {
     }
 }
 
+
+// Positive: demonstrate a command wit concatenate with db
+TEST(IDLCommand, TestConcatentateWithDb) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("BasicConcatenateWithDbCommand"
+                        << "coll1"
+                        << "field1"
+                        << 3
+                        << "field2"
+                        << "five");
+
+    auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc);
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getField2(), "five");
+    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
+
+    assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(NamespaceString("coll1"), &builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        BasicConcatenateWithDbCommand one_new;
+        one_new.setField1(3);
+        one_new.setField2("five");
+        one_new.serialize(NamespaceString("coll1"), &builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+TEST(IDLCommand, TestConcatentateWithDbSymbol) {
+    IDLParserErrorContext ctxt("root");
+
+    // Postive - symbol???
+    {
+        auto testDoc =
+            BSON("BasicConcatenateWithDbCommand" << BSONSymbol("coll1") << "field1" << 3 << "field2"
+                                                 << "five");
+        auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc);
+        ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString("db.coll1"));
+    }
+}
+
+
+TEST(IDLCommand, TestConcatentateWithDbNegative) {
+    IDLParserErrorContext ctxt("root");
+
+    // Negative - duplicate namespace field
+    {
+        auto testDoc = BSON("BasicConcatenateWithDbCommand" << 1 << "field1" << 3
+                                                            << "BasicConcatenateWithDbCommand"
+                                                            << 1
+                                                            << "field2"
+                                                            << "five");
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc), UserException);
+    }
+
+    // Negative -  namespace field wrong order
+    {
+        auto testDoc = BSON("field1" << 3 << "BasicConcatenateWithDbCommand" << 1 << "field2"
+                                     << "five");
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc), UserException);
+    }
+
+    // Negative -  namespace missing
+    {
+        auto testDoc = BSON("field1" << 3 << "field2"
+                                     << "five");
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc), UserException);
+    }
+
+    // Negative - wrong type
+    {
+        auto testDoc = BSON("BasicConcatenateWithDbCommand" << 1 << "field1" << 3 << "field2"
+                                                            << "five");
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc), UserException);
+    }
+
+    // Negative - bad ns with embedded null
+    {
+        StringData sd1("db\0foo", 6);
+        auto testDoc = BSON("BasicConcatenateWithDbCommand" << sd1 << "field1" << 3 << "field2"
+                                                            << "five");
+        ASSERT_THROWS(BasicConcatenateWithDbCommand::parse(ctxt, "db", testDoc), UserException);
+    }
+}
+
+// Positive: demonstrate a command with concatenate with db
+TEST(IDLCommand, TestIgnore) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("BasicIgnoredCommand" << 1 << "field1" << 3 << "field2"
+                                              << "five");
+
+    auto testStruct = BasicIgnoredCommand::parse(ctxt, testDoc);
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getField2(), "five");
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        testStruct.serialize(&builder);
+        auto loopbackDoc = builder.obj();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        BasicIgnoredCommand one_new;
+        one_new.setField1(3);
+        one_new.setField2("five");
+        one_new.serialize(&builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+    }
+}
+
+
+TEST(IDLCommand, TestIgnoredNegative) {
+    IDLParserErrorContext ctxt("root");
+
+    // Negative - duplicate namespace field
+    {
+        auto testDoc = BSON(
+            "BasicIgnoredCommand" << 1 << "field1" << 3 << "BasicIgnoredCommand" << 1 << "field2"
+                                  << "five");
+        ASSERT_THROWS(BasicIgnoredCommand::parse(ctxt, testDoc), UserException);
+    }
+
+    // Negative -  namespace field wrong order
+    {
+        auto testDoc = BSON("field1" << 3 << "BasicIgnoredCommand" << 1 << "field2"
+                                     << "five");
+        ASSERT_THROWS(BasicIgnoredCommand::parse(ctxt, testDoc), UserException);
+    }
+
+    // Negative -  namespace missing
+    {
+        auto testDoc = BSON("field1" << 3 << "field2"
+                                     << "five");
+        ASSERT_THROWS(BasicIgnoredCommand::parse(ctxt, testDoc), UserException);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

@@ -203,7 +203,6 @@ void IDLParserErrorContext::throwBadArrayFieldNumberSequence(std::uint32_t actua
                             << "'.");
 }
 
-
 void IDLParserErrorContext::throwBadEnumValue(int enumValue) const {
     std::string path = getElementPath(StringData());
     uasserted(40440,
@@ -216,6 +215,21 @@ void IDLParserErrorContext::throwBadEnumValue(StringData enumValue) const {
     uasserted(40441,
               str::stream() << "Enumeration value '" << enumValue << "' for field '" << path
                             << "' is not a valid value.");
+}
+
+NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
+                                                                 const BSONElement& element) {
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "collection name has invalid type " << typeName(element.type()),
+            element.canonicalType() == canonicalizeBSONType(mongo::String));
+
+    const NamespaceString nss(dbName, element.valueStringData());
+
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+            nss.isValid());
+
+    return nss;
 }
 
 std::vector<StringData> transformVector(const std::vector<std::string>& input) {

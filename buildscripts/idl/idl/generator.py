@@ -29,6 +29,7 @@ from . import bson
 from . import common
 from . import cpp_types
 from . import enum_types
+from . import struct_types
 from . import writer
 
 
@@ -241,23 +242,27 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         return writer.IndentedScopedBlock(self._writer,
                                           'class %s {' % common.title_case(class_name), '};')
 
-    def gen_serializer_methods(self, class_name):
-        # type: (unicode) -> None
+    def gen_serializer_methods(self, struct):
+        # type: (ast.Struct) -> None
         """Generate a serializer method declarations."""
-        self._writer.write_line(
-            'static %s parse(const IDLParserErrorContext& ctxt, const BSONObj& object);' %
-            (common.title_case(class_name)))
-        self._writer.write_line('void serialize(BSONObjBuilder* builder) const;')
-        self._writer.write_line('BSONObj toBSON() const;')
+
+        struct_type_info = struct_types.get_struct_info(struct)
+
+        self._writer.write_line(struct_type_info.get_deserializer_static_method().get_declaration())
+
+        self._writer.write_line(struct_type_info.get_serializer_method().get_declaration())
+
+        self._writer.write_line(struct_type_info.get_to_bson_method().get_declaration())
+
         self._writer.write_empty_line()
 
-    def gen_protected_serializer_methods(self):
-        # type: () -> None
+    def gen_protected_serializer_methods(self, struct):
+        # type: (ast.Struct) -> None
         # pylint: disable=invalid-name
         """Generate protected serializer method declarations."""
+        struct_type_info = struct_types.get_struct_info(struct)
 
-        self._writer.write_line(
-            'void parseProtected(const IDLParserErrorContext& ctxt, const BSONObj& object);')
+        self._writer.write_line(struct_type_info.get_deserializer_method().get_declaration())
         self._writer.write_empty_line()
 
     def gen_getter(self, field):
@@ -352,6 +357,22 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         name=enum_value.name,
                         value=enum_type_info.get_cpp_value_assignment(enum_value)))
 
+    def gen_command_methods(self, command):
+        # type: (ast.Command) -> None
+        """Generate the methods for a command."""
+        struct_type_info = struct_types.get_struct_info(command)
+        struct_type_info.gen_getter_method(self._writer)
+
+        self._writer.write_empty_line()
+
+    def gen_command_member(self, command):
+        # type: (ast.Command) -> None
+        """Generate the class members for a command."""
+        struct_type_info = struct_types.get_struct_info(command)
+        struct_type_info.gen_member(self._writer)
+
+        self._writer.write_empty_line()
+
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
@@ -404,7 +425,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.gen_enum_functions(idl_enum)
                 self._writer.write_empty_line()
 
-            for struct in spec.structs:
+            spec_and_structs = spec.structs
+            spec_and_structs += spec.commands
+
+            for struct in spec_and_structs:
                 self.gen_description_comment(struct.description)
                 with self.gen_class_declaration_block(struct.name):
                     self.write_unindented_line('public:')
@@ -414,7 +438,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     self.write_empty_line()
 
                     # Write constructor
-                    self.gen_serializer_methods(struct.name)
+                    self.gen_serializer_methods(struct)
+
+                    if isinstance(struct, ast.Command):
+                        self.gen_command_methods(struct)
 
                     # Write getters & setters
                     for field in struct.fields:
@@ -425,9 +452,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             self.gen_setter(field)
 
                     self.write_unindented_line('protected:')
-                    self.gen_protected_serializer_methods()
+                    self.gen_protected_serializer_methods(struct)
 
                     self.write_unindented_line('private:')
+
+                    # Write command member variables
+                    if isinstance(struct, ast.Command):
+                        self.gen_command_member(struct)
 
                     # Write member variables
                     for field in struct.fields:
@@ -571,23 +602,37 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 object_value = self._gen_field_deserializer_expression('element', field)
                 self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
 
+    def gen_command_namespace_check(self, command):
+        # type: (ast.Command) -> None
+        """Generate a namespace check for a command."""
+
+        with self._predicate("firstFieldFound == false"):
+            struct_type_info = struct_types.get_struct_info(command)
+            struct_type_info.gen_namespace_check(self._writer)
+
+            self._writer.write_line('firstFieldFound = true;')
+            self._writer.write_line('continue;')
+
     def gen_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
         """Generate the C++ deserializer method definitions."""
-        func_def = common.template_args(
-            '${class_name} ${class_name}::parse (const IDLParserErrorContext& ctxt,' +
-            'const BSONObj& bsonObject)',
-            class_name=common.title_case(struct.name))
-        with self._block('%s {' % (func_def), '}'):
+        # Commands that have concatentate_with_db namespaces require db name as a parameter
+
+        struct_type_info = struct_types.get_struct_info(struct)
+
+        with self._block('%s {' %
+                         (struct_type_info.get_deserializer_static_method().get_definition()), '}'):
             self._writer.write_line('%s object;' % common.title_case(struct.name))
-            self._writer.write_line('object.parseProtected(ctxt, bsonObject);')
+            self._writer.write_line(struct_type_info.get_deserializer_method().get_call('object'))
             self._writer.write_line('return object;')
 
-        func_def = 'void %s::parseProtected(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject)' % (
-            common.title_case(struct.name))
+        func_def = struct_type_info.get_deserializer_method().get_definition()
         with self._block('%s {' % (func_def), '}'):
 
             field_usage_check = _FieldUsageChecker(self._writer)
+            if isinstance(struct, ast.Command):
+                self._writer.write_line('bool firstFieldFound = false;')
+
             self._writer.write_empty_line()
 
             with self._block('for (const auto& element : bsonObject) {', '}'):
@@ -595,7 +640,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
                 self._writer.write_empty_line()
 
-                # TODO: generate command namespace string check
+                if isinstance(struct, ast.Command):
+                    self.gen_command_namespace_check(struct)
+
                 field_usage_check.add_store()
                 self._writer.write_empty_line()
 
@@ -729,8 +776,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate the serialize method definition."""
 
-        with self._block('void %s::serialize(BSONObjBuilder* builder) const {' %
-                         common.title_case(struct.name), '}'):
+        struct_type_info = struct_types.get_struct_info(struct)
+
+        with self._block('%s {' % (struct_type_info.get_serializer_method().get_definition()), '}'):
+
+            # Serialize the namespace as the first field
+            if isinstance(struct, ast.Command):
+                struct_type_info = struct_types.get_struct_info(struct)
+                struct_type_info.gen_serializer(self._writer)
 
             for field in struct.fields:
                 # If fields are meant to be ignored during deserialization, there is not need to serialize them
@@ -771,16 +824,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_to_bson_serializer_method(self, struct):
         # type: (ast.Struct) -> None
         """Generate the toBSON method definition."""
-        self._writer.write_line(
-            common.template_args(
-                """\
-            BSONObj ${class_name}::toBSON() const {
-                BSONObjBuilder builder;
-                serialize(&builder);
-                return builder.obj();
-            }
-            """,
-                class_name=common.title_case(struct.name)))
+        struct_type_info = struct_types.get_struct_info(struct)
+
+        with self._block('%s {' % (struct_type_info.get_to_bson_method().get_definition()), '}'):
+            self._writer.write_line('BSONObjBuilder builder;')
+            self._writer.write_line(struct_type_info.get_serializer_method().get_call(None).replace(
+                "builder", "&builder"))
+            self._writer.write_line('return builder.obj();')
 
     def gen_string_constants_definitions(self, struct):
         # type: (ast.Struct) -> None
@@ -801,7 +851,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_enum_definition(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the definitions for an enum's supporting functions."""
-        #TODO: generate string constants and function names
         enum_type_info = enum_types.get_type_info(idl_enum)
 
         enum_type_info.gen_deserializer_definition(self._writer)

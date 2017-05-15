@@ -96,18 +96,19 @@ class SymbolTable(object):
     def __init__(self):
         # type: () -> None
         """Construct an empty symbol table."""
-        self.types = []  # type: List[Type]
-        self.structs = []  # type: List[Struct]
         self.commands = []  # type: List[Command]
         self.enums = []  # type: List[Enum]
+        self.structs = []  # type: List[Struct]
+        self.types = []  # type: List[Type]
 
     def _is_duplicate(self, ctxt, location, name, duplicate_class_name):
         # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> bool
         """Return true if the given item already exist in the symbol table."""
         for (item, entity_type) in _item_and_type({
+                "command": self.commands,
+                "enum": self.enums,
                 "struct": self.structs,
                 "type": self.types,
-                "enum": self.enums
         }):
             if item.name == name:
                 ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
@@ -135,9 +136,9 @@ class SymbolTable(object):
 
     def add_command(self, ctxt, command):
         # type: (errors.ParserContext, Command) -> None
-        """Add an IDL command  to the symbol table and check for duplicates."""
-        # TODO: add commands
-        pass
+        """Add an IDL command to the symbol table and check for duplicates."""
+        if not self._is_duplicate(ctxt, command, command.name, "command"):
+            self.commands.append(command)
 
     def add_imported_symbol_table(self, ctxt, imported_symbols):
         # type: (errors.ParserContext, SymbolTable) -> None
@@ -146,6 +147,11 @@ class SymbolTable(object):
 
         Marks imported structs as imported, and errors on duplicate symbols.
         """
+        for command in imported_symbols.commands:
+            if not self._is_duplicate(ctxt, command, command.name, "command"):
+                command.imported = True
+                self.commands.append(command)
+
         for struct in imported_symbols.structs:
             if not self._is_duplicate(ctxt, struct, struct.name, "struct"):
                 struct.imported = True
@@ -160,36 +166,42 @@ class SymbolTable(object):
             self.add_type(ctxt, idltype)
 
     def resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode)-> Tuple[Optional[Enum], Optional[Struct], Optional[Type]]
+        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         return self._resolve_field_type(ctxt, location, field_name, type_name)
 
     def _resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Tuple[Optional[Enum], Optional[Struct], Optional[Type]]
+        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
+        # pylint: disable=too-many-return-statements
+
+        for command in self.commands:
+            if command.name == type_name:
+                return command
+
         for idl_enum in self.enums:
             if idl_enum.name == type_name:
-                return (idl_enum, None, None)
-
-        for idltype in self.types:
-            if idltype.name == type_name:
-                return (None, None, idltype)
+                return idl_enum
 
         for struct in self.structs:
             if struct.name == type_name:
-                return (None, struct, None)
+                return struct
+
+        for idltype in self.types:
+            if idltype.name == type_name:
+                return idltype
 
         if type_name.startswith('array<'):
             array_type_name = parse_array_type(type_name)
             if not array_type_name:
                 ctxt.add_bad_array_type_name_error(location, field_name, type_name)
-                return (None, None, None)
+                return None
 
             return self._resolve_field_type(ctxt, location, field_name, array_type_name)
 
         ctxt.add_unknown_type_error(location, field_name, type_name)
 
-        return (None, None, None)
+        return None
 
 
 class Global(common.SourceLocation):
@@ -300,9 +312,19 @@ class Struct(common.SourceLocation):
         super(Struct, self).__init__(file_name, line, column)
 
 
-# TODO: add support for commands
 class Command(Struct):
-    """IDL command."""
+    """
+    IDL command information, a subtype of Struct.
+
+    Namespace is required.
+    """
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a Command."""
+        self.namespace = None  # type: unicode
+
+        super(Command, self).__init__(file_name, line, column)
 
 
 class EnumValue(common.SourceLocation):
