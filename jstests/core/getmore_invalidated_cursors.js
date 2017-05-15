@@ -87,4 +87,24 @@
     assert.commandWorked(testDB.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));
     assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: coll.getName()}),
                                  ErrorCodes.CursorNotFound);
+
+    // Test that all cursors on collections to be renamed get invalidated. Note that we can't do
+    // renames on sharded collections.
+    if (!isShardedCollection) {
+        setupCollection();
+        const collRenamed = testDB.test_rename;
+        collRenamed.drop();
+        cursor = coll.find().batchSize(batchSize);
+        assert(cursor.hasNext(), "Expected more data from find call on " + coll.getName());
+        assert.commandWorked(testDB.adminCommand({
+            renameCollection: testDB.getName() + "." + coll.getName(),
+            to: testDB.getName() + "." + collRenamed.getName()
+        }));
+
+        // Ensure getMore fails with an appropriate error code and message.
+        error = assert.throws(() => cursor.itcount());
+        assert.eq(error.code, ErrorCodes.OperationFailed, tojson(error));
+        assert.neq(-1, error.message.indexOf('collection dropped'), error.message);
+    }
+
 }());

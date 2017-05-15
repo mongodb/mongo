@@ -432,8 +432,6 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     audit::logDropCollection(&cc(), fullns.toString());
 
-    collection->getCursorManager()->invalidateAll(opCtx, true, "collection dropped");
-
     Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fullns.toString());
 
     auto uuid = collection->uuid();
@@ -495,14 +493,16 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
 
     // We want to destroy the Collection object before telling the StorageEngine to destroy the
     // RecordStore.
-    _clearCollectionCache(opCtx, fullns.toString(), "collection dropped");
+    _clearCollectionCache(
+        opCtx, fullns.toString(), "collection dropped", /*collectionGoingAway*/ true);
 
     return _dbEntry->dropCollection(opCtx, fullns.toString());
 }
 
 void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
                                          StringData fullns,
-                                         const std::string& reason) {
+                                         const std::string& reason,
+                                         bool collectionGoingAway) {
     verify(_name == nsToDatabaseSubstring(fullns));
     CollectionMap::const_iterator it = _collections.find(fullns.toString());
 
@@ -512,7 +512,7 @@ void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
     // Takes ownership of the collection
     opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
 
-    it->second->getCursorManager()->invalidateAll(opCtx, false, reason);
+    it->second->getCursorManager()->invalidateAll(opCtx, collectionGoingAway, reason);
     _collections.erase(it);
 }
 
@@ -565,11 +565,12 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
         while (ii.more()) {
             IndexDescriptor* desc = ii.next();
-            _clearCollectionCache(opCtx, desc->indexNamespace(), clearCacheReason);
+            _clearCollectionCache(
+                opCtx, desc->indexNamespace(), clearCacheReason, /*collectionGoingAway*/ true);
         }
 
-        _clearCollectionCache(opCtx, fromNS, clearCacheReason);
-        _clearCollectionCache(opCtx, toNS, clearCacheReason);
+        _clearCollectionCache(opCtx, fromNS, clearCacheReason, /*collectionGoingAway*/ true);
+        _clearCollectionCache(opCtx, toNS, clearCacheReason, /*collectionGoingAway*/ false);
 
         Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fromNS.toString());
     }
