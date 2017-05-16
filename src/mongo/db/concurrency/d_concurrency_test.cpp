@@ -35,6 +35,7 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
@@ -179,6 +180,10 @@ private:
     ServiceContext::UniqueClient _client;
 };
 
+
+TEST_F(DConcurrencyTestFixture, WriteConflictRetryInstantiatesOK) {
+    writeConflictRetry(nullptr, "", "", [] {});
+}
 
 TEST_F(DConcurrencyTestFixture, ResourceMutex) {
     Lock::ResourceMutex mtx("testMutex");
