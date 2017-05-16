@@ -98,10 +98,9 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
@@ -112,11 +111,11 @@ public:
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));
 
         Status mergeChunkResult =
-            Grid::get(txn)->catalogManager()->commitChunkMerge(txn,
-                                                               parsedRequest.getNamespace(),
-                                                               parsedRequest.getEpoch(),
-                                                               parsedRequest.getChunkBoundaries(),
-                                                               parsedRequest.getShardName());
+            Grid::get(opCtx)->catalogManager()->commitChunkMerge(opCtx,
+                                                                 parsedRequest.getNamespace(),
+                                                                 parsedRequest.getEpoch(),
+                                                                 parsedRequest.getChunkBoundaries(),
+                                                                 parsedRequest.getShardName());
 
         if (!mergeChunkResult.isOK()) {
             return appendCommandStatus(result, mergeChunkResult);

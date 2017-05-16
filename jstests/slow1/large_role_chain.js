@@ -6,6 +6,15 @@ function runTest(conn) {
     testdb.runCommand({dropAllRolesFromDatabase: 1});
     var chainLen = 2000;
 
+    var buildInfo = conn.getDB("admin").runCommand("buildInfo");
+    assert.commandWorked(buildInfo);
+
+    // We reduce the number of roles linked together in the chain to avoid causing this test to take
+    // a long time with --dbg=on builds.
+    if (buildInfo.debug) {
+        chainLen = 200;
+    }
+
     jsTestLog("Generating a chain of " + chainLen + " linked roles");
 
     var roleNameBase = "chainRole";

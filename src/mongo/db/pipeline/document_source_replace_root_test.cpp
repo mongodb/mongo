@@ -279,6 +279,16 @@ TEST_F(ReplaceRootBasics, ReplaceRootModifiesAllFields) {
     ASSERT_EQUALS(0U, modifiedPaths.paths.size());
 }
 
+TEST_F(ReplaceRootBasics, ReplaceRootWithRemoveSystemVariableThrows) {
+    auto replaceRoot = createReplaceRoot(BSON("newRoot"
+                                              << "$$REMOVE"));
+    Document inputDoc = Document{{"b", 2}};
+    auto mock = DocumentSourceMock::create({inputDoc});
+    replaceRoot->setSource(mock.get());
+
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
+}
+
 /**
  * Fixture to test error cases of initializing the $replaceRoot stage.
  */

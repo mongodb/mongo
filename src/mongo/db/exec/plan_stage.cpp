@@ -74,13 +74,13 @@ void PlanStage::restoreState() {
     doRestoreState();
 }
 
-void PlanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void PlanStage::invalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     ++_commonStats.invalidates;
     for (auto&& child : _children) {
-        child->invalidate(txn, dl, type);
+        child->invalidate(opCtx, dl, type);
     }
 
-    doInvalidate(txn, dl, type);
+    doInvalidate(opCtx, dl, type);
 }
 
 void PlanStage::detachFromOperationContext() {

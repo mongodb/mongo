@@ -1,0 +1,137 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='update_common',
+    source=[
+        'field_checker.cpp',
+        'log_builder.cpp',
+        'path_support.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ],
+)
+
+env.CppUnitTest(
+    target='field_checker_test',
+    source=[
+        'field_checker_test.cpp',
+    ],
+    LIBDEPS=[
+        'update_common',
+    ],
+)
+
+env.CppUnitTest(
+    target='log_builder_test',
+    source=[
+        'log_builder_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        'update_common',
+    ],
+)
+
+env.CppUnitTest(
+    target='path_support_test',
+    source=[
+        'path_support_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        'update_common',
+    ],
+)
+
+env.Library(
+    target='update',
+    source=[
+        'modifier_table.cpp',
+        'set_node.cpp',
+        'update_node.cpp',
+        'update_object_node.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/ops/update',
+        '$BUILD_DIR/mongo/db/update_index_data',
+        'update_common',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_table_test',
+    source='modifier_table_test.cpp',
+    LIBDEPS=[
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='set_node_test',
+    source='set_node_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='update_object_node_test',
+    source='update_object_node_test.cpp',
+    LIBDEPS=[
+        'update',
+    ],
+)
+
+env.Library(
+    target='update_driver',
+    source=[
+        'update_driver.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/ops/update',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='update_driver_test',
+    source='update_driver_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'update_driver',
+    ],
+)
+
+env.Library(
+    target='array_filter',
+    source=[
+        'array_filter.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/matcher/expressions",
+    ],
+)
+
+env.CppUnitTest(
+    target='array_filter_test',
+    source='array_filter_test.cpp',
+    LIBDEPS=[
+        'array_filter',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+    ],
+)

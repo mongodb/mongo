@@ -47,10 +47,9 @@ public:
     CmdReplSetRequestVotes() : ReplSetCommand("replSetRequestVotes") {}
 
 private:
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string&,
              BSONObj& cmdObj,
-             int,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
@@ -67,7 +66,7 @@ private:
         // We want to keep request vote connection open when relinquishing primary.
         // Tag it here.
         transport::Session::TagMask originalTag = 0;
-        auto session = txn->getClient()->session();
+        auto session = opCtx->getClient()->session();
         if (session) {
             originalTag = session->getTags();
             session->replaceTags(originalTag | transport::Session::kKeepOpen);
@@ -82,7 +81,7 @@ private:
 
         ReplSetRequestVotesResponse response;
         status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(
-            txn, parsedArgs, &response);
+            opCtx, parsedArgs, &response);
         response.addToBSON(&result);
         return appendCommandStatus(result, status);
     }

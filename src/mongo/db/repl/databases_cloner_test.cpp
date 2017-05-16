@@ -104,8 +104,7 @@ public:
         NetworkInterfaceMock* net = getNet();
         Milliseconds millis(0);
         RemoteCommandResponse response(obj, BSONObj(), millis);
-        executor::TaskExecutor::ResponseStatus responseStatus(response);
-        net->scheduleResponse(noi, net->now(), responseStatus);
+        net->scheduleResponse(noi, net->now(), response);
     }
 
     void scheduleNetworkResponse(std::string cmdName, Status errorStatus) {
@@ -142,27 +141,27 @@ protected:
         executor::ThreadPoolExecutorTest::setUp();
         launchExecutorThread();
 
-        _storageInterface.createOplogFn = [this](OperationContext* txn,
+        _storageInterface.createOplogFn = [this](OperationContext* opCtx,
                                                  const NamespaceString& nss) {
             _storageInterfaceWorkDone.createOplogCalled = true;
             return Status::OK();
         };
         _storageInterface.insertDocumentFn =
-            [this](OperationContext* txn, const NamespaceString& nss, const BSONObj& doc) {
+            [this](OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
                 ++_storageInterfaceWorkDone.documentsInsertedCount;
                 return Status::OK();
             };
         _storageInterface.insertDocumentsFn = [this](
-            OperationContext* txn, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
+            OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& ops) {
             _storageInterfaceWorkDone.insertedOplogEntries = true;
             ++_storageInterfaceWorkDone.oplogEntriesInserted;
             return Status::OK();
         };
-        _storageInterface.dropCollFn = [this](OperationContext* txn, const NamespaceString& nss) {
+        _storageInterface.dropCollFn = [this](OperationContext* opCtx, const NamespaceString& nss) {
             _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns());
             return Status::OK();
         };
-        _storageInterface.dropUserDBsFn = [this](OperationContext* txn) {
+        _storageInterface.dropUserDBsFn = [this](OperationContext* opCtx) {
             _storageInterfaceWorkDone.droppedUserDBs = true;
             return Status::OK();
         };
@@ -242,11 +241,11 @@ protected:
             log() << "Sending response for network request:";
             log() << "     req: " << noi->getRequest().dbname << "." << noi->getRequest().cmdObj;
             log() << "     resp:" << responses[processedRequests].second;
-            net->scheduleResponse(
-                noi,
-                net->now(),
-                executor::TaskExecutor::ResponseStatus(RemoteCommandResponse(
-                    responses[processedRequests].second, BSONObj(), Milliseconds(10))));
+            net->scheduleResponse(noi,
+                                  net->now(),
+                                  RemoteCommandResponse(responses[processedRequests].second,
+                                                        BSONObj(),
+                                                        Milliseconds(10)));
 
             if ((Date_t::now() - lastLog) > Seconds(1)) {
                 lastLog = Date_t();
@@ -728,9 +727,9 @@ TEST_F(DBsClonerTest, DatabaseClonerChecksAdminDbUsingStorageInterfaceAfterCopyi
     bool isAdminDbValidFnCalled = false;
     OperationContext* isAdminDbValidFnOpCtx = nullptr;
     _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled,
-                                          &isAdminDbValidFnOpCtx](OperationContext* txn) {
+                                          &isAdminDbValidFnOpCtx](OperationContext* opCtx) {
         isAdminDbValidFnCalled = true;
-        isAdminDbValidFnOpCtx = txn;
+        isAdminDbValidFnOpCtx = opCtx;
         return Status::OK();
     };
 
@@ -770,7 +769,7 @@ TEST_F(DBsClonerTest, AdminDbValidationErrorShouldAbortTheCloner) {
     Status result = getDetectableErrorStatus();
 
     bool isAdminDbValidFnCalled = false;
-    _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled](OperationContext* txn) {
+    _storageInterface.isAdminDbValidFn = [&isAdminDbValidFnCalled](OperationContext* opCtx) {
         isAdminDbValidFnCalled = true;
         return Status(ErrorCodes::OperationFailed, "admin db invalid");
     };

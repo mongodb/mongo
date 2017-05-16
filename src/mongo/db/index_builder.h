@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
@@ -74,7 +75,7 @@ public:
      */
     virtual std::string name() const;
 
-    Status buildInForeground(OperationContext* txn, Database* db) const;
+    Status buildInForeground(OperationContext* opCtx, Database* db) const;
 
     /**
      * Waits for a background index build to register itself.  This function must be called
@@ -84,7 +85,7 @@ public:
     static void waitForBgIndexStarting();
 
 private:
-    Status _build(OperationContext* txn,
+    Status _build(OperationContext* opCtx,
                   Database* db,
                   bool allowBackgroundBuilding,
                   Lock::DBLock* dbLock) const;

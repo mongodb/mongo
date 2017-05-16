@@ -40,8 +40,6 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-const OplogInterfaceMock::Operations kEmptyMockOperations;
-
 BSONObj makeOp(int seconds, long long hash) {
     return BSON("ts" << Timestamp(Seconds(seconds), 0) << "h" << hash);
 }
@@ -75,7 +73,7 @@ TEST(RollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
 }
 
 TEST(RollBackLocalOperationsTest, EmptyLocalOplog) {
-    OplogInterfaceMock localOplog(kEmptyMockOperations);
+    OplogInterfaceMock localOplog;
     RollBackLocalOperations finder(localOplog, [](const BSONObj&) { return Status::OK(); });
     auto result = finder.onRemoteOperation(makeOp(1, 0));
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing, result.getStatus().code());
@@ -232,7 +230,7 @@ TEST(RollBackLocalOperationsTest, SameTimestampDifferentHashesEndOfLocalOplog) {
 
 TEST(SyncRollBackLocalOperationsTest, OplogStartMissing) {
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
-                  syncRollBackLocalOperations(OplogInterfaceMock(kEmptyMockOperations),
+                  syncRollBackLocalOperations(OplogInterfaceMock(),
                                               OplogInterfaceMock({makeOpAndRecordId(1, 0)}),
                                               [](const BSONObj&) { return Status::OK(); })
                       .getStatus()
@@ -242,7 +240,7 @@ TEST(SyncRollBackLocalOperationsTest, OplogStartMissing) {
 TEST(SyncRollBackLocalOperationsTest, RemoteOplogMissing) {
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource,
                   syncRollBackLocalOperations(OplogInterfaceMock({makeOpAndRecordId(1, 0)}),
-                                              OplogInterfaceMock(kEmptyMockOperations),
+                                              OplogInterfaceMock(),
                                               [](const BSONObj&) { return Status::OK(); })
                       .getStatus()
                       .code());

@@ -37,7 +37,7 @@ class OperationContext;
  * Drops the collection "collectionName" and populates "result" with statistics about what
  * was removed.
  */
-Status dropCollection(OperationContext* txn,
+Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result);
 }  // namespace mongo

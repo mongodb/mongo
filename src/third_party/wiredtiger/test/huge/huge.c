@@ -29,7 +29,6 @@
 #include "test_util.h"
 
 static char home[512];				/* Program working dir */
-static const char *progname;			/* Program name */
 static uint8_t *big;				/* Big key/value buffer */
 
 #define	GIGABYTE	(1073741824)
@@ -167,14 +166,10 @@ main(int argc, char *argv[])
 	int ch, small;
 	char *working_dir;
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	small = 0;
 	working_dir = NULL;
-
 	while ((ch = __wt_getopt(progname, argc, argv, "h:s")) != EOF)
 		switch (ch) {
 		case 'h':

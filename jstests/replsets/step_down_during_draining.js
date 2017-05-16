@@ -86,7 +86,7 @@ load("jstests/replsets/rslib.js");
 
     reconnect(secondary);
     stepUp(secondary);
-    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY, 1000);
+    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
     replSet.awaitNodesAgreeOnPrimary();
 
     // Secondary doesn't allow writes yet.
@@ -104,12 +104,12 @@ load("jstests/replsets/rslib.js");
     // Original primary steps up.
     reconnect(primary);
     stepUp(primary);
-    replSet.waitForState(primary, ReplSetTest.State.PRIMARY, 1000);
+    replSet.waitForState(primary, ReplSetTest.State.PRIMARY);
     replSet.awaitNodesAgreeOnPrimary();
 
     reconnect(secondary);
     stepUp(secondary);
-    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY, 1000);
+    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
     replSet.awaitNodesAgreeOnPrimary();
 
     // Disable fail point to allow replication.

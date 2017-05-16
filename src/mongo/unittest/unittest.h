@@ -135,9 +135,9 @@
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
  * does not return an error code equal to EXPECTED_CODE.
  */
-#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE)              \
-    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE& ex) { \
-                           return (EXPECTED_CODE) == ex.getCode();                \
+#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE)               \
+    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                           return (EXPECTED_CODE) == ex.getCode();                 \
                        }))
 
 /**
@@ -146,7 +146,7 @@
  * does not return a string equal to EXPECTED_WHAT.
  */
 #define ASSERT_THROWS_CODE_AND_WHAT(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
-    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE& ex) {            \
+    ASSERT_THROWS_PRED(STATEMENT, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) {           \
                            return (EXPECTED_CODE) == ex.getCode() &&                         \
                                ::mongo::StringData(ex.what()) ==                             \
                                ::mongo::StringData(EXPECTED_WHAT);                           \

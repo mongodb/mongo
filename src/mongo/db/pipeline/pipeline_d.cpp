@@ -96,7 +96,7 @@ public:
     }
 
     bool isSharded(const NamespaceString& nss) final {
-        AutoGetCollectionForRead autoColl(_ctx->opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(_ctx->opCtx, nss);
         // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
         // state.
         auto css = CollectionShardingState::get(_ctx->opCtx, nss);
@@ -114,7 +114,7 @@ public:
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) final {
-        AutoGetCollectionForRead autoColl(opCtx, ns);
+        AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
         Collection* collection = autoColl.getCollection();
         if (!collection) {
@@ -149,7 +149,7 @@ public:
         const NamespaceString& targetNs,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) final {
-        Lock::GlobalWrite globalLock(_ctx->opCtx->lockState());
+        Lock::GlobalWrite globalLock(_ctx->opCtx);
 
         if (SimpleBSONObjComparator::kInstance.evaluate(originalCollectionOptions !=
                                                         getCollectionOptions(targetNs))) {
@@ -178,7 +178,7 @@ public:
                                           str::stream() << "renameCollection failed: " << info};
     }
 
-    StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
         // 'expCtx' may represent the settings for an aggregation pipeline on a different namespace
@@ -193,7 +193,7 @@ public:
 
         pipeline.getValue()->optimizePipeline();
 
-        AutoGetCollectionForRead autoColl(expCtx->opCtx, expCtx->ns);
+        AutoGetCollectionForReadCommand autoColl(expCtx->opCtx, expCtx->ns);
 
         // makePipeline() is only called to perform secondary aggregation requests and expects the
         // collection representing the document source to be not-sharded. We confirm sharding state
@@ -205,7 +205,8 @@ public:
         auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
         uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
 
-        PipelineD::prepareCursorSource(autoColl.getCollection(), nullptr, pipeline.getValue());
+        PipelineD::prepareCursorSource(
+            autoColl.getCollection(), nullptr, pipeline.getValue().get());
 
         return pipeline;
     }
@@ -220,10 +221,8 @@ private:
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
  * percentage of the collection.
  */
-StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* collection,
-                                                                OperationContext* txn,
-                                                                long long sampleSize,
-                                                                long long numRecords) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorExecutor(
+    Collection* collection, OperationContext* opCtx, long long sampleSize, long long numRecords) {
     double kMaxSampleRatioForRandCursor = 0.05;
     if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
         return {nullptr};
@@ -231,18 +230,19 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
 
     // Attempt to get a random cursor from the RecordStore. If the RecordStore does not support
     // random cursors, attempt to get one from the _id index.
-    std::unique_ptr<RecordCursor> rsRandCursor = collection->getRecordStore()->getRandomCursor(txn);
+    std::unique_ptr<RecordCursor> rsRandCursor =
+        collection->getRecordStore()->getRandomCursor(opCtx);
 
     auto ws = stdx::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> stage;
 
     if (rsRandCursor) {
-        stage = stdx::make_unique<MultiIteratorStage>(txn, ws.get(), collection);
+        stage = stdx::make_unique<MultiIteratorStage>(opCtx, ws.get(), collection);
         static_cast<MultiIteratorStage*>(stage.get())->addIterator(std::move(rsRandCursor));
 
     } else {
         auto indexCatalog = collection->getIndexCatalog();
-        auto indexDescriptor = indexCatalog->findIdIndex(txn);
+        auto indexDescriptor = indexCatalog->findIdIndex(opCtx);
 
         if (!indexDescriptor) {
             // There was no _id index.
@@ -250,34 +250,34 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
         }
 
         IndexAccessMethod* idIam = indexCatalog->getIndex(indexDescriptor);
-        auto idxRandCursor = idIam->newRandomCursor(txn);
+        auto idxRandCursor = idIam->newRandomCursor(opCtx);
 
         if (!idxRandCursor) {
             // Storage engine does not support any type of random cursor.
             return {nullptr};
         }
 
-        auto idxIterator = stdx::make_unique<IndexIteratorStage>(txn,
+        auto idxIterator = stdx::make_unique<IndexIteratorStage>(opCtx,
                                                                  ws.get(),
                                                                  collection,
                                                                  idIam,
                                                                  indexDescriptor->keyPattern(),
                                                                  std::move(idxRandCursor));
         stage = stdx::make_unique<FetchStage>(
-            txn, ws.get(), idxIterator.release(), nullptr, collection);
+            opCtx, ws.get(), idxIterator.release(), nullptr, collection);
     }
 
     {
-        AutoGetCollection autoColl(txn, collection->ns(), MODE_IS);
+        AutoGetCollectionForRead autoColl(opCtx, collection->ns());
 
         // If we're in a sharded environment, we need to filter out documents we don't own.
-        if (ShardingState::get(txn)->needCollectionMetadata(txn, collection->ns().ns())) {
+        if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
             auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
-                txn,
-                CollectionShardingState::get(txn, collection->ns())->getMetadata(),
+                opCtx,
+                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(),
                 ws.get(),
                 stage.release());
-            return PlanExecutor::make(txn,
+            return PlanExecutor::make(opCtx,
                                       std::move(ws),
                                       std::move(shardFilterStage),
                                       collection,
@@ -286,11 +286,11 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
     }
 
     return PlanExecutor::make(
-        txn, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+        opCtx, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
 }
 
-StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
-    OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
+    OperationContext* opCtx,
     Collection* collection,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     BSONObj queryObj,
@@ -303,6 +303,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
     if (aggRequest) {
+        qr->setExplain(static_cast<bool>(aggRequest->getExplain()));
         qr->setHint(aggRequest->getHint());
     }
 
@@ -318,7 +319,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
 
     const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 
-    auto cq = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
+    auto cq = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of
@@ -330,13 +331,13 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     }
 
     return getExecutor(
-        txn, collection, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
+        opCtx, collection, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
 }
 }  // namespace
 
 void PipelineD::prepareCursorSource(Collection* collection,
                                     const AggregationRequest* aggRequest,
-                                    const intrusive_ptr<Pipeline>& pipeline) {
+                                    Pipeline* pipeline) {
     auto expCtx = pipeline->getContext();
     dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(expCtx->ns.ns(), MODE_IS));
 
@@ -354,13 +355,6 @@ void PipelineD::prepareCursorSource(Collection* collection,
 
     if (!sources.empty()) {
         if (sources.front()->isValidInitialSource()) {
-            if (dynamic_cast<DocumentSourceMergeCursors*>(sources.front().get())) {
-                // Enable the hooks for setting up authentication on the subsequent internal
-                // connections we are going to create. This would normally have been done
-                // when SetShardVersion was called, but since SetShardVersion is never called
-                // on secondaries, this is needed.
-                ShardedConnectionInfo::addHook();
-            }
             return;  // don't need a cursor
         }
 
@@ -445,11 +439,11 @@ void PipelineD::prepareCursorSource(Collection* collection,
         collection, pipeline, expCtx, std::move(exec), deps, queryObj, sortObj, projForQuery);
 }
 
-StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
-    OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(
+    OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
-    const intrusive_ptr<Pipeline>& pipeline,
+    Pipeline* pipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
     const intrusive_ptr<DocumentSourceSort>& sortStage,
     const DepsTracker& deps,
@@ -479,7 +473,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
 
     // If we are connecting directly to the shard rather than through a mongos, don't filter out
     // orphaned documents.
-    if (ShardingState::get(txn)->needCollectionMetadata(txn, nss.ns())) {
+    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, nss.ns())) {
         plannerOpts |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
@@ -499,12 +493,18 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
     BSONObj emptyProjection;
     if (sortStage) {
         // See if the query system can provide a non-blocking sort.
-        auto swExecutorSort = attemptToGetExecutor(
-            txn, collection, expCtx, queryObj, emptyProjection, *sortObj, aggRequest, plannerOpts);
+        auto swExecutorSort = attemptToGetExecutor(opCtx,
+                                                   collection,
+                                                   expCtx,
+                                                   queryObj,
+                                                   emptyProjection,
+                                                   *sortObj,
+                                                   aggRequest,
+                                                   plannerOpts);
 
         if (swExecutorSort.isOK()) {
             // Success! Now see if the query system can also cover the projection.
-            auto swExecutorSortAndProj = attemptToGetExecutor(txn,
+            auto swExecutorSortAndProj = attemptToGetExecutor(opCtx,
                                                               collection,
                                                               expCtx,
                                                               queryObj,
@@ -513,7 +513,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
                                                               aggRequest,
                                                               plannerOpts);
 
-            std::unique_ptr<PlanExecutor> exec;
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             if (swExecutorSortAndProj.isOK()) {
                 // Success! We have a non-blocking sort and a covered projection.
                 exec = std::move(swExecutorSortAndProj.getValue());
@@ -553,7 +553,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
 
     // See if the query system can cover the projection.
     auto swExecutorProj = attemptToGetExecutor(
-        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, aggRequest, plannerOpts);
+        opCtx, collection, expCtx, queryObj, *projectionObj, *sortObj, aggRequest, plannerOpts);
     if (swExecutorProj.isOK()) {
         // Success! We have a covered projection.
         return std::move(swExecutorProj.getValue());
@@ -568,26 +568,23 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
     *projectionObj = BSONObj();
     // If this doesn't work, nothing will.
     return attemptToGetExecutor(
-        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, aggRequest, plannerOpts);
+        opCtx, collection, expCtx, queryObj, *projectionObj, *sortObj, aggRequest, plannerOpts);
 }
 
 void PipelineD::addCursorSource(Collection* collection,
-                                const intrusive_ptr<Pipeline>& pipeline,
+                                Pipeline* pipeline,
                                 const intrusive_ptr<ExpressionContext>& expCtx,
-                                unique_ptr<PlanExecutor> exec,
+                                unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                 DepsTracker deps,
                                 const BSONObj& queryObj,
                                 const BSONObj& sortObj,
                                 const BSONObj& projectionObj) {
-    // Get the full "namespace" name.
-    const string& fullName = expCtx->ns.ns();
-
     // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
     exec->saveState();
 
     // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
     intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(collection, fullName, std::move(exec), expCtx);
+        DocumentSourceCursor::create(collection, std::move(exec), expCtx);
 
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);
@@ -616,7 +613,7 @@ void PipelineD::addCursorSource(Collection* collection,
     pipeline->optimizePipeline();
 }
 
-std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline) {
+std::string PipelineD::getPlanSummaryStr(const Pipeline* pPipeline) {
     if (auto docSourceCursor =
             dynamic_cast<DocumentSourceCursor*>(pPipeline->_sources.front().get())) {
         return docSourceCursor->getPlanSummaryStr();
@@ -625,8 +622,7 @@ std::string PipelineD::getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& p
     return "";
 }
 
-void PipelineD::getPlanSummaryStats(const boost::intrusive_ptr<Pipeline>& pPipeline,
-                                    PlanSummaryStats* statsOut) {
+void PipelineD::getPlanSummaryStats(const Pipeline* pPipeline, PlanSummaryStats* statsOut) {
     invariant(statsOut);
 
     if (auto docSourceCursor =

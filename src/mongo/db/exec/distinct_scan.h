@@ -74,7 +74,7 @@ struct DistinctParams {
  */
 class DistinctScan final : public PlanStage {
 public:
-    DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet);
+    DistinctScan(OperationContext* opCtx, const DistinctParams& params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;

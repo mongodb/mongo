@@ -1,4 +1,5 @@
-/** *    Copyright (C) 2015 MongoDB Inc.
+/**
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -38,6 +39,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
+#include "mongo/util/lru_cache.h"
 #include "mongo/util/scopeguard.h"
 
 // One interesting implementation note herein concerns how setup() and
@@ -104,9 +106,17 @@ public:
      */
     size_t createdConnections(const stdx::unique_lock<stdx::mutex>& lk);
 
+    /**
+     * Returns the total number of connections currently open that belong to
+     * this pool. This is the sum of refreshingConnections, availableConnections,
+     * and inUseConnections.
+     */
+    size_t openConnections(const stdx::unique_lock<stdx::mutex>& lk);
+
 private:
     using OwnedConnection = std::unique_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
+    using LRUOwnershipPool = LRUCache<OwnershipPool::key_type, OwnershipPool::mapped_type>;
     using Request = std::pair<Date_t, GetConnectionCallback>;
     struct RequestComparator {
         bool operator()(const Request& a, const Request& b) {
@@ -122,7 +132,10 @@ private:
 
     void shutdown();
 
-    OwnedConnection takeFromPool(OwnershipPool& pool, ConnectionInterface* connection);
+    template <typename OwnershipPoolType>
+    typename OwnershipPoolType::mapped_type takeFromPool(
+        OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr);
+
     OwnedConnection takeFromProcessingPool(ConnectionInterface* connection);
 
     void updateStateInLock();
@@ -132,7 +145,7 @@ private:
 
     const HostAndPort _hostAndPort;
 
-    OwnershipPool _readyPool;
+    LRUOwnershipPool _readyPool;
     OwnershipPool _processingPool;
     OwnershipPool _droppedProcessingPool;
     OwnershipPool _checkedOutPool;
@@ -238,6 +251,16 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
     }
 }
 
+size_t ConnectionPool::getNumConnectionsPerHost(const HostAndPort& hostAndPort) const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto iter = _pools.find(hostAndPort);
+    if (iter != _pools.end()) {
+        return iter->second->openConnections(lk);
+    }
+
+    return 0;
+}
+
 void ConnectionPool::returnConnection(ConnectionInterface* conn) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -251,6 +274,7 @@ void ConnectionPool::returnConnection(ConnectionInterface* conn) {
 ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent, const HostAndPort& hostAndPort)
     : _parent(parent),
       _hostAndPort(hostAndPort),
+      _readyPool(std::numeric_limits<size_t>::max()),
       _requestTimer(parent->_factory->makeTimer()),
       _generation(0),
       _inFulfillRequests(false),
@@ -278,6 +302,10 @@ size_t ConnectionPool::SpecificPool::refreshingConnections(
 
 size_t ConnectionPool::SpecificPool::createdConnections(const stdx::unique_lock<stdx::mutex>& lk) {
     return _created;
+}
+
+size_t ConnectionPool::SpecificPool::openConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+    return _checkedOutPool.size() + _readyPool.size() + _processingPool.size();
 }
 
 void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
@@ -317,6 +345,8 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
 
     if (!conn->getStatus().isOK()) {
         // TODO: alert via some callback if the host is bad
+        log() << "Ending connection to host " << _hostAndPort << " due to bad connection status; "
+              << openConnections(lk) << " connections to that host remain open";
         return;
     }
 
@@ -327,6 +357,9 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
         if (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() >=
             _parent->_options.minConnections) {
             // If we already have minConnections, just let the connection lapse
+            log() << "Ending idle connection to host " << _hostAndPort
+                  << " because the pool meets constraints; " << openConnections(lk)
+                  << " connections to that host remain open";
             return;
         }
 
@@ -361,6 +394,10 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              // failing all operations.  We do this because the various callers have
                              // their own time limit which is unrelated to our internal one.
                              if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+                                 log() << "Pending connection to host " << _hostAndPort
+                                       << " did not complete within the connection timeout,"
+                                       << " retrying with a new connection;" << openConnections(lk)
+                                       << " connections to that host remain open";
                                  spawnConnections(lk);
                                  return;
                              }
@@ -382,7 +419,8 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
                                               OwnedConnection conn) {
     auto connPtr = conn.get();
 
-    _readyPool[connPtr] = std::move(conn);
+    // This makes the connection the new most-recently-used connection.
+    _readyPool.add(connPtr, std::move(conn));
 
     // Our strategy for refreshing connections is to check them out and
     // immediately check them back in (which kicks off the refresh logic in
@@ -424,6 +462,10 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status,
     // Drop ready connections
     _readyPool.clear();
 
+    // Log something helpful
+    log() << "Dropping all pooled connections to " << _hostAndPort
+          << " due to failed operation on a connection";
+
     // Migrate processing connections to the dropped pool
     for (auto&& x : _processingPool) {
         _droppedProcessingPool[x.first] = std::move(x.second);
@@ -462,6 +504,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
     auto guard = MakeGuard([&] { _inFulfillRequests = false; });
 
     while (_requests.size()) {
+        // _readyPool is an LRUCache, so its begin() object is the MRU item.
         auto iter = _readyPool.begin();
 
         if (iter == _readyPool.end())
@@ -611,8 +654,9 @@ void ConnectionPool::SpecificPool::shutdown() {
     _parent->_pools.erase(_hostAndPort);
 }
 
-ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::takeFromPool(
-    OwnershipPool& pool, ConnectionInterface* connPtr) {
+template <typename OwnershipPoolType>
+typename OwnershipPoolType::mapped_type ConnectionPool::SpecificPool::takeFromPool(
+    OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr) {
     auto iter = pool.find(connPtr);
     invariant(iter != pool.end());
 

@@ -66,19 +66,19 @@ struct GeoNearParams {
 class GeoNear2DStage final : public NearStage {
 public:
     GeoNear2DStage(const GeoNearParams& nearParams,
-                   OperationContext* txn,
+                   OperationContext* opCtx,
                    WorkingSet* workingSet,
                    Collection* collection,
                    IndexDescriptor* twoDIndex);
 
 protected:
-    StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+    StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                               WorkingSet* workingSet,
                                               Collection* collection) final;
 
     StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
-    PlanStage::StageState initialize(OperationContext* txn,
+    PlanStage::StageState initialize(OperationContext* opCtx,
                                      WorkingSet* workingSet,
                                      Collection* collection,
                                      WorkingSetID* out) final;
@@ -112,7 +112,7 @@ private:
 class GeoNear2DSphereStage final : public NearStage {
 public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
-                         OperationContext* txn,
+                         OperationContext* opCtx,
                          WorkingSet* workingSet,
                          Collection* collection,
                          IndexDescriptor* s2Index);
@@ -120,13 +120,13 @@ public:
     ~GeoNear2DSphereStage();
 
 protected:
-    StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+    StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                               WorkingSet* workingSet,
                                               Collection* collection) final;
 
     StatusWith<double> computeDistance(WorkingSetMember* member) final;
 
-    PlanStage::StageState initialize(OperationContext* txn,
+    PlanStage::StageState initialize(OperationContext* opCtx,
                                      WorkingSet* workingSet,
                                      Collection* collection,
                                      WorkingSetID* out) final;

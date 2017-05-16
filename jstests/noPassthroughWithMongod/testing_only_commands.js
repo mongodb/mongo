@@ -10,6 +10,7 @@ var testOnlyCommands = [
     'journalLatencyTest',
     'godinsert',
     'sleep',
+    'cpuload',
     'captrunc',
     'emptycapped'
 ];

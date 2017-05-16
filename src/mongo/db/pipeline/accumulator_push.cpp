@@ -67,7 +67,7 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorPush::getValue(bool toBeMerged) const {
+Value AccumulatorPush::getValue(bool toBeMerged) {
     return Value(vpValue);
 }
 

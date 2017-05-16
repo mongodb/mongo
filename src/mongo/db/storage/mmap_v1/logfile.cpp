@@ -35,7 +35,7 @@
 #include "mongo/db/storage/mmap_v1/logfile.h"
 
 #include "mongo/db/storage/mmap_v1/mmap.h"
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/log.h"

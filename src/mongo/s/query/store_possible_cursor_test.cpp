@@ -42,6 +42,7 @@ namespace {
 
 const NamespaceString nss("test.collection");
 const HostAndPort hostAndPort("testhost", 27017);
+const ShardId shardId("testshard");
 
 class StorePossibleCursorTest : public unittest::Test {
 protected:
@@ -63,6 +64,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     CursorResponse cursorResponse(nss, CursorId(0), batch);
     auto outgoingCursorResponse =
         storePossibleCursor(nullptr,  // OperationContext*
+                            shardId,
                             hostAndPort,
                             cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
                             nss,
@@ -82,6 +84,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 // Test that storePossibleCursor() propagates an error if it cannot parse the cursor response.
 TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
     auto outgoingCursorResponse = storePossibleCursor(nullptr,  // OperationContext*
+                                                      shardId,
                                                       hostAndPort,
                                                       fromjson("{ok: 1, cursor: {}}"),
                                                       nss,
@@ -97,6 +100,7 @@ TEST_F(StorePossibleCursorTest, PassesUpCommandResultIfItDoesNotDescribeACursor)
     BSONObj notACursorObj = BSON("not"
                                  << "cursor");
     auto outgoingCursorResponse = storePossibleCursor(nullptr,  // OperationContext*
+                                                      shardId,
                                                       hostAndPort,
                                                       notACursorObj,
                                                       nss,

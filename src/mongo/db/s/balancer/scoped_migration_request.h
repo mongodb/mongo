@@ -66,7 +66,7 @@ public:
      *
      * The destructor will handle removing the document when it is no longer needed.
      */
-    static StatusWith<ScopedMigrationRequest> writeMigration(OperationContext* txn,
+    static StatusWith<ScopedMigrationRequest> writeMigration(OperationContext* opCtx,
                                                              const MigrateInfo& migrate,
                                                              bool waitForDelete);
 
@@ -77,7 +77,7 @@ public:
      * This should only be used on Balancer recovery when a config.migrations document already
      * exists for the migration.
      */
-    static ScopedMigrationRequest createForRecovery(OperationContext* txn,
+    static ScopedMigrationRequest createForRecovery(OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const BSONObj& minKey);
 
@@ -102,12 +102,12 @@ public:
     void keepDocumentOnDestruct();
 
 private:
-    ScopedMigrationRequest(OperationContext* txn,
+    ScopedMigrationRequest(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& minKey);
 
     // Need an operation context with which to do a write in the destructor.
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // ns and minkey are needed to identify the migration document when it is removed from
     // config.migrations by the destructor.

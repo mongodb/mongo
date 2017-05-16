@@ -42,7 +42,7 @@ class Status;
  *
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
-Status initializeGlobalShardingStateForMongod(OperationContext* txn,
+Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
                                               const ConnectionString& configCS,
                                               StringData distLockProcessId);
 

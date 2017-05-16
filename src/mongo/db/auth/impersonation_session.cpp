@@ -45,11 +45,11 @@
 
 namespace mongo {
 
-ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* txn) : _txn(txn) {
-    auto authSession = AuthorizationSession::get(_txn->getClient());
+ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : _opCtx(opCtx) {
+    auto authSession = AuthorizationSession::get(_opCtx->getClient());
 
     const auto& impersonatedUsersAndRoles =
-        rpc::AuditMetadata::get(txn).getImpersonatedUsersAndRoles();
+        rpc::AuditMetadata::get(opCtx).getImpersonatedUsersAndRoles();
 
     if (impersonatedUsersAndRoles != boost::none) {
         uassert(ErrorCodes::Unauthorized,
@@ -66,8 +66,9 @@ ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* txn) : _t
 }
 
 ImpersonationSessionGuard::~ImpersonationSessionGuard() {
-    DESTRUCTOR_GUARD(
-        if (_active) { AuthorizationSession::get(_txn->getClient())->clearImpersonatedUserData(); })
+    DESTRUCTOR_GUARD(if (_active) {
+        AuthorizationSession::get(_opCtx->getClient())->clearImpersonatedUserData();
+    })
 }
 
 }  // namespace mongo

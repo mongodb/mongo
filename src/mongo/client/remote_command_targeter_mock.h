@@ -57,7 +57,7 @@ public:
     StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
                                                 Milliseconds maxWait) override;
 
-    StatusWith<HostAndPort> findHost(OperationContext* txn,
+    StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;
 
     /**

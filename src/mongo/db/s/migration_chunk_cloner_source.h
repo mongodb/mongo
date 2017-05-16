@@ -65,7 +65,7 @@ public:
      * NOTE: Must be called without any locks and must succeed, before any other methods are called
      * (except for cancelClone and [insert/update/delete]Op).
      */
-    virtual Status startClone(OperationContext* txn) = 0;
+    virtual Status startClone(OperationContext* opCtx) = 0;
 
     /**
      * Blocking method, which uses some custom selected logic for deciding whether it is appropriate
@@ -77,7 +77,7 @@ public:
      *
      * NOTE: Must be called without any locks.
      */
-    virtual Status awaitUntilCriticalSectionIsAppropriate(OperationContext* txn,
+    virtual Status awaitUntilCriticalSectionIsAppropriate(OperationContext* opCtx,
                                                           Milliseconds maxTimeToWait) = 0;
 
     /**
@@ -90,7 +90,7 @@ public:
      *
      * NOTE: Must be called without any locks.
      */
-    virtual Status commitClone(OperationContext* txn) = 0;
+    virtual Status commitClone(OperationContext* opCtx) = 0;
 
     /**
      * Tells the recipient to abort the clone and cleanup any unused data. This method's
@@ -98,7 +98,7 @@ public:
      *
      * NOTE: Must be called without any locks.
      */
-    virtual void cancelClone(OperationContext* txn) = 0;
+    virtual void cancelClone(OperationContext* opCtx) = 0;
 
     // These methods are only meaningful for the legacy cloner and they are used as a way to keep a
     // running list of changes, which need to be fetched.
@@ -109,7 +109,7 @@ public:
      *
      * NOTE: Must be called with at least IS lock held on the collection.
      */
-    virtual bool isDocumentInMigratingChunk(OperationContext* txn, const BSONObj& doc) = 0;
+    virtual bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc) = 0;
 
     /**
      * Notifies this cloner that an insert happened to the collection, which it owns. It is up to
@@ -118,7 +118,7 @@ public:
      *
      * NOTE: Must be called with at least IX lock held on the collection.
      */
-    virtual void onInsertOp(OperationContext* txn, const BSONObj& insertedDoc) = 0;
+    virtual void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc) = 0;
 
     /**
      * Notifies this cloner that an update happened to the collection, which it owns. It is up to
@@ -127,7 +127,7 @@ public:
      *
      * NOTE: Must be called with at least IX lock held on the collection.
      */
-    virtual void onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc) = 0;
+    virtual void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc) = 0;
 
     /**
      * Notifies this cloner that a delede happened to the collection, which it owns. It is up to the
@@ -136,7 +136,7 @@ public:
      *
      * NOTE: Must be called with at least IX lock held on the collection.
      */
-    virtual void onDeleteOp(OperationContext* txn, const BSONObj& deletedDocId) = 0;
+    virtual void onDeleteOp(OperationContext* opCtx, const BSONObj& deletedDocId) = 0;
 
 protected:
     MigrationChunkClonerSource();

@@ -45,11 +45,7 @@ __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 		    session, uri, NULL, NULL, 0)) != 0)
 			return (ret == EBUSY ? 0 : ret);
 		WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
-		if (WT_META_TRACKING(session))
-			WT_TRET(__wt_meta_track_handle_lock(
-			    session, false));
-		else
-			WT_TRET(__wt_session_release_btree(session));
+		WT_TRET(__wt_session_release_btree(session));
 		WT_RET(ret);
 	}
 	WT_RET_NOTFOUND_OK(ret);

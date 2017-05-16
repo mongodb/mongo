@@ -47,20 +47,21 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
 // static
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
-CachedPlanStage::CachedPlanStage(OperationContext* txn,
+CachedPlanStage::CachedPlanStage(OperationContext* opCtx,
                                  Collection* collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  PlanStage* root)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _canonicalQuery(cq),
@@ -114,7 +115,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             return Status::OK();
         } else if (PlanStage::NEED_YIELD == state) {
             if (id == WorkingSet::INVALID_ID) {
-                if (!yieldPolicy->allowedToYield()) {
+                if (!yieldPolicy->canAutoYield()) {
                     throw WriteConflictException();
                 }
             } else {
@@ -124,7 +125,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                 _fetcher.reset(member->releaseFetcher());
             }
 
-            if (yieldPolicy->allowedToYield()) {
+            if (yieldPolicy->canAutoYield()) {
                 yieldPolicy->forceYield();
             }
 
@@ -213,7 +214,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
                                     << status.reason());
     }
 
-    OwnedPointerVector<QuerySolution> solutions(rawSolutions);
+    std::vector<std::unique_ptr<QuerySolution>> solutions =
+        transitional_tools_do_not_use::spool_vector(rawSolutions);
 
     // We cannot figure out how to answer the query.  Perhaps it requires an index
     // we do not have?
@@ -236,7 +238,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         verify(StageBuilder::build(
             getOpCtx(), _collection, *_canonicalQuery, *solutions[0], _ws, &newRoot));
         _children.emplace_back(newRoot);
-        _replannedQs.reset(solutions.popAndReleaseBack());
+        _replannedQs = std::move(solutions.back());
+        solutions.pop_back();
 
         LOG(1)
             << "Replanning of query resulted in single query solution, which will not be cached. "
@@ -264,7 +267,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
             getOpCtx(), _collection, *_canonicalQuery, *solutions[ix], _ws, &nextPlanRoot));
 
         // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
-        multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);
+        multiPlanStage->addPlan(solutions[ix].release(), nextPlanRoot, _ws);
     }
 
     // Delegate to the MultiPlanStage's plan selection facility.
@@ -299,13 +302,13 @@ PlanStage::StageState CachedPlanStage::doWork(WorkingSetID* out) {
     return child()->work(out);
 }
 
-void CachedPlanStage::doInvalidate(OperationContext* txn,
+void CachedPlanStage::doInvalidate(OperationContext* opCtx,
                                    const RecordId& dl,
                                    InvalidationType type) {
     for (auto it = _results.begin(); it != _results.end(); ++it) {
         WorkingSetMember* member = _ws->get(*it);
         if (member->hasRecordId() && member->recordId == dl) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
         }
     }
 }

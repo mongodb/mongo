@@ -103,7 +103,7 @@ void WiredTigerRecoveryUnit::_abort() {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
-            Change* change = *it;
+            Change* change = it->get();
             LOG(2) << "CUSTOM ROLLBACK " << redact(demangleName(typeid(*change)));
             change->rollback();
         }
@@ -148,7 +148,7 @@ bool WiredTigerRecoveryUnit::waitUntilDurable() {
 
 void WiredTigerRecoveryUnit::registerChange(Change* change) {
     invariant(_inUnitOfWork);
-    _changes.push_back(change);
+    _changes.push_back(std::unique_ptr<Change>{change});
 }
 
 void WiredTigerRecoveryUnit::assertInActiveTxn() const {
@@ -257,10 +257,10 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
 WiredTigerCursor::WiredTigerCursor(const std::string& uri,
                                    uint64_t tableId,
                                    bool forRecordStore,
-                                   OperationContext* txn) {
+                                   OperationContext* opCtx) {
     _tableID = tableId;
-    _ru = WiredTigerRecoveryUnit::get(txn);
-    _session = _ru->getSession(txn);
+    _ru = WiredTigerRecoveryUnit::get(opCtx);
+    _session = _ru->getSession(opCtx);
     _cursor = _session->getCursor(uri, tableId, forRecordStore);
     if (!_cursor) {
         error() << "no cursor for uri: " << uri;

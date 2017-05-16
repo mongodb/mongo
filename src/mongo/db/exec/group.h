@@ -87,7 +87,7 @@ class GroupStage final : public PlanStage {
     MONGO_DISALLOW_COPYING(GroupStage);
 
 public:
-    GroupStage(OperationContext* txn,
+    GroupStage(OperationContext* opCtx,
                const GroupRequest& request,
                WorkingSet* workingSet,
                PlanStage* child);

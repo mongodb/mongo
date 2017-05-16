@@ -48,7 +48,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
@@ -74,13 +73,13 @@ void initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
     spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incoming.maxWireVersion = LATEST_WIRE_VERSION;
     // connect to any version
     spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 }
 
-Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bool unique) {
+Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
     specBuilder.append("name", DBClientBase::genIndexName(keys));
     specBuilder.append("ns", ns);
@@ -89,19 +88,19 @@ Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bo
     if (unique) {
         specBuilder.appendBool("unique", true);
     }
-    return createIndexFromSpec(txn, ns, specBuilder.done());
+    return createIndexFromSpec(opCtx, ns, specBuilder.done());
 }
 
-Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& spec) {
-    AutoGetOrCreateDb autoDb(txn, nsToDatabaseSubstring(ns), MODE_X);
+Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
+    AutoGetOrCreateDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
     Collection* coll;
     {
-        WriteUnitOfWork wunit(txn);
-        coll = autoDb.getDb()->getOrCreateCollection(txn, ns);
+        WriteUnitOfWork wunit(opCtx);
+        coll = autoDb.getDb()->getOrCreateCollection(opCtx, NamespaceString(ns));
         invariant(coll);
         wunit.commit();
     }
-    MultiIndexBlock indexer(txn, coll);
+    MultiIndexBlock indexer(opCtx, coll);
     Status status = indexer.init(spec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
@@ -113,7 +112,7 @@ Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& 
     if (!status.isOK()) {
         return status;
     }
-    WriteUnitOfWork wunit(txn);
+    WriteUnitOfWork wunit(opCtx);
     indexer.commit();
     wunit.commit();
     return Status::OK();
@@ -132,11 +131,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     ServiceContext* service = getGlobalServiceContext();
 
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(service, std::move(timeProofService), false);
+    auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
 
     repl::setGlobalReplicationCoordinator(

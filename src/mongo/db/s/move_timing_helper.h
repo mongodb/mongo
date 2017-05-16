@@ -41,7 +41,7 @@ class OperationContext;
 
 class MoveTimingHelper {
 public:
-    MoveTimingHelper(OperationContext* txn,
+    MoveTimingHelper(OperationContext* opCtx,
                      const std::string& where,
                      const std::string& ns,
                      const BSONObj& min,
@@ -58,7 +58,7 @@ private:
     // Measures how long the receiving of a chunk takes
     Timer _t;
 
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
     const std::string _where;
     const std::string _ns;
     const ShardId _to;

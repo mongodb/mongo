@@ -68,6 +68,12 @@ public:
      */
     virtual void asyncWait(Handler handler) = 0;
 
+    /**
+     * Reset this timer's expiry time relative to now. Any pending asyncWait operations
+     * will be canceled, and their handlers will be invoked with an error code.
+     */
+    virtual void expireAfter(Milliseconds expiration) = 0;
+
 protected:
     AsyncTimerInterface() = default;
 };

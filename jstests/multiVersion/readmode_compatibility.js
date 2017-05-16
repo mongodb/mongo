@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    var storageEngine = jsTest.options().storageEngine;
+    var storageEngine = jsTest.options().storageEngine || 'wiredTiger';
 
     var conn30 = MongoRunner.runMongod({binVersion: '3.0', storageEngine: storageEngine});
     assert.neq(conn30, null, 'unable to start 3.0 mongod');

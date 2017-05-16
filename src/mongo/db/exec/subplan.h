@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
@@ -67,7 +69,7 @@ class OperationContext;
  */
 class SubplanStage final : public PlanStage {
 public:
-    SubplanStage(OperationContext* txn,
+    SubplanStage(OperationContext* opCtx,
                  Collection* collection,
                  WorkingSet* ws,
                  const QueryPlannerParams& params,
@@ -156,7 +158,7 @@ private:
         std::unique_ptr<CachedSolution> cachedSolution;
 
         // Query solutions resulting from planning the $or branch.
-        OwnedPointerVector<QuerySolution> solutions;
+        std::vector<std::unique_ptr<QuerySolution>> solutions;
     };
 
     /**
@@ -203,7 +205,7 @@ private:
     std::unique_ptr<QuerySolution> _compositeSolution;
 
     // Holds a list of the results from planning each branch.
-    OwnedPointerVector<BranchPlanningResult> _branchResults;
+    std::vector<std::unique_ptr<BranchPlanningResult>> _branchResults;
 
     // We need this to extract cache-friendly index data from the index assignments.
     std::map<StringData, size_t> _indexMap;

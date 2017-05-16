@@ -34,6 +34,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/time_support.h"
 
@@ -70,6 +71,8 @@ void ClusterCursorCleanupJob::run() {
         manager->killMortalCursorsInactiveSince(Date_t::now() -
                                                 Milliseconds(cursorTimeoutMillis.load()));
         manager->incrementCursorsTimedOut(manager->reapZombieCursors());
+
+        MONGO_IDLE_THREAD_BLOCK;
         sleepsecs(clientCursorMonitorFrequencySecs.load());
     }
 }

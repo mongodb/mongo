@@ -30,6 +30,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/duration.h"
 
@@ -115,6 +116,19 @@ private:
 };
 
 struct ReadPreferenceSetting {
+    static const OperationContext::Decoration<ReadPreferenceSetting> get;
+
+    /**
+     * The minimal value maxStalenessSeconds can have.
+     */
+    static const Seconds kMinimalMaxStalenessValue;
+
+    /**
+     * An object representing the metadata generated for a SecondaryPreferred read preference:
+     * {$readPreference: {mode: "secondaryPreferred"}}
+     */
+    static const BSONObj& secondaryPreferredMetadata();
+
     /**
      * @param pref the read preference mode.
      * @param tag the tag set. Note that this object will have the
@@ -126,6 +140,7 @@ struct ReadPreferenceSetting {
     ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
+    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {}
 
     inline bool equals(const ReadPreferenceSetting& other) const {
         return (pref == other.pref) && (tags == other.tags) &&
@@ -133,14 +148,33 @@ struct ReadPreferenceSetting {
     }
 
     /**
-     * Serializes this ReadPreferenceSetting as a BSON document.
+     * Serializes this ReadPreferenceSetting as an inner BSON document. (The document inside a
+     * $readPreference element)
      */
-    BSONObj toBSON() const;
+    void toInnerBSON(BSONObjBuilder* builder) const;
+    BSONObj toInnerBSON() const {
+        BSONObjBuilder bob;
+        toInnerBSON(&bob);
+        return bob.obj();
+    }
 
     /**
-     * Describes this ReadPreferenceSetting as a string.
+     * Serializes this ReadPreferenceSetting as a containing BSON document. (The document containing
+     * a $readPreference element)
+     *
+     * Will not add the $readPreference element if the read preference is PrimaryOnly.
      */
-    std::string toString() const;
+    void toContainingBSON(BSONObjBuilder* builder) const {
+        if (!canRunOnSecondary())
+            return;  // Write nothing since default is fine.
+        BSONObjBuilder inner(builder->subobjStart("$readPreference"));
+        toInnerBSON(&inner);
+    }
+    BSONObj toContainingBSON() const {
+        BSONObjBuilder bob;
+        toContainingBSON(&bob);
+        return bob.obj();
+    }
 
     /**
      * Parses a ReadPreferenceSetting from a BSON document of the form:
@@ -150,17 +184,30 @@ struct ReadPreferenceSetting {
      * further validation is performed on it other than checking that it is an array, and that it is
      * empty if 'mode' is 'primary'.
      */
-    static StatusWith<ReadPreferenceSetting> fromBSON(const BSONObj& readPrefSettingObj);
+    static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONObj& readPrefSettingObj);
+    static StatusWith<ReadPreferenceSetting> fromInnerBSON(const BSONElement& readPrefSettingObj);
+
+    /**
+     * Parses a ReadPreference setting from an object that may contain a $readPreference object
+     * field with the contents described in fromInnerObject(). If the field is missing, returns the
+     * default read preference.
+     */
+    static StatusWith<ReadPreferenceSetting> fromContainingBSON(
+        const BSONObj& obj, ReadPreference defaultReadPref = ReadPreference::PrimaryOnly);
+
+    /**
+     * Describes this ReadPreferenceSetting as a string.
+     */
+    std::string toString() const;
+
+    bool canRunOnSecondary() const {
+        return pref != ReadPreference::PrimaryOnly;
+    }
 
     ReadPreference pref;
     TagSet tags;
     Seconds maxStalenessSeconds{};
     repl::OpTime minOpTime{};
-
-    /**
-     * The minimal value maxStalenessSeconds can have.
-     */
-    static const Seconds kMinimalMaxStalenessValue;
 };
 
 }  // namespace mongo

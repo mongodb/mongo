@@ -32,6 +32,7 @@
 
 #include <utility>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/message.h"
@@ -70,26 +71,25 @@ CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs
 
 CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
     invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all down-conversion here so that the rest of the code only has to
+    // deal with the current format.
+    BSONObjBuilder bob(_builder);
+    for (auto elem : metadata) {
+        if (elem.fieldNameStringData() == "$configServerState") {
+            bob.appendAs(elem, "configsvr");
+        } else if (elem.fieldNameStringData() == "$readPreference") {
+            BSONObjBuilder ssmBuilder(bob.subobjStart("$ssm"));
+            ssmBuilder.append(elem);
+            ssmBuilder.append(
+                "$secondaryOk",
+                uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(elem)).canRunOnSecondary());
+        } else {
+            bob.append(elem);
+        }
+    }
     _state = State::kInputDocs;
     return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-    invariant(_state == State::kInputDocs);
-    auto rangeData = inputDocs.data();
-    _builder.appendBuf(rangeData.data(), rangeData.length());
-    return *this;
-}
-
-CommandRequestBuilder& CommandRequestBuilder::addInputDoc(BSONObj inputDoc) {
-    invariant(_state == State::kInputDocs);
-    inputDoc.appendSelfToBufBuilder(_builder);
-    return *this;
-}
-
-RequestBuilderInterface::State CommandRequestBuilder::getState() const {
-    return _state;
 }
 
 Protocol CommandRequestBuilder::getProtocol() const {

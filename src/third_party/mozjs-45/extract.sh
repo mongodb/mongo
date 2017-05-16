@@ -229,4 +229,5 @@ cp extract/mfbt/XorShift128PlusRNG.h include/mozilla
 git apply \
     mongo_patches/SERVER-23358.patch \
     mongo_patches/SERVER-24400.patch \
-    mongo_patches/SERVER-22927-x86_64.patch
+    mongo_patches/SERVER-22927-x86_64.patch \
+    mongo_patches/SERVER-28400-Solaris_MAP_NORESERVE.patch

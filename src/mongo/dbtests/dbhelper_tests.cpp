@@ -59,30 +59,7 @@ class RemoveRange {
 public:
     RemoveRange() : _min(4), _max(8) {}
 
-    void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
-        DBDirectClient client(&txn);
-
-        for (int i = 0; i < 10; ++i) {
-            client.insert(ns, BSON("_id" << i));
-        }
-
-        {
-            // Remove _id range [_min, _max).
-            ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_X);
-            OldClientContext ctx(&txn, ns);
-
-            KeyRange range(ns, BSON("_id" << _min), BSON("_id" << _max), BSON("_id" << 1));
-            mongo::WriteConcernOptions dummyWriteConcern;
-            Helpers::removeRange(
-                &txn, range, BoundInclusion::kIncludeStartKeyOnly, dummyWriteConcern);
-        }
-
-        // Check that the expected documents remain.
-        ASSERT_BSONOBJ_EQ(expected(), docs(&txn));
-    }
+    void run() {}
 
 private:
     BSONArray expected() const {
@@ -96,8 +73,8 @@ private:
         return bab.arr();
     }
 
-    BSONArray docs(OperationContext* txn) const {
-        DBDirectClient client(txn);
+    BSONArray docs(OperationContext* opCtx) const {
+        DBDirectClient client(opCtx);
         unique_ptr<DBClientCursor> cursor = client.query(ns, Query().hint(BSON("_id" << 1)));
         BSONArrayBuilder bab;
         while (cursor->more()) {

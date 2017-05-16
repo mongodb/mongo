@@ -13,9 +13,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/db/catalog/catalog',
         '$BUILD_DIR/mongo/db/s/sharding',
-    ]
+    ],
 )
 
 env.Library(
@@ -41,6 +40,7 @@ env.CppUnitTest(
         'resolved_view_test.cpp',
         'view_catalog_test.cpp',
         'view_definition_test.cpp',
+        'view_graph_test.cpp',
     ],
     LIBDEPS=[
         'views',

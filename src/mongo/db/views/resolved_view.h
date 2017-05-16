@@ -33,10 +33,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 
 namespace mongo {
-
-class AggregationRequest;
 
 /**
  * Represents a resolved definition, composed of a base collection namespace and a pipeline
@@ -56,11 +55,10 @@ public:
     static ResolvedView fromBSON(BSONObj commandResponseObj);
 
     /**
-     * Convert an aggregation command on a view to the equivalent command against the views
+     * Convert an aggregation command on a view to the equivalent command against the view's
      * underlying collection.
      */
-    StatusWith<BSONObj> asExpandedViewAggregation(const BSONObj& aggCommand) const;
-    StatusWith<BSONObj> asExpandedViewAggregation(const AggregationRequest& aggRequest) const;
+    AggregationRequest asExpandedViewAggregation(const AggregationRequest& aggRequest) const;
 
     const NamespaceString& getNamespace() const {
         return _namespace;

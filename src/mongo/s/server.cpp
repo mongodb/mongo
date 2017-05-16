@@ -50,11 +50,11 @@
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -67,6 +67,7 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
@@ -88,6 +89,7 @@
 #include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
@@ -136,23 +138,23 @@ static void cleanupTask() {
         Client::initThreadIfNotAlready();
         Client& client = cc();
         ServiceContext::UniqueOperationContext uniqueTxn;
-        OperationContext* txn = client.getOperationContext();
-        if (!txn) {
+        OperationContext* opCtx = client.getOperationContext();
+        if (!opCtx) {
             uniqueTxn = client.makeOperationContext();
-            txn = uniqueTxn.get();
+            opCtx = uniqueTxn.get();
         }
 
         if (serviceContext)
             serviceContext->setKillAllOperations();
 
-        if (auto cursorManager = Grid::get(txn)->getCursorManager()) {
+        if (auto cursorManager = Grid::get(opCtx)->getCursorManager()) {
             cursorManager->shutdown();
         }
-        if (auto pool = Grid::get(txn)->getExecutorPool()) {
+        if (auto pool = Grid::get(opCtx)->getExecutorPool()) {
             pool->shutdownAndJoin();
         }
-        if (auto catalog = Grid::get(txn)->catalogClient(txn)) {
-            catalog->shutDown(txn);
+        if (auto catalog = Grid::get(opCtx)->catalogClient(opCtx)) {
+            catalog->shutDown(opCtx);
         }
     }
 
@@ -173,7 +175,7 @@ static BSONObj buildErrReply(const DBException& ex) {
 
 using namespace mongo;
 
-static Status initializeSharding(OperationContext* txn) {
+static Status initializeSharding(OperationContext* opCtx) {
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
@@ -198,13 +200,15 @@ static Status initializeSharding(OperationContext* txn) {
         stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     Status status = initializeGlobalShardingState(
-        txn,
+        opCtx,
         mongosGlobalParams.configdbs,
-        generateDistLockProcessId(txn),
+        generateDistLockProcessId(opCtx),
         std::move(shardFactory),
-        []() {
+        stdx::make_unique<CatalogCache>(),
+        [opCtx]() {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-            // TODO SERVER-27750: add LogicalTimeMetadataHook
+            hookList->addHook(
+                stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>());
             return hookList;
         },
@@ -216,7 +220,7 @@ static Status initializeSharding(OperationContext* txn) {
         return status;
     }
 
-    status = reloadShardRegistryUntilSuccess(txn);
+    status = reloadShardRegistryUntilSuccess(opCtx);
     if (!status.isOK()) {
         return status;
     }
@@ -228,7 +232,7 @@ static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // connect to version supporting Write Concern only
     spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 
     spec.isInternalClient = true;
 }
@@ -255,12 +259,20 @@ static ExitCode runMongosServer() {
         return EXIT_NET_ERROR;
     }
 
-    // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
-    globalConnPool.addHook(new ShardingConnectionHook(
-        false, stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>()));
+    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    unshardedHookList->addHook(
+        stdx::make_unique<rpc::LogicalTimeMetadataHook>(getGlobalServiceContext()));
+    unshardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>());
 
-    shardConnectionPool.addHook(new ShardingConnectionHook(
-        true, stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>()));
+    // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
+    globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
+
+    auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    shardedHookList->addHook(
+        stdx::make_unique<rpc::LogicalTimeMetadataHook>(getGlobalServiceContext()));
+    shardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>());
+
+    shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
 
     ReplicaSetMonitor::setAsynchronousConfigChangeHook(
         &ShardRegistry::replicaSetChangeConfigServerUpdateHook);
@@ -277,13 +289,7 @@ static ExitCode runMongosServer() {
 
     auto opCtx = cc().makeOperationContext();
 
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
-    auto logicalClock = stdx::make_unique<LogicalClock>(
-        opCtx->getServiceContext(),
-        std::move(timeProofService),
-        serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled);
+    auto logicalClock = stdx::make_unique<LogicalClock>(opCtx->getServiceContext());
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
 
     {
@@ -299,17 +305,6 @@ static ExitCode runMongosServer() {
         }
 
         Grid::get(opCtx.get())->getBalancerConfiguration()->refreshAndCheck(opCtx.get());
-    }
-
-    if (serverGlobalParams.isHttpInterfaceEnabled) {
-        std::shared_ptr<DbWebServer> dbWebServer(new DbWebServer(serverGlobalParams.bind_ip,
-                                                                 serverGlobalParams.port + 1000,
-                                                                 getGlobalServiceContext(),
-                                                                 new NoAdminAccess()));
-        dbWebServer->setupSockets();
-
-        stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
-        web.detach();
     }
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);
@@ -348,6 +343,7 @@ static ExitCode runMongosServer() {
 #endif
 
     // Block until shutdown.
+    MONGO_IDLE_THREAD_BLOCK;
     return waitForShutdown();
 }
 

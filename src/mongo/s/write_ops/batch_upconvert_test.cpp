@@ -62,11 +62,10 @@ TEST(WriteBatchUpconvert, BasicInsert) {
     doc.appendSelfToBufBuilder(insertMsgB);
     insertMsg.setData(dbInsert, insertMsgB.buf(), insertMsgB.len());
 
-    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    std::vector<std::unique_ptr<BatchedCommandRequest>> requests;
     msgToBatchRequests(insertMsg, &requests);
 
-    BatchedCommandRequest* request = requests.back();
+    BatchedCommandRequest* request = requests.back().get();
     ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Insert);
     string errMsg;
     ASSERT(request->isValid(&errMsg));
@@ -98,11 +97,10 @@ TEST(WriteBatchUpconvert, BasicUpdate) {
     update.appendSelfToBufBuilder(updateMsgB);
     updateMsg.setData(dbUpdate, updateMsgB.buf(), updateMsgB.len());
 
-    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    std::vector<std::unique_ptr<BatchedCommandRequest>> requests;
     msgToBatchRequests(updateMsg, &requests);
 
-    BatchedCommandRequest* request = requests.back();
+    BatchedCommandRequest* request = requests.back().get();
     ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Update);
     string errMsg;
     ASSERT(request->isValid(&errMsg));
@@ -132,11 +130,10 @@ TEST(WriteBatchUpconvert, BasicDelete) {
     query.appendSelfToBufBuilder(deleteMsgB);
     deleteMsg.setData(dbDelete, deleteMsgB.buf(), deleteMsgB.len());
 
-    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    std::vector<std::unique_ptr<BatchedCommandRequest>> requests;
     msgToBatchRequests(deleteMsg, &requests);
 
-    BatchedCommandRequest* request = requests.back();
+    BatchedCommandRequest* request = requests.back().get();
     ASSERT_EQUALS(request->getBatchType(), BatchedCommandRequest::BatchType_Delete);
     string errMsg;
     ASSERT(request->isValid(&errMsg));

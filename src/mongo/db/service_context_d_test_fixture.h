@@ -39,7 +39,7 @@ class OperationContext;
  * Test fixture class for tests that use either the "ephemeralForTest" or "devnull" storage engines.
  */
 class ServiceContextMongoDTest : public unittest::Test {
-protected:
+public:
     /**
      * Initializes global storage engine.
      */
@@ -58,10 +58,20 @@ protected:
 
 private:
     /**
+     * Unused implementation of test function. This allows us to instantiate
+     * ServiceContextMongoDTest on its own without the need to inherit from it in a test.
+     * This supports using ServiceContextMongoDTest inside another test fixture and works around the
+     * limitation that tests cannot inherit from multiple test fixtures.
+     *
+     * It is an error to call this implementation of _doTest() directly.
+     */
+    void _doTest() override;
+
+    /**
      * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
      * used to drop the databases.
      */
-    void _dropAllDBs(OperationContext* txn);
+    void _dropAllDBs(OperationContext* opCtx);
 };
 
 }  // namespace mongo

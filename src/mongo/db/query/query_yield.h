@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -48,9 +48,9 @@ public:
      *
      * If in a nested context (eg DBDirectClient), does nothing.
      */
-    static void yieldAllLocks(OperationContext* txn,
+    static void yieldAllLocks(OperationContext* opCtx,
                               RecordFetcher* fetcher,
-                              const std::string& planExecNS);
+                              const NamespaceString& planExecNS);
 };
 
 }  // namespace mongo

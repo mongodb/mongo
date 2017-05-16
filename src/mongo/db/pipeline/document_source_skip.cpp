@@ -73,7 +73,7 @@ DocumentSource::GetNextResult DocumentSourceSkip::getNext() {
     return pSource->getNext();
 }
 
-Value DocumentSourceSkip::serialize(bool explain) const {
+Value DocumentSourceSkip::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(DOC(getSourceName() << _nToSkip));
 }
 

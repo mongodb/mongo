@@ -81,7 +81,7 @@ void CursorHandleInfo::finalize(JSFreeOp* fop, JSObject* obj) {
             }
         }
 
-        delete cursorTracker;
+        getScope(fop)->trackedDelete(cursorTracker);
     }
 }
 

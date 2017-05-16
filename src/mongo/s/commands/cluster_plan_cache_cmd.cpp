@@ -33,11 +33,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
+namespace {
 
 using std::string;
 using std::stringstream;
@@ -86,10 +86,9 @@ public:
     }
 
     // Cluster plan cache command entry point.
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result);
 
@@ -110,10 +109,9 @@ private:
 // Cluster plan cache command implementation(s) below
 //
 
-bool ClusterPlanCacheCmd::run(OperationContext* txn,
+bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
                               const std::string& dbName,
                               BSONObj& cmdObj,
-                              int options,
                               std::string& errMsg,
                               BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -124,7 +122,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
     vector<Strategy::CommandResult> results;
     const BSONObj query;
     Strategy::commandOp(
-        txn, dbName, cmdObj, options, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
+        opCtx, dbName, cmdObj, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
 
     // Set value of first shard result's "ok" field.
     bool clusterCmdResult = true;
@@ -153,8 +151,6 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
 // Register plan cache commands at startup
 //
 
-namespace {
-
 MONGO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
     // Leaked intentionally: a Command registers itself when constructed.
 
@@ -174,5 +170,4 @@ MONGO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
 }
 
 }  // namespace
-
 }  // namespace mongo

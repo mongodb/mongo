@@ -38,15 +38,10 @@ class OperationContext;
 
 struct CollModRequest;
 
-StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
-                                               const NamespaceString& nss,
-                                               Collection* coll,
-                                               const BSONObj& cmdObj);
-
 /**
  * Performs the collection modification described in "cmdObj" on the collection "ns".
  */
-Status collMod(OperationContext* txn,
+Status collMod(OperationContext* opCtx,
                const NamespaceString& ns,
                const BSONObj& cmdObj,
                BSONObjBuilder* result);

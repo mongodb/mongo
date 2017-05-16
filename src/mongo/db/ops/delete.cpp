@@ -39,41 +39,33 @@
 
 namespace mongo {
 
-/* ns:      namespace, e.g. <database>.<collection>
-   pattern: the "where" clause / criteria
-   justOne: stop after 1 match
-   god:     allow access to system namespaces, and don't yield
-*/
-long long deleteObjects(OperationContext* txn,
+long long deleteObjects(OperationContext* opCtx,
                         Collection* collection,
-                        StringData ns,
+                        const NamespaceString& ns,
                         BSONObj pattern,
-                        PlanExecutor::YieldPolicy policy,
                         bool justOne,
                         bool god,
                         bool fromMigrate) {
-    NamespaceString nsString(ns);
-    DeleteRequest request(nsString);
+    DeleteRequest request(ns);
     request.setQuery(pattern);
     request.setMulti(!justOne);
     request.setGod(god);
     request.setFromMigrate(fromMigrate);
-    request.setYieldPolicy(policy);
 
-    ParsedDelete parsedDelete(txn, &request);
+    ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    auto client = txn->getClient();
+    auto client = opCtx->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
 
-    std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
-        getExecutorDelete(txn, &CurOp::get(txn)->debug(), collection, &parsedDelete));
+    auto exec = uassertStatusOK(
+        getExecutorDelete(opCtx, &CurOp::get(opCtx)->debug(), collection, &parsedDelete));
 
     uassertStatusOK(exec->executePlan());
 
     // No-ops need to reset lastOp in the client, for write concern.
     if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-        repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+        repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx);
     }
 
     return DeleteStage::getNumDeleted(*exec);

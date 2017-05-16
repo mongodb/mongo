@@ -73,10 +73,9 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         if (cmdObj.firstElement().type() != jstOID) {

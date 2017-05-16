@@ -41,13 +41,13 @@ namespace authindex {
  * Creates the appropriate indexes on _new_ system collections supporting authentication and
  * authorization.
  */
-void createSystemIndexes(OperationContext* txn, Collection* collection);
+void createSystemIndexes(OperationContext* opCtx, Collection* collection);
 
 /**
  * Verifies that only the appropriate indexes to support authentication and authorization
  * are present in the admin database
  */
-Status verifySystemIndexes(OperationContext* txn);
+Status verifySystemIndexes(OperationContext* opCtx);
 
 }  // namespace authindex
 }  // namespace mongo

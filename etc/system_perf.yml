@@ -51,7 +51,7 @@ post:
           # these default values in the distro config in evergreen.
 
           if [ -d "${scons_cache_path}" ]; then
-              ${python|python} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+              ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
 functions:
@@ -264,11 +264,7 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          # Specify the test list to use. Change the testList parameter
-          # if you want to run a non-default list.
-          $DSI_PATH/bin/update_test_list.py ${testList}
-          $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
-          echo "Done test for ${test}-${storageEngine} with setup ${setup}!"
+          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
     - command: "json.send"
       params:
          name: "perf"
@@ -302,7 +298,7 @@ functions:
         silent: true
         script: |
           set -o errexit
-          TAGS="3.3.10-Baseline 3.2.9-Baseline 3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline"
+          TAGS="3.4.4-Baseline 3.2.12-Baseline"
           OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $TAGS --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
@@ -317,7 +313,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          TAG="3.2.9-Baseline"
+          TAG="3.4.4-Baseline"
           OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
 
@@ -388,23 +384,45 @@ tasks:
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
     - command: shell.exec
       params:
+        working_dir: src/src/mongo/gotools
+        script: |
+          set -o verbose
+          set -o errexit
+          # make sure newlines in the scripts are handled correctly by windows
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
+          sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
+          sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+          . ./${set_tools_gopath|set_gopath.sh}
+          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog"
+          if [ "${build_mongoreplay}" = "true" ]; then
+            build_tools="$build_tools mongoreplay"
+          fi
+          for i in $build_tools; do
+            ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
+            "../../mongo-tools/$i${exe|}" --version
+          done
+    - command: shell.exec
+      params:
         working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
           mkdir -p mongodb/jstests/hooks
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
+          mv src/mongo-tools/* mongodb/bin
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests/hooks"
@@ -440,7 +458,6 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -463,7 +480,6 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -473,12 +489,11 @@ tasks:
   depends_on:
     - name: compile
       variant: linux-standalone
-  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
+        test: "core"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -486,8 +501,7 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
-        testList: "default"
+        test: "core"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -495,12 +509,11 @@ tasks:
   depends_on:
     - name: compile
       variant: linux-standalone
-  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun"
+        test: "core"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -508,8 +521,127 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun"
-        testList: "default"
+        test: "core"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: non_sharded_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "non_sharded"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "non_sharded"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: non_sharded_workloads_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "non_sharded"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "non_sharded"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: mongos_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "mongos"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "mongos"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: mongos_workloads_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "mongos"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "mongos"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: move_chunk_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "move_chunk"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "move_chunk"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: move_chunk_workloads_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "move_chunk"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "move_chunk"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -521,7 +653,7 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
+        test: "secondary_performance"
         setup: "replica-2node"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
@@ -531,8 +663,7 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
-        testList: "secondary_performance"
+        test: "secondary_performance"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -544,7 +675,7 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun"
+        test: "secondary_performance"
         setup: "replica-2node"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
@@ -554,8 +685,7 @@ tasks:
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
-        test: "benchRun"
-        testList: "secondary_performance"
+        test: "secondary_performance"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -640,7 +770,6 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialSync"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -661,53 +790,6 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "initialSync"
-        testList: "default"
-    - func: "make test log artifact"
-    - func: "analyze"
-
-- name: initialsync_WT_dr
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  commands:
-    - func: "prepare environment"
-      vars:
-        storageEngine: "wiredTiger"
-        setup: "replica-2node.dr"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
-        setup: "replica-2node.dr"
-    - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "initialSync"
-        testList: "default"
-    - func: "make test log artifact"
-    - func: "analyze"
-
-- name: initialsync_MMAPv1_dr
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  commands:
-    - func: "prepare environment"
-      vars:
-        storageEngine: "mmapv1"
-        setup: "replica-2node.dr"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
-        setup: "replica-2node.dr"
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "initialSync"
-        testList: "default"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -729,7 +811,6 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialsync-logkeeper"
-        testList: "initialsync-logkeeper"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -764,17 +845,15 @@ modules:
 buildvariants:
 - name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
-  batchtime: 10080 # 7 days
+  batchtime: 1440 # 24 hours
   modules: &modules
     - dsi
     - workloads
     - YCSB
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: single-replica
     cluster: single
     platform: linux
-    use_scons_cache: true
     project: &project dsi
   run_on:
       - "rhel70-perf-single"
@@ -783,6 +862,8 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: non_sharded_workloads_WT
+    - name: non_sharded_workloads_MMAPv1
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -794,6 +875,8 @@ buildvariants:
     cluster: single
     platform: linux
     use_scons_cache: true
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: ""
     project: *project
   run_on:
       - "rhel70-perf-single"
@@ -805,17 +888,17 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: non_sharded_workloads_WT
+    - name: non_sharded_workloads_MMAPv1
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: shard
     cluster: shard
     platform: linux
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-shard"
@@ -824,13 +907,16 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: mongos_workloads_WT
+    - name: mongos_workloads_MMAPv1
+    - name: move_chunk_workloads_WT
+    - name: move_chunk_workloads_MMAPv1
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 10080 # 7 days
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: replica
     cluster: replica
     platform: linux
@@ -844,36 +930,32 @@ buildvariants:
     - name: core_workloads_MMAPv1
     - name: secondary_performance_WT
     - name: secondary_performance_MMAPv1
+    - name: non_sharded_workloads_WT
+    - name: non_sharded_workloads_MMAPv1
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 10080 # 7 days
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: replica-2node
     cluster: replica
     platform: linux
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-replset"
   tasks:
     - name: initialsync_WT
     - name: initialsync_MMAPv1
-    - name: initialsync_WT_dr
-    - name: initialsync_MMAPv1_dr
 
 - name: linux-replSet-initialsync-logkeeper
   display_name: Linux ReplSet Initial Sync LogKeeper
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     setup: initialsync-logkeeper
     cluster: initialsync-logkeeper
     platform: linux
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-initialsync-logkeeper"
@@ -882,11 +964,9 @@ buildvariants:
 
 - name: linux-oplog-compare
   display_name: Linux Oplog Compare
-  batchtime: 10080 # 7 days
+  batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    use_scons_cache: true
     project: *project
   run_on:
       - "rhel70-perf-single"

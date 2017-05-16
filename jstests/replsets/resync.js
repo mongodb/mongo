@@ -9,7 +9,18 @@
 (function() {
     "use strict";
 
-    var replTest = new ReplSetTest({name: 'resync', nodes: 3, oplogSize: 1});
+    var replTest = new ReplSetTest({
+        name: 'resync',
+        nodes: 3,
+        oplogSize: 1,
+        // At the end of this test we call resync on a node that may have blacklisted the only other
+        // data bearing node.  We need to ensure that the resync attempt will keep looking for a
+        // sync source for at least 60 seconds, until the blacklist period ends.  Since we sleep 1
+        // second in between each attempt to find a sync source, setting the number of attempts to
+        // find a sync source to larger than 60 should ensure that the resync attempt is able to
+        // succeed.
+        nodeOptions: {setParameter: "numInitialSyncConnectAttempts=90"}
+    });
     var nodes = replTest.nodeList();
 
     var conns = replTest.startSet();
@@ -60,6 +71,8 @@
         }
     }
 
+    jsTestLog("Rolling over oplog");
+
     // Make sure the oplog has rolled over on the primary and secondary that is up,
     // so when we bring up the other replica it is "too stale"
     for (var cycleNumber = 0; cycleNumber < 10; cycleNumber++) {
@@ -78,9 +91,11 @@
 
     assert(hasCycled());
 
+    jsTestLog("Restarting node B");
     // bring node B and it will enter recovery mode because its newest oplog entry is too old
     replTest.restart(BID);
 
+    jsTestLog("Waiting for node B to to into RECOVERING");
     // check that it is in recovery mode
     assert.soon(function() {
         try {
@@ -91,6 +106,7 @@
         }
     }, "node didn't enter RECOVERING state");
 
+    jsTestLog("Resync node B");
     // run resync and wait for it to happen
     assert.commandWorked(b_conn.getDB("admin").runCommand({resync: 1}));
     replTest.awaitReplication();

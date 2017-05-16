@@ -139,8 +139,7 @@ class MasterSlaveFixture(interface.ReplFixture):
         master of a master-slave deployment.
         """
 
-        logger_name = "%s:master" % (self.logger.name)
-        mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongod_logger = self.logger.new_fixture_node_logger("master")
 
         mongod_options = self.mongod_options.copy()
         mongod_options.update(self.master_options)
@@ -154,8 +153,7 @@ class MasterSlaveFixture(interface.ReplFixture):
         slave of a master-slave deployment.
         """
 
-        logger_name = "%s:slave" % (self.logger.name)
-        mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongod_logger = self.logger.new_fixture_node_logger("slave")
 
         mongod_options = self.mongod_options.copy()
         mongod_options.update(self.slave_options)

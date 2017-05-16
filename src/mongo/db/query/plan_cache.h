@@ -420,10 +420,6 @@ private:
     // Protects _cache.
     mutable stdx::mutex _cacheMutex;
 
-    // Counter for write notifications since initialization or last clear() invocation.  Starts
-    // at 0.
-    AtomicInt32 _writeOperations;
-
     // Full namespace of collection.
     std::string _ns;
 

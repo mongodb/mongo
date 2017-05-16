@@ -127,4 +127,25 @@ bool isValidBSONType(int type) {
     }
 }
 
+const char* typeName(BinDataType type) {
+    switch (type) {
+        case BinDataGeneral:
+            return "general";
+        case Function:
+            return "function";
+        case ByteArrayDeprecated:
+            return "byte(deprecated)";
+        case bdtUUID:
+            return "UUID(deprecated)";
+        case newUUID:
+            return "UUID";
+        case MD5Type:
+            return "MD5";
+        case bdtCustom:
+            return "Custom";
+        default:
+            return "invalid";
+    }
+}
+
 }  // namespace mongo

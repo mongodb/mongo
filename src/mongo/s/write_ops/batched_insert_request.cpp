@@ -29,6 +29,7 @@
 #include "mongo/s/write_ops/batched_insert_request.h"
 
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -112,8 +113,9 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
 
     while (sourceIt.more()) {
         BSONElement sourceEl = sourceIt.next();
+        const auto fieldName = sourceEl.fieldNameStringData();
 
-        if (collName() == sourceEl.fieldName()) {
+        if (fieldName == collName()) {
             std::string temp;
             FieldParser::FieldState fieldState =
                 FieldParser::extract(sourceEl, collName, &temp, errMsg);
@@ -124,7 +126,7 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
                     str::stream() << "Invalid namespace: " << _ns.ns(),
                     _ns.isValid());
             _isNSSet = fieldState == FieldParser::FIELD_SET;
-        } else if (documents() == sourceEl.fieldName()) {
+        } else if (fieldName == documents()) {
             FieldParser::FieldState fieldState =
                 FieldParser::extract(sourceEl, documents, &_documents, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID)
@@ -132,28 +134,23 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
             _isDocumentsSet = fieldState == FieldParser::FIELD_SET;
             if (_documents.size() >= 1)
                 extractIndexNSS(_documents.at(0), &_targetNSS);
-        } else if (writeConcern() == sourceEl.fieldName()) {
+        } else if (fieldName == writeConcern()) {
             FieldParser::FieldState fieldState =
                 FieldParser::extract(sourceEl, writeConcern, &_writeConcern, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
             _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
-        } else if (ordered() == sourceEl.fieldName()) {
+        } else if (fieldName == ordered()) {
             FieldParser::FieldState fieldState =
                 FieldParser::extract(sourceEl, ordered, &_ordered, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
             _isOrderedSet = fieldState == FieldParser::FIELD_SET;
-        } else if (bypassDocumentValidationCommandOption() == sourceEl.fieldNameStringData()) {
+        } else if (fieldName == bypassDocumentValidationCommandOption()) {
             _shouldBypassValidation = sourceEl.trueValue();
-        } else if (sourceEl.fieldName()[0] != '$') {
-            std::initializer_list<StringData> ignoredFields = {"maxTimeMS", "shardVersion"};
-            if (std::find(ignoredFields.begin(), ignoredFields.end(), sourceEl.fieldName()) ==
-                ignoredFields.end()) {
-                *errMsg = str::stream() << "Unknown option to insert command: "
-                                        << sourceEl.fieldName();
-                return false;
-            }
+        } else if (!Command::isGenericArgument(fieldName)) {
+            *errMsg = str::stream() << "Unknown option to insert command: " << sourceEl.fieldName();
+            return false;
         }
     }
 

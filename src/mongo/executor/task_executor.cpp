@@ -57,7 +57,7 @@ TaskExecutor::CallbackArgs::CallbackArgs(TaskExecutor* theExecutor,
     : executor(theExecutor),
       myHandle(std::move(theHandle)),
       status(std::move(theStatus)),
-      txn(theTxn) {}
+      opCtx(theTxn) {}
 
 
 TaskExecutor::RemoteCommandCallbackArgs::RemoteCommandCallbackArgs(

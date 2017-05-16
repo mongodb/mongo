@@ -51,46 +51,46 @@ public:
     virtual ~NamespaceDetailsRSV1MetaData() {}
 
     virtual const DiskLoc& capExtent() const;
-    virtual void setCapExtent(OperationContext* txn, const DiskLoc& loc);
+    virtual void setCapExtent(OperationContext* opCtx, const DiskLoc& loc);
 
     virtual const DiskLoc& capFirstNewRecord() const;
-    virtual void setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc);
+    virtual void setCapFirstNewRecord(OperationContext* opCtx, const DiskLoc& loc);
 
     virtual bool capLooped() const;
 
     virtual long long dataSize() const;
     virtual long long numRecords() const;
 
-    virtual void incrementStats(OperationContext* txn,
+    virtual void incrementStats(OperationContext* opCtx,
                                 long long dataSizeIncrement,
                                 long long numRecordsIncrement);
 
-    virtual void setStats(OperationContext* txn, long long dataSize, long long numRecords);
+    virtual void setStats(OperationContext* opCtx, long long dataSize, long long numRecords);
 
     virtual DiskLoc deletedListEntry(int bucket) const;
-    virtual void setDeletedListEntry(OperationContext* txn, int bucket, const DiskLoc& loc);
+    virtual void setDeletedListEntry(OperationContext* opCtx, int bucket, const DiskLoc& loc);
 
     virtual DiskLoc deletedListLegacyGrabBag() const;
-    virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+    virtual void setDeletedListLegacyGrabBag(OperationContext* opCtx, const DiskLoc& loc);
 
-    virtual void orphanDeletedList(OperationContext* txn);
+    virtual void orphanDeletedList(OperationContext* opCtx);
 
-    virtual const DiskLoc& firstExtent(OperationContext* txn) const;
-    virtual void setFirstExtent(OperationContext* txn, const DiskLoc& loc);
+    virtual const DiskLoc& firstExtent(OperationContext* opCtx) const;
+    virtual void setFirstExtent(OperationContext* opCtx, const DiskLoc& loc);
 
-    virtual const DiskLoc& lastExtent(OperationContext* txn) const;
-    virtual void setLastExtent(OperationContext* txn, const DiskLoc& loc);
+    virtual const DiskLoc& lastExtent(OperationContext* opCtx) const;
+    virtual void setLastExtent(OperationContext* opCtx, const DiskLoc& loc);
 
     virtual bool isCapped() const;
 
     virtual bool isUserFlagSet(int flag) const;
     virtual int userFlags() const;
-    virtual bool setUserFlag(OperationContext* txn, int flag);
-    virtual bool clearUserFlag(OperationContext* txn, int flag);
-    virtual bool replaceUserFlags(OperationContext* txn, int flags);
+    virtual bool setUserFlag(OperationContext* opCtx, int flag);
+    virtual bool clearUserFlag(OperationContext* opCtx, int flag);
+    virtual bool replaceUserFlags(OperationContext* opCtx, int flags);
 
-    virtual int lastExtentSize(OperationContext* txn) const;
-    virtual void setLastExtentSize(OperationContext* txn, int newMax);
+    virtual int lastExtentSize(OperationContext* opCtx) const;
+    virtual void setLastExtentSize(OperationContext* opCtx, int newMax);
 
     virtual long long maxCappedDocs() const;
 

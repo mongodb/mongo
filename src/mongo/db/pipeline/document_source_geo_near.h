@@ -49,7 +49,7 @@ public:
     bool isValidInitialSource() const final {
         return true;
     }
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     BSONObjSet getOutputSorts() final {
         return SimpleBSONObjComparator::kInstance.makeBSONObjSet(
             {BSON(distanceField->fullPath() << -1)});

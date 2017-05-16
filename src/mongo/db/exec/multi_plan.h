@@ -75,7 +75,7 @@ public:
      * If 'shouldCache' is true, writes a cache entry for the winning plan to the plan cache
      * when possible. If 'shouldCache' is false, the plan cache will never be written.
      */
-    MultiPlanStage(OperationContext* txn,
+    MultiPlanStage(OperationContext* opCtx,
                    const Collection* collection,
                    CanonicalQuery* cq,
                    CachingMode cachingMode = CachingMode::AlwaysCache);
@@ -84,7 +84,7 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
 
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_MULTI_PLAN;
@@ -118,7 +118,7 @@ public:
      *
      * Calculated based on a fixed query knob and the size of the collection.
      */
-    static size_t getTrialPeriodWorks(OperationContext* txn, const Collection* collection);
+    static size_t getTrialPeriodWorks(OperationContext* opCtx, const Collection* collection);
 
     /**
      * Returns the max number of documents which we should allow any plan to return during the

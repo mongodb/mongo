@@ -34,6 +34,9 @@
 
 #include <memory.h>
 
+#include <memory>
+#include <vector>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context.h"
@@ -101,8 +104,8 @@ public:
         return _oplogReadTill;
     }
 
-    static WiredTigerRecoveryUnit* get(OperationContext* txn) {
-        return checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+    static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
+        return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
     }
 
     static void appendGlobalStats(BSONObjBuilder& b);
@@ -134,7 +137,7 @@ private:
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
     std::unique_ptr<Timer> _timer;
 
-    typedef OwnedPointerVector<Change> Changes;
+    typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
 };
 
@@ -146,7 +149,7 @@ public:
     WiredTigerCursor(const std::string& uri,
                      uint64_t tableID,
                      bool forRecordStore,
-                     OperationContext* txn);
+                     OperationContext* opCtx);
 
     ~WiredTigerCursor();
 

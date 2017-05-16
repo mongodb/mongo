@@ -49,6 +49,7 @@ JAVA_JUNIT = \
 		$(JAVATEST)/ConcurrentCloseTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
+		$(JAVATEST)/CursorTest03.java \
 		$(JAVATEST)/ExceptionTest.java \
 		$(JAVATEST)/PackTest.java \
 		$(JAVATEST)/PackTest02.java \

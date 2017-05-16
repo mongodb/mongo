@@ -47,22 +47,22 @@ auto mongo::SortedDataInterfaceHarnessHelper::newSortedDataInterface(
     return index;
 }
 
-void mongo::insertToIndex(unowned_ptr<OperationContext> txn,
+void mongo::insertToIndex(unowned_ptr<OperationContext> opCtx,
                           unowned_ptr<SortedDataInterface> index,
                           std::initializer_list<IndexKeyEntry> toInsert) {
-    WriteUnitOfWork wuow(txn);
+    WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toInsert) {
-        ASSERT_OK(index->insert(txn, entry.key, entry.loc, true));
+        ASSERT_OK(index->insert(opCtx, entry.key, entry.loc, true));
     }
     wuow.commit();
 }
 
-void mongo::removeFromIndex(unowned_ptr<OperationContext> txn,
+void mongo::removeFromIndex(unowned_ptr<OperationContext> opCtx,
                             unowned_ptr<SortedDataInterface> index,
                             std::initializer_list<IndexKeyEntry> toRemove) {
-    WriteUnitOfWork wuow(txn);
+    WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toRemove) {
-        index->unindex(txn, entry.key, entry.loc, true);
+        index->unindex(opCtx, entry.key, entry.loc, true);
     }
     wuow.commit();
 }

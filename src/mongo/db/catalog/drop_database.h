@@ -34,5 +34,5 @@ class OperationContext;
 /**
  * Drops the database "dbName".
  */
-Status dropDatabase(OperationContext* txn, const std::string& dbName);
+Status dropDatabase(OperationContext* opCtx, const std::string& dbName);
 }  // namespace mongo

@@ -21,19 +21,6 @@ env.Library(
 
 env.Library(
     target=[
-        'document_range',
-    ],
-    source=[
-        'document_range.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core',
-    ],
-)
-
-env.Library(
-    target=[
         'protocol',
     ],
     source=[
@@ -88,7 +75,7 @@ env.Library(
         'command_request_builder.cpp',
     ],
     LIBDEPS=[
-        'document_range',
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -102,7 +89,6 @@ env.Library(
         'legacy_request_builder.cpp',
     ],
     LIBDEPS=[
-        'document_range',
         'metadata',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/util/net/network',
@@ -119,7 +105,6 @@ env.Library(
         'reply_builder_interface.cpp',
     ],
     LIBDEPS=[
-        'document_range',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -134,7 +119,6 @@ env.Library(
     ],
     LIBDEPS=[
         'command_reply',
-        'document_range',
         'metadata',
         'object_check',
         '$BUILD_DIR/mongo/util/net/network',
@@ -151,7 +135,6 @@ env.Clone().InjectModule("enterprise").Library(
         'metadata/config_server_metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
         'metadata/logical_time_metadata.cpp',
-        'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
         'metadata/oplog_query_metadata.cpp',
@@ -162,6 +145,8 @@ env.Clone().InjectModule("enterprise").Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/logical_time_validator',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/signed_logical_time',
         '$BUILD_DIR/mongo/util/decorable',
@@ -173,9 +158,9 @@ env.CppUnitTest(
         'rpc_metadata_test',
     ],
     source=[
+        'metadata_test.cpp',
         'metadata/egress_metadata_hook_list_test.cpp',
         'metadata/logical_time_metadata_test.cpp',
-        'metadata/server_selection_metadata_test.cpp',
         'metadata/sharding_metadata_test.cpp',
         'metadata/tracking_metadata_test.cpp',
     ],
@@ -192,7 +177,6 @@ env.CppUnitTest(
         'command_reply_test.cpp',
         'command_request_builder_test.cpp',
         'command_request_test.cpp',
-        'legacy_request_test.cpp',
         'object_check_test.cpp',
         'protocol_test.cpp',
         'reply_builder_test.cpp',

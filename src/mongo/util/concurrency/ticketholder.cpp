@@ -59,27 +59,35 @@ TicketHolder::~TicketHolder() {
 
 bool TicketHolder::tryAcquire() {
     while (0 != sem_trywait(&_sem)) {
-        switch (errno) {
-            case EAGAIN:
-                return false;
-            case EINTR:
-                break;
-            default:
-                _check(-1);
-        }
+        if (errno == EAGAIN)
+            return false;
+        if (errno != EINTR)
+            _check(-1);
     }
     return true;
 }
 
 void TicketHolder::waitForTicket() {
     while (0 != sem_wait(&_sem)) {
-        switch (errno) {
-            case EINTR:
-                break;
-            default:
-                _check(-1);
-        }
+        if (errno != EINTR)
+            _check(-1);
     }
+}
+
+bool TicketHolder::waitForTicketUntil(Date_t until) {
+    const long long millisSinceEpoch = until.toMillisSinceEpoch();
+    struct timespec ts;
+
+    ts.tv_sec = millisSinceEpoch / 1000;
+    ts.tv_nsec = (millisSinceEpoch % 1000) * (1000 * 1000);
+    while (0 != sem_timedwait(&_sem, &ts)) {
+        if (errno == ETIMEDOUT)
+            return false;
+
+        if (errno != EINTR)
+            _check(-1);
+    }
+    return true;
 }
 
 void TicketHolder::release() {
@@ -144,6 +152,12 @@ void TicketHolder::waitForTicket() {
     while (!_tryAcquire()) {
         _newTicket.wait(lk);
     }
+}
+
+bool TicketHolder::waitForTicketUntil(Date_t until) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    return _newTicket.wait_until(lk, until.toSystemTimePoint(), [this] { return _tryAcquire(); });
 }
 
 void TicketHolder::release() {

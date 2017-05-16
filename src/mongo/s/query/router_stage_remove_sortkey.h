@@ -41,9 +41,9 @@ class RouterStageRemoveSortKey final : public RouterExecStage {
 public:
     RouterStageRemoveSortKey(std::unique_ptr<RouterExecStage> child);
 
-    StatusWith<ClusterQueryResult> next(OperationContext* txn) final;
+    StatusWith<ClusterQueryResult> next(OperationContext* opCtx) final;
 
-    void kill(OperationContext* txn) final;
+    void kill(OperationContext* opCtx) final;
 
     bool remotesExhausted() final;
 

@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
 
 var collectionName = "bulk_api_ordered";
 var coll = db.getCollection(collectionName);

@@ -39,12 +39,12 @@ RouterStageLimit::RouterStageLimit(std::unique_ptr<RouterExecStage> child, long 
     invariant(limit > 0);
 }
 
-StatusWith<ClusterQueryResult> RouterStageLimit::next(OperationContext* txn) {
+StatusWith<ClusterQueryResult> RouterStageLimit::next(OperationContext* opCtx) {
     if (_returnedSoFar >= _limit) {
         return {ClusterQueryResult()};
     }
 
-    auto childResult = getChildStage()->next(txn);
+    auto childResult = getChildStage()->next(opCtx);
     if (!childResult.isOK()) {
         return childResult;
     }
@@ -55,8 +55,8 @@ StatusWith<ClusterQueryResult> RouterStageLimit::next(OperationContext* txn) {
     return childResult;
 }
 
-void RouterStageLimit::kill(OperationContext* txn) {
-    getChildStage()->kill(txn);
+void RouterStageLimit::kill(OperationContext* opCtx) {
+    getChildStage()->kill(opCtx);
 }
 
 bool RouterStageLimit::remotesExhausted() {

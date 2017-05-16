@@ -56,9 +56,9 @@ public:
     OperationShardingState();
 
     /**
-     * Retrieves a reference to the shard version decorating the OperationContext, 'txn'.
+     * Retrieves a reference to the shard version decorating the OperationContext, 'opCtx'.
      */
-    static OperationShardingState& get(OperationContext* txn);
+    static OperationShardingState& get(OperationContext* opCtx);
 
     /**
      * Parses shard version from the command parameters 'cmdObj' and stores the results in this
@@ -104,7 +104,7 @@ public:
      * Returns true if the call actually waited because of migration critical section (regardless if
      * whether it timed out or not), false if there was no active migration critical section.
      */
-    bool waitForMigrationCriticalSectionSignal(OperationContext* txn);
+    bool waitForMigrationCriticalSectionSignal(OperationContext* opCtx);
 
     /**
      * Setting this value indicates that when the version check failed, there was an active
@@ -140,11 +140,11 @@ class OperationShardingState::IgnoreVersioningBlock {
     MONGO_DISALLOW_COPYING(IgnoreVersioningBlock);
 
 public:
-    IgnoreVersioningBlock(OperationContext* txn, const NamespaceString& ns);
+    IgnoreVersioningBlock(OperationContext* opCtx, const NamespaceString& ns);
     ~IgnoreVersioningBlock();
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     NamespaceString _ns;
     ChunkVersion _originalVersion;
     bool _hadOriginalVersion;

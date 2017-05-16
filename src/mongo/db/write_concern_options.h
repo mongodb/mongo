@@ -79,12 +79,6 @@ public:
      */
     bool shouldWaitForOtherNodes() const;
 
-    /**
-     * Returns true if this is a {w:majority} write concern, which is the only valid write concern
-     * to use against a config server.
-     */
-    bool validForConfigServers() const;
-
     void reset() {
         syncMode = SyncMode::UNSET;
         wNumNodes = 0;

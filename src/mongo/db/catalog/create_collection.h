@@ -40,7 +40,7 @@ class OperationContext;
  * _id index according to 'idIndex', if it is non-empty. When 'idIndex' is empty, creates the
  * default _id index.
  */
-Status createCollection(OperationContext* txn,
+Status createCollection(OperationContext* opCtx,
                         const std::string& dbName,
                         const BSONObj& cmdObj,
                         const BSONObj& idIndex = BSONObj());

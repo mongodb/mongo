@@ -6,17 +6,15 @@ var st = new ShardingTest({shards: 2, mongos: 1});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
-var shards = config.shards.find().toArray();
 var coll = mongos.getCollection("foo.bar");
 var collUnsharded = mongos.getCollection("foo.baz");
 
 // Shard collection
 printjson(admin.runCommand({enableSharding: coll.getDB() + ""}));
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: shards[0]._id}));
+printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
 printjson(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 printjson(admin.runCommand({split: coll + "", middle: {_id: 0}}));
-printjson(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: shards[1]._id}));
+printjson(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
 jsTest.log("Collection set up...");
 st.printShardingStatus(true);

@@ -63,7 +63,7 @@
 #define	WT_MAX(a, b)	((a) < (b) ? (b) : (a))
 
 /* Elements in an array. */
-#define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
+#define	WT_ELEMENTS(a)	(sizeof(a) / sizeof((a)[0]))
 
 /* 10 level skip lists, 1/4 have a link to the next element. */
 #define	WT_SKIP_MAXDEPTH	10
@@ -140,6 +140,7 @@
 
 #define	F_CLR(p, mask)		        FLD_CLR((p)->flags, mask)
 #define	F_ISSET(p, mask)	        FLD_ISSET((p)->flags, mask)
+#define	F_ISSET_ALL(p, mask)	        (FLD_MASK((p)->flags, mask) == (mask))
 #define	F_MASK(p, mask)	                FLD_MASK((p)->flags, mask)
 #define	F_SET(p, mask)		        FLD_SET((p)->flags, mask)
 
@@ -180,14 +181,14 @@
  */
 #define	WT_BINARY_SEARCH(key, arrayp, n, found) do {			\
 	uint32_t __base, __indx, __limit;				\
-	found = false;							\
+	(found) = false;						\
 	for (__base = 0, __limit = (n); __limit != 0; __limit >>= 1) {	\
 		__indx = __base + (__limit >> 1);			\
-		if ((arrayp)[__indx] < key) {				\
+		if ((arrayp)[__indx] < (key)) {				\
 			__base = __indx + 1;				\
 			--__limit;					\
-		} else if ((arrayp)[__indx] == key) {			\
-			found = true;					\
+		} else if ((arrayp)[__indx] == (key)) {			\
+			(found) = true;					\
 			break;						\
 		}							\
 	}								\
@@ -206,8 +207,8 @@
 
 /* Check if a string matches a prefix. */
 #define	WT_PREFIX_MATCH(str, pfx)					\
-	(((const char *)(str))[0] == ((const char *)pfx)[0] &&		\
-	    strncmp((str), (pfx), strlen(pfx)) == 0)
+	(((const char *)(str))[0] == ((const char *)(pfx))[0] &&	\
+	    strncmp(str, pfx, strlen(pfx)) == 0)
 
 /* Check if a string matches a prefix, and move past it. */
 #define	WT_PREFIX_SKIP(str, pfx)					\
@@ -224,8 +225,8 @@
 
 /* Check if a string matches a byte string of len bytes. */
 #define	WT_STRING_MATCH(str, bytes, len)				\
-	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
-	    strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+	(((const char *)(str))[0] == ((const char *)(bytes))[0] &&	\
+	    strncmp(str, bytes, len) == 0 && (str)[len] == '\0')
 
 /*
  * Macro that produces a string literal that isn't wrapped in quotes, to avoid

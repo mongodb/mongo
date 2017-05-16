@@ -507,7 +507,7 @@ struct __wt_page {
 #define	WT_INTL_INDEX_GET_SAFE(page)					\
 	((page)->u.intl.__index)
 #define	WT_INTL_INDEX_GET(session, page, pindex) do {			\
-	WT_ASSERT(session, session->split_gen != 0);			\
+	WT_ASSERT(session, (session)->split_gen != 0);			\
 	(pindex) = WT_INTL_INDEX_GET_SAFE(page);			\
 } while (0)
 #define	WT_INTL_INDEX_SET(page, v) do {					\
@@ -868,7 +868,7 @@ struct __wt_col {
  *	Return the 0-based array offset based on a WT_COL reference.
  */
 #define	WT_COL_SLOT(page, cip)						\
-	((uint32_t)(((WT_COL *)cip) - (page)->pg_var))
+	((uint32_t)(((WT_COL *)(cip)) - (page)->pg_var))
 
 /*
  * WT_IKEY --
@@ -977,10 +977,10 @@ struct __wt_insert {
 		} key;
 	} u;
 
-#define	WT_INSERT_KEY_SIZE(ins) (((WT_INSERT *)ins)->u.key.size)
+#define	WT_INSERT_KEY_SIZE(ins) (((WT_INSERT *)(ins))->u.key.size)
 #define	WT_INSERT_KEY(ins)						\
-	((void *)((uint8_t *)(ins) + ((WT_INSERT *)ins)->u.key.offset))
-#define	WT_INSERT_RECNO(ins)	(((WT_INSERT *)ins)->u.recno)
+	((void *)((uint8_t *)(ins) + ((WT_INSERT *)(ins))->u.key.offset))
+#define	WT_INSERT_RECNO(ins)	(((WT_INSERT *)(ins))->u.recno)
 
 	WT_INSERT *next[0];			/* forward-linked skip list */
 };
@@ -989,9 +989,9 @@ struct __wt_insert {
  * Skiplist helper macros.
  */
 #define	WT_SKIP_FIRST(ins_head)						\
-	(((ins_head) == NULL) ? NULL : ((WT_INSERT_HEAD *)ins_head)->head[0])
+	(((ins_head) == NULL) ? NULL : ((WT_INSERT_HEAD *)(ins_head))->head[0])
 #define	WT_SKIP_LAST(ins_head)						\
-	(((ins_head) == NULL) ? NULL : ((WT_INSERT_HEAD *)ins_head)->tail[0])
+	(((ins_head) == NULL) ? NULL : ((WT_INSERT_HEAD *)(ins_head))->tail[0])
 #define	WT_SKIP_NEXT(ins)  ((ins)->next[0])
 #define	WT_SKIP_FOREACH(ins, ins_head)					\
 	for ((ins) = WT_SKIP_FIRST(ins_head);				\
@@ -1004,7 +1004,7 @@ struct __wt_insert {
 #define	WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)	do {		\
 	if (((v) = (dest)) == NULL) {					\
 		WT_ERR(__wt_calloc_def(s, count, &(v)));		\
-		if (__wt_atomic_cas_ptr(&dest, NULL, v))		\
+		if (__wt_atomic_cas_ptr(&(dest), NULL, v))		\
 			__wt_cache_page_inmem_incr(			\
 			    s, page, (count) * sizeof(*(v)));		\
 		else							\

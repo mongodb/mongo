@@ -51,7 +51,7 @@ public:
         RecordId lastRecord;  // RecordId of the last record in a chunk of the oplog.
     };
 
-    OplogStones(OperationContext* txn, WiredTigerRecordStore* rs);
+    OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs);
 
     bool isDead();
 
@@ -73,12 +73,12 @@ public:
 
     void createNewStoneIfNeeded(RecordId lastRecord);
 
-    void updateCurrentStoneAfterInsertOnCommit(OperationContext* txn,
+    void updateCurrentStoneAfterInsertOnCommit(OperationContext* opCtx,
                                                int64_t bytesInserted,
                                                RecordId highestInserted,
                                                int64_t countInserted);
 
-    void clearStonesOnCommit(OperationContext* txn);
+    void clearStonesOnCommit(OperationContext* opCtx);
 
     // Updates the metadata about the oplog stones after a rollback occurs.
     void updateStonesAfterCappedTruncateAfter(int64_t recordsRemoved,
@@ -116,8 +116,8 @@ private:
     class TruncateChange;
 
     void _calculateStones(OperationContext* opCtx, size_t size);
-    void _calculateStonesByScanning(OperationContext* txn);
-    void _calculateStonesBySampling(OperationContext* txn,
+    void _calculateStonesByScanning(OperationContext* opCtx);
+    void _calculateStonesBySampling(OperationContext* opCtx,
                                     int64_t estRecordsPerStone,
                                     int64_t estBytesPerStone);
 

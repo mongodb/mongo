@@ -46,21 +46,18 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 class IndexScanTest {
 public:
     IndexScanTest()
-        : _scopedXact(&_txn, MODE_IX),
-          _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
-          _ctx(&_txn, ns()),
-          _coll(NULL) {}
+        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X), _ctx(&_opCtx, ns()), _coll(NULL) {}
 
     virtual ~IndexScanTest() {}
 
     virtual void setup() {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
 
-        _ctx.db()->dropCollection(&_txn, ns());
-        _coll = _ctx.db()->createCollection(&_txn, ns());
+        _ctx.db()->dropCollection(&_opCtx, ns());
+        _coll = _ctx.db()->createCollection(&_opCtx, ns());
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
-            &_txn,
+            &_opCtx,
             BSON("ns" << ns() << "key" << BSON("x" << 1) << "name"
                       << DBClientBase::genIndexName(BSON("x" << 1))
                       << "v"
@@ -70,9 +67,9 @@ public:
     }
 
     void insert(const BSONObj& doc) {
-        WriteUnitOfWork wunit(&_txn);
+        WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(_coll->insertDocument(&_txn, doc, nullOpDebug, false));
+        ASSERT_OK(_coll->insertDocument(&_opCtx, doc, nullOpDebug, false));
         wunit.commit();
     }
 
@@ -100,7 +97,7 @@ public:
     IndexScan* createIndexScanSimpleRange(BSONObj startKey, BSONObj endKey) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<IndexDescriptor*> indexes;
-        catalog->findIndexesByKeyPattern(&_txn, BSON("x" << 1), false, &indexes);
+        catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         // We are not testing indexing here so use maximal bounds
@@ -114,7 +111,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = NULL;
-        return new IndexScan(&_txn, params, &_ws, filter);
+        return new IndexScan(&_opCtx, params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -124,7 +121,7 @@ public:
                                int direction = 1) {
         IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<IndexDescriptor*> indexes;
-        catalog->findIndexesByKeyPattern(&_txn, BSON("x" << 1), false, &indexes);
+        catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         IndexScanParams params;
@@ -139,7 +136,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         MatchExpression* filter = NULL;
-        return new IndexScan(&_txn, params, &_ws, filter);
+        return new IndexScan(&_opCtx, params, &_ws, filter);
     }
 
     static const char* ns() {
@@ -147,10 +144,9 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
 
-    ScopedTransaction _scopedXact;
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
     Collection* _coll;

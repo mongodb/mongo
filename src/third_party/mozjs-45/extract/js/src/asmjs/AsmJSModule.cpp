@@ -64,12 +64,11 @@ using JS::GenericNaN;
 static uint8_t*
 AllocateExecutableMemory(ExclusiveContext* cx, size_t bytes)
 {
-    // On most platforms, this will allocate RWX memory. On iOS, or when
-    // --non-writable-jitcode is used, this will allocate RW memory. In this
-    // case, DynamicallyLinkModule will reprotect the code as RX.
-    unsigned permissions =
-        ExecutableAllocator::initialProtectionFlags(ExecutableAllocator::Writable);
-    void* p = AllocateExecutableMemory(nullptr, bytes, permissions, "asm-js-code", AsmJSPageSize);
+    // bytes is a multiple of the system's page size, but not necessarily
+    // a multiple of ExecutableCodePageSize.
+    bytes = JS_ROUNDUP(bytes, ExecutableCodePageSize);
+
+    void* p = AllocateExecutableMemory(bytes, ProtectionSetting::Writable);
     if (!p)
         ReportOutOfMemory(cx);
     return (uint8_t*)p;
@@ -122,7 +121,8 @@ AsmJSModule::~AsmJSModule()
             exitDatum.baselineScript->removeDependentAsmJSModule(exit);
         }
 
-        DeallocateExecutableMemory(code_, pod.totalBytes_, AsmJSPageSize);
+        uint32_t size = JS_ROUNDUP(pod.totalBytes_, ExecutableCodePageSize);
+        DeallocateExecutableMemory(code_, size);
     }
 
     if (prevLinked_)

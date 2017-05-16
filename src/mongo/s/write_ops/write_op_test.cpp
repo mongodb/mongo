@@ -83,7 +83,7 @@ TEST(WriteOpTests, TargetSingle) {
     // Basic targeting test
     //
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     NamespaceString nss("foo.bar");
 
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
@@ -105,7 +105,7 @@ TEST(WriteOpTests, TargetSingle) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(&txn, targeter, &targeted);
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
 
     ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
@@ -141,7 +141,7 @@ TEST(WriteOpTests, TargetMultiOneShard) {
     // Multi-write targeting test where our query goes to one shard
     //
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     NamespaceString nss("foo.bar");
 
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion(10, 0, OID()));
@@ -167,7 +167,7 @@ TEST(WriteOpTests, TargetMultiOneShard) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(&txn, targeter, &targeted);
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
 
     ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
@@ -184,7 +184,7 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     // Multi-write targeting test where our write goes to more than one shard
     //
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     NamespaceString nss("foo.bar");
 
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion(10, 0, OID()));
@@ -211,7 +211,7 @@ TEST(WriteOpTests, TargetMultiAllShards) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(&txn, targeter, &targeted);
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
 
     ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
@@ -236,7 +236,7 @@ TEST(WriteOpTests, ErrorSingle) {
     // Single error after targeting test
     //
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     NamespaceString nss("foo.bar");
 
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
@@ -258,7 +258,7 @@ TEST(WriteOpTests, ErrorSingle) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(&txn, targeter, &targeted);
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
 
     ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
@@ -282,7 +282,7 @@ TEST(WriteOpTests, CancelSingle) {
     // Cancel single targeting test
     //
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     NamespaceString nss("foo.bar");
 
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
@@ -304,7 +304,7 @@ TEST(WriteOpTests, CancelSingle) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(&txn, targeter, &targeted);
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
 
     ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
@@ -325,7 +325,7 @@ TEST(WriteOpTests, RetrySingleOp) {
     // Retry single targeting test
     //
 
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     NamespaceString nss("foo.bar");
 
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
@@ -347,7 +347,7 @@ TEST(WriteOpTests, RetrySingleOp) {
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
-    Status status = writeOp.targetWrites(&txn, targeter, &targeted);
+    Status status = writeOp.targetWrites(&opCtx, targeter, &targeted);
 
     ASSERT(status.isOK());
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);

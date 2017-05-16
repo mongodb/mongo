@@ -91,13 +91,11 @@ public:
     bool run(OperationContext* opCtx,
             const string& dbname,
             BSONObj& jsobj,
-            int,
             string& errmsg,
             BSONObjBuilder& result) {
-        StringData dbName("local");
-        AutoGetDb autoDb(opCtx, dbName, MODE_X);
-        Database* const db = autoDb.getDb();
-        Collection* coll = db ? db->getCollection("local.oplog.rs") : nullptr;
+	NamespaceString nss("local.oplog.rs");
+	AutoGetCollection autoColl(opCtx, nss, MODE_X);
+	Collection* coll = autoColl.getCollection();
         if (!coll) {
             return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotFound, "oplog does not exist"));
         }

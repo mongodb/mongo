@@ -73,9 +73,9 @@ BtreeLogicTestHelper<OnDiskFormat>::BtreeLogicTestHelper(const BSONObj& order)
 
     // Generate a valid record location for a "fake" record, which we will repeatedly use
     // thoughout the tests.
-    OperationContextNoop txn;
+    OperationContextNoop opCtx;
     StatusWith<RecordId> s =
-        recordStore.insertRecord(&txn, randomData.c_str(), randomData.length(), false);
+        recordStore.insertRecord(&opCtx, randomData.c_str(), randomData.length(), false);
 
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, recordStore.numRecords(NULL));
@@ -90,13 +90,13 @@ BtreeLogicTestHelper<OnDiskFormat>::BtreeLogicTestHelper(const BSONObj& order)
 
 template <class OnDiskFormat>
 void ArtificialTreeBuilder<OnDiskFormat>::makeTree(const string& spec) {
-    _helper->headManager.setHead(_txn, makeTree(fromjson(spec)).toRecordId());
+    _helper->headManager.setHead(_opCtx, makeTree(fromjson(spec)).toRecordId());
 }
 
 template <class OnDiskFormat>
 DiskLoc ArtificialTreeBuilder<OnDiskFormat>::makeTree(const BSONObj& spec) {
-    DiskLoc bucketLoc = _helper->btree._addBucket(_txn);
-    BucketType* bucket = _helper->btree.getBucket(_txn, bucketLoc);
+    DiskLoc bucketLoc = _helper->btree._addBucket(_opCtx);
+    BucketType* bucket = _helper->btree.getBucket(_opCtx, bucketLoc);
 
     BSONObjIterator i(spec);
     while (i.more()) {
@@ -114,13 +114,13 @@ DiskLoc ArtificialTreeBuilder<OnDiskFormat>::makeTree(const BSONObj& spec) {
         }
     }
 
-    _helper->btree.fixParentPtrs(_txn, bucket, bucketLoc);
+    _helper->btree.fixParentPtrs(_opCtx, bucket, bucketLoc);
     return bucketLoc;
 }
 
 template <class OnDiskFormat>
 void ArtificialTreeBuilder<OnDiskFormat>::checkStructure(const string& spec) const {
-    checkStructure(fromjson(spec), DiskLoc::fromRecordId(_helper->headManager.getHead(_txn)));
+    checkStructure(fromjson(spec), DiskLoc::fromRecordId(_helper->headManager.getHead(_opCtx)));
 }
 
 template <class OnDiskFormat>
@@ -128,16 +128,16 @@ void ArtificialTreeBuilder<OnDiskFormat>::push(const DiskLoc bucketLoc,
                                                const BSONObj& key,
                                                const DiskLoc child) {
     KeyDataOwnedType k(key);
-    BucketType* bucket = _helper->btree.getBucket(_txn, bucketLoc);
+    BucketType* bucket = _helper->btree.getBucket(_opCtx, bucketLoc);
 
     invariant(_helper->btree.pushBack(bucket, _helper->dummyDiskLoc, k, child));
-    _helper->btree.fixParentPtrs(_txn, bucket, bucketLoc);
+    _helper->btree.fixParentPtrs(_opCtx, bucket, bucketLoc);
 }
 
 template <class OnDiskFormat>
 void ArtificialTreeBuilder<OnDiskFormat>::checkStructure(const BSONObj& spec,
                                                          const DiskLoc node) const {
-    BucketType* bucket = _helper->btree.getBucket(_txn, node);
+    BucketType* bucket = _helper->btree.getBucket(_opCtx, node);
 
     BSONObjIterator j(spec);
     for (int i = 0; i < bucket->n; ++i) {
@@ -172,8 +172,8 @@ template <class OnDiskFormat>
 bool ArtificialTreeBuilder<OnDiskFormat>::isPresent(const BSONObj& key, int direction) const {
     int pos;
     DiskLoc loc;
-    OperationContextNoop txn;
-    return _helper->btree.locate(&txn, key, _helper->dummyDiskLoc, direction, &pos, &loc);
+    OperationContextNoop opCtx;
+    return _helper->btree.locate(&opCtx, key, _helper->dummyDiskLoc, direction, &pos, &loc);
 }
 
 // Static
@@ -200,7 +200,7 @@ int ArtificialTreeBuilder<OnDiskFormat>::fillBucketToExactSize(const DiskLoc buc
                                                                char startKey) {
     ASSERT_FALSE(bucketLoc.isNull());
 
-    BucketType* bucket = _helper->btree.getBucket(_txn, bucketLoc);
+    BucketType* bucket = _helper->btree.getBucket(_opCtx, bucketLoc);
     ASSERT_EQUALS(0, bucket->n);
 
     static const int bigSize = KeyDataOwnedType(simpleKey('a', 801)).dataSize();

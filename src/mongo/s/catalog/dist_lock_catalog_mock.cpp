@@ -144,7 +144,7 @@ DistLockCatalogMock::DistLockCatalogMock()
 
 DistLockCatalogMock::~DistLockCatalogMock() {}
 
-StatusWith<LockpingsType> DistLockCatalogMock::getPing(OperationContext* txn,
+StatusWith<LockpingsType> DistLockCatalogMock::getPing(OperationContext* opCtx,
                                                        StringData processID) {
     auto ret = kLockpingsTypeBadRetValue;
     GetPingFunc checkerFunc = noGetPingSet;
@@ -159,7 +159,7 @@ StatusWith<LockpingsType> DistLockCatalogMock::getPing(OperationContext* txn,
     return ret;
 }
 
-Status DistLockCatalogMock::ping(OperationContext* txn, StringData processID, Date_t ping) {
+Status DistLockCatalogMock::ping(OperationContext* opCtx, StringData processID, Date_t ping) {
     auto ret = kBadRetValue;
     PingFunc checkerFunc = noPingFuncSet;
 
@@ -173,7 +173,7 @@ Status DistLockCatalogMock::ping(OperationContext* txn, StringData processID, Da
     return ret;
 }
 
-StatusWith<LocksType> DistLockCatalogMock::grabLock(OperationContext* txn,
+StatusWith<LocksType> DistLockCatalogMock::grabLock(OperationContext* opCtx,
                                                     StringData lockID,
                                                     const OID& lockSessionID,
                                                     StringData who,
@@ -194,7 +194,7 @@ StatusWith<LocksType> DistLockCatalogMock::grabLock(OperationContext* txn,
     return ret;
 }
 
-StatusWith<LocksType> DistLockCatalogMock::overtakeLock(OperationContext* txn,
+StatusWith<LocksType> DistLockCatalogMock::overtakeLock(OperationContext* opCtx,
                                                         StringData lockID,
                                                         const OID& lockSessionID,
                                                         const OID& currentHolderTS,
@@ -215,7 +215,7 @@ StatusWith<LocksType> DistLockCatalogMock::overtakeLock(OperationContext* txn,
     return ret;
 }
 
-Status DistLockCatalogMock::unlock(OperationContext* txn, const OID& lockSessionID) {
+Status DistLockCatalogMock::unlock(OperationContext* opCtx, const OID& lockSessionID) {
     auto ret = kBadRetValue;
     UnlockFunc checkerFunc = noUnLockFuncSet;
 
@@ -229,7 +229,7 @@ Status DistLockCatalogMock::unlock(OperationContext* txn, const OID& lockSession
     return ret;
 }
 
-Status DistLockCatalogMock::unlock(OperationContext* txn,
+Status DistLockCatalogMock::unlock(OperationContext* opCtx,
                                    const OID& lockSessionID,
                                    StringData name) {
     auto ret = kBadRetValue;
@@ -246,7 +246,8 @@ Status DistLockCatalogMock::unlock(OperationContext* txn,
     return ret;
 }
 
-StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogMock::getServerInfo(OperationContext* txn) {
+StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogMock::getServerInfo(
+    OperationContext* opCtx) {
     auto ret = kServerInfoBadRetValue;
     GetServerInfoFunc checkerFunc = noGetServerInfoSet;
 
@@ -260,7 +261,7 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogMock::getServerInfo(Opera
     return ret;
 }
 
-StatusWith<LocksType> DistLockCatalogMock::getLockByTS(OperationContext* txn,
+StatusWith<LocksType> DistLockCatalogMock::getLockByTS(OperationContext* opCtx,
                                                        const OID& lockSessionID) {
     auto ret = kLocksTypeBadRetValue;
     GetLockByTSFunc checkerFunc = noGetLockByTSSet;
@@ -275,7 +276,7 @@ StatusWith<LocksType> DistLockCatalogMock::getLockByTS(OperationContext* txn,
     return ret;
 }
 
-StatusWith<LocksType> DistLockCatalogMock::getLockByName(OperationContext* txn, StringData name) {
+StatusWith<LocksType> DistLockCatalogMock::getLockByName(OperationContext* opCtx, StringData name) {
     auto ret = kLocksTypeBadRetValue;
     GetLockByNameFunc checkerFunc = noGetLockByNameSet;
 
@@ -289,7 +290,7 @@ StatusWith<LocksType> DistLockCatalogMock::getLockByName(OperationContext* txn, 
     return ret;
 }
 
-Status DistLockCatalogMock::stopPing(OperationContext* txn, StringData processId) {
+Status DistLockCatalogMock::stopPing(OperationContext* opCtx, StringData processId) {
     auto ret = kBadRetValue;
     StopPingFunc checkerFunc = noStopPingFuncSet;
 
@@ -370,7 +371,7 @@ void DistLockCatalogMock::expectGetServerInfo(GetServerInfoFunc checkerFunc,
     _getServerInfoReturnValue = returnThis;
 }
 
-Status DistLockCatalogMock::unlockAll(OperationContext* txn, const std::string& processID) {
+Status DistLockCatalogMock::unlockAll(OperationContext* opCtx, const std::string& processID) {
     return Status(ErrorCodes::IllegalOperation,
                   str::stream() << "unlockAll not expected to be called; processID: " << processID);
 }

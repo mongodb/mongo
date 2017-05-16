@@ -39,11 +39,11 @@ class OperationContext;
 /**
  * Invoked when database profile is enabled.
  */
-void profile(OperationContext* txn, NetworkOp op);
+void profile(OperationContext* opCtx, NetworkOp op);
 
 /**
  * Pre-creates the profile collection for the specified database.
  */
-Status createProfileCollection(OperationContext* txn, Database* db);
+Status createProfileCollection(OperationContext* opCtx, Database* db);
 
 }  // namespace mongo

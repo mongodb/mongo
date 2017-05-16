@@ -33,20 +33,18 @@ file_create(const char *name)
 {
 	WT_SESSION *session;
 	int ret;
-	char *p, *end, config[128];
+	char config[128];
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		testutil_die(ret, "conn.session");
 
-	p = config;
-	end = config + sizeof(config);
-	p += snprintf(p, (size_t)(end - p),
+	testutil_check(__wt_snprintf(config, sizeof(config),
 	    "key_format=%s,"
 	    "internal_page_max=%d,"
-	    "leaf_page_max=%d,",
-	    ftype == ROW ? "u" : "r", 16 * 1024, 128 * 1024);
-	if (ftype == FIX)
-		(void)snprintf(p, (size_t)(end - p), ",value_format=3t");
+	    "leaf_page_max=%d,"
+	    "%s",
+	    ftype == ROW ? "u" : "r", 16 * 1024, 128 * 1024,
+	    ftype == FIX ? ",value_format=3t" : ""));
 
 	if ((ret = session->create(session, name, config)) != 0)
 		if (ret != EEXIST)
@@ -62,9 +60,10 @@ load(const char *name)
 	WT_CURSOR *cursor;
 	WT_ITEM *key, _key, *value, _value;
 	WT_SESSION *session;
-	char keybuf[64], valuebuf[64];
-	u_int keyno;
+	uint64_t keyno;
+	size_t len;
 	int ret;
+	char keybuf[64], valuebuf[64];
 
 	file_create(name);
 
@@ -79,18 +78,22 @@ load(const char *name)
 	value = &_value;
 	for (keyno = 1; keyno <= nkeys; ++keyno) {
 		if (ftype == ROW) {
+			testutil_check(__wt_snprintf_len_set(
+			    keybuf, sizeof(keybuf),
+			    &len, "%017" PRIu64, keyno));
 			key->data = keybuf;
-			key->size = (uint32_t)
-			    snprintf(keybuf, sizeof(keybuf), "%017u", keyno);
+			key->size = (uint32_t)len;
 			cursor->set_key(cursor, key);
 		} else
-			cursor->set_key(cursor, (uint32_t)keyno);
-		value->data = valuebuf;
+			cursor->set_key(cursor, keyno);
 		if (ftype == FIX)
 			cursor->set_value(cursor, 0x01);
 		else {
-			value->size = (uint32_t)
-			    snprintf(valuebuf, sizeof(valuebuf), "%37u", keyno);
+			testutil_check(__wt_snprintf_len_set(
+			    valuebuf, sizeof(valuebuf),
+			    &len, "%37" PRIu64, keyno));
+			value->data = valuebuf;
+			value->size = (uint32_t)len;
 			cursor->set_value(cursor, value);
 		}
 		if ((ret = cursor->insert(cursor)) != 0)

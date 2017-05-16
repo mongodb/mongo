@@ -64,11 +64,12 @@ var blacklist = [
     'indexed_insert_eval.js',  // eval doesn't work with sharded collections
     'indexed_insert_eval_nolock.js',  // eval doesn't work with sharded collections
 
-    // This workload sometimes triggers an 'unable to target write op for collection ... caused by
-    // ... database not found' error. Further investigation still needs to be done, but this
-    // workload may be failing due to SERVER-17397 'drops in a sharded cluster may not fully
-    // succeed' because it drops and reuses the same namespaces.
+    // These workloads sometimes triggers an 'unable to target write op for collection ... caused by
+    // ... database not found' error. Further investigation still needs to be done, but these
+    // failures may be due to SERVER-17397 'drops in a sharded cluster may not fully succeed'
+    // because it drops and reuses the same namespaces.
     'kill_multicollection_aggregation.js',
+    'invalidated_cursors.js',
 
     'plan_cache_drop_database.js',  // cannot ensureIndex after dropDatabase without sharding first
     'remove_single_document.js',    // our .remove(query, {justOne: true}) calls lack shard keys

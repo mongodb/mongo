@@ -39,7 +39,6 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/initial_sync_common.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_parameters.h"
@@ -73,6 +72,10 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListIndexesAttempts, int, 3);
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
 }  // namespace
 
+// Failpoint which causes initial sync to hang when it has cloned 'numDocsToClone' documents to
+// collection 'namespace'.
+MONGO_FP_DECLARE(initialSyncHangDuringCollectionClone);
+
 CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                    OldThreadPool* dbWorkThreadPool,
                                    const HostAndPort& source,
@@ -92,7 +95,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                       RemoteCommandRequest(_source,
                                            _sourceNss.db().toString(),
                                            BSON("count" << _sourceNss.coll()),
-                                           rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                                           ReadPreferenceSetting::secondaryPreferredMetadata(),
                                            nullptr,
                                            RemoteCommandRequest::kNoTimeout),
                       stdx::bind(&CollectionCloner::_countCallback, this, stdx::placeholders::_1),
@@ -109,7 +112,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                      stdx::placeholders::_1,
                                      stdx::placeholders::_2,
                                      stdx::placeholders::_3),
-                          rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                          ReadPreferenceSetting::secondaryPreferredMetadata(),
                           RemoteCommandRequest::kNoTimeout,
                           RemoteCommandRetryScheduler::makeRetryPolicy(
                               numInitialSyncListIndexesAttempts.load(),
@@ -119,9 +122,9 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _documents(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
       _scheduleDbWorkFn([this](const executor::TaskExecutor::CallbackFn& work) {
-          auto task = [work](OperationContext* txn,
+          auto task = [work](OperationContext* opCtx,
                              const Status& status) -> TaskRunner::NextAction {
-              work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, txn));
+              work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
               return TaskRunner::NextAction::kDisposeOperationContext;
           };
           _dbWorkTaskRunner.schedule(task);
@@ -149,21 +152,6 @@ CollectionCloner::~CollectionCloner() {
 
 const NamespaceString& CollectionCloner::getSourceNamespace() const {
     return _sourceNss;
-}
-
-std::string CollectionCloner::getDiagnosticString() const {
-    LockGuard lk(_mutex);
-    str::stream output;
-    output << "CollectionCloner";
-    output << " executor: " << _executor->getDiagnosticString();
-    output << " source: " << _source.toString();
-    output << " source namespace: " << _sourceNss.toString();
-    output << " destination namespace: " << _destNss.toString();
-    output << " collection options: " << _options.toBSON();
-    output << " active: " << _isActive_inlock();
-    output << " listIndexes fetcher: " << _listIndexesFetcher.getDiagnosticString();
-    output << " find fetcher: " << (_findFetcher ? _findFetcher->getDiagnosticString() : "");
-    return output;
 }
 
 bool CollectionCloner::isActive() const {
@@ -337,9 +325,10 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
                     _finishCallback(cbd.status);
                     return;
                 }
-                auto txn = cbd.txn;
-                txn->setReplicatedWrites(false);
-                auto&& createStatus = _storageInterface->createCollection(txn, _destNss, _options);
+                auto opCtx = cbd.opCtx;
+                UnreplicatedWritesBlock uwb(opCtx);
+                auto&& createStatus =
+                    _storageInterface->createCollection(opCtx, _destNss, _options);
                 _finishCallback(createStatus);
             });
         if (!scheduleResult.isOK()) {
@@ -499,7 +488,7 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
                    stdx::placeholders::_2,
                    stdx::placeholders::_3,
                    onCompletionGuard),
-        rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
         RemoteCommandRequest::kNoTimeout,
         RemoteCommandRetryScheduler::makeRetryPolicy(
             numInitialSyncCollectionFindAttempts.load(),

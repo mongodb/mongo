@@ -50,7 +50,7 @@ class OperationContext;
 namespace repl {
 
 // Main entry point for master/slave at startup time.
-void startMasterSlave(OperationContext* txn);
+void startMasterSlave(OperationContext* opCtx);
 
 // externed for use with resync.cpp
 extern AtomicInt32 relinquishSyncingSome;
@@ -78,15 +78,15 @@ public:
 class ReplSource {
     std::shared_ptr<OldThreadPool> tp;
 
-    void resync(OperationContext* txn, const std::string& dbName);
+    void resync(OperationContext* opCtx, const std::string& dbName);
 
     /** @param alreadyLocked caller already put us in write lock if true */
-    void _sync_pullOpLog_applyOperation(OperationContext* txn, BSONObj& op, bool alreadyLocked);
+    void _sync_pullOpLog_applyOperation(OperationContext* opCtx, BSONObj& op, bool alreadyLocked);
 
     /* pull some operations from the master's oplog, and apply them.
        calls sync_pullOpLog_applyOperation
     */
-    int _sync_pullOpLog(OperationContext* txn, int& nApplied);
+    int _sync_pullOpLog(OperationContext* opCtx, int& nApplied);
 
     /* we only clone one database per pass, even if a lot need done.  This helps us
        avoid overflowing the master's transaction log by doing too much work before going
@@ -106,7 +106,7 @@ class ReplSource {
      */
     bool _doHandshake = false;
 
-    void resyncDrop(OperationContext* txn, const std::string& dbName);
+    void resyncDrop(OperationContext* opCtx, const std::string& dbName);
     // call without the db mutex
     void syncToTailOfRemoteLog();
     std::string ns() const {
@@ -120,16 +120,16 @@ class ReplSource {
      * master.
      * @return true iff an op with the specified ns may be applied.
      */
-    bool handleDuplicateDbName(OperationContext* txn,
+    bool handleDuplicateDbName(OperationContext* opCtx,
                                const BSONObj& op,
                                const char* ns,
                                const char* db);
 
     // populates _me so that it can be passed to oplogreader for handshakes
     /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
-    void ensureMe(OperationContext* txn);
+    void ensureMe(OperationContext* opCtx);
 
-    void forceResync(OperationContext* txn, const char* requester);
+    void forceResync(OperationContext* opCtx, const char* requester);
 
     bool _connect(OplogReader* reader, const HostAndPort& host, const OID& myRID);
 
@@ -138,8 +138,8 @@ class ReplSource {
 public:
     OplogReader oplogReader;
 
-    void applyCommand(OperationContext* txn, const BSONObj& op);
-    void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);
+    void applyCommand(OperationContext* opCtx, const BSONObj& op);
+    void applyOperation(OperationContext* opCtx, Database* db, const BSONObj& op);
     std::string hostName;     // ip addr or hostname plus optionally, ":<port>"
     std::string _sourceName;  // a logical source name.
     std::string sourceName() const {
@@ -156,18 +156,18 @@ public:
     int nClonedThisPass;
 
     typedef std::vector<std::shared_ptr<ReplSource>> SourceVector;
-    static void loadAll(OperationContext* txn, SourceVector&);
+    static void loadAll(OperationContext* opCtx, SourceVector&);
 
-    explicit ReplSource(OperationContext* txn, BSONObj);
+    explicit ReplSource(OperationContext* opCtx, BSONObj);
     // This is not the constructor you are looking for. Always prefer the version that takes
     // a BSONObj.  This is public only as a hack so that the ReplicationCoordinator can find
     // out the process's RID in master/slave setups.
-    ReplSource(OperationContext* txn);
+    ReplSource(OperationContext* opCtx);
 
     /* -1 = error */
-    int sync(OperationContext* txn, int& nApplied);
+    int sync(OperationContext* opCtx, int& nApplied);
 
-    void save(OperationContext* txn);  // write ourself to local.sources
+    void save(OperationContext* opCtx);  // write ourself to local.sources
 
     // make a jsobj from our member fields of the form
     //   { host: ..., source: ..., syncedTo: ... }
@@ -190,8 +190,8 @@ public:
         return wait > 0 ? wait : 0;
     }
 
-    static bool throttledForceResyncDead(OperationContext* txn, const char* requester);
-    static void forceResyncDead(OperationContext* txn, const char* requester);
+    static bool throttledForceResyncDead(OperationContext* opCtx, const char* requester);
+    static void forceResyncDead(OperationContext* opCtx, const char* requester);
 };
 
 /**

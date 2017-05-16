@@ -105,13 +105,13 @@ public:
     // Should be called at the beginning of every new request.  This performs the checks
     // necessary to determine if localhost connections should be given full access.
     // TODO: try to eliminate the need for this call.
-    void startRequest(OperationContext* txn);
+    void startRequest(OperationContext* opCtx);
 
     /**
      * Adds the User identified by "UserName" to the authorization session, acquiring privileges
      * for it in the process.
      */
-    Status addAndAuthorizeUser(OperationContext* txn, const UserName& userName);
+    Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName);
 
     // Returns the authenticated user with the given name.  Returns NULL
     // if no such user is found.
@@ -155,7 +155,7 @@ public:
 
     // Checks if this connection has the privileges necessary to perform the given update on the
     // given namespace.
-    Status checkAuthForUpdate(OperationContext* txn,
+    Status checkAuthForUpdate(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& query,
                               const BSONObj& update,
@@ -164,13 +164,13 @@ public:
     // Checks if this connection has the privileges necessary to insert the given document
     // to the given namespace.  Correctly interprets inserts to system.indexes and performs
     // the proper auth checks for index building.
-    Status checkAuthForInsert(OperationContext* txn,
+    Status checkAuthForInsert(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& document);
 
     // Checks if this connection has the privileges necessary to perform a delete on the given
     // namespace.
-    Status checkAuthForDelete(OperationContext* txn,
+    Status checkAuthForDelete(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& query);
 
@@ -217,6 +217,10 @@ public:
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own password
     bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName);
+
+    // Returns true if the current session is authorized to list the collections in the given
+    // database.
+    bool isAuthorizedToListCollections(StringData dbname);
 
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own customData.
@@ -271,6 +275,11 @@ public:
     // The existence of 'opClient' must be guaranteed through locks taken by the caller.
     bool isCoauthorizedWithClient(Client* opClient);
 
+    // Returns true if the session and 'userNameIter' share an authenticated user, or if both have
+    // no authenticated users. Impersonated users are not considered as 'authenticated' for the
+    // purpose of this check. This always returns true if auth is not enabled.
+    bool isCoauthorizedWith(UserNameIterator userNameIter);
+
     // Tells whether impersonation is active or not.  This state is set when
     // setImpersonatedUserData is called and cleared when clearImpersonatedUserData is
     // called.
@@ -292,8 +301,11 @@ protected:
 private:
     // If any users authenticated on this session are marked as invalid this updates them with
     // up-to-date information. May require a read lock on the "admin" db to read the user data.
-    void _refreshUserInfoAsNeeded(OperationContext* txn);
-
+    //
+    // When refreshing a user document, we will use the current user's id to confirm that our
+    // user is of the same generation as the refreshed user document. If the generations don't
+    // match we will remove the outdated user document from the cache.
+    void _refreshUserInfoAsNeeded(OperationContext* opCtx);
 
     // Checks if this connection is authorized for the given Privilege, ignoring whether or not
     // we should even be doing authorization checks in general.  Note: this may acquire a read

@@ -7,16 +7,19 @@ Command line utility for determining what jstests have been added or modified
 from __future__ import absolute_import
 
 import collections
+import copy
 import json
 import optparse
 import os.path
 import subprocess
 import re
 import requests
+import shlex
 import sys
+import urlparse
 import yaml
 
-API_SERVER_DEFAULT = "http://mci-motu.10gen.cc:8080"
+API_SERVER_DEFAULT = "http://evergreen-api.mongodb.com:8080"
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -79,61 +82,10 @@ def parse_command_line():
     return parser.parse_args()
 
 
-# Copied from python 2.7 version of subprocess.py
-# Exception classes used by this module.
-class CalledProcessError(Exception):
-    """This exception is raised when a process run by check_call() or
-    check_output() returns a non-zero exit status.
-    The exit status will be stored in the returncode attribute;
-    check_output() will also store the output in the output attribute.
-    """
-    def __init__(self, returncode, cmd, output=None):
-        self.returncode = returncode
-        self.cmd = cmd
-        self.output = output
-    def __str__(self):
-        return ("Command '%s' returned non-zero exit status %d with output %s" %
-                (self.cmd, self.returncode, self.output))
-
-
-# Copied from python 2.7 version of subprocess.py
-def check_output(*popenargs, **kwargs):
-    """Run command with arguments and return its output as a byte string.
-
-    If the exit code was non-zero it raises a CalledProcessError.  The
-    CalledProcessError object will have the return code in the returncode
-    attribute and output in the output attribute.
-
-    The arguments are the same as for the Popen constructor.  Example:
-
-    >>> check_output(["ls", "-l", "/dev/null"])
-    'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
-
-    The stdout argument is not allowed as it is used internally.
-    To capture standard error in the result, use stderr=STDOUT.
-
-    >>> check_output(["/bin/sh", "-c",
-    ...               "ls -l non_existent_file ; exit 0"],
-    ..              stderr=STDOUT)
-    'ls: non_existent_file: No such file or directory\n'
-    """
-    if 'stdout' in kwargs:
-        raise ValueError('stdout argument not allowed, it will be overridden.')
-    process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-    output, unused_err = process.communicate()
-    retcode = process.poll()
-    if retcode:
-        cmd = kwargs.get("args")
-        if cmd is None:
-            cmd = popenargs[0]
-        raise CalledProcessError(retcode, cmd, output)
-    return output
-
-
 def callo(args):
     """Call a program, and capture its output
     """
-    return check_output(args)
+    return subprocess.check_output(args)
 
 
 def read_evg_config():
@@ -157,12 +109,10 @@ def find_last_activated_task(revisions, variant, branch_name):
     build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
 
     evg_cfg = read_evg_config()
-    try:
-        api_server = evg_cfg["api_server_host"]
-        # Makes some assumptions, but saves doing a full url parse.
-        if api_server.endsWith("/api"):
-            api_server = api_server[:-4]
-    except:
+    if evg_cfg is not None and "api_server_host" in evg_cfg:
+        api_server = "{url.scheme}://{url.netloc}".format(
+            url=urlparse.urlparse(evg_cfg["api_server_host"]))
+    else:
         api_server = API_SERVER_DEFAULT
 
     api_prefix = api_server + rest_prefix
@@ -203,6 +153,11 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
         revs_to_check = callo(["git", "rev-list", base_commit,
                                "--max-count=200", "--skip=1"]).splitlines()
         last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
+        if last_activated is None:
+            # When the current commit is the first time 'buildvariant' has run, there won't be a
+            # commit among 'revs_to_check' that's been activated in Evergreen. We handle this by
+            # only considering tests changed in the current commit.
+            last_activated = "HEAD"
         print "Comparing current branch against", last_activated
         revisions = callo(["git", "rev-list", base_commit + "..." + last_activated]).splitlines()
         base_commit = last_activated
@@ -340,26 +295,33 @@ def create_task_list(evergreen_file, buildvariant, suites, exclude_tasks):
     with open(evergreen_file, "r") as fstream:
         evg = yaml.load(fstream)
 
+    evg_buildvariant = next(item for item in evg["buildvariants"] if item["name"] == buildvariant)
+
     # Find all the task names for the specified buildvariant.
-    variant_tasks = [li["name"] for li in next(item for item in evg["buildvariants"]
-                                               if item["name"] == buildvariant)["tasks"]]
+    variant_tasks = [li["name"] for li in evg_buildvariant['tasks']]
 
     # Find all the buildvariant task's resmoke_args.
     variant_task_args = {}
     for task in [a for a in evg["tasks"] if a["name"] in set(variant_tasks) - set(exclude_tasks)]:
         for command in task["commands"]:
             if ("func" in command and command["func"] == "run tests" and
-                "vars" in command and "resmoke_args" in command["vars"]):
+                    "vars" in command and "resmoke_args" in command["vars"]):
                 variant_task_args[task["name"]] = command["vars"]["resmoke_args"]
+
+    # Find if the buildvariant has a test_flags expansion, which will be passed onto resmoke.py.
+    test_flags = evg_buildvariant.get("expansions", {}).get("test_flags", "")
 
     # Create the list of tasks to run for the specified suite.
     tasks_to_run = {}
     for suite in suites.keys():
         for task_name, task_arg in variant_task_args.items():
+            # Append the test_flags to the task arguments to match the logic in the "run tests"
+            # function. This allows the storage engine to be overridden.
+            task_arg = "{} {}".format(task_arg, test_flags)
             # Find the resmoke_args for matching suite names.
             # Change the --suites to --executor
             if (re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg) or
-                re.compile('--executor=' + suite + '(?:\s+|$)').match(task_arg)):
+                    re.compile('--executor=' + suite + '(?:\s+|$)').match(task_arg)):
                 tasks_to_run[task_name] = {
                     "resmoke_args": task_arg.replace("--suites", "--executor"),
                     "tests": suites[suite]}
@@ -417,6 +379,8 @@ def main():
         tests_by_task = _load_tests_file(values.test_list_file)
         # If there are no tests to run, carry on.
         if tests_by_task is None:
+            test_results = {"failures": 0, "results": []}
+            _write_report_file(test_results, values.report_file)
             sys.exit(0)
 
     # Run the executor finder.
@@ -437,6 +401,7 @@ def main():
         # If there are no changed tests, exit cleanly.
         if not changed_tests:
             print "No new or modified tests found."
+            _write_report_file({}, values.test_list_outfile)
             sys.exit(0)
         suites = resmokelib.parser.get_suites(values, changed_tests)
         tests_by_executor = create_executor_list(suites, exclude_suites)
@@ -452,10 +417,11 @@ def main():
         test_results = {"failures": 0, "results": []}
 
         for task in sorted(tests_by_task):
+            resmoke_cmd = copy.deepcopy(args)
+            resmoke_cmd.extend(shlex.split(tests_by_task[task]["resmoke_args"]))
+            resmoke_cmd.extend(tests_by_task[task]["tests"])
             try:
-                subprocess.check_call(" ".join(args) + " " +
-                                      tests_by_task[task]["resmoke_args"] + " " +
-                                      " ".join(tests_by_task[task]["tests"]), shell=True)
+                subprocess.check_call(resmoke_cmd, shell=False)
             except subprocess.CalledProcessError as err:
                 print "Resmoke returned an error with task:", task
                 _save_report_data(test_results, values.report_file, task)
@@ -466,6 +432,7 @@ def main():
         _write_report_file(test_results, values.report_file)
 
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

@@ -68,14 +68,14 @@ using std::endl;
 using std::hex;
 using std::vector;
 
-CappedRecordStoreV1::CappedRecordStoreV1(OperationContext* txn,
+CappedRecordStoreV1::CappedRecordStoreV1(OperationContext* opCtx,
                                          CappedCallback* collection,
                                          StringData ns,
                                          RecordStoreV1MetaData* details,
                                          ExtentManager* em,
                                          bool isSystemIndexes)
     : RecordStoreV1Base(ns, details, em, isSystemIndexes), _cappedCallback(collection) {
-    DiskLoc extentLoc = details->firstExtent(txn);
+    DiskLoc extentLoc = details->firstExtent(opCtx);
     while (!extentLoc.isNull()) {
         _extentAdvice.push_back(_extentManager->cacheHint(extentLoc, ExtentManager::Sequential));
         Extent* extent = em->getExtent(extentLoc);
@@ -83,12 +83,12 @@ CappedRecordStoreV1::CappedRecordStoreV1(OperationContext* txn,
     }
 
     // this is for VERY VERY old versions of capped collections
-    cappedCheckMigrate(txn);
+    cappedCheckMigrate(opCtx);
 }
 
 CappedRecordStoreV1::~CappedRecordStoreV1() {}
 
-StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
+StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* opCtx,
                                                      int lenToAlloc,
                                                      bool enforceQuota) {
     {
@@ -100,12 +100,12 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
         // the extent check is a way to try and improve performance
         // since we have to iterate all the extents (for now) to get
         // storage size
-        if (lenToAlloc > storageSize(txn)) {
+        if (lenToAlloc > storageSize(opCtx)) {
             return StatusWith<DiskLoc>(
                 ErrorCodes::DocTooLargeForCapped,
                 mongoutils::str::stream() << "document is larger than capped size " << lenToAlloc
                                           << " > "
-                                          << storageSize(txn),
+                                          << storageSize(opCtx),
                 16328);
         }
     }
@@ -114,7 +114,7 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
 
         // signal done allocating new extents.
         if (!cappedLastDelRecLastExtent().isValid())
-            setLastDelRecLastExtent(txn, DiskLoc());
+            setLastDelRecLastExtent(opCtx, DiskLoc());
 
         invariant(lenToAlloc < 400000000);
         int passes = 0;
@@ -128,17 +128,17 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
         DiskLoc firstEmptyExtent;  // This prevents us from infinite looping.
         while (1) {
             if (_details->numRecords() < _details->maxCappedDocs()) {
-                loc = __capAlloc(txn, lenToAlloc);
+                loc = __capAlloc(opCtx, lenToAlloc);
                 if (!loc.isNull())
                     break;
             }
 
             // If on first iteration through extents, don't delete anything.
             if (!_details->capFirstNewRecord().isValid()) {
-                advanceCapExtent(txn, _ns);
+                advanceCapExtent(opCtx, _ns);
 
-                if (_details->capExtent() != _details->firstExtent(txn))
-                    _details->setCapFirstNewRecord(txn, DiskLoc().setInvalid());
+                if (_details->capExtent() != _details->firstExtent(opCtx))
+                    _details->setCapFirstNewRecord(opCtx, DiskLoc().setInvalid());
                 // else signal done with first iteration through extents.
                 continue;
             }
@@ -147,37 +147,37 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
                 theCapExtent()->firstRecord == _details->capFirstNewRecord()) {
                 // We've deleted all records that were allocated on the previous
                 // iteration through this extent.
-                advanceCapExtent(txn, _ns);
+                advanceCapExtent(opCtx, _ns);
                 continue;
             }
 
             if (theCapExtent()->firstRecord.isNull()) {
                 if (firstEmptyExtent.isNull())
                     firstEmptyExtent = _details->capExtent();
-                advanceCapExtent(txn, _ns);
+                advanceCapExtent(opCtx, _ns);
                 if (firstEmptyExtent == _details->capExtent()) {
                     // All records have been deleted but there is still no room for this record.
                     // Nothing we can do but fail.
-                    _maybeComplain(txn, lenToAlloc);
+                    _maybeComplain(opCtx, lenToAlloc);
                     return StatusWith<DiskLoc>(ErrorCodes::DocTooLargeForCapped,
                                                str::stream()
                                                    << "document doesn't fit in capped collection."
                                                    << " size: "
                                                    << lenToAlloc
                                                    << " storageSize:"
-                                                   << storageSize(txn),
+                                                   << storageSize(opCtx),
                                                28575);
                 }
                 continue;
             }
 
             const RecordId fr = theCapExtent()->firstRecord.toRecordId();
-            Status status = _cappedCallback->aboutToDeleteCapped(txn, fr, dataFor(txn, fr));
+            Status status = _cappedCallback->aboutToDeleteCapped(opCtx, fr, dataFor(opCtx, fr));
             if (!status.isOK())
                 return StatusWith<DiskLoc>(status);
-            deleteRecord(txn, fr);
+            deleteRecord(opCtx, fr);
 
-            _compact(txn);
+            _compact(opCtx);
             if ((++passes % 5000) == 0) {
                 StringBuilder sb;
                 log() << "passes = " << passes << " in CappedRecordStoreV1::allocRecord:"
@@ -191,7 +191,7 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
 
         // Remember first record allocated on this iteration through capExtent.
         if (_details->capFirstNewRecord().isValid() && _details->capFirstNewRecord().isNull())
-            _details->setCapFirstNewRecord(txn, loc);
+            _details->setCapFirstNewRecord(opCtx, loc);
     }
 
     invariant(!loc.isNull());
@@ -208,53 +208,55 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
     int left = regionlen - lenToAlloc;
 
     /* split off some for further use. */
-    txn->recoveryUnit()->writingInt(r->lengthWithHeaders()) = lenToAlloc;
+    opCtx->recoveryUnit()->writingInt(r->lengthWithHeaders()) = lenToAlloc;
     DiskLoc newDelLoc = loc;
     newDelLoc.inc(lenToAlloc);
     DeletedRecord* newDel = drec(newDelLoc);
-    DeletedRecord* newDelW = txn->recoveryUnit()->writing(newDel);
+    DeletedRecord* newDelW = opCtx->recoveryUnit()->writing(newDel);
     newDelW->extentOfs() = r->extentOfs();
     newDelW->lengthWithHeaders() = left;
     newDelW->nextDeleted().Null();
 
-    addDeletedRec(txn, newDelLoc);
+    addDeletedRec(opCtx, newDelLoc);
 
     return StatusWith<DiskLoc>(loc);
 }
 
-Status CappedRecordStoreV1::truncate(OperationContext* txn) {
-    setLastDelRecLastExtent(txn, DiskLoc());
-    setListOfAllDeletedRecords(txn, DiskLoc());
+Status CappedRecordStoreV1::truncate(OperationContext* opCtx) {
+    setLastDelRecLastExtent(opCtx, DiskLoc());
+    setListOfAllDeletedRecords(opCtx, DiskLoc());
 
     // preserve firstExtent/lastExtent
-    _details->setCapExtent(txn, _details->firstExtent(txn));
-    _details->setStats(txn, 0, 0);
+    _details->setCapExtent(opCtx, _details->firstExtent(opCtx));
+    _details->setStats(opCtx, 0, 0);
     // preserve lastExtentSize
     // nIndexes preserve 0
     // capped preserve true
     // max preserve
     // paddingFactor is unused
-    _details->setCapFirstNewRecord(txn, DiskLoc().setInvalid());
-    setLastDelRecLastExtent(txn, DiskLoc().setInvalid());
+    _details->setCapFirstNewRecord(opCtx, DiskLoc().setInvalid());
+    setLastDelRecLastExtent(opCtx, DiskLoc().setInvalid());
     // dataFileVersion preserve
     // indexFileVersion preserve
 
     // Reset all existing extents and recreate the deleted list.
     Extent* ext;
-    for (DiskLoc extLoc = _details->firstExtent(txn); !extLoc.isNull(); extLoc = ext->xnext) {
+    for (DiskLoc extLoc = _details->firstExtent(opCtx); !extLoc.isNull(); extLoc = ext->xnext) {
         ext = _extentManager->getExtent(extLoc);
 
-        txn->recoveryUnit()->writing(&ext->firstRecord)->Null();
-        txn->recoveryUnit()->writing(&ext->lastRecord)->Null();
+        opCtx->recoveryUnit()->writing(&ext->firstRecord)->Null();
+        opCtx->recoveryUnit()->writing(&ext->lastRecord)->Null();
 
-        addDeletedRec(txn, _findFirstSpot(txn, extLoc, ext));
+        addDeletedRec(opCtx, _findFirstSpot(opCtx, extLoc, ext));
     }
 
     return Status::OK();
 }
 
-void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
-    cappedTruncateAfter(txn, _ns.c_str(), DiskLoc::fromRecordId(end), inclusive);
+void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* opCtx,
+                                              RecordId end,
+                                              bool inclusive) {
+    cappedTruncateAfter(opCtx, _ns.c_str(), DiskLoc::fromRecordId(end), inclusive);
 }
 
 /* combine adjacent deleted records *for the current extent* of the capped collection
@@ -262,7 +264,7 @@ void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn, RecordId en
    this is O(n^2) but we call it for capped tables where typically n==1 or 2!
    (or 3...there will be a little unused sliver at the end of the extent.)
 */
-void CappedRecordStoreV1::_compact(OperationContext* txn) {
+void CappedRecordStoreV1::_compact(OperationContext* opCtx) {
     DDD("CappedRecordStoreV1::compact enter");
 
     vector<DiskLoc> drecs;
@@ -274,7 +276,7 @@ void CappedRecordStoreV1::_compact(OperationContext* txn) {
         drecs.push_back(i);
     }
 
-    setFirstDeletedInCurExtent(txn, i);
+    setFirstDeletedInCurExtent(opCtx, i);
 
     std::sort(drecs.begin(), drecs.end());
     DDD("\t drecs.size(): " << drecs.size());
@@ -286,24 +288,24 @@ void CappedRecordStoreV1::_compact(OperationContext* txn) {
         j++;
         if (j == drecs.end()) {
             DDD("\t compact adddelrec");
-            addDeletedRec(txn, a);
+            addDeletedRec(opCtx, a);
             break;
         }
         DiskLoc b = *j;
         while (a.a() == b.a() && a.getOfs() + drec(a)->lengthWithHeaders() == b.getOfs()) {
             // a & b are adjacent.  merge.
-            txn->recoveryUnit()->writingInt(drec(a)->lengthWithHeaders()) +=
+            opCtx->recoveryUnit()->writingInt(drec(a)->lengthWithHeaders()) +=
                 drec(b)->lengthWithHeaders();
             j++;
             if (j == drecs.end()) {
                 DDD("\t compact adddelrec2");
-                addDeletedRec(txn, a);
+                addDeletedRec(opCtx, a);
                 return;
             }
             b = *j;
         }
         DDD("\t compact adddelrec3");
-        addDeletedRec(txn, a);
+        addDeletedRec(opCtx, a);
         a = b;
     }
 }
@@ -315,18 +317,18 @@ DiskLoc CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
         return drec(cappedLastDelRecLastExtent())->nextDeleted();
 }
 
-void CappedRecordStoreV1::setFirstDeletedInCurExtent(OperationContext* txn, const DiskLoc& loc) {
+void CappedRecordStoreV1::setFirstDeletedInCurExtent(OperationContext* opCtx, const DiskLoc& loc) {
     if (cappedLastDelRecLastExtent().isNull())
-        setListOfAllDeletedRecords(txn, loc);
+        setListOfAllDeletedRecords(opCtx, loc);
     else
-        *txn->recoveryUnit()->writing(&drec(cappedLastDelRecLastExtent())->nextDeleted()) = loc;
+        *opCtx->recoveryUnit()->writing(&drec(cappedLastDelRecLastExtent())->nextDeleted()) = loc;
 }
 
-void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* txn) {
+void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* opCtx) {
     // migrate old RecordStoreV1MetaData format
     if (_details->capExtent().a() == 0 && _details->capExtent().getOfs() == 0) {
-        WriteUnitOfWork wunit(txn);
-        _details->setCapFirstNewRecord(txn, DiskLoc().setInvalid());
+        WriteUnitOfWork wunit(opCtx);
+        _details->setCapFirstNewRecord(opCtx, DiskLoc().setInvalid());
         // put all the DeletedRecords in cappedListOfAllDeletedRecords()
         for (int i = 1; i < Buckets; ++i) {
             DiskLoc first = _details->deletedListEntry(i);
@@ -335,15 +337,15 @@ void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* txn) {
             DiskLoc last = first;
             for (; !drec(last)->nextDeleted().isNull(); last = drec(last)->nextDeleted())
                 ;
-            *txn->recoveryUnit()->writing(&drec(last)->nextDeleted()) =
+            *opCtx->recoveryUnit()->writing(&drec(last)->nextDeleted()) =
                 cappedListOfAllDeletedRecords();
-            setListOfAllDeletedRecords(txn, first);
-            _details->setDeletedListEntry(txn, i, DiskLoc());
+            setListOfAllDeletedRecords(opCtx, first);
+            _details->setDeletedListEntry(opCtx, i, DiskLoc());
         }
         // NOTE cappedLastDelRecLastExtent() set to DiskLoc() in above
 
         // Last, in case we're killed before getting here
-        _details->setCapExtent(txn, _details->firstExtent(txn));
+        _details->setCapExtent(opCtx, _details->firstExtent(opCtx));
         wunit.commit();
     }
 }
@@ -370,29 +372,30 @@ bool CappedRecordStoreV1::nextIsInCapExtent(const DiskLoc& dl) const {
     return inCapExtent(next);
 }
 
-void CappedRecordStoreV1::advanceCapExtent(OperationContext* txn, StringData ns) {
+void CappedRecordStoreV1::advanceCapExtent(OperationContext* opCtx, StringData ns) {
     // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
     // (or DiskLoc() if new capExtent == firstExtent)
-    if (_details->capExtent() == _details->lastExtent(txn))
-        setLastDelRecLastExtent(txn, DiskLoc());
+    if (_details->capExtent() == _details->lastExtent(opCtx))
+        setLastDelRecLastExtent(opCtx, DiskLoc());
     else {
         DiskLoc i = cappedFirstDeletedInCurExtent();
         for (; !i.isNull() && nextIsInCapExtent(i); i = drec(i)->nextDeleted())
             ;
-        setLastDelRecLastExtent(txn, i);
+        setLastDelRecLastExtent(opCtx, i);
     }
 
-    _details->setCapExtent(
-        txn, theCapExtent()->xnext.isNull() ? _details->firstExtent(txn) : theCapExtent()->xnext);
+    _details->setCapExtent(opCtx,
+                           theCapExtent()->xnext.isNull() ? _details->firstExtent(opCtx)
+                                                          : theCapExtent()->xnext);
 
     /* this isn't true if a collection has been renamed...that is ok just used for diagnostics */
     // dassert( theCapExtent()->ns == ns );
 
     theCapExtent()->assertOk();
-    _details->setCapFirstNewRecord(txn, DiskLoc());
+    _details->setCapFirstNewRecord(opCtx, DiskLoc());
 }
 
-DiskLoc CappedRecordStoreV1::__capAlloc(OperationContext* txn, int len) {
+DiskLoc CappedRecordStoreV1::__capAlloc(OperationContext* opCtx, int len) {
     DiskLoc prev = cappedLastDelRecLastExtent();
     DiskLoc i = cappedFirstDeletedInCurExtent();
     DiskLoc ret;
@@ -408,10 +411,10 @@ DiskLoc CappedRecordStoreV1::__capAlloc(OperationContext* txn, int len) {
     /* unlink ourself from the deleted list */
     if (!ret.isNull()) {
         if (prev.isNull())
-            setListOfAllDeletedRecords(txn, drec(ret)->nextDeleted());
+            setListOfAllDeletedRecords(opCtx, drec(ret)->nextDeleted());
         else
-            *txn->recoveryUnit()->writing(&drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
-        *txn->recoveryUnit()->writing(&drec(ret)->nextDeleted()) =
+            *opCtx->recoveryUnit()->writing(&drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
+        *opCtx->recoveryUnit()->writing(&drec(ret)->nextDeleted()) =
             DiskLoc().setInvalid();  // defensive.
         invariant(drec(ret)->extentOfs() < ret.getOfs());
     }
@@ -419,12 +422,12 @@ DiskLoc CappedRecordStoreV1::__capAlloc(OperationContext* txn, int len) {
     return ret;
 }
 
-void CappedRecordStoreV1::cappedTruncateLastDelUpdate(OperationContext* txn) {
-    if (_details->capExtent() == _details->firstExtent(txn)) {
+void CappedRecordStoreV1::cappedTruncateLastDelUpdate(OperationContext* opCtx) {
+    if (_details->capExtent() == _details->firstExtent(opCtx)) {
         // Only one extent of the collection is in use, so there
         // is no deleted record in a previous extent, so nullify
         // cappedLastDelRecLastExtent().
-        setLastDelRecLastExtent(txn, DiskLoc());
+        setLastDelRecLastExtent(opCtx, DiskLoc());
     } else {
         // Scan through all deleted records in the collection
         // until the last deleted record for the extent prior
@@ -439,11 +442,11 @@ void CappedRecordStoreV1::cappedTruncateLastDelUpdate(OperationContext* txn) {
         // record.  (We expect that there will be deleted records in the new
         // capExtent as well.)
         invariant(!drec(i)->nextDeleted().isNull());
-        setLastDelRecLastExtent(txn, i);
+        setLastDelRecLastExtent(opCtx, i);
     }
 }
 
-void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn,
+void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* opCtx,
                                               const char* ns,
                                               DiskLoc end,
                                               bool inclusive) {
@@ -476,13 +479,13 @@ void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn,
         // this case instead of asserting.
         uassert(13415, "emptying the collection is not allowed", _details->numRecords() > 1);
 
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         // Delete the newest record, and coalesce the new deleted
         // record with existing deleted records.
-        Status status = _cappedCallback->aboutToDeleteCapped(txn, currId, dataFor(txn, currId));
+        Status status = _cappedCallback->aboutToDeleteCapped(opCtx, currId, dataFor(opCtx, currId));
         uassertStatusOK(status);
-        deleteRecord(txn, currId);
-        _compact(txn);
+        deleteRecord(opCtx, currId);
+        _compact(opCtx);
 
         // This is the case where we have not yet had to remove any
         // documents to make room for other documents, and we are allocating
@@ -497,11 +500,11 @@ void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn,
                 // NOTE Because we didn't delete the last document, and
                 // capLooped() is false, capExtent is not the first extent
                 // so xprev will be nonnull.
-                _details->setCapExtent(txn, theCapExtent()->xprev);
+                _details->setCapExtent(opCtx, theCapExtent()->xprev);
                 theCapExtent()->assertOk();
 
                 // update cappedLastDelRecLastExtent()
-                cappedTruncateLastDelUpdate(txn);
+                cappedTruncateLastDelUpdate(opCtx);
             }
             wunit.commit();
             continue;
@@ -524,20 +527,20 @@ void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn,
             DiskLoc newCapExtent = _details->capExtent();
             do {
                 // Find the previous extent, looping if necessary.
-                newCapExtent = (newCapExtent == _details->firstExtent(txn))
-                    ? _details->lastExtent(txn)
+                newCapExtent = (newCapExtent == _details->firstExtent(opCtx))
+                    ? _details->lastExtent(opCtx)
                     : _extentManager->getExtent(newCapExtent)->xprev;
                 _extentManager->getExtent(newCapExtent)->assertOk();
             } while (_extentManager->getExtent(newCapExtent)->firstRecord.isNull());
-            _details->setCapExtent(txn, newCapExtent);
+            _details->setCapExtent(opCtx, newCapExtent);
 
             // Place all documents in the new capExtent on the fresh side
             // of the capExtent by setting capFirstNewRecord to the first
             // document in the new capExtent.
-            _details->setCapFirstNewRecord(txn, theCapExtent()->firstRecord);
+            _details->setCapFirstNewRecord(opCtx, theCapExtent()->firstRecord);
 
             // update cappedLastDelRecLastExtent()
-            cappedTruncateLastDelUpdate(txn);
+            cappedTruncateLastDelUpdate(opCtx);
         }
 
         wunit.commit();
@@ -548,62 +551,63 @@ DiskLoc CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
     return _details->deletedListEntry(0);
 }
 
-void CappedRecordStoreV1::setListOfAllDeletedRecords(OperationContext* txn, const DiskLoc& loc) {
-    return _details->setDeletedListEntry(txn, 0, loc);
+void CappedRecordStoreV1::setListOfAllDeletedRecords(OperationContext* opCtx, const DiskLoc& loc) {
+    return _details->setDeletedListEntry(opCtx, 0, loc);
 }
 
 DiskLoc CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
     return _details->deletedListEntry(1);
 }
 
-void CappedRecordStoreV1::setLastDelRecLastExtent(OperationContext* txn, const DiskLoc& loc) {
-    return _details->setDeletedListEntry(txn, 1, loc);
+void CappedRecordStoreV1::setLastDelRecLastExtent(OperationContext* opCtx, const DiskLoc& loc) {
+    return _details->setDeletedListEntry(opCtx, 1, loc);
 }
 
 Extent* CappedRecordStoreV1::theCapExtent() const {
     return _extentManager->getExtent(_details->capExtent());
 }
 
-void CappedRecordStoreV1::addDeletedRec(OperationContext* txn, const DiskLoc& dloc) {
-    DeletedRecord* d = txn->recoveryUnit()->writing(drec(dloc));
+void CappedRecordStoreV1::addDeletedRec(OperationContext* opCtx, const DiskLoc& dloc) {
+    DeletedRecord* d = opCtx->recoveryUnit()->writing(drec(dloc));
 
     if (!cappedLastDelRecLastExtent().isValid()) {
         // Initial extent allocation.  Insert at end.
         d->nextDeleted() = DiskLoc();
         if (cappedListOfAllDeletedRecords().isNull())
-            setListOfAllDeletedRecords(txn, dloc);
+            setListOfAllDeletedRecords(opCtx, dloc);
         else {
             DiskLoc i = cappedListOfAllDeletedRecords();
             for (; !drec(i)->nextDeleted().isNull(); i = drec(i)->nextDeleted())
                 ;
-            *txn->recoveryUnit()->writing(&drec(i)->nextDeleted()) = dloc;
+            *opCtx->recoveryUnit()->writing(&drec(i)->nextDeleted()) = dloc;
         }
     } else {
         d->nextDeleted() = cappedFirstDeletedInCurExtent();
-        setFirstDeletedInCurExtent(txn, dloc);
+        setFirstDeletedInCurExtent(opCtx, dloc);
         // always _compact() after this so order doesn't matter
     }
 }
 
-std::unique_ptr<SeekableRecordCursor> CappedRecordStoreV1::getCursor(OperationContext* txn,
+std::unique_ptr<SeekableRecordCursor> CappedRecordStoreV1::getCursor(OperationContext* opCtx,
                                                                      bool forward) const {
-    return stdx::make_unique<CappedRecordStoreV1Iterator>(txn, this, forward);
+    return stdx::make_unique<CappedRecordStoreV1Iterator>(opCtx, this, forward);
 }
 
 vector<std::unique_ptr<RecordCursor>> CappedRecordStoreV1::getManyCursors(
-    OperationContext* txn) const {
+    OperationContext* opCtx) const {
     vector<std::unique_ptr<RecordCursor>> cursors;
 
     if (!_details->capLooped()) {
         // if we haven't looped yet, just spit out all extents (same as non-capped impl)
         const Extent* ext;
-        for (DiskLoc extLoc = details()->firstExtent(txn); !extLoc.isNull(); extLoc = ext->xnext) {
-            ext = _getExtent(txn, extLoc);
+        for (DiskLoc extLoc = details()->firstExtent(opCtx); !extLoc.isNull();
+             extLoc = ext->xnext) {
+            ext = _getExtent(opCtx, extLoc);
             if (ext->firstRecord.isNull())
                 continue;
 
             cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
-                txn, ext->firstRecord, this));
+                opCtx, ext->firstRecord, this));
         }
     } else {
         // if we've looped we need to iterate the extents, starting and ending with the
@@ -615,40 +619,40 @@ vector<std::unique_ptr<RecordCursor>> CappedRecordStoreV1::getManyCursors(
         // First do the "old" portion of capExtent if there is any
         DiskLoc extLoc = capExtent;
         {
-            const Extent* ext = _getExtent(txn, extLoc);
+            const Extent* ext = _getExtent(opCtx, extLoc);
             if (ext->firstRecord != details()->capFirstNewRecord()) {
                 // this means there is old data in capExtent
                 cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
-                    txn, ext->firstRecord, this));
+                    opCtx, ext->firstRecord, this));
             }
 
-            extLoc = ext->xnext.isNull() ? details()->firstExtent(txn) : ext->xnext;
+            extLoc = ext->xnext.isNull() ? details()->firstExtent(opCtx) : ext->xnext;
         }
 
         // Next handle all the other extents
         while (extLoc != capExtent) {
-            const Extent* ext = _getExtent(txn, extLoc);
+            const Extent* ext = _getExtent(opCtx, extLoc);
             cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
-                txn, ext->firstRecord, this));
+                opCtx, ext->firstRecord, this));
 
-            extLoc = ext->xnext.isNull() ? details()->firstExtent(txn) : ext->xnext;
+            extLoc = ext->xnext.isNull() ? details()->firstExtent(opCtx) : ext->xnext;
         }
 
         // Finally handle the "new" data in the capExtent
         cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
-            txn, details()->capFirstNewRecord(), this));
+            opCtx, details()->capFirstNewRecord(), this));
     }
 
     return cursors;
 }
 
-void CappedRecordStoreV1::_maybeComplain(OperationContext* txn, int len) const {
+void CappedRecordStoreV1::_maybeComplain(OperationContext* opCtx, int len) const {
     RARELY {
         std::stringstream buf;
         buf << "couldn't make room for record len: " << len << " in capped ns " << _ns << '\n';
-        buf << "numRecords: " << numRecords(txn) << '\n';
+        buf << "numRecords: " << numRecords(opCtx) << '\n';
         int i = 0;
-        for (DiskLoc e = _details->firstExtent(txn); !e.isNull();
+        for (DiskLoc e = _details->firstExtent(opCtx); !e.isNull();
              e = _extentManager->getExtent(e)->xnext, ++i) {
             buf << "  Extent " << i;
             if (e == _details->capExtent())
@@ -666,12 +670,13 @@ void CappedRecordStoreV1::_maybeComplain(OperationContext* txn, int len) const {
         warning() << buf.str();
 
         // assume it is unusually large record; if not, something is broken
-        fassert(17438, len * 5 > _details->lastExtentSize(txn));
+        fassert(17438, len * 5 > _details->lastExtentSize(opCtx));
     }
 }
 
-DiskLoc CappedRecordStoreV1::firstRecord(OperationContext* txn, const DiskLoc& startExtent) const {
-    for (DiskLoc i = startExtent.isNull() ? _details->firstExtent(txn) : startExtent; !i.isNull();
+DiskLoc CappedRecordStoreV1::firstRecord(OperationContext* opCtx,
+                                         const DiskLoc& startExtent) const {
+    for (DiskLoc i = startExtent.isNull() ? _details->firstExtent(opCtx) : startExtent; !i.isNull();
          i = _extentManager->getExtent(i)->xnext) {
         Extent* e = _extentManager->getExtent(i);
 
@@ -681,8 +686,8 @@ DiskLoc CappedRecordStoreV1::firstRecord(OperationContext* txn, const DiskLoc& s
     return DiskLoc();
 }
 
-DiskLoc CappedRecordStoreV1::lastRecord(OperationContext* txn, const DiskLoc& startExtent) const {
-    for (DiskLoc i = startExtent.isNull() ? _details->lastExtent(txn) : startExtent; !i.isNull();
+DiskLoc CappedRecordStoreV1::lastRecord(OperationContext* opCtx, const DiskLoc& startExtent) const {
+    for (DiskLoc i = startExtent.isNull() ? _details->lastExtent(opCtx) : startExtent; !i.isNull();
          i = _extentManager->getExtent(i)->xprev) {
         Extent* e = _extentManager->getExtent(i);
         if (!e->lastRecord.isNull())

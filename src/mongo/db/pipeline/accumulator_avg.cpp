@@ -101,7 +101,7 @@ Decimal128 AccumulatorAvg::_getDecimalTotal() const {
     return _decimalTotal.add(_nonDecimalTotal.getDecimal());
 }
 
-Value AccumulatorAvg::getValue(bool toBeMerged) const {
+Value AccumulatorAvg::getValue(bool toBeMerged) {
     if (toBeMerged) {
         if (_isDecimal)
             return Value(Document{{subTotalName, _getDecimalTotal()}, {countName, _count}});

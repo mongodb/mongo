@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/explain_options.h"
 
 namespace mongo {
 
@@ -46,24 +47,32 @@ class Document;
  */
 class AggregationRequest {
 public:
-    static const StringData kCommandName;
-    static const StringData kCursorName;
-    static const StringData kBatchSizeName;
-    static const StringData kFromRouterName;
-    static const StringData kPipelineName;
-    static const StringData kCollationName;
-    static const StringData kExplainName;
-    static const StringData kAllowDiskUseName;
-    static const StringData kHintName;
+    static constexpr StringData kCommandName = "aggregate"_sd;
+    static constexpr StringData kCursorName = "cursor"_sd;
+    static constexpr StringData kBatchSizeName = "batchSize"_sd;
+    static constexpr StringData kFromRouterName = "fromRouter"_sd;
+    static constexpr StringData kPipelineName = "pipeline"_sd;
+    static constexpr StringData kCollationName = "collation"_sd;
+    static constexpr StringData kExplainName = "explain"_sd;
+    static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
+    static constexpr StringData kHintName = "hint"_sd;
+    static constexpr StringData kCommentName = "comment"_sd;
 
-    static const long long kDefaultBatchSize;
+    static constexpr long long kDefaultBatchSize = 101;
 
     /**
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a
      * non-OK status if a required field was missing, if there was an unrecognized field name or if
      * there was a bad value for one of the fields.
+     *
+     * If we are parsing a request for an explained aggregation with an explain verbosity provided,
+     * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
+     * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
      */
-    static StatusWith<AggregationRequest> parseFromBSON(NamespaceString nss, const BSONObj& cmdObj);
+    static StatusWith<AggregationRequest> parseFromBSON(
+        NamespaceString nss,
+        const BSONObj& cmdObj,
+        boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
     /**
      * Constructs an AggregationRequest over the given namespace with the given pipeline. All
@@ -75,6 +84,9 @@ public:
      * Serializes the options to a Document. Note that this serialization includes the original
      * pipeline object, as specified. Callers will likely want to override this field with a
      * serialization of a parsed and optimized Pipeline object.
+     *
+     * The explain option is not serialized. Since the explain command format is {explain:
+     * {aggregate: ...}, ...}, explain options are not part of the aggregate command object.
      */
     Document serializeToCommandObj() const;
 
@@ -95,10 +107,6 @@ public:
      */
     const std::vector<BSONObj>& getPipeline() const {
         return _pipeline;
-    }
-
-    bool isExplain() const {
-        return _explain;
     }
 
     bool isFromRouter() const {
@@ -124,6 +132,26 @@ public:
         return _hint;
     }
 
+    const std::string& getComment() const {
+        return _comment;
+    }
+
+    boost::optional<ExplainOptions::Verbosity> getExplain() const {
+        return _explainMode;
+    }
+
+    unsigned int getMaxTimeMS() const {
+        return _maxTimeMS;
+    }
+
+    const BSONObj& getReadConcern() const {
+        return _readConcern;
+    }
+
+    const BSONObj& getUnwrappedReadPref() const {
+        return _unwrappedReadPref;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -144,8 +172,12 @@ public:
         _hint = hint.getOwned();
     }
 
-    void setExplain(bool isExplain) {
-        _explain = isExplain;
+    void setComment(const std::string& comment) {
+        _comment = comment;
+    }
+
+    void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
+        _explainMode = verbosity;
     }
 
     void setAllowDiskUse(bool allowDiskUse) {
@@ -160,9 +192,20 @@ public:
         _bypassDocumentValidation = shouldBypassDocumentValidation;
     }
 
+    void setMaxTimeMS(unsigned int maxTimeMS) {
+        _maxTimeMS = maxTimeMS;
+    }
+
+    void setReadConcern(BSONObj readConcern) {
+        _readConcern = readConcern.getOwned();
+    }
+
+    void setUnwrappedReadPref(BSONObj unwrappedReadPref) {
+        _unwrappedReadPref = unwrappedReadPref.getOwned();
+    }
+
 private:
     // Required fields.
-
     const NamespaceString _nss;
 
     // An unparsed version of the pipeline.
@@ -181,9 +224,24 @@ private:
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
 
-    bool _explain = false;
+    // The comment parameter attached to this aggregation.
+    std::string _comment;
+
+    BSONObj _readConcern;
+
+    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
+    // This object will be empty when no readPreference is specified or if the request does not
+    // originate from mongos.
+    BSONObj _unwrappedReadPref;
+
+    // The explain mode to use, or boost::none if this is not a request for an aggregation explain.
+    boost::optional<ExplainOptions::Verbosity> _explainMode;
+
     bool _allowDiskUse = false;
     bool _fromRouter = false;
     bool _bypassDocumentValidation = false;
+
+    // A user-specified maxTimeMS limit, or a value of '0' if not specified.
+    unsigned int _maxTimeMS = 0;
 };
 }  // namespace mongo

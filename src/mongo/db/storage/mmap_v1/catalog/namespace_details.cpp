@@ -82,13 +82,13 @@ NamespaceDetails::NamespaceDetails(const DiskLoc& loc, bool capped) {
     memset(_reserved, 0, sizeof(_reserved));
 }
 
-NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* txn,
+NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* opCtx,
                                                       StringData ns,
                                                       NamespaceIndex& ni,
                                                       int nindexessofar) {
     // Namespace details must always be changed under an exclusive DB lock
     const NamespaceString nss(ns);
-    invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
     verify(i >= 0 && i <= 1);
@@ -101,18 +101,18 @@ NamespaceDetails::Extra* NamespaceDetails::allocExtra(OperationContext* txn,
     Extra temp;
     temp.init();
 
-    ni.add_ns(txn, extrans, reinterpret_cast<NamespaceDetails*>(&temp));
+    ni.add_ns(opCtx, extrans, reinterpret_cast<NamespaceDetails*>(&temp));
     Extra* e = reinterpret_cast<NamespaceDetails::Extra*>(ni.details(extrans));
 
     long ofs = e->ofsFrom(this);
     if (i == 0) {
         verify(_extraOffset == 0);
-        *txn->recoveryUnit()->writing(&_extraOffset) = ofs;
+        *opCtx->recoveryUnit()->writing(&_extraOffset) = ofs;
         verify(extra() == e);
     } else {
         Extra* hd = extra();
         verify(hd->next(this) == 0);
-        hd->setNext(txn, ofs);
+        hd->setNext(opCtx, ofs);
     }
     return e;
 }
@@ -176,7 +176,7 @@ NamespaceDetails::IndexIterator::IndexIterator(const NamespaceDetails* _d,
 }
 
 // must be called when renaming a NS to fix up extra
-void NamespaceDetails::copyingFrom(OperationContext* txn,
+void NamespaceDetails::copyingFrom(OperationContext* opCtx,
                                    StringData thisns,
                                    NamespaceIndex& ni,
                                    NamespaceDetails* src) {
@@ -184,35 +184,35 @@ void NamespaceDetails::copyingFrom(OperationContext* txn,
     Extra* se = src->extra();
     int n = NIndexesBase;
     if (se) {
-        Extra* e = allocExtra(txn, thisns, ni, n);
+        Extra* e = allocExtra(opCtx, thisns, ni, n);
         while (1) {
             n += NIndexesExtra;
             e->copy(this, *se);
             se = se->next(src);
             if (se == 0)
                 break;
-            Extra* nxt = allocExtra(txn, thisns, ni, n);
-            e->setNext(txn, nxt->ofsFrom(this));
+            Extra* nxt = allocExtra(opCtx, thisns, ni, n);
+            e->setNext(opCtx, nxt->ofsFrom(this));
             e = nxt;
         }
         verify(_extraOffset);
     }
 }
 
-NamespaceDetails* NamespaceDetails::writingWithoutExtra(OperationContext* txn) {
-    return txn->recoveryUnit()->writing(this);
+NamespaceDetails* NamespaceDetails::writingWithoutExtra(OperationContext* opCtx) {
+    return opCtx->recoveryUnit()->writing(this);
 }
 
 
 // XXX - this method should go away
-NamespaceDetails* NamespaceDetails::writingWithExtra(OperationContext* txn) {
+NamespaceDetails* NamespaceDetails::writingWithExtra(OperationContext* opCtx) {
     for (Extra* e = extra(); e; e = e->next(this)) {
-        txn->recoveryUnit()->writing(e);
+        opCtx->recoveryUnit()->writing(e);
     }
-    return writingWithoutExtra(txn);
+    return writingWithoutExtra(opCtx);
 }
 
-void NamespaceDetails::setMaxCappedDocs(OperationContext* txn, long long max) {
+void NamespaceDetails::setMaxCappedDocs(OperationContext* opCtx, long long max) {
     massert(16499,
             "max in a capped collection has to be < 2^31 or -1",
             CollectionOptions::validMaxCappedDocs(&max));
@@ -222,21 +222,21 @@ void NamespaceDetails::setMaxCappedDocs(OperationContext* txn, long long max) {
 /* ------------------------------------------------------------------------- */
 
 
-int NamespaceDetails::_catalogFindIndexByName(OperationContext* txn,
+int NamespaceDetails::_catalogFindIndexByName(OperationContext* opCtx,
                                               const Collection* coll,
                                               StringData name,
                                               bool includeBackgroundInProgress) const {
     IndexIterator i = ii(includeBackgroundInProgress);
     while (i.more()) {
-        const BSONObj obj = coll->docFor(txn, i.next().info.toRecordId()).value();
+        const BSONObj obj = coll->docFor(opCtx, i.next().info.toRecordId()).value();
         if (name == obj.getStringField("name"))
             return i.pos() - 1;
     }
     return -1;
 }
 
-void NamespaceDetails::Extra::setNext(OperationContext* txn, long ofs) {
-    *txn->recoveryUnit()->writing(&_next) = ofs;
+void NamespaceDetails::Extra::setNext(OperationContext* opCtx, long ofs) {
+    *opCtx->recoveryUnit()->writing(&_next) = ofs;
 }
 
 }  // namespace mongo

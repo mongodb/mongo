@@ -30,12 +30,10 @@
 
 #include <vector>
 
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 
 namespace mongo {
-
-template <typename T>
-class StatusWith;
 
 namespace repl {
 
@@ -63,7 +61,7 @@ public:
      * Method to call once for each received response.
      */
     virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                 const ResponseStatus& response) = 0;
+                                 const executor::RemoteCommandResponse& response) = 0;
 
     /**
      * Returns true if no more calls to processResponse are needed to consider the

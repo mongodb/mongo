@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -73,40 +74,44 @@ class PlanExecutor;
  */
 class CursorManager {
 public:
-    CursorManager(StringData ns);
+    // The number of minutes a cursor is allowed to be idle before timing out.
+    static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
+
+    CursorManager(NamespaceString nss);
 
     /**
-     * Destroys the CursorManager. Managed cursors which are not pinned are destroyed. Ownership of
-     * pinned cursors is transferred to the corresponding ClientCursorPin.
+     * Destroys the CursorManager. All cursors and PlanExecutors must be cleaned up via
+     * invalidateAll() before destruction.
      */
     ~CursorManager();
 
     /**
-     * Kills all managed query executors and ClientCursors.
+     * Kills all managed query executors and ClientCursors. Callers must have exclusive access to
+     * the collection (i.e. must have the collection, databse, or global resource locked in MODE_X).
      *
      * 'collectionGoingAway' indicates whether the Collection instance is being deleted.  This could
-     * be because the db is being closed, or the collection/db is being dropped. When passing
-     * a 'collectionGoingAway' value of true, callers must have exclusive access to the collection
-     * (i.e. must have the collection, database, or global resource locked in MODE_X).
+     * be because the db is being closed, or the collection/db is being dropped.
      *
      * The 'reason' is the motivation for invalidating all cursors. This will be used for error
      * reporting and logging when an operation finds that the cursor it was operating on has been
      * killed.
      */
-    void invalidateAll(bool collectionGoingAway, const std::string& reason);
+    void invalidateAll(OperationContext* opCtx,
+                       bool collectionGoingAway,
+                       const std::string& reason);
 
     /**
      * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
      * must called *before* the provided RecordId is about to be deleted or mutated.
      */
-    void invalidateDocument(OperationContext* txn, const RecordId& dl, InvalidationType type);
+    void invalidateDocument(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
 
     /**
      * Destroys cursors that have been inactive for too long.
      *
      * Returns the number of cursors that were timed out.
      */
-    std::size_t timeoutCursors(int millisSinceLastCall);
+    std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
      * Register an executor so that it can be notified of deletion/invalidation during yields.
@@ -116,7 +121,8 @@ public:
     void registerExecutor(PlanExecutor* exec);
 
     /**
-     * Remove an executor from the registry.
+     * Remove an executor from the registry. It is legal to call this even if 'exec' is not
+     * registered.
      */
     void deregisterExecutor(PlanExecutor* exec);
 
@@ -124,43 +130,29 @@ public:
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
      * registered with the manager and returned in pinned state.
      */
-    ClientCursorPin registerCursor(const ClientCursorParams& cursorParams);
-
-    /**
-     * Constructs and pins a special ClientCursor used to track sharding state for the given
-     * collection. See range_preserver.h for more details.
-     */
-    ClientCursorPin registerRangePreserverCursor(const Collection* collection);
+    ClientCursorPin registerCursor(OperationContext* opCtx, ClientCursorParams&& cursorParams);
 
     /**
      * Pins and returns the cursor with the given id.
      *
-     * Returns ErrorCodes::CursorNotFound if the cursor does not exist.
+     * Returns ErrorCodes::CursorNotFound if the cursor does not exist or
+     * ErrorCodes::QueryPlanKilled if the cursor was killed in between uses.
      *
      * Throws a UserException if the cursor is already pinned. Callers need not specially handle
      * this error, as it should only happen if a misbehaving client attempts to simultaneously issue
      * two operations against the same cursor id.
      */
-    StatusWith<ClientCursorPin> pinCursor(CursorId id);
+    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx, CursorId id);
 
     /**
      * Returns an OK status if the cursor was successfully erased.
      *
-     * Returns error code CursorNotFound if the cursor id is not owned by this manager. Returns
-     * error code OperationFailed if attempting to erase a pinned cursor.
+     * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager. Returns
+     * ErrorCodes::OperationFailed if attempting to erase a pinned cursor.
      *
      * If 'shouldAudit' is true, will perform audit logging.
      */
-    Status eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit);
-
-    /**
-     * Returns true if the space of cursor ids that cursor manager is responsible for includes
-     * the given cursor id.  Otherwise, returns false.
-     *
-     * The return value of this method does not indicate any information about whether or not a
-     * cursor actually exists with the given cursor id.
-     */
-    bool ownsCursorId(CursorId cursorId) const;
+    Status eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
 
     void getCursorIds(std::set<CursorId>* openCursors) const;
 
@@ -172,32 +164,47 @@ public:
 
     static CursorManager* getGlobalCursorManager();
 
-    static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, const char* ids);
+    /**
+     * Returns true if this CursorId would be registered with the global CursorManager. Note that if
+     * this method returns true it does not imply the cursor exists.
+     */
+    static bool isGloballyManagedCursor(CursorId cursorId) {
+        // The first two bits are 01 for globally managed cursors, and 00 for cursors owned by a
+        // collection. The leading bit is always 0 so that CursorIds do not appear as negative.
+        const long long mask = static_cast<long long>(0b11) << 62;
+        return (cursorId & mask) == (static_cast<long long>(0b01) << 62);
+    }
 
-    static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
+    static int eraseCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
-    static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
+    static bool eraseCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
+
+    static bool eraseCursorGlobal(OperationContext* opCtx, CursorId id);
 
     /**
      * Deletes inactive cursors from the global cursor manager and from all per-collection cursor
      * managers. Returns the number of cursors that were timed out.
      */
-    static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
+    static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
 
 private:
     friend class ClientCursorPin;
 
     CursorId _allocateCursorId_inlock();
     void _deregisterCursor_inlock(ClientCursor* cc);
-    ClientCursorPin _registerCursor_inlock(
-        std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
     void deregisterCursor(ClientCursor* cc);
 
-    void unpin(ClientCursor* cursor);
+    void unpin(OperationContext* opCtx, ClientCursor* cursor);
+
+    bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
+
+    bool isGlobalManager() const {
+        return _nss.isEmpty();
+    }
 
     NamespaceString _nss;
-    unsigned _collectionCacheRuntimeId;
+    uint32_t _collectionCacheRuntimeId;
     std::unique_ptr<PseudoRandom> _random;
 
     mutable SimpleMutex _mutex;

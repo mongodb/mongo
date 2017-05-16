@@ -43,7 +43,7 @@ struct Extent;
  */
 class CappedRecordStoreV1Iterator final : public SeekableRecordCursor {
 public:
-    CappedRecordStoreV1Iterator(OperationContext* txn,
+    CappedRecordStoreV1Iterator(OperationContext* opCtx,
                                 const CappedRecordStoreV1* collection,
                                 bool forward);
 
@@ -52,12 +52,12 @@ public:
     void save() final;
     bool restore() final;
     void detachFromOperationContext() final {
-        _txn = nullptr;
+        _opCtx = nullptr;
     }
-    void reattachToOperationContext(OperationContext* txn) final {
-        _txn = txn;
+    void reattachToOperationContext(OperationContext* opCtx) final {
+        _opCtx = opCtx;
     }
-    void invalidate(OperationContext* txn, const RecordId& dl) final;
+    void invalidate(OperationContext* opCtx, const RecordId& dl) final;
     std::unique_ptr<RecordFetcher> fetcherForNext() const final;
     std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
 
@@ -80,7 +80,7 @@ private:
     DiskLoc _getPrevRecord(const DiskLoc& loc);
 
     // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // The collection we're iterating over.
     const CappedRecordStoreV1* const _recordStore;

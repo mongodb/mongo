@@ -30,9 +30,10 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/update/array_filter.h"
+#include "mongo/db/update/update_driver.h"
 
 namespace mongo {
 
@@ -64,7 +65,7 @@ public:
      * The object pointed to by "request" must stay in scope for the life of the constructed
      * ParsedUpdate.
      */
-    ParsedUpdate(OperationContext* txn, const UpdateRequest* request);
+    ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request);
 
     /**
      * Parses the update request to a canonical query and an update driver. On success, the
@@ -137,14 +138,22 @@ private:
      */
     Status parseUpdate();
 
+    /**
+     * Parses the array filters portion of the update request.
+     */
+    Status parseArrayFilters();
+
     // Unowned pointer to the transactional context.
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // Unowned pointer to the request object to process.
     const UpdateRequest* const _request;
 
     // The collator for the parsed update.  Owned here.
     std::unique_ptr<CollatorInterface> _collator;
+
+    // The array filters for the parsed update. Owned here.
+    std::map<StringData, std::unique_ptr<ArrayFilter>> _arrayFilters;
 
     // Driver for processing updates on matched documents.
     UpdateDriver _driver;

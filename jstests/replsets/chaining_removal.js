@@ -2,6 +2,8 @@
 
 (function() {
     "use strict";
+    load("jstests/replsets/rslib.js");
+
     var numNodes = 5;
     var host = getHostName();
     var name = "chaining_removal";
@@ -35,27 +37,9 @@
         {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'alwaysOn'}));
 
     // Force node 1 to sync directly from node 0.
-    assert.commandWorked(nodes[1].getDB("admin").runCommand({"replSetSyncFrom": nodes[0].host}));
-    var res;
-    assert.soon(
-        function() {
-            res = nodes[1].getDB("admin").runCommand({"replSetGetStatus": 1});
-            return res.syncingTo === nodes[0].host;
-        },
-        function() {
-            return "node 1 failed to start syncing from node 0: " + tojson(res);
-        });
-
+    syncFrom(nodes[1], nodes[0], replTest);
     // Force node 4 to sync through node 1.
-    assert.commandWorked(nodes[4].getDB("admin").runCommand({"replSetSyncFrom": nodes[1].host}));
-    assert.soon(
-        function() {
-            res = nodes[4].getDB("admin").runCommand({"replSetGetStatus": 1});
-            return res.syncingTo === nodes[1].host;
-        },
-        function() {
-            return "node 4 failed to start chaining through node 1: " + tojson(res);
-        });
+    syncFrom(nodes[4], nodes[1], replTest);
 
     // write that should reach all nodes
     var timeout = 60 * 1000;

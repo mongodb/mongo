@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include <vector>
+
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
@@ -34,9 +36,9 @@ namespace mongo {
 namespace {
 
 TEST(BsonCheck, CheckNothingLegal) {
-    const char* const* nada = NULL;
-    ASSERT_OK(bsonCheckOnlyHasFields("", BSONObj(), nada, nada));
-    ASSERT_EQUALS(ErrorCodes::BadValue, bsonCheckOnlyHasFields("", BSON("a" << 1), nada, nada));
+    ASSERT_OK(bsonCheckOnlyHasFields("", BSONObj(), std::vector<StringData>()));
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  bsonCheckOnlyHasFields("", BSON("a" << 1), std::vector<StringData>()));
 }
 
 const char* const legals[] = {"aField", "anotherField", "thirdField"};

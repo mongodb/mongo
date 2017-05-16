@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of following errmsg: Cannot output to a
+// non-sharded collection because sharded collection exists already.
+// @tags: [assumes_unsharded_collection]
+
 // Test that the eval command can't be used to invoke the mapReduce command.  SERVER-17889.
 (function() {
     "use strict";

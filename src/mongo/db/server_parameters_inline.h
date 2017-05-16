@@ -38,22 +38,22 @@ namespace mongo {
 // for a value type is chosen by the server_parameter_storage_type type trait. Since there is no
 // support for partial template specialization of member functions, we generate 4 (the Atomic types)
 // x 2 (RuntimeOnly, StartupAndRuntime) implementations of append and set.
-#define EXPORTED_ATOMIC_SERVER_PARAMETER_TYPE(VALUE_TYPE, PARAM_TYPE)        \
-    template <>                                                              \
-    inline void ExportedServerParameter<VALUE_TYPE, PARAM_TYPE>::append(     \
-        OperationContext* txn, BSONObjBuilder& b, const std::string& name) { \
-        b.append(name, _value->load());                                      \
-    }                                                                        \
-                                                                             \
-    template <>                                                              \
-    inline Status ExportedServerParameter<VALUE_TYPE, PARAM_TYPE>::set(      \
-        const VALUE_TYPE& newValue) {                                        \
-        Status v = validate(newValue);                                       \
-        if (!v.isOK())                                                       \
-            return v;                                                        \
-                                                                             \
-        _value->store(newValue);                                             \
-        return Status::OK();                                                 \
+#define EXPORTED_ATOMIC_SERVER_PARAMETER_TYPE(VALUE_TYPE, PARAM_TYPE)          \
+    template <>                                                                \
+    inline void ExportedServerParameter<VALUE_TYPE, PARAM_TYPE>::append(       \
+        OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) { \
+        b.append(name, _value->load());                                        \
+    }                                                                          \
+                                                                               \
+    template <>                                                                \
+    inline Status ExportedServerParameter<VALUE_TYPE, PARAM_TYPE>::set(        \
+        const VALUE_TYPE& newValue) {                                          \
+        Status v = validate(newValue);                                         \
+        if (!v.isOK())                                                         \
+            return v;                                                          \
+                                                                               \
+        _value->store(newValue);                                               \
+        return Status::OK();                                                   \
     }
 
 #define EXPORTED_ATOMIC_SERVER_PARAMETER(PARAM_TYPE)             \
@@ -86,7 +86,7 @@ inline Status ExportedServerParameter<T, paramType>::set(const T& newValue) {
 }
 
 template <typename T, ServerParameterType paramType>
-void ExportedServerParameter<T, paramType>::append(OperationContext* txn,
+void ExportedServerParameter<T, paramType>::append(OperationContext* opCtx,
                                                    BSONObjBuilder& b,
                                                    const std::string& name) {
     b.append(name, *_value);

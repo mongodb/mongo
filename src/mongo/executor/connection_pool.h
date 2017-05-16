@@ -123,6 +123,8 @@ public:
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;
 
+    size_t getNumConnectionsPerHost(const HostAndPort& hostAndPort) const;
+
 private:
     void returnConnection(ConnectionInterface* connection);
 
@@ -194,7 +196,6 @@ class ConnectionPool::ConnectionInterface : public TimerInterface {
 
 public:
     ConnectionInterface() = default;
-
     virtual ~ConnectionInterface() = default;
 
     /**

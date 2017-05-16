@@ -20,7 +20,7 @@ using JS::Symbol;
 using namespace js;
 
 Symbol*
-Symbol::newInternal(ExclusiveContext* cx, JS::SymbolCode code, JSAtom* description)
+Symbol::newInternal(ExclusiveContext* cx, JS::SymbolCode code, uint32_t hash, JSAtom* description)
 {
     MOZ_ASSERT(cx->compartment() == cx->atomsCompartment());
     MOZ_ASSERT(cx->atomsCompartment()->runtimeFromAnyThread()->currentThreadHasExclusiveAccess());
@@ -31,7 +31,7 @@ Symbol::newInternal(ExclusiveContext* cx, JS::SymbolCode code, JSAtom* descripti
         ReportOutOfMemory(cx);
         return nullptr;
     }
-    return new (p) Symbol(code, description);
+    return new (p) Symbol(code, hash, description);
 }
 
 Symbol*
@@ -48,7 +48,7 @@ Symbol::new_(ExclusiveContext* cx, JS::SymbolCode code, JSString* description)
     // probably be replaced with an assertion that we're on the main thread.
     AutoLockForExclusiveAccess lock(cx);
     AutoCompartment ac(cx, cx->atomsCompartment());
-    return newInternal(cx, code, atom);
+    return newInternal(cx, code, cx->compartment()->randomHashCode(), atom);
 }
 
 Symbol*
@@ -66,7 +66,7 @@ Symbol::for_(js::ExclusiveContext* cx, HandleString description)
         return *p;
 
     AutoCompartment ac(cx, cx->atomsCompartment());
-    Symbol* sym = newInternal(cx, SymbolCode::InSymbolRegistry, atom);
+    Symbol* sym = newInternal(cx, SymbolCode::InSymbolRegistry, atom->hash(), atom);
     if (!sym)
         return nullptr;
 

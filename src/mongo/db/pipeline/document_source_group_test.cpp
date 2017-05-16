@@ -73,10 +73,10 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     expCtx->inRouter = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
     AccumulationStatement countStatement{"count",
-                                         AccumulationStatement::getFactory("$sum"),
-                                         ExpressionConstant::create(expCtx, Value(1))};
+                                         ExpressionConstant::create(expCtx, Value(1)),
+                                         AccumulationStatement::getFactory("$sum")};
     auto group = DocumentSourceGroup::create(
-        expCtx, ExpressionConstant::create(expCtx, Value(BSONNULL)), {countStatement}, 0);
+        expCtx, ExpressionConstant::create(expCtx, Value(BSONNULL)), {countStatement});
     auto mock = DocumentSourceMock::create({DocumentSource::GetNextResult::makePauseExecution(),
                                             Document(),
                                             DocumentSource::GetNextResult::makePauseExecution(),
@@ -106,14 +106,13 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     expCtx->extSortAllowed = true;
     const size_t maxMemoryUsageBytes = 1000;
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     AccumulationStatement pushStatement{"spaceHog",
-                                        AccumulationStatement::getFactory("$push"),
-                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps)};
+                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps),
+                                        AccumulationStatement::getFactory("$push")};
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$_id", vps);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpression, {pushStatement}, idGen.getIdCount(), maxMemoryUsageBytes);
+        expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
@@ -146,14 +145,13 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     expCtx->inRouter = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     AccumulationStatement pushStatement{"spaceHog",
-                                        AccumulationStatement::getFactory("$push"),
-                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps)};
+                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps),
+                                        AccumulationStatement::getFactory("$push")};
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$_id", vps);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpression, {pushStatement}, idGen.getIdCount(), maxMemoryUsageBytes);
+        expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},
@@ -169,14 +167,13 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     expCtx->inRouter = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
-    VariablesIdGenerator idGen;
-    VariablesParseState vps(&idGen);
+    VariablesParseState vps = expCtx->variablesParseState;
     AccumulationStatement pushStatement{"spaceHog",
-                                        AccumulationStatement::getFactory("$push"),
-                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps)};
+                                        ExpressionFieldPath::parse(expCtx, "$largeStr", vps),
+                                        AccumulationStatement::getFactory("$push")};
     auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$_id", vps);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpression, {pushStatement}, idGen.getIdCount(), maxMemoryUsageBytes);
+        expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
 
     string largeStr(maxMemoryUsageBytes / 2, 'x');
     auto mock = DocumentSourceMock::create({Document{{"_id", 0}, {"largeStr", largeStr}},

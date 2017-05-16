@@ -39,7 +39,7 @@ using namespace mongo;
 static const Seconds kMinMaxStaleness = ReadPreferenceSetting::kMinimalMaxStalenessValue;
 
 void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
-    const auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
+    const auto swRps = ReadPreferenceSetting::fromInnerBSON(rpsObj);
     ASSERT_OK(swRps.getStatus());
     const auto rps = swRps.getValue();
     ASSERT_TRUE(rps.equals(expected));
@@ -92,12 +92,18 @@ TEST(ReadPreferenceSetting, ParseValid) {
 }
 
 void checkParseFails(const BSONObj& rpsObj) {
-    auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
+    auto swRps = ReadPreferenceSetting::fromInnerBSON(rpsObj);
     ASSERT_NOT_OK(swRps.getStatus());
 }
 
 void checkParseFailsWithError(const BSONObj& rpsObj, ErrorCodes::Error error) {
-    auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
+    auto swRps = ReadPreferenceSetting::fromInnerBSON(rpsObj);
+    ASSERT_NOT_OK(swRps.getStatus());
+    ASSERT_EQUALS(swRps.getStatus().code(), error);
+}
+
+void checkParseContainerFailsWithError(const BSONObj& rpsObj, ErrorCodes::Error error) {
+    auto swRps = ReadPreferenceSetting::fromContainingBSON(rpsObj);
     ASSERT_NOT_OK(swRps.getStatus());
     ASSERT_EQUALS(swRps.getStatus().code(), error);
 }
@@ -169,10 +175,16 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
                          << "secondary"
                          << "maxStalenessSeconds"
                          << Seconds::max().count()));
+
+    checkParseContainerFailsWithError(BSON("$query" << BSON("pang"
+                                                            << "pong")
+                                                    << "$readPreference"
+                                                    << 2),
+                                      ErrorCodes::TypeMismatch);
 }
 
 void checkRoundtrip(const ReadPreferenceSetting& rps) {
-    auto parsed = ReadPreferenceSetting::fromBSON(rps.toBSON());
+    auto parsed = ReadPreferenceSetting::fromInnerBSON(rps.toInnerBSON());
     ASSERT_OK(parsed.getStatus());
     ASSERT_TRUE(parsed.getValue().equals(rps));
 }

@@ -65,10 +65,11 @@ public:
                                                         const ViewDefinition* view);
 
     /**
-     * Appends the resolved view definition and CommandOnShardedViewNotSupportedOnMongod status to
-     * 'result'.
+     * Appends the resolved view definition to 'result' and returns a
+     * CommandOnShardedViewNotSupportedOnMongod error status. The caller is responsible for
+     * appending the non-ok status and error code.
      */
-    static void appendShardedViewStatus(const BSONObj& resolvedView, BSONObjBuilder* result);
+    static Status appendShardedViewResponse(const BSONObj& resolvedView, BSONObjBuilder* result);
 
 private:
     /**

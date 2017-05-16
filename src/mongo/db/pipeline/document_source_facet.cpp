@@ -149,6 +149,13 @@ void DocumentSourceFacet::setSource(DocumentSource* source) {
     _teeBuffer->setSource(source);
 }
 
+void DocumentSourceFacet::doDispose() {
+    for (auto&& facet : _facets) {
+        facet.pipeline.get_deleter().dismissDisposal();
+        facet.pipeline->dispose(pExpCtx->opCtx);
+    }
+}
+
 DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
     pExpCtx->checkForInterrupt();
 
@@ -179,11 +186,11 @@ DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
     return resultDoc.freeze();
 }
 
-Value DocumentSourceFacet::serialize(bool explain) const {
+Value DocumentSourceFacet::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument serialized;
     for (auto&& facet : _facets) {
-        serialized[facet.name] =
-            Value(explain ? facet.pipeline->writeExplainOps() : facet.pipeline->serialize());
+        serialized[facet.name] = Value(explain ? facet.pipeline->writeExplainOps(*explain)
+                                               : facet.pipeline->serialize());
     }
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }

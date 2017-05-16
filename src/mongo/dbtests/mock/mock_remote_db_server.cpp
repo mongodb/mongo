@@ -184,7 +184,7 @@ bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
     BSONObj upconvertedRequest;
     BSONObj upconvertedMetadata;
     std::tie(upconvertedRequest, upconvertedMetadata) =
-        uassertStatusOK(rpc::upconvertRequestMetadata(cmdObj, options));
+        rpc::upconvertRequestMetadata(cmdObj, options);
 
     StringData commandName = upconvertedRequest.firstElementFieldName();
 

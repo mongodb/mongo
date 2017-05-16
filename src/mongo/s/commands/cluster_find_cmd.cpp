@@ -101,11 +101,10 @@ public:
         return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                   ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         // Parse the command BSON to a QueryRequest.
@@ -116,7 +115,7 @@ public:
         }
 
         auto result = Strategy::explainFind(
-            txn, cmdObj, *qr.getValue(), verbosity, serverSelectionMetadata, out);
+            opCtx, cmdObj, *qr.getValue(), verbosity, ReadPreferenceSetting::get(opCtx), out);
 
         if (result == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
             auto resolvedView = ResolvedView::fromBSON(out->asTempObj());
@@ -127,17 +126,22 @@ public:
                 return aggCmdOnView.getStatus();
             }
 
-            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
-            if (!aggCmd.isOK()) {
-                return aggCmd.getStatus();
+            auto aggRequestOnView =
+                AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue(), verbosity);
+            if (!aggRequestOnView.isOK()) {
+                return aggRequestOnView.getStatus();
             }
 
-            int queryOptions = 0;
+            auto resolvedAggRequest =
+                resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
+            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
+
             ClusterAggregate::Namespaces nsStruct;
             nsStruct.requestedNss = std::move(nss);
             nsStruct.executionNss = std::move(resolvedView.getNamespace());
-            auto status =
-                ClusterAggregate::runAggregate(txn, nsStruct, aggCmd.getValue(), queryOptions, out);
+
+            auto status = ClusterAggregate::runAggregate(
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
             appendCommandStatus(*out, status);
             return status;
         }
@@ -145,10 +149,9 @@ public:
         return result;
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         // We count find command as a query op.
@@ -163,15 +166,14 @@ public:
         }
 
         auto cq =
-            CanonicalQuery::canonicalize(txn, std::move(qr.getValue()), ExtensionsCallbackNoop());
+            CanonicalQuery::canonicalize(opCtx, std::move(qr.getValue()), ExtensionsCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }
 
         // Extract read preference. If no read preference is specified in the query, will we pass
         // down a "primaryOnly" or "secondary" read pref, depending on the slaveOk setting.
-        auto readPref =
-            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        auto readPref = ClusterFind::extractUnwrappedReadPref(cmdObj);
         if (!readPref.isOK()) {
             return appendCommandStatus(result, readPref.getStatus());
         }
@@ -181,7 +183,7 @@ public:
         std::vector<BSONObj> batch;
         BSONObj viewDefinition;
         auto cursorId = ClusterFind::runQuery(
-            txn, *cq.getValue(), readPref.getValue(), &batch, &viewDefinition);
+            opCtx, *cq.getValue(), readPref.getValue(), &batch, &viewDefinition);
         if (!cursorId.isOK()) {
             if (cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
                 auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();
@@ -189,11 +191,16 @@ public:
                     return appendCommandStatus(result, aggCmdOnView.getStatus());
                 }
 
-                auto resolvedView = ResolvedView::fromBSON(viewDefinition);
-                auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
-                if (!aggCmd.isOK()) {
-                    return appendCommandStatus(result, aggCmd.getStatus());
+                auto aggRequestOnView =
+                    AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
+                if (!aggRequestOnView.isOK()) {
+                    return appendCommandStatus(result, aggRequestOnView.getStatus());
                 }
+
+                auto resolvedView = ResolvedView::fromBSON(viewDefinition);
+                auto resolvedAggRequest =
+                    resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
+                auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
                 // We pass both the underlying collection namespace and the view namespace here. The
                 // underlying collection namespace is used to execute the aggregation on mongoD. Any
@@ -202,8 +209,9 @@ public:
                 ClusterAggregate::Namespaces nsStruct;
                 nsStruct.requestedNss = std::move(nss);
                 nsStruct.executionNss = std::move(resolvedView.getNamespace());
+
                 auto status = ClusterAggregate::runAggregate(
-                    txn, nsStruct, aggCmd.getValue(), options, &result);
+                    opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &result);
                 appendCommandStatus(result, status);
                 return status.isOK();
             }

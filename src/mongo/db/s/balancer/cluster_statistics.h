@@ -106,7 +106,7 @@ public:
      * Retrieves a snapshot of the current shard utilization state. The implementation of this
      * method may block if necessary in order to refresh its state or may return a cached value.
      */
-    virtual StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* txn) = 0;
+    virtual StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* opCtx) = 0;
 
 protected:
     ClusterStatistics();

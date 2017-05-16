@@ -32,6 +32,7 @@
 
 #include "mongo/executor/async_timer_asio.h"
 
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -51,6 +52,10 @@ void AsyncTimerASIO::cancel() {
 
 void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
     _timer.async_wait(_strand->wrap(std::move(handler)));
+}
+
+void AsyncTimerASIO::expireAfter(Milliseconds expiration) {
+    _timer.expires_after(stdx::chrono::milliseconds(expiration.count()));
 }
 
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_service::strand* strand,

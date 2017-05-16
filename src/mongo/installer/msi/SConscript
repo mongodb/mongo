@@ -41,43 +41,23 @@ enterpriseToolBuildDir = buildDir + r'\mongo\db\modules\enterprise'
 # msi_flavor - "2008R2Plus" or ""
 #
 
+msi_flavor = '2008R2Plus'
+msi_platform = 'x64'
+
 # Enterprise
 if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
-  msi_flavor = '2008R2Plus'
-  msi_platform = 'x64'
   upgrade_code = '822C75A4-40BA-456B-91D3-C339155F0F90'
 # Community
 else:
   if has_option('ssl'):
     msi_edition = 'SSL'
+    upgrade_code = 'FDAA2775-060E-4C54-9C19-A84197F3070D'
   else:
     msi_edition = 'Standard'
-  if env['TARGET_ARCH'] == 'i386':
-    msi_platform = 'x86'
-    msi_flavor = ''
-    upgrade_code = '480C63DF-8F9F-46BE-BD24-F16E9E992F4D'
-  else:
-    msi_platform = 'x64'
-    if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
-      msi_flavor = '2008R2Plus'
-      if msi_edition == 'SSL':
-        upgrade_code = 'FDAA2775-060E-4C54-9C19-A84197F3070D'
-      else:
-        upgrade_code = '7BCCBD4E-AC8A-48BC-9922-E9EBB158A060'
-    else:
-      msi_flavor = 'Legacy'
-      upgrade_code = '3433D310-B4A0-4E5B-BB38-34FC140F06F1'
+    upgrade_code = '7BCCBD4E-AC8A-48BC-9922-E9EBB158A060'
 
-if 'msi' in BUILD_TARGETS and msi_edition == 'SSL' and msi_flavor != '2008R2Plus':
-  print "Building the MongoDB SSL MSI is only supported on Windows 2008 R2+ or Windows 7+ platforms."
-  print "You must add --win-version-min=ws08r2 to your scons flags"
-  exit(1)
-
-if msi_platform == 'x64':
-  sourcesList.append("Installer_64.wxs")
-else:
-  sourcesList.append("Installer.wxs")
+sourcesList.append("Installer_64.wxs")
 
 sources = ["wxs/" + file for file in sourcesList]
 objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourcesList]

@@ -76,6 +76,10 @@ var checkLog;
                 300);
         };
 
-        return {contains: contains, containsWithCount: containsWithCount};
+        return {
+            getGlobalLog: getGlobalLog,
+            contains: contains,
+            containsWithCount: containsWithCount
+        };
     })();
 })();

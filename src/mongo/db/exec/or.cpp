@@ -120,7 +120,7 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
     return childStatus;
 }
 
-void OrStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void OrStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // TODO remove this since calling isEOF is illegal inside of doInvalidate().
     if (isEOF()) {
         return;

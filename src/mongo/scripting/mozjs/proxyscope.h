@@ -113,11 +113,11 @@ public:
 
     bool isKillPending() const override;
 
-    void registerOperation(OperationContext* txn) override;
+    void registerOperation(OperationContext* opCtx) override;
 
     void unregisterOperation() override;
 
-    void localConnectForDbEval(OperationContext* txn, const char* dbName) override;
+    void localConnectForDbEval(OperationContext* opCtx, const char* dbName) override;
 
     void externalSetup() override;
 
@@ -165,8 +165,7 @@ public:
 
     void injectNative(const char* field, NativeFunction func, void* data = 0) override;
 
-    ScriptingFunction _createFunction(const char* code,
-                                      ScriptingFunction functionNumber = 0) override;
+    ScriptingFunction _createFunction(const char* code) override;
 
     OperationContext* getOpContext() const;
 

@@ -76,11 +76,11 @@ Status getKey(
 // static
 const char* GroupStage::kStageType = "GROUP";
 
-GroupStage::GroupStage(OperationContext* txn,
+GroupStage::GroupStage(OperationContext* opCtx,
                        const GroupRequest& request,
                        WorkingSet* workingSet,
                        PlanStage* child)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _request(request),
       _ws(workingSet),
       _specificStats(),

@@ -55,8 +55,8 @@
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
@@ -208,15 +208,16 @@ private:
         read(_buffer.get(), blockSize);
         massert(16816, "file too short?", !_done);
 
-        auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-        if (hooks->enabled()) {
+        auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+        if (encryptionHooks->enabled()) {
             std::unique_ptr<char[]> out(new char[blockSize]);
             size_t outLen;
-            Status status = hooks->unprotectTmpData(reinterpret_cast<uint8_t*>(_buffer.get()),
-                                                    blockSize,
-                                                    reinterpret_cast<uint8_t*>(out.get()),
-                                                    blockSize,
-                                                    &outLen);
+            Status status =
+                encryptionHooks->unprotectTmpData(reinterpret_cast<uint8_t*>(_buffer.get()),
+                                                  blockSize,
+                                                  reinterpret_cast<uint8_t*>(out.get()),
+                                                  blockSize,
+                                                  &outLen);
             massert(28841,
                     str::stream() << "Failed to unprotect data: " << status.toString(),
                     status.isOK());
@@ -866,16 +867,16 @@ void SortedFileWriter<Key, Value>::spill() {
     }
 
     std::unique_ptr<char[]> out;
-    auto hooks = WiredTigerCustomizationHooks::get(getGlobalServiceContext());
-    if (hooks->enabled()) {
-        size_t protectedSizeMax = size + hooks->additionalBytesForProtectedBuffer();
+    auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
+    if (encryptionHooks->enabled()) {
+        size_t protectedSizeMax = size + encryptionHooks->additionalBytesForProtectedBuffer();
         out.reset(new char[protectedSizeMax]);
         size_t resultLen;
-        Status status = hooks->protectTmpData(reinterpret_cast<const uint8_t*>(outBuffer),
-                                              size,
-                                              reinterpret_cast<uint8_t*>(out.get()),
-                                              protectedSizeMax,
-                                              &resultLen);
+        Status status = encryptionHooks->protectTmpData(reinterpret_cast<const uint8_t*>(outBuffer),
+                                                        size,
+                                                        reinterpret_cast<uint8_t*>(out.get()),
+                                                        protectedSizeMax,
+                                                        &resultLen);
         massert(28842,
                 str::stream() << "Failed to compress data: " << status.toString(),
                 status.isOK());

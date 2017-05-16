@@ -42,6 +42,6 @@ std::unique_ptr<mongo::KVDatabaseCatalogEntryMock> mongo::kvDatabaseCatalogEntry
 
 // Used to satisfy link dependencies in unit test - not invoked.
 mongo::IndexAccessMethod* mongo::KVDatabaseCatalogEntryMock::getIndex(
-    OperationContext* txn, const CollectionCatalogEntry* collection, IndexCatalogEntry* index) {
+    OperationContext* opCtx, const CollectionCatalogEntry* collection, IndexCatalogEntry* index) {
     invariant(false);
 }

@@ -60,12 +60,12 @@ public:
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) override;
 
-    virtual Status findOne(OperationContext* txn,
+    virtual Status findOne(OperationContext* opCtx,
                            const NamespaceString& collectionName,
                            const BSONObj& query,
                            BSONObj* result);
 
-    virtual Status query(OperationContext* txn,
+    virtual Status query(OperationContext* opCtx,
                          const NamespaceString& collectionName,
                          const BSONObj& query,
                          const BSONObj& projection,  // Currently unused in mock
@@ -74,25 +74,25 @@ public:
     /**
      * Inserts the given user object into the "admin" database.
      */
-    Status insertPrivilegeDocument(OperationContext* txn,
+    Status insertPrivilegeDocument(OperationContext* opCtx,
                                    const BSONObj& userObj,
                                    const BSONObj& writeConcern);
 
     // This implementation does not understand uniqueness constraints.
-    virtual Status insert(OperationContext* txn,
+    virtual Status insert(OperationContext* opCtx,
                           const NamespaceString& collectionName,
                           const BSONObj& document,
                           const BSONObj& writeConcern);
 
     // This implementation does not understand uniqueness constraints, ignores writeConcern,
     // and only correctly handles some upsert behaviors.
-    virtual Status updateOne(OperationContext* txn,
+    virtual Status updateOne(OperationContext* opCtx,
                              const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& updatePattern,
                              bool upsert,
                              const BSONObj& writeConcern);
-    virtual Status update(OperationContext* txn,
+    virtual Status update(OperationContext* opCtx,
                           const NamespaceString& collectionName,
                           const BSONObj& query,
                           const BSONObj& updatePattern,
@@ -100,7 +100,7 @@ public:
                           bool multi,
                           const BSONObj& writeConcern,
                           int* nMatched);
-    virtual Status remove(OperationContext* txn,
+    virtual Status remove(OperationContext* opCtx,
                           const NamespaceString& collectionName,
                           const BSONObj& query,
                           const BSONObj& writeConcern,

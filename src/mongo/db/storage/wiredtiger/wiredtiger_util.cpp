@@ -419,18 +419,18 @@ int WiredTigerUtil::ErrorAccumulator::onError(WT_EVENT_HANDLER* handler,
     }
 }
 
-int WiredTigerUtil::verifyTable(OperationContext* txn,
+int WiredTigerUtil::verifyTable(OperationContext* opCtx,
                                 const std::string& uri,
                                 std::vector<std::string>* errors) {
     ErrorAccumulator eventHandler(errors);
 
     // Try to close as much as possible to avoid EBUSY errors.
-    WiredTigerRecoveryUnit::get(txn)->getSession(txn)->closeAllCursors();
-    WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
+    WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->closeAllCursors();
+    WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     sessionCache->closeAllCursors();
 
     // Open a new session with custom error handlers.
-    WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(txn)->getSessionCache()->conn();
+    WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
     WT_SESSION* session;
     invariantWTOK(conn->open_session(conn, &eventHandler, NULL, &session));
     ON_BLOCK_EXIT(session->close, session, "");

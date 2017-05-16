@@ -88,7 +88,7 @@ TEST(LockerImpl, ConflictWithTimeout) {
 
     DefaultLockerImpl locker2;
     ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
-    ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
+    ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, Milliseconds(0)));
 
     ASSERT(locker2.getLockMode(resId) == MODE_NONE);
 
@@ -110,7 +110,7 @@ TEST(LockerImpl, ConflictUpgradeWithTimeout) {
     ASSERT(LOCK_OK == locker2.lock(resId, MODE_S));
 
     // Try upgrading locker 1, which should block and timeout
-    ASSERT(LOCK_TIMEOUT == locker1.lock(resId, MODE_X, 1));
+    ASSERT(LOCK_TIMEOUT == locker1.lock(resId, MODE_X, Milliseconds(1)));
 
     locker1.unlockGlobal();
     locker2.unlockGlobal();
@@ -276,13 +276,14 @@ TEST(LockerImpl, CanceledDeadlockUnblocks) {
     ASSERT(LOCK_WAITING == locker3.lockBegin(db1, MODE_S));
 
     // Detect deadlock, canceling our request
-    ASSERT(LOCK_DEADLOCK == locker2.lockComplete(db1, MODE_X, 1, /*checkDeadlock*/ true));
+    ASSERT(LOCK_DEADLOCK ==
+           locker2.lockComplete(db1, MODE_X, Milliseconds(1), /*checkDeadlock*/ true));
 
     // Now locker3 must be able to complete its request
-    ASSERT(LOCK_OK == locker3.lockComplete(db1, MODE_S, 1, /*checkDeadlock*/ false));
+    ASSERT(LOCK_OK == locker3.lockComplete(db1, MODE_S, Milliseconds(1), /*checkDeadlock*/ false));
 
     // Locker1 still can't complete its request
-    ASSERT(LOCK_TIMEOUT == locker1.lockComplete(db2, MODE_X, 1, false));
+    ASSERT(LOCK_TIMEOUT == locker1.lockComplete(db2, MODE_X, Milliseconds(1), false));
 
     // Check ownership for db1
     ASSERT(locker1.getLockMode(db1) == MODE_S);
@@ -373,10 +374,10 @@ TEST(LockerImpl, GetLockerInfoShouldReportPendingLocks) {
     ASSERT(successfulLocker.unlock(dbId));
     ASSERT(successfulLocker.unlockGlobal());
 
-    const unsigned timeoutMs = 0;
+    const Milliseconds timeout = Milliseconds(0);
     const bool checkDeadlock = false;
     ASSERT_EQ(LOCK_OK,
-              conflictingLocker.lockComplete(collectionId, MODE_IS, timeoutMs, checkDeadlock));
+              conflictingLocker.lockComplete(collectionId, MODE_IS, timeout, checkDeadlock));
 
     conflictingLocker.getLockerInfo(&lockerInfo);
     ASSERT_FALSE(lockerInfo.waitingResource.isValid());

@@ -294,7 +294,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_create[] = {
 	{ "source", "string", NULL, NULL, NULL, 0 },
 	{ "split_deepen_min_child", "int", NULL, NULL, NULL, 0 },
 	{ "split_deepen_per_child", "int", NULL, NULL, NULL, 0 },
-	{ "split_pct", "int", NULL, "min=25,max=100", NULL, 0 },
+	{ "split_pct", "int", NULL, "min=50,max=100", NULL, 0 },
 	{ "type", "string", NULL, NULL, NULL, 0 },
 	{ "value_format", "format",
 	    __wt_struct_confchk, NULL,
@@ -466,7 +466,7 @@ static const WT_CONFIG_CHECK confchk_file_config[] = {
 	{ "prefix_compression_min", "int", NULL, "min=0", NULL, 0 },
 	{ "split_deepen_min_child", "int", NULL, NULL, NULL, 0 },
 	{ "split_deepen_per_child", "int", NULL, NULL, NULL, 0 },
-	{ "split_pct", "int", NULL, "min=25,max=100", NULL, 0 },
+	{ "split_pct", "int", NULL, "min=50,max=100", NULL, 0 },
 	{ "value_format", "format",
 	    __wt_struct_confchk, NULL,
 	    NULL, 0 },
@@ -530,7 +530,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "prefix_compression_min", "int", NULL, "min=0", NULL, 0 },
 	{ "split_deepen_min_child", "int", NULL, NULL, NULL, 0 },
 	{ "split_deepen_per_child", "int", NULL, NULL, NULL, 0 },
-	{ "split_pct", "int", NULL, "min=25,max=100", NULL, 0 },
+	{ "split_pct", "int", NULL, "min=50,max=100", NULL, 0 },
 	{ "value_format", "format",
 	    __wt_struct_confchk, NULL,
 	    NULL, 0 },
@@ -614,7 +614,7 @@ static const WT_CONFIG_CHECK confchk_lsm_meta[] = {
 	{ "prefix_compression_min", "int", NULL, "min=0", NULL, 0 },
 	{ "split_deepen_min_child", "int", NULL, NULL, NULL, 0 },
 	{ "split_deepen_per_child", "int", NULL, NULL, NULL, 0 },
-	{ "split_pct", "int", NULL, "min=25,max=100", NULL, 0 },
+	{ "split_pct", "int", NULL, "min=50,max=100", NULL, 0 },
 	{ "value_format", "format",
 	    __wt_struct_confchk, NULL,
 	    NULL, 0 },
@@ -1119,7 +1119,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "chunk_size=10MB,merge_max=15,merge_min=0),memory_page_max=5MB,"
 	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=false,"
 	  "prefix_compression_min=4,source=,split_deepen_min_child=0,"
-	  "split_deepen_per_child=0,split_pct=75,type=file,value_format=u",
+	  "split_deepen_per_child=0,split_pct=90,type=file,value_format=u",
 	  confchk_WT_SESSION_create, 42
 	},
 	{ "WT_SESSION.drop",
@@ -1213,7 +1213,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "leaf_value_max=0,log=(enabled=true),memory_page_max=5MB,"
 	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=false,"
 	  "prefix_compression_min=4,split_deepen_min_child=0,"
-	  "split_deepen_per_child=0,split_pct=75,value_format=u",
+	  "split_deepen_per_child=0,split_pct=90,value_format=u",
 	  confchk_file_config, 35
 	},
 	{ "file.meta",
@@ -1228,7 +1228,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "leaf_key_max=0,leaf_page_max=32KB,leaf_value_max=0,"
 	  "log=(enabled=true),memory_page_max=5MB,os_cache_dirty_max=0,"
 	  "os_cache_max=0,prefix_compression=false,prefix_compression_min=4"
-	  ",split_deepen_min_child=0,split_deepen_per_child=0,split_pct=75,"
+	  ",split_deepen_min_child=0,split_deepen_per_child=0,split_pct=90,"
 	  "value_format=u,version=(major=0,minor=0)",
 	  confchk_file_meta, 39
 	},
@@ -1253,7 +1253,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "merge_min=0),memory_page_max=5MB,old_chunks=,"
 	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=false,"
 	  "prefix_compression_min=4,split_deepen_min_child=0,"
-	  "split_deepen_per_child=0,split_pct=75,value_format=u",
+	  "split_deepen_per_child=0,split_pct=90,value_format=u",
 	  confchk_lsm_meta, 39
 	},
 	{ "table.meta",

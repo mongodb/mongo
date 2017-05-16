@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -262,6 +263,7 @@ void ThreadPool::_consumeTasks() {
 
                 LOG(3) << "Not reaping because the earliest retirement date is "
                        << nextThreadRetirementDate;
+                MONGO_IDLE_THREAD_BLOCK;
                 _workAvailable.wait_until(lk, nextThreadRetirementDate.toSystemTimePoint());
             } else {
                 // Since the number of threads is not more than minThreads, this thread is not
@@ -270,6 +272,7 @@ void ThreadPool::_consumeTasks() {
                 // would be eligible for retirement once they had no work left to do.
                 LOG(3) << "waiting for work; I am one of " << _threads.size() << " thread(s);"
                        << " the minimum number of threads is " << _options.minThreads;
+                MONGO_IDLE_THREAD_BLOCK;
                 _workAvailable.wait(lk);
             }
             continue;

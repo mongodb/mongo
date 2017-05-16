@@ -112,6 +112,8 @@ private:
         Connection(std::unique_ptr<AbstractMessagingPort> port)
             : amp(std::move(port)), connectionId(amp->connectionId()) {}
 
+        stdx::mutex closeMutex;
+
         std::unique_ptr<AbstractMessagingPort> amp;
 
         const long long connectionId;

@@ -58,7 +58,6 @@ typedef struct {
 	u_int nkeys;				/* Keys to load */
 	u_int nops;				/* Operations per thread */
 	FILE *logfp;				/* Message log file. */
-	char *progname;				/* Program name */
 	int nworkers;				/* Number workers configured */
 	int ntables;				/* Number tables configured */
 	int ntables_created;			/* Number tables opened */

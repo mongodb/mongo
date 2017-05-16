@@ -28,22 +28,49 @@
 
 #pragma once
 
+#include "mongo/s/sharding_mongod_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+class ClockSourceMock;
+class DBDirectClient;
+class LogicalClock;
+class LogicalTime;
+
 /**
- * A test fixture that installs a LogicalClock instance onto a service context.
+ * A test fixture that installs a LogicalClock instance with a TimeProofService onto a service
+ * context, in addition to the mock storage engine, network, and OpObserver provided by
+ * ShardingMongodTestFixture.
  */
-class LogicalClockTest : public unittest::Test {
+class LogicalClockTestFixture : public ShardingMongodTestFixture {
 public:
-    ~LogicalClockTest() override = default;
+    LogicalClockTestFixture();
+    ~LogicalClockTestFixture();
 
 protected:
     /**
-     * Sets up this fixture with a context and a LogicalClock.
+     * Sets up this fixture as the primary node in a shard server replica set with a LogicalClock
+     * (with a TimeProofService), storage engine, DBClient, OpObserver, and a mocked clock source.
      */
     void setUp() override;
-    void tearDown() override{};
+
+    void tearDown() override;
+
+    LogicalClock* getClock() const;
+
+    ClockSourceMock* getMockClockSource() const;
+
+    void setMockClockSourceTime(Date_t time) const;
+
+    Date_t getMockClockSourceTime() const;
+
+    DBDirectClient* getDBClient() const;
+
+private:
+    LogicalClock* _clock;
+    std::shared_ptr<ClockSourceMock> _mockClockSource = std::make_shared<ClockSourceMock>();
+    std::unique_ptr<DBDirectClient> _dbDirectClient;
 };
 
 }  // namespace mongo

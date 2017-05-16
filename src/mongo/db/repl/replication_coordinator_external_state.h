@@ -58,11 +58,7 @@ namespace repl {
 class LastVote;
 class ReplSettings;
 class ReplicationCoordinator;
-class ReplicationExecutor;
 
-using OnInitialSyncFinishedFn = stdx::function<void(OperationContext* txn)>;
-using StartInitialSyncFn = stdx::function<void(OnInitialSyncFinishedFn callback)>;
-using StartSteadyReplicationFn = stdx::function<void()>;
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
  * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
@@ -84,43 +80,33 @@ public:
     virtual void startThreads(const ReplSettings& settings) = 0;
 
     /**
-     * Starts an initial sync, and calls "finished" when done,
-     * for replica set member -- legacy impl not in DataReplicator.
-     *
-     * NOTE: Use either this (and below function) or the Master/Slave version, but not both.
-     */
-    virtual void startInitialSync(OnInitialSyncFinishedFn finished) = 0;
-
-    /**
      * Returns true if an incomplete initial sync is detected.
      */
-    virtual bool isInitialSyncFlagSet(OperationContext* txn) = 0;
+    virtual bool isInitialSyncFlagSet(OperationContext* opCtx) = 0;
 
     /**
-     * Starts steady state sync for replica set member -- legacy impl not in DataReplicator.
+     * Starts steady state sync for replica set member.
      *
      * NOTE: Use either this or the Master/Slave version, but not both.
      */
-    virtual void startSteadyStateReplication(OperationContext* txn,
+    virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) = 0;
-
-    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) = 0;
 
     /**
      * Stops the data replication threads = bgsync, applier, reporter.
      */
-    virtual void stopDataReplication(OperationContext* txn) = 0;
+    virtual void stopDataReplication(OperationContext* opCtx) = 0;
 
     /**
      * Starts the Master/Slave threads and sets up logOp
      */
-    virtual void startMasterSlave(OperationContext* txn) = 0;
+    virtual void startMasterSlave(OperationContext* opCtx) = 0;
 
     /**
      * Performs any necessary external state specific shutdown tasks, such as cleaning up
      * the threads it started.
      */
-    virtual void shutdown(OperationContext* txn) = 0;
+    virtual void shutdown(OperationContext* opCtx) = 0;
 
     /**
      * Returns task executor for scheduling tasks to be run asynchronously.
@@ -136,12 +122,12 @@ public:
      * Runs the repair database command on the "local" db, if the storage engine is MMapV1.
      * Note: Used after initial sync to compact the database files.
      */
-    virtual Status runRepairOnLocalDB(OperationContext* txn) = 0;
+    virtual Status runRepairOnLocalDB(OperationContext* opCtx) = 0;
 
     /**
      * Creates the oplog, writes the first entry and stores the replica set config document.
      */
-    virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config) = 0;
+    virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config) = 0;
 
     /**
      * Called when a node on way to becoming a primary is ready to leave drain mode. It is called
@@ -149,7 +135,7 @@ public:
      *
      * Throws on errors.
      */
-    virtual void onDrainComplete(OperationContext* txn) = 0;
+    virtual void onDrainComplete(OperationContext* opCtx) = 0;
 
     /**
      * Called as part of the process of transitioning to primary and run with the global X lock and
@@ -163,7 +149,7 @@ public:
      *
      * Throws on errors.
      */
-    virtual OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) = 0;
+    virtual OpTime onTransitionToPrimary(OperationContext* opCtx, bool isV1ElectionProtocol) = 0;
 
     /**
      * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
@@ -188,22 +174,23 @@ public:
     /**
      * Gets the replica set config document from local storage, or returns an error.
      */
-    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn) = 0;
+    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) = 0;
 
     /**
      * Stores the replica set config document in local storage, or returns an error.
      */
-    virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config) = 0;
+    virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
 
     /**
      * Gets the replica set lastVote document from local storage, or returns an error.
      */
-    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn) = 0;
+    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx) = 0;
 
     /**
      * Stores the replica set lastVote document in local storage, or returns an error.
      */
-    virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote) = 0;
+    virtual Status storeLocalLastVoteDocument(OperationContext* opCtx,
+                                              const LastVote& lastVote) = 0;
 
     /**
      * Sets the global opTime to be 'newTime'.
@@ -214,20 +201,20 @@ public:
      * Gets the last optime of an operation performed on this host, from stable
      * storage.
      */
-    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn) = 0;
+    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx) = 0;
 
     /**
      * Cleaning up the oplog, by potentially truncating:
      * If we are recovering from a failed batch then minvalid.start though minvalid.end need
      * to be removed from the oplog before we can start applying operations.
      */
-    virtual void cleanUpLastApplyBatch(OperationContext* txn) = 0;
+    virtual void cleanUpLastApplyBatch(OperationContext* opCtx) = 0;
 
     /**
      * Returns the HostAndPort of the remote client connected to us that initiated the operation
-     * represented by "txn".
+     * represented by "opCtx".
      */
-    virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
+    virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx) = 0;
 
     /**
      * Closes all connections in the given TransportLayer except those marked with the
@@ -240,7 +227,7 @@ public:
      * Kills all operations that have a Client that is associated with an incoming user
      * connection.  Used during stepdown.
      */
-    virtual void killAllUserOperations(OperationContext* txn) = 0;
+    virtual void killAllUserOperations(OperationContext* opCtx) = 0;
 
     /**
      * Resets any active sharding metadata on this server and stops any sharding-related threads
@@ -279,7 +266,7 @@ public:
     /**
      * Creates a new snapshot.
      */
-    virtual void createSnapshot(OperationContext* txn, SnapshotName name) = 0;
+    virtual void createSnapshot(OperationContext* opCtx, SnapshotName name) = 0;
 
     /**
      * Signals the SnapshotThread, if running, to take a forced snapshot even if the global
@@ -305,13 +292,13 @@ public:
     /**
      * Returns true if the current storage engine supports read committed.
      */
-    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const = 0;
+    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const = 0;
 
     /**
      * Applies the operations described in the oplog entries contained in "ops" using the
      * "applyOperation" function.
      */
-    virtual StatusWith<OpTime> multiApply(OperationContext* txn,
+    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
 
@@ -333,18 +320,13 @@ public:
      * This function creates an oplog buffer of the type specified at server startup.
      */
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* txn) const = 0;
+        OperationContext* opCtx) const = 0;
 
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* txn) const = 0;
-
-    /**
-     * Returns true if the user specified to use the data replicator for initial sync.
-     */
-    virtual bool shouldUseDataReplicatorInitialSync() const = 0;
+        OperationContext* opCtx) const = 0;
 
     /**
      * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog

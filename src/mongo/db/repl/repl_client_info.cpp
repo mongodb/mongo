@@ -48,9 +48,10 @@ void ReplClientInfo::setLastOp(const OpTime& ot) {
     _lastOp = ot;
 }
 
-void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* txn) {
-    ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(txn->getServiceContext());
-    if (replCoord->isReplEnabled() && txn->writesAreReplicated()) {
+void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
+    ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
         setLastOp(replCoord->getMyLastAppliedOpTime());
     }
 }

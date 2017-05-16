@@ -711,13 +711,6 @@ public:
     }
 
     /**
-       get a list of all the current databases
-       uses the { listDatabases : 1 } command.
-       throws on error
-     */
-    std::list<std::string> getDatabaseNames();
-
-    /**
      * { name : "<short collection name>",
      *   options : { }
      * }
@@ -794,6 +787,11 @@ public:
                                   const BSONObj& cmdArgs,
                                   BSONObj& info,
                                   int options = 0);
+
+    /**
+     * Reconnect if needed and allowed.
+     */
+    virtual void checkConnection() {}
 
 protected:
     /** if the result of a command is ok*/
@@ -1145,6 +1143,12 @@ public:
         return _compressorManager;
     }
 
+    // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
+    void checkConnection() override {
+        if (_failed)
+            _checkConnection();
+    }
+
 protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
@@ -1162,12 +1166,6 @@ protected:
     std::string _applicationName;
 
     void _checkConnection();
-
-    // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
-    void checkConnection() {
-        if (_failed)
-            _checkConnection();
-    }
 
     std::map<std::string, BSONObj> authCache;
     double _so_timeout;

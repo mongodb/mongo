@@ -23,25 +23,6 @@ class JSAutoByteString;
 
 namespace js {
 
-JS_STATIC_ASSERT(sizeof(HashNumber) == 4);
-
-static MOZ_ALWAYS_INLINE js::HashNumber
-HashId(jsid id)
-{
-    return mozilla::HashGeneric(JSID_BITS(id));
-}
-
-struct JsidHasher
-{
-    typedef jsid Lookup;
-    static HashNumber hash(const Lookup& l) {
-        return HashNumber(JSID_BITS(l));
-    }
-    static bool match(const jsid& id, const Lookup& l) {
-        return id == l;
-    }
-};
-
 /*
  * Return a printable, lossless char[] representation of a string-type atom.
  * The lifetime of the result matches the lifetime of bytes.

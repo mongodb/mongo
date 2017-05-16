@@ -73,10 +73,9 @@ public:
 
     void redactForLogging(mutablebson::Document* cmdObj) override;
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& ignored,
                      BSONObjBuilder& result);
 
@@ -101,10 +100,9 @@ public:
                                        const BSONObj&,
                                        std::vector<Privilege>*) {}
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& db,
                      BSONObj& cmdObj,
-                     int options,
                      std::string& ignored,
                      BSONObjBuilder& result);
 
@@ -270,10 +268,9 @@ void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) {
     }
 }
 
-bool CmdSaslStart::run(OperationContext* txn,
+bool CmdSaslStart::run(OperationContext* opCtx,
                        const std::string& db,
                        BSONObj& cmdObj,
-                       int options,
                        std::string& ignored,
                        BSONObjBuilder& result) {
     Client* client = Client::getCurrent();
@@ -289,7 +286,7 @@ bool CmdSaslStart::run(OperationContext* txn,
 
     std::unique_ptr<AuthenticationSession> sessionGuard(session);
 
-    session->setOpCtxt(txn);
+    session->setOpCtxt(opCtx);
 
     Status status = doSaslStart(client, session, db, cmdObj, &result);
     appendCommandStatus(result, status);
@@ -312,10 +309,9 @@ void CmdSaslContinue::help(std::stringstream& os) const {
     os << "Subsequent steps in a SASL authentication conversation.";
 }
 
-bool CmdSaslContinue::run(OperationContext* txn,
+bool CmdSaslContinue::run(OperationContext* opCtx,
                           const std::string& db,
                           BSONObj& cmdObj,
-                          int options,
                           std::string& ignored,
                           BSONObjBuilder& result) {
     Client* client = Client::getCurrent();
@@ -339,7 +335,7 @@ bool CmdSaslContinue::run(OperationContext* txn,
                    "Attempt to switch database target during SASL authentication."));
     }
 
-    session->setOpCtxt(txn);
+    session->setOpCtxt(opCtx);
 
     Status status = doSaslContinue(client, session, cmdObj, &result);
     appendCommandStatus(result, status);

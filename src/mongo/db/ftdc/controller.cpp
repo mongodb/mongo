@@ -40,6 +40,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -177,6 +178,7 @@ void FTDCController::doLoop() {
             // Wait for the next run or signal to shutdown
             {
                 stdx::unique_lock<stdx::mutex> lock(_mutex);
+                MONGO_IDLE_THREAD_BLOCK;
 
                 // We ignore spurious wakeups by just doing an iteration of the loop
                 auto status = _condvar.wait_until(lock, next_time.toSystemTimePoint());

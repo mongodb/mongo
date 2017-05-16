@@ -96,10 +96,9 @@ public:
         help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         string fromhost = cmdObj.getStringField("fromhost");
@@ -112,7 +111,7 @@ public:
 
         const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromhost)));
 
-        auto& authConn = CopyDbAuthConnection::forClient(txn->getClient());
+        auto& authConn = CopyDbAuthConnection::forClient(opCtx->getClient());
         authConn.reset(cs.connect(StringData(), errmsg));
         if (!authConn) {
             return false;
@@ -170,10 +169,9 @@ public:
                 "from secure server\n";
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const auto fromdbElt = cmdObj["fromdb"];
@@ -209,7 +207,7 @@ public:
             return false;
         }
 
-        auto& authConn = CopyDbAuthConnection::forClient(txn->getClient());
+        auto& authConn = CopyDbAuthConnection::forClient(opCtx->getClient());
         authConn.reset(cs.connect(StringData(), errmsg));
         if (!authConn.get()) {
             return false;

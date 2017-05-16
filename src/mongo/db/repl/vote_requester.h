@@ -34,9 +34,9 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 
@@ -45,8 +45,6 @@ namespace mongo {
 class Status;
 
 namespace repl {
-
-class ScatterGatherRunner;
 
 class VoteRequester {
     MONGO_DISALLOW_COPYING(VoteRequester);
@@ -60,7 +58,7 @@ public:
 
     class Algorithm : public ScatterGatherAlgorithm {
     public:
-        Algorithm(const ReplicaSetConfig& rsConfig,
+        Algorithm(const ReplSetConfig& rsConfig,
                   long long candidateIndex,
                   long long term,
                   bool dryRun,
@@ -68,7 +66,7 @@ public:
         virtual ~Algorithm();
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
-                                     const ResponseStatus& response);
+                                     const executor::RemoteCommandResponse& response);
         virtual bool hasReceivedSufficientResponses() const;
 
         /**
@@ -84,7 +82,7 @@ public:
         unordered_set<HostAndPort> getResponders() const;
 
     private:
-        const ReplicaSetConfig _rsConfig;
+        const ReplSetConfig _rsConfig;
         const long long _candidateIndex;
         const long long _term;
         bool _dryRun = false;  // this bool indicates this is a mock election when true
@@ -106,12 +104,12 @@ public:
      * evh can be used to schedule a callback when the process is complete.
      * If this function returns Status::OK(), evh is then guaranteed to be signaled.
      **/
-    StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
-                                                       const ReplicaSetConfig& rsConfig,
-                                                       long long candidateIndex,
-                                                       long long term,
-                                                       bool dryRun,
-                                                       OpTime lastDurableOpTime);
+    StatusWith<executor::TaskExecutor::EventHandle> start(executor::TaskExecutor* executor,
+                                                          const ReplSetConfig& rsConfig,
+                                                          long long candidateIndex,
+                                                          long long term,
+                                                          bool dryRun,
+                                                          OpTime lastDurableOpTime);
 
     /**
      * Informs the VoteRequester to cancel further processing.

@@ -50,6 +50,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
 namespace mongo {
@@ -70,46 +71,33 @@ static ServerStatusMetricField<Counter64> dCursorStatsOpenNoTimeout("cursor.open
 static ServerStatusMetricField<Counter64> dCursorStatusTimedout("cursor.timedOut",
                                                                 &cursorStatsTimedOut);
 
-MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis, int, 10 * 60 * 1000 /* 10 minutes */);
 MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, int, 4);
 
 long long ClientCursor::totalOpen() {
     return cursorStatsOpen.get();
 }
 
-ClientCursor::ClientCursor(const ClientCursorParams& params,
+ClientCursor::ClientCursor(ClientCursorParams&& params,
                            CursorManager* cursorManager,
-                           CursorId cursorId)
+                           CursorId cursorId,
+                           Date_t now)
     : _cursorid(cursorId),
-      _ns(params.ns),
+      _nss(std::move(params.nss)),
+      _authenticatedUsers(std::move(params.authenticatedUsers)),
       _isReadCommitted(params.isReadCommitted),
       _cursorManager(cursorManager),
-      _query(params.query),
-      _queryOptions(params.qopts),
-      _isAggCursor(params.isAggCursor) {
-    _exec.reset(params.exec);
-    init();
-}
-
-ClientCursor::ClientCursor(const Collection* collection,
-                           CursorManager* cursorManager,
-                           CursorId cursorId)
-    : _cursorid(cursorId),
-      _ns(collection->ns().ns()),
-      _cursorManager(cursorManager),
-      _queryOptions(QueryOption_NoCursorTimeout) {
-    init();
-}
-
-void ClientCursor::init() {
+      _originatingCommand(params.originatingCommandObj),
+      _queryOptions(params.queryOptions),
+      _exec(std::move(params.exec)),
+      _lastUseDate(now) {
     invariant(_cursorManager);
+    invariant(_exec);
 
     cursorStatsOpen.increment();
 
-    if (_queryOptions & QueryOption_NoCursorTimeout) {
+    if (isNoTimeout()) {
         // cursors normally timeout after an inactivity period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
-        _isNoTimeout = true;
         cursorStatsOpenNoTimeout.increment();
     }
 }
@@ -117,44 +105,34 @@ void ClientCursor::init() {
 ClientCursor::~ClientCursor() {
     // Cursors must be unpinned and deregistered from their cursor manager before being deleted.
     invariant(!_isPinned);
-    invariant(!_cursorManager);
+    invariant(_disposed);
 
     cursorStatsOpen.decrement();
-    if (_isNoTimeout) {
+    if (isNoTimeout()) {
         cursorStatsOpenNoTimeout.decrement();
     }
 }
 
-void ClientCursor::kill() {
-    if (_exec.get())
-        _exec->kill("cursor killed");
-
-    _cursorManager = nullptr;
+void ClientCursor::markAsKilled(const std::string& reason) {
+    _exec->markAsKilled(reason);
 }
 
-//
-// Timing and timeouts
-//
-
-bool ClientCursor::shouldTimeout(int millis) {
-    _idleAgeMillis += millis;
-    if (_isNoTimeout || _isPinned) {
-        return false;
+void ClientCursor::dispose(OperationContext* opCtx) {
+    if (_disposed) {
+        return;
     }
-    return _idleAgeMillis > cursorTimeoutMillis.load();
+
+    _exec->dispose(opCtx, _cursorManager);
+    _disposed = true;
 }
 
-void ClientCursor::resetIdleTime() {
-    _idleAgeMillis = 0;
-}
-
-void ClientCursor::updateSlaveLocation(OperationContext* txn) {
+void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
     if (_slaveReadTill.isNull())
         return;
 
-    verify(str::startsWith(_ns.c_str(), "local.oplog."));
+    verify(_nss.isOplog());
 
-    Client* c = txn->getClient();
+    Client* c = opCtx->getClient();
     verify(c);
     OID rid = repl::ReplClientInfo::forClient(c).getRemoteID();
     if (!rid.isSet())
@@ -167,10 +145,12 @@ void ClientCursor::updateSlaveLocation(OperationContext* txn) {
 // Pin methods
 //
 
-ClientCursorPin::ClientCursorPin(ClientCursor* cursor) : _cursor(cursor) {
+ClientCursorPin::ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor)
+    : _opCtx(opCtx), _cursor(cursor) {
     invariant(_cursor);
     invariant(_cursor->_isPinned);
     invariant(_cursor->_cursorManager);
+    invariant(!_cursor->_disposed);
 
     // We keep track of the number of cursors currently pinned. The cursor can become unpinned
     // either by being released back to the cursor manager or by being deleted. A cursor may be
@@ -179,15 +159,16 @@ ClientCursorPin::ClientCursorPin(ClientCursor* cursor) : _cursor(cursor) {
     cursorStatsOpenPinned.increment();
 }
 
-ClientCursorPin::ClientCursorPin(ClientCursorPin&& other) : _cursor(other._cursor) {
+ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
+    : _opCtx(other._opCtx), _cursor(other._cursor) {
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
     invariant(other._cursor);
     invariant(other._cursor->_isPinned);
 
     // Be sure to set the 'other' pin's cursor to null in order to transfer ownership to ourself.
-    _cursor = other._cursor;
     other._cursor = nullptr;
+    other._opCtx = nullptr;
 }
 
 ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
@@ -206,6 +187,10 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
     // Be sure to set the 'other' pin's cursor to null in order to transfer ownership to ourself.
     _cursor = other._cursor;
     other._cursor = nullptr;
+
+    _opCtx = other._opCtx;
+    other._opCtx = nullptr;
+
     return *this;
 }
 
@@ -217,18 +202,25 @@ void ClientCursorPin::release() {
     if (!_cursor)
         return;
 
+    // Note it's not safe to dereference _cursor->_cursorManager unless we know we haven't been
+    // killed. If we're not locked we assume we haven't been killed because we're working with the
+    // global cursor manager which never kills cursors.
+    const bool isLocked =
+        _opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS);
+    dassert(isLocked || _cursor->_cursorManager->isGlobalManager());
+
     invariant(_cursor->_isPinned);
 
-    if (!_cursor->_cursorManager) {
+    if (_cursor->getExecutor()->isMarkedAsKilled()) {
         // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
-        // kill it.
+        // call dispose() and delete it.
         deleteUnderlying();
     } else {
         // Unpin the cursor under the collection cursor manager lock.
-        _cursor->_cursorManager->unpin(_cursor);
+        _cursor->_cursorManager->unpin(_opCtx, _cursor);
+        cursorStatsOpenPinned.decrement();
     }
 
-    cursorStatsOpenPinned.decrement();
     _cursor = nullptr;
 }
 
@@ -236,16 +228,26 @@ void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
     invariant(_cursor->_isPinned);
     // Note the following subtleties of this method's implementation:
-    // - We must unpin the cursor before destruction, since it is an error to destroy a pinned
+    // - We must unpin the cursor before destruction, since it is an error to delete a pinned
     //   cursor.
     // - In addition, we must deregister the cursor before unpinning, since it is an
     //   error to unpin a registered cursor without holding the cursor manager lock (note that
     //   we can't simply unpin with the cursor manager lock here, since we need to guarantee
     //   exclusive ownership of the cursor when we are deleting it).
-    if (_cursor->_cursorManager) {
+
+    // Note it's not safe to dereference _cursor->_cursorManager unless we know we haven't been
+    // killed. If we're not locked we assume we haven't been killed because we're working with the
+    // global cursor manager which never kills cursors.
+    const bool isLocked =
+        _opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS);
+    dassert(isLocked || _cursor->_cursorManager->isGlobalManager());
+
+    if (!_cursor->getExecutor()->isMarkedAsKilled()) {
         _cursor->_cursorManager->deregisterCursor(_cursor);
-        _cursor->kill();
     }
+
+    // Make sure the cursor is disposed and unpinned before being destroyed.
+    _cursor->dispose(_opCtx);
     _cursor->_isPinned = false;
     delete _cursor;
 
@@ -262,7 +264,7 @@ ClientCursor* ClientCursorPin::getCursor() const {
 //
 
 /**
- * Thread for timing out old cursors
+ * Thread for timing out inactive cursors.
  */
 class ClientCursorMonitor : public BackgroundJob {
 public:
@@ -272,14 +274,14 @@ public:
 
     void run() {
         Client::initThread("clientcursormon");
-        Timer t;
         while (!globalInShutdownDeprecated()) {
             {
-                const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-                OperationContext& txn = *txnPtr;
+                const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
+                auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
                 cursorStatsTimedOut.increment(
-                    CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
+                    CursorManager::timeoutCursorsGlobal(opCtx.get(), now));
             }
+            MONGO_IDLE_THREAD_BLOCK;
             sleepsecs(clientCursorMonitorFrequencySecs.load());
         }
     }

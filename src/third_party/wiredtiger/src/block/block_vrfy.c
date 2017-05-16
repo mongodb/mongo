@@ -22,7 +22,7 @@ static int __verify_set_file_size(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 	((off) / (block)->allocsize - 1)
 #ifdef HAVE_VERBOSE
 #define	WT_FRAG_TO_OFF(block, frag)					\
-	(((wt_off_t)(frag + 1)) * (block)->allocsize)
+	(((wt_off_t)((frag) + 1)) * (block)->allocsize)
 #endif
 
 /*

@@ -1,3 +1,6 @@
+// Cannot implicitly shard accessed collections because of collection existing when none expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // Test that the $group stage and all accumulators respect the collation.
 (function() {
     "use strict";

@@ -43,7 +43,6 @@
 
 namespace mongo {
 namespace repl {
-using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 class ReplicationCoordinatorImpl::LoseElectionGuardV1 {
     MONGO_DISALLOW_COPYING(LoseElectionGuardV1);
@@ -58,10 +57,10 @@ public:
         _replCoord->_topCoord->processLoseElection();
         _replCoord->_voteRequester.reset(nullptr);
         if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {
-            _replCoord->_replExecutor.signalEvent(_replCoord->_electionDryRunFinishedEvent);
+            _replCoord->_replExecutor->signalEvent(_replCoord->_electionDryRunFinishedEvent);
         }
         if (_replCoord->_electionFinishedEvent.isValid()) {
-            _replCoord->_replExecutor.signalEvent(_replCoord->_electionFinishedEvent);
+            _replCoord->_replExecutor->signalEvent(_replCoord->_electionFinishedEvent);
         }
     }
 
@@ -87,10 +86,14 @@ public:
 
 
 void ReplicationCoordinatorImpl::_startElectSelfV1() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _startElectSelfV1_inlock();
+}
+
+void ReplicationCoordinatorImpl::_startElectSelfV1_inlock() {
     invariant(!_voteRequester);
     invariant(!_freshnessChecker);
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
     switch (_rsConfigState) {
         case kConfigSteady:
             break;
@@ -134,14 +137,9 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
     log() << "conducting a dry run election to see if we could be elected";
     _voteRequester.reset(new VoteRequester);
 
-    // This is necessary because the voteRequester may call directly into winning an
-    // election, if there are no other MaybeUp nodes.  Winning an election attempts to lock
-    // _mutex again.
-    lk.unlock();
-
     long long term = _topCoord->getTerm();
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh =
-        _voteRequester->start(&_replExecutor,
+    StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh =
+        _voteRequester->start(_replExecutor.get(),
                               _rsConfig,
                               _selfIndex,
                               _topCoord->getTerm(),
@@ -151,16 +149,16 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
         return;
     }
     fassert(28685, nextPhaseEvh.getStatus());
-    _replExecutor.onEvent(nextPhaseEvh.getValue(),
-                          stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
+    _replExecutor->onEvent(nextPhaseEvh.getValue(),
+                           stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
     lossGuard.dismiss();
 }
 
 void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
-    invariant(_voteRequester);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     LoseElectionDryRunGuardV1 lossGuard(this);
 
-    LockGuard lk(_topoMutex);
+    invariant(_voteRequester);
 
     if (_topCoord->getTerm() != originalTerm) {
         log() << "not running for primary, we have been superceded already";
@@ -183,7 +181,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     log() << "dry election run succeeded, running for election";
     // Stepdown is impossible from this term update.
     TopologyCoordinator::UpdateTermResult updateTermResult;
-    _updateTerm_incallback(originalTerm + 1, &updateTermResult);
+    _updateTerm_inlock(originalTerm + 1, &updateTermResult);
     invariant(updateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
@@ -191,8 +189,8 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     // Store the vote in persistent storage.
     LastVote lastVote{originalTerm + 1, _selfIndex};
 
-    auto cbStatus = _replExecutor.scheduleDBWork(
-        [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
+    auto cbStatus = _replExecutor->scheduleDBWork(
+        [this, lastVote](const executor::TaskExecutor::CallbackArgs& cbData) {
             _writeLastVoteForMyElection(lastVote, cbData);
         });
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -203,54 +201,57 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
 }
 
 void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
-    LastVote lastVote, const ReplicationExecutor::CallbackArgs& cbData) {
+    LastVote lastVote, const executor::TaskExecutor::CallbackArgs& cbData) {
+    // storeLocalLastVoteDocument can call back in to the replication coordinator,
+    // so _mutex must be unlocked here.  However, we cannot return until we
+    // lock it because we want to lose the election on cancel or error and
+    // doing so requires _mutex.
+    Status status = Status::OK();
+    if (cbData.status.isOK()) {
+        invariant(cbData.opCtx);
+        status = _externalState->storeLocalLastVoteDocument(cbData.opCtx, lastVote);
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_voteRequester);
     LoseElectionDryRunGuardV1 lossGuard(this);
-
-    if (cbData.status == ErrorCodes::CallbackCanceled) {
+    if (!cbData.status.isOK()) {
         return;
     }
-    invariant(cbData.txn);
 
-    Status status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
     if (!status.isOK()) {
         error() << "failed to store LastVote document when voting for myself: " << status;
         return;
     }
 
-    _startVoteRequester(lastVote.getTerm());
-    _replExecutor.signalEvent(_electionDryRunFinishedEvent);
+    _startVoteRequester_inlock(lastVote.getTerm());
+    _replExecutor->signalEvent(_electionDryRunFinishedEvent);
 
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
+void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
     invariant(_voteRequester);
-    LoseElectionGuardV1 lossGuard(this);
 
-    LockGuard lk(_topoMutex);
-
-    const auto lastOpTime = getMyLastAppliedOpTime();
+    const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
 
     _voteRequester.reset(new VoteRequester);
-    StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
-        &_replExecutor, _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime);
+    StatusWith<executor::TaskExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
+        _replExecutor.get(), _rsConfig, _selfIndex, _topCoord->getTerm(), false, lastOpTime);
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
     fassert(28643, nextPhaseEvh.getStatus());
-    _replExecutor.onEvent(
+    _replExecutor->onEvent(
         nextPhaseEvh.getValue(),
         stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm));
-
-    lossGuard.dismiss();
 }
 
 void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) {
-    invariant(_voteRequester);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     LoseElectionGuardV1 lossGuard(this);
 
-    LockGuard lk(_topoMutex);
+    invariant(_voteRequester);
 
     if (_topCoord->getTerm() != originalTerm) {
         log() << "not becoming primary, we have been superceded already";
@@ -271,27 +272,28 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
             break;
     }
 
-    {
-        // Mark all nodes that responded to our vote request as up to avoid immediately
-        // relinquishing primary.
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        Date_t now = _replExecutor.now();
-        const unordered_set<HostAndPort> liveNodes = _voteRequester->getResponders();
-        for (auto& nodeInfo : _slaveInfo) {
-            if (liveNodes.count(nodeInfo.hostAndPort)) {
-                nodeInfo.down = false;
-                nodeInfo.lastUpdate = now;
-            }
+    // Mark all nodes that responded to our vote request as up to avoid immediately
+    // relinquishing primary.
+    Date_t now = _replExecutor->now();
+    const unordered_set<HostAndPort> liveNodes = _voteRequester->getResponders();
+    for (auto& nodeInfo : _slaveInfo) {
+        if (liveNodes.count(nodeInfo.hostAndPort)) {
+            nodeInfo.down = false;
+            nodeInfo.lastUpdate = now;
         }
     }
 
     // Prevent last committed optime from updating until we finish draining.
-    _setFirstOpTimeOfMyTerm(
+    _setFirstOpTimeOfMyTerm_inlock(
         OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max()));
+
+    _voteRequester.reset();
+    auto electionFinishedEvent = _electionFinishedEvent;
+
+    lk.unlock();
     _performPostMemberStateUpdateAction(kActionWinElection);
 
-    _voteRequester.reset(nullptr);
-    _replExecutor.signalEvent(_electionFinishedEvent);
+    _replExecutor->signalEvent(electionFinishedEvent);
     lossGuard.dismiss();
 }
 

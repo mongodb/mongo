@@ -36,9 +36,12 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
@@ -110,13 +113,12 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) override {
-        auto shardingState = ShardingState::get(txn);
+        auto shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         const MoveChunkRequest moveChunkRequest = uassertStatusOK(
@@ -124,7 +126,7 @@ public:
 
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.
-        grid.shardRegistry()->reload(txn);
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
         auto scopedRegisterMigration =
             uassertStatusOK(shardingState->registerDonateChunk(moveChunkRequest));
@@ -134,7 +136,7 @@ public:
         // Check if there is an existing migration running and if so, join it
         if (scopedRegisterMigration.mustExecute()) {
             try {
-                _runImpl(txn, moveChunkRequest);
+                _runImpl(opCtx, moveChunkRequest);
                 status = Status::OK();
             } catch (const DBException& e) {
                 status = e.toStatus();
@@ -148,7 +150,7 @@ public:
 
             scopedRegisterMigration.complete(status);
         } else {
-            status = scopedRegisterMigration.waitForCompletion(txn);
+            status = scopedRegisterMigration.waitForCompletion(opCtx);
         }
 
         if (status == ErrorCodes::ChunkTooBig) {
@@ -165,27 +167,27 @@ public:
     }
 
 private:
-    static void _runImpl(OperationContext* txn, const MoveChunkRequest& moveChunkRequest) {
+    static void _runImpl(OperationContext* opCtx, const MoveChunkRequest& moveChunkRequest) {
         const auto writeConcernForRangeDeleter =
             uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
-                txn, moveChunkRequest.getSecondaryThrottle()));
+                opCtx, moveChunkRequest.getSecondaryThrottle()));
 
         // Resolve the donor and recipient shards and their connection string
-        auto const shardRegistry = Grid::get(txn)->shardRegistry();
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         const auto donorConnStr =
-            uassertStatusOK(shardRegistry->getShard(txn, moveChunkRequest.getFromShardId()))
+            uassertStatusOK(shardRegistry->getShard(opCtx, moveChunkRequest.getFromShardId()))
                 ->getConnString();
         const auto recipientHost = uassertStatusOK([&] {
             auto recipientShard =
-                uassertStatusOK(shardRegistry->getShard(txn, moveChunkRequest.getToShardId()));
+                uassertStatusOK(shardRegistry->getShard(opCtx, moveChunkRequest.getToShardId()));
 
             return recipientShard->getTargeter()->findHostNoWait(
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         }());
 
         string unusedErrMsg;
-        MoveTimingHelper moveTimingHelper(txn,
+        MoveTimingHelper moveTimingHelper(opCtx,
                                           "from",
                                           moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
@@ -202,64 +204,42 @@ private:
 
         {
             MigrationSourceManager migrationSourceManager(
-                txn, moveChunkRequest, donorConnStr, recipientHost);
+                opCtx, moveChunkRequest, donorConnStr, recipientHost);
 
             shardKeyPattern = migrationSourceManager.getKeyPattern().getOwned();
 
             moveTimingHelper.done(2);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
 
-            uassertStatusOKWithWarning(migrationSourceManager.startClone(txn));
+            uassertStatusOKWithWarning(migrationSourceManager.startClone(opCtx));
             moveTimingHelper.done(3);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
 
-            uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(txn));
+            uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(opCtx));
             moveTimingHelper.done(4);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
 
-            uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(txn));
-            uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(txn));
+            uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(opCtx));
+            uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(opCtx));
             moveTimingHelper.done(5);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
 
-            uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(txn));
-            moveTimingHelper.done(6);
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
+            uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
         }
+        moveTimingHelper.done(6);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
 
-        // Schedule the range deleter
-        RangeDeleterOptions deleterOptions(KeyRange(moveChunkRequest.getNss().ns(),
-                                                    moveChunkRequest.getMinKey().getOwned(),
-                                                    moveChunkRequest.getMaxKey().getOwned(),
-                                                    shardKeyPattern));
-        deleterOptions.writeConcern = writeConcernForRangeDeleter;
-        deleterOptions.waitForOpenCursors = true;
-        deleterOptions.fromMigrate = true;
-        deleterOptions.onlyRemoveOrphanedDocs = true;
-        deleterOptions.removeSaverReason = "post-cleanup";
-
+        auto range = ChunkRange(moveChunkRequest.getMinKey(), moveChunkRequest.getMaxKey());
         if (moveChunkRequest.getWaitForDelete()) {
-            log() << "doing delete inline for cleanup of chunk data";
-
-            string errMsg;
-
-            // This is an immediate delete, and as a consequence, there could be more
-            // deletes happening simultaneously than there are deleter worker threads.
-            if (!getDeleter()->deleteNow(txn, deleterOptions, &errMsg)) {
-                log() << "Error occured while performing cleanup: " << redact(errMsg);
-            }
+            CollectionShardingState::waitForClean(
+                opCtx, moveChunkRequest.getNss(), moveChunkRequest.getVersionEpoch(), range);
+            // Ensure that wait for write concern for the chunk cleanup will include
+            // the deletes performed by the range deleter thread.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         } else {
-            log() << "forking for cleanup of chunk data";
-
-            string errMsg;
-            if (!getDeleter()->queueDelete(txn,
-                                           deleterOptions,
-                                           NULL,  // Don't want to be notified
-                                           &errMsg)) {
-                log() << "could not queue migration cleanup: " << redact(errMsg);
-            }
+            log() << "Leaving cleanup of " << moveChunkRequest.getNss().ns() << " range "
+                  << redact(range.toString()) << " to complete in background";
         }
-
         moveTimingHelper.done(7);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep7);
     }

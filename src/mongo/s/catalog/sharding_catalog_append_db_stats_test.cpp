@@ -34,7 +34,6 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/sharding_catalog_test_fixture.h"
@@ -53,7 +52,7 @@ using ShardingCatalogClientAppendDbStatsTest = ShardingCatalogTestFixture;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};

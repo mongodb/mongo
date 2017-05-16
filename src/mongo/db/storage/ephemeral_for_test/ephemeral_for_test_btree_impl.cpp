@@ -142,11 +142,11 @@ public:
         _currentKeySize = 0;
     }
 
-    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
+    virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) {
         return new EphemeralForTestBtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
     }
 
-    virtual Status insert(OperationContext* txn,
+    virtual Status insert(OperationContext* opCtx,
                           const BSONObj& key,
                           const RecordId& loc,
                           bool dupsAllowed) {
@@ -167,12 +167,12 @@ public:
         IndexKeyEntry entry(key.getOwned(), loc);
         if (_data->insert(entry).second) {
             _currentKeySize += key.objsize();
-            txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
+            opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
         }
         return Status::OK();
     }
 
-    virtual void unindex(OperationContext* txn,
+    virtual void unindex(OperationContext* opCtx,
                          const BSONObj& key,
                          const RecordId& loc,
                          bool dupsAllowed) {
@@ -184,47 +184,51 @@ public:
         invariant(numDeleted <= 1);
         if (numDeleted == 1) {
             _currentKeySize -= key.objsize();
-            txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
+            opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
         }
     }
 
-    virtual void fullValidate(OperationContext* txn,
+    virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
                               ValidateResults* fullResults) const {
         // TODO check invariants?
         *numKeysOut = _data->size();
     }
 
-    virtual bool appendCustomStats(OperationContext* txn,
+    virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const {
         return false;
     }
 
-    virtual long long getSpaceUsedBytes(OperationContext* txn) const {
+    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const {
         return _currentKeySize + (sizeof(IndexKeyEntry) * _data->size());
     }
 
-    virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+    virtual Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& loc) {
         invariant(!hasFieldNames(key));
         if (isDup(*_data, key, loc))
             return dupKeyError(key);
         return Status::OK();
     }
 
-    virtual bool isEmpty(OperationContext* txn) {
+    virtual bool isEmpty(OperationContext* opCtx) {
         return _data->empty();
     }
 
-    virtual Status touch(OperationContext* txn) const {
+    virtual Status touch(OperationContext* opCtx) const {
         // already in memory...
         return Status::OK();
     }
 
     class Cursor final : public SortedDataInterface::Cursor {
     public:
-        Cursor(OperationContext* txn, const IndexSet& data, bool isForward, bool isUnique)
-            : _txn(txn), _data(data), _forward(isForward), _isUnique(isUnique), _it(data.end()) {}
+        Cursor(OperationContext* opCtx, const IndexSet& data, bool isForward, bool isUnique)
+            : _opCtx(opCtx),
+              _data(data),
+              _forward(isForward),
+              _isUnique(isUnique),
+              _it(data.end()) {}
 
         boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
             if (_lastMoveWasRestore) {
@@ -291,7 +295,7 @@ public:
 
         void save() override {
             // Keep original position if we haven't moved since the last restore.
-            _txn = nullptr;
+            _opCtx = nullptr;
             if (_lastMoveWasRestore)
                 return;
 
@@ -340,11 +344,11 @@ public:
         }
 
         void detachFromOperationContext() final {
-            _txn = nullptr;
+            _opCtx = nullptr;
         }
 
-        void reattachToOperationContext(OperationContext* txn) final {
-            _txn = txn;
+        void reattachToOperationContext(OperationContext* opCtx) final {
+            _opCtx = opCtx;
         }
 
     private:
@@ -440,7 +444,7 @@ public:
             _endState->it = it;
         }
 
-        OperationContext* _txn;  // not owned
+        OperationContext* _opCtx;  // not owned
         const IndexSet& _data;
         const bool _forward;
         const bool _isUnique;
@@ -466,12 +470,12 @@ public:
         RecordId _savedLoc;
     };
 
-    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* txn,
+    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                                    bool isForward) const {
-        return stdx::make_unique<Cursor>(txn, *_data, isForward, _isUnique);
+        return stdx::make_unique<Cursor>(opCtx, *_data, isForward, _isUnique);
     }
 
-    virtual Status initAsEmpty(OperationContext* txn) {
+    virtual Status initAsEmpty(OperationContext* opCtx) {
         // No-op
         return Status::OK();
     }

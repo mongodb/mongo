@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -83,7 +85,7 @@ public:
      *
      * Returns !OK with message if document could not be targeted for other reasons.
      */
-    virtual Status targetInsert(OperationContext* txn,
+    virtual Status targetInsert(OperationContext* opCtx,
                                 const BSONObj& doc,
                                 ShardEndpoint** endpoint) const = 0;
 
@@ -92,32 +94,34 @@ public:
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetUpdate(OperationContext* txn,
+    virtual Status targetUpdate(OperationContext* opCtx,
                                 const BatchedUpdateDocument& updateDoc,
-                                std::vector<ShardEndpoint*>* endpoints) const = 0;
+                                std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard delete.
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetDelete(OperationContext* txn,
+    virtual Status targetDelete(OperationContext* opCtx,
                                 const BatchedDeleteDocument& deleteDoc,
-                                std::vector<ShardEndpoint*>* endpoints) const = 0;
+                                std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for the entire collection.
      *
      * Returns !OK with message if the full collection could not be targeted.
      */
-    virtual Status targetCollection(std::vector<ShardEndpoint*>* endpoints) const = 0;
+    virtual Status targetCollection(
+        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for all shards.
      *
      * Returns !OK with message if all shards could not be targeted.
      */
-    virtual Status targetAllShards(std::vector<ShardEndpoint*>* endpoints) const = 0;
+    virtual Status targetAllShards(
+        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const = 0;
 
     /**
      * Informs the targeter that a targeting failure occurred during one of the last targeting
@@ -147,7 +151,7 @@ public:
      * NOTE: This function may block for shared resources or network calls.
      * Returns !OK with message if could not refresh
      */
-    virtual Status refreshIfNeeded(OperationContext* txn, bool* wasChanged) = 0;
+    virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
 };
 
 /**

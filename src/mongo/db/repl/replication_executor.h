@@ -105,8 +105,8 @@ public:
      */
     virtual ~ReplicationExecutor();
 
-    std::string getDiagnosticString() const override;
     BSONObj getDiagnosticBSON() const;
+    void appendDiagnosticBSON(BSONObjBuilder* b) const override;
     Date_t now() override;
     void startup() override;
     void shutdown() override;
@@ -226,11 +226,6 @@ private:
     typedef stdx::list<EventHandle> EventList;
 
     /**
-     * Returns diagnostic info
-     */
-    std::string _getDiagnosticString_inlock() const;
-
-    /**
      * Implementation of makeEvent() for use when _mutex is already held.
      */
     StatusWith<EventHandle> makeEvent_inlock();
@@ -280,7 +275,7 @@ private:
      * Executes the callback referenced by "cbHandle", and moves the underlying
      * WorkQueue::iterator from "workQueue" into the _freeQueue.
      *
-     * "txn" is a pointer to the OperationContext.
+     * "opCtx" is a pointer to the OperationContext.
      *
      * "status" is the callback status from the task runner. Only possible values are
      * Status::OK and ErrorCodes::CallbackCanceled (when task runner is canceled).
@@ -288,7 +283,7 @@ private:
      * If "terribleExLockSyncMutex" is not null, serializes execution of "cbHandle" with the
      * execution of other callbacks.
      */
-    void _doOperation(OperationContext* txn,
+    void _doOperation(OperationContext* opCtx,
                       const Status& taskRunnerStatus,
                       const CallbackHandle& cbHandle,
                       WorkQueue* workQueue,
@@ -369,8 +364,6 @@ private:
     WorkQueue::iterator _iter;
     EventHandle _finishedEvent;
 };
-
-typedef ReplicationExecutor::ResponseStatus ResponseStatus;
 
 /**
  * Description of a scheduled but not-yet-run work item.

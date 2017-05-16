@@ -58,7 +58,7 @@ bool isCursorAwaitData(const ClientCursor* cursor);
  * If false, the caller should close the cursor and indicate this to the client by sending back
  * a cursor ID of 0.
  */
-bool shouldSaveCursor(OperationContext* txn,
+bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec);
@@ -75,21 +75,21 @@ bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
                              bool isTailable);
 
 /**
- * Fills out the CurOp for "txn" with information about this query.
+ * Fills out the CurOp for "opCtx" with information about this query.
  */
-void beginQueryOp(OperationContext* txn,
+void beginQueryOp(OperationContext* opCtx,
                   const NamespaceString& nss,
                   const BSONObj& queryObj,
                   long long ntoreturn,
                   long long ntoskip);
 
 /**
- * 1) Fills out CurOp for "txn" with information regarding this query's execution.
+ * 1) Fills out CurOp for "opCtx" with information regarding this query's execution.
  * 2) Reports index usage to the CollectionInfoCache.
  *
  * Uses explain functionality to extract stats from 'exec'.
  */
-void endQueryOp(OperationContext* txn,
+void endQueryOp(OperationContext* opCtx,
                 Collection* collection,
                 const PlanExecutor& exec,
                 long long numResults,
@@ -103,7 +103,7 @@ void endQueryOp(OperationContext* txn,
  * The oplog start finding hack requires that 'cq' has a $gt or $gte predicate over
  * a field named 'ts'.
  */
-StatusWith<std::unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
+StatusWith<std::unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* opCtx,
                                                             Collection* collection,
                                                             std::unique_ptr<CanonicalQuery> cq);
 
@@ -111,7 +111,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* tx
  * Called from the getMore entry point in ops/query.cpp.
  * Returned buffer is the message to return to the client.
  */
-Message getMore(OperationContext* txn,
+Message getMore(OperationContext* opCtx,
                 const char* ns,
                 int ntoreturn,
                 long long cursorid,
@@ -121,7 +121,7 @@ Message getMore(OperationContext* txn,
 /**
  * Run the query 'q' and place the result in 'result'.
  */
-std::string runQuery(OperationContext* txn,
+std::string runQuery(OperationContext* opCtx,
                      QueryMessage& q,
                      const NamespaceString& ns,
                      Message& result);

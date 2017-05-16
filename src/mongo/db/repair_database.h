@@ -41,7 +41,7 @@ class StringData;
  * Some data may be lost or modified in the process but the output will
  * be structurally valid on successful return.
  */
-Status repairDatabase(OperationContext* txn,
+Status repairDatabase(OperationContext* opCtx,
                       StorageEngine* engine,
                       const std::string& dbName,
                       bool preserveClonedFilesOnFailure = false,

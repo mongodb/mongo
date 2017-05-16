@@ -44,7 +44,7 @@ namespace repl {
 
 /**
  * Interface for temporary container of oplog entries (in BSON format) from sync source by
- * OplogFetcher that will be read by applier in the DataReplicator.
+ * OplogFetcher that will be read by applier in the InitialSyncer.
  *
  * Implementations are only required to support one pusher and one popper.
  */
@@ -70,7 +70,7 @@ public:
      * create backing storage, etc). This method may be called at most once for the lifetime of an
      * oplog buffer.
      */
-    virtual void startup(OperationContext* txn) = 0;
+    virtual void startup(OperationContext* opCtx) = 0;
 
     /**
      * Signals to the oplog buffer that it should shut down. This method may block. After
@@ -79,7 +79,7 @@ public:
      * It is legal to call this method multiple times, but it should only be called after startup
      * has been called.
      */
-    virtual void shutdown(OperationContext* txn) = 0;
+    virtual void shutdown(OperationContext* opCtx) = 0;
 
     /**
      * Pushes operation into oplog buffer, ignoring any size constraints. Does not block.
@@ -87,26 +87,26 @@ public:
      * the limit returned by getMaxSize() but should not otherwise adversely affect normal
      * functionality such as pushing and popping operations from the oplog buffer.
      */
-    virtual void pushEvenIfFull(OperationContext* txn, const Value& value) = 0;
+    virtual void pushEvenIfFull(OperationContext* opCtx, const Value& value) = 0;
 
     /**
      * Pushes operation into oplog buffer.
      * If there are size constraints on the oplog buffer, this may block until sufficient space
      * is made available (by popping) to complete this operation.
      */
-    virtual void push(OperationContext* txn, const Value& value) = 0;
+    virtual void push(OperationContext* opCtx, const Value& value) = 0;
 
     /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
      */
-    virtual void pushAllNonBlocking(OperationContext* txn,
+    virtual void pushAllNonBlocking(OperationContext* opCtx,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end) = 0;
 
     /**
      * Returns when enough space is available.
      */
-    virtual void waitForSpace(OperationContext* txn, std::size_t size) = 0;
+    virtual void waitForSpace(OperationContext* opCtx, std::size_t size) = 0;
 
     /**
      * Returns true if oplog buffer is empty.
@@ -135,13 +135,13 @@ public:
     /**
      * Clears oplog buffer.
      */
-    virtual void clear(OperationContext* txn) = 0;
+    virtual void clear(OperationContext* opCtx) = 0;
 
     /**
      * Returns false if oplog buffer is empty. "value" is left unchanged.
      * Otherwise, removes last item (saves in "value") from the oplog buffer and returns true.
      */
-    virtual bool tryPop(OperationContext* txn, Value* value) = 0;
+    virtual bool tryPop(OperationContext* opCtx, Value* value) = 0;
 
     /**
      * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
@@ -154,12 +154,12 @@ public:
      * Returns false if oplog buffer is empty.
      * Otherwise, returns true and sets "value" to last item in oplog buffer.
      */
-    virtual bool peek(OperationContext* txn, Value* value) = 0;
+    virtual bool peek(OperationContext* opCtx, Value* value) = 0;
 
     /**
      * Returns the item most recently added to the oplog buffer or nothing if the buffer is empty.
      */
-    virtual boost::optional<Value> lastObjectPushed(OperationContext* txn) const = 0;
+    virtual boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const = 0;
 };
 
 }  // namespace repl

@@ -34,7 +34,6 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -130,7 +129,7 @@ public:
         coll.setEpoch(ChunkVersion::DROPPED().epoch());
         coll.setUpdatedAt(network()->now());
 
-        expectUpdateCollection(configHost(), coll);
+        expectUpdateCollection(configHost(), coll, false);
     }
 
     void expectSetShardVersionZero(const ShardType& shard) {

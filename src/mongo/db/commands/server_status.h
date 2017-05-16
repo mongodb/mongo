@@ -80,7 +80,8 @@ public:
      * @param configElement the element from the actual command related to this section
      *                      so if the section is 'foo', this is cmdObj['foo']
      */
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
         return BSONObj{};
     };
 
@@ -94,10 +95,10 @@ public:
      * If you are doing something a bit more complicated, you can implement this and have
      * full control over what gets included in the command result.
      */
-    virtual void appendSection(OperationContext* txn,
+    virtual void appendSection(OperationContext* opCtx,
                                const BSONElement& configElement,
                                BSONObjBuilder* result) const {
-        const auto ret = generateSection(txn, configElement);
+        const auto ret = generateSection(opCtx, configElement);
         if (ret.isEmpty())
             return;
         result->append(getSectionName(), ret);
@@ -114,7 +115,8 @@ public:
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const;
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const;
 
 private:
     const OpCounters* _counters;

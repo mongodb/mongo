@@ -191,11 +191,11 @@ RecordStore* KVDatabaseCatalogEntryBase::getRecordStore(StringData ns) const {
     return it->second->getRecordStore();
 }
 
-Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* txn,
+Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
                                                     StringData ns,
                                                     const CollectionOptions& options,
                                                     bool allocateDefaultSpace) {
-    invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     if (ns.empty()) {
         return Status(ErrorCodes::BadValue, "Collection namespace cannot be empty");
@@ -207,28 +207,29 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* txn,
     }
 
     // need to create it
-    Status status = _engine->getCatalog()->newCollection(txn, ns, options);
+    Status status = _engine->getCatalog()->newCollection(opCtx, ns, options);
     if (!status.isOK())
         return status;
 
     string ident = _engine->getCatalog()->getCollectionIdent(ns);
 
-    status = _engine->getEngine()->createRecordStore(txn, ns, ident, options);
+    status = _engine->getEngine()->createRecordStore(opCtx, ns, ident, options);
     if (!status.isOK())
         return status;
 
     // Mark collation feature as in use if the collection has a non-simple default collation.
     if (!options.collation.isEmpty()) {
         const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
-        if (_engine->getCatalog()->getFeatureTracker()->isNonRepairableFeatureInUse(txn, feature)) {
-            _engine->getCatalog()->getFeatureTracker()->markNonRepairableFeatureAsInUse(txn,
+        if (_engine->getCatalog()->getFeatureTracker()->isNonRepairableFeatureInUse(opCtx,
+                                                                                    feature)) {
+            _engine->getCatalog()->getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx,
                                                                                         feature);
         }
     }
 
-    txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns, ident, true));
+    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns, ident, true));
 
-    auto rs = _engine->getEngine()->getRecordStore(txn, ns, ident, options);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, ns, ident, options);
     invariant(rs);
 
     _collections[ns.toString()] = new KVCollectionCatalogEntry(
@@ -272,11 +273,11 @@ void KVDatabaseCatalogEntryBase::reinitCollectionAfterRepair(OperationContext* o
     initCollection(opCtx, ns, false);
 }
 
-Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* txn,
+Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
                                                     StringData fromNS,
                                                     StringData toNS,
                                                     bool stayTemp) {
-    invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     RecordStore* originalRS = NULL;
 
@@ -294,11 +295,11 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* txn,
 
     const std::string identFrom = _engine->getCatalog()->getCollectionIdent(fromNS);
 
-    Status status = _engine->getEngine()->okToRename(txn, fromNS, toNS, identFrom, originalRS);
+    Status status = _engine->getEngine()->okToRename(opCtx, fromNS, toNS, identFrom, originalRS);
     if (!status.isOK())
         return status;
 
-    status = _engine->getCatalog()->renameCollection(txn, fromNS, toNS, stayTemp);
+    status = _engine->getCatalog()->renameCollection(opCtx, fromNS, toNS, stayTemp);
     if (!status.isOK())
         return status;
 
@@ -306,17 +307,18 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* txn,
 
     invariant(identFrom == identTo);
 
-    BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(txn, toNS);
+    BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, toNS);
 
     const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
     invariant(itFrom != _collections.end());
-    txn->recoveryUnit()->registerChange(
-        new RemoveCollectionChange(txn, this, fromNS, identFrom, itFrom->second, false));
+    opCtx->recoveryUnit()->registerChange(
+        new RemoveCollectionChange(opCtx, this, fromNS, identFrom, itFrom->second, false));
     _collections.erase(itFrom);
 
-    txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, toNS, identTo, false));
+    opCtx->recoveryUnit()->registerChange(
+        new AddCollectionChange(opCtx, this, toNS, identTo, false));
 
-    auto rs = _engine->getEngine()->getRecordStore(txn, toNS, identTo, md.options);
+    auto rs = _engine->getEngine()->getRecordStore(opCtx, toNS, identTo, md.options);
 
     _collections[toNS.toString()] = new KVCollectionCatalogEntry(
         _engine->getEngine(), _engine->getCatalog(), toNS, identTo, std::move(rs));

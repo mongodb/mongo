@@ -44,54 +44,57 @@ OplogEntry::OplogEntry(BSONObj rawInput) : raw(std::move(rawInput)) {
         raw = raw.copy();
     }
 
+    BSONElement version;
     for (auto elem : raw) {
         const auto name = elem.fieldNameStringData();
         if (name == "ns") {
-            ns = elem.valuestrsafe();
+            _ns = NamespaceString(elem.valuestrsafe());
         } else if (name == "op") {
-            opType = elem.valuestrsafe();
+            _opType = elem.valuestrsafe();
         } else if (name == "o2") {
-            o2 = elem;
+            _o2 = elem.Obj();
         } else if (name == "ts") {
-            ts = elem;
+            _ts = elem.timestamp();
         } else if (name == "v") {
             version = elem;
         } else if (name == "o") {
-            o = elem;
+            _o = elem.Obj();
         }
     }
+
+    _version = version.eoo() ? 1 : version.numberInt();
 }
 
 bool OplogEntry::isCommand() const {
-    return opType[0] == 'c';
+    return getOpType()[0] == 'c';
 }
 
 bool OplogEntry::isCrudOpType() const {
-    switch (opType[0]) {
+    switch (getOpType()[0]) {
         case 'd':
         case 'i':
         case 'u':
-            return opType[1] == 0;
+            return getOpType()[1] == 0;
     }
     return false;
 }
 
 bool OplogEntry::hasNamespace() const {
-    return !ns.empty();
+    return !getNamespace().isEmpty();
 }
 
 int OplogEntry::getVersion() const {
-    return version.eoo() ? 1 : version.Int();
+    return _version;
 }
 
 BSONElement OplogEntry::getIdElement() const {
     invariant(isCrudOpType());
-    switch (opType[0]) {
+    switch (getOpType()[0]) {
         case 'u':
-            return o2.Obj()["_id"];
+            return getObject2()["_id"];
         case 'd':
         case 'i':
-            return o.Obj()["_id"];
+            return getObject()["_id"];
     }
     MONGO_UNREACHABLE;
 }
@@ -100,12 +103,8 @@ OpTime OplogEntry::getOpTime() const {
     return fassertStatusOK(34436, OpTime::parseFromOplogEntry(raw));
 }
 
-Seconds OplogEntry::getTimestampSecs() const {
-    return Seconds(ts.timestamp().getSecs());
-}
-
 StringData OplogEntry::getCollectionName() const {
-    return nsToCollectionSubstring(ns);
+    return getNamespace().coll();
 }
 
 std::string OplogEntry::toString() const {

@@ -68,7 +68,7 @@ public:
         _allowLocalhostReturnValue = returnValue;
     }
 
-    virtual void startRequest(OperationContext* txn) {}
+    virtual void startRequest(OperationContext* opCtx) {}
 
 private:
     bool _ignoreAuthChecksReturnValue;

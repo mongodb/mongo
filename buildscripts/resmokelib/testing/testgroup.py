@@ -5,8 +5,10 @@ about when and how they execute.
 
 from __future__ import absolute_import
 
+import itertools
 import time
 
+from . import report as _report
 from . import summary as _summary
 
 
@@ -30,17 +32,30 @@ class TestGroup(object):
         self._end_times = []
         self._reports = []
 
+        # We keep a reference to the TestReports from the currently running jobs so that we can
+        # report intermediate results.
+        self._partial_reports = None
+
     def get_reports(self):
         """
-        Returns the list of reports.
+        Returns the list of reports. If there's an execution currently
+        in progress, then a report for the partial results is included
+        in the returned list.
         """
+
+        if self._partial_reports is not None:
+            active_report = _report.TestReport.combine(*self._partial_reports)
+            return self._reports + [active_report]
+
         return self._reports
 
-    def record_start(self):
+    def record_start(self, partial_reports):
         """
-        Records the start time of an execution.
+        Records the start time of an execution and stores the
+        TestReports for currently running jobs.
         """
         self._start_times.append(time.time())
+        self._partial_reports = partial_reports
 
     def record_end(self, report):
         """
@@ -48,13 +63,24 @@ class TestGroup(object):
         """
         self._end_times.append(time.time())
         self._reports.append(report)
+        self._partial_reports = None
 
     def summarize_latest(self, sb):
         """
         Returns a summary of the latest execution of the group and appends a
         summary of that execution onto the string builder 'sb'.
+
+        If there's an execution currently in progress, then the partial
+        summary of that execution is appended to 'sb'.
         """
-        return self._summarize_execution(-1, sb)
+
+        if self._partial_reports is None:
+            return self._summarize_execution(-1, sb)
+
+        active_report = _report.TestReport.combine(*self._partial_reports)
+        # Use the current time as the time that the test group finished running.
+        end_time = time.time()
+        return self._summarize_report(active_report, self._start_times[-1], end_time, sb)
 
     def summarize(self, sb):
         """
@@ -103,10 +129,26 @@ class TestGroup(object):
         string builder 'sb'.
         """
 
-        report = self._reports[iteration]
-        time_taken = self._end_times[iteration] - self._start_times[iteration]
+        return self._summarize_report(self._reports[iteration],
+                                      self._start_times[iteration],
+                                      self._end_times[iteration],
+                                      sb)
 
-        num_run = report.num_succeeded + report.num_errored + report.num_failed
+    def _summarize_report(self, report, start_time, end_time, sb):
+        """
+        Returns the summary information of the execution given by
+        'report' that started at 'start_time' and finished at
+        'end_time', and appends a summary of that execution onto the
+        string builder 'sb'.
+        """
+
+        time_taken = end_time - start_time
+
+        # Tests that were interrupted are treated as failures because (1) the test has already been
+        # started and therefore isn't skipped and (2) the test has yet to finish and therefore
+        # cannot be said to have succeeded.
+        num_failed = report.num_failed + report.num_interrupted
+        num_run = report.num_succeeded + report.num_errored + num_failed
         num_skipped = len(self.tests) + report.num_dynamic - num_run
 
         if report.num_succeeded == num_run and num_skipped == 0:
@@ -114,14 +156,14 @@ class TestGroup(object):
             return _summary.Summary(num_run, time_taken, num_run, 0, 0, 0)
 
         summary = _summary.Summary(num_run, time_taken, report.num_succeeded, num_skipped,
-                                   report.num_failed, report.num_errored)
+                                   num_failed, report.num_errored)
 
         sb.append("%d test(s) ran in %0.2f seconds"
                   " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
 
-        if report.num_failed > 0:
+        if num_failed > 0:
             sb.append("The following tests failed (with exit code):")
-            for test_info in report.get_failed():
+            for test_info in itertools.chain(report.get_failed(), report.get_interrupted()):
                 sb.append("    %s (%d)" % (test_info.test_id, test_info.return_code))
 
         if report.num_errored > 0:

@@ -83,7 +83,7 @@ void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorStdDev::getValue(bool toBeMerged) const {
+Value AccumulatorStdDev::getValue(bool toBeMerged) {
     if (!toBeMerged) {
         const long long adjustedCount = (_isSamp ? _count - 1 : _count);
         if (adjustedCount <= 0)

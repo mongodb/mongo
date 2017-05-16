@@ -38,10 +38,7 @@ class OperationContext;
 
 /**
  * LogicalClock maintain the clusterTime for a clusterNode. Every cluster node in a replica set has
- * an instance of the LogicalClock installed as a ServiceContext decoration. LogicalClock owns the
- * TimeProofService that allows it to generate proofs to sign LogicalTime values and to validate the
- * proofs of SignedLogicalTime values.LogicalClock instance must be created before the instance
- * starts up.
+ * an instance of the LogicalClock installed as a ServiceContext decoration.
  */
 class LogicalClock {
 public:
@@ -50,57 +47,52 @@ public:
     static LogicalClock* get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalClock> logicalClock);
 
-    /**
-     *  Creates an instance of LogicalClock. The TimeProofService must already be fully initialized.
-     *  The validateProof indicates if the advanceClusterTime validates newTime. It should do so
-     *  only when LogicalClock installed on mongos and the auth is on. When the auth is off we
-     *  assume that the DBA uses other ways to validate authenticity of user messages.
-     */
-    LogicalClock(ServiceContext*, std::unique_ptr<TimeProofService>, bool validateProof);
+    static constexpr Seconds kMaxAcceptableLogicalClockDrift =
+        Seconds(365 * 24 * 60 * 60);  // 1 year
 
     /**
-     * The method sets clusterTime to the newTime if the newTime > _clusterTime and the newTime
-     * passes the rate check and proof validation.
-     * Returns an error if the newTime does not pass the rate check or proof validation,
-     * OK otherwise.
+     *  Creates an instance of LogicalClock.
      */
-    Status advanceClusterTime(const SignedLogicalTime&);
+    LogicalClock(ServiceContext*);
 
     /**
-     * Simliar to advaneClusterTime, but only does rate checking and not proof validation.
+     * The method sets current time to newTime if the newTime > current time and it passes the rate
+     * check.
+     *
+     * Returns an error if the newTime does not pass the rate check.
      */
-    Status advanceClusterTimeFromTrustedSource(LogicalTime);
+    Status advanceClusterTime(const LogicalTime newTime);
 
     /**
      * Returns the current clusterTime.
      */
-    SignedLogicalTime getClusterTime();
+    LogicalTime getClusterTime();
 
     /**
-     * Returns the next  clusterTime value and provides the guarantee that the next reserveTicks
-     * call will return the value at least nTicks ticks in the future from the current clusterTime.
+     * Returns the next clusterTime value and provides a guarantee that any future call to
+     * reserveTicks() will return a value at least 'nTicks' ticks in the future from the current
+     * clusterTime.
      */
     LogicalTime reserveTicks(uint64_t nTicks);
 
     /**
-     * Resets _clusterTime to the signed time created from newTime. Should be used at the
-     * initialization after reading the oplog. Must not be called on already initialized clock.
+     * Resets current time to newTime. Should only be used for initializing this clock from an
+     * oplog timestamp.
      */
-    void initClusterTimeFromTrustedSource(LogicalTime newTime);
+    void setClusterTimeFromTrustedSource(LogicalTime newTime);
 
 private:
     /**
-     * Utility to create valid SignedLogicalTime from LogicalTime.
+     * Rate limiter for advancing logical time. Rejects newTime if its seconds value is more than
+     * kMaxAcceptableLogicalClockDrift seconds ahead of this node's wall clock.
      */
-    SignedLogicalTime _makeSignedLogicalTime(LogicalTime);
+    Status _passesRateLimiter_inlock(LogicalTime newTime);
 
     ServiceContext* const _service;
-    std::unique_ptr<TimeProofService> _timeProofService;
 
-    // the mutex protects _clusterTime
+    // The mutex protects _clusterTime.
     stdx::mutex _mutex;
-    SignedLogicalTime _clusterTime;
-    const bool _validateProof;
+    LogicalTime _clusterTime;
 };
 
 }  // namespace mongo

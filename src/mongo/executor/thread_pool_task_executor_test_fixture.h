@@ -49,10 +49,26 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
  * Useful fixture class for tests that use a ThreadPoolTaskExecutor.
  */
 class ThreadPoolExecutorTest : public TaskExecutorTest {
+public:
+    /**
+     * This default constructor supports the use of this class as a base class for a test fixture.
+     */
+    ThreadPoolExecutorTest();
+
+    /**
+     * This constructor supports the use of this class as a member variable to be used alongside
+     * another test fixture. Accepts a ThreadPoolMock::Options that will be used to override the
+     * result of makeThreadPoolMockOptions().
+     */
+    explicit ThreadPoolExecutorTest(ThreadPoolMock::Options options);
+
 private:
     virtual ThreadPoolMock::Options makeThreadPoolMockOptions() const;
     std::unique_ptr<TaskExecutor> makeTaskExecutor(
         std::unique_ptr<NetworkInterfaceMock> net) override;
+
+    // Returned by makeThreadPoolMockOptions().
+    const ThreadPoolMock::Options _options = {};
 };
 
 }  // namespace executor

@@ -40,7 +40,7 @@ namespace mongo {
  * Appends to 'builder' storage related statistics for the collection represented by 'nss'.
  * Used by both the collStats command and the $collStats aggregation stage.
  */
-Status appendCollectionStorageStats(OperationContext* txn,
+Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const BSONObj& param,
                                     BSONObjBuilder* builder);

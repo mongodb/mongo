@@ -44,33 +44,33 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& request) {
+UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request) {
     invariant(db);
 
     // Explain should never use this helper.
     invariant(!request.isExplain());
 
-    auto client = txn->getClient();
+    auto client = opCtx->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
     ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
                                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                                                txn);
+                                                opCtx);
 
     const NamespaceString& nsString = request.getNamespaceString();
-    Collection* collection = db->getCollection(nsString.ns());
+    Collection* collection = db->getCollection(opCtx, nsString);
 
     // If this is the local database, don't set last op.
     if (db->name() == "local") {
@@ -82,16 +82,15 @@ UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& re
     if (!collection && request.isUpsert()) {
         // We have to have an exclusive lock on the db to be allowed to create the collection.
         // Callers should either get an X or create the collection.
-        const Locker* locker = txn->lockState();
+        const Locker* locker = opCtx->lockState();
         invariant(locker->isW() ||
                   locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_X));
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+            Lock::DBLock lk(opCtx, nsString.db(), MODE_X);
 
-            const bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
+            const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString);
 
             if (userInitiatedWritesAndNotPrimary) {
                 uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,
@@ -99,21 +98,20 @@ UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& re
                                                      << nsString.ns()
                                                      << " during upsert"));
             }
-            WriteUnitOfWork wuow(txn);
-            collection = db->createCollection(txn, nsString.ns(), CollectionOptions());
+            WriteUnitOfWork wuow(opCtx);
+            collection = db->createCollection(opCtx, nsString.ns(), CollectionOptions());
             invariant(collection);
             wuow.commit();
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", nsString.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "createCollection", nsString.ns());
     }
 
     // Parse the update, get an executor for it, run the executor, get stats out.
-    ParsedUpdate parsedUpdate(txn, &request);
+    ParsedUpdate parsedUpdate(opCtx, &request);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     OpDebug* const nullOpDebug = nullptr;
-    std::unique_ptr<PlanExecutor> exec =
-        uassertStatusOK(getExecutorUpdate(txn, nullOpDebug, collection, &parsedUpdate));
+    auto exec = uassertStatusOK(getExecutorUpdate(opCtx, nullOpDebug, collection, &parsedUpdate));
 
     uassertStatusOK(exec->executePlan());
     if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {

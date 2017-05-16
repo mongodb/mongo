@@ -84,6 +84,18 @@ TEST(FastMapNoAlloc, NotEmpty) {
     ASSERT(!it);
 }
 
+TEST(FastMapNoAlloc, ExceedCapacity) {
+    TestFastMapNoAlloc map;
+
+    for (int i = 0; i < 6; i++) {
+        map.insert(ResourceId(RESOURCE_COLLECTION, i))
+            ->initNew(i, "Item" + boost::lexical_cast<std::string>(i));
+    }
+
+    ASSERT_THROWS_CODE(
+        map.insert(ResourceId(RESOURCE_COLLECTION, 6)), UserException, ErrorCodes::TooManyLocks);
+}
+
 TEST(FastMapNoAlloc, FindNonExisting) {
     TestFastMapNoAlloc map;
 

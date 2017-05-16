@@ -67,7 +67,7 @@ void CursorInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto cursor = static_cast<CursorInfo::CursorHolder*>(JS_GetPrivate(obj));
 
     if (cursor) {
-        delete cursor;
+        getScope(fop)->trackedDelete(cursor);
     }
 }
 

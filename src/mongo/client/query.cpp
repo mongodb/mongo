@@ -115,7 +115,8 @@ bool Query::isComplex(const BSONObj& obj, bool* hasDollar) {
 }
 
 Query& Query::readPref(ReadPreference pref, const BSONArray& tags) {
-    appendComplex(ReadPrefField.name().c_str(), ReadPreferenceSetting(pref, TagSet(tags)).toBSON());
+    appendComplex(ReadPrefField.name().c_str(),
+                  ReadPreferenceSetting(pref, TagSet(tags)).toInnerBSON());
     return *this;
 }
 

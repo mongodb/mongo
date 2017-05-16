@@ -40,6 +40,7 @@
 
     jsTestLog("Wait long enough for the secondary to call for an election.");
     checkLog.contains(secondary, "can see a healthy primary of equal or greater priority");
+    checkLog.contains(secondary, "not running for primary");
 
     jsTestLog("Verify the primary and secondary do not change during the partition.");
     assert.eq(primary, replTest.getPrimary());

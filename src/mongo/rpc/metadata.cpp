@@ -30,33 +30,62 @@
 
 #include "mongo/rpc/metadata.h"
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 
 namespace mongo {
 namespace rpc {
 
+namespace {
+
+std::vector<Privilege> advanceLogicalClockPrivilege;
+
+MONGO_INITIALIZER(InitializeAdvanceLogicalClockPrivilegeVector)(InitializerContext* const) {
+    ActionSet actions;
+    actions.addAction(ActionType::internal);
+    advanceLogicalClockPrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
+    return Status::OK();
+}
+
+bool isAuthorizedToAdvanceClock(OperationContext* opCtx) {
+    auto client = opCtx->getClient();
+    // Note: returns true if auth is off, courtesy of
+    // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.
+    return AuthorizationSession::get(client)->isAuthorizedForPrivileges(
+        advanceLogicalClockPrivilege);
+}
+
+}  // unnamed namespace
+
 BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
-    BSONElement ssmElem;
+void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
+    BSONElement readPreferenceElem;
     BSONElement auditElem;
     BSONElement configSvrElem;
     BSONElement trackingElem;
     BSONElement clientElem;
+    BSONElement logicalTimeElem;
 
     for (const auto& metadataElem : metadataObj) {
         auto fieldName = metadataElem.fieldNameStringData();
-        if (fieldName == ServerSelectionMetadata::fieldName()) {
-            ssmElem = metadataElem;
+        if (fieldName == "$readPreference") {
+            readPreferenceElem = metadataElem;
         } else if (fieldName == AuditMetadata::fieldName()) {
             auditElem = metadataElem;
         } else if (fieldName == ConfigServerMetadata::fieldName()) {
@@ -65,127 +94,132 @@ Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
             clientElem = metadataElem;
         } else if (fieldName == TrackingMetadata::fieldName()) {
             trackingElem = metadataElem;
+        } else if (fieldName == LogicalTimeMetadata::fieldName()) {
+            logicalTimeElem = metadataElem;
         }
     }
 
-    auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(ssmElem);
-    if (!swServerSelectionMetadata.isOK()) {
-        return swServerSelectionMetadata.getStatus();
-    }
-    ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
-
-    auto swAuditMetadata = AuditMetadata::readFromMetadata(auditElem);
-    if (!swAuditMetadata.isOK()) {
-        return swAuditMetadata.getStatus();
-    }
-    AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
-
-    const auto statusClientMetadata =
-        ClientMetadataIsMasterState::readFromMetadata(txn, clientElem);
-    if (!statusClientMetadata.isOK()) {
-        return statusClientMetadata;
+    if (readPreferenceElem) {
+        ReadPreferenceSetting::get(opCtx) =
+            uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreferenceElem));
     }
 
-    auto configServerMetadata = ConfigServerMetadata::readFromMetadata(configSvrElem);
-    if (!configServerMetadata.isOK()) {
-        return configServerMetadata.getStatus();
-    }
-    ConfigServerMetadata::get(txn) = std::move(configServerMetadata.getValue());
+    AuditMetadata::get(opCtx) = uassertStatusOK(AuditMetadata::readFromMetadata(auditElem));
 
-    auto trackingMetadata = TrackingMetadata::readFromMetadata(trackingElem);
-    if (!trackingMetadata.isOK()) {
-        return trackingMetadata.getStatus();
-    }
-    TrackingMetadata::get(txn) = std::move(trackingMetadata.getValue());
+    uassertStatusOK(ClientMetadataIsMasterState::readFromMetadata(opCtx, clientElem));
 
-    return Status::OK();
+    ConfigServerMetadata::get(opCtx) =
+        uassertStatusOK(ConfigServerMetadata::readFromMetadata(configSvrElem));
+
+    TrackingMetadata::get(opCtx) =
+        uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
+
+    auto logicalClock = LogicalClock::get(opCtx);
+    if (logicalClock) {
+        auto logicalTimeMetadata =
+            uassertStatusOK(rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem));
+
+        auto& signedTime = logicalTimeMetadata.getSignedTime();
+        // LogicalTimeMetadata is default constructed if no logical time metadata was sent, so a
+        // default constructed SignedLogicalTime should be ignored.
+        if (signedTime.getTime() != LogicalTime::kUninitialized) {
+            auto logicalTimeValidator = LogicalTimeValidator::get(opCtx);
+            if (isAuthorizedToAdvanceClock(opCtx)) {
+                if (logicalTimeValidator) {
+                    logicalTimeValidator->updateCacheTrustedSource(signedTime);
+                }
+            } else if (!logicalTimeValidator) {
+                uasserted(ErrorCodes::CannotVerifyAndSignLogicalTime,
+                          "Cannot accept logicalTime: " + signedTime.getTime().toString() +
+                              ". May not be a part of a sharded cluster");
+            } else {
+                uassertStatusOK(logicalTimeValidator->validate(signedTime));
+            }
+
+            uassertStatusOK(logicalClock->advanceClusterTime(signedTime.getTime()));
+        }
+    }
 }
 
-Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob) {
-    auto ssStatus = ServerSelectionMetadata::get(txn).writeToMetadata(metadataBob);
-    if (!ssStatus.isOK()) {
-        return ssStatus;
-    }
-    return Status::OK();
-}
-
-StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
+CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
     // We can reuse the same metadata BOB for every upconvert call, but we need to keep
     // making new command BOBs as each metadata bob will need to remove fields. We can not use
-    // mutablebson here because the ServerSelectionMetadata upconvert routine performs
+    // mutablebson here because the ReadPreference upconvert routine performs
     // manipulations (replacing a root with its child) that mutablebson doesn't
     // support.
+
+    auto readPrefContainer = BSONObj();
+    const StringData firstFieldName = legacyCmdObj.firstElementFieldName();
+    if (firstFieldName == "$query" || firstFieldName == "query") {
+        // Commands sent over OP_QUERY specify read preference by putting it at the top level and
+        // putting the command in a nested field called either query or $query.
+
+        // Check if legacyCommand has an invalid $maxTimeMS option.
+        uassert(ErrorCodes::InvalidOptions,
+                "cannot use $maxTimeMS query option with commands; use maxTimeMS command option "
+                "instead",
+                !legacyCmdObj.hasField("$maxTimeMS"));
+        readPrefContainer = legacyCmdObj;
+        legacyCmdObj = legacyCmdObj.firstElement().Obj().getOwned();
+    } else if (auto queryOptions = legacyCmdObj["$queryOptions"]) {
+        // Mongos rewrites commands with $readPreference to put it in a field nested inside of
+        // $queryOptions. Its command implementations often forward commands in that format to
+        // shards. This function is responsible for rewriting it to a format that the shards
+        // understand.
+        readPrefContainer = queryOptions.Obj().getOwned();
+        legacyCmdObj = legacyCmdObj.removeField("$queryOptions");
+    }
+
     BSONObjBuilder metadataBob;
-
-    // Ordering is important here - ServerSelectionMetadata must be upconverted
-    // first, then AuditMetadata.
-    BSONObjBuilder ssmCommandBob;
-    auto upconvertStatus =
-        ServerSelectionMetadata::upconvert(legacyCmdObj, queryFlags, &ssmCommandBob, &metadataBob);
-    if (!upconvertStatus.isOK()) {
-        return upconvertStatus;
+    if (auto readPref = readPrefContainer["$readPreference"]) {
+        metadataBob.append(readPref);
+    } else if (queryFlags & QueryOption_SlaveOk) {
+        ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&metadataBob);
     }
 
-
+    // Ordering is important here - AuditMetadata::upconvert() expects the above up-conversion to
+    // already be done.
     BSONObjBuilder auditCommandBob;
-    upconvertStatus =
-        AuditMetadata::upconvert(ssmCommandBob.done(), queryFlags, &auditCommandBob, &metadataBob);
-
-    if (!upconvertStatus.isOK()) {
-        return upconvertStatus;
-    }
-
+    uassertStatusOK(
+        AuditMetadata::upconvert(legacyCmdObj, queryFlags, &auditCommandBob, &metadataBob));
 
     return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
 }
 
-StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
+LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
     int legacyQueryFlags = 0;
     BSONObjBuilder auditCommandBob;
     // Ordering is important here - AuditingMetadata must be downconverted first,
-    // then ServerSelectionMetadata.
-    auto downconvertStatus =
-        AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags);
+    // then ReadPreference.
+    uassertStatusOK(
+        AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags));
 
-    if (!downconvertStatus.isOK()) {
-        return downconvertStatus;
+
+    auto readPref = metadata["$readPreference"];
+    if (!readPref)
+        readPref = cmdObj["$readPreference"];
+
+    if (readPref) {
+        BSONObjBuilder bob;
+        bob.append("$query", cmdObj);
+        bob.append(readPref);
+        cmdObj = bob.obj();
+
+        auto parsed = ReadPreferenceSetting::fromInnerBSON(readPref);
+        if (parsed.isOK() && parsed.getValue().canRunOnSecondary()) {
+            legacyQueryFlags |= QueryOption_SlaveOk;
+        }
     }
 
-
-    BSONObjBuilder ssmCommandBob;
-    downconvertStatus = ServerSelectionMetadata::downconvert(
-        auditCommandBob.done(), metadata, &ssmCommandBob, &legacyQueryFlags);
-    if (!downconvertStatus.isOK()) {
-        return downconvertStatus;
-    }
-
-
-    return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
+    return std::make_tuple(cmdObj, std::move(legacyQueryFlags));
 }
 
-StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(const BSONObj& legacyReply) {
+CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply) {
     BSONObjBuilder commandReplyBob;
     BSONObjBuilder metadataBob;
 
-    auto upconvertStatus = ShardingMetadata::upconvert(legacyReply, &commandReplyBob, &metadataBob);
-    if (!upconvertStatus.isOK()) {
-        return upconvertStatus;
-    }
-
+    uassertStatusOK(ShardingMetadata::upconvert(legacyReply, &commandReplyBob, &metadataBob));
     return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
-}
-
-StatusWith<BSONObj> downconvertReplyMetadata(const BSONObj& commandReply,
-                                             const BSONObj& replyMetadata) {
-    BSONObjBuilder legacyCommandReplyBob;
-
-    auto downconvertStatus =
-        ShardingMetadata::downconvert(commandReply, replyMetadata, &legacyCommandReplyBob);
-    if (!downconvertStatus.isOK()) {
-        return downconvertStatus;
-    }
-
-    return legacyCommandReplyBob.obj();
 }
 
 }  // namespace rpc

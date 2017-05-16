@@ -261,9 +261,9 @@ TEST(ShardKeyPattern, ExtractDocShardKeyHashed) {
 
 static BSONObj queryKey(const ShardKeyPattern& pattern, const BSONObj& query) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
-    StatusWith<BSONObj> status = pattern.extractShardKeyFromQuery(txn.get(), query);
+    StatusWith<BSONObj> status = pattern.extractShardKeyFromQuery(opCtx.get(), query);
     if (!status.isOK())
         return BSONObj();
     return status.getValue();

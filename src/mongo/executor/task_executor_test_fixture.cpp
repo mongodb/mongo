@@ -34,6 +34,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -98,6 +99,10 @@ void TaskExecutorTest::joinExecutorThread() {
     _executorState = LifecycleState::kJoining;
     _executor->join();
     _executorState = LifecycleState::kShutdownComplete;
+}
+
+void TaskExecutorTest::_doTest() {
+    MONGO_UNREACHABLE;
 }
 
 void TaskExecutorTest::postExecutorThreadLaunch() {}

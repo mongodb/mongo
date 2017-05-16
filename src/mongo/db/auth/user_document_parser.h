@@ -68,6 +68,8 @@ public:
 
     std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
 
+    boost::optional<OID> extractUserIDFromUserDocument(const BSONObj& doc) const;
+
     Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
 
     Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;

@@ -71,7 +71,7 @@ public:
     public:
         void reset();
 
-        void reset(BSONElement element, BSONElement arrayOffset, bool outerArray);
+        void reset(BSONElement element, BSONElement arrayOffset);
 
         void setArrayOffset(BSONElement e) {
             _arrayOffset = e;
@@ -83,14 +83,10 @@ public:
         BSONElement arrayOffset() const {
             return _arrayOffset;
         }
-        bool outerArray() const {
-            return _outerArray;
-        }
 
     private:
         BSONElement _element;
         BSONElement _arrayOffset;
-        bool _outerArray;
     };
 
     virtual ~ElementIterator();
@@ -104,8 +100,9 @@ public:
 class SingleElementElementIterator : public ElementIterator {
 public:
     explicit SingleElementElementIterator(BSONElement e) : _seen(false) {
-        _element.reset(e, BSONElement(), false);
+        _element.reset(e, BSONElement());
     }
+
     virtual ~SingleElementElementIterator() {}
 
     virtual bool more() {
@@ -137,11 +134,28 @@ private:
 class BSONElementIterator : public ElementIterator {
 public:
     BSONElementIterator();
-    BSONElementIterator(const ElementPath* path, const BSONObj& context);
+
+    /**
+     * Constructs an iterator over 'elementToIterate', where the desired element(s) is/are at the
+     * end of the suffix of 'path' starting at 'suffixIndex'. For example, constructing a
+     * BSONElementIterator with path="a.b.c", suffixIndex=1, and 'elementToIterate' as the
+     * subdocument located at 'a' within the object {a: {b: [{c: 1}, {c: 2}]}} would iterate over
+     * the elements of {b: [{c: 1}, {c: 2}]} at the end of the path 'b.c'. 'elementToIterate' does
+     * not need to be of type Object, so it would also be valid to construct a BSONElementIterator
+     * with path="a.b" and 'elementToIterate' as the array within 'a.b'.
+     */
+    BSONElementIterator(const ElementPath* path, size_t suffixIndex, BSONElement elementToIterate);
+
+    /**
+     * Constructs an iterator over 'objectToIterate', where the desired element(s) is/are at the end
+     * of 'path'.
+     */
+    BSONElementIterator(const ElementPath* path, const BSONObj& objectToIterate);
 
     virtual ~BSONElementIterator();
 
-    void reset(const ElementPath* path, const BSONObj& context);
+    void reset(const ElementPath* path, size_t suffixIndex, BSONElement elementToIterate);
+    void reset(const ElementPath* path, const BSONObj& objectToIterate);
 
     bool more();
     Context next();
@@ -153,8 +167,22 @@ private:
      */
     bool subCursorHasMore();
 
+    /**
+     * Sets _traversalStart and _traversalStartIndex by traversing 'elementToIterate' along the
+     * suffix of '_path' starting at 'suffixIndex'.
+     */
+    void _setTraversalStart(size_t suffixIndex, BSONElement elementToIterate);
+
     const ElementPath* _path;
-    BSONObj _context;
+
+    // The element where we begin our iteration. This is either:
+    // -- The element at the end of _path.
+    // -- The first array element encountered along _path.
+    // -- EOO, if _path does not exist in the object/element we are exploring.
+    BSONElement _traversalStart;
+
+    // This index of _traversalStart in _path, or 0 if _traversalStart is EOO.
+    size_t _traversalStartIndex;
 
     enum State { BEGIN, IN_ARRAY, DONE } _state;
     Context _next;

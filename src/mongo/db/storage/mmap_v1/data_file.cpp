@@ -104,14 +104,14 @@ int DataFile::_defaultSize() const {
 }
 
 /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-Status DataFile::openExisting(OperationContext* txn, const char* filename) {
+Status DataFile::openExisting(OperationContext* opCtx, const char* filename) {
     invariant(_mb == 0);
 
     if (!boost::filesystem::exists(filename)) {
         return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
     }
 
-    if (!mmf.open(txn, filename)) {
+    if (!mmf.open(opCtx, filename)) {
         return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
     }
 
@@ -138,7 +138,7 @@ Status DataFile::openExisting(OperationContext* txn, const char* filename) {
     return Status::OK();
 }
 
-void DataFile::open(OperationContext* txn,
+void DataFile::open(OperationContext* opCtx,
                     const char* filename,
                     int minSize,
                     bool preallocateOnly) {
@@ -170,7 +170,7 @@ void DataFile::open(OperationContext* txn,
     {
         invariant(_mb == 0);
         unsigned long long sz = size;
-        if (mmf.create(txn, filename, sz)) {
+        if (mmf.create(opCtx, filename, sz)) {
             _mb = mmf.getView();
         }
 
@@ -179,14 +179,14 @@ void DataFile::open(OperationContext* txn,
     }
 
     data_file_check(_mb);
-    header()->init(txn, _fileNo, size, filename);
+    header()->init(opCtx, _fileNo, size, filename);
 }
 
 void DataFile::flush(bool sync) {
     mmf.flush(sync);
 }
 
-DiskLoc DataFile::allocExtentArea(OperationContext* txn, int size) {
+DiskLoc DataFile::allocExtentArea(OperationContext* opCtx, int size) {
     // The header would be NULL if file open failed. However, if file open failed we should
     // never be entering here.
     invariant(header());
@@ -195,15 +195,18 @@ DiskLoc DataFile::allocExtentArea(OperationContext* txn, int size) {
     int offset = header()->unused.getOfs();
 
     DataFileHeader* h = header();
-    *txn->recoveryUnit()->writing(&h->unused) = DiskLoc(_fileNo, offset + size);
-    txn->recoveryUnit()->writingInt(h->unusedLength) = h->unusedLength - size;
+    *opCtx->recoveryUnit()->writing(&h->unused) = DiskLoc(_fileNo, offset + size);
+    opCtx->recoveryUnit()->writingInt(h->unusedLength) = h->unusedLength - size;
 
     return DiskLoc(_fileNo, offset);
 }
 
 // -------------------------------------------------------------------------------
 
-void DataFileHeader::init(OperationContext* txn, int fileno, int filelength, const char* filename) {
+void DataFileHeader::init(OperationContext* opCtx,
+                          int fileno,
+                          int filelength,
+                          const char* filename) {
     if (uninitialized()) {
         DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
 
@@ -233,17 +236,17 @@ void DataFileHeader::init(OperationContext* txn, int fileno, int filelength, con
         freeListStart.Null();
         freeListEnd.Null();
     } else {
-        checkUpgrade(txn);
+        checkUpgrade(opCtx);
     }
 }
 
-void DataFileHeader::checkUpgrade(OperationContext* txn) {
+void DataFileHeader::checkUpgrade(OperationContext* opCtx) {
     if (freeListStart == DiskLoc(0, 0)) {
         // we are upgrading from 2.4 to 2.6
         invariant(freeListEnd == DiskLoc(0, 0));  // both start and end should be (0,0) or real
-        WriteUnitOfWork wunit(txn);
-        *txn->recoveryUnit()->writing(&freeListStart) = DiskLoc();
-        *txn->recoveryUnit()->writing(&freeListEnd) = DiskLoc();
+        WriteUnitOfWork wunit(opCtx);
+        *opCtx->recoveryUnit()->writing(&freeListStart) = DiskLoc();
+        *opCtx->recoveryUnit()->writing(&freeListEnd) = DiskLoc();
         wunit.commit();
     }
 }

@@ -40,17 +40,17 @@ namespace mongo {
 namespace write_stage_common {
 
 bool ensureStillMatches(const Collection* collection,
-                        OperationContext* txn,
+                        OperationContext* opCtx,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq) {
     // If the snapshot changed, then we have to make sure we have the latest copy of the doc and
     // that it still matches.
     WorkingSetMember* member = ws->get(id);
-    if (txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
-        std::unique_ptr<SeekableRecordCursor> cursor(collection->getCursor(txn));
+    if (opCtx->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
+        std::unique_ptr<SeekableRecordCursor> cursor(collection->getCursor(opCtx));
 
-        if (!WorkingSetCommon::fetch(txn, ws, id, cursor)) {
+        if (!WorkingSetCommon::fetch(opCtx, ws, id, cursor)) {
             // Doc is already deleted.
             return false;
         }

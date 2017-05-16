@@ -165,7 +165,8 @@ public:
         return true;
     }
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
         if (!getDur().isDurable()) {
             return BSONObj();
         }
@@ -193,18 +194,18 @@ public:
     virtual bool waitUntilDurable() {
         return false;
     }
-    virtual bool commitNow(OperationContext* txn) {
+    virtual bool commitNow(OperationContext* opCtx) {
         return false;
     }
     virtual bool commitIfNeeded() {
         return false;
     }
-    virtual void syncDataAndTruncateJournal(OperationContext* txn) {}
+    virtual void syncDataAndTruncateJournal(OperationContext* opCtx) {}
     virtual bool isDurable() const {
         return false;
     }
     virtual void closingFileNotification() {}
-    virtual void commitAndStopDurThread(OperationContext* txn) {}
+    virtual void commitAndStopDurThread(OperationContext* opCtx) {}
 };
 
 
@@ -219,14 +220,14 @@ public:
     virtual void declareWriteIntents(const std::vector<std::pair<void*, unsigned>>& intents);
     virtual void createdFile(const std::string& filename, unsigned long long len);
     virtual bool waitUntilDurable();
-    virtual bool commitNow(OperationContext* txn);
+    virtual bool commitNow(OperationContext* opCtx);
     virtual bool commitIfNeeded();
-    virtual void syncDataAndTruncateJournal(OperationContext* txn);
+    virtual void syncDataAndTruncateJournal(OperationContext* opCtx);
     virtual bool isDurable() const {
         return true;
     }
     virtual void closingFileNotification();
-    virtual void commitAndStopDurThread(OperationContext* txn);
+    virtual void commitAndStopDurThread(OperationContext* opCtx);
 
     void start(ClockSource* cs, int64_t serverStartMs);
 
@@ -318,7 +319,7 @@ void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
 /**
  * Main code of the remap private view function.
  */
-void remapPrivateViewImpl(OperationContext* txn, double fraction) {
+void remapPrivateViewImpl(OperationContext* opCtx, double fraction) {
     LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
 // There is no way that the set of files can change while we are in this method, because
@@ -335,9 +336,9 @@ void remapPrivateViewImpl(OperationContext* txn, double fraction) {
 // See SERVER-5680 to see why this code is necessary on Windows.
 // See SERVER-8795 to see why this code is necessary on Solaris.
 #if defined(_WIN32) || defined(__sun)
-    LockMongoFilesExclusive lk(txn);
+    LockMongoFilesExclusive lk(opCtx);
 #else
-    LockMongoFilesShared lk(txn);
+    LockMongoFilesShared lk(opCtx);
 #endif
 
     std::set<MongoFile*>& files = MongoFile::getAllFiles();
@@ -381,7 +382,7 @@ void remapPrivateViewImpl(OperationContext* txn, double fraction) {
             }
 
             if (mmf->willNeedRemap()) {
-                mmf->remapThePrivateView(txn);
+                mmf->remapThePrivateView(opCtx);
             }
 
             i++;
@@ -517,10 +518,10 @@ DurableInterface::~DurableInterface() {}
 // DurableImpl
 //
 
-bool DurableImpl::commitNow(OperationContext* txn) {
+bool DurableImpl::commitNow(OperationContext* opCtx) {
     CommitNotifier::When when = commitNotify.now();
 
-    AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
+    AutoYieldFlushLockForMMAPV1Commit flushLockYield(opCtx->lockState());
 
     // There is always just one waiting anyways
     flushRequested.notify_one();
@@ -562,15 +563,15 @@ bool DurableImpl::commitIfNeeded() {
     return true;
 }
 
-void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {
-    invariant(txn->lockState()->isW());
+void DurableImpl::syncDataAndTruncateJournal(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
 
     // Once this returns, all the outstanding journal has been applied to the data files and
     // so it's safe to do the flushAll/journalCleanup below.
-    commitNow(txn);
+    commitNow(opCtx);
 
     // Flush the shared view to disk.
-    MongoFile::flushAll(txn, true);
+    MongoFile::flushAll(opCtx, true);
 
     // Once the shared view has been flushed, we do not need the journal files anymore.
     journalCleanup(true);
@@ -588,7 +589,7 @@ void DurableImpl::closingFileNotification() {
     }
 }
 
-void DurableImpl::commitAndStopDurThread(OperationContext* txn) {
+void DurableImpl::commitAndStopDurThread(OperationContext* opCtx) {
     CommitNotifier::When when = commitNotify.now();
 
     // There is always just one waiting anyways
@@ -600,7 +601,7 @@ void DurableImpl::commitAndStopDurThread(OperationContext* txn) {
     applyToDataFilesNotify.waitFor(when);
 
     // Flush the shared view to disk.
-    MongoFile::flushAll(txn, true);
+    MongoFile::flushAll(opCtx, true);
 
     // Once the shared view has been flushed, we do not need the journal files anymore.
     journalCleanup(true);
@@ -630,14 +631,14 @@ void DurableImpl::start(ClockSource* cs, int64_t serverStartMs) {
  * @param fraction Value between (0, 1] indicating what fraction of the memory to remap.
  *      Remapping too much or too frequently incurs copy-on-write page fault cost.
  */
-static void remapPrivateView(OperationContext* txn, double fraction) {
+static void remapPrivateView(OperationContext* opCtx, double fraction) {
     // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't see any
     // newly written data on reads.
     invariant(!commitJob.hasWritten());
 
     try {
         Timer t;
-        remapPrivateViewImpl(txn, fraction);
+        remapPrivateViewImpl(opCtx, fraction);
         stats.curr()->_remapPrivateViewMicros += t.micros();
 
         LOG(4) << "remapPrivateView end";
@@ -725,9 +726,9 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
 
             Timer t;
 
-            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-            OperationContext& txn = *txnPtr;
-            AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
+            AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(opCtx.lockState());
 
             // We need to snapshot the commitNumber after the flush lock has been obtained,
             // because at this point we know that we have a stable snapshot of the data.
@@ -828,7 +829,7 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
                     // accessing it. Technically this step could be avoided on systems, which
                     // support atomic remap.
                     autoFlushLock.upgradeFlushLockToExclusive();
-                    remapPrivateView(txnPtr.get(), remapFraction);
+                    remapPrivateView(opCtxPtr.get(), remapFraction);
 
                     autoFlushLock.release();
 

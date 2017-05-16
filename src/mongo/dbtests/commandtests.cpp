@@ -47,7 +47,7 @@ using std::string;
  */
 class Base {
 public:
-    Base() : db(&_txn) {
+    Base() : db(&_opCtx) {
         db.dropCollection(ns());
     }
 
@@ -62,16 +62,16 @@ public:
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient db;
 };
 
 // one namespace per command
 namespace FileMD5 {
 struct Base {
-    Base() : db(&_txn) {
+    Base() : db(&_opCtx) {
         db.dropCollection(ns());
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("files_id" << 1 << "n" << 1)));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("files_id" << 1 << "n" << 1)));
     }
 
     const char* ns() {
@@ -79,7 +79,7 @@ struct Base {
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient db;
 };
 struct Type0 : Base {

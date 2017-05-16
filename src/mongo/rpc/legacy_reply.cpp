@@ -75,10 +75,8 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
                           << causedBy(status),
             status.isOK());
 
-    std::tie(_commandReply, _metadata) =
-        uassertStatusOK(rpc::upconvertReplyMetadata(BSONObj(qr.data())));
+    std::tie(_commandReply, _metadata) = rpc::upconvertReplyMetadata(BSONObj(qr.data()));
 
-    _outputDocs = DocumentRange{};
     return;
 }
 
@@ -88,10 +86,6 @@ const BSONObj& LegacyReply::getMetadata() const {
 
 const BSONObj& LegacyReply::getCommandReply() const {
     return _commandReply;
-}
-
-DocumentRange LegacyReply::getOutputDocs() const {
-    return _outputDocs;
 }
 
 Protocol LegacyReply::getProtocol() const {

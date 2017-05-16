@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <ostream>
 #include <string>
 #include <type_traits>
 
@@ -144,6 +145,14 @@ inline std::string MemberState::toString() const {
             return "REMOVED";
     }
     return "";
+}
+
+/**
+ * Insertion operator for MemberState. Formats member state for output stream.
+ * For testing only.
+ */
+inline std::ostream& operator<<(std::ostream& os, const MemberState& state) {
+    return os << state.toString();
 }
 
 }  // namespace repl

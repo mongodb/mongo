@@ -81,24 +81,24 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(
 }
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer(
-    OperationContext* txn) const {
+    OperationContext* opCtx) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeSteadyStateOplogBuffer(
-    OperationContext* txn) const {
+    OperationContext* opCtx) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-StatusWith<ReplicaSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
+StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
     return replSetConfigResult;
 }
 
 StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
-    OperationContext* txn,
+    OperationContext* opCtx,
     MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return multiApplyFn(txn, std::move(ops), applyOperation);
+    return multiApplyFn(opCtx, std::move(ops), applyOperation);
 }
 
 Status DataReplicatorExternalStateMock::_multiSyncApply(MultiApplier::OperationPtrs* ops) {

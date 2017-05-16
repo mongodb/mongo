@@ -51,7 +51,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/replset_dist_lock_manager.h"
@@ -66,6 +65,7 @@
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
@@ -144,8 +144,14 @@ std::unique_ptr<ShardingCatalogManager> ConfigServerTestFixture::makeShardingCat
     return stdx::make_unique<ShardingCatalogManagerImpl>(std::move(specialExec));
 }
 
-std::unique_ptr<CatalogCache> ConfigServerTestFixture::makeCatalogCache() {
-    return stdx::make_unique<CatalogCache>();
+std::unique_ptr<CatalogCacheLoader> ConfigServerTestFixture::makeCatalogCacheLoader() {
+    return stdx::make_unique<ConfigServerCatalogCacheLoader>();
+}
+
+std::unique_ptr<CatalogCache> ConfigServerTestFixture::makeCatalogCache(
+    std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
+    invariant(catalogCacheLoader);
+    return stdx::make_unique<CatalogCache>(std::move(catalogCacheLoader));
 }
 
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {
@@ -174,7 +180,7 @@ std::shared_ptr<Shard> ConfigServerTestFixture::getConfigShard() const {
     return shardRegistry()->getConfigShard();
 }
 
-Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
+Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc) {
     auto insert(stdx::make_unique<BatchedInsertRequest>());
@@ -186,7 +192,7 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     auto config = getConfigShard();
     invariant(config);
 
-    auto insertResponse = config->runCommand(txn,
+    auto insertResponse = config->runCommand(opCtx,
                                              kReadPref,
                                              ns.db().toString(),
                                              request.toBSON(),
@@ -198,14 +204,14 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
     return status;
 }
 
-StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* txn,
+StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(OperationContext* opCtx,
                                                                        const NamespaceString& ns,
                                                                        const BSONObj& filter) {
     auto config = getConfigShard();
     invariant(config);
 
     auto findStatus = config->exhaustiveFindOnConfig(
-        txn, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
+        opCtx, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -231,10 +237,10 @@ Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards
     return Status::OK();
 }
 
-StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn,
+StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opCtx,
                                                            const std::string& shardId) {
     auto doc = findOneOnConfigCollection(
-        txn, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name(shardId)));
+        opCtx, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name(shardId)));
     if (!doc.isOK()) {
         if (doc.getStatus() == ErrorCodes::NoMatchingDocument) {
             return {ErrorCodes::ShardNotFound,
@@ -258,21 +264,21 @@ Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks
     return Status::OK();
 }
 
-StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* txn,
+StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
                                                            const BSONObj& minKey) {
     auto doc = findOneOnConfigCollection(
-        txn, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::min() << minKey));
+        opCtx, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::min() << minKey));
     if (!doc.isOK())
         return doc.getStatus();
 
     return ChunkType::fromConfigBSON(doc.getValue());
 }
 
-StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* txn,
+StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* opCtx,
                                                                      const NamespaceString& ns) {
     auto configShard = getConfigShard();
 
-    auto response = configShard->runCommand(txn,
+    auto response = configShard->runCommand(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             ns.db().toString(),
                                             BSON("listIndexes" << ns.coll().toString()),
@@ -292,5 +298,27 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
     return cursorResponse.getValue().getBatch();
 }
 
+std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationContext* opCtx) {
+    auto config = getConfigShard();
+    auto findStatus =
+        config->exhaustiveFindOnConfig(opCtx,
+                                       kReadPref,
+                                       repl::ReadConcernLevel::kMajorityReadConcern,
+                                       NamespaceString(KeysCollectionDocument::ConfigNS),
+                                       BSONObj(),
+                                       BSON("expiresAt" << 1),
+                                       boost::none);
+    ASSERT_OK(findStatus.getStatus());
+
+    std::vector<KeysCollectionDocument> keys;
+    const auto& docs = findStatus.getValue().docs;
+    for (const auto& doc : docs) {
+        auto keyStatus = KeysCollectionDocument::fromBSON(doc);
+        ASSERT_OK(keyStatus.getStatus());
+        keys.push_back(keyStatus.getValue());
+    }
+
+    return keys;
+}
 
 }  // namespace mongo

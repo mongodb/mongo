@@ -1,5 +1,7 @@
 # -*- mode: python -*-
 
+import libdeps
+
 Import("env use_system_version_of_library usemozjs get_option")
 Import("wiredtiger")
 
@@ -120,7 +122,7 @@ else:
     pcreEnv.SConscript('pcre' + pcreSuffix + '/SConscript', exports={ 'env' : pcreEnv })
     pcreEnv = pcreEnv.Clone(
         LIBDEPS=[
-            'pcre' + pcreSuffix + '/pcrecpp',
+            ('pcre' + pcreSuffix + '/pcrecpp', libdeps.dependency.Interface),
         ])
 
 pcreEnv.Library(
@@ -152,13 +154,13 @@ else:
     boostEnv.SConscript(boostDirectory + '/SConscript', exports={ 'env' : boostEnv })
     boostEnv = boostEnv.Clone(
         LIBDEPS=[
-            boostDirectory + '/boost_program_options',
-            boostDirectory + '/boost_filesystem',
-            boostDirectory + '/boost_thread',
-            boostDirectory + '/boost_system',
-            boostDirectory + '/boost_chrono',
-            boostDirectory + '/boost_iostreams',
-            boostDirectory + '/boost_regex',
+            (boostDirectory + '/boost_program_options', libdeps.dependency.Interface),
+            (boostDirectory + '/boost_filesystem', libdeps.dependency.Interface),
+            (boostDirectory + '/boost_thread', libdeps.dependency.Interface),
+            (boostDirectory + '/boost_system', libdeps.dependency.Interface),
+            (boostDirectory + '/boost_chrono', libdeps.dependency.Interface),
+            (boostDirectory + '/boost_iostreams', libdeps.dependency.Interface),
+            (boostDirectory + '/boost_regex', libdeps.dependency.Interface),
         ])
 
 boostEnv.Library(
@@ -180,7 +182,7 @@ else:
     snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
     snappyEnv = snappyEnv.Clone(
         LIBDEPS=[
-            'snappy' + snappySuffix + '/snappy',
+            ('snappy' + snappySuffix + '/snappy',  libdeps.dependency.Interface),
         ])
 
 snappyEnv.Library(
@@ -200,7 +202,7 @@ else:
     zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={ 'env' : zlibEnv })
     zlibEnv = zlibEnv.Clone(
         LIBDEPS=[
-            'zlib' + zlibSuffix + '/zlib',
+            ('zlib' + zlibSuffix + '/zlib', libdeps.dependency.Interface),
         ])
 
 zlibEnv.Library(
@@ -214,8 +216,8 @@ if usemozjs:
     mozjsEnv.SConscript('mozjs' + mozjsSuffix + '/SConscript', exports={'env' : mozjsEnv })
     mozjsEnv = mozjsEnv.Clone(
         LIBDEPS=[
-            'mozjs' + mozjsSuffix + '/mozjs',
-            'shim_zlib',
+            ('mozjs' + mozjsSuffix + '/mozjs', libdeps.dependency.Interface),
+            ('shim_zlib', libdeps.dependency.Interface),
         ])
 
     mozjsEnv.Library(
@@ -237,7 +239,7 @@ if (gperftoolsEnv['MONGO_ALLOCATOR'] == "tcmalloc"):
         gperftoolsEnv.SConscript('gperftools' + gperftoolsSuffix + '/SConscript', exports={ 'env' : gperftoolsEnv })
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS=[
-                'gperftools' + gperftoolsSuffix + '/tcmalloc_minimal',
+                ('gperftools' + gperftoolsSuffix + '/tcmalloc_minimal', libdeps.dependency.Interface),
             ])
 
 gperftoolsEnv.Library(
@@ -258,7 +260,7 @@ else:
     stemmerEnv.SConscript('libstemmer_c/SConscript', exports={ 'env' : stemmerEnv })
     stemmerEnv = stemmerEnv.Clone(
         LIBDEPS=[
-            'libstemmer_c/stemmer',
+             ('libstemmer_c/stemmer', libdeps.dependency.Interface),
         ])
 
 stemmerEnv.Library(
@@ -279,7 +281,7 @@ else:
     yamlEnv.SConscript('yaml-cpp' + yamlSuffix + '/SConscript', exports={ 'env' : yamlEnv })
     yamlEnv = yamlEnv.Clone(
         LIBDEPS=[
-            'yaml-cpp' + yamlSuffix + '/yaml',
+            ('yaml-cpp' + yamlSuffix + '/yaml', libdeps.dependency.Interface),
         ])
 
 yamlEnv.Library(
@@ -295,7 +297,7 @@ if env.TargetOSIs('solaris'):
     tzEnv.SConscript('tz/SConscript', exports={ 'env' : tzEnv })
     tzEnv = tzEnv.Clone(
         LIBDEPS=[
-            'tz/tz',
+            ('tz/tz', libdeps.dependency.Interface),
         ])
 
 tzEnv.Library(
@@ -317,7 +319,7 @@ if wiredtiger:
         wiredtigerEnv.SConscript('wiredtiger/SConscript', exports={ 'env' : wiredtigerEnv })
         wiredtigerEnv = wiredtigerEnv.Clone(
             LIBDEPS=[
-                'wiredtiger/wiredtiger',
+                 ('wiredtiger/wiredtiger', libdeps.dependency.Interface),
             ])
 
     wiredtigerEnv.Library(
@@ -337,7 +339,7 @@ else:
     asioEnv.SConscript('asio-asio-1-11-0/SConscript', exports={ 'env' : asioEnv })
     asioEnv = asioEnv.Clone(
         LIBDEPS=[
-            'asio-asio-1-11-0/asio',
+            ('asio-asio-1-11-0/asio', libdeps.dependency.Interface),
         ])
 
 asioEnv.Library(
@@ -357,7 +359,7 @@ else:
     intelDecimal128Env.SConscript('IntelRDFPMathLib20U1/SConscript', exports={ 'env' : intelDecimal128Env })
     intelDecimal128Env = intelDecimal128Env.Clone(
 	LIBDEPS=[
-	    'IntelRDFPMathLib20U1/intel_decimal128',
+	    ('IntelRDFPMathLib20U1/intel_decimal128', libdeps.dependency.Interface),
 	])
 
 intelDecimal128Env.Library(
@@ -379,7 +381,7 @@ else:
     icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
     icuEnv = icuEnv.Clone(
         LIBDEPS=[
-            'icu4c' + icuSuffix + '/source/icu_i18n',
+            ('icu4c' + icuSuffix + '/source/icu_i18n', libdeps.dependency.Interface),
         ])
 
 icuEnv.Library(

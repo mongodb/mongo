@@ -44,33 +44,33 @@ OplogBuffer* OplogBufferProxy::getTarget() const {
     return _target.get();
 }
 
-void OplogBufferProxy::startup(OperationContext* txn) {
-    _target->startup(txn);
+void OplogBufferProxy::startup(OperationContext* opCtx) {
+    _target->startup(opCtx);
 }
 
-void OplogBufferProxy::shutdown(OperationContext* txn) {
+void OplogBufferProxy::shutdown(OperationContext* opCtx) {
     {
         stdx::lock_guard<stdx::mutex> backLock(_lastPushedMutex);
         stdx::lock_guard<stdx::mutex> frontLock(_lastPeekedMutex);
         _lastPushed.reset();
         _lastPeeked.reset();
     }
-    _target->shutdown(txn);
+    _target->shutdown(opCtx);
 }
 
-void OplogBufferProxy::pushEvenIfFull(OperationContext* txn, const Value& value) {
+void OplogBufferProxy::pushEvenIfFull(OperationContext* opCtx, const Value& value) {
     stdx::lock_guard<stdx::mutex> lk(_lastPushedMutex);
     _lastPushed = value;
-    _target->pushEvenIfFull(txn, value);
+    _target->pushEvenIfFull(opCtx, value);
 }
 
-void OplogBufferProxy::push(OperationContext* txn, const Value& value) {
+void OplogBufferProxy::push(OperationContext* opCtx, const Value& value) {
     stdx::lock_guard<stdx::mutex> lk(_lastPushedMutex);
     _lastPushed = value;
-    _target->push(txn, value);
+    _target->push(opCtx, value);
 }
 
-void OplogBufferProxy::pushAllNonBlocking(OperationContext* txn,
+void OplogBufferProxy::pushAllNonBlocking(OperationContext* opCtx,
                                           Batch::const_iterator begin,
                                           Batch::const_iterator end) {
     if (begin == end) {
@@ -78,11 +78,11 @@ void OplogBufferProxy::pushAllNonBlocking(OperationContext* txn,
     }
     stdx::lock_guard<stdx::mutex> lk(_lastPushedMutex);
     _lastPushed = *(end - 1);
-    _target->pushAllNonBlocking(txn, begin, end);
+    _target->pushAllNonBlocking(opCtx, begin, end);
 }
 
-void OplogBufferProxy::waitForSpace(OperationContext* txn, std::size_t size) {
-    _target->waitForSpace(txn, size);
+void OplogBufferProxy::waitForSpace(OperationContext* opCtx, std::size_t size) {
+    _target->waitForSpace(opCtx, size);
 }
 
 bool OplogBufferProxy::isEmpty() const {
@@ -101,18 +101,18 @@ std::size_t OplogBufferProxy::getCount() const {
     return _target->getCount();
 }
 
-void OplogBufferProxy::clear(OperationContext* txn) {
+void OplogBufferProxy::clear(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> backLock(_lastPushedMutex);
     stdx::lock_guard<stdx::mutex> frontLock(_lastPeekedMutex);
     _lastPushed.reset();
     _lastPeeked.reset();
-    _target->clear(txn);
+    _target->clear(opCtx);
 }
 
-bool OplogBufferProxy::tryPop(OperationContext* txn, Value* value) {
+bool OplogBufferProxy::tryPop(OperationContext* opCtx, Value* value) {
     stdx::lock_guard<stdx::mutex> backLock(_lastPushedMutex);
     stdx::lock_guard<stdx::mutex> frontLock(_lastPeekedMutex);
-    if (!_target->tryPop(txn, value)) {
+    if (!_target->tryPop(opCtx, value)) {
         return false;
     }
     _lastPeeked.reset();
@@ -133,13 +133,13 @@ bool OplogBufferProxy::waitForData(Seconds waitDuration) {
     return _target->waitForData(waitDuration);
 }
 
-bool OplogBufferProxy::peek(OperationContext* txn, Value* value) {
+bool OplogBufferProxy::peek(OperationContext* opCtx, Value* value) {
     stdx::lock_guard<stdx::mutex> lk(_lastPeekedMutex);
     if (_lastPeeked) {
         *value = *_lastPeeked;
         return true;
     }
-    if (_target->peek(txn, value)) {
+    if (_target->peek(opCtx, value)) {
         _lastPeeked = *value;
         return true;
     }
@@ -147,7 +147,7 @@ bool OplogBufferProxy::peek(OperationContext* txn, Value* value) {
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferProxy::lastObjectPushed(
-    OperationContext* txn) const {
+    OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_lastPushedMutex);
     if (!_lastPushed) {
         return boost::none;

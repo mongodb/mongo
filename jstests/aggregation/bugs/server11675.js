@@ -166,7 +166,8 @@ var server11675 = function() {
 
     // Error checking
     // $match, but wrong position
-    assertErrorCode(t, [{$sort: {text: 1}}, {$match: {$text: {$search: 'apple banana'}}}], 17313);
+    assertErrorCode(
+        t, [{$sort: {text: 1}}, {$match: {$text: {$search: 'apple banana'}}}], ErrorCodes.BadValue);
 
     // wrong $stage, but correct position
     assertErrorCode(t,

@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-MoveTimingHelper::MoveTimingHelper(OperationContext* txn,
+MoveTimingHelper::MoveTimingHelper(OperationContext* opCtx,
                                    const std::string& where,
                                    const std::string& ns,
                                    const BSONObj& min,
@@ -48,7 +48,7 @@ MoveTimingHelper::MoveTimingHelper(OperationContext* txn,
                                    std::string* cmdErrmsg,
                                    const ShardId& toShard,
                                    const ShardId& fromShard)
-    : _txn(txn),
+    : _opCtx(opCtx),
       _where(where),
       _ns(ns),
       _to(toShard),
@@ -82,11 +82,11 @@ MoveTimingHelper::~MoveTimingHelper() {
             _b.append("errmsg", *_cmdErrmsg);
         }
 
-        grid.catalogClient(_txn)->logChange(_txn,
-                                            str::stream() << "moveChunk." << _where,
-                                            _ns,
-                                            _b.obj(),
-                                            ShardingCatalogClient::kMajorityWriteConcern);
+        grid.catalogClient(_opCtx)->logChange(_opCtx,
+                                              str::stream() << "moveChunk." << _where,
+                                              _ns,
+                                              _b.obj(),
+                                              ShardingCatalogClient::kMajorityWriteConcern);
     } catch (const std::exception& e) {
         warning() << "couldn't record timing for moveChunk '" << _where
                   << "': " << redact(e.what());
@@ -99,10 +99,10 @@ void MoveTimingHelper::done(int step) {
 
     const std::string s = str::stream() << "step " << step << " of " << _totalNumSteps;
 
-    CurOp* op = CurOp::get(_txn);
+    CurOp* op = CurOp::get(_opCtx);
 
     {
-        stdx::lock_guard<Client> lk(*_txn->getClient());
+        stdx::lock_guard<Client> lk(*_opCtx->getClient());
         op->setMessage_inlock(s.c_str());
     }
 

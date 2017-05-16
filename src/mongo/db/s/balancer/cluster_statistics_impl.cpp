@@ -60,16 +60,16 @@ const char kVersionField[] = "version";
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the version could not be retrieved
  */
-StatusWith<string> retrieveShardMongoDVersion(OperationContext* txn, ShardId shardId) {
-    auto shardRegistry = Grid::get(txn)->shardRegistry();
-    auto shardStatus = shardRegistry->getShard(txn, shardId);
+StatusWith<string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId shardId) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    auto shardStatus = shardRegistry->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
     auto shard = shardStatus.getValue();
 
     auto commandResponse =
-        shard->runCommandWithFixedRetryAttempts(txn,
+        shard->runCommandWithFixedRetryAttempts(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                 "admin",
                                                 BSON("serverStatus" << 1),
@@ -100,14 +100,14 @@ ClusterStatisticsImpl::ClusterStatisticsImpl() = default;
 
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
-StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* txn) {
+StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
     // Get a list of all the shards that are participating in this balance round along with any
     // maximum allowed quotas and current utilization. We get the latter by issuing
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
-    auto shardsStatus = Grid::get(txn)->catalogClient(txn)->getAllShards(
-        txn, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto shardsStatus = Grid::get(opCtx)->catalogClient(opCtx)->getAllShards(
+        opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!shardsStatus.isOK()) {
         return shardsStatus.getStatus();
     }
@@ -117,7 +117,7 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
     vector<ShardStatistics> stats;
 
     for (const auto& shard : shards) {
-        auto shardSizeStatus = shardutil::retrieveTotalShardSize(txn, shard.getName());
+        auto shardSizeStatus = shardutil::retrieveTotalShardSize(opCtx, shard.getName());
         if (!shardSizeStatus.isOK()) {
             const Status& status = shardSizeStatus.getStatus();
 
@@ -130,7 +130,7 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
 
         string mongoDVersion;
 
-        auto mongoDVersionStatus = retrieveShardMongoDVersion(txn, shard.getName());
+        auto mongoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
         if (mongoDVersionStatus.isOK()) {
             mongoDVersion = std::move(mongoDVersionStatus.getValue());
         } else {

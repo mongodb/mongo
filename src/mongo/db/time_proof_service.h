@@ -46,7 +46,7 @@ public:
     using TimeProof = SHA1Block;
     using Key = SHA1Block;
 
-    TimeProofService(Key key) : _key(std::move(key)) {}
+    TimeProofService() = default;
 
     /**
      * Generates a pseudorandom key to be used for HMAC authentication.
@@ -56,15 +56,12 @@ public:
     /**
      * Returns the proof matching the time argument.
      */
-    TimeProof getProof(const LogicalTime& time) const;
+    TimeProof getProof(const LogicalTime& time, const Key& key) const;
 
     /**
      * Verifies that the proof matches the time argument.
      */
-    Status checkProof(const LogicalTime& time, const TimeProof& proof) const;
-
-private:
-    Key _key;
+    Status checkProof(const LogicalTime& time, const TimeProof& proof, const Key& key) const;
 };
 
 }  // namespace mongo

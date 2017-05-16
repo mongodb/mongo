@@ -32,6 +32,10 @@
 
 #include "mongo/db/exec/update.h"
 
+#include <algorithm>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -48,6 +52,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -64,15 +69,34 @@ namespace {
 const char idFieldName[] = "_id";
 const FieldRef idFieldRef(idFieldName);
 
-Status storageValid(const mb::Document&, const bool = true);
-Status storageValid(const mb::ConstElement&, const bool = true);
-Status storageValidChildren(const mb::ConstElement&, const bool = true);
+StatusWith<std::uint32_t> storageValid(const mb::Document&,
+                                       bool deep,
+                                       std::uint32_t recursionLevel);
+StatusWith<std::uint32_t> storageValid(const mb::ConstElement&,
+                                       bool deep,
+                                       std::uint32_t recursionLevel);
+StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement&,
+                                               bool deep,
+                                               std::uint32_t recursionLevel);
 
 /**
- * mutable::document storageValid check -- like BSONObj::_okForStorage
+ * Validates that the MutableBSON document 'doc' is acceptable for storage in a collection. If
+ * 'deep' is true, the check is performed recursively on subdocuments.
+ *
+ * An error is returned if the validation fails or if 'recursionLevel' exceeds the maximum allowable
+ * depth. On success, an integer is returned that represents the nesting depth of this document.
  */
-Status storageValid(const mb::Document& doc, const bool deep) {
+StatusWith<std::uint32_t> storageValid(const mb::Document& doc,
+                                       bool deep,
+                                       std::uint32_t recursionLevel) {
+    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Document exceeds maximum nesting depth of "
+                                    << BSONDepth::getMaxDepthForUserStorage());
+    }
+
     mb::ConstElement currElem = doc.root().leftChild();
+    std::uint32_t greatestDepth = recursionLevel;
     while (currElem.ok()) {
         if (currElem.getFieldName() == idFieldName) {
             switch (currElem.getType()) {
@@ -86,13 +110,20 @@ Status storageValid(const mb::Document& doc, const bool deep) {
                     break;
             }
         }
-        Status s = storageValid(currElem, deep);
-        if (!s.isOK())
-            return s;
+
+        // Get the nesting depth of this child element.
+        auto depth = storageValid(currElem, deep, recursionLevel + 1);
+        if (!depth.isOK()) {
+            return depth;
+        }
+
+        // The depth of this document is the depth of its deepest child, so we only keep track of
+        // the maximum depth seen so far.
+        greatestDepth = std::max(greatestDepth, depth.getValue());
         currElem = currElem.rightSibling();
     }
 
-    return Status::OK();
+    return greatestDepth;
 }
 
 /**
@@ -122,9 +153,13 @@ Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep)
 
     // Found a $id field
     if (currName == "$id") {
-        Status s = storageValidChildren(curr, deep);
-        if (!s.isOK())
-            return s;
+        // We don't care about the recursion level being accurate, as the validate() command will
+        // perform full validation of the updated object.
+        const uint32_t recursionLevel = 0;
+        auto depth = storageValidChildren(curr, deep, recursionLevel);
+        if (!depth.isOK()) {
+            return depth.getStatus();
+        }
 
         curr = curr.leftSibling();
         if (!curr.ok() || (curr.getFieldName() != "$ref")) {
@@ -159,29 +194,49 @@ Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep)
 }
 
 /**
- * Checks that all parents, of the element passed in, are valid for storage
+ * Checks that all of the parents of the MutableBSON element 'elem' are valid for storage. Note that
+ * 'elem' must be in a valid state when using this function.
  *
- * Note: The elem argument must be in a valid state when using this function
+ * An error is returned if the validation fails, or if 'recursionLevel' exceeds the maximum
+ * allowable depth. On success, an integer is returned that represents the number of steps from this
+ * element to the root through ancestor nodes.
  */
-Status storageValidParents(const mb::ConstElement& elem) {
+StatusWith<std::uint32_t> storageValidParents(const mb::ConstElement& elem,
+                                              std::uint32_t recursionLevel) {
+    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Document exceeds maximum nesting depth of "
+                                    << BSONDepth::getMaxDepthForUserStorage());
+    }
+
     const mb::ConstElement& root = elem.getDocument().root();
     if (elem != root) {
         const mb::ConstElement& parent = elem.parent();
         if (parent.ok() && parent != root) {
-            Status s = storageValid(parent, false);
-            if (s.isOK()) {
-                s = storageValidParents(parent);
+            const bool doRecursiveCheck = false;
+            const uint32_t parentsRecursionLevel = 0;
+            auto height = storageValid(parent, doRecursiveCheck, parentsRecursionLevel);
+            if (height.isOK()) {
+                height = storageValidParents(parent, recursionLevel + 1);
             }
-
-            return s;
+            return height;
         }
+        return recursionLevel + 1;
     }
-    return Status::OK();
+    return recursionLevel;
 }
 
-Status storageValid(const mb::ConstElement& elem, const bool deep) {
+StatusWith<std::uint32_t> storageValid(const mb::ConstElement& elem,
+                                       const bool deep,
+                                       std::uint32_t recursionLevel) {
     if (!elem.ok())
         return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
+
+    if (recursionLevel >= BSONDepth::getMaxDepthForUserStorage()) {
+        return Status(ErrorCodes::Overflow,
+                      str::stream() << "Document exceeds maximum nesting depth of "
+                                    << BSONDepth::getMaxDepthForUserStorage());
+    }
 
     // Field names of elements inside arrays are not meaningful in mutable bson,
     // so we do not want to validate them.
@@ -210,27 +265,38 @@ Status storageValid(const mb::ConstElement& elem, const bool deep) {
 
     if (deep) {
         // Check children if there are any.
-        Status s = storageValidChildren(elem, deep);
-        if (!s.isOK())
-            return s;
+        auto depth = storageValidChildren(elem, deep, recursionLevel);
+        if (!depth.isOK()) {
+            return depth;
+        }
+        invariant(depth.getValue() >= recursionLevel);
+        return depth.getValue();
     }
 
-    return Status::OK();
+    return recursionLevel;
 }
 
-Status storageValidChildren(const mb::ConstElement& elem, const bool deep) {
-    if (!elem.hasChildren())
-        return Status::OK();
+StatusWith<std::uint32_t> storageValidChildren(const mb::ConstElement& elem,
+                                               const bool deep,
+                                               std::uint32_t recursionLevel) {
+    if (!elem.hasChildren()) {
+        return recursionLevel;
+    }
 
+    std::uint32_t greatestDepth = recursionLevel;
     mb::ConstElement curr = elem.leftChild();
     while (curr.ok()) {
-        Status s = storageValid(curr, deep);
-        if (!s.isOK())
-            return s;
+        auto depth = storageValid(curr, deep, recursionLevel + 1);
+        if (!depth.isOK()) {
+            return depth.getStatus();
+        }
+
+        // Find the maximum depth amongst all of the children of 'elem'.
+        greatestDepth = std::max(greatestDepth, depth.getValue());
         curr = curr.rightSibling();
     }
 
-    return Status::OK();
+    return greatestDepth;
 }
 
 /**
@@ -243,7 +309,7 @@ Status storageValidChildren(const mb::ConstElement& elem, const bool deep) {
 inline Status validate(const BSONObj& original,
                        const FieldRefSet& updatedFields,
                        const mb::Document& updated,
-                       const std::vector<FieldRef*>* immutableAndSingleValueFields,
+                       const std::vector<std::unique_ptr<FieldRef>>* immutableAndSingleValueFields,
                        const ModifierInterface::Options& opts) {
     LOG(3) << "update validate options -- "
            << " updatedFields: " << updatedFields << " immutableAndSingleValueFields.size:"
@@ -261,20 +327,27 @@ inline Status validate(const BSONObj& original,
     if (updatedFields.empty() || !opts.enforceOkForStorage) {
         if (opts.enforceOkForStorage) {
             // No specific fields were updated so the whole doc must be checked
-            Status s = storageValid(updated, true);
-            if (!s.isOK())
-                return s;
+            const bool doRecursiveCheck = true;
+            const std::uint32_t recursionLevel = 1;
+            auto documentDepth = storageValid(updated, doRecursiveCheck, recursionLevel);
+            if (!documentDepth.isOK()) {
+                return documentDepth.getStatus();
+            }
         }
 
         // Check all immutable fields
-        if (immutableAndSingleValueFields)
-            changedImmutableFields.fillFrom(*immutableAndSingleValueFields);
+        if (immutableAndSingleValueFields) {
+            changedImmutableFields.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(*immutableAndSingleValueFields));
+        }
     } else {
         // TODO: Change impl so we don't need to create a new FieldRefSet
         //       -- move all conflict logic into static function on FieldRefSet?
         FieldRefSet immutableFieldRef;
-        if (immutableAndSingleValueFields)
-            immutableFieldRef.fillFrom(*immutableAndSingleValueFields);
+        if (immutableAndSingleValueFields) {
+            immutableFieldRef.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(*immutableAndSingleValueFields));
+        }
 
         FieldRefSet::const_iterator where = updatedFields.begin();
         const FieldRefSet::const_iterator end = updatedFields.end();
@@ -290,14 +363,28 @@ inline Status validate(const BSONObj& original,
             // newElem might be missing if $unset/$renamed-away
             if (newElem.ok()) {
                 // Check element, and its children
-                Status s = storageValid(newElem, true);
-                if (!s.isOK())
-                    return s;
+                const bool doRecursiveCheck = true;
+                const std::uint32_t recursionLevel = 0;
+                auto newElemDepth = storageValid(newElem, doRecursiveCheck, recursionLevel);
+                if (!newElemDepth.isOK()) {
+                    return newElemDepth.getStatus();
+                }
 
                 // Check parents to make sure they are valid as well.
-                s = storageValidParents(newElem);
-                if (!s.isOK())
-                    return s;
+                auto parentsDepth = storageValidParents(newElem, recursionLevel);
+                if (!parentsDepth.isOK()) {
+                    return parentsDepth.getStatus();
+                }
+
+                // Ensure that the combined depths of both the new element and its parents do not
+                // exceed the maximum BSON depth.
+                if (newElemDepth.getValue() + parentsDepth.getValue() >
+                    BSONDepth::getMaxDepthForUserStorage()) {
+                    return {ErrorCodes::Overflow,
+                            str::stream() << "Update operation causes document to exceed maximum "
+                                             "nesting depth of "
+                                          << BSONDepth::getMaxDepthForUserStorage()};
+                }
             }
             // Check if the updated field conflicts with immutable fields
             immutableFieldRef.findConflicts(&current, &changedImmutableFields);
@@ -435,10 +522,11 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
     return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
 };
 
-const std::vector<FieldRef*>* getImmutableFields(OperationContext* txn, const NamespaceString& ns) {
-    auto metadata = CollectionShardingState::get(txn, ns)->getMetadata();
+const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContext* opCtx,
+                                                                 const NamespaceString& ns) {
+    auto metadata = CollectionShardingState::get(opCtx, ns)->getMetadata();
     if (metadata) {
-        const std::vector<FieldRef*>& fields = metadata->getKeyPatternFields();
+        const std::vector<std::unique_ptr<FieldRef>>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.
         return &fields;
     }
@@ -449,12 +537,12 @@ const std::vector<FieldRef*>* getImmutableFields(OperationContext* txn, const Na
 
 const char* UpdateStage::kStageType = "UPDATE";
 
-UpdateStage::UpdateStage(OperationContext* txn,
+UpdateStage::UpdateStage(OperationContext* opCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _params(params),
       _ws(ws),
       _collection(collection),
@@ -557,7 +645,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         // Verify that no immutable fields were changed and data is valid for storage.
 
         if (!(!getOpCtx()->writesAreReplicated() || request->isFromMigration())) {
-            const std::vector<FieldRef*>* immutableFields = NULL;
+            const std::vector<std::unique_ptr<FieldRef>>* immutableFields = nullptr;
             if (lifecycle)
                 immutableFields = getImmutableFields(getOpCtx(), request->getNamespaceString());
 
@@ -578,7 +666,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 OplogUpdateEntryArgs args;
-                args.ns = _collection->ns().ns();
+                args.nss = _collection->ns();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -607,7 +695,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 invariant(_collection);
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 OplogUpdateEntryArgs args;
-                args.ns = _collection->ns().ns();
+                args.nss = _collection->ns();
+                args.uuid = _collection->uuid();
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
@@ -649,7 +738,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     return newObj;
 }
 
-Status UpdateStage::applyUpdateOpsForInsert(OperationContext* txn,
+Status UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
                                             const CanonicalQuery* cq,
                                             const BSONObj& query,
                                             UpdateDriver* driver,
@@ -665,15 +754,20 @@ Status UpdateStage::applyUpdateOpsForInsert(OperationContext* txn,
     driver->setLogOp(false);
     driver->setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
 
-    const vector<FieldRef*>* immutablePaths = NULL;
+    const std::vector<std::unique_ptr<FieldRef>>* immutablePaths = nullptr;
     if (!isInternalRequest)
-        immutablePaths = getImmutableFields(txn, ns);
+        immutablePaths = getImmutableFields(opCtx, ns);
 
     // The original document we compare changes to - immutable paths must not change
     BSONObj original;
 
     if (cq) {
-        Status status = driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc);
+        std::vector<FieldRef*> fields;
+        if (immutablePaths) {
+            fields = transitional_tools_do_not_use::unspool_vector(*immutablePaths);
+        }
+
+        Status status = driver->populateDocumentWithQueryFields(*cq, &fields, *doc);
         if (!status.isOK()) {
             return status;
         }
@@ -1003,7 +1097,7 @@ Status UpdateStage::restoreUpdateState() {
 
     // We may have stepped down during the yield.
     bool userInitiatedWritesAndNotPrimary = getOpCtx()->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(getOpCtx(), nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,

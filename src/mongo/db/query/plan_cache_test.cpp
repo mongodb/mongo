@@ -49,6 +49,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 using namespace mongo;
 
@@ -67,12 +68,12 @@ static const NamespaceString nss("test.collection");
  */
 unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(queryObj);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -87,7 +88,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* projStr,
                                         const char* collationStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
@@ -95,7 +96,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setProj(fromjson(projStr));
     qr->setCollation(fromjson(collationStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -109,7 +110,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* minStr,
                                         const char* maxStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
@@ -125,7 +126,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setMin(fromjson(minStr));
     qr->setMax(fromjson(maxStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -141,7 +142,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         bool snapshot,
                                         bool explain) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
@@ -159,7 +160,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setSnapshot(snapshot);
     qr->setExplain(explain);
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -218,9 +219,9 @@ PlanRankingDecision* createDecision(size_t numPlans) {
     unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
     for (size_t i = 0; i < numPlans; ++i) {
         CommonStats common("COLLSCAN");
-        unique_ptr<PlanStageStats> stats(new PlanStageStats(common, STAGE_COLLSCAN));
+        auto stats = stdx::make_unique<PlanStageStats>(common, STAGE_COLLSCAN);
         stats->specific.reset(new CollectionScanStats());
-        why->stats.mutableVector().push_back(stats.release());
+        why->stats.push_back(std::move(stats));
         why->scores.push_back(0U);
         why->candidateOrder.push_back(i);
     }
@@ -539,7 +540,7 @@ protected:
                       const BSONObj& maxObj,
                       bool snapshot) {
         QueryTestServiceContext serviceContext;
-        auto txn = serviceContext.makeOperationContext();
+        auto opCtx = serviceContext.makeOperationContext();
 
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
@@ -563,7 +564,7 @@ protected:
         qr->setMax(maxObj);
         qr->setSnapshot(snapshot);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
         ASSERT_OK(s);
@@ -571,7 +572,7 @@ protected:
 
     void runQueryAsCommand(const BSONObj& cmdObj) {
         QueryTestServiceContext serviceContext;
-        auto txn = serviceContext.makeOperationContext();
+        auto opCtx = serviceContext.makeOperationContext();
 
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
@@ -585,7 +586,7 @@ protected:
             assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns);
         ASSERT_OK(s);
@@ -658,7 +659,7 @@ protected:
                                       const BSONObj& collation,
                                       const QuerySolution& soln) const {
         QueryTestServiceContext serviceContext;
-        auto txn = serviceContext.makeOperationContext();
+        auto opCtx = serviceContext.makeOperationContext();
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(query);
@@ -666,7 +667,7 @@ protected:
         qr->setProj(proj);
         qr->setCollation(collation);
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 

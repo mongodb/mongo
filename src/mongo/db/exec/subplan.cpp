@@ -32,6 +32,9 @@
 
 #include "mongo/db/exec/subplan.h"
 
+#include <memory>
+#include <vector>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -46,6 +49,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -56,12 +60,12 @@ using stdx::make_unique;
 
 const char* SubplanStage::kStageType = "SUBPLAN";
 
-SubplanStage::SubplanStage(OperationContext* txn,
+SubplanStage::SubplanStage(OperationContext* opCtx,
                            Collection* collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _plannerParams(params),
@@ -180,8 +184,8 @@ Status SubplanStage::planSubqueries() {
 
     for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
         // We need a place to shove the results from planning this branch.
-        _branchResults.push_back(new BranchPlanningResult());
-        BranchPlanningResult* branchResult = _branchResults.back();
+        _branchResults.push_back(stdx::make_unique<BranchPlanningResult>());
+        BranchPlanningResult* branchResult = _branchResults.back().get();
 
         MatchExpression* orChild = _orExpression->getChild(i);
 
@@ -216,9 +220,11 @@ Status SubplanStage::planSubqueries() {
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
-            Status status = QueryPlanner::plan(*branchResult->canonicalQuery,
-                                               _plannerParams,
-                                               &branchResult->solutions.mutableVector());
+            invariant(branchResult->solutions.empty());
+            std::vector<QuerySolution*> rawSolutions;
+            Status status =
+                QueryPlanner::plan(*branchResult->canonicalQuery, _plannerParams, &rawSolutions);
+            branchResult->solutions = transitional_tools_do_not_use::spool_vector(rawSolutions);
 
             if (!status.isOK()) {
                 mongoutils::str::stream ss;
@@ -290,7 +296,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
     for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
         MatchExpression* orChild = _orExpression->getChild(i);
-        BranchPlanningResult* branchResult = _branchResults[i];
+        BranchPlanningResult* branchResult = _branchResults[i].get();
 
         if (branchResult->cachedSolution.get()) {
             // We can get the index tags we need out of the cache.
@@ -300,7 +306,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                 return tagStatus;
             }
         } else if (1 == branchResult->solutions.size()) {
-            QuerySolution* soln = branchResult->solutions.front();
+            QuerySolution* soln = branchResult->solutions.front().get();
             Status tagStatus = tagOrChildAccordingToCache(
                 cacheData.get(), soln->cacheData.get(), orChild, _indexMap);
             if (!tagStatus.isOK()) {
@@ -342,7 +348,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
                                               &nextPlanRoot));
 
                 // Takes ownership of solution with index 'ix' and 'nextPlanRoot'.
-                multiPlanStage->addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
+                multiPlanStage->addPlan(branchResult->solutions[ix].release(), nextPlanRoot, _ws);
             }
 
             Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
@@ -433,13 +439,13 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     // Use the query planning module to plan the whole query.
     std::vector<QuerySolution*> rawSolutions;
     Status status = QueryPlanner::plan(*_query, _plannerParams, &rawSolutions);
+    std::vector<std::unique_ptr<QuerySolution>> solutions =
+        transitional_tools_do_not_use::spool_vector(rawSolutions);
     if (!status.isOK()) {
         return Status(ErrorCodes::BadValue,
                       "error processing query: " + _query->toString() +
                           " planner returned error: " + status.reason());
     }
-
-    OwnedPointerVector<QuerySolution> solutions(rawSolutions);
 
     // We cannot figure out how to answer the query.  Perhaps it requires an index
     // we do not have?
@@ -457,7 +463,8 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
         _children.emplace_back(root);
 
         // This SubplanStage takes ownership of the query solution.
-        _compositeSolution.reset(solutions.popAndReleaseBack());
+        _compositeSolution = std::move(solutions.back());
+        solutions.pop_back();
 
         return Status::OK();
     } else {
@@ -478,7 +485,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
                 getOpCtx(), _collection, *_query, *solutions[ix], _ws, &nextPlanRoot));
 
             // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
-            multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);
+            multiPlanStage->addPlan(solutions[ix].release(), nextPlanRoot, _ws);
         }
 
         // Delegate the the MultiPlanStage's plan selection facility.

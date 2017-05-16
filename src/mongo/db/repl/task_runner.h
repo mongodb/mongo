@@ -59,7 +59,7 @@ public:
     };
 
     using Task = stdx::function<NextAction(OperationContext*, const Status&)>;
-    using SynchronousTask = stdx::function<Status(OperationContext* txn)>;
+    using SynchronousTask = stdx::function<Status(OperationContext* opCtx)>;
 
     /**
      * Returns the Status from the supplied function after running it..

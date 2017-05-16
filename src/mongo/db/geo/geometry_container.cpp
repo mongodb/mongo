@@ -31,6 +31,7 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 
@@ -422,10 +423,11 @@ bool containsLine(const S2Polygon& poly, const S2Polyline& otherLine) {
     // Kind of a mess.  We get a function for clipping the line to the
     // polygon.  We do this and make sure the line is the same as the
     // line we're clipping against.
-    OwnedPointerVector<S2Polyline> clippedOwned;
-    vector<S2Polyline*>& clipped = clippedOwned.mutableVector();
+    std::vector<S2Polyline*> clipped;
 
     poly.IntersectWithPolyline(&otherLine, &clipped);
+    const std::vector<std::unique_ptr<S2Polyline>> clippedOwned =
+        transitional_tools_do_not_use::spool_vector(clipped);
     if (1 != clipped.size()) {
         return false;
     }

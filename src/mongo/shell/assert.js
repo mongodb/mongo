@@ -131,7 +131,7 @@ assert.neq = function(a, b, msg) {
     doassert("[" + a + "] != [" + b + "] are equal : " + msg);
 };
 
-assert.hasFields = function(o, arr, msg) {
+assert.hasFields = function(result, arr, msg) {
     var count = 0;
     if (!Array.isArray(arr)) {
         throw new Error("The second argument to assert.hasFields must be an array.");
@@ -144,7 +144,7 @@ assert.hasFields = function(o, arr, msg) {
     }
 
     if (count != arr.length) {
-        doassert("None of values from " + tojson(arr) + " was in " + tojson(o) + " : " + msg);
+        doassert("None of values from " + tojson(arr) + " was in " + tojson(result) + " : " + msg);
     }
 };
 
@@ -265,6 +265,22 @@ assert.retry = function(func, msg, num_attempts, intervalMS) {
 assert.retryNoExcept = function(func, msg, num_attempts, intervalMS) {
     var safeFunc = _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
     assert.retry(safeFunc, msg, num_attempts, intervalMS);
+};
+
+/**
+ * Runs the given command on the 'admin' database of the provided node. Asserts that the command
+ * worked but allows network errors to occur.
+ */
+assert.adminCommandWorkedAllowingNetworkError = function(node, commandObj) {
+    try {
+        assert.commandWorked(node.adminCommand(commandObj));
+    } catch (e) {
+        // Ignore errors due to connection failures.
+        if (!isNetworkError(e)) {
+            throw e;
+        }
+        print("Caught network error: " + tojson(e));
+    }
 };
 
 assert.time = function(f, msg, timeout /*ms*/) {

@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of unsupported group operator on sharded
+// collection.
+// @tags: [assumes_unsharded_collection]
+
 t = db.group1;
 t.drop();
 
@@ -99,7 +103,7 @@ p = {
     },
     initial: {count: 0},
     finalize: function(obj) {
-        ob;
+        throw new Error("Intentionally throwing exception in finalize function");
     }
 };
 assert.commandFailedWithCode(
@@ -113,7 +117,7 @@ p = {
     },
     initial: {count: 0},
     finalize: function(obj) {
-        ob;
+        throw new Error("Intentionally throwing exception in finalize function");
     }
 };
 assert.commandFailedWithCode(

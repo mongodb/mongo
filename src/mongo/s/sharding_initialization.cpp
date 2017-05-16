@@ -37,9 +37,13 @@
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_validator.h"
+#include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -89,13 +93,15 @@ using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
+using executor::ShardingTaskExecutor;
 
 static constexpr auto kRetryInterval = Seconds{2};
 
-std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
+auto makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
-    return stdx::make_unique<ThreadPoolTaskExecutor>(
+    auto executor = stdx::make_unique<ThreadPoolTaskExecutor>(
         stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+    return stdx::make_unique<ShardingTaskExecutor>(std::move(executor));
 }
 
 std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service,
@@ -119,22 +125,17 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
 
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
-        auto net = executor::makeNetworkInterface(
+        auto exec = makeTaskExecutor(executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
             metadataHookBuilder(),
-            connPoolOptions);
-        auto netPtr = net.get();
-        auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
-            stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
+            connPoolOptions));
 
         executors.emplace_back(std::move(exec));
     }
 
     // Add executor used to perform non-performance critical work.
-    auto fixedNetPtr = fixedNet.get();
-    auto fixedExec = stdx::make_unique<ThreadPoolTaskExecutor>(
-        stdx::make_unique<NetworkInterfaceThreadPool>(fixedNetPtr), std::move(fixedNet));
+    auto fixedExec = makeTaskExecutor(std::move(fixedNet));
 
     auto executorPool = stdx::make_unique<TaskExecutorPool>();
     executorPool->addExecutors(std::move(executors), std::move(fixedExec));
@@ -145,20 +146,21 @@ std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
 
 const StringData kDistLockProcessIdForConfigServer("ConfigServer");
 
-std::string generateDistLockProcessId(OperationContext* txn) {
+std::string generateDistLockProcessId(OperationContext* opCtx) {
     std::unique_ptr<SecureRandom> rng(SecureRandom::create());
 
     return str::stream()
         << HostAndPort(getHostName(), serverGlobalParams.port).toString() << ':'
         << durationCount<Seconds>(
-               txn->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
+               opCtx->getServiceContext()->getPreciseClockSource()->now().toDurationSinceEpoch())
         << ':' << rng->nextInt64();
 }
 
-Status initializeGlobalShardingState(OperationContext* txn,
+Status initializeGlobalShardingState(OperationContext* opCtx,
                                      const ConnectionString& configCS,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
+                                     std::unique_ptr<CatalogCache> catalogCache,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder) {
     if (configCS.type() == ConnectionString::INVALID) {
@@ -189,7 +191,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
 
     auto catalogClient =
-        makeCatalogClient(txn->getServiceContext(), shardRegistry.get(), distLockProcessId);
+        makeCatalogClient(opCtx->getServiceContext(), shardRegistry.get(), distLockProcessId);
 
     auto rawCatalogClient = catalogClient.get();
 
@@ -201,7 +203,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
     grid.init(
         std::move(catalogClient),
         std::move(catalogManager),
-        stdx::make_unique<CatalogCache>(),
+        std::move(catalogCache),
         std::move(shardRegistry),
         stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getPreciseClockSource()),
         stdx::make_unique<BalancerConfiguration>(),
@@ -209,7 +211,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
         networkPtr);
 
     // must be started once the grid is initialized
-    grid.shardRegistry()->startup();
+    grid.shardRegistry()->startup(opCtx);
 
     auto status = rawCatalogClient->startup();
     if (!status.isOK()) {
@@ -224,23 +226,26 @@ Status initializeGlobalShardingState(OperationContext* txn,
         }
     }
 
+    LogicalTimeValidator::set(opCtx->getServiceContext(),
+                              stdx::make_unique<LogicalTimeValidator>());
+
     return Status::OK();
 }
 
-Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
+Status reloadShardRegistryUntilSuccess(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
 
     while (!globalInShutdownDeprecated()) {
-        auto stopStatus = txn->checkForInterruptNoAssert();
+        auto stopStatus = opCtx->checkForInterruptNoAssert();
         if (!stopStatus.isOK()) {
             return stopStatus;
         }
 
         try {
-            uassertStatusOK(ClusterIdentityLoader::get(txn)->loadClusterId(
-                txn, repl::ReadConcernLevel::kMajorityReadConcern));
+            uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
+                opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
             if (grid.shardRegistry()->isUp()) {
                 return Status::OK();
             }

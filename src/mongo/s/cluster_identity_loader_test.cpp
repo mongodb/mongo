@@ -38,7 +38,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -61,7 +60,7 @@ using unittest::assertGet;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};

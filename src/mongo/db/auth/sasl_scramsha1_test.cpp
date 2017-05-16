@@ -218,7 +218,7 @@ protected:
 
     ServiceContextNoop serviceContext;
     ServiceContextNoop::UniqueClient client;
-    ServiceContextNoop::UniqueOperationContext txn;
+    ServiceContextNoop::UniqueOperationContext opCtx;
 
     AuthzManagerExternalStateMock* authzManagerExternalState;
     std::unique_ptr<AuthorizationManager> authzManager;
@@ -229,7 +229,7 @@ protected:
 
     void setUp() {
         client = serviceContext.makeClient("test");
-        txn = serviceContext.makeOperationContext(client.get());
+        opCtx = serviceContext.makeOperationContext(client.get());
 
         auto uniqueAuthzManagerExternalStateMock =
             stdx::make_unique<AuthzManagerExternalStateMock>();
@@ -240,7 +240,7 @@ protected:
             stdx::make_unique<AuthzSessionExternalStateMock>(authzManager.get()));
 
         saslServerSession = stdx::make_unique<NativeSaslAuthenticationSession>(authzSession.get());
-        saslServerSession->setOpCtxt(txn.get());
+        saslServerSession->setOpCtxt(opCtx.get());
         saslServerSession->start("test", "SCRAM-SHA-1", "mongodb", "MockServer.test", 1, false);
         saslClientSession = stdx::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism, "SCRAM-SHA-1");
@@ -254,7 +254,7 @@ protected:
 
 TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -277,7 +277,7 @@ TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
 
 TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -299,7 +299,7 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
 
 TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -324,7 +324,7 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
 
 TEST_F(SCRAMSHA1Fixture, testServerStep2GivesBadVerifier) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -359,7 +359,7 @@ TEST_F(SCRAMSHA1Fixture, testServerStep2GivesBadVerifier) {
 
 TEST_F(SCRAMSHA1Fixture, testSCRAM) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -372,7 +372,7 @@ TEST_F(SCRAMSHA1Fixture, testSCRAM) {
 
 TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -386,7 +386,7 @@ TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
 
 TEST_F(SCRAMSHA1Fixture, testCommasInUsernameAndPassword) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "s,a,jack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -411,7 +411,7 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectUser) {
 
 TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -427,7 +427,7 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
 
 TEST_F(SCRAMSHA1Fixture, testMONGODBCR) {
     authzManagerExternalState->insertPrivilegeDocument(
-        txn.get(), generateMONGODBCRUserDocument("sajack", "sajack"), BSONObj());
+        opCtx.get(), generateMONGODBCRUserDocument("sajack", "sajack"), BSONObj());
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,

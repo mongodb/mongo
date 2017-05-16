@@ -223,6 +223,7 @@ Status _checkV2RolesArray(const BSONElement& rolesElement) {
 
 Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
     BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
+    BSONElement userIDElement = doc[AuthorizationManager::USER_ID_FIELD_NAME];
     BSONElement userDBElement = doc[AuthorizationManager::USER_DB_FIELD_NAME];
     BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
     BSONElement rolesElement = doc[ROLES_FIELD_NAME];
@@ -232,6 +233,11 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         return _badValue("User document needs 'user' field to be a string", 0);
     if (userElement.valueStringData().empty())
         return _badValue("User document needs 'user' field to be non-empty", 0);
+
+    // If we have an id field, make sure it is an OID
+    if (!userIDElement.eoo() && (userIDElement.type() != BSONType::jstOID)) {
+        return _badValue("User document 'userId' field must be an OID", 0);
+    }
 
     // Validate the "db" element
     if (userDBElement.type() != String || userDBElement.valueStringData().empty()) {
@@ -298,6 +304,15 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
 
 std::string V2UserDocumentParser::extractUserNameFromUserDocument(const BSONObj& doc) const {
     return doc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
+}
+
+boost::optional<OID> V2UserDocumentParser::extractUserIDFromUserDocument(const BSONObj& doc) const {
+    BSONElement e = doc[AuthorizationManager::USER_ID_FIELD_NAME];
+    if (e.type() == BSONType::EOO) {
+        return boost::optional<OID>();
+    }
+
+    return e.OID();
 }
 
 Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(

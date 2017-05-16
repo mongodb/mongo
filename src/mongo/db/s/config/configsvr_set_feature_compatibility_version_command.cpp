@@ -81,10 +81,9 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const auto version = uassertStatusOK(
@@ -97,11 +96,11 @@ public:
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         // Forward to all shards.
-        uassertStatusOK(
-            Grid::get(txn)->catalogManager()->setFeatureCompatibilityVersionOnShards(txn, version));
+        uassertStatusOK(Grid::get(opCtx)->catalogManager()->setFeatureCompatibilityVersionOnShards(
+            opCtx, version));
 
         // On success, set featureCompatibilityVersion on self.
-        FeatureCompatibilityVersion::set(txn, version);
+        FeatureCompatibilityVersion::set(opCtx, version);
 
         return true;
     }

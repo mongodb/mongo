@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+class FailPoint;
+
 /**
  * @return the global fail point registry.
  */
@@ -55,4 +57,17 @@ FailPointRegistry* getGlobalFailPointRegistry();
  * Convenience macro for defining a fail point in a header scope.
  */
 #define MONGO_FP_FORWARD_DECLARE(fp) extern FailPoint fp;
-}
+
+/**
+ * Convenience class for enabling a failpoint and disabling it as this goes out of scope.
+ */
+class FailPointEnableBlock {
+public:
+    FailPointEnableBlock(const std::string& failPointName);
+    ~FailPointEnableBlock();
+
+private:
+    FailPoint* _failPoint;
+};
+
+}  // namespace mongo

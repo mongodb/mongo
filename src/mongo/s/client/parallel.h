@@ -91,7 +91,7 @@ public:
 
     ~ParallelSortClusteredCursor();
 
-    void init(OperationContext* txn);
+    void init(OperationContext* opCtx);
 
     bool more();
 
@@ -107,9 +107,9 @@ public:
 private:
     using ShardCursorsMap = std::map<ShardId, ParallelConnectionMetadata>;
 
-    void fullInit(OperationContext* txn);
-    void startInit(OperationContext* txn);
-    void finishInit(OperationContext* txn);
+    void fullInit(OperationContext* opCtx);
+    void startInit(OperationContext* opCtx);
+    void finishInit(OperationContext* opCtx);
 
     bool isCommand() {
         return NamespaceString(_qSpec.ns()).isCommand();
@@ -117,11 +117,7 @@ private:
 
     void _finishCons();
 
-    void _markStaleNS(OperationContext* txn,
-                      const NamespaceString& staleNS,
-                      const StaleConfigException& e,
-                      bool& forceReload);
-    void _handleStaleNS(OperationContext* txn, const NamespaceString& staleNS, bool forceReload);
+    void _markStaleNS(const NamespaceString& staleNS, const StaleConfigException& e);
 
     bool _didInit;
     bool _done;
@@ -150,7 +146,7 @@ private:
      * set connection and the primary cannot be reached, the version
      * will not be set if the slaveOk flag is set.
      */
-    void setupVersionAndHandleSlaveOk(OperationContext* txn,
+    void setupVersionAndHandleSlaveOk(OperationContext* opCtx,
                                       std::shared_ptr<ParallelConnectionState> state /* in & out */,
                                       const ShardId& shardId,
                                       std::shared_ptr<Shard> primary /* in */,

@@ -34,12 +34,16 @@
 
 #include "mongo/util/net/listen.h"
 
+#include <memory>
+#include <vector>
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/asio_message_port.h"
@@ -92,10 +96,10 @@ using std::vector;
 vector<SockAddr> ipToAddrs(const char* ips, int port, bool useUnixSockets) {
     vector<SockAddr> out;
     if (*ips == '\0') {
-        out.push_back(SockAddr("0.0.0.0", port));  // IPv4 all
+        out.push_back(SockAddr("127.0.0.1", port));  // IPv4 localhost
 
         if (IPv6Enabled())
-            out.push_back(SockAddr("::", port));  // IPv6 all
+            out.push_back(SockAddr("::1", port));  // IPv6 localhost
 #ifndef _WIN32
         if (useUnixSockets)
             out.push_back(SockAddr(makeUnixSockPath(port), port));  // Unix socket
@@ -291,7 +295,10 @@ void Listener::initAndListen() {
 
         maxSelectTime.tv_sec = 0;
         maxSelectTime.tv_usec = 250000;
-        const int ret = select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
+        const int ret = [&] {
+            MONGO_IDLE_THREAD_BLOCK;
+            return select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
+        }();
 
         if (ret == 0) {
             continue;
@@ -444,18 +451,20 @@ void Listener::initAndListen() {
         _readyCondition.notify_all();
     }
 
-    OwnedPointerVector<EventHolder> eventHolders;
+    std::vector<std::unique_ptr<EventHolder>> eventHolders;
     std::unique_ptr<WSAEVENT[]> events(new WSAEVENT[_socks.size()]);
 
 
     // Populate events array with an event for each socket we are watching
     for (size_t count = 0; count < _socks.size(); ++count) {
-        EventHolder* ev(new EventHolder);
-        eventHolders.mutableVector().push_back(ev);
-        events[count] = ev->get();
+        auto ev = stdx::make_unique<EventHolder>();
+        eventHolders.push_back(std::move(ev));
+        events[count] = eventHolders.back()->get();
     }
 
-    while (!globalInShutdownDeprecated()) {
+    // The check against _finished allows us to actually stop the listener by signalling it through
+    // the _finished flag.
+    while (!globalInShutdownDeprecated() && !_finished.load()) {
         // Turn on listening for accept-ready sockets
         for (size_t count = 0; count < _socks.size(); ++count) {
             int status = WSAEventSelect(_socks[count], events[count], FD_ACCEPT | FD_CLOSE);

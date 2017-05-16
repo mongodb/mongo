@@ -54,7 +54,8 @@ enum class OpType {
     REMOVE,
     CREATEINDEX,
     DROPINDEX,
-    LET
+    LET,
+    CPULOAD
 };
 
 /**
@@ -66,6 +67,7 @@ public:
     BSONElement check;
     BSONObj command;
     BSONObj context;
+    double cpuFactor = 1;
     int delay = 0;
     BSONObj doc;
     bool isDocAnArray = false;

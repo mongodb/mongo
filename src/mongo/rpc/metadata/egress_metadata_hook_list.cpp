@@ -40,11 +40,10 @@ void EgressMetadataHookList::addHook(std::unique_ptr<EgressMetadataHook>&& newHo
     _hooks.emplace_back(std::forward<std::unique_ptr<EgressMetadataHook>>(newHook));
 }
 
-Status EgressMetadataHookList::writeRequestMetadata(OperationContext* txn,
-                                                    const HostAndPort& requestDestination,
+Status EgressMetadataHookList::writeRequestMetadata(OperationContext* opCtx,
                                                     BSONObjBuilder* metadataBob) {
     for (auto&& hook : _hooks) {
-        auto status = hook->writeRequestMetadata(txn, requestDestination, metadataBob);
+        auto status = hook->writeRequestMetadata(opCtx, metadataBob);
         if (!status.isOK()) {
             return status;
         }
@@ -53,7 +52,7 @@ Status EgressMetadataHookList::writeRequestMetadata(OperationContext* txn,
     return Status::OK();
 }
 
-Status EgressMetadataHookList::readReplyMetadata(const HostAndPort& replySource,
+Status EgressMetadataHookList::readReplyMetadata(StringData replySource,
                                                  const BSONObj& metadataObj) {
     for (auto&& hook : _hooks) {
         auto status = hook->readReplyMetadata(replySource, metadataObj);

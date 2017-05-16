@@ -47,7 +47,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -68,9 +67,6 @@ namespace {
 // Include kReplSetMetadataFieldName in a request to get the shard's ReplSetMetadata in the
 // response.
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
-
-// Allow the command to be executed on a secondary (see ServerSelectionMetadata).
-const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
 
 /**
  * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with maxTimeMS
@@ -141,22 +137,22 @@ std::string ShardRemote::toString() const {
     return getId().toString() + ":" + _originalConnString.toString();
 }
 
-BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* txn,
+BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
                                                const ReadPreferenceSetting& readPref) {
     BSONObjBuilder builder;
     if (logger::globalLogDomain()->shouldLog(
             logger::LogComponent::kTracking,
             logger::LogSeverity::Debug(1))) {  // avoid performance overhead if not logging
-        if (!TrackingMetadata::get(txn).getIsLogged()) {
-            if (!TrackingMetadata::get(txn).getOperId()) {
-                TrackingMetadata::get(txn).initWithOperName("NotSet");
+        if (!TrackingMetadata::get(opCtx).getIsLogged()) {
+            if (!TrackingMetadata::get(opCtx).getOperId()) {
+                TrackingMetadata::get(opCtx).initWithOperName("NotSet");
             }
             MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
-                << TrackingMetadata::get(txn).toString();
-            TrackingMetadata::get(txn).setIsLogged(true);
+                << TrackingMetadata::get(opCtx).toString();
+            TrackingMetadata::get(opCtx).setIsLogged(true);
         }
 
-        TrackingMetadata metadata = TrackingMetadata::get(txn).constructChildMetadata();
+        TrackingMetadata metadata = TrackingMetadata::get(opCtx).constructChildMetadata();
         metadata.writeToMetadata(&builder);
     }
 
@@ -164,84 +160,82 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* txn,
         if (readPref.pref == ReadPreference::PrimaryOnly) {
             builder.appendElements(kReplMetadata);
         } else {
-            builder.appendElements(kSecondaryOkMetadata);
+            builder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
             builder.appendElements(kReplMetadata);
         }
     } else {
         if (readPref.pref != ReadPreference::PrimaryOnly) {
-            builder.appendElements(kSecondaryOkMetadata);
+            builder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
         }
     }
     return builder.obj();
 }
 
-Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
-                                                 const ReadPreferenceSetting& readPref,
-                                                 const string& dbName,
-                                                 Milliseconds maxTimeMSOverride,
-                                                 const BSONObj& cmdObj) {
+StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* opCtx,
+                                                            const ReadPreferenceSetting& readPref,
+                                                            const string& dbName,
+                                                            Milliseconds maxTimeMSOverride,
+                                                            const BSONObj& cmdObj) {
 
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
     if (getId() == "config") {
         readPrefWithMinOpTime.minOpTime = grid.configOpTime();
     }
-    const auto host = _targeter->findHost(txn, readPrefWithMinOpTime);
-    if (!host.isOK()) {
-        return Shard::HostWithResponse(boost::none, host.getStatus());
+    const auto swHost = _targeter->findHost(opCtx, readPrefWithMinOpTime);
+    if (!swHost.isOK()) {
+        return swHost.getStatus();
     }
+    const auto host = std::move(swHost.getValue());
 
     const Milliseconds requestTimeout =
-        std::min(txn->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+        std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
 
     const RemoteCommandRequest request(
-        host.getValue(),
+        host,
         dbName,
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
-        _appendMetadataForCommand(txn, readPrefWithMinOpTime),
-        txn,
+        _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
+        opCtx,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 
-    RemoteCommandResponse swResponse =
+    RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    TaskExecutor* executor = Grid::get(txn)->getExecutorPool()->getFixedExecutor();
-    auto callStatus = executor->scheduleRemoteCommand(
-        request,
-        [&swResponse](const RemoteCommandCallbackArgs& args) { swResponse = args.response; });
-    if (!callStatus.isOK()) {
-        return Shard::HostWithResponse(host.getValue(), callStatus.getStatus());
+    TaskExecutor* executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto swCallbackHandle = executor->scheduleRemoteCommand(
+        request, [&response](const RemoteCommandCallbackArgs& args) { response = args.response; });
+    if (!swCallbackHandle.isOK()) {
+        return swCallbackHandle.getStatus();
     }
 
     // Block until the command is carried out
-    executor->wait(callStatus.getValue());
+    executor->wait(swCallbackHandle.getValue());
 
-    updateReplSetMonitor(host.getValue(), swResponse.status);
+    updateReplSetMonitor(host, response.status);
 
-    if (!swResponse.isOK()) {
-        if (swResponse.status.compareCode(ErrorCodes::ExceededTimeLimit)) {
-            LOG(0) << "Operation timed out with status " << redact(swResponse.status);
+    if (!response.status.isOK()) {
+        if (response.status == ErrorCodes::ExceededTimeLimit) {
+            LOG(0) << "Operation timed out with status " << redact(response.status);
         }
-        return Shard::HostWithResponse(host.getValue(), swResponse.status);
+        return response.status;
     }
 
-    BSONObj responseObj = swResponse.data.getOwned();
-    BSONObj responseMetadata = swResponse.metadata.getOwned();
-    Status commandStatus = getStatusFromCommandResult(responseObj);
-    Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
+    auto result = response.data.getOwned();
+    auto commandStatus = getStatusFromCommandResult(result);
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
 
-    // Tell the replica set monitor of any errors
-    updateReplSetMonitor(host.getValue(), commandStatus);
-    updateReplSetMonitor(host.getValue(), writeConcernStatus);
+    updateReplSetMonitor(host, commandStatus);
+    updateReplSetMonitor(host, writeConcernStatus);
 
-    return Shard::HostWithResponse(host.getValue(),
-                                   CommandResponse(std::move(responseObj),
-                                                   std::move(responseMetadata),
-                                                   std::move(commandStatus),
-                                                   std::move(writeConcernStatus)));
+    return Shard::CommandResponse(std::move(host),
+                                  std::move(result),
+                                  response.metadata.getOwned(),
+                                  std::move(commandStatus),
+                                  std::move(writeConcernStatus));
 }
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
@@ -252,7 +246,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
     readPrefWithMinOpTime.minOpTime = grid.configOpTime();
 
-    const auto host = _targeter->findHost(txn, readPrefWithMinOpTime);
+    const auto host = _targeter->findHost(opCtx, readPrefWithMinOpTime);
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -313,7 +307,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     }
 
     const Milliseconds maxTimeMS =
-        std::min(txn->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
+        std::min(opCtx->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
 
     BSONObjBuilder findCmdBuilder;
 
@@ -331,12 +325,12 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         qr.asFindCommand(&findCmdBuilder);
     }
 
-    Fetcher fetcher(Grid::get(txn)->getExecutorPool()->getFixedExecutor(),
+    Fetcher fetcher(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
                     host.getValue(),
                     nss.db().toString(),
                     findCmdBuilder.done(),
                     fetcherCallback,
-                    _appendMetadataForCommand(txn, readPrefWithMinOpTime),
+                    _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
                     maxTimeMS);
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
@@ -357,7 +351,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     return response;
 }
 
-Status ShardRemote::createIndexOnConfig(OperationContext* txn,
+Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const BSONObj& keys,
                                         bool unique) {

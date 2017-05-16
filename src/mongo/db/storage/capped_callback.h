@@ -50,7 +50,7 @@ public:
      * If data is unowned, it is only valid inside of this call. If implementations wish to
      * stash a pointer, they must copy it.
      */
-    virtual Status aboutToDeleteCapped(OperationContext* txn,
+    virtual Status aboutToDeleteCapped(OperationContext* opCtx,
                                        const RecordId& loc,
                                        RecordData data) = 0;
 

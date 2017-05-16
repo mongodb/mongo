@@ -52,14 +52,14 @@ static const NamespaceString nss{"unittests.QueryStageDistinct"};
 
 class DistinctBase {
 public:
-    DistinctBase() : _client(&_txn) {}
+    DistinctBase() : _client(&_opCtx) {}
 
     virtual ~DistinctBase() {
         _client.dropCollection(nss.ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_opCtx, nss.ns(), obj));
     }
 
     void insert(const BSONObj& obj) {
@@ -95,7 +95,7 @@ public:
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
 
 private:
     DBDirectClient _client;
@@ -121,12 +121,12 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
         std::vector<IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, BSON("a" << 1), false, &indexes);
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
         DistinctParams params;
@@ -141,7 +141,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_txn, params, &ws);
+        DistinctScan distinct(&_opCtx, params, &ws);
 
         WorkingSetID wsid;
         // Get our first result.
@@ -188,17 +188,17 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
         std::vector<IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(&_txn, BSON("a" << 1), false, &indexes);
+        coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, BSON("a" << 1), false, &indexes);
         verify(indexes.size() == 1);
 
         DistinctParams params;
         params.descriptor = indexes[0];
-        ASSERT_TRUE(params.descriptor->isMultikey(&_txn));
+        ASSERT_TRUE(params.descriptor->isMultikey(&_opCtx));
 
         verify(params.descriptor);
         params.direction = 1;
@@ -211,7 +211,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_txn, params, &ws);
+        DistinctScan distinct(&_opCtx, params, &ws);
 
         // We should see each number in the range [1, 6] exactly once.
         std::set<int> seen;
@@ -257,12 +257,12 @@ public:
 
         addIndex(BSON("a" << 1 << "b" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         std::vector<IndexDescriptor*> indices;
         coll->getIndexCatalog()->findIndexesByKeyPattern(
-            &_txn, BSON("a" << 1 << "b" << 1), false, &indices);
+            &_opCtx, BSON("a" << 1 << "b" << 1), false, &indices);
         ASSERT_EQ(1U, indices.size());
 
         DistinctParams params;
@@ -282,7 +282,7 @@ public:
         params.bounds.fields.push_back(bOil);
 
         WorkingSet ws;
-        DistinctScan distinct(&_txn, params, &ws);
+        DistinctScan distinct(&_opCtx, params, &ws);
 
         WorkingSetID wsid;
         PlanStage::StageState state;

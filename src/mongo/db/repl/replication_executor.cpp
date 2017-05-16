@@ -71,59 +71,45 @@ ReplicationExecutor::~ReplicationExecutor() {
 }
 
 BSONObj ReplicationExecutor::getDiagnosticBSON() const {
+    BSONObjBuilder b;
+    appendDiagnosticBSON(&b);
+    return b.obj();
+}
+
+void ReplicationExecutor::appendDiagnosticBSON(BSONObjBuilder* builder) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    BSONObjBuilder builder;
 
     // Counters
-    BSONObjBuilder counters(builder.subobjStart("counters"));
-    counters.appendIntOrLL("eventCreated", _counterCreatedEvents);
-    counters.appendIntOrLL("eventWait", _counterCreatedEvents);
-    counters.appendIntOrLL("cancels", _counterCancels);
-    counters.appendIntOrLL("waits", _counterWaits);
-    counters.appendIntOrLL("scheduledNetCmd", _counterScheduledCommands);
-    counters.appendIntOrLL("scheduledDBWork", _counterScheduledDBWorks);
-    counters.appendIntOrLL("scheduledXclWork", _counterScheduledExclusiveWorks);
-    counters.appendIntOrLL("scheduledWorkAt", _counterScheduledWorkAts);
-    counters.appendIntOrLL("scheduledWork", _counterScheduledWorks);
-    counters.appendIntOrLL("schedulingFailures", _counterSchedulingFailures);
-    counters.done();
+    {
+        BSONObjBuilder counters(builder->subobjStart("counters"));
+        counters.appendIntOrLL("eventCreated", _counterCreatedEvents);
+        counters.appendIntOrLL("eventWait", _counterCreatedEvents);
+        counters.appendIntOrLL("cancels", _counterCancels);
+        counters.appendIntOrLL("waits", _counterWaits);
+        counters.appendIntOrLL("scheduledNetCmd", _counterScheduledCommands);
+        counters.appendIntOrLL("scheduledDBWork", _counterScheduledDBWorks);
+        counters.appendIntOrLL("scheduledXclWork", _counterScheduledExclusiveWorks);
+        counters.appendIntOrLL("scheduledWorkAt", _counterScheduledWorkAts);
+        counters.appendIntOrLL("scheduledWork", _counterScheduledWorks);
+        counters.appendIntOrLL("schedulingFailures", _counterSchedulingFailures);
+    }
 
     // Queues
-    BSONObjBuilder queues(builder.subobjStart("queues"));
-    queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
-    queues.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
-    queues.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
-    queues.appendIntOrLL("sleepers", _sleepersQueue.size());
-    queues.appendIntOrLL("ready", _readyQueue.size());
-    queues.appendIntOrLL("free", _freeQueue.size());
-    queues.done();
+    {
+        BSONObjBuilder queues(builder->subobjStart("queues"));
+        queues.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
+        queues.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
+        queues.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
+        queues.appendIntOrLL("sleepers", _sleepersQueue.size());
+        queues.appendIntOrLL("ready", _readyQueue.size());
+        queues.appendIntOrLL("free", _freeQueue.size());
+        queues.done();
+    }
 
-    builder.appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
-    builder.appendIntOrLL("eventWaiters", _totalEventWaiters);
-    builder.append("shuttingDown", _inShutdown);
-    builder.append("networkInterface", _networkInterface->getDiagnosticString());
-    return builder.obj();
-}
-
-std::string ReplicationExecutor::getDiagnosticString() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _getDiagnosticString_inlock();
-}
-
-std::string ReplicationExecutor::_getDiagnosticString_inlock() const {
-    str::stream output;
-    output << "ReplicationExecutor";
-    output << " networkInProgress:" << _networkInProgressQueue.size();
-    output << " dbWorkInProgress:" << _dbWorkInProgressQueue.size();
-    output << " exclusiveInProgress:" << _exclusiveLockInProgressQueue.size();
-    output << " sleeperQueue:" << _sleepersQueue.size();
-    output << " ready:" << _readyQueue.size();
-    output << " free:" << _freeQueue.size();
-    output << " unsignaledEvents:" << _unsignaledEvents.size();
-    output << " eventWaiters:" << _totalEventWaiters;
-    output << " shuttingDown:" << _inShutdown;
-    output << " networkInterface:" << _networkInterface->getDiagnosticString();
-    return output;
+    builder->appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
+    builder->appendIntOrLL("eventWaiters", _totalEventWaiters);
+    builder->append("shuttingDown", _inShutdown);
+    builder->append("networkInterface", _networkInterface->getDiagnosticString());
 }
 
 Date_t ReplicationExecutor::now() {
@@ -282,13 +268,13 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::onEvent(
 static void remoteCommandFinished(const ReplicationExecutor::CallbackArgs& cbData,
                                   const ReplicationExecutor::RemoteCommandCallbackFn& cb,
                                   const RemoteCommandRequest& request,
-                                  const ResponseStatus& response) {
+                                  const RemoteCommandResponse& response) {
     if (cbData.status.isOK()) {
         cb(ReplicationExecutor::RemoteCommandCallbackArgs(
             cbData.executor, cbData.myHandle, request, response));
     } else {
         cb(ReplicationExecutor::RemoteCommandCallbackArgs(
-            cbData.executor, cbData.myHandle, request, ResponseStatus(cbData.status)));
+            cbData.executor, cbData.myHandle, request, cbData.status));
     }
 }
 
@@ -297,11 +283,11 @@ static void remoteCommandFailedEarly(const ReplicationExecutor::CallbackArgs& cb
                                      const RemoteCommandRequest& request) {
     invariant(!cbData.status.isOK());
     cb(ReplicationExecutor::RemoteCommandCallbackArgs(
-        cbData.executor, cbData.myHandle, request, ResponseStatus(cbData.status)));
+        cbData.executor, cbData.myHandle, request, cbData.status));
 }
 
 void ReplicationExecutor::_finishRemoteCommand(const RemoteCommandRequest& request,
-                                               const ResponseStatus& response,
+                                               const RemoteCommandResponse& response,
                                                const CallbackHandle& cbHandle,
                                                const uint64_t expectedHandleGeneration,
                                                const RemoteCommandCallbackFn& cb) {
@@ -404,8 +390,8 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleDBW
                                handle.getValue(),
                                &_dbWorkInProgressQueue,
                                nullptr);
-        auto task = [doOp](OperationContext* txn, const Status& status) {
-            makeNoExcept(stdx::bind(doOp, txn, status))();
+        auto task = [doOp](OperationContext* opCtx, const Status& status) {
+            makeNoExcept(stdx::bind(doOp, opCtx, status))();
             return TaskRunner::NextAction::kDisposeOperationContext;
         };
         if (mode == MODE_NONE && nss.ns().empty()) {
@@ -418,7 +404,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleDBW
     return handle;
 }
 
-void ReplicationExecutor::_doOperation(OperationContext* txn,
+void ReplicationExecutor::_doOperation(OperationContext* opCtx,
                                        const Status& taskRunnerStatus,
                                        const CallbackHandle& cbHandle,
                                        WorkQueue* workQueue,
@@ -442,7 +428,7 @@ void ReplicationExecutor::_doOperation(OperationContext* txn,
                          (callback->_isCanceled || !taskRunnerStatus.isOK()
                               ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
                               : Status::OK()),
-                         txn));
+                         opCtx));
     }
     lk.lock();
     signalEvent_inlock(callback->_finishedEvent);
@@ -461,8 +447,8 @@ ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock(const CallbackFn& work)
                                &_exclusiveLockInProgressQueue,
                                &_terribleExLockSyncMutex);
         _dblockExclusiveLockTaskRunner.schedule(DatabaseTask::makeGlobalExclusiveLockTask(
-            [doOp](OperationContext* txn, const Status& status) {
-                makeNoExcept(stdx::bind(doOp, txn, status))();
+            [doOp](OperationContext* opCtx, const Status& status) {
+                makeNoExcept(stdx::bind(doOp, opCtx, status))();
                 return TaskRunner::NextAction::kDisposeOperationContext;
             }));
     }

@@ -26,8 +26,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/util/fail_point_service.h"
+#include "mongo/platform/basic.h"
 
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -52,4 +53,15 @@ MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, MONGO_NO_PREREQUISITES, MONGO
 FailPointRegistry* getGlobalFailPointRegistry() {
     return _fpRegistry.get();
 }
+
+FailPointEnableBlock::FailPointEnableBlock(const std::string& failPointName) {
+    _failPoint = getGlobalFailPointRegistry()->getFailPoint(failPointName);
+    invariant(_failPoint != nullptr);
+    _failPoint->setMode(FailPoint::alwaysOn);
 }
+
+FailPointEnableBlock::~FailPointEnableBlock() {
+    _failPoint->setMode(FailPoint::off);
+}
+
+}  // namespace mongo

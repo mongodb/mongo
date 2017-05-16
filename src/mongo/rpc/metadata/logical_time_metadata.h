@@ -42,13 +42,21 @@ namespace rpc {
  * Format:
  * logicalTime: {
  *     clusterTime: <Timestamp>,
- *     signature: <SHA1 hash of clusterTime as BinData>
+ *     signature: {
+ *         hash: <SHA1 hash of clusterTime as BinData>,
+ *         keyId: <long long>
+ *     }
  * }
  */
 class LogicalTimeMetadata {
 public:
+    LogicalTimeMetadata() = default;
     explicit LogicalTimeMetadata(SignedLogicalTime time);
 
+    /**
+     * Parses the metadata from BSON. Returns an empty LogicalTimeMetadata If the metadata is not
+     * present.
+     */
     static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONObj& metadata);
     static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONElement& metadataElem);
 

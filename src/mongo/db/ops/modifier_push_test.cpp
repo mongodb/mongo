@@ -42,8 +42,8 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/log_builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -1306,7 +1306,6 @@ TEST_F(SlicedMod, ObjectArrayFromExisting) {
 
 TEST(ToPosition, BadInputs) {
     const char* const bad[] = {
-        "{$push: {a: { $each: [1], $position:-1}}}",
         "{$push: {a: { $each: [1], $position:'s'}}}",
         "{$push: {a: { $each: [1], $position:{}}}}",
         "{$push: {a: { $each: [1], $position:[0]}}}",
@@ -1471,6 +1470,111 @@ TEST(ToPosition, Back) {
     ASSERT_OK(pushMod.log(&logBuilder));
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
     ASSERT_EQUALS(fromjson("{$set: {'a.1':1}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionEmptyArray) {
+    Document doc(fromjson("{a: []}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -1}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionOneElementArray) {
+    Document doc(fromjson("{a: [0]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -1}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1, 0]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionMultiElementArray) {
+    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [5], $position: -2}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [0, 1, 2, 5, 3, 4]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [0, 1, 2, 5, 3, 4]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionOutOfBoundsDefaultsToBeginning) {
+    Document doc(fromjson("{a: [0]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1], $position: -2}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [1, 0]}}"), logDoc);
+}
+
+TEST(ToPosition, NegativePositionPushMultipleElements) {
+    Document doc(fromjson("{a: [0, 1, 2, 3, 4]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [5, 6, 7], $position: -2}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: [0, 1, 2, 5, 6, 7, 3, 4]}"), doc);
+
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    ASSERT_OK(pushMod.log(&logBuilder));
+    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a': [0, 1, 2, 5, 6, 7, 3, 4]}}"), logDoc);
 }
 
 }  // unnamed namespace

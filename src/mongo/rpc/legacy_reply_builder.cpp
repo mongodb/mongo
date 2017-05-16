@@ -78,14 +78,14 @@ LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(const BSONObj& comman
     return *this;
 }
 
-BufBuilder& LegacyReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+BSONObjBuilder LegacyReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
     invariant(_state == State::kCommandReply);
     // Eagerly allocate reserveBytes bytes.
     _builder.reserveBytes(reserveBytes);
     // Claim our reservation immediately so we can actually write data to it.
     _builder.claimReservedBytes(reserveBytes);
     _state = State::kMetadata;
-    return _builder;
+    return BSONObjBuilder(_builder);
 }
 
 LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(const BSONObj& metadata) {
@@ -104,22 +104,6 @@ LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(const BSONObj& metadata) {
     }
     _state = State::kOutputDocs;
     return *this;
-}
-
-Status LegacyReplyBuilder::addOutputDocs(DocumentRange docs) {
-    invariant(_state == State::kOutputDocs);
-    // no op
-    return Status::OK();
-}
-
-Status LegacyReplyBuilder::addOutputDoc(const BSONObj& bson) {
-    invariant(_state == State::kOutputDocs);
-    // no op
-    return Status::OK();
-}
-
-ReplyBuilderInterface::State LegacyReplyBuilder::getState() const {
-    return _state;
 }
 
 Protocol LegacyReplyBuilder::getProtocol() const {

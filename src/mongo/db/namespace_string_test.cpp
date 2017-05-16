@@ -173,6 +173,41 @@ TEST(NamespaceStringTest, ListIndexesCursorNS) {
     ASSERT(!NamespaceString("test.$cmd.listCollections.foo").isListIndexesCursorNS());
 }
 
+TEST(NamespaceStringTest, IsGloballyManagedNamespace) {
+    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate.foo"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes.foo"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand.foo"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listCollections"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.otherCommand"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.aggregate"}.isGloballyManagedNamespace());
+    ASSERT_TRUE(NamespaceString{"test.$cmd.listIndexes"}.isGloballyManagedNamespace());
+
+    ASSERT_FALSE(NamespaceString{"test.foo"}.isGloballyManagedNamespace());
+    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isGloballyManagedNamespace());
+
+    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isGloballyManagedNamespace());
+    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isGloballyManagedNamespace());
+}
+
+TEST(NamespaceStringTest, GetTargetNSForGloballyManagedNamespace) {
+    ASSERT_EQ(
+        (NamespaceString{"test", "foo"}),
+        NamespaceString{"test.$cmd.aggregate.foo"}.getTargetNSForGloballyManagedNamespace().get());
+    ASSERT_EQ((NamespaceString{"test", "foo"}),
+              NamespaceString{"test.$cmd.listIndexes.foo"}
+                  .getTargetNSForGloballyManagedNamespace()
+                  .get());
+    ASSERT_EQ((NamespaceString{"test", "foo"}),
+              NamespaceString{"test.$cmd.otherCommand.foo"}
+                  .getTargetNSForGloballyManagedNamespace()
+                  .get());
+
+    ASSERT_FALSE(
+        NamespaceString{"test.$cmd.listCollections"}.getTargetNSForGloballyManagedNamespace());
+    ASSERT_FALSE(
+        NamespaceString{"test.$cmd.otherCommand"}.getTargetNSForGloballyManagedNamespace());
+}
+
 TEST(NamespaceStringTest, CollectionComponentValidNames) {
     ASSERT(NamespaceString::validCollectionComponent("a.b"));
     ASSERT(NamespaceString::validCollectionComponent("a.b"));

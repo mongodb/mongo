@@ -45,9 +45,9 @@ MONGO_FP_DECLARE(setYieldAllLocksWait);
 }  // namespace
 
 // static
-void QueryYield::yieldAllLocks(OperationContext* txn,
+void QueryYield::yieldAllLocks(OperationContext* opCtx,
                                RecordFetcher* fetcher,
-                               const std::string& planExecNS) {
+                               const NamespaceString& planExecNS) {
     // Things have to happen here in a specific order:
     //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
     //   2) Release lock mgr locks
@@ -55,12 +55,12 @@ void QueryYield::yieldAllLocks(OperationContext* txn,
     //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
     //   5) Reacquire lock mgr locks
 
-    Locker* locker = txn->lockState();
+    Locker* locker = opCtx->lockState();
 
     Locker::LockSnapshot snapshot;
 
     if (fetcher) {
-        fetcher->setup(txn);
+        fetcher->setup(opCtx);
     }
 
     // Nothing was unlocked, just return, yielding is pointless.
@@ -70,7 +70,10 @@ void QueryYield::yieldAllLocks(OperationContext* txn,
 
     // Top-level locks are freed, release any potential low-level (storage engine-specific
     // locks). If we are yielding, we are at a safe place to do so.
-    txn->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    // Track the number of yields in CurOp.
+    CurOp::get(opCtx)->yielded();
 
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
 
@@ -81,9 +84,6 @@ void QueryYield::yieldAllLocks(OperationContext* txn,
             sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
         }
     }
-
-    // Track the number of yields in CurOp.
-    CurOp::get(txn)->yielded();
 
     if (fetcher) {
         fetcher->fetch();

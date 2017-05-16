@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
@@ -42,30 +44,36 @@ class CursorManager;
 class RecoveryUnit;
 
 /**
- * Parameters used for constructing a ClientCursor. ClientCursors cannot be constructed in
- * isolation, but rather must be constructed and managed using a CursorManager. See cursor_manager.h
- * for more details.
+ * Parameters used for constructing a ClientCursor. Makes an owned copy of 'originatingCommandObj'
+ * to be used across getMores.
+ *
+ * ClientCursors cannot be constructed in isolation, but rather must be
+ * constructed and managed using a CursorManager. See cursor_manager.h for more details.
  */
 struct ClientCursorParams {
-    ClientCursorParams(PlanExecutor* exec,
-                       std::string ns,
+    ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
+                       NamespaceString nss,
+                       UserNameIterator authenticatedUsersIter,
                        bool isReadCommitted,
-                       int qopts = 0,
-                       const BSONObj query = BSONObj(),
-                       bool isAggCursor = false)
-        : exec(exec),
-          ns(std::move(ns)),
+                       BSONObj originatingCommandObj)
+        : exec(std::move(planExecutor)),
+          nss(std::move(nss)),
           isReadCommitted(isReadCommitted),
-          qopts(qopts),
-          query(query),
-          isAggCursor(isAggCursor) {}
+          queryOptions(exec->getCanonicalQuery()
+                           ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
+                           : 0),
+          originatingCommandObj(originatingCommandObj.getOwned()) {
+        while (authenticatedUsersIter.more()) {
+            authenticatedUsers.emplace_back(authenticatedUsersIter.next());
+        }
+    }
 
-    PlanExecutor* exec = nullptr;
-    const std::string ns;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+    const NamespaceString nss;
+    std::vector<UserName> authenticatedUsers;
     bool isReadCommitted = false;
-    int qopts = 0;
-    const BSONObj query = BSONObj();
-    bool isAggCursor = false;
+    int queryOptions = 0;
+    BSONObj originatingCommandObj;
 };
 
 /**
@@ -92,18 +100,22 @@ public:
         return _cursorid;
     }
 
-    std::string ns() const {
-        return _ns;
+    const NamespaceString& nss() const {
+        return _nss;
+    }
+
+    UserNameIterator getAuthenticatedUsers() const {
+        return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
     }
 
     bool isReadCommitted() const {
         return _isReadCommitted;
     }
 
-    bool isAggCursor() const {
-        return _isAggCursor;
-    }
-
+    /**
+     * Returns a pointer to the underlying query plan executor. All cursors manage a PlanExecutor,
+     * so this method never returns a null pointer.
+     */
     PlanExecutor* getExecutor() const {
         return _exec.get();
     }
@@ -112,8 +124,8 @@ public:
         return _queryOptions;
     }
 
-    const BSONObj& getQuery() const {
-        return _query;
+    const BSONObj& getOriginatingCommandObj() const {
+        return _originatingCommand;
     }
 
     /**
@@ -138,29 +150,8 @@ public:
     }
 
     //
-    // Timing and timeouts.
+    // Timing.
     //
-
-    /**
-     * Increments the amount of time for which this cursor believes it has been idle by 'millis'.
-     *
-     * After factoring in this additional idle time, returns whether or not this cursor now exceeds
-     * its idleness timeout and should be deleted.
-     */
-    bool shouldTimeout(int millis);
-
-    /**
-     * Resets this cursor's idle time to zero. Only cursors whose idle time is sufficiently high
-     * will be deleted by the cursor manager's reaper thread.
-     */
-    void resetIdleTime();
-
-    /**
-     * Returns the number of milliseconds for which this cursor believes it has been idle.
-     */
-    int idleTime() const {
-        return _idleAgeMillis;
-    }
 
     /**
      * Returns the amount of time execution time available to this cursor. Only valid at the
@@ -188,7 +179,7 @@ public:
 
     // Used to report replication position only in master-slave, so we keep them as TimeStamp rather
     // than OpTime.
-    void updateSlaveLocation(OperationContext* txn);
+    void updateSlaveLocation(OperationContext* opCtx);
 
     void slaveReadTill(const Timestamp& t) {
         _slaveReadTill = t;
@@ -223,12 +214,10 @@ private:
      * Constructs a ClientCursor. Since cursors must come into being registered and pinned, this is
      * private. See cursor_manager.h for more details.
      */
-    ClientCursor(const ClientCursorParams& params, CursorManager* cursorManager, CursorId cursorId);
-
-    /**
-     * Constructs a special ClientCursor used to track sharding state for the given collection.
-     */
-    ClientCursor(const Collection* collection, CursorManager* cursorManager, CursorId cursorId);
+    ClientCursor(ClientCursorParams&& params,
+                 CursorManager* cursorManager,
+                 CursorId cursorId,
+                 Date_t now);
 
     /**
      * Destroys a ClientCursor. This is private, since only the CursorManager or the ClientCursorPin
@@ -239,47 +228,71 @@ private:
      */
     ~ClientCursor();
 
-    void init();
+    /**
+     * Marks this cursor as killed, so any future uses will return an error status including
+     * 'reason'.
+     */
+    void markAsKilled(const std::string& reason);
 
     /**
-     * Marks the cursor, and its underlying query plan, as killed.
+     * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to
+     * ensure it has a chance to clean up any resources it is using. Can be called multiple times.
+     * It is an error to call any other method after calling dispose().
      */
-    void kill();
+    void dispose(OperationContext* opCtx);
+
+    bool isNoTimeout() const {
+        return (_queryOptions & QueryOption_NoCursorTimeout);
+    }
 
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
     CursorId _cursorid = 0;
 
-    // The namespace we're operating on.
-    std::string _ns;
+    const NamespaceString _nss;
+
+    // The set of authenticated users when this cursor was created.
+    std::vector<UserName> _authenticatedUsers;
 
     const bool _isReadCommitted = false;
 
-    // A pointer to the CursorManager which owns this cursor. This must be filled out when the
-    // cursor is constructed via the CursorManager.
-    //
-    // If '_cursorManager' is destroyed while this cursor is pinned, then ownership of the cursor is
-    // transferred to the ClientCursorPin. In this case, '_cursorManager' set back to null in order
-    // to indicate the ownership transfer.
-    CursorManager* _cursorManager = nullptr;
+    CursorManager* _cursorManager;
+
+    // Tracks whether dispose() has been called, to make sure it happens before destruction. It is
+    // an error to use a ClientCursor once it has been disposed.
+    bool _disposed = false;
 
     // Tracks the number of results returned by this cursor so far.
     long long _pos = 0;
 
-    // If this cursor was created by a find operation, '_query' holds the query predicate for
-    // the find. If this cursor was created by a command (e.g. the aggregate command), then
-    // '_query' holds the command specification received from the client.
-    BSONObj _query;
+    // Holds an owned copy of the command specification received from the client.
+    const BSONObj _originatingCommand;
 
     // See the QueryOptions enum in dbclientinterface.h.
-    int _queryOptions = 0;
+    const int _queryOptions = 0;
 
-    // Is this ClientCursor backed by an aggregation pipeline?
+    // The replication position only used in master-slave.
+    Timestamp _slaveReadTill;
+
+    // Unused maxTime budget for this cursor.
+    Microseconds _leftoverMaxTimeMicros = Microseconds::max();
+
+    // The underlying query execution machinery. Must be non-null.
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
+
     //
-    // Agg executors differ from others in that they manage their own locking internally and
-    // should not be killed or destroyed when the underlying collection is deleted.
+    // The following fields are used by the CursorManager and the ClientCursorPin. In most
+    // conditions, they can only be used while holding the CursorManager's mutex. Exceptions
+    // include:
+    //   - If the ClientCursor is pinned, the CursorManager will never change '_isPinned' until
+    //     asked to by the ClientCursorPin.
+    //   - It is safe to read '_killed' while holding a collection lock, which must be held when
+    //     interacting with a ClientCursorPin.
+    //   - A ClientCursorPin can access these members after deregistering the cursor from the
+    //     CursorManager, at which point it has sole ownership of the ClientCursor.
     //
-    // Note: This should *not* be set for the internal cursor used as input to an aggregation.
-    const bool _isAggCursor = false;
+
+    // TODO SERVER-28309 Remove this field and instead use _exec->markedAsKilled().
+    bool _killed = false;
 
     // While a cursor is being used by a client, it is marked as "pinned". See ClientCursorPin
     // below.
@@ -287,21 +300,7 @@ private:
     // Cursors always come into existence in a pinned state.
     bool _isPinned = true;
 
-    // Is the "no timeout" flag set on this cursor?  If false, this cursor may be automatically
-    // deleted after an interval of inactivity.
-    bool _isNoTimeout = false;
-
-    // The replication position only used in master-slave.
-    Timestamp _slaveReadTill;
-
-    // How long has the cursor been idle?
-    int _idleAgeMillis = 0;
-
-    // Unused maxTime budget for this cursor.
-    Microseconds _leftoverMaxTimeMicros = Microseconds::max();
-
-    // The underlying query execution machinery.
-    std::unique_ptr<PlanExecutor> _exec;
+    Date_t _lastUseDate;
 };
 
 /**
@@ -321,10 +320,10 @@ private:
  *
  * Example usage:
  * {
- *     StatusWith<ClientCursorPin> pin = cursorManager->pinCursor(cursorid);
+ *     StatusWith<ClientCursorPin> pin = cursorManager->pinCursor(opCtx, cursorid);
  *     if (!pin.isOK()) {
- *         // No cursor with id 'cursorid' exists. Handle the error here. Pin automatically released
- *         // on block exit.
+ *         // No cursor with id 'cursorid' exists, or it was killed while inactive. Handle the error
+ *         here.
  *         return pin.getStatus();
  *     }
  *
@@ -383,8 +382,9 @@ public:
 private:
     friend class CursorManager;
 
-    ClientCursorPin(ClientCursor* cursor);
+    ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor);
 
+    OperationContext* _opCtx = nullptr;
     ClientCursor* _cursor = nullptr;
 };
 

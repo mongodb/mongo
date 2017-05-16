@@ -92,34 +92,34 @@ public:
     /**
      * Must be called before destruction.
      */
-    void close(OperationContext* txn) {
-        _files.close(txn);
+    void close(OperationContext* opCtx) {
+        _files.close(opCtx);
     }
 
     /**
      * opens all current files, not thread safe
      */
-    Status init(OperationContext* txn);
+    Status init(OperationContext* opCtx);
 
     int numFiles() const;
     long long fileSize() const;
 
     // must call Extent::reuse on the returned extent
-    DiskLoc allocateExtent(OperationContext* txn, bool capped, int size, bool enforceQuota);
+    DiskLoc allocateExtent(OperationContext* opCtx, bool capped, int size, bool enforceQuota);
 
     /**
      * firstExt has to be == lastExt or a chain
      */
-    void freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt);
+    void freeExtents(OperationContext* opCtx, DiskLoc firstExt, DiskLoc lastExt);
 
     /**
      * frees a single extent
      * ignores all fields in the Extent except: magic, myLoc, length
      */
-    void freeExtent(OperationContext* txn, DiskLoc extent);
+    void freeExtent(OperationContext* opCtx, DiskLoc extent);
 
 
-    void freeListStats(OperationContext* txn, int* numExtents, int64_t* totalFreeSizeBytes) const;
+    void freeListStats(OperationContext* opCtx, int* numExtents, int64_t* totalFreeSizeBytes) const;
 
     /**
      * @param loc - has to be for a specific MmapV1RecordHeader
@@ -152,8 +152,8 @@ public:
     /**
      * Not thread safe, requires a database exclusive lock
      */
-    DataFileVersion getFileFormat(OperationContext* txn) const final;
-    void setFileFormat(OperationContext* txn, DataFileVersion newVersion) final;
+    DataFileVersion getFileFormat(OperationContext* opCtx) const final;
+    void setFileFormat(OperationContext* opCtx, DataFileVersion newVersion) final;
 
     const DataFile* getOpenFile(int n) const final {
         return _getOpenFile(n);
@@ -167,13 +167,13 @@ private:
     /**
      * will return NULL if nothing suitable in free list
      */
-    DiskLoc _allocFromFreeList(OperationContext* txn, int approxSize, bool capped);
+    DiskLoc _allocFromFreeList(OperationContext* opCtx, int approxSize, bool capped);
 
     /* allocate a new Extent, does not check free list
     */
-    DiskLoc _createExtent(OperationContext* txn, int approxSize, bool enforceQuota);
+    DiskLoc _createExtent(OperationContext* opCtx, int approxSize, bool enforceQuota);
 
-    DataFile* _addAFile(OperationContext* txn, int sizeNeeded, bool preallocateNextFile);
+    DataFile* _addAFile(OperationContext* opCtx, int sizeNeeded, bool preallocateNextFile);
 
 
     /**
@@ -184,14 +184,14 @@ private:
 
     DiskLoc _getFreeListStart() const;
     DiskLoc _getFreeListEnd() const;
-    void _setFreeListStart(OperationContext* txn, DiskLoc loc);
-    void _setFreeListEnd(OperationContext* txn, DiskLoc loc);
+    void _setFreeListStart(OperationContext* opCtx, DiskLoc loc);
+    void _setFreeListEnd(OperationContext* opCtx, DiskLoc loc);
 
     const DataFile* _getOpenFile(int fileId) const;
     DataFile* _getOpenFile(int fileId);
 
     DiskLoc _createExtentInFile(
-        OperationContext* txn, int fileNo, DataFile* f, int size, bool enforceQuota);
+        OperationContext* opCtx, int fileNo, DataFile* f, int size, bool enforceQuota);
 
     boost::filesystem::path _fileName(int n) const;
 
@@ -219,7 +219,7 @@ private:
         /**
          * Must be called before destruction.
          */
-        void close(OperationContext* txn);
+        void close(OperationContext* opCtx);
 
         /**
          * Returns file at location 'n' in the array, with 'n' less than number of files added.

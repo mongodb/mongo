@@ -43,11 +43,13 @@ public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}};
+        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
     }
 
     bool canSwapWithMatch() const final {
@@ -57,13 +59,6 @@ public:
     BSONObjSet getOutputSorts() final {
         return allPrefixes(_sort);
     }
-
-    /**
-     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
-    void dispose() final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
@@ -120,10 +115,18 @@ public:
         return limitSrc;
     }
 
+protected:
+    /**
+     * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+    void doDispose() final;
+
 private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    Value serialize(bool explain = false) const final {
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
     }
 

@@ -76,4 +76,10 @@ TEST(Builder, BooleanOstreamOperator) {
     sb << "{abc: " << true << ", def: " << false << "}";
     ASSERT_EQUALS("{abc: 1, def: 0}", sb.str());
 }
+
+TEST(Builder, StackAllocatorShouldNotLeak) {
+    StackAllocator stackAlloc;
+    stackAlloc.malloc(StackAllocator::SZ + 1);  // Force heap allocation.
+    // Let the builder go out of scope. If this leaks, it will trip the ASAN leak detector.
+}
 }

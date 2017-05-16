@@ -58,11 +58,11 @@ namespace mongo {
 // static
 const char* IndexScan::kStageType = "IXSCAN";
 
-IndexScan::IndexScan(OperationContext* txn,
+IndexScan::IndexScan(OperationContext* opCtx,
                      const IndexScanParams& params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _keyPattern(params.descriptor->keyPattern().getOwned()),
@@ -267,7 +267,7 @@ void IndexScan::doReattachToOperationContext() {
         _indexCursor->reattachToOperationContext(getOpCtx());
 }
 
-void IndexScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void IndexScan::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // The only state we're responsible for holding is what RecordIds to drop.  If a document
     // mutates the underlying index cursor will deal with it.
     if (INVALIDATION_MUTATION == type) {

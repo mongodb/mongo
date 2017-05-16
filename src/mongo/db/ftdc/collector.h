@@ -66,7 +66,7 @@ public:
      * If a collector fails to collect data, it should update builder with the result of the
      * failure.
      */
-    virtual void collect(OperationContext* txn, BSONObjBuilder& builder) = 0;
+    virtual void collect(OperationContext* opCtx, BSONObjBuilder& builder) = 0;
 
 protected:
     FTDCCollectorInterface() = default;

@@ -72,6 +72,9 @@
 
                     if (result.inprog.length === 1) {
                         assert.eq(result.inprog[0].appName, "MongoDB Shell", tojson(result));
+                        assert.eq(result.inprog[0].clientMetadata.application.name,
+                                  "MongoDB Shell",
+                                  tojson(result));
 
                         return true;
                     }
@@ -99,8 +102,11 @@
             {
               test: function() {
                   assert.eq(db.currentop_query
-                                .aggregate([{$match: {a: 1, $comment: "currentop_query"}}],
-                                           {collation: {locale: "fr"}, hint: {_id: 1}})
+                                .aggregate([{$match: {a: 1, $comment: "currentop_query"}}], {
+                                    collation: {locale: "fr"},
+                                    hint: {_id: 1},
+                                    comment: "currentop_query_2"
+                                })
                                 .itcount(),
                             1);
               },
@@ -108,6 +114,7 @@
               planSummary: "IXSCAN { _id: 1 }",
               currentOpFilter: {
                   "query.pipeline.0.$match.$comment": "currentop_query",
+                  "query.comment": "currentop_query_2",
                   "query.collation": {locale: "fr"},
                   "query.hint": {_id: 1}
               }
@@ -271,7 +278,8 @@
         });
 
         //
-        // Confirm currentOp content for getMore.
+        // Confirm currentOp content for getMore. This case tests command and legacy getMore with an
+        // originating find command.
         //
         coll.drop();
         for (i = 0; i < 10; ++i) {
@@ -284,15 +292,10 @@
 
         TestData.commandResult = cmdRes;
 
-        var filter;
-        if (params.readMode === "legacy") {
-            filter = {"op": "getmore", "query.filter.$comment": "currentop_query"};
-        } else {
-            filter = {
-                "query.getMore": TestData.commandResult.cursor.id,
-                "originatingCommand.filter.$comment": "currentop_query"
-            };
-        }
+        var filter = {
+            "query.getMore": TestData.commandResult.cursor.id,
+            "originatingCommand.filter.$comment": "currentop_query"
+        };
 
         confirmCurrentOpContents({
             test: function() {
@@ -306,7 +309,50 @@
         delete TestData.commandResult;
 
         //
-        // Confirm 512 byte size limit for currentOp query field.
+        // Confirm that currentOp displays upconverted getMore and originatingCommand in the case of
+        // a legacy query.
+        //
+        if (params.readMode === "legacy") {
+            let filter = {
+                "query.getMore": {$gt: 0},
+                "query.collection": "currentop_query",
+                "query.batchSize": 2,
+                originatingCommand: {
+                    find: "currentop_query",
+                    filter: {},
+                    ntoreturn: 2,
+                    comment: "currentop_query"
+                }
+            };
+
+            confirmCurrentOpContents({
+                test: function() {
+                    // Temporarily disable hanging yields so that we can iterate the first batch.
+                    assert.commandWorked(
+                        db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+
+                    let cursor =
+                        db.currentop_query.find({}).comment("currentop_query").batchSize(2);
+
+                    // Exhaust the current batch so that the next request will force a getMore.
+                    while (cursor.objsLeftInBatch() > 0) {
+                        cursor.next();
+                    }
+
+                    // Set yields to hang so that we can check currentOp output.
+                    assert.commandWorked(db.adminCommand(
+                        {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+
+                    assert.eq(cursor.itcount(), 8);
+                },
+                operation: "getmore",
+                planSummary: "COLLSCAN",
+                currentOpFilter: filter
+            });
+        }
+
+        //
+        // Confirm ~1000 byte size limit for currentOp query field.
         //
         coll.drop();
         assert.writeOK(coll.insert({a: 1}));
@@ -315,26 +361,82 @@
         // values inside it are truncated at 150 characters. To test "total length" truncation we
         // need to pass multiple values, each smaller than 150 bytes.
         TestData.queryFilter = {
-            "1": "1".repeat(100),
-            "2": "2".repeat(100),
-            "3": "3".repeat(100),
-            "4": "4".repeat(100),
-            "5": "5".repeat(100),
-            "6": "6".repeat(100),
+            "1": "1".repeat(149),
+            "2": "2".repeat(149),
+            "3": "3".repeat(149),
+            "4": "4".repeat(149),
+            "5": "5".repeat(149),
+            "6": "6".repeat(149),
+            "7": "7".repeat(149),
         };
-        var truncatedQueryString = "{ find: \"currentop_query\", filter: { " +
-            "1: \"1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111\", " +
-            "2: \"2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222\", " +
-            "3: \"3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333\", " +
-            "4: \"4444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444\", " +
-            "5: \"5555555555555555555555555555555555555555...";
+
+        var truncatedQueryString = "^\\{ find: \"currentop_query\", filter: \\{ " +
+            "1: \"1{149}\", 2: \"2{149}\", 3: \"3{149}\", 4: \"4{149}\", 5: \"5{149}\", " +
+            "6: \"6{149}\", 7: \"7+\\.\\.\\.";
 
         confirmCurrentOpContents({
             test: function() {
-                assert.eq(db.currentop_query.find(TestData.queryFilter).itcount(), 0);
+                assert.eq(db.currentop_query.find(TestData.queryFilter)
+                              .comment("currentop_query")
+                              .itcount(),
+                          0);
             },
             planSummary: "COLLSCAN",
-            currentOpFilter: {"query": truncatedQueryString}
+            currentOpFilter: {
+                "query.$truncated": {$regex: truncatedQueryString},
+                "query.comment": "currentop_query"
+            }
+        });
+
+        // Verify that an originatingCommand truncated by currentOp appears as { $truncated:
+        // <string>, comment: <string> }.
+        cmdRes = testDB.runCommand({
+            find: "currentop_query",
+            filter: TestData.queryFilter,
+            comment: "currentop_query",
+            batchSize: 0
+        });
+        assert.commandWorked(cmdRes);
+
+        TestData.commandResult = cmdRes;
+
+        filter = {
+            "query.getMore": TestData.commandResult.cursor.id,
+            "originatingCommand.$truncated": {$regex: truncatedQueryString},
+            "originatingCommand.comment": "currentop_query"
+        };
+
+        confirmCurrentOpContents({
+            test: function() {
+                var cursor = new DBCommandCursor(db.getMongo(), TestData.commandResult, 5);
+                assert.eq(cursor.itcount(), 0);
+            },
+            planSummary: "COLLSCAN",
+            currentOpFilter: filter
+        });
+
+        delete TestData.commandResult;
+
+        // Verify that an aggregation truncated by currentOp appears as { $truncated: <string>,
+        // comment: <string> } when a comment parameter is present.
+        truncatedQueryString =
+            "^\\{ aggregate: \"currentop_query\", pipeline: \\[ \\{ \\$match: \\{ " +
+            "1: \"1{149}\", 2: \"2{149}\", 3: \"3{149}\", 4: \"4{149}\", 5: \"5{149}\", " +
+            "6: \"6{149}\", 7: \"7+\\.\\.\\.";
+
+        confirmCurrentOpContents({
+            test: function() {
+                assert.eq(
+                    db.currentop_query
+                        .aggregate([{$match: TestData.queryFilter}], {comment: "currentop_query"})
+                        .itcount(),
+                    0);
+            },
+            planSummary: "COLLSCAN",
+            currentOpFilter: {
+                "query.$truncated": {$regex: truncatedQueryString},
+                "query.comment": "currentop_query"
+            }
         });
 
         delete TestData.queryFilter;

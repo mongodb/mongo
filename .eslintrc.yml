@@ -33,6 +33,7 @@ rules:
   no-sparse-arrays: 2
   no-unexpected-multiline: 2
   no-unreachable: 2
+  no-unused-expressions: 2
   no-useless-call: 2
   no-with: 2
   semi: 2

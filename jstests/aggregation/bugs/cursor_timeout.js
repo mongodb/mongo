@@ -57,7 +57,8 @@
                 return +serverStatus.metrics.cursor.timedOut === expectedNumTimedOutCursors;
             },
             function() {
-                return "aggregation cursor failed to time out: " + tojson(serverStatus);
+                return "aggregation cursor failed to time out: " +
+                    tojson(serverStatus.metrics.cursor);
             });
 
         assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus));

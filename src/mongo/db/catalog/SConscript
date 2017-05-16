@@ -4,7 +4,17 @@ Import("env")
 
 env = env.Clone()
 
-env.Library('collection_options', ['collection_options.cpp'], LIBDEPS=['$BUILD_DIR/mongo/base'])
+env.Library(
+    target='collection_options',
+    source=[
+        'collection_options.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
 
 env.CppUnitTest('collection_options_test', ['collection_options_test.cpp'],
                 LIBDEPS=['collection_options'])
@@ -44,7 +54,70 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'index_key_validate',
-    ]
+    ],
+)
+
+env.Library(
+    target='index_catalog',
+    source=[
+        "index_catalog.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='index_catalog_entry',
+    source=[
+        "index_catalog_entry.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='collection',
+    source=[
+        "collection.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='database',
+    source=[
+        "database.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='database_holder',
+    source=[
+        "database_holder.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='collection_info_cache',
+    source=[
+        'collection_info_cache.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='index_create',
+    source=[
+        "index_create.cpp",
+    ],
+    LIBDEPS=[
+    ],
 )
 
 env.Library(
@@ -53,23 +126,31 @@ env.Library(
         "apply_ops.cpp",
         "capped_utils.cpp",
         "coll_mod.cpp",
-        "collection.cpp",
         "collection_compact.cpp",
-        "collection_info_cache.cpp",
+        "collection_impl.cpp",
+        "collection_info_cache_impl.cpp",
         "create_collection.cpp",
         "cursor_manager.cpp",
-        "database.cpp",
-        "database_holder.cpp",
+        "database_impl.cpp",
+        "database_holder_impl.cpp",
         "drop_collection.cpp",
         "drop_database.cpp",
         "drop_indexes.cpp",
-        "index_catalog.cpp",
-        "index_catalog_entry.cpp",
-        "index_create.cpp",
+        "index_catalog_impl.cpp",
+        "index_catalog_entry_impl.cpp",
+        "index_create_impl.cpp",
         "rename_collection.cpp",
     ],
     LIBDEPS=[
+        'collection',
+        'collection_info_cache',
         'collection_options',
+        'database',
+        'database_holder',
+        'index_catalog',
+        'index_catalog_entry',
+        'index_create',
+        'index_key_validate',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
@@ -82,15 +163,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/background',
-        #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
-        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
-        #'$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
-        #'$BUILD_DIR/mongo/db/views/views_mongod', # CYCLE
-        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
-        #'$BUILD_DIR/mongo/db/clientcursor', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-10): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/clientcursor',
+        '$BUILD_DIR/mongo/db/commands/dcommands',
+        '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/s/balancer',
     ],
 )

@@ -255,10 +255,22 @@ Status StorageEngineMetadata::write() const {
 }
 
 template <>
-Status StorageEngineMetadata::validateStorageEngineOption<bool>(StringData fieldName,
-                                                                bool expectedValue) const {
+Status StorageEngineMetadata::validateStorageEngineOption<bool>(
+    StringData fieldName, bool expectedValue, boost::optional<bool> defaultValue) const {
     BSONElement element = _storageEngineOptions.getField(fieldName);
     if (element.eoo()) {
+        if (defaultValue && *defaultValue != expectedValue) {
+            return Status(
+                ErrorCodes::InvalidOptions,
+                str::stream()
+                    << "Requested option conflicts with the current storage engine option for "
+                    << fieldName
+                    << "; you requested "
+                    << (expectedValue ? "true" : "false")
+                    << " but the current server storage is implicitly set to "
+                    << (*defaultValue ? "true" : "false")
+                    << " and cannot be changed");
+        }
         return Status::OK();
     }
     if (!element.isBoolean()) {

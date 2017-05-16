@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 // Test that updates to fields in a text-indexed document are correctly reflected in the text index.
 var coll = db.fts_index3;
 

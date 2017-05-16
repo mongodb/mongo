@@ -43,7 +43,7 @@ class SimpleRecordStoreV1;
  */
 class SimpleRecordStoreV1Iterator final : public SeekableRecordCursor {
 public:
-    SimpleRecordStoreV1Iterator(OperationContext* txn,
+    SimpleRecordStoreV1Iterator(OperationContext* opCtx,
                                 const SimpleRecordStoreV1* records,
                                 bool forward);
 
@@ -52,12 +52,12 @@ public:
     void save() final;
     bool restore() final;
     void detachFromOperationContext() final {
-        _txn = nullptr;
+        _opCtx = nullptr;
     }
-    void reattachToOperationContext(OperationContext* txn) final {
-        _txn = txn;
+    void reattachToOperationContext(OperationContext* opCtx) final {
+        _opCtx = opCtx;
     }
-    void invalidate(OperationContext* txn, const RecordId& dl) final;
+    void invalidate(OperationContext* opCtx, const RecordId& dl) final;
     std::unique_ptr<RecordFetcher> fetcherForNext() const final;
     std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
 
@@ -68,7 +68,7 @@ private:
     }
 
     // for getNext, not owned
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 
     // The result returned on the next call to getNext().
     DiskLoc _curr;

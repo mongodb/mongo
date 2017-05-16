@@ -54,7 +54,7 @@ public:
         return _nss;
     }
 
-    const BSONObj getQuery() const {
+    BSONObj getQuery() const {
         return _query;
     }
 
@@ -74,13 +74,13 @@ public:
         _skip = skip;
     }
 
-    const BSONObj getHint() const {
+    BSONObj getHint() const {
         return _hint.value_or(BSONObj());
     }
 
     void setHint(BSONObj hint);
 
-    const BSONObj getCollation() const {
+    BSONObj getCollation() const {
         return _collation.value_or(BSONObj());
     }
 
@@ -94,11 +94,37 @@ public:
         _explain = explain;
     }
 
-    /**
-     * Constructs a BSON representation of this request, which can be used for sending it in
-     * commands.
-     */
-    BSONObj toBSON() const;
+    const std::string& getComment() const {
+        return _comment;
+    }
+
+    void setComment(StringData comment) {
+        _comment = comment.toString();
+    }
+
+    unsigned int getMaxTimeMS() const {
+        return _maxTimeMS;
+    }
+
+    void setMaxTimeMS(unsigned int maxTimeMS) {
+        _maxTimeMS = maxTimeMS;
+    }
+
+    BSONObj getReadConcern() const {
+        return _readConcern;
+    }
+
+    void setReadConcern(BSONObj readConcern) {
+        _readConcern = readConcern.getOwned();
+    }
+
+    BSONObj getUnwrappedReadPref() const {
+        return _unwrappedReadPref;
+    }
+
+    void setUnwrappedReadPref(BSONObj unwrappedReadPref) {
+        _unwrappedReadPref = unwrappedReadPref.getOwned();
+    }
 
     /**
      * Converts this CountRequest into an aggregation.
@@ -132,6 +158,19 @@ private:
 
     // Optional. The collation used to compare strings.
     boost::optional<BSONObj> _collation;
+
+    BSONObj _readConcern;
+
+    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
+    // This object will be empty when no readPreference is specified or if the request does not
+    // originate from mongos.
+    BSONObj _unwrappedReadPref;
+
+    // When non-empty, represents a user comment.
+    std::string _comment;
+
+    // A user-specified maxTimeMS limit, or a value of '0' if not specified.
+    unsigned int _maxTimeMS = 0;
 
     // If true, generate an explain plan instead of the actual count.
     bool _explain = false;

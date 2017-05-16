@@ -44,22 +44,22 @@ public:
     virtual ~DistLockManagerMock() = default;
 
     void startUp() override;
-    void shutDown(OperationContext* txn) override;
+    void shutDown(OperationContext* opCtx) override;
 
     std::string getProcessID() override;
 
-    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
+    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* opCtx,
                                                  StringData name,
                                                  StringData whyMessage,
                                                  const OID& lockSessionID,
                                                  Milliseconds waitFor) override;
 
-    StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
+    StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* opCtx,
                                                             StringData name,
                                                             StringData whyMessage,
                                                             const OID& lockSessionID) override;
 
-    void unlockAll(OperationContext* txn, const std::string& processID) override;
+    void unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
     using LockFunc =
         stdx::function<void(StringData name, StringData whyMessage, Milliseconds waitFor)>;
@@ -67,11 +67,13 @@ public:
     void expectLock(LockFunc checkerFunc, Status lockStatus);
 
 protected:
-    void unlock(OperationContext* txn, const DistLockHandle& lockHandle) override;
+    void unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) override;
 
-    void unlock(OperationContext* txn, const DistLockHandle& lockHandle, StringData name) override;
+    void unlock(OperationContext* opCtx,
+                const DistLockHandle& lockHandle,
+                StringData name) override;
 
-    Status checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) override;
+    Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockHandle) override;
 
 private:
     struct LockInfo {

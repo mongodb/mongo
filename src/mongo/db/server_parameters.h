@@ -81,7 +81,7 @@ public:
     }
 
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) = 0;
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
 
     virtual Status set(const BSONElement& newValueElement) = 0;
 
@@ -218,7 +218,7 @@ public:
           _value(value) {}
     virtual ~ExportedServerParameter() {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name);
 
     virtual Status set(const BSONElement& newValueElement);
     virtual Status set(const T& newValue);

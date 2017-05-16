@@ -49,12 +49,12 @@ using stdx::make_unique;
 // static
 const char* FetchStage::kStageType = "FETCH";
 
-FetchStage::FetchStage(OperationContext* txn,
+FetchStage::FetchStage(OperationContext* opCtx,
                        WorkingSet* ws,
                        PlanStage* child,
                        const MatchExpression* filter,
                        const Collection* collection)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _filter(filter),
@@ -170,14 +170,14 @@ void FetchStage::doReattachToOperationContext() {
         _cursor->reattachToOperationContext(getOpCtx());
 }
 
-void FetchStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void FetchStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // It's possible that the recordId getting invalidated is the one we're about to
     // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
     if (WorkingSet::INVALID_ID != _idRetrying) {
         WorkingSetMember* member = _ws->get(_idRetrying);
         if (member->hasRecordId() && (member->recordId == dl)) {
             // Fetch it now and kill the recordId.
-            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
         }
     }
 }

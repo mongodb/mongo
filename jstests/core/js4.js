@@ -16,7 +16,6 @@ assert.eq("/abc/i", real.c.toString(), "regex 1");
 
 var cursor = t.find({
     $where: function() {
-        fullObject;
         assert.eq(7, Object.keySet(obj).length, "A");
         assert.eq(1, obj.a, "B");
         assert.eq("abc", obj.b, "C");
@@ -37,7 +36,6 @@ t.drop();
 t.save({a: 2, b: {c: 7, d: "d is good"}});
 var cursor = t.find({
     $where: function() {
-        fullObject;
         assert.eq(3, Object.keySet(obj).length);
         assert.eq(2, obj.a);
         assert.eq(7, obj.b.c);

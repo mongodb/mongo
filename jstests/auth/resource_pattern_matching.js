@@ -228,12 +228,8 @@ MongoRunner.stopMongod(conn);
 print('--- done standalone node test ---');
 
 print('--- replica set test ---');
-var rst = new ReplSetTest({
-    name: 'testset',
-    nodes: 2,
-    nodeOptions: {'auth': null, 'httpinterface': null},
-    keyFile: keyfile
-});
+var rst =
+    new ReplSetTest({name: 'testset', nodes: 2, nodeOptions: {'auth': null}, keyFile: keyfile});
 
 rst.startSet();
 rst.initiate();
@@ -250,9 +246,9 @@ var st = new ShardingTest({
     shard: 1,
     keyFile: keyfile,
     other: {
-        mongosOptions: {'auth': null, 'httpinterface': null},
-        configOptions: {'auth': null, 'httpinterface': null},
-        shardOptions: {'auth': null, 'httpinterface': null}
+        mongosOptions: {'auth': null},
+        configOptions: {'auth': null},
+        shardOptions: {'auth': null}
     }
 });
 run_tests(st.s0.getDB('admin'), st.s1.getDB('admin'));

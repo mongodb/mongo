@@ -42,13 +42,13 @@ using stdx::make_unique;
 
 const char* IndexIteratorStage::kStageType = "INDEX_ITERATOR";
 
-IndexIteratorStage::IndexIteratorStage(OperationContext* txn,
+IndexIteratorStage::IndexIteratorStage(OperationContext* opCtx,
                                        WorkingSet* ws,
                                        Collection* collection,
                                        IndexAccessMethod* iam,
                                        BSONObj keyPattern,
                                        unique_ptr<SortedDataInterface::Cursor> cursor)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _iam(iam),

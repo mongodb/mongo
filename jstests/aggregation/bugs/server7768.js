@@ -6,7 +6,8 @@ db[collection].insert({foo: 1});
 res = db.runCommand({
     'aggregate': collection,
     'pipeline': [{'$project': {'_id': false, 'foo': true}}],
-    $readPreference: {'mode': 'primary'}, 'cursor': {}
+    '$queryOptions': {$readPreference: {'mode': 'primary'}},
+    'cursor': {}
 });
 
 assert.commandWorked(res);

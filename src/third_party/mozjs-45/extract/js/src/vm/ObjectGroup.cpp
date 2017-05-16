@@ -12,6 +12,7 @@
 #include "gc/StoreBuffer.h"
 #include "gc/Zone.h"
 #include "vm/ArrayObject.h"
+#include "vm/Shape.h"
 #include "vm/UnboxedObject.h"
 
 #include "jsobjinlines.h"
@@ -554,45 +555,38 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
 
     ObjectGroupCompartment::newTablePostBarrier(cx, table, clasp, proto, associated);
 
-    if (proto.isObject()) {
-        RootedObject obj(cx, proto.toObject());
-
-        if (associated) {
-            if (associated->is<JSFunction>()) {
-                if (!TypeNewScript::make(cx->asJSContext(), group, &associated->as<JSFunction>()))
-                    return nullptr;
-            } else {
-                group->setTypeDescr(&associated->as<TypeDescr>());
-            }
+    if (associated) {
+        if (associated->is<JSFunction>()) {
+            if (!TypeNewScript::make(cx->asJSContext(), group, &associated->as<JSFunction>()))
+                return nullptr;
+        } else {
+            group->setTypeDescr(&associated->as<TypeDescr>());
         }
+    }
 
-        /*
-         * Some builtin objects have slotful native properties baked in at
-         * creation via the Shape::{insert,get}initialShape mechanism. Since
-         * these properties are never explicitly defined on new objects, update
-         * the type information for them here.
-         */
+    /*
+     * Some builtin objects have slotful native properties baked in at
+     * creation via the Shape::{insert,get}initialShape mechanism. Since
+     * these properties are never explicitly defined on new objects, update
+     * the type information for them here.
+     */
 
-        const JSAtomState& names = cx->names();
+    const JSAtomState& names = cx->names();
 
-        if (obj->is<RegExpObject>()) {
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.source), TypeSet::StringType());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.global), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.ignoreCase), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.multiline), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.sticky), TypeSet::BooleanType());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.lastIndex), TypeSet::Int32Type());
-        }
-
-        if (obj->is<StringObject>())
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.length), TypeSet::Int32Type());
-
-        if (obj->is<ErrorObject>()) {
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.fileName), TypeSet::StringType());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.lineNumber), TypeSet::Int32Type());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.columnNumber), TypeSet::Int32Type());
-            AddTypePropertyId(cx, group, nullptr, NameToId(names.stack), TypeSet::StringType());
-        }
+    if (clasp == &RegExpObject::class_) {
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.source), TypeSet::StringType());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.global), TypeSet::BooleanType());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.ignoreCase), TypeSet::BooleanType());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.multiline), TypeSet::BooleanType());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.sticky), TypeSet::BooleanType());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.lastIndex), TypeSet::Int32Type());
+    } else if (clasp == &StringObject::class_) {
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.length), TypeSet::Int32Type());
+    } else if (ErrorObject::isErrorClass(clasp)) {
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.fileName), TypeSet::StringType());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.lineNumber), TypeSet::Int32Type());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.columnNumber), TypeSet::Int32Type());
+        AddTypePropertyId(cx, group, nullptr, NameToId(names.stack), TypeSet::StringType());
     }
 
     return group;
@@ -1116,7 +1110,7 @@ struct ObjectGroupCompartment::PlainObjectKey
     };
 
     static inline HashNumber hash(const Lookup& lookup) {
-        return (HashNumber) (JSID_BITS(lookup.properties[lookup.nproperties - 1].id) ^
+        return (HashNumber) (HashId(lookup.properties[lookup.nproperties - 1].id) ^
                              lookup.nproperties);
     }
 

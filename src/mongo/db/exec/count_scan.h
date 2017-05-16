@@ -67,7 +67,7 @@ struct CountScanParams {
  */
 class CountScan final : public PlanStage {
 public:
-    CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet);
+    CountScan(OperationContext* opCtx, const CountScanParams& params, WorkingSet* workingSet);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
@@ -75,7 +75,7 @@ public:
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_COUNT_SCAN;

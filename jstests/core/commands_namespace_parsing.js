@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because the error response from the shard about
+// using the empty string as the out collection name is converted to an error and no longer retains
+// the "code" property.
+// @tags: [assumes_unsharded_collection]
+
 // This file tests that commands namespace parsing rejects embedded null bytes.
 // Note that for each command, a properly formatted command object must be passed to the helper
 // function, regardless of the namespace used in the command object.

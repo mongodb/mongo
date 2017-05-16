@@ -97,6 +97,11 @@ struct HostAndPort {
     bool isLocalHost() const;
 
     /**
+     * Returns true if the hostname is an IP matching the default route.
+     */
+    bool isDefaultRoute() const;
+
+    /**
      * Returns a string representation of "host:port".
      */
     std::string toString() const;

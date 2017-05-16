@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
@@ -65,13 +66,34 @@ struct OplogEntry {
 
     BSONObj raw;  // Owned.
 
-    StringData ns = "";
-    StringData opType = "";
+    // TODO: Remove these when we add the IDL.
+    const NamespaceString& getNamespace() const {
+        return _ns;
+    }
 
-    BSONElement version;
-    BSONElement o;
-    BSONElement o2;
-    BSONElement ts;
+    StringData getOpType() const {
+        return _opType;
+    }
+
+    Timestamp getTimestamp() const {
+        return _ts;
+    }
+
+    const BSONObj& getObject() const {
+        return _o;
+    }
+
+    const BSONObj& getObject2() const {
+        return _o2;
+    }
+
+private:
+    NamespaceString _ns;
+    StringData _opType = "";
+    int _version;
+    Timestamp _ts;
+    BSONObj _o;
+    BSONObj _o2;
 };
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);

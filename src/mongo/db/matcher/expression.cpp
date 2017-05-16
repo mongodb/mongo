@@ -55,6 +55,11 @@ bool MatchExpression::matchesBSON(const BSONObj& doc, MatchDetails* details) con
     return matches(&mydoc, details);
 }
 
+bool MatchExpression::matchesBSONElement(BSONElement elem, MatchDetails* details) const {
+    BSONElementViewMatchableDocument matchableDoc(elem);
+    return matches(&matchableDoc, details);
+}
+
 void MatchExpression::setCollator(const CollatorInterface* collator) {
     for (size_t i = 0; i < numChildren(); ++i) {
         getChild(i)->setCollator(collator);

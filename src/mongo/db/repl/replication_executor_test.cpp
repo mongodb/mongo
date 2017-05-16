@@ -72,12 +72,12 @@ TEST_F(ReplicationExecutorTest, ScheduleDBWorkAndExclusiveWorkConcurrently) {
     NamespaceString nss("mydb", "mycoll");
     ReplicationExecutor& executor = getReplExecutor();
     Status status1 = getDetectableErrorStatus();
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     using CallbackData = ReplicationExecutor::CallbackArgs;
     ASSERT_OK(executor
                   .scheduleDBWork([&](const CallbackData& cbData) {
                       status1 = cbData.status;
-                      txn = cbData.txn;
+                      opCtx = cbData.opCtx;
                       barrier.countDownAndWait();
                       if (cbData.status != ErrorCodes::CallbackCanceled)
                           cbData.executor->shutdown();
@@ -90,23 +90,23 @@ TEST_F(ReplicationExecutorTest, ScheduleDBWorkAndExclusiveWorkConcurrently) {
     executor.startup();
     executor.join();
     ASSERT_OK(status1);
-    ASSERT(txn);
+    ASSERT(opCtx);
 }
 
 TEST_F(ReplicationExecutorTest, ScheduleDBWorkWithCollectionLock) {
     NamespaceString nss("mydb", "mycoll");
     ReplicationExecutor& executor = getReplExecutor();
     Status status1 = getDetectableErrorStatus();
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     bool collectionIsLocked = false;
     using CallbackData = ReplicationExecutor::CallbackArgs;
     ASSERT_OK(executor
                   .scheduleDBWork(
                       [&](const CallbackData& cbData) {
                           status1 = cbData.status;
-                          txn = cbData.txn;
-                          collectionIsLocked = txn
-                              ? txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X)
+                          opCtx = cbData.opCtx;
+                          collectionIsLocked = opCtx
+                              ? opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X)
                               : false;
                           if (cbData.status != ErrorCodes::CallbackCanceled)
                               cbData.executor->shutdown();
@@ -117,21 +117,21 @@ TEST_F(ReplicationExecutorTest, ScheduleDBWorkWithCollectionLock) {
     executor.startup();
     executor.join();
     ASSERT_OK(status1);
-    ASSERT(txn);
+    ASSERT(opCtx);
     ASSERT_TRUE(collectionIsLocked);
 }
 
 TEST_F(ReplicationExecutorTest, ScheduleExclusiveLockOperation) {
     ReplicationExecutor& executor = getReplExecutor();
     Status status1 = getDetectableErrorStatus();
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     bool lockIsW = false;
     using CallbackData = ReplicationExecutor::CallbackArgs;
     ASSERT_OK(executor
                   .scheduleWorkWithGlobalExclusiveLock([&](const CallbackData& cbData) {
                       status1 = cbData.status;
-                      txn = cbData.txn;
-                      lockIsW = txn ? txn->lockState()->isW() : false;
+                      opCtx = cbData.opCtx;
+                      lockIsW = opCtx ? opCtx->lockState()->isW() : false;
                       if (cbData.status != ErrorCodes::CallbackCanceled)
                           cbData.executor->shutdown();
                   })
@@ -139,7 +139,7 @@ TEST_F(ReplicationExecutorTest, ScheduleExclusiveLockOperation) {
     executor.startup();
     executor.join();
     ASSERT_OK(status1);
-    ASSERT(txn);
+    ASSERT(opCtx);
     ASSERT_TRUE(lockIsW);
 }
 

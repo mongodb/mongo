@@ -713,7 +713,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 	snapshot_pinned = txn_global->nsnap_oldest_id;
 
 	WT_STAT_SET(session, stats, txn_pinned_range,
-	   txn_global->current - txn_global->oldest_id);
+	    txn_global->current - txn_global->oldest_id);
 
 	WT_STAT_SET(session, stats, txn_pinned_snapshot_range,
 	    snapshot_pinned == WT_TXN_NONE ?

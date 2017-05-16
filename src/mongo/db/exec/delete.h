@@ -84,7 +84,7 @@ class DeleteStage final : public PlanStage {
     MONGO_DISALLOW_COPYING(DeleteStage);
 
 public:
-    DeleteStage(OperationContext* txn,
+    DeleteStage(OperationContext* opCtx,
                 const DeleteStageParams& params,
                 WorkingSet* ws,
                 Collection* collection,

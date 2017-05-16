@@ -59,21 +59,21 @@
 /* Count the leading zero bytes. */
 #if defined(__GNUC__)
 #define	WT_LEADING_ZEROS(x, i)						\
-	(i = (x == 0) ? (int)sizeof(x) : __builtin_clzll(x) >> 3)
+	((i) = ((x) == 0) ? (int)sizeof(x) : __builtin_clzll(x) >> 3)
 #elif defined(_MSC_VER)
 #define	WT_LEADING_ZEROS(x, i)	do {					\
-	if (x == 0) i = (int)sizeof(x);				\
+	if ((x) == 0) (i) = (int)sizeof(x);				\
 	else  { 							\
 		unsigned long __index;					\
 		_BitScanReverse64(&__index, x);				\
 		__index = 63 ^ __index;					\
-		i = (int)(__index >> 3); }				\
+		(i) = (int)(__index >> 3); }				\
 	} while (0)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
 	uint64_t __m = (uint64_t)0xff << 56;				\
-	for (i = 0; !(__x & __m) && i != 8; i++)			\
+	for ((i) = 0; !(__x & __m) && (i) != 8; (i)++)			\
 		__m >>= 8;						\
 } while (0)
 #endif
@@ -231,7 +231,8 @@ __wt_vpack_int(uint8_t **pp, size_t maxlen, int64_t x)
 	if (x < NEG_2BYTE_MIN) {
 		*p = NEG_MULTI_MARKER;
 		return (__wt_vpack_negint(pp, maxlen, (uint64_t)x));
-	} else if (x < NEG_1BYTE_MIN) {
+	}
+	if (x < NEG_1BYTE_MIN) {
 		WT_SIZE_CHECK_PACK(2, maxlen);
 		x -= NEG_2BYTE_MIN;
 		*p++ = NEG_2BYTE_MARKER | GET_BITS(x, 13, 8);
@@ -358,12 +359,10 @@ __wt_vsize_uint(uint64_t x)
 {
 	if (x <= POS_1BYTE_MAX)
 		return (1);
-	else if (x <= POS_2BYTE_MAX + 1) {
+	if (x <= POS_2BYTE_MAX + 1)
 		return (2);
-	} else {
-		x -= POS_2BYTE_MAX + 1;
-		return (__wt_vsize_posint(x));
-	}
+	x -= POS_2BYTE_MAX + 1;
+	return (__wt_vsize_posint(x));
 }
 
 /*
@@ -373,13 +372,12 @@ __wt_vsize_uint(uint64_t x)
 static inline size_t
 __wt_vsize_int(int64_t x)
 {
-	if (x < NEG_2BYTE_MIN) {
+	if (x < NEG_2BYTE_MIN)
 		return (__wt_vsize_negint((uint64_t)x));
-	} else if (x < NEG_1BYTE_MIN) {
+	if (x < NEG_1BYTE_MIN)
 		return (2);
-	} else if (x < 0) {
+	if (x < 0)
 		return (1);
-	} else
-		/* For non-negative values, use the unsigned code above. */
-		return (__wt_vsize_uint((uint64_t)x));
+	/* For non-negative values, use the unsigned code above. */
+	return (__wt_vsize_uint((uint64_t)x));
 }

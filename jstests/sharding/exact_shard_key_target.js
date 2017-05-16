@@ -9,14 +9,13 @@ var st = new ShardingTest({shards: 2, verbose: 4});
 var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");
 var admin = mongos.getDB("admin");
-var shards = mongos.getDB("config").shards.find().toArray();
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
-printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: shards[0]._id}));
+printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {"a.b": 1}}));
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {"a.b": 0}}));
 assert.commandWorked(
-    admin.runCommand({moveChunk: coll.getFullName(), find: {"a.b": 0}, to: shards[1]._id}));
+    admin.runCommand({moveChunk: coll.getFullName(), find: {"a.b": 0}, to: st.shard1.shardName}));
 
 st.printShardingStatus();
 

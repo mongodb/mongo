@@ -40,6 +40,7 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/callback_completion_guard.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -113,8 +114,6 @@ public:
     virtual ~CollectionCloner();
 
     const NamespaceString& getSourceNamespace() const;
-
-    std::string getDiagnosticString() const override;
 
     bool isActive() const override;
 

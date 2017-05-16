@@ -147,15 +147,15 @@ void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
     jsHeapLimitMB.store(limit);
 }
 
-void MozJSScriptEngine::registerOperation(OperationContext* txn, MozJSImplScope* scope) {
+void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScope* scope) {
     stdx::lock_guard<stdx::mutex> giLock(_globalInterruptLock);
 
-    auto opId = txn->getOpID();
+    auto opId = opCtx->getOpID();
 
     _opToScopeMap[opId] = scope;
 
     LOG(2) << "SMScope " << static_cast<const void*>(scope) << " registered for op " << opId;
-    Status status = txn->checkForInterruptNoAssert();
+    Status status = opCtx->checkForInterruptNoAssert();
     if (!status.isOK()) {
         scope->kill();
     }

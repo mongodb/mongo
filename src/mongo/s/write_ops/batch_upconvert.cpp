@@ -30,6 +30,9 @@
 
 #include "mongo/s/write_ops/batch_upconvert.h"
 
+#include <memory>
+#include <vector>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
@@ -40,6 +43,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/batched_update_document.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -51,7 +55,8 @@ using std::vector;
 namespace {
 
 // Batch inserts may get mapped to multiple batch requests, to avoid spilling MaxBSONObjSize
-void msgToBatchInserts(const Message& insertMsg, vector<BatchedCommandRequest*>* insertRequests) {
+void msgToBatchInserts(const Message& insertMsg,
+                       std::vector<std::unique_ptr<BatchedCommandRequest>>* insertRequests) {
     // Parsing DbMessage throws
     DbMessage dbMsg(insertMsg);
     NamespaceString nss(dbMsg.getns());
@@ -80,8 +85,8 @@ void msgToBatchInserts(const Message& insertMsg, vector<BatchedCommandRequest*>*
         dassert(!docs.empty());
 
         // No exceptions from here on
-        BatchedCommandRequest* request =
-            new BatchedCommandRequest(BatchedCommandRequest::BatchType_Insert);
+        auto request =
+            stdx::make_unique<BatchedCommandRequest>(BatchedCommandRequest::BatchType_Insert);
         request->setNS(nss);
         for (vector<BSONObj>::const_iterator it = docs.begin(); it != docs.end(); ++it) {
             request->getInsertRequest()->addToDocuments(*it);
@@ -89,11 +94,11 @@ void msgToBatchInserts(const Message& insertMsg, vector<BatchedCommandRequest*>*
         request->setOrdered(ordered);
         request->setWriteConcern(WriteConcernOptions::Acknowledged);
 
-        insertRequests->push_back(request);
+        insertRequests->push_back(std::move(request));
     }
 }
 
-BatchedCommandRequest* msgToBatchUpdate(const Message& updateMsg) {
+std::unique_ptr<BatchedCommandRequest> msgToBatchUpdate(const Message& updateMsg) {
     // Parsing DbMessage throws
     DbMessage dbMsg(updateMsg);
     NamespaceString nss(dbMsg.getns());
@@ -110,8 +115,8 @@ BatchedCommandRequest* msgToBatchUpdate(const Message& updateMsg) {
     updateDoc->setUpsert(upsert);
     updateDoc->setMulti(multi);
 
-    BatchedCommandRequest* request =
-        new BatchedCommandRequest(BatchedCommandRequest::BatchType_Update);
+    auto request =
+        stdx::make_unique<BatchedCommandRequest>(BatchedCommandRequest::BatchType_Update);
     request->setNS(nss);
     request->getUpdateRequest()->addToUpdates(updateDoc);
     request->setWriteConcern(WriteConcernOptions::Acknowledged);
@@ -119,7 +124,7 @@ BatchedCommandRequest* msgToBatchUpdate(const Message& updateMsg) {
     return request;
 }
 
-BatchedCommandRequest* msgToBatchDelete(const Message& deleteMsg) {
+std::unique_ptr<BatchedCommandRequest> msgToBatchDelete(const Message& deleteMsg) {
     // Parsing DbMessage throws
     DbMessage dbMsg(deleteMsg);
     NamespaceString nss(dbMsg.getns());
@@ -132,8 +137,8 @@ BatchedCommandRequest* msgToBatchDelete(const Message& deleteMsg) {
     deleteDoc->setLimit(limit);
     deleteDoc->setQuery(query);
 
-    BatchedCommandRequest* request =
-        new BatchedCommandRequest(BatchedCommandRequest::BatchType_Delete);
+    auto request =
+        stdx::make_unique<BatchedCommandRequest>(BatchedCommandRequest::BatchType_Delete);
     request->setNS(nss);
     request->getDeleteRequest()->addToDeletes(deleteDoc);
     request->setWriteConcern(WriteConcernOptions::Acknowledged);
@@ -148,7 +153,8 @@ void buildErrorFromResponse(const BatchedCommandResponse& response, WriteErrorDe
 
 }  // namespace
 
-void msgToBatchRequests(const Message& msg, vector<BatchedCommandRequest*>* requests) {
+void msgToBatchRequests(const Message& msg,
+                        std::vector<std::unique_ptr<BatchedCommandRequest>>* requests) {
     int opType = msg.operation();
 
     if (opType == dbInsert) {

@@ -32,11 +32,13 @@ executor:
     fixture:
       class: ShardedClusterFixture
       mongos_options:
+        bind_ip_all: ''
         keyFile: *keyFile
         set_parameters:
           enableTestCommands: 1
           enableLocalhostAuthBypass: false
       mongod_options:
+        bind_ip_all: ''
         auth: ''
         keyFile: *keyFile
         set_parameters:

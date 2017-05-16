@@ -59,7 +59,7 @@ PlanYieldPolicy::PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* 
       _planYielding(nullptr) {}
 
 bool PlanYieldPolicy::shouldYield() {
-    if (!allowedToYield())
+    if (!canAutoYield())
         return false;
     invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
     if (_forceYield)
@@ -73,7 +73,7 @@ void PlanYieldPolicy::resetTimer() {
 
 bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
     invariant(_planYielding);
-    invariant(allowedToYield());
+    invariant(canAutoYield());
 
     // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
     // again right away. We delay the resetTimer() call so that the clock doesn't start ticking
@@ -108,14 +108,14 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 // Release and reacquire locks.
-                QueryYield::yieldAllLocks(opCtx, fetcher, _planYielding->ns());
+                QueryYield::yieldAllLocks(opCtx, fetcher, _planYielding->nss());
             }
 
             return _planYielding->restoreStateWithoutRetrying();
         } catch (const WriteConflictException& wce) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             WriteConflictException::logAndBackoff(
-                attempt, "plan execution restoreState", _planYielding->ns());
+                attempt, "plan execution restoreState", _planYielding->nss().ns());
             // retry
         }
     }

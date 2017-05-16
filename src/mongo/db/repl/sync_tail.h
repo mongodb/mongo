@@ -70,7 +70,7 @@ public:
      * 'opCounter' is used to update server status metrics.
      * Returns failure status if the op was an update that could not be applied.
      */
-    using ApplyOperationInLockFn = stdx::function<Status(OperationContext* txn,
+    using ApplyOperationInLockFn = stdx::function<Status(OperationContext* opCtx,
                                                          Database* db,
                                                          const BSONObj& opObj,
                                                          bool inSteadyStateReplication,
@@ -100,17 +100,19 @@ public:
      * Functions for applying operations/commands and increment server status counters may
      * be overridden for testing.
      */
-    static Status syncApply(OperationContext* txn,
+    static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
                             bool inSteadyStateReplication,
                             ApplyOperationInLockFn applyOperationInLock,
                             ApplyCommandInLockFn applyCommandInLock,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
-    static Status syncApply(OperationContext* txn, const BSONObj& o, bool inSteadyStateReplication);
+    static Status syncApply(OperationContext* opCtx,
+                            const BSONObj& o,
+                            bool inSteadyStateReplication);
 
     void oplogApplication(ReplicationCoordinator* replCoord);
-    bool peek(OperationContext* txn, BSONObj* obj);
+    bool peek(OperationContext* opCtx, BSONObj* obj);
 
     class OpQueue {
     public:
@@ -195,17 +197,17 @@ public:
      * If ops is empty on entry and nothing can be added yet, will wait up to a second before
      * returning true.
      */
-    bool tryPopAndWaitForMore(OperationContext* txn, OpQueue* ops, const BatchLimits& limits);
+    bool tryPopAndWaitForMore(OperationContext* opCtx, OpQueue* ops, const BatchLimits& limits);
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
      */
-    virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o);
+    virtual BSONObj getMissingDoc(OperationContext* opCtx, Database* db, const BSONObj& o);
 
     /**
      * If applyOperation_inlock should be called again after an update fails.
      */
-    virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
+    virtual bool shouldRetry(OperationContext* opCtx, const BSONObj& o);
     void setHostname(const std::string& hostname);
 
     /**
@@ -222,7 +224,7 @@ protected:
 
     // Apply a batch of operations, using multiple threads.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
-    OpTime multiApply(OperationContext* txn, MultiApplier::Operations ops);
+    OpTime multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
 private:
     class OpQueueBatcher;
@@ -247,7 +249,7 @@ private:
  *
  * Shared between here and MultiApplier.
  */
-StatusWith<OpTime> multiApply(OperationContext* txn,
+StatusWith<OpTime> multiApply(OperationContext* opCtx,
                               OldThreadPool* workerPool,
                               MultiApplier::Operations ops,
                               MultiApplier::ApplyOperationFn applyOperation);
@@ -271,9 +273,9 @@ Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
  * Accepts an external operation context and a function with the same argument list as
  * SyncTail::syncApply.
  */
-using SyncApplyFn =
-    stdx::function<Status(OperationContext* txn, const BSONObj& o, bool inSteadyStateReplication)>;
-Status multiSyncApply_noAbort(OperationContext* txn,
+using SyncApplyFn = stdx::function<Status(
+    OperationContext* opCtx, const BSONObj& o, bool inSteadyStateReplication)>;
+Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* ops,
                               SyncApplyFn syncApply);
 
@@ -281,7 +283,7 @@ Status multiSyncApply_noAbort(OperationContext* txn,
  * Testing-only version of multiInitialSyncApply that accepts an external operation context and
  * returns an error instead of aborting.
  */
-Status multiInitialSyncApply_noAbort(OperationContext* txn,
+Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                                      MultiApplier::OperationPtrs* ops,
                                      SyncTail* st,
                                      AtomicUInt32* fetchCount);

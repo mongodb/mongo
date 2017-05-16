@@ -68,6 +68,23 @@
     assert.eq(explainPlan["stages"][0]["$cursor"]["queryPlanner"]["namespace"],
               "views_distinct.coll");
 
+    // Distinct with explicit explain modes works on a view.
+    explainPlan = assert.commandWorked(largePopView.explain("queryPlanner").distinct("pop"));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
+    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+
+    explainPlan = assert.commandWorked(largePopView.explain("executionStats").distinct("pop"));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 2);
+    assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
+    explainPlan = assert.commandWorked(largePopView.explain("allPlansExecution").distinct("pop"));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 2);
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
     // Distinct commands fail when they try to change the collation of a view.
     assert.commandFailedWithCode(
         viewsDB.runCommand({distinct: "identityView", key: "state", collation: {locale: "en_US"}}),

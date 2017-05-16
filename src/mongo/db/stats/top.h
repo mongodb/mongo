@@ -84,13 +84,19 @@ public:
         OperationLatencyHistogram opLatencyHistogram;
     };
 
+    enum class LockType {
+        ReadLocked,
+        WriteLocked,
+        NotLocked,
+    };
+
     typedef StringMap<CollectionData> UsageMap;
 
 public:
-    void record(OperationContext* txn,
+    void record(OperationContext* opCtx,
                 StringData ns,
                 LogicalOp logicalOp,
-                int lockType,
+                LockType lockType,
                 long long micros,
                 bool command,
                 Command::ReadWriteType readWriteType);
@@ -109,7 +115,7 @@ public:
     /**
      * Increments the global histogram.
      */
-    void incrementGlobalLatencyStats(OperationContext* txn,
+    void incrementGlobalLatencyStats(OperationContext* opCtx,
                                      uint64_t latency,
                                      Command::ReadWriteType readWriteType);
 
@@ -123,14 +129,14 @@ private:
 
     void _appendStatsEntry(BSONObjBuilder& b, const char* statsName, const UsageData& map) const;
 
-    void _record(OperationContext* txn,
+    void _record(OperationContext* opCtx,
                  CollectionData& c,
                  LogicalOp logicalOp,
-                 int lockType,
+                 LockType lockType,
                  long long micros,
                  Command::ReadWriteType readWriteType);
 
-    void _incrementHistogram(OperationContext* txn,
+    void _incrementHistogram(OperationContext* opCtx,
                              long long latency,
                              OperationLatencyHistogram* histogram,
                              Command::ReadWriteType readWriteType);

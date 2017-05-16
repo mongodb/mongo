@@ -40,15 +40,18 @@ bool isAllDigits(StringData str) {
     return true;
 }
 
-BSONElement getFieldDottedOrArray(const BSONObj& doc, const FieldRef& path, size_t* idxPath) {
-    if (path.numParts() == 0)
+BSONElement getFieldDottedOrArray(const BSONObj& doc,
+                                  const FieldRef& path,
+                                  size_t* idxPath,
+                                  size_t startIndex) {
+    if (path.numParts() == startIndex)
         return doc.getField("");
 
     BSONElement res;
 
     BSONObj curr = doc;
     bool stop = false;
-    size_t partNum = 0;
+    size_t partNum = startIndex;
     while (partNum < path.numParts() && !stop) {
         res = curr.getField(path.getPart(partNum));
 

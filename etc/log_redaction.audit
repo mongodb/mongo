@@ -2256,8 +2256,6 @@
 20160711:ramon:src/mongo/rpc/command_request_builder.h:0
 20160711:ramon:src/mongo/rpc/command_request_builder_test.cpp:0
 20160711:ramon:src/mongo/rpc/command_request_test.cpp:0
-20160711:ramon:src/mongo/rpc/document_range.cpp:0
-20160711:ramon:src/mongo/rpc/document_range.h:0
 20160711:ramon:src/mongo/rpc/factory.cpp:0
 20160711:ramon:src/mongo/rpc/factory.h:0
 20160711:ramon:src/mongo/rpc/get_status_from_command_result.cpp:0

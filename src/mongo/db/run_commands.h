@@ -36,7 +36,7 @@ class ReplyBuilderInterface;
 class RequestInterface;
 }  // namespace rpc
 
-void runCommands(OperationContext* txn,
+void runCommands(OperationContext* opCtx,
                  const rpc::RequestInterface& request,
                  rpc::ReplyBuilderInterface* replyBuilder);
 

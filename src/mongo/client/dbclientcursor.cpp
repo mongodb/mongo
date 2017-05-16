@@ -58,16 +58,10 @@ using std::string;
 using std::vector;
 
 namespace {
-/**
- * This code is mostly duplicated from DBClientWithCommands::runCommand. It may not
- * be worth de-duplicating as this codepath will eventually be removed anyway.
- */
 Message assembleCommandRequest(DBClientWithCommands* cli,
                                StringData database,
                                int legacyQueryOptions,
                                BSONObj legacyQuery) {
-    // TODO: Rewrite this to a common utility shared between this and DBClientMultiCommand.
-
     // Can be an OP_COMMAND or OP_QUERY message.
     auto requestBuilder =
         rpc::makeRequestBuilder(cli->getClientRPCProtocols(), cli->getServerRPCProtocols());
@@ -76,15 +70,13 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
     BSONObj upconvertedMetadata;
 
     std::tie(upconvertedCommand, upconvertedMetadata) =
-        uassertStatusOK(rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions));
+        rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions);
 
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);
     if (cli->getRequestMetadataWriter()) {
-        uassertStatusOK(
-            cli->getRequestMetadataWriter()((haveClient() ? cc().getOperationContext() : nullptr),
-                                            &metadataBob,
-                                            cli->getServerAddress()));
+        uassertStatusOK(cli->getRequestMetadataWriter()(
+            (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
     }
 
     requestBuilder->setDatabase(database);
@@ -112,19 +104,21 @@ int DBClientCursor::nextBatchSize() {
 void DBClientCursor::_assembleInit(Message& toSend) {
     // If we haven't gotten a cursorId yet, we need to issue a new query or command.
     if (!cursorId) {
-        // HACK:
-        // Unfortunately, this code is used by the shell to run commands,
-        // so we need to allow the shell to send invalid options so that we can
-        // test that the server rejects them. Thus, to allow generating commands with
-        // invalid options, we validate them here, and fall back to generating an OP_QUERY
-        // through assembleQueryRequest if the options are invalid.
+        if (_isCommand) {
+            // HACK:
+            // Unfortunately, this code is used by the shell to run commands,
+            // so we need to allow the shell to send invalid options so that we can
+            // test that the server rejects them. Thus, to allow generating commands with
+            // invalid options, we validate them here, and fall back to generating an OP_QUERY
+            // through assembleQueryRequest if the options are invalid.
+            bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
+            bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
+            bool hasInvalidMaxTimeMs = query.hasField("$maxTimeMS");
 
-        bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
-        bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
-
-        if (_isCommand && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
-            toSend = assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query);
-            return;
+            if (hasValidNToReturnForCommand && hasValidFlagsForCommand && !hasInvalidMaxTimeMs) {
+                toSend = assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query);
+                return;
+            }
         }
         assembleQueryRequest(ns, query, nextBatchSize(), nToSkip, fieldsToReturn, opts, toSend);
         return;
@@ -233,7 +227,7 @@ void DBClientCursor::exhaustReceiveMore() {
 
 void DBClientCursor::commandDataReceived() {
     int op = batch.m.operation();
-    invariant(op == opReply || op == dbCommandReply);
+    invariant(op == opReply || op == dbCommandReply || op == dbMsg);
 
     batch.nReturned = 1;
     batch.pos = 0;
@@ -256,11 +250,9 @@ void DBClientCursor::commandDataReceived() {
 
     // HACK: If we got an OP_COMMANDREPLY, take the reply object
     // and shove it in to an OP_REPLY message.
-    if (op == dbCommandReply) {
-        // Need to take ownership here as we destroy the underlying message.
-        BSONObj reply = commandReply->getCommandReply().getOwned();
-        batch.m.reset();
-        replyToQuery(0, batch.m, reply);
+    if (op == dbCommandReply || op == dbMsg) {
+        BSONObj reply = commandReply->getCommandReply();
+        batch.m = replyToQuery(reply).response;
     }
 
     QueryResult::View qr = batch.m.singleData().view2ptr();

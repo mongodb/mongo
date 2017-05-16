@@ -62,7 +62,7 @@ class test_reconfig02(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.conn.reconfigure("log=(path=foo)"), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.conn.reconfigure("log=(recovery=true)"), msg)
+            lambda: self.conn.reconfigure("log=(recover=true)"), msg)
 
     # Logging starts on, but prealloc is off.  Verify it is off.
     # Reconfigure it on and run again, making sure that log files

@@ -39,7 +39,6 @@ class BSONObj;
 class StringData;
 
 namespace rpc {
-class DocumentRange;
 
 /**
  * Constructs an RPC request.
@@ -78,24 +77,6 @@ public:
      * Sets the arguments to pass to the command.
      */
     virtual RequestBuilderInterface& setCommandArgs(BSONObj commandArgs) = 0;
-
-    /**
-     * Add a range of input documents to the request. This method can be called multiple times
-     * before calling done().
-     */
-    virtual RequestBuilderInterface& addInputDocs(DocumentRange inputDocs) = 0;
-
-    /**
-     * Add a single output document to the request. This method can be called multiple times
-     * before calling done().
-     */
-    virtual RequestBuilderInterface& addInputDoc(BSONObj inputDoc) = 0;
-
-    /**
-     * Get the state of the builder. This method is intended to enable debug or invariant
-     * checks that the builder is in the correct state.
-     */
-    virtual State getState() const = 0;
 
     /**
      * Gets the protocol used to serialize this request. This should only be used for asserts,

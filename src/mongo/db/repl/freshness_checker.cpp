@@ -35,8 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
@@ -47,9 +46,10 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
+using executor::RemoteCommandResponse;
 
 FreshnessChecker::Algorithm::Algorithm(Timestamp lastOpTimeApplied,
-                                       const ReplicaSetConfig& rsConfig,
+                                       const ReplSetConfig& rsConfig,
                                        int selfIndex,
                                        const std::vector<HostAndPort>& targets)
     : _responsesProcessed(0),
@@ -122,7 +122,7 @@ bool FreshnessChecker::Algorithm::_isVotingMember(const HostAndPort hap) const {
 }
 
 void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& request,
-                                                  const ResponseStatus& response) {
+                                                  const RemoteCommandResponse& response) {
     ++_responsesProcessed;
     bool votingMember = _isVotingMember(request.target);
 
@@ -209,10 +209,10 @@ long long FreshnessChecker::getOriginalConfigVersion() const {
 FreshnessChecker::FreshnessChecker() : _isCanceled(false) {}
 FreshnessChecker::~FreshnessChecker() {}
 
-StatusWith<ReplicationExecutor::EventHandle> FreshnessChecker::start(
-    ReplicationExecutor* executor,
+StatusWith<executor::TaskExecutor::EventHandle> FreshnessChecker::start(
+    executor::TaskExecutor* executor,
     const Timestamp& lastOpTimeApplied,
-    const ReplicaSetConfig& currentConfig,
+    const ReplSetConfig& currentConfig,
     int selfIndex,
     const std::vector<HostAndPort>& targets) {
     _originalConfigVersion = currentConfig.getConfigVersion();

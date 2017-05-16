@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because the explain output from a mongod when run
+// against a sharded collection is wrapped in a "shards" object with keys for each shard.
+// @tags: [assumes_unsharded_collection]
+
 // Read ops tests for partial indexes.
 
 // Include helpers for analyzing explain output.

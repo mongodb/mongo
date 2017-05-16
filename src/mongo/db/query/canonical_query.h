@@ -47,13 +47,14 @@ public:
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
      * query (which will never be NULL).  If parsing fails, returns an error Status.
      *
-     * 'txn' must point to a valid OperationContext, but 'txn' does not need to outlive the returned
+     * 'opCtx' must point to a valid OperationContext, but 'opCtx' does not need to outlive the
+     * returned
      * CanonicalQuery.
      *
      * Used for legacy find through the OP_QUERY message.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const QueryMessage& qm,
         const ExtensionsCallback& extensionsCallback);
 
@@ -61,11 +62,12 @@ public:
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
      * query (which will never be NULL).  If parsing fails, returns an error Status.
      *
-     * 'txn' must point to a valid OperationContext, but 'txn' does not need to outlive the returned
+     * 'opCtx' must point to a valid OperationContext, but 'opCtx' does not need to outlive the
+     * returned
      *  CanonicalQuery.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        OperationContext* txn, std::unique_ptr<QueryRequest> qr, const ExtensionsCallback&);
+        OperationContext* opCtx, std::unique_ptr<QueryRequest> qr, const ExtensionsCallback&);
 
     /**
      * For testing or for internal clients to use.
@@ -79,7 +81,7 @@ public:
      * Does not take ownership of 'root'.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const CanonicalQuery& baseQuery,
         MatchExpression* root,
         const ExtensionsCallback& extensionsCallback);

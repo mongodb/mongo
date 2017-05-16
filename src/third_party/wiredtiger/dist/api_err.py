@@ -82,7 +82,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
                 ''.join('\n * ' + l for l in textwrap.wrap(
             textwrap.dedent(err.long_desc).strip(), 77)) +
         '\n' if err.long_desc else ''))
-            tfile.write('#define\t%s\t%d\n' % (err.name, err.value))
+            tfile.write('#define\t%s\t(%d)\n' % (err.name, err.value))
             if 'undoc' in err.flags:
                 tfile.write('/*! @endcond */\n')
         tfile.write('/*\n')

@@ -53,7 +53,7 @@ void AccumulatorFirst::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorFirst::getValue(bool toBeMerged) const {
+Value AccumulatorFirst::getValue(bool toBeMerged) {
     return _first;
 }
 

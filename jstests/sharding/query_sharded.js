@@ -29,7 +29,7 @@ var cmdQuery = cmdColl.find({ping: 1}).limit(1);
 assert.commandWorked(cmdQuery.next());
 cmdQuery = cmdColl.find({ping: 1}).limit(1).addOption(DBQuery.Option.exhaust);
 assert.throws(function() {
-    cmdQuery.next();
+    assert.commandWorked(cmdQuery.next());
 });
 
 jsTest.log("DONE!");

@@ -49,45 +49,45 @@ public:
     ExtensionsCallbackRealTest() : _nss("unittests.extensions_callback_real_test") {}
 
     void setUp() final {
-        AutoGetOrCreateDb autoDb(&_txn, _nss.db(), MODE_X);
+        AutoGetOrCreateDb autoDb(&_opCtx, _nss.db(), MODE_X);
         Database* database = autoDb.getDb();
         {
-            WriteUnitOfWork wunit(&_txn);
-            ASSERT(database->createCollection(&_txn, _nss.ns()));
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT(database->createCollection(&_opCtx, _nss.ns()));
             wunit.commit();
         }
     }
 
     void tearDown() final {
-        AutoGetDb autoDb(&_txn, _nss.db(), MODE_X);
+        AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
         Database* database = autoDb.getDb();
         if (!database) {
             return;
         }
         {
-            WriteUnitOfWork wunit(&_txn);
-            static_cast<void>(database->dropCollection(&_txn, _nss.ns()));
+            WriteUnitOfWork wunit(&_opCtx);
+            static_cast<void>(database->dropCollection(&_opCtx, _nss.ns()));
             wunit.commit();
         }
     }
 
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     const NamespaceString _nss;
 };
 
 TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
     BSONObj query = fromjson("{$text: {$search:\"awesome\"}}");
     StatusWithMatchExpression result =
-        ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement());
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
 
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(ErrorCodes::IndexNotFound, result.getStatus());
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextBasic) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -95,7 +95,7 @@ TEST_F(ExtensionsCallbackRealTest, TextBasic) {
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"english\"}}");
     auto expr =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement()));
+        unittest::assertGet(ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement()));
 
     ASSERT_EQUALS(MatchExpression::TEXT, expr->matchType());
     std::unique_ptr<TextMatchExpression> textExpr(
@@ -109,7 +109,7 @@ TEST_F(ExtensionsCallbackRealTest, TextBasic) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -117,13 +117,13 @@ TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"spanglish\"}}");
     StatusWithMatchExpression result =
-        ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement());
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
 
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -131,7 +131,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: true}}");
     auto expr =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement()));
+        unittest::assertGet(ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement()));
 
     ASSERT_EQUALS(MatchExpression::TEXT, expr->matchType());
     std::unique_ptr<TextMatchExpression> textExpr(
@@ -140,7 +140,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -148,7 +148,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: false}}");
     auto expr =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement()));
+        unittest::assertGet(ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement()));
 
     ASSERT_EQUALS(MatchExpression::TEXT, expr->matchType());
     std::unique_ptr<TextMatchExpression> textExpr(
@@ -157,7 +157,7 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveFalse) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveError) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -165,13 +165,13 @@ TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveError) {
 
     BSONObj query = fromjson("{$text:{$search:\"awesome\", $caseSensitive: 0}}");
     StatusWithMatchExpression result =
-        ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement());
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
 
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -179,7 +179,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $diacriticSensitive: true}}");
     auto expr =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement()));
+        unittest::assertGet(ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement()));
 
     ASSERT_EQUALS(MatchExpression::TEXT, expr->matchType());
     std::unique_ptr<TextMatchExpression> textExpr(
@@ -188,7 +188,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveTrue) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -196,7 +196,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $diacriticSensitive: false}}");
     auto expr =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement()));
+        unittest::assertGet(ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement()));
 
     ASSERT_EQUALS(MatchExpression::TEXT, expr->matchType());
     std::unique_ptr<TextMatchExpression> textExpr(
@@ -205,7 +205,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveFalse) {
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveError) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -213,13 +213,13 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveError) {
 
     BSONObj query = fromjson("{$text:{$search:\"awesome\", $diacriticSensitive: 0}}");
     StatusWithMatchExpression result =
-        ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement());
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
 
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
-    ASSERT_OK(dbtests::createIndex(&_txn,
+    ASSERT_OK(dbtests::createIndex(&_opCtx,
                                    _nss.ns(),
                                    BSON("a"
                                         << "text"),
@@ -228,7 +228,7 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
     BSONObj query =
         fromjson("{$text: {$search:\"awesome\", $diacriticSensitive: true, $caseSensitive: true}}");
     auto expr =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseText(query.firstElement()));
+        unittest::assertGet(ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement()));
 
     ASSERT_EQUALS(MatchExpression::TEXT, expr->matchType());
     std::unique_ptr<TextMatchExpression> textExpr(
@@ -245,14 +245,14 @@ TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeHaveSameBSONRepr
     const char code[] = "function(){ return a; }";
 
     BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query1.firstElement()));
+    auto expr1 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
     BSONObjBuilder builder1;
     expr1->serialize(&builder1);
 
     BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr2 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query2.firstElement()));
+    auto expr2 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
     BSONObjBuilder builder2;
     expr2->serialize(&builder2);
 
@@ -264,14 +264,14 @@ TEST_F(ExtensionsCallbackRealTest,
     const char code[] = "function(){ return a; }";
 
     BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query1.firstElement()));
+    auto expr1 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
     BSONObjBuilder builder1;
     expr1->serialize(&builder1);
 
     BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << false)));
-    auto expr2 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query2.firstElement()));
+    auto expr2 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
     BSONObjBuilder builder2;
     expr2->serialize(&builder2);
 
@@ -282,12 +282,12 @@ TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithSameScopeAreEquivalent) {
     const char code[] = "function(){ return a; }";
 
     BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query1.firstElement()));
+    auto expr1 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
 
     BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr2 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query2.firstElement()));
+    auto expr2 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
 
     ASSERT(expr1->equivalent(expr2.get()));
     ASSERT(expr2->equivalent(expr1.get()));
@@ -297,12 +297,12 @@ TEST_F(ExtensionsCallbackRealTest, WhereExpressionsWithDifferentScopesAreNotEqui
     const char code[] = "function(){ return a; }";
 
     BSONObj query1 = BSON("$where" << BSONCodeWScope(code, BSON("a" << true)));
-    auto expr1 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query1.firstElement()));
+    auto expr1 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query1.firstElement()));
 
     BSONObj query2 = BSON("$where" << BSONCodeWScope(code, BSON("a" << false)));
-    auto expr2 =
-        unittest::assertGet(ExtensionsCallbackReal(&_txn, &_nss).parseWhere(query2.firstElement()));
+    auto expr2 = unittest::assertGet(
+        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(query2.firstElement()));
 
     ASSERT_FALSE(expr1->equivalent(expr2.get()));
     ASSERT_FALSE(expr2->equivalent(expr1.get()));

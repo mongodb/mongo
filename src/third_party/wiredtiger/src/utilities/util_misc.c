@@ -140,7 +140,10 @@ util_flush(WT_SESSION *session, const char *uri)
 	if ((buf = malloc(len)) == NULL)
 		return (util_err(session, errno, NULL));
 
-	(void)snprintf(buf, len, "target=(\"%s\")", uri);
+	if ((ret = __wt_snprintf(buf, len, "target=(\"%s\")", uri)) != 0) {
+		free(buf);
+		return (util_err(session, ret, NULL));
+	}
 	ret = session->checkpoint(session, buf);
 	free(buf);
 

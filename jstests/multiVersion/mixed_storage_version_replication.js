@@ -671,18 +671,23 @@ function doMultiThreadedWork(primary, numThreads) {
     ];
     var replTest = new ReplSetTest({nodes: {n0: setups[0]}, name: name});
     replTest.startSet();
-    replTest.initiate();
+    var config = replTest.getReplSetConfig();
+    // Override the default value -1 in 3.5.
+    config.settings = {catchUpTimeoutMillis: 2000};
+    replTest.initiate(config);
 
     for (let i = 1; i < setups.length; ++i) {
         replTest.add(setups[i]);
     }
 
-    var config = replTest.getReplSetConfig();
+    var newConfig = replTest.getReplSetConfig();
+    config = replTest.getReplSetConfigFromNode();
     // Make sure everyone is syncing from the primary, to ensure we have all combinations of
     // primary/secondary syncing.
-    config.settings = {chainingAllowed: false};
+    config.members = newConfig.members;
+    config.settings.chainingAllowed = false;
     config.protocolVersion = 0;
-    config.version = replTest.getReplSetConfigFromNode().version + 1;
+    config.version += 1;
     reconfig(replTest, config);
 
     // Ensure all are synced.

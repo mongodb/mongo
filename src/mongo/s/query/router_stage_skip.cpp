@@ -39,9 +39,9 @@ RouterStageSkip::RouterStageSkip(std::unique_ptr<RouterExecStage> child, long lo
     invariant(skip > 0);
 }
 
-StatusWith<ClusterQueryResult> RouterStageSkip::next(OperationContext* txn) {
+StatusWith<ClusterQueryResult> RouterStageSkip::next(OperationContext* opCtx) {
     while (_skippedSoFar < _skip) {
-        auto next = getChildStage()->next(txn);
+        auto next = getChildStage()->next(opCtx);
         if (!next.isOK()) {
             return next;
         }
@@ -53,11 +53,11 @@ StatusWith<ClusterQueryResult> RouterStageSkip::next(OperationContext* txn) {
         ++_skippedSoFar;
     }
 
-    return getChildStage()->next(txn);
+    return getChildStage()->next(opCtx);
 }
 
-void RouterStageSkip::kill(OperationContext* txn) {
-    getChildStage()->kill(txn);
+void RouterStageSkip::kill(OperationContext* opCtx) {
+    getChildStage()->kill(opCtx);
 }
 
 bool RouterStageSkip::remotesExhausted() {

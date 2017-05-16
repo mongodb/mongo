@@ -105,13 +105,10 @@ protected:
             &_opCtx, std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
         auto exec = uassertStatusOK(
-            getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
+            getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD));
 
         exec->saveState();
-        exec->registerExec(ctx.getCollection());
-
-        _source =
-            DocumentSourceCursor::create(ctx.getCollection(), nss.ns(), std::move(exec), _ctx);
+        _source = DocumentSourceCursor::create(ctx.getCollection(), std::move(exec), _ctx);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {
@@ -273,6 +270,7 @@ public:
     void run() {
         createSource(BSON("$natural" << 1));
         ASSERT_EQ(source()->getOutputSorts().size(), 0U);
+        source()->dispose();
     }
 };
 
@@ -284,6 +282,7 @@ public:
 
         ASSERT_EQ(source()->getOutputSorts().size(), 1U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
+        source()->dispose();
     }
 };
 
@@ -295,6 +294,7 @@ public:
 
         ASSERT_EQ(source()->getOutputSorts().size(), 1U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << -1)), 1U);
+        source()->dispose();
     }
 };
 
@@ -307,6 +307,42 @@ public:
         ASSERT_EQ(source()->getOutputSorts().size(), 2U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
         ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1 << "b" << -1)), 1U);
+        source()->dispose();
+    }
+};
+
+class SerializationRespectsExplainModes : public Base {
+public:
+    void run() {
+        createSource();
+
+        {
+            // Nothing serialized when no explain mode specified.
+            auto explainResult = source()->serialize();
+            ASSERT_TRUE(explainResult.missing());
+        }
+
+        {
+            auto explainResult = source()->serialize(ExplainOptions::Verbosity::kQueryPlanner);
+            ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
+            ASSERT_TRUE(explainResult["$cursor"]["executionStats"].missing());
+        }
+
+        {
+            auto explainResult = source()->serialize(ExplainOptions::Verbosity::kExecStats);
+            ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
+            ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
+            ASSERT_TRUE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
+        }
+
+        {
+            auto explainResult =
+                source()->serialize(ExplainOptions::Verbosity::kExecAllPlans).getDocument();
+            ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
+            ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
+            ASSERT_FALSE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
+        }
+        source()->dispose();
     }
 };
 
@@ -325,6 +361,7 @@ public:
         add<DocumentSourceCursor::IndexScanProvidesSortOnKeys>();
         add<DocumentSourceCursor::ReverseIndexScanProvidesSort>();
         add<DocumentSourceCursor::CompoundIndexScanProvidesMultipleSorts>();
+        add<DocumentSourceCursor::SerializationRespectsExplainModes>();
     }
 };
 

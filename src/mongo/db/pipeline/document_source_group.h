@@ -48,9 +48,8 @@ public:
     // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetNextResult getNext() final;
-    void dispose() final;
     const char* getSourceName() const final;
     BSONObjSet getOutputSorts() final;
 
@@ -61,7 +60,6 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<AccumulationStatement> accumulationStatements,
-        Variables::Id numVariables,
         size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);
 
     /**
@@ -95,6 +93,9 @@ public:
     // Virtuals for SplittableDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+protected:
+    void doDispose() final;
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -139,7 +140,7 @@ private:
     /**
      * Computes the internal representation of the group key.
      */
-    Value computeId(Variables* vars);
+    Value computeId(const Document& root);
 
     /**
      * Converts the internal representation of the group key to the _id shape specified by the
@@ -147,20 +148,11 @@ private:
      */
     Value expandId(const Value& val);
 
-    /**
-     * 'vFieldName' contains the field names for the result documents, 'vpAccumulatorFactory'
-     * contains the accumulator factories for the result documents, and 'vpExpression' contains the
-     * common expressions used by each instance of each accumulator in order to find the right-hand
-     * side of what gets added to the accumulator. These three vectors parallel each other.
-     */
-    std::vector<std::string> vFieldName;
-    std::vector<Accumulator::Factory> vpAccumulatorFactory;
-    std::vector<boost::intrusive_ptr<Expression>> vpExpression;
+    std::vector<AccumulationStatement> _accumulatedFields;
 
     bool _doingMerge;
     size_t _memoryUsageBytes = 0;
     size_t _maxMemoryUsageBytes;
-    std::unique_ptr<Variables> _variables;
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
 

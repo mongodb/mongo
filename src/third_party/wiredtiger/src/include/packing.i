@@ -104,8 +104,8 @@ __pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
 	WT_CONFIG_ITEM ignore;
 
 	if (pn->genname) {
-		(void)snprintf(pn->buf, sizeof(pn->buf),
-		    (pn->iskey ? "key%d" : "value%d"), pn->count);
+		WT_RET(__wt_snprintf(pn->buf, sizeof(pn->buf),
+		    (pn->iskey ? "key%d" : "value%d"), pn->count));
 		WT_CLEAR(*name);
 		name->str = pn->buf;
 		name->len = strlen(pn->buf);
@@ -198,7 +198,7 @@ next:	if (pack->cur == pack->end)
 		return (0);
 	default:
 		WT_RET_MSG(pack->session, EINVAL,
-		   "Invalid type '%c' found in format '%.*s'",
+		    "Invalid type '%c' found in format '%.*s'",
 		    pv->type, (int)(pack->end - pack->orig), pack->orig);
 	}
 
@@ -206,43 +206,43 @@ next:	if (pack->cur == pack->end)
 
 #define	WT_PACK_GET(session, pv, ap) do {				\
 	WT_ITEM *__item;						\
-	switch (pv.type) {						\
+	switch ((pv).type) {						\
 	case 'x':							\
 		break;							\
 	case 's':							\
 	case 'S':							\
-		pv.u.s = va_arg(ap, const char *);			\
+		(pv).u.s = va_arg(ap, const char *);			\
 		break;							\
 	case 'U':							\
 	case 'u':							\
 		__item = va_arg(ap, WT_ITEM *);				\
-		pv.u.item.data = __item->data;				\
-		pv.u.item.size = __item->size;				\
+		(pv).u.item.data = __item->data;			\
+		(pv).u.item.size = __item->size;			\
 		break;							\
 	case 'b':							\
 	case 'h':							\
 	case 'i':							\
-		pv.u.i = va_arg(ap, int);				\
+		(pv).u.i = va_arg(ap, int);				\
 		break;							\
 	case 'B':							\
 	case 'H':							\
 	case 'I':							\
 	case 't':							\
-		pv.u.u = va_arg(ap, unsigned int);			\
+		(pv).u.u = va_arg(ap, unsigned int);			\
 		break;							\
 	case 'l':							\
-		pv.u.i = va_arg(ap, long);				\
+		(pv).u.i = va_arg(ap, long);				\
 		break;							\
 	case 'L':							\
-		pv.u.u = va_arg(ap, unsigned long);			\
+		(pv).u.u = va_arg(ap, unsigned long);			\
 		break;							\
 	case 'q':							\
-		pv.u.i = va_arg(ap, int64_t);				\
+		(pv).u.i = va_arg(ap, int64_t);				\
 		break;							\
 	case 'Q':							\
 	case 'r':							\
 	case 'R':							\
-		pv.u.u = va_arg(ap, uint64_t);				\
+		(pv).u.u = va_arg(ap, uint64_t);			\
 		break;							\
 	/* User format strings have already been validated. */		\
 	WT_ILLEGAL_VALUE(session);					\
@@ -556,47 +556,47 @@ __unpack_read(WT_SESSION_IMPL *session,
 
 #define	WT_UNPACK_PUT(session, pv, ap) do {				\
 	WT_ITEM *__item;						\
-	switch (pv.type) {						\
+	switch ((pv).type) {						\
 	case 'x':							\
 		break;							\
 	case 's':							\
 	case 'S':							\
-		*va_arg(ap, const char **) = pv.u.s;			\
+		*va_arg(ap, const char **) = (pv).u.s;			\
 		break;							\
 	case 'U':							\
 	case 'u':							\
 		__item = va_arg(ap, WT_ITEM *);				\
-		__item->data = pv.u.item.data;				\
-		__item->size = pv.u.item.size;				\
+		__item->data = (pv).u.item.data;			\
+		__item->size = (pv).u.item.size;			\
 		break;							\
 	case 'b':							\
-		*va_arg(ap, int8_t *) = (int8_t)pv.u.i;			\
+		*va_arg(ap, int8_t *) = (int8_t)(pv).u.i;		\
 		break;							\
 	case 'h':							\
-		*va_arg(ap, int16_t *) = (short)pv.u.i;			\
+		*va_arg(ap, int16_t *) = (short)(pv).u.i;		\
 		break;							\
 	case 'i':							\
 	case 'l':							\
-		*va_arg(ap, int32_t *) = (int32_t)pv.u.i;		\
+		*va_arg(ap, int32_t *) = (int32_t)(pv).u.i;		\
 		break;							\
 	case 'q':							\
-		*va_arg(ap, int64_t *) = pv.u.i;			\
+		*va_arg(ap, int64_t *) = (pv).u.i;			\
 		break;							\
 	case 'B':							\
 	case 't':							\
-		*va_arg(ap, uint8_t *) = (uint8_t)pv.u.u;		\
+		*va_arg(ap, uint8_t *) = (uint8_t)(pv).u.u;		\
 		break;							\
 	case 'H':							\
-		*va_arg(ap, uint16_t *) = (uint16_t)pv.u.u;		\
+		*va_arg(ap, uint16_t *) = (uint16_t)(pv).u.u;		\
 		break;							\
 	case 'I':							\
 	case 'L':							\
-		*va_arg(ap, uint32_t *) = (uint32_t)pv.u.u;		\
+		*va_arg(ap, uint32_t *) = (uint32_t)(pv).u.u;		\
 		break;							\
 	case 'Q':							\
 	case 'r':							\
 	case 'R':							\
-		*va_arg(ap, uint64_t *) = pv.u.u;			\
+		*va_arg(ap, uint64_t *) = (pv).u.u;			\
 		break;							\
 	/* User format strings have already been validated. */		\
 	WT_ILLEGAL_VALUE(session);					\

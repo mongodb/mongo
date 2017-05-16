@@ -57,6 +57,8 @@ struct SSLParams {
     bool sslFIPSMode = false;                     // --sslFIPSMode
     bool sslAllowInvalidCertificates = false;     // --sslAllowInvalidCertificates
     bool sslAllowInvalidHostnames = false;        // --sslAllowInvalidHostnames
+    bool disableNonSSLConnectionLogging =
+        false;  // --setParameter disableNonSSLConnectionLogging=true
 
     SSLParams() {
         sslMode.store(SSLMode_disabled);

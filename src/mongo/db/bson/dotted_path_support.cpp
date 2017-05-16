@@ -190,11 +190,13 @@ BSONObj extractElementsBasedOnTemplate(const BSONObj& obj,
         BSONElement e = i.next();
         if (e.eoo())
             break;
-        BSONElement x = extractElementAtPath(obj, e.fieldName());
+
+        const auto name = e.fieldNameStringData();
+        BSONElement x = extractElementAtPath(obj, name);
         if (!x.eoo())
-            b.appendAs(x, e.fieldName());
+            b.appendAs(x, name);
         else if (useNullIfMissing)
-            b.appendNull(e.fieldName());
+            b.appendNull(name);
     }
     return b.obj();
 }
@@ -216,12 +218,13 @@ int compareObjectsAccordingToSort(const BSONObj& firstObj,
         if (f.eoo())
             return 0;
 
-        BSONElement l = assumeDottedPaths ? extractElementAtPath(firstObj, f.fieldName())
-                                          : firstObj.getField(f.fieldName());
+        const auto name = f.fieldNameStringData();
+        BSONElement l =
+            assumeDottedPaths ? extractElementAtPath(firstObj, name) : firstObj.getField(name);
         if (l.eoo())
             l = kNullElt;
-        BSONElement r = assumeDottedPaths ? extractElementAtPath(secondObj, f.fieldName())
-                                          : secondObj.getField(f.fieldName());
+        BSONElement r =
+            assumeDottedPaths ? extractElementAtPath(secondObj, name) : secondObj.getField(name);
         if (r.eoo())
             r = kNullElt;
 

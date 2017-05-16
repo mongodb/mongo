@@ -1,18 +1,20 @@
 """Pseudo-builders for building and registering integration tests.
 """
+from SCons.Script import Action
 
 def exists(env):
     return True
 
+_integration_tests = []
 def register_integration_test(env, test):
     installed_test = env.Install("#/build/integration_tests/", test)
-    env['INTEGRATION_TEST_LIST_ENV']._IntegrationTestList('$INTEGRATION_TEST_LIST', installed_test)
+    _integration_tests.append(installed_test[0].path)
+    env.Alias('$INTEGRATION_TEST_ALIAS', installed_test)
 
 def integration_test_list_builder_action(env, target, source):
-    print "Generating " + str(target[0])
     ofile = open(str(target[0]), 'wb')
     try:
-        for s in source:
+        for s in _integration_tests:
             print '\t' + str(s)
             ofile.write('%s\n' % s)
     finally:
@@ -29,15 +31,8 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     return result
 
 def generate(env):
-    # Capture the top level env so we can use it to generate the integration test list file
-    # indepenently of which environment CppUnitTest was called in. Otherwise we will get "Two
-    # different env" warnings for the unit_test_list_builder_action.
-    env['INTEGRATION_TEST_LIST_ENV'] = env;
-    integration_test_list_builder = env.Builder(
-        action=env.Action(integration_test_list_builder_action, "Generating $TARGET"),
-        multi=True)
-    env.Append(BUILDERS=dict(_IntegrationTestList=integration_test_list_builder))
+    env.Command('$INTEGRATION_TEST_LIST', env.Value(_integration_tests),
+            Action(integration_test_list_builder_action, "Generating $TARGET"))
     env.AddMethod(register_integration_test, 'RegisterIntegrationTest')
     env.AddMethod(build_cpp_integration_test, 'CppIntegrationTest')
-    env.Alias('$INTEGRATION_TEST_ALIAS', "#/build/integration_tests/")
     env.Alias('$INTEGRATION_TEST_ALIAS', '$INTEGRATION_TEST_LIST')

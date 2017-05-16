@@ -45,10 +45,10 @@ using stdx::make_unique;
 // static
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
-DistinctScan::DistinctScan(OperationContext* txn,
+DistinctScan::DistinctScan(OperationContext* opCtx,
                            const DistinctParams& params,
                            WorkingSet* workingSet)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),

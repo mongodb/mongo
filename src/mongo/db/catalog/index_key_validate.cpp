@@ -439,14 +439,14 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
     return Status::OK();
 }
 
-StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* txn,
+StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                                                const BSONObj& indexSpec,
                                                const CollatorInterface* defaultCollator) {
     if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
         // validateIndexSpec() should have already verified that 'collationElem' is an object.
         invariant(collationElem.type() == BSONType::Object);
 
-        auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
+        auto collator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                             ->makeFromBSON(collationElem.Obj());
         if (!collator.isOK()) {
             return collator.getStatus();

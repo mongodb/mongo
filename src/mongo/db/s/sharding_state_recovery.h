@@ -53,13 +53,13 @@ public:
      * server's minOpTime after node failure. It is only safe to commence the operation after this
      * method returns an OK status.
      */
-    static Status startMetadataOp(OperationContext* txn);
+    static Status startMetadataOp(OperationContext* opCtx);
 
     /**
      * Marks the end of a sharding metadata operation, persisting the latest config server opTime at
      * the time of the call.
      */
-    static void endMetadataOp(OperationContext* txn);
+    static void endMetadataOp(OperationContext* opCtx);
 
     /**
      * Recovers the minimal config server opTime that the instance should be using for reading
@@ -71,7 +71,7 @@ public:
      * Returns OK if the minOpTime was successfully recovered or failure status otherwise. It is
      * unsafe to read and rely on any sharding metadata before this method has returned success.
      */
-    static Status recover(OperationContext* txn);
+    static Status recover(OperationContext* opCtx);
 };
 
 }  // namespace mongo

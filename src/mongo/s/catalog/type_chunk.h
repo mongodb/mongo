@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
 
@@ -82,9 +83,25 @@ public:
     bool operator==(const ChunkRange& other) const;
     bool operator!=(const ChunkRange& other) const;
 
+    /**
+     * Returns true iff the union of *this and the argument range is the same as *this.
+     */
+    bool covers(ChunkRange const& other) const;
+
+    /**
+     * Returns the range of overlap between *this and other, if any.
+     */
+    boost::optional<ChunkRange> overlapWith(ChunkRange const& other) const;
+
+    /**
+     * Returns a range that includes *this and other. If the ranges do not overlap, it includes
+     * all the space between, as well.
+     */
+    ChunkRange unionWith(ChunkRange const& other) const;
+
 private:
-    BSONObj _minKey;
-    BSONObj _maxKey;
+    const BSONObj _minKey;
+    const BSONObj _maxKey;
 };
 
 /**
@@ -132,6 +149,9 @@ public:
     // Name of the chunks collection in the config server.
     static const std::string ConfigNS;
 
+    // The shard chunks collections' common namespace prefix.
+    static const std::string ShardNSPrefix;
+
     // Field names and types in the chunks collections.
     static const BSONField<std::string> name;
     static const BSONField<BSONObj> minShardID;
@@ -142,6 +162,9 @@ public:
     static const BSONField<bool> jumbo;
     static const BSONField<Date_t> DEPRECATED_lastmod;
     static const BSONField<OID> DEPRECATED_epoch;
+
+    ChunkType();
+    ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);
 
     /**
      * Constructs a new ChunkType object from BSON that has the config server's config.chunks
@@ -232,7 +255,7 @@ public:
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
-    // (M)(C)     collection this chunk is in
+    // (O)(C)     collection this chunk is in
     boost::optional<std::string> _ns;
     // (M)(C)(S)  first key of the range, inclusive
     boost::optional<BSONObj> _min;

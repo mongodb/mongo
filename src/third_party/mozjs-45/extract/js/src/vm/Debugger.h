@@ -607,7 +607,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     void updateObservesAsmJSOnDebuggees(IsObserving observing);
 
     JSObject* getHook(Hook hook) const;
-    bool hasAnyLiveHooks() const;
+    bool hasAnyLiveHooks(JSRuntime* rt) const;
 
     static JSTrapStatus slowPathOnEnterFrame(JSContext* cx, AbstractFramePtr frame);
     static bool slowPathOnLeaveFrame(JSContext* cx, AbstractFramePtr frame, bool ok);

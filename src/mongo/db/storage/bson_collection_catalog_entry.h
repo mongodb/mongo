@@ -48,23 +48,23 @@ public:
 
     virtual ~BSONCollectionCatalogEntry() {}
 
-    virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
+    virtual CollectionOptions getCollectionOptions(OperationContext* opCtx) const;
 
-    virtual int getTotalIndexCount(OperationContext* txn) const;
+    virtual int getTotalIndexCount(OperationContext* opCtx) const;
 
-    virtual int getCompletedIndexCount(OperationContext* txn) const;
+    virtual int getCompletedIndexCount(OperationContext* opCtx) const;
 
-    virtual BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const;
+    virtual BSONObj getIndexSpec(OperationContext* opCtx, StringData idxName) const;
 
-    virtual void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const;
+    virtual void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const;
 
-    virtual bool isIndexMultikey(OperationContext* txn,
+    virtual bool isIndexMultikey(OperationContext* opCtx,
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const;
 
-    virtual RecordId getIndexHead(OperationContext* txn, StringData indexName) const;
+    virtual RecordId getIndexHead(OperationContext* opCtx, StringData indexName) const;
 
-    virtual bool isIndexReady(OperationContext* txn, StringData indexName) const;
+    virtual bool isIndexReady(OperationContext* opCtx, StringData indexName) const;
 
     // ------ for implementors
 
@@ -111,6 +111,6 @@ public:
     };
 
 protected:
-    virtual MetaData _getMetaData(OperationContext* txn) const = 0;
+    virtual MetaData _getMetaData(OperationContext* opCtx) const = 0;
 };
 }

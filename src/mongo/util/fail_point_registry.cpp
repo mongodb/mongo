@@ -55,7 +55,7 @@ Status FailPointRegistry::addFailPoint(const string& name, FailPoint* failPoint)
 }
 
 FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
-    return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(NULL));
+    return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(nullptr));
 }
 
 void FailPointRegistry::freeze() {

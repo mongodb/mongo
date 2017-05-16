@@ -124,7 +124,7 @@ public:
      * but simply keeps a record of it. Can also be paused by pauseDeletes and
      * resumed with resumeDeletes.
      */
-    bool deleteRange(OperationContext* txn,
+    bool deleteRange(OperationContext* opCtx,
                      const RangeDeleteEntry& taskDetails,
                      long long int* deletedDocs,
                      std::string* errMsg);
@@ -134,7 +134,7 @@ public:
      * RangeDeleterEnv::getCursorIds. The cursors returned can be modified with
      * the setCursorId and clearCursorMap methods.
      */
-    void getCursorIds(OperationContext* txn, StringData ns, std::set<CursorId>* in);
+    void getCursorIds(OperationContext* opCtx, StringData ns, std::set<CursorId>* in);
 
 private:
     // mutex acquisition ordering:

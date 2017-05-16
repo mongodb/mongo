@@ -17,7 +17,6 @@ from . import replicaset
 from ... import config
 from ... import core
 from ... import errors
-from ... import logging
 from ... import utils
 
 
@@ -28,6 +27,7 @@ class ShardedClusterFixture(interface.Fixture):
     """
 
     _CONFIGSVR_REPLSET_NAME = "config-rs"
+    _SHARD_REPLSET_NAME_PREFIX = "shard-rs"
 
     def __init__(self,
                  logger,
@@ -39,6 +39,7 @@ class ShardedClusterFixture(interface.Fixture):
                  dbpath_prefix=None,
                  preserve_dbpath=False,
                  num_shards=1,
+                 num_rs_nodes_per_shard=None,
                  separate_configsvr=True,
                  enable_sharding=None,
                  auth_options=None):
@@ -58,6 +59,7 @@ class ShardedClusterFixture(interface.Fixture):
         self.mongod_options = utils.default_if_none(mongod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.num_shards = num_shards
+        self.num_rs_nodes_per_shard = num_rs_nodes_per_shard
         self.separate_configsvr = separate_configsvr
         self.enable_sharding = utils.default_if_none(enable_sharding, [])
         self.auth_options = auth_options
@@ -81,7 +83,14 @@ class ShardedClusterFixture(interface.Fixture):
 
         if not self.shards:
             for i in xrange(self.num_shards):
-                shard = self._new_shard(i)
+                if self.num_rs_nodes_per_shard is None:
+                    shard = self._new_standalone_shard(i)
+                elif isinstance(self.num_rs_nodes_per_shard, int):
+                    if self.num_rs_nodes_per_shard <= 0:
+                        raise ValueError("num_rs_nodes_per_shard must be a positive integer")
+                    shard = self._new_rs_shard(i, self.num_rs_nodes_per_shard)
+                else:
+                    raise TypeError("num_rs_nodes_per_shard must be an integer or None")
                 self.shards.append(shard)
 
         # Start up each of the shards
@@ -170,14 +179,19 @@ class ShardedClusterFixture(interface.Fixture):
                 all(shard.is_running() for shard in self.shards) and
                 self.mongos is not None and self.mongos.is_running())
 
+    def get_connection_string(self):
+        if self.mongos is None:
+            raise ValueError("Must call setup() before calling get_connection_string()")
+
+        return "%s:%d" % (socket.gethostname(), self.mongos.port)
+
     def _new_configsvr(self):
         """
         Returns a replicaset.ReplicaSetFixture configured to be used as
         the config server of a sharded cluster.
         """
 
-        logger_name = "%s:configsvr" % (self.logger.name)
-        mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongod_logger = self.logger.new_fixture_node_logger("configsvr")
 
         mongod_options = copy.deepcopy(self.mongod_options)
         mongod_options["configsvr"] = ""
@@ -194,14 +208,35 @@ class ShardedClusterFixture(interface.Fixture):
                                             auth_options=self.auth_options,
                                             replset_config_options={"configsvr": True})
 
-    def _new_shard(self, index):
+    def _new_rs_shard(self, index, num_rs_nodes_per_shard):
+        """
+        Returns a replicaset.ReplicaSetFixture configured to be used as a
+        shard in a sharded cluster.
+        """
+
+        mongod_logger = self.logger.new_fixture_node_logger("shard%d" % index)
+
+        mongod_options = copy.deepcopy(self.mongod_options)
+        mongod_options["shardsvr"] = ""
+        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard%d" % (index))
+        mongod_options["replSet"] = ShardedClusterFixture._SHARD_REPLSET_NAME_PREFIX + str(index)
+
+        return replicaset.ReplicaSetFixture(mongod_logger,
+                                            self.job_num,
+                                            mongod_executable=self.mongod_executable,
+                                            mongod_options=mongod_options,
+                                            preserve_dbpath=self.preserve_dbpath,
+                                            num_nodes=num_rs_nodes_per_shard,
+                                            auth_options=self.auth_options,
+                                            replset_config_options={"configsvr": False})
+
+    def _new_standalone_shard(self, index):
         """
         Returns a standalone.MongoDFixture configured to be used as a
         shard in a sharded cluster.
         """
 
-        logger_name = "%s:shard%d" % (self.logger.name, index)
-        mongod_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongod_logger = self.logger.new_fixture_node_logger("shard%d" % index)
 
         mongod_options = copy.deepcopy(self.mongod_options)
         mongod_options["shardsvr"] = ""
@@ -219,8 +254,7 @@ class ShardedClusterFixture(interface.Fixture):
         a sharded cluster.
         """
 
-        logger_name = "%s:mongos" % (self.logger.name)
-        mongos_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
+        mongos_logger = self.logger.new_fixture_node_logger("mongos")
 
         mongos_options = copy.deepcopy(self.mongos_options)
         configdb_hostname = socket.gethostname()
@@ -248,9 +282,9 @@ class ShardedClusterFixture(interface.Fixture):
         for more details.
         """
 
-        hostname = socket.gethostname()
-        self.logger.info("Adding %s:%d as a shard..." % (hostname, shard.port))
-        client.admin.command({"addShard": "%s:%d" % (hostname, shard.port)})
+        connection_string = shard.get_connection_string()
+        self.logger.info("Adding %s as a shard..." % (connection_string))
+        client.admin.command({"addShard": "%s" % (connection_string)})
 
 
 class _MongoSFixture(interface.Fixture):

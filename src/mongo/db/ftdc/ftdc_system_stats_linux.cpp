@@ -77,7 +77,7 @@ public:
         }
     }
 
-    void collect(OperationContext* txn, BSONObjBuilder& builder) override {
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         {
             BSONObjBuilder subObjBuilder(builder.subobjStart("cpu"_sd));
 

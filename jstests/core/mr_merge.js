@@ -1,3 +1,6 @@
+// Cannot implicitly shard accessed collections because of following errmsg: Cannot output to a
+// non-sharded collection because sharded collection exists already.
+// @tags: [assumes_unsharded_collection]
 
 t = db.mr_merge;
 t.drop();

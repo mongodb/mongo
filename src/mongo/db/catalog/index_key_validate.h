@@ -74,7 +74,7 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec);
  * collation spec. If 'collation' is missing, fills it in with the spec for 'defaultCollator'.
  * Returns the index specification with 'collation' filled in.
  */
-StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* txn,
+StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                                                const BSONObj& indexSpec,
                                                const CollatorInterface* defaultCollator);
 

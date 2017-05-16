@@ -41,12 +41,14 @@ namespace executor {
 class TaskExecutor;
 }  // namespace executor
 
+class CatalogCache;
 class ConnectionString;
 class OperationContext;
 class ShardFactory;
 class Status;
 class ShardingCatalogClient;
 class ShardingCatalogManager;
+
 using ShardingCatalogManagerBuilder = stdx::function<std::unique_ptr<ShardingCatalogManager>(
     ShardingCatalogClient*, std::unique_ptr<executor::TaskExecutor>)>;
 
@@ -63,16 +65,17 @@ extern const StringData kDistLockProcessIdForConfigServer;
 /**
  * Generates a uniform string to be used as a process id for the distributed lock manager.
  */
-std::string generateDistLockProcessId(OperationContext* txn);
+std::string generateDistLockProcessId(OperationContext* opCtx);
 
 /**
  * Takes in the connection string for reaching the config servers and initializes the global
  * ShardingCatalogClient, ShardingCatalogManager, ShardRegistry, and Grid objects.
  */
-Status initializeGlobalShardingState(OperationContext* txn,
+Status initializeGlobalShardingState(OperationContext* opCtx,
                                      const ConnectionString& configCS,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
+                                     std::unique_ptr<CatalogCache> catalogCache,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder);
 
@@ -80,6 +83,6 @@ Status initializeGlobalShardingState(OperationContext* txn,
  * Tries to contact the config server and reload the shard registry and the cluster ID until it
  * succeeds or is interrupted.
  */
-Status reloadShardRegistryUntilSuccess(OperationContext* txn);
+Status reloadShardRegistryUntilSuccess(OperationContext* opCtx);
 
 }  // namespace mongo

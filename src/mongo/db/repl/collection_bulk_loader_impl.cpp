@@ -51,7 +51,7 @@
 namespace mongo {
 namespace repl {
 
-CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
+CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* opCtx,
                                                    Collection* coll,
                                                    const BSONObj idIndexSpec,
                                                    std::unique_ptr<OldThreadPool> threadPool,
@@ -62,13 +62,13 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(OperationContext* txn,
       _runner(std::move(runner)),
       _autoColl(std::move(autoColl)),
       _autoDB(std::move(autoDb)),
-      _txn(txn),
+      _opCtx(opCtx),
       _coll(coll),
       _nss{coll->ns()},
-      _idIndexBlock(stdx::make_unique<MultiIndexBlock>(txn, coll)),
-      _secondaryIndexesBlock(stdx::make_unique<MultiIndexBlock>(txn, coll)),
+      _idIndexBlock(stdx::make_unique<MultiIndexBlock>(opCtx, coll)),
+      _secondaryIndexesBlock(stdx::make_unique<MultiIndexBlock>(opCtx, coll)),
       _idIndexSpec(idIndexSpec) {
-    invariant(txn);
+    invariant(opCtx);
     invariant(coll);
     invariant(_runner);
     invariant(_autoDB);
@@ -89,10 +89,13 @@ CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
 Status CollectionBulkLoaderImpl::init(Collection* coll,
                                       const std::vector<BSONObj>& secondaryIndexSpecs) {
     return _runTaskReleaseResourcesOnFailure(
-        [coll, &secondaryIndexSpecs, this](OperationContext* txn) -> Status {
-            invariant(txn);
+        [coll, &secondaryIndexSpecs, this](OperationContext* opCtx) -> Status {
+            invariant(opCtx);
             invariant(coll);
-            invariant(txn->getClient() == &cc());
+            invariant(opCtx->getClient() == &cc());
+            // All writes in CollectionBulkLoaderImpl should be unreplicated.
+            // The opCtx is accessed indirectly through _secondaryIndexesBlock.
+            UnreplicatedWritesBlock uwb(opCtx);
             std::vector<BSONObj> specs(secondaryIndexSpecs);
             // This enforces the buildIndexes setting in the replica set configuration.
             _secondaryIndexesBlock->removeExistingIndexes(&specs);
@@ -122,8 +125,9 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                                                  const std::vector<BSONObj>::const_iterator end) {
     int count = 0;
     return _runTaskReleaseResourcesOnFailure(
-        [begin, end, &count, this](OperationContext* txn) -> Status {
-            invariant(txn);
+        [begin, end, &count, this](OperationContext* opCtx) -> Status {
+            invariant(opCtx);
+            UnreplicatedWritesBlock uwb(opCtx);
 
             for (auto iter = begin; iter != end; ++iter) {
                 std::vector<MultiIndexBlock*> indexers;
@@ -134,15 +138,15 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
                     indexers.push_back(_secondaryIndexesBlock.get());
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(txn);
-                    const auto status = _coll->insertDocument(txn, *iter, indexers, false);
+                    WriteUnitOfWork wunit(opCtx);
+                    const auto status = _coll->insertDocument(opCtx, *iter, indexers, false);
                     if (!status.isOK()) {
                         return status;
                     }
                     wunit.commit();
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _txn, "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
+                    _opCtx, "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
 
                 ++count;
             }
@@ -152,11 +156,12 @@ Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::con
 
 Status CollectionBulkLoaderImpl::commit() {
     return _runTaskReleaseResourcesOnFailure(
-        [this](OperationContext* txn) -> Status {
+        [this](OperationContext* opCtx) -> Status {
             _stats.startBuildingIndexes = Date_t::now();
             LOG(2) << "Creating indexes for ns: " << _nss.ns();
-            invariant(txn->getClient() == &cc());
-            invariant(txn == _txn);
+            invariant(opCtx->getClient() == &cc());
+            invariant(opCtx == _opCtx);
+            UnreplicatedWritesBlock uwb(opCtx);
 
             // Commit before deleting dups, so the dups will be removed from secondary indexes when
             // deleted.
@@ -173,12 +178,12 @@ Status CollectionBulkLoaderImpl::commit() {
                                                    "MultiIndexBlock::ignoreUniqueConstraint set."};
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(txn);
+                    WriteUnitOfWork wunit(opCtx);
                     _secondaryIndexesBlock->commit();
                     wunit.commit();
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
+                    _opCtx, "CollectionBulkLoaderImpl::commit", _nss.ns());
             }
 
             if (_idIndexBlock) {
@@ -192,8 +197,8 @@ Status CollectionBulkLoaderImpl::commit() {
 
                 for (auto&& it : dups) {
                     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                        WriteUnitOfWork wunit(_txn);
-                        _coll->deleteDocument(_txn,
+                        WriteUnitOfWork wunit(_opCtx);
+                        _coll->deleteDocument(_opCtx,
                                               it,
                                               nullptr /** OpDebug **/,
                                               false /* fromMigrate */,
@@ -201,17 +206,17 @@ Status CollectionBulkLoaderImpl::commit() {
                         wunit.commit();
                     }
                     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                        _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
+                        _opCtx, "CollectionBulkLoaderImpl::commit", _nss.ns());
                 }
 
                 // Commit _id index, without dups.
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(txn);
+                    WriteUnitOfWork wunit(opCtx);
                     _idIndexBlock->commit();
                     wunit.commit();
                 }
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _txn, "CollectionBulkLoaderImpl::commit", _nss.ns());
+                    _opCtx, "CollectionBulkLoaderImpl::commit", _nss.ns());
             }
             _stats.endBuildingIndexes = Date_t::now();
             LOG(2) << "Done creating indexes for ns: " << _nss.ns()
@@ -244,9 +249,9 @@ void CollectionBulkLoaderImpl::_releaseResources() {
 
 Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(
     TaskRunner::SynchronousTask task, TaskRunner::NextAction nextAction) {
-    auto newTask = [this, &task](OperationContext* txn) -> Status {
+    auto newTask = [this, &task](OperationContext* opCtx) -> Status {
         ScopeGuard guard = MakeGuard(&CollectionBulkLoaderImpl::_releaseResources, this);
-        const auto status = task(txn);
+        const auto status = task(opCtx);
         if (status.isOK()) {
             guard.Dismiss();
         }

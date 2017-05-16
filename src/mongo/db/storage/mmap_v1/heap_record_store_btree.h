@@ -49,33 +49,33 @@ public:
     // RecordId(0,0) isn't valid for records.
     explicit HeapRecordStoreBtree(StringData ns) : RecordStore(ns), _nextId(1) {}
 
-    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
+    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 
-    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* out) const;
+    virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out) const;
 
-    virtual void deleteRecord(OperationContext* txn, const RecordId& dl);
+    virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl);
 
-    virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
+    virtual StatusWith<RecordId> insertRecord(OperationContext* opCtx,
                                               const char* data,
                                               int len,
                                               bool enforceQuota);
 
-    virtual Status insertRecordsWithDocWriter(OperationContext* txn,
+    virtual Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                               const DocWriter* const* docs,
                                               size_t nDocs,
                                               RecordId* idsOut);
 
-    virtual long long numRecords(OperationContext* txn) const {
+    virtual long long numRecords(OperationContext* opCtx) const {
         return _records.size();
     }
 
-    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
+    virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
 
     // public methods below here are not necessary to test btree, and will crash when called.
 
     // ------------------------------
 
-    virtual Status updateRecord(OperationContext* txn,
+    virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
                                 const char* data,
                                 int len,
@@ -88,7 +88,7 @@ public:
         return true;
     }
 
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
                                                      const RecordId& loc,
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
@@ -96,17 +96,17 @@ public:
         invariant(false);
     }
 
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final {
         invariant(false);
     }
 
 
-    virtual Status truncate(OperationContext* txn) {
+    virtual Status truncate(OperationContext* opCtx) {
         invariant(false);
     }
 
-    virtual void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
+    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
         invariant(false);
     }
 
@@ -114,7 +114,7 @@ public:
         invariant(false);
     }
 
-    virtual Status validate(OperationContext* txn,
+    virtual Status validate(OperationContext* opCtx,
                             ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
@@ -122,23 +122,23 @@ public:
         invariant(false);
     }
 
-    virtual void appendCustomStats(OperationContext* txn,
+    virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const {
         invariant(false);
     }
 
-    virtual void increaseStorageSize(OperationContext* txn, int size, bool enforceQuota) {
+    virtual void increaseStorageSize(OperationContext* opCtx, int size, bool enforceQuota) {
         invariant(false);
     }
 
-    virtual int64_t storageSize(OperationContext* txn,
+    virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const {
         invariant(false);
     }
 
-    virtual long long dataSize(OperationContext* txn) const {
+    virtual long long dataSize(OperationContext* opCtx) const {
         invariant(false);
     }
 
@@ -154,11 +154,11 @@ public:
         invariant(false);
     }
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override {
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {
         invariant(false);
     }
 
-    virtual void updateStatsAfterRepair(OperationContext* txn,
+    virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize) {
         invariant(false);

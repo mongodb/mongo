@@ -39,6 +39,8 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -201,7 +203,7 @@ void RangeDeleter::stopWorkers() {
     }
 }
 
-bool RangeDeleter::queueDelete(OperationContext* txn,
+bool RangeDeleter::queueDelete(OperationContext* opCtx,
                                const RangeDeleterOptions& options,
                                Notification<void>* doneSignal,
                                std::string* errMsg) {
@@ -231,7 +233,7 @@ bool RangeDeleter::queueDelete(OperationContext* txn,
     }
 
     if (options.waitForOpenCursors) {
-        _env->getCursorIds(txn, ns, &toDelete->cursorsToWait);
+        _env->getCursorIds(opCtx, ns, &toDelete->cursorsToWait);
     }
 
     toDelete->stats.queueStartTS = jsTime();
@@ -257,12 +259,12 @@ bool RangeDeleter::queueDelete(OperationContext* txn,
 namespace {
 const int kWTimeoutMillis = 60 * 60 * 1000;
 
-bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
+bool _waitForMajority(OperationContext* opCtx, std::string* errMsg) {
     const WriteConcernOptions writeConcern(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, kWTimeoutMillis);
 
     repl::ReplicationCoordinator::StatusAndDuration replStatus =
-        repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(txn,
+        repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(opCtx,
                                                                                    writeConcern);
     if (!replStatus.status.isOK()) {
         *errMsg = str::stream() << "rangeDeleter failed while waiting for replication after "
@@ -275,7 +277,7 @@ bool _waitForMajority(OperationContext* txn, std::string* errMsg) {
 }
 }  // namespace
 
-bool RangeDeleter::deleteNow(OperationContext* txn,
+bool RangeDeleter::deleteNow(OperationContext* opCtx,
                              const RangeDeleterOptions& options,
                              string* errMsg) {
     if (stopRequested()) {
@@ -308,7 +310,7 @@ bool RangeDeleter::deleteNow(OperationContext* txn,
 
     RangeDeleteEntry taskDetails(options);
     if (options.waitForOpenCursors) {
-        _env->getCursorIds(txn, ns, &taskDetails.cursorsToWait);
+        _env->getCursorIds(opCtx, ns, &taskDetails.cursorsToWait);
     }
 
     long long checkIntervalMillis = 5;
@@ -320,7 +322,7 @@ bool RangeDeleter::deleteNow(OperationContext* txn,
         logCursorsWaiting(&taskDetails);
 
         set<CursorId> cursorsNow;
-        _env->getCursorIds(txn, ns, &cursorsNow);
+        _env->getCursorIds(opCtx, ns, &cursorsNow);
 
         set<CursorId> cursorsLeft;
         std::set_intersection(taskDetails.cursorsToWait.begin(),
@@ -353,13 +355,13 @@ bool RangeDeleter::deleteNow(OperationContext* txn,
     taskDetails.stats.queueEndTS = jsTime();
 
     taskDetails.stats.deleteStartTS = jsTime();
-    bool result = _env->deleteRange(txn, taskDetails, &taskDetails.stats.deletedDocCount, errMsg);
+    bool result = _env->deleteRange(opCtx, taskDetails, &taskDetails.stats.deletedDocCount, errMsg);
 
     taskDetails.stats.deleteEndTS = jsTime();
 
     if (result) {
         taskDetails.stats.waitForReplStartTS = jsTime();
-        result = _waitForMajority(txn, errMsg);
+        result = _waitForMajority(opCtx, errMsg);
         taskDetails.stats.waitForReplEndTS = jsTime();
     }
 
@@ -378,16 +380,17 @@ bool RangeDeleter::deleteNow(OperationContext* txn,
     return result;
 }
 
-void RangeDeleter::getStatsHistory(std::vector<DeleteJobStats*>* stats) const {
-    stats->clear();
-    stats->reserve(kDeleteJobsHistory);
+std::vector<std::unique_ptr<DeleteJobStats>> RangeDeleter::getStatsHistory() const {
+    std::vector<std::unique_ptr<DeleteJobStats>> stats;
+    stats.reserve(kDeleteJobsHistory);
 
     stdx::lock_guard<stdx::mutex> sl(_statsHistoryMutex);
     for (std::deque<DeleteJobStats*>::const_iterator it = _statsHistory.begin();
          it != _statsHistory.end();
          ++it) {
-        stats->push_back(new DeleteJobStats(**it));
+        stats.push_back(stdx::make_unique<DeleteJobStats>(**it));
     }
+    return stats;
 }
 
 BSONObj RangeDeleter::toBSON() const {
@@ -423,8 +426,11 @@ void RangeDeleter::doWork() {
         {
             stdx::unique_lock<stdx::mutex> sl(_queueMutex);
             while (_taskQueue.empty()) {
-                _taskQueueNotEmptyCV.wait_for(
-                    sl, Milliseconds(kNotEmptyTimeoutMillis).toSystemDuration());
+                {
+                    MONGO_IDLE_THREAD_BLOCK;
+                    _taskQueueNotEmptyCV.wait_for(
+                        sl, Milliseconds(kNotEmptyTimeoutMillis).toSystemDuration());
+                }
 
                 if (stopRequested()) {
                     log() << "stopping range deleter worker" << endl;
@@ -441,8 +447,8 @@ void RangeDeleter::doWork() {
 
                         set<CursorId> cursorsNow;
                         if (entry->options.waitForOpenCursors) {
-                            auto txn = client->makeOperationContext();
-                            _env->getCursorIds(txn.get(), entry->options.range.ns, &cursorsNow);
+                            auto opCtx = client->makeOperationContext();
+                            _env->getCursorIds(opCtx.get(), entry->options.range.ns, &cursorsNow);
                         }
 
                         set<CursorId> cursorsLeft;
@@ -479,16 +485,16 @@ void RangeDeleter::doWork() {
         }
 
         {
-            auto txn = client->makeOperationContext();
+            auto opCtx = client->makeOperationContext();
             nextTask->stats.deleteStartTS = jsTime();
-            bool delResult =
-                _env->deleteRange(txn.get(), *nextTask, &nextTask->stats.deletedDocCount, &errMsg);
+            bool delResult = _env->deleteRange(
+                opCtx.get(), *nextTask, &nextTask->stats.deletedDocCount, &errMsg);
             nextTask->stats.deleteEndTS = jsTime();
 
             if (delResult) {
                 nextTask->stats.waitForReplStartTS = jsTime();
 
-                if (!_waitForMajority(txn.get(), &errMsg)) {
+                if (!_waitForMajority(opCtx.get(), &errMsg)) {
                     warning() << "Error encountered while waiting for replication: " << errMsg;
                 }
 

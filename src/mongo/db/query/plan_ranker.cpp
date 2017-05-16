@@ -76,14 +76,14 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     double eofBonus = 1.0;
 
     // Each plan will have a stat tree.
-    vector<PlanStageStats*> statTrees;
+    std::vector<std::unique_ptr<PlanStageStats>> statTrees;
 
     // Get stat trees from each plan.
     // Copy stats trees instead of transferring ownership
     // because multi plan runner will need its own stats
     // trees for explain.
     for (size_t i = 0; i < candidates.size(); ++i) {
-        statTrees.push_back(candidates[i].root->getStats().release());
+        statTrees.push_back(candidates[i].root->getStats());
     }
 
     // Holds (score, candidateInndex).
@@ -98,7 +98,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
         LOG(2) << "Scoring query plan: " << redact(Explain::getPlanSummary(candidates[i].root))
                << " planHitEOF=" << statTrees[i]->common.isEOF;
 
-        double score = scoreTree(statTrees[i]);
+        double score = scoreTree(statTrees[i].get());
         LOG(5) << "score = " << score;
         if (statTrees[i]->common.isEOF) {
             LOG(5) << "Adding +" << eofBonus << " EOF bonus to score.";
@@ -151,7 +151,7 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
             score -= eofBonus;
         }
 
-        why->stats.mutableVector().push_back(statTrees[candidateIndex]);
+        why->stats.push_back(std::move(statTrees[candidateIndex]));
         why->scores.push_back(score);
         why->candidateOrder.push_back(candidateIndex);
     }

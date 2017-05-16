@@ -37,10 +37,10 @@
 
 namespace mongo {
 class BSONObj;
+class BSONObjBuilder;
 class Message;
 
 namespace rpc {
-class DocumentRange;
 
 /**
  * Constructs an RPC Reply.
@@ -49,17 +49,7 @@ class ReplyBuilderInterface {
     MONGO_DISALLOW_COPYING(ReplyBuilderInterface);
 
 public:
-    /**
-     * Reply builders must have their fields set in order as they are immediately written into
-     * the underlying message buffer. This enum represents the next field that can be written
-     * into the builder. Note that when the builder is in state 'kInputDocs', multiple input
-     * docs can be added. After the builder's done() method is called it is in state 'kDone',
-     * and no further methods can be called.
-     */
-    enum class State { kMetadata, kCommandReply, kOutputDocs, kDone };
-
     virtual ~ReplyBuilderInterface() = default;
-
 
     /**
      * Sets the raw command reply. This should probably not be used in favor of the
@@ -68,9 +58,9 @@ public:
     virtual ReplyBuilderInterface& setRawCommandReply(const BSONObj& reply) = 0;
 
     /**
-     * Returns a BufBuilder suitable for building a command reply in place.
+     * Returns a BSONObjBuilder for building a command reply in place.
      */
-    virtual BufBuilder& getInPlaceReplyBuilder(std::size_t reserveBytes) = 0;
+    virtual BSONObjBuilder getInPlaceReplyBuilder(std::size_t reserveBytes) = 0;
 
     virtual ReplyBuilderInterface& setMetadata(const BSONObj& metadata) = 0;
 
@@ -96,28 +86,6 @@ public:
      */
     virtual ReplyBuilderInterface& setCommandReply(Status nonOKStatus,
                                                    const BSONObj& extraErrorInfo);
-
-    /**
-     * Add a range of output documents to the reply. This method can be called multiple times
-     * before calling done(). A non OK status indicates that the message does not have
-     * enough space to store ouput documents.
-     */
-    virtual Status addOutputDocs(DocumentRange outputDocs) = 0;
-
-    /**
-     * Add a single output document to the reply. This method can be called multiple times
-     * before calling done(). A non OK status indicates that the message does not have
-     * enough space to store ouput documents.
-     */
-    virtual Status addOutputDoc(const BSONObj& outputDoc) = 0;
-
-    /**
-     * Gets the state of the builder. As the builder will simply crash the process if it is ever
-     * put in an invalid state, it isn't neccessary to call this method for correctness. Rather
-     * it may be helpful to explicitly assert that the builder is in a certain state to make
-     * code that manipulates the builder more readable.
-     */
-    virtual State getState() const = 0;
 
     /**
      * Gets the protocol used to serialize this reply. This should be used for validity checks

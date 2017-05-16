@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/data_view.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
@@ -327,6 +328,12 @@ Status validateBSONIterative(Buffer* buffer) {
     while (state != ValidationState::Done) {
         switch (state) {
             case ValidationState::BeginObj:
+                if (frames.size() > BSONDepth::getMaxAllowableDepth()) {
+                    return {ErrorCodes::Overflow,
+                            str::stream() << "BSONObj exceeded maximum nested object depth: "
+                                          << BSONDepth::getMaxAllowableDepth()};
+                }
+
                 frames.push_back(ValidationObjectFrame());
                 curr = &frames.back();
                 curr->setStartPosition(buffer->position());

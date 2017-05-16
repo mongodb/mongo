@@ -46,13 +46,13 @@ public:
         return true;
     }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElem) const {
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElem) const {
         BSONObjBuilder latencyBuilder;
         bool includeHistograms = false;
         if (configElem.type() == BSONType::Object) {
             includeHistograms = configElem.Obj()["histograms"].trueValue();
         }
-        Top::get(txn->getServiceContext())
+        Top::get(opCtx->getServiceContext())
             .appendGlobalLatencyStats(includeHistograms, &latencyBuilder);
         return latencyBuilder.obj();
     }

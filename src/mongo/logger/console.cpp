@@ -40,18 +40,10 @@
 namespace mongo {
 namespace {
 
-/*
- * Theory of operation:
- *
- * At process start, the loader initializes "consoleMutex" to NULL.  At some point during static
- * initialization, the static initialization process, running in the one and only extant thread,
- * allocates a new stdx::mutex on the heap and assigns consoleMutex to point to it.  While
- * consoleMutex is still NULL, we know that there is only one thread extant, so it is safe to
- * skip locking the consoleMutex in the Console constructor.  Once the mutex is initialized,
- * users of Console can start acquiring it.
- */
-
-stdx::mutex* consoleMutex = new stdx::mutex;
+stdx::mutex& consoleMutex() {
+    static stdx::mutex instance;
+    return instance;
+}
 
 #if defined(_WIN32)
 /**
@@ -252,10 +244,8 @@ Console::Console() : _consoleLock() {
     // single-threaded context via a mongo initializer above.
     static const std::ios_base::Init initializeCout;
 
-    if (consoleMutex) {
-        stdx::unique_lock<stdx::mutex> lk(*consoleMutex);
-        lk.swap(_consoleLock);
-    }
+    stdx::unique_lock<stdx::mutex> lk(consoleMutex());
+    lk.swap(_consoleLock);
 }
 
 std::ostream& Console::out() {

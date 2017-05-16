@@ -41,7 +41,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -129,7 +128,7 @@ public:
             const std::string& dbname,
             const BSONObj& cmdObj,
             const CallbackFn& work,
-            const BSONObj& metadata = rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+            const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
             Milliseconds timeout = RemoteCommandRequest::kNoTimeout,
             std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
                 RemoteCommandRetryScheduler::makeNoRetryPolicy());

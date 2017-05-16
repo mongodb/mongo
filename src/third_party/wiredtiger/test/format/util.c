@@ -241,20 +241,23 @@ val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 void
 track(const char *tag, uint64_t cnt, TINFO *tinfo)
 {
-	static int lastlen = 0;
-	int len;
+	static size_t lastlen = 0;
+	size_t len;
 	char msg[128];
 
 	if (g.c_quiet || tag == NULL)
 		return;
 
 	if (tinfo == NULL && cnt == 0)
-		len = snprintf(msg, sizeof(msg), "%4d: %s", g.run_cnt, tag);
+		testutil_check(__wt_snprintf_len_set(
+		    msg, sizeof(msg), &len, "%4d: %s", g.run_cnt, tag));
 	else if (tinfo == NULL)
-		len = snprintf(
-		    msg, sizeof(msg), "%4d: %s: %" PRIu64, g.run_cnt, tag, cnt);
+		testutil_check(__wt_snprintf_len_set(
+		    msg, sizeof(msg), &len,
+		    "%4d: %s: %" PRIu64, g.run_cnt, tag, cnt));
 	else
-		len = snprintf(msg, sizeof(msg),
+		testutil_check(__wt_snprintf_len_set(
+		    msg, sizeof(msg), &len,
 		    "%4d: %s: "
 		    "search %" PRIu64 "%s, "
 		    "insert %" PRIu64 "%s, "
@@ -268,7 +271,7 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 		    tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
 		    tinfo->update > M(9) ? "M" : "",
 		    tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
-		    tinfo->remove > M(9) ? "M" : "");
+		    tinfo->remove > M(9) ? "M" : ""));
 
 	if (lastlen > len) {
 		memset(msg + len, ' ', (size_t)(lastlen - len));
@@ -297,27 +300,30 @@ path_setup(const char *home)
 	/* Log file. */
 	len = strlen(g.home) + strlen("log") + 2;
 	g.home_log = dmalloc(len);
-	snprintf(g.home_log, len, "%s/%s", g.home, "log");
+	testutil_check(__wt_snprintf(g.home_log, len, "%s/%s", g.home, "log"));
 
 	/* RNG log file. */
 	len = strlen(g.home) + strlen("rand") + 2;
 	g.home_rand = dmalloc(len);
-	snprintf(g.home_rand, len, "%s/%s", g.home, "rand");
+	testutil_check(__wt_snprintf(
+	    g.home_rand, len, "%s/%s", g.home, "rand"));
 
 	/* Run file. */
 	len = strlen(g.home) + strlen("CONFIG") + 2;
 	g.home_config = dmalloc(len);
-	snprintf(g.home_config, len, "%s/%s", g.home, "CONFIG");
+	testutil_check(__wt_snprintf(
+	    g.home_config, len, "%s/%s", g.home, "CONFIG"));
 
 	/* Statistics file. */
 	len = strlen(g.home) + strlen("stats") + 2;
 	g.home_stats = dmalloc(len);
-	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
+	testutil_check(__wt_snprintf(
+	    g.home_stats, len, "%s/%s", g.home, "stats"));
 
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
 	g.home_bdb = dmalloc(len);
-	snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb");
+	testutil_check(__wt_snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb"));
 
 	/*
 	 * Home directory initialize command: create the directory if it doesn't
@@ -336,21 +342,23 @@ path_setup(const char *home)
 	     "cd %s & mkdir KVS"
 	len = strlen(g.home) * 7 + strlen(CMD) + 1;
 	g.home_init = dmalloc(len);
-	snprintf(g.home_init, len, CMD,
-	    g.home, g.home, g.home, g.home, g.home, g.home, g.home);
+	testutil_check(__wt_snprintf(g.home_init, len, CMD,
+	    g.home, g.home, g.home, g.home, g.home, g.home, g.home));
 #else
 #define	CMD	"test -e %s || mkdir %s; "				\
 		"cd %s > /dev/null && rm -rf `ls | sed /rand/d`; "	\
 		"mkdir KVS"
 	len = strlen(g.home) * 3 + strlen(CMD) + 1;
 	g.home_init = dmalloc(len);
-	snprintf(g.home_init, len, CMD, g.home, g.home, g.home);
+	testutil_check(__wt_snprintf(
+	    g.home_init, len, CMD, g.home, g.home, g.home));
 #endif
 
 	/* Primary backup directory. */
 	len = strlen(g.home) + strlen("BACKUP") + 2;
 	g.home_backup = dmalloc(len);
-	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
+	testutil_check(__wt_snprintf(
+	    g.home_backup, len, "%s/%s", g.home, "BACKUP"));
 
 	/*
 	 * Backup directory initialize command, remove and re-create the primary
@@ -365,9 +373,9 @@ path_setup(const char *home)
 	len = strlen(g.home) * 4 +
 	    strlen("BACKUP") * 2 + strlen("BACKUP_COPY") * 2 + strlen(CMD) + 1;
 	g.home_backup_init = dmalloc(len);
-	snprintf(g.home_backup_init, len, CMD,
+	testutil_check(__wt_snprintf(g.home_backup_init, len, CMD,
 	    g.home, "BACKUP", g.home, "BACKUP_COPY",
-	    g.home, "BACKUP", g.home, "BACKUP_COPY");
+	    g.home, "BACKUP", g.home, "BACKUP_COPY"));
 
 	/*
 	 * Salvage command, save the interesting files so we can replay the
@@ -390,7 +398,7 @@ path_setup(const char *home)
 #endif
 	len = strlen(g.home) + strlen(CMD) + 1;
 	g.home_salvage_copy = dmalloc(len);
-	snprintf(g.home_salvage_copy, len, CMD, g.home);
+	testutil_check(__wt_snprintf(g.home_salvage_copy, len, CMD, g.home));
 }
 
 /*
@@ -489,8 +497,9 @@ alter(void *arg)
 	while (!g.workers_finished) {
 		period = mmrand(NULL, 1, 10);
 
-		snprintf(buf, sizeof(buf),
-		    "access_pattern_hint=%s", access_value ? "random" : "none");
+		testutil_check(__wt_snprintf(buf, sizeof(buf),
+		    "access_pattern_hint=%s",
+		    access_value ? "random" : "none"));
 		access_value = !access_value;
 		if (session->alter(session, g.uri, buf) != 0)
 			break;

@@ -214,7 +214,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
                                      "Expected read of " + coll.getFullName() + " to block");
     }
 
-    function assertReadsSucceed(coll, timeoutMs = 10000) {
+    function assertReadsSucceed(coll, timeoutMs = 20000) {
         var res =
             coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
         assert.commandWorked(res, 'reading from ' + coll.getFullName());

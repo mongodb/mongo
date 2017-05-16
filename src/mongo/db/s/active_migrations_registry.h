@@ -92,7 +92,7 @@ public:
      *
      * Takes an IS lock on the namespace of the active migration, if one is active.
      */
-    BSONObj getActiveMigrationStatusReport(OperationContext* txn);
+    BSONObj getActiveMigrationStatusReport(OperationContext* opCtx);
 
 private:
     friend class ScopedRegisterDonateChunk;
@@ -194,7 +194,7 @@ public:
      * Must only be called if the object is in the 'join' mode. Blocks until the main executor of
      * the moveChunk command calls complete.
      */
-    Status waitForCompletion(OperationContext* txn);
+    Status waitForCompletion(OperationContext* opCtx);
 
 private:
     // Registry from which to unregister the migration. Not owned.

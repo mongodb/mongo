@@ -1,3 +1,7 @@
+// Failing due to queries on a sharded collection not able to be covered when they aren't on the
+// shard key since the document needs to be fetched in order to apply the SHARDING_FILTER stage.
+// @tags: [assumes_unsharded_collection]
+
 /**
  * Test projections with dotted field paths. Also test that such projections result in covered plans
  * when appropriate.
@@ -7,7 +11,7 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    let coll = db[jsTest.name()];
+    let coll = db["projection_dotted_paths"];
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1, "b.c": 1, "b.d": 1, c: 1}));
     assert.writeOK(coll.insert({_id: 1, a: 1, b: {c: 1, d: 1, e: 1}, c: 1, e: 1}));

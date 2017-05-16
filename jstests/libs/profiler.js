@@ -2,18 +2,27 @@
 
 // Retrieve latest system.profile entry.
 function getLatestProfilerEntry(inputDb, filter) {
-    var cursor = inputDb.system.profile.find(filter === null ? {} : filter);
-    return cursor.sort({$natural: -1}).next();
+    if (filter === null) {
+        filter = {};
+    }
+    var cursor = inputDb.system.profile.find(filter).sort({$natural: -1});
+    assert(
+        cursor.hasNext(),
+        "could not find any entries in the profile collection matching filter: " + tojson(filter));
+    return cursor.next();
 }
 
 // Returns a string representing the wire protocol used for commands run on the given connection.
 // This string matches the system.profile "protocol" field when commands are profiled.
 function getProfilerProtocolStringForCommand(conn) {
-    if ("opQueryOnly" === conn.getClientRPCProtocols()) {
+    const protocols = conn.getClientRPCProtocols();
+    if ("all" === protocols || /Msg/.test(protocols))
+        return "op_msg";
+    if (/Command/.test(protocols))
+        return "op_command";
+    if (/Query/.test(protocols))
         return "op_query";
-    }
-
-    return "op_command";
+    doassert(`Unknown prototocol string ${protocols}`);
 }
 
 // Throws an assertion if the profiler does not contain exactly one entry matching <filter>.

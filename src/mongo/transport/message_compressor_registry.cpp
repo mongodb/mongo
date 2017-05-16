@@ -40,6 +40,10 @@
 #include <boost/algorithm/string/split.hpp>
 
 namespace mongo {
+namespace {
+const auto kDisabledConfigValue = "disabled"_sd;
+const auto kDefaultConfigValue = "snappy"_sd;
+}  // namespace
 
 StringData getMessageCompressorName(MessageCompressor id) {
     switch (id) {
@@ -111,7 +115,8 @@ Status addMessageCompressionOptions(moe::OptionSection* options, bool forShell) 
                                 "networkMessageCompressors",
                                 moe::String,
                                 "Comma-separated list of compressors to use for network messages")
-            .setImplicit(moe::Value(std::string("")));
+            .setDefault(moe::Value(kDefaultConfigValue.toString()))
+            .setImplicit(moe::Value(kDisabledConfigValue.toString()));
     if (forShell)
         ret.hidden();
 
@@ -122,7 +127,9 @@ Status storeMessageCompressionOptions(const moe::Environment& params) {
     std::vector<std::string> restrict;
     if (params.count("net.compression.compressors")) {
         auto compressorListStr = params["net.compression.compressors"].as<std::string>();
-        boost::algorithm::split(restrict, compressorListStr, boost::is_any_of(", "));
+        if (compressorListStr != kDisabledConfigValue) {
+            boost::algorithm::split(restrict, compressorListStr, boost::is_any_of(", "));
+        }
     }
 
     auto& compressorFactory = MessageCompressorRegistry::get();

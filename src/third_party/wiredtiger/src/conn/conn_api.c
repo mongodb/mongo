@@ -1662,8 +1662,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR_MSG(session, EINVAL,
 			    "Creating a new database is incompatible with "
 			    "read-only configuration");
-		len = (size_t)snprintf(buf, sizeof(buf),
-		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
+		WT_ERR(__wt_snprintf_len_set(buf, sizeof(buf), &len,
+		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING));
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
 		WT_ERR(__wt_fsync(session, fh, true));
 	} else {
@@ -2250,10 +2250,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_scr_alloc(session, 0, &i3));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
 	cfg[1] = NULL;
-	WT_ERR_TEST(snprintf(version, sizeof(version),
+	WT_ERR(__wt_snprintf(version, sizeof(version),
 	    "version=(major=%d,minor=%d)",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR) >=
-	    (int)sizeof(version), ENOMEM);
+	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR));
 	__conn_config_append(cfg, version);
 
 	/* Ignore the base_config file if config_base_set is false. */

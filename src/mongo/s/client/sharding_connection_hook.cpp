@@ -48,8 +48,8 @@ namespace mongo {
 
 using std::string;
 
-ShardingConnectionHook::ShardingConnectionHook(
-    bool shardedConnections, std::unique_ptr<rpc::ShardingEgressMetadataHook> egressHook)
+ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections,
+                                               std::unique_ptr<rpc::EgressMetadataHook> egressHook)
     : _shardedConnections(shardedConnections), _egressHook(std::move(egressHook)) {}
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
@@ -77,11 +77,9 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
             return _egressHook->readReplyMetadata(target, metadataObj);
         });
     }
-    conn->setRequestMetadataWriter(
-        [this](OperationContext* txn, BSONObjBuilder* metadataBob, StringData hostStringData) {
-            return _egressHook->writeRequestMetadata(
-                _shardedConnections, txn, hostStringData, metadataBob);
-        });
+    conn->setRequestMetadataWriter([this](OperationContext* opCtx, BSONObjBuilder* metadataBob) {
+        return _egressHook->writeRequestMetadata(opCtx, metadataBob);
+    });
 
 
     if (conn->type() == ConnectionString::MASTER) {
@@ -98,6 +96,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
             // This isn't a config server we're talking to.
             return;
         }
+        uassertStatusOK(status);
 
         const long long minKnownConfigServerMode = 1;
         const long long maxKnownConfigServerMode = 2;

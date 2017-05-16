@@ -38,6 +38,7 @@
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/legacy_request_builder.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -54,6 +55,8 @@ std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientPr
 
 std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto) {
     switch (proto) {
+        case Protocol::kOpMsg:
+            return stdx::make_unique<OpMsgRequestBuilder>();
         case Protocol::kOpQuery:
             return stdx::make_unique<LegacyRequestBuilder>();
         case Protocol::kOpCommandV1:
@@ -65,6 +68,8 @@ std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto) {
 
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
     switch (unownedMessage->operation()) {
+        case mongo::dbMsg:
+            return stdx::make_unique<OpMsgReply>(OpMsg::parse(*unownedMessage));
         case mongo::opReply:
             return stdx::make_unique<LegacyReply>(unownedMessage);
         case mongo::dbCommandReply:
@@ -78,6 +83,8 @@ std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
 
 std::unique_ptr<RequestInterface> makeRequest(const Message* unownedMessage) {
     switch (unownedMessage->operation()) {
+        case mongo::dbMsg:
+            return stdx::make_unique<OpMsgRequest>(OpMsg::parse(*unownedMessage));
         case mongo::dbQuery:
             return stdx::make_unique<LegacyRequest>(unownedMessage);
         case mongo::dbCommand:
@@ -91,6 +98,8 @@ std::unique_ptr<RequestInterface> makeRequest(const Message* unownedMessage) {
 
 std::unique_ptr<ReplyBuilderInterface> makeReplyBuilder(Protocol protocol) {
     switch (protocol) {
+        case Protocol::kOpMsg:
+            return stdx::make_unique<OpMsgReplyBuilder>();
         case Protocol::kOpQuery:
             return stdx::make_unique<LegacyReplyBuilder>();
         case Protocol::kOpCommandV1:

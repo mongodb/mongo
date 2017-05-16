@@ -69,10 +69,9 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string&,
              mongo::BSONObj&,
-             int,
              std::string&,
              mongo::BSONObjBuilder& result) override {
         executor::ConnectionPoolStats stats{};
@@ -83,13 +82,13 @@ public:
         result.appendNumber("numAScopedConnections", AScopedConnection::getNumConnections());
 
         // Replication connections, if we have them.
-        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord && replCoord->isReplEnabled()) {
             replCoord->appendConnectionStats(&stats);
         }
 
         // Sharding connections, if we have any.
-        auto grid = Grid::get(txn);
+        auto grid = Grid::get(opCtx);
         if (grid->shardRegistry()) {
             grid->getExecutorPool()->appendConnectionStats(&stats);
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

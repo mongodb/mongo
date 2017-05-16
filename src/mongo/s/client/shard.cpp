@@ -47,20 +47,21 @@ namespace {
 
 const int kOnErrorNumRetries = 3;
 
-Status _getEffectiveCommandStatus(StatusWith<Shard::CommandResponse> cmdResponse) {
-    // Make sure the command even received a valid response
-    if (!cmdResponse.isOK()) {
-        return cmdResponse.getStatus();
+Status _getEffectiveStatus(const StatusWith<Shard::CommandResponse>& swResponse) {
+    // Check if the request even reached the shard.
+    if (!swResponse.isOK()) {
+        return swResponse.getStatus();
+    }
+    auto& response = swResponse.getValue();
+
+    // If the request reached the shard, check if the command failed.
+    if (!response.commandStatus.isOK()) {
+        return response.commandStatus;
     }
 
-    // If the request reached the shard, check if the command itself failed.
-    if (!cmdResponse.getValue().commandStatus.isOK()) {
-        return cmdResponse.getValue().commandStatus;
-    }
-
-    // Finally check if the write concern failed
-    if (!cmdResponse.getValue().writeConcernStatus.isOK()) {
-        return cmdResponse.getValue().writeConcernStatus;
+    // Finally check if the write concern failed.
+    if (!response.writeConcernStatus.isOK()) {
+        return response.writeConcernStatus;
     }
 
     return Status::OK();
@@ -69,11 +70,11 @@ Status _getEffectiveCommandStatus(StatusWith<Shard::CommandResponse> cmdResponse
 }  // namespace
 
 Status Shard::CommandResponse::processBatchWriteResponse(
-    StatusWith<Shard::CommandResponse> response, BatchedCommandResponse* batchResponse) {
-    auto status = _getEffectiveCommandStatus(response);
+    StatusWith<Shard::CommandResponse> swResponse, BatchedCommandResponse* batchResponse) {
+    auto status = _getEffectiveStatus(swResponse);
     if (status.isOK()) {
         string errmsg;
-        if (!batchResponse->parseBSON(response.getValue().response, &errmsg)) {
+        if (!batchResponse->parseBSON(swResponse.getValue().response, &errmsg)) {
             status = Status(ErrorCodes::FailedToParse,
                             str::stream() << "Failed to parse write response: " << errmsg);
         } else {
@@ -110,107 +111,100 @@ bool Shard::isConfig() const {
     return _id == "config";
 }
 
-StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
+StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
                                                      const ReadPreferenceSetting& readPref,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
                                                      RetryPolicy retryPolicy) {
-    return runCommand(txn, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+    return runCommand(opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
 }
 
-StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* txn,
+StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
                                                      const ReadPreferenceSetting& readPref,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj,
                                                      Milliseconds maxTimeMSOverride,
                                                      RetryPolicy retryPolicy) {
     while (true) {
-        auto interruptStatus = txn->checkForInterruptNoAssert();
+        auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK()) {
             return interruptStatus;
         }
 
-        auto hostWithResponse = _runCommand(txn, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto swCmdResponse = std::move(hostWithResponse.commandResponse);
-        auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
-
-        if (isRetriableError(commandStatus.code(), retryPolicy)) {
+        auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+        auto status = _getEffectiveStatus(swResponse);
+        if (isRetriableError(status.code(), retryPolicy)) {
             LOG(2) << "Command " << redact(cmdObj)
                    << " failed with retriable error and will be retried"
-                   << causedBy(redact(commandStatus));
+                   << causedBy(redact(status));
             continue;
         }
 
-        return swCmdResponse;
+        return swResponse;
     }
     MONGO_UNREACHABLE;
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const std::string& dbName,
     const BSONObj& cmdObj,
     RetryPolicy retryPolicy) {
     return runCommandWithFixedRetryAttempts(
-        txn, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
+        opCtx, readPref, dbName, cmdObj, Milliseconds::max(), retryPolicy);
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const std::string& dbName,
     const BSONObj& cmdObj,
     Milliseconds maxTimeMSOverride,
     RetryPolicy retryPolicy) {
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto interruptStatus = txn->checkForInterruptNoAssert();
+        auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK()) {
             return interruptStatus;
         }
 
-        auto hostWithResponse = _runCommand(txn, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto swCmdResponse = std::move(hostWithResponse.commandResponse);
-        auto commandStatus = _getEffectiveCommandStatus(swCmdResponse);
-
-        if (retry < kOnErrorNumRetries && isRetriableError(commandStatus.code(), retryPolicy)) {
+        auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+        auto status = _getEffectiveStatus(swResponse);
+        if (retry < kOnErrorNumRetries && isRetriableError(status.code(), retryPolicy)) {
             LOG(2) << "Command " << redact(cmdObj)
                    << " failed with retriable error and will be retried"
-                   << causedBy(redact(commandStatus));
+                   << causedBy(redact(status));
             continue;
         }
 
-        return swCmdResponse;
+        return swResponse;
     }
     MONGO_UNREACHABLE;
 }
 
-BatchedCommandResponse Shard::runBatchWriteCommandOnConfig(
-    OperationContext* txn, const BatchedCommandRequest& batchRequest, RetryPolicy retryPolicy) {
-    invariant(isConfig());
+BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
+                                                   const Milliseconds maxTimeMS,
+                                                   const BatchedCommandRequest& batchRequest,
+                                                   RetryPolicy retryPolicy) {
+    // Cluster metadata writes are not done in batches.
+    if (isConfig()) {
+        invariant(batchRequest.sizeWriteOps() == 1);
+    }
 
     const std::string dbname = batchRequest.getNS().db().toString();
-    invariant(batchRequest.sizeWriteOps() == 1);
 
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
-        auto response = _runCommand(txn,
-                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                    dbname,
-                                    kDefaultConfigCommandTimeout,
-                                    cmdObj);
+        // Note: write commands can only be issued against a primary.
+        auto swResponse = _runCommand(
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, dbname, maxTimeMS, cmdObj);
 
         BatchedCommandResponse batchResponse;
-        Status writeStatus =
-            CommandResponse::processBatchWriteResponse(response.commandResponse, &batchResponse);
-
-        if (!writeStatus.isOK() && response.host) {
-            updateReplSetMonitor(response.host.get(), writeStatus);
-        }
-
+        auto writeStatus = CommandResponse::processBatchWriteResponse(swResponse, &batchResponse);
         if (retry < kOnErrorNumRetries && isRetriableError(writeStatus.code(), retryPolicy)) {
-            LOG(2) << "Batch write command failed with retriable error and will be retried"
+            LOG(2) << "Batch write command to " << getId()
+                   << " failed with retriable error and will be retried"
                    << causedBy(redact(writeStatus));
             continue;
         }
@@ -221,7 +215,7 @@ BatchedCommandResponse Shard::runBatchWriteCommandOnConfig(
 }
 
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
@@ -233,7 +227,7 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
 
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
         auto result =
-            _exhaustiveFindOnConfig(txn, readPref, readConcernLevel, nss, query, sort, limit);
+            _exhaustiveFindOnConfig(opCtx, readPref, readConcernLevel, nss, query, sort, limit);
 
         if (retry < kOnErrorNumRetries &&
             isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {

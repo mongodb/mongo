@@ -120,8 +120,15 @@ static WT_EVENT_HANDLER event_handler = {
 	NULL	/* Close handler. */
 };
 
-#undef	REMAIN
-#define	REMAIN(p, end)	(size_t)((p) >= (end) ? 0 : (end) - (p))
+#define	CONFIG_APPEND(p, ...) do {					\
+	size_t __len;							\
+	testutil_check(							\
+	    __wt_snprintf_len_set(p, max, &__len, __VA_ARGS__));	\
+	if (__len > max)						\
+		__len = max;						\
+	p += __len;							\
+	max -= __len;							\
+} while (0)
 
 /*
  * wts_open --
@@ -132,42 +139,42 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	WT_DECL_RET;
-	char *config, *end, *p, helium_config[1024];
+	size_t max;
+	char *config, *p, helium_config[1024];
 
 	*connp = NULL;
 
 	config = p = g.wiredtiger_open_config;
-	end = config + sizeof(g.wiredtiger_open_config);
+	max = sizeof(g.wiredtiger_open_config);
 
-	p += snprintf(p, REMAIN(p, end),
+	CONFIG_APPEND(p,
 	    "create=true,"
 	    "cache_size=%" PRIu32 "MB,"
 	    "checkpoint_sync=false,"
 	    "error_prefix=\"%s\"",
-	    g.c_cache, g.progname);
+	    g.c_cache, progname);
 
 	/* In-memory configuration. */
 	if (g.c_in_memory != 0)
-		p += snprintf(p, REMAIN(p, end), ",in_memory=1");
+		CONFIG_APPEND(p, ",in_memory=1");
 
 	/* LSM configuration. */
 	if (DATASOURCE("lsm"))
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    ",lsm_manager=(worker_thread_max=%" PRIu32 "),",
 		    g.c_lsm_worker_threads);
 
-	if (DATASOURCE("lsm") || g.c_cache < 20) {
-		p += snprintf(p, REMAIN(p, end), ",eviction_dirty_trigger=95");
-	}
+	if (DATASOURCE("lsm") || g.c_cache < 20)
+		CONFIG_APPEND(p, ",eviction_dirty_trigger=95");
 
 	/* Eviction worker configuration. */
 	if (g.c_evict_max != 0)
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    ",eviction=(threads_max=%" PRIu32 ")", g.c_evict_max);
 
 	/* Logging configuration. */
 	if (g.c_logging)
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    ",log=(enabled=true,archive=%d,prealloc=%d"
 		    ",compressor=\"%s\")",
 		    g.c_logging_archive ? 1 : 0,
@@ -175,21 +182,21 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 		    compressor(g.c_logging_compression_flag));
 
 	if (g.c_encryption)
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    ",encryption=(name=%s)", encryptor(g.c_encryption_flag));
 
 	/* Miscellaneous. */
 #ifdef HAVE_POSIX_MEMALIGN
-	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
+	CONFIG_APPEND(p, ",buffer_alignment=512");
 #endif
 
-	p += snprintf(p, REMAIN(p, end), ",mmap=%d", g.c_mmap ? 1 : 0);
+	CONFIG_APPEND(p, ",mmap=%d", g.c_mmap ? 1 : 0);
 
 	if (g.c_direct_io)
-		p += snprintf(p, REMAIN(p, end), ",direct_io=(data)");
+		CONFIG_APPEND(p, ",direct_io=(data)");
 
 	if (g.c_data_extend)
-		p += snprintf(p, REMAIN(p, end), ",file_extend=(data=8MB)");
+		CONFIG_APPEND(p, ",file_extend=(data=8MB)");
 
 	/*
 	 * Run the statistics server and/or maintain statistics in the engine.
@@ -198,18 +205,18 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	if (g.c_statistics_server) {
 		if (mmrand(NULL, 0, 5) == 1 &&
 		    memcmp(g.uri, "file:", strlen("file:")) == 0)
-			p += snprintf(p, REMAIN(p, end),
+			CONFIG_APPEND(p,
 			    ",statistics=(fast)"
 			    ",statistics_log=(wait=5,sources=(\"file:\"))");
 		else
-			p += snprintf(p, REMAIN(p, end),
+			CONFIG_APPEND(p,
 			    ",statistics=(fast),statistics_log=(wait=5)");
 	} else
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    ",statistics=(%s)", g.c_statistics ? "fast" : "none");
 
 	/* Extensions. */
-	p += snprintf(p, REMAIN(p, end),
+	CONFIG_APPEND(p,
 	    ",extensions=["
 	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
@@ -227,11 +234,11 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	 * override the standard configuration.
 	 */
 	if (g.c_config_open != NULL)
-		p += snprintf(p, REMAIN(p, end), ",%s", g.c_config_open);
+		CONFIG_APPEND(p, ",%s", g.c_config_open);
 	if (g.config_open != NULL)
-		p += snprintf(p, REMAIN(p, end), ",%s", g.config_open);
+		CONFIG_APPEND(p, ",%s", g.config_open);
 
-	if (REMAIN(p, end) == 0)
+	if (max == 0)
 		testutil_die(ENOMEM,
 		    "wiredtiger_open configuration buffer too small");
 
@@ -259,12 +266,13 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	if (DATASOURCE("helium")) {
 		if (g.helium_mount == NULL)
 			testutil_die(EINVAL, "no Helium mount point specified");
-		(void)snprintf(helium_config, sizeof(helium_config),
+		testutil_check(
+		    __wt_snprintf(helium_config, sizeof(helium_config),
 		    "entry=wiredtiger_extension_init,config=["
 		    "helium_verbose=0,"
 		    "dev1=[helium_devices=\"he://./%s\","
 		    "helium_o_volume_truncate=1]]",
-		    g.helium_mount);
+		    g.helium_mount));
 		if ((ret = conn->load_extension(
 		    conn, HELIUM_PATH, helium_config)) != 0)
 			testutil_die(ret,
@@ -299,13 +307,13 @@ wts_init(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
+	size_t max;
 	uint32_t maxintlpage, maxintlkey, maxleafpage, maxleafkey, maxleafvalue;
-	char config[4096], *end, *p;
+	char config[4096], *p;
 
 	conn = g.wts_conn;
-
 	p = config;
-	end = config + sizeof(config);
+	max = sizeof(config);
 
 	/*
 	 * Ensure that we can service at least one operation per-thread
@@ -326,7 +334,7 @@ wts_init(void)
 		if (maxleafpage > 512)
 			maxleafpage >>= 1;
 	}
-	p += snprintf(p, REMAIN(p, end),
+	CONFIG_APPEND(p,
 	    "key_format=%s,"
 	    "allocation_size=512,%s"
 	    "internal_page_max=%" PRIu32 ",leaf_page_max=%" PRIu32,
@@ -340,43 +348,35 @@ wts_init(void)
 	 */
 	maxintlkey = mmrand(NULL, maxintlpage / 50, maxintlpage / 40);
 	if (maxintlkey > 20)
-		p += snprintf(p, REMAIN(p, end),
-		    ",internal_key_max=%" PRIu32, maxintlkey);
+		CONFIG_APPEND(p, ",internal_key_max=%" PRIu32, maxintlkey);
 	maxleafkey = mmrand(NULL, maxleafpage / 50, maxleafpage / 40);
 	if (maxleafkey > 20)
-		p += snprintf(p, REMAIN(p, end),
-		    ",leaf_key_max=%" PRIu32, maxleafkey);
+		CONFIG_APPEND(p, ",leaf_key_max=%" PRIu32, maxleafkey);
 	maxleafvalue = mmrand(NULL, maxleafpage * 10, maxleafpage / 40);
 	if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
-		p += snprintf(p, REMAIN(p, end),
-		    ",leaf_value_max=%" PRIu32, maxleafvalue);
+		CONFIG_APPEND(p, ",leaf_value_max=%" PRIu32, maxleafvalue);
 
 	switch (g.type) {
 	case FIX:
-		p += snprintf(p, REMAIN(p, end),
-		    ",value_format=%" PRIu32 "t", g.c_bitcnt);
+		CONFIG_APPEND(p, ",value_format=%" PRIu32 "t", g.c_bitcnt);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
-			p += snprintf(p, REMAIN(p, end),
-			    ",huffman_key=english");
+			CONFIG_APPEND(p, ",huffman_key=english");
 		if (g.c_prefix_compression)
-			p += snprintf(p, REMAIN(p, end),
+			CONFIG_APPEND(p,
 			    ",prefix_compression_min=%" PRIu32,
 			    g.c_prefix_compression_min);
 		else
-			p += snprintf(p, REMAIN(p, end),
-			    ",prefix_compression=false");
+			CONFIG_APPEND(p, ",prefix_compression=false");
 		if (g.c_reverse)
-			p += snprintf(p, REMAIN(p, end),
-			    ",collator=reverse");
+			CONFIG_APPEND(p, ",collator=reverse");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
-			p += snprintf(p, REMAIN(p, end),
-			    ",huffman_value=english");
+			CONFIG_APPEND(p, ",huffman_value=english");
 		if (g.c_dictionary)
-			p += snprintf(p, REMAIN(p, end),
+			CONFIG_APPEND(p,
 			    ",dictionary=%" PRIu32, mmrand(NULL, 123, 517));
 		break;
 	}
@@ -384,66 +384,63 @@ wts_init(void)
 	/* Configure checksums. */
 	switch (g.c_checksum_flag) {
 	case CHECKSUM_OFF:
-		p += snprintf(p, REMAIN(p, end), ",checksum=\"off\"");
+		CONFIG_APPEND(p, ",checksum=\"off\"");
 		break;
 	case CHECKSUM_ON:
-		p += snprintf(p, REMAIN(p, end), ",checksum=\"on\"");
+		CONFIG_APPEND(p, ",checksum=\"on\"");
 		break;
 	case CHECKSUM_UNCOMPRESSED:
-		p += snprintf(p, REMAIN(p, end), ",checksum=\"uncompressed\"");
+		CONFIG_APPEND(p, ",checksum=\"uncompressed\"");
 		break;
 	}
 
 	/* Configure compression. */
 	if (g.c_compression_flag != COMPRESS_NONE)
-		p += snprintf(p, REMAIN(p, end), ",block_compressor=\"%s\"",
+		CONFIG_APPEND(p, ",block_compressor=\"%s\"",
 		    compressor(g.c_compression_flag));
 
 	/* Configure Btree internal key truncation. */
-	p += snprintf(p, REMAIN(p, end), ",internal_key_truncate=%s",
+	CONFIG_APPEND(p, ",internal_key_truncate=%s",
 	    g.c_internal_key_truncation ? "true" : "false");
 
 	/* Configure Btree page key gap. */
-	p += snprintf(p, REMAIN(p, end), ",key_gap=%" PRIu32, g.c_key_gap);
+	CONFIG_APPEND(p, ",key_gap=%" PRIu32, g.c_key_gap);
 
 	/* Configure Btree split page percentage. */
-	p += snprintf(p, REMAIN(p, end), ",split_pct=%" PRIu32, g.c_split_pct);
+	CONFIG_APPEND(p, ",split_pct=%" PRIu32, g.c_split_pct);
 
 	/* Configure LSM and data-sources. */
 	if (DATASOURCE("helium"))
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
 		    g.c_compression_flag == COMPRESS_NONE ? 0 : 1);
 
 	if (DATASOURCE("kvsbdb"))
-		p += snprintf(p, REMAIN(p, end), ",type=kvsbdb");
+		CONFIG_APPEND(p, ",type=kvsbdb");
 
 	if (DATASOURCE("lsm")) {
-		p += snprintf(p, REMAIN(p, end), ",type=lsm,lsm=(");
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p, ",type=lsm,lsm=(");
+		CONFIG_APPEND(p,
 		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
-		p += snprintf(p, REMAIN(p, end),
-		    "chunk_size=%" PRIu32 "MB,", g.c_chunk_size);
+		CONFIG_APPEND(p, "chunk_size=%" PRIu32 "MB,", g.c_chunk_size);
 		/*
 		 * We can't set bloom_oldest without bloom, and we want to test
 		 * with Bloom filters on most of the time anyway.
 		 */
 		if (g.c_bloom_oldest)
 			g.c_bloom = 1;
-		p += snprintf(p, REMAIN(p, end),
-		    "bloom=%s,", g.c_bloom ? "true" : "false");
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p, "bloom=%s,", g.c_bloom ? "true" : "false");
+		CONFIG_APPEND(p,
 		    "bloom_bit_count=%" PRIu32 ",", g.c_bloom_bit_count);
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    "bloom_hash_count=%" PRIu32 ",", g.c_bloom_hash_count);
-		p += snprintf(p, REMAIN(p, end),
+		CONFIG_APPEND(p,
 		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
-		p += snprintf(p, REMAIN(p, end),
-		    "merge_max=%" PRIu32 ",", g.c_merge_max);
-		p += snprintf(p, REMAIN(p, end), ",)");
+		CONFIG_APPEND(p, "merge_max=%" PRIu32 ",", g.c_merge_max);
+		CONFIG_APPEND(p, ",)");
 	}
 
-	if (REMAIN(p, end) == 0)
+	if (max == 0)
 		testutil_die(ENOMEM,
 		    "WT_SESSION.create configuration buffer too small");
 
@@ -490,14 +487,14 @@ wts_dump(const char *tag, int dump_bdb)
 
 	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
 	cmd = dmalloc(len);
-	(void)snprintf(cmd, len,
+	testutil_check(__wt_snprintf(cmd, len,
 	    "sh s_dumpcmp -h %s %s %s %s %s %s",
 	    g.home,
 	    dump_bdb ? "-b " : "",
 	    dump_bdb ? BERKELEY_DB_PATH : "",
 	    g.type == FIX || g.type == VAR ? "-c" : "",
 	    g.uri == NULL ? "" : "-n",
-	    g.uri == NULL ? "" : g.uri);
+	    g.uri == NULL ? "" : g.uri));
 
 	testutil_checkfmt(system(cmd), "%s: dump comparison failed", tag);
 	free(cmd);
@@ -587,7 +584,7 @@ wts_stats(void)
 	fprintf(fp, "\n\n====== Data source statistics:\n");
 	len = strlen("statistics:") + strlen(g.uri) + 1;
 	stat_name = dmalloc(len);
-	snprintf(stat_name, len, "statistics:%s", g.uri);
+	testutil_check(__wt_snprintf(stat_name, len, "statistics:%s", g.uri));
 	testutil_check(session->open_cursor(
 	    session, stat_name, NULL, NULL, &cursor));
 	free(stat_name);

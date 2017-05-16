@@ -767,7 +767,7 @@ struct AutoFlushICache
 namespace gc {
 
 inline bool
-IsMarked(const jit::VMFunction*)
+IsMarked(JSRuntime* rt, const jit::VMFunction*)
 {
     // VMFunction are only static objects which are used by WeakMaps as keys.
     // It is considered as a root object which is always marked.
