@@ -184,6 +184,7 @@ private:
 constexpr Milliseconds ConnectionPool::kDefaultHostTimeout;
 size_t const ConnectionPool::kDefaultMaxConns = std::numeric_limits<size_t>::max();
 size_t const ConnectionPool::kDefaultMinConns = 1;
+size_t const ConnectionPool::kDefaultMaxConnecting = std::numeric_limits<size_t>::max();
 constexpr Milliseconds ConnectionPool::kDefaultRefreshRequirement;
 constexpr Milliseconds ConnectionPool::kDefaultRefreshTimeout;
 
@@ -370,8 +371,10 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              auto conn = takeFromProcessingPool(connPtr);
 
                              // If the host and port were dropped, let this lapse
-                             if (conn->getGeneration() != _generation)
+                             if (conn->getGeneration() != _generation) {
+                                 spawnConnections(lk);
                                  return;
+                             }
 
                              // If we're in shutdown, we don't need refreshed connections
                              if (_state == State::kInShutdown)
@@ -381,6 +384,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              // pool
                              if (status.isOK()) {
                                  addToReady(lk, std::move(conn));
+                                 spawnConnections(lk);
                                  return;
                              }
 
@@ -560,7 +564,8 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
     };
 
     // While all of our inflight connections are less than our target
-    while (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() < target()) {
+    while ((_readyPool.size() + _processingPool.size() + _checkedOutPool.size() < target()) &&
+           (_processingPool.size() < _parent->_options.maxConnecting)) {
         std::unique_ptr<ConnectionPool::ConnectionInterface> handle;
         try {
             // make a new connection and put it in processing
@@ -588,8 +593,10 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
                 if (conn->getGeneration() != _generation) {
                     // If the host and port was dropped, let the
                     // connection lapse
+                    spawnConnections(lk);
                 } else if (status.isOK()) {
                     addToReady(lk, std::move(conn));
+                    spawnConnections(lk);
                 } else if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
                     // If we've exceeded the time limit, restart the connect, rather than
                     // failing all operations.  We do this because the various callers

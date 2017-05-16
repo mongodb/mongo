@@ -74,6 +74,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeoutMS,
                                       int,
                                       ConnectionPool::kDefaultHostTimeout.count());
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxSize, int, -1);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxConnecting, int, -1);
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMinSize,
                                       int,
                                       static_cast<int>(ConnectionPool::kDefaultMinConns));
@@ -174,6 +175,9 @@ Status initializeGlobalShardingState(OperationContext* txn,
     connPoolOptions.maxConnections = (ShardingTaskExecutorPoolMaxSize != -1)
         ? ShardingTaskExecutorPoolMaxSize
         : ConnectionPool::kDefaultMaxConns;
+    connPoolOptions.maxConnecting = (ShardingTaskExecutorPoolMaxConnecting != -1)
+        ? ShardingTaskExecutorPoolMaxConnecting
+        : ConnectionPool::kDefaultMaxConnecting;
     connPoolOptions.minConnections = ShardingTaskExecutorPoolMinSize;
     connPoolOptions.refreshRequirement = Milliseconds(ShardingTaskExecutorPoolRefreshRequirementMS);
     connPoolOptions.refreshTimeout = Milliseconds(ShardingTaskExecutorPoolRefreshTimeoutMS);
