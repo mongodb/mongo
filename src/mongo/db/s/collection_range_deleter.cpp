@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -222,15 +223,17 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
             break;
         }
         invariant(PlanExecutor::ADVANCED == state);
-        {
+
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             WriteUnitOfWork wuow(opCtx);
             if (saver) {
                 saver->goingToDelete(obj);
             }
             collection->deleteDocument(opCtx, rloc, nullptr, true);
-
             wuow.commit();
         }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "delete range", nss.ns());
+
     } while (++numDeleted < maxToDelete);
 
     return numDeleted;
