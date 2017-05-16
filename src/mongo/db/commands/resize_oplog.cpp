@@ -96,9 +96,9 @@ public:
             BSONObj& jsobj,
             string& errmsg,
             BSONObjBuilder& result) {
-	NamespaceString nss("local.oplog.rs");
-	AutoGetCollection autoColl(opCtx, nss, MODE_X);
-	Collection* coll = autoColl.getCollection();
+        NamespaceString nss("local.oplog.rs");
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        Collection* coll = autoColl.getCollection();
         if (!coll) {
             return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotFound, "oplog does not exist"));
         }
