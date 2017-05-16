@@ -53,11 +53,14 @@ env.Library(
         'rollback_source_impl.cpp',
     ],
     LIBDEPS=[
+        'oplog',
+        'oplog_interface_remote',
         'repl_coordinator_interface',
         'repl_coordinator_global',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -65,11 +68,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/ops/write_ops',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

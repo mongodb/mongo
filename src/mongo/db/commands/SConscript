@@ -146,6 +146,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/clientcursor',
         '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/commands',
@@ -156,8 +157,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/pipeline/serveronly',
         '$BUILD_DIR/mongo/db/repair_database',
+        '$BUILD_DIR/mongo/db/repl/apply_ops',
+        '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/isself',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/stats/serveronly',
         '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
@@ -166,10 +170,10 @@ env.Library(
         'apply_ops_cmd_common',
         'core',
         'killcursors_common',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE (CursorManager)
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above.
+        # TODO(ADAM, 2017-05-16): See `CYCLE` tags above.
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
