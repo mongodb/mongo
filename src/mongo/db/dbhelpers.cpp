@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -375,8 +376,6 @@ long long Helpers::removeRange(OperationContext* txn,
 
             verify(PlanExecutor::ADVANCED == state);
 
-            WriteUnitOfWork wuow(txn);
-
             if (onlyRemoveOrphanedDocs) {
                 // Do a final check in the write lock to make absolutely sure that our
                 // collection hasn't been modified in a way that invalidates our migration
@@ -408,20 +407,25 @@ long long Helpers::removeRange(OperationContext* txn,
                 }
             }
 
-            NamespaceString nss(ns);
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
-                warning() << "stepped down from primary while deleting chunk; "
-                          << "orphaning data in " << ns << " in range [" << redact(min) << ", "
-                          << redact(max) << ")";
-                return numDeleted;
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wuow(txn);
+                NamespaceString nss(ns);
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
+                    warning() << "stepped down from primary while deleting chunk; "
+                              << "orphaning data in " << ns << " in range [" << redact(min) << ", "
+                              << redact(max) << ")";
+                    return numDeleted;
+                }
+
+                if (callback)
+                    callback->goingToDelete(obj);
+
+                OpDebug* const nullOpDebug = nullptr;
+                collection->deleteDocument(txn, rloc, nullOpDebug, fromMigrate);
+                wuow.commit();
             }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "delete range", ns);
 
-            if (callback)
-                callback->goingToDelete(obj);
-
-            OpDebug* const nullOpDebug = nullptr;
-            collection->deleteDocument(txn, rloc, nullOpDebug, fromMigrate);
-            wuow.commit();
             numDeleted++;
         }
 
