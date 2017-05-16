@@ -3143,10 +3143,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
 #define	WT_NOTFOUND	(-31803)
 /*!
  * WiredTiger library panic.
- * This error indicates an underlying problem that requires the application exit
- * and restart. The application can exit immediately when \c WT_PANIC is
- * returned from a WiredTiger interface, no further WiredTiger calls are
- * required.
+ * This error indicates an underlying problem that requires a database restart.
+ * The application may exit immediately, no further WiredTiger calls are
+ * required (and further calls will themselves immediately fail).
  */
 #define	WT_PANIC	(-31804)
 /*! @cond internal */

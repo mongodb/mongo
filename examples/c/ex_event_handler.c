@@ -70,6 +70,10 @@ handle_wiredtiger_error(WT_EVENT_HANDLER *handler,
 	    "app_id %s, thread context %p, error %d, message %s\n",
 	    custom_handler->app_id, (void *)session, error, message);
 
+	/* Exit if the database has a fatal error. */
+	if (error == WT_PANIC)
+		exit (1);
+
 	return (0);
 }
 
