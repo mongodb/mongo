@@ -116,9 +116,13 @@ void ConnectionImpl::pushSetup(PushSetupCallback status) {
     _pushSetupQueue.push_back(status);
 
     if (_setupQueue.size()) {
-        _setupQueue.front()->_setupCallback(_setupQueue.front(), _pushSetupQueue.front()());
+        auto connPtr = _setupQueue.front();
+        auto callback = _pushSetupQueue.front();
         _setupQueue.pop_front();
         _pushSetupQueue.pop_front();
+
+        auto cb = connPtr->_setupCallback;
+        cb(connPtr, callback());
     }
 }
 
@@ -126,18 +130,31 @@ void ConnectionImpl::pushSetup(Status status) {
     pushSetup([status]() { return status; });
 }
 
+size_t ConnectionImpl::setupQueueDepth() {
+    return _setupQueue.size();
+}
+
 void ConnectionImpl::pushRefresh(PushRefreshCallback status) {
     _pushRefreshQueue.push_back(status);
 
     if (_refreshQueue.size()) {
-        _refreshQueue.front()->_refreshCallback(_refreshQueue.front(), _pushRefreshQueue.front()());
+        auto connPtr = _refreshQueue.front();
+        auto callback = _pushRefreshQueue.front();
+
         _refreshQueue.pop_front();
         _pushRefreshQueue.pop_front();
+
+        auto cb = connPtr->_refreshCallback;
+        cb(connPtr, callback());
     }
 }
 
 void ConnectionImpl::pushRefresh(Status status) {
     pushRefresh([status]() { return status; });
+}
+
+size_t ConnectionImpl::refreshQueueDepth() {
+    return _refreshQueue.size();
 }
 
 Date_t ConnectionImpl::getLastUsed() const {
@@ -166,9 +183,13 @@ void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb) {
     _setupQueue.push_back(this);
 
     if (_pushSetupQueue.size()) {
-        _setupQueue.front()->_setupCallback(_setupQueue.front(), _pushSetupQueue.front()());
+        auto connPtr = _setupQueue.front();
+        auto callback = _pushSetupQueue.front();
         _setupQueue.pop_front();
         _pushSetupQueue.pop_front();
+
+        auto cb = connPtr->_setupCallback;
+        cb(connPtr, callback());
     }
 }
 
@@ -182,9 +203,14 @@ void ConnectionImpl::refresh(Milliseconds timeout, RefreshCallback cb) {
     _refreshQueue.push_back(this);
 
     if (_pushRefreshQueue.size()) {
-        _refreshQueue.front()->_refreshCallback(_refreshQueue.front(), _pushRefreshQueue.front()());
+        auto connPtr = _refreshQueue.front();
+        auto callback = _pushRefreshQueue.front();
+
         _refreshQueue.pop_front();
         _pushRefreshQueue.pop_front();
+
+        auto cb = connPtr->_refreshCallback;
+        cb(connPtr, callback());
     }
 }
 
