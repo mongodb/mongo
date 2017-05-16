@@ -1360,7 +1360,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSMatch) {
                                         << BSON("lastWriteDate" << (nonStale ? lastWriteDateNonStale
                                                                              : lastWriteDateStale)
                                                                 << "opTime"
-                                                                << opTime.toBSON())
+                                                                << opTime)
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1410,7 +1410,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoMatch) {
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
                                                                             : lastWriteDateStale)
                                                                 << "opTime"
-                                                                << opTime.toBSON())
+                                                                << opTime)
                                         << "ok"
                                         << true));
 
@@ -1462,7 +1462,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoPrimaryMatch) {
                                                 << (isNonStale ? lastWriteDateNonStale
                                                                : lastWriteDateStale)
                                                 << "opTime"
-                                                << opTime.toBSON())
+                                                << opTime)
                                         << "ok"
                                         << true));
 
@@ -1516,7 +1516,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllFailed) {
                                                 << (isNonStale ? lastWriteDateNonStale
                                                                : lastWriteDateStale)
                                                 << "opTime"
-                                                << opTime.toBSON())
+                                                << opTime)
                                         << "ok"
                                         << true));
 
@@ -1568,7 +1568,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllButPrimaryFailed) {
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
                                                                             : lastWriteDateStale)
                                                                 << "opTime"
-                                                                << opTime.toBSON())
+                                                                << opTime)
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1620,7 +1620,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSOneSecondaryFailed) {
                                         << BSON("lastWriteDate" << (primary ? lastWriteDateNonStale
                                                                             : lastWriteDateStale)
                                                                 << "opTime"
-                                                                << opTime.toBSON())
+                                                                << opTime)
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();
@@ -1673,7 +1673,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNonStaleSecondaryMatched) {
                                                 << (isNonStale ? lastWriteDateNonStale
                                                                : lastWriteDateStale)
                                                 << "opTime"
-                                                << opTime.toBSON())
+                                                << opTime)
                                         << "ok"
                                         << true));
         ns = refresher.getNextStep();

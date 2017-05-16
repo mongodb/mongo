@@ -110,9 +110,10 @@ int ProcessInfo::getVirtualMemorySize() {
     }
 
     kinfo_proc* task = kvm_getprocs(kd, KERN_PROC_PID, _pid.toNative(), sizeof(kinfo_proc), &cnt);
-    kvm_close(kd);
-    return ((task->p_vm_dsize + task->p_vm_ssize + task->p_vm_tsize) * sysconf(_SC_PAGESIZE)) /
+    int vss = ((task->p_vm_dsize + task->p_vm_ssize + task->p_vm_tsize) * sysconf(_SC_PAGESIZE)) /
         1048576;
+    kvm_close(kd);
+    return vss;
 }
 
 int ProcessInfo::getResidentSize() {
@@ -124,8 +125,9 @@ int ProcessInfo::getResidentSize() {
         return -1;
     }
     kinfo_proc* task = kvm_getprocs(kd, KERN_PROC_PID, _pid.toNative(), sizeof(kinfo_proc), &cnt);
+    int rss = (task->p_vm_rssize * sysconf(_SC_PAGESIZE)) / 1048576;  // convert from pages to MB
     kvm_close(kd);
-    return (task->p_vm_rssize * sysconf(_SC_PAGESIZE)) / 1048576;  // convert from pages to MB
+    return rss;
 }
 
 double ProcessInfo::getSystemMemoryPressurePercentage() {

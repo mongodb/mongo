@@ -322,7 +322,7 @@ TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
 
 TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     // Passing a sortKey meta-projection without a sort is an error.
     {
@@ -330,7 +330,7 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
         auto qr = assertGet(QueryRequest::makeFromFindCommand(
             nss, fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}}"), isExplain));
         auto cq = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_NOT_OK(cq.getStatus());
     }
 
@@ -342,7 +342,7 @@ TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
             fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}}"),
             isExplain));
         auto cq = CanonicalQuery::canonicalize(
-            txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+            opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
         ASSERT_OK(cq.getStatus());
     }
 }
@@ -435,12 +435,12 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
  */
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -449,14 +449,14 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                              const char* sortStr,
                                              const char* projStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }
@@ -561,18 +561,18 @@ TEST(CanonicalQueryTest, NormalizeWithInPreservesCollator) {
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     const bool isExplain = true;
     const std::string cmdStr =
         "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}}";
     auto qr = assertGet(QueryRequest::makeFromFindCommand(nss, fromjson(cmdStr), isExplain));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
 
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
 
     // Descriptive test. The childCq's filter should be the relevant $or clause, rather than the
     // entire query predicate.
@@ -586,55 +586,55 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
 
 TEST(CanonicalQueryTest, CanonicalQueryFromQRWithNoCollation) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     auto cq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
     ASSERT_TRUE(cq->getCollator() == nullptr);
 }
 
 TEST(CanonicalQueryTest, CanonicalQueryFromQRWithCollation) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setCollation(BSON("locale"
                           << "reverse"));
     auto cq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ASSERT_TRUE(CollatorInterface::collatorsMatch(cq->getCollator(), &collator));
 }
 
 TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
     ASSERT_TRUE(baseCq->getCollator() == nullptr);
     ASSERT_TRUE(childCq->getCollator() == nullptr);
 }
 
 TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
     qr->setCollation(BSON("locale"
                           << "reverse"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), *baseCq, firstClauseExpr, ExtensionsCallbackDisallowExtensions()));
     ASSERT(baseCq->getCollator());
     ASSERT(childCq->getCollator());
     ASSERT_TRUE(*(childCq->getCollator()) == *(baseCq->getCollator()));
@@ -642,12 +642,12 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
 
 TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson("{a: 'foo', b: {$in: ['bar', 'baz']}}"));
     auto cq = assertGet(CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions()));
     ASSERT_EQUALS(2U, cq->root()->numChildren());
     auto firstChild = cq->root()->getChild(0);
     auto secondChild = cq->root()->getChild(1);
@@ -663,7 +663,7 @@ TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
     ASSERT(!inExpr->getCollator());
 
     unique_ptr<CollatorInterface> collator =
-        assertGet(CollatorFactoryInterface::get(txn->getServiceContext())
+        assertGet(CollatorFactoryInterface::get(opCtx->getServiceContext())
                       ->makeFromBSON(BSON("locale"
                                           << "reverse")));
     cq->setCollator(std::move(collator));

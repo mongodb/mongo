@@ -89,7 +89,8 @@ const std::map<OpType, std::string> opTypeName{{OpType::NONE, "none"},
                                                {OpType::REMOVE, "remove"},
                                                {OpType::CREATEINDEX, "createIndex"},
                                                {OpType::DROPINDEX, "dropIndex"},
-                                               {OpType::LET, "let"}};
+                                               {OpType::LET, "let"},
+                                               {OpType::CPULOAD, "cpuload"}};
 
 BenchRunEventCounter::BenchRunEventCounter() {
     reset();
@@ -213,6 +214,12 @@ BenchRunOp opFromBson(const BSONObj& op) {
             myOp.command = arg.Obj();
         } else if (name == "context") {
             myOp.context = arg.Obj();
+        } else if (name == "cpuFactor") {
+            uassert(40436,
+                    str::stream() << "Field 'cpuFactor' should be a number, instead it's type: "
+                                  << typeName(arg.type()),
+                    arg.isNumber());
+            myOp.cpuFactor = arg.numberDouble();
         } else if (name == "delay") {
             uassert(34379,
                     str::stream() << "Field 'delay' should be a number, instead it's type: "
@@ -303,6 +310,8 @@ BenchRunOp opFromBson(const BSONObj& op) {
                 myOp.op = OpType::DROPINDEX;
             } else if (type == "let") {
                 myOp.op = OpType::LET;
+            } else if (type == "cpuload") {
+                myOp.op = OpType::CPULOAD;
             } else {
                 uassert(34387,
                         str::stream() << "benchRun passed an unsupported op type: " << type,
@@ -704,11 +713,24 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 scope->init(&scopeObj);
                 invariant(scopeFunc);
             }
-
             try {
                 switch (op.op) {
                     case OpType::NOP:
                         break;
+                    case OpType::CPULOAD: {
+                        // perform a tight multiplication loop. The
+                        // performance of this loop should be
+                        // predictable, and this operation can be used
+                        // to test underlying system variability.
+                        long long limit = 10000 * op.cpuFactor;
+                        // volatile used to ensure that loop is not optimized away
+                        volatile uint64_t result = 0;  // NOLINT
+                        uint64_t x = 100;
+                        for (long long i = 0; i < limit; i++) {
+                            x *= 13;
+                        }
+                        result = x;
+                    } break;
                     case OpType::FINDONE: {
                         BSONObj fixedQuery = fixQuery(op.query, bsonTemplateEvaluator);
                         BSONObj result;
@@ -1228,7 +1250,6 @@ BenchRunner* BenchRunner::get(OID oid) {
     stdx::lock_guard<stdx::mutex> lk(_staticMutex);
     return _activeRuns[oid];
 }
-
 void BenchRunner::populateStats(BenchRunStats* stats) {
     _brState.assertFinished();
     stats->reset();

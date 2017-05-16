@@ -83,7 +83,7 @@ public:
     /**
      * Performs necessary cleanup when shutting down cleanly.
      */
-    virtual void shutDown(OperationContext* txn) = 0;
+    virtual void shutDown(OperationContext* opCtx) = 0;
 
     /**
      *
@@ -98,7 +98,7 @@ public:
      *         no limitation to space usage.
      * @return either an !OK status or the name of the newly added shard.
      */
-    virtual StatusWith<std::string> addShard(OperationContext* txn,
+    virtual StatusWith<std::string> addShard(OperationContext* opCtx,
                                              const std::string* shardProposedName,
                                              const ConnectionString& shardConnectionString,
                                              const long long maxSize) = 0;
@@ -107,7 +107,7 @@ public:
      * Adds the shard to the zone.
      * Returns ErrorCodes::ShardNotFound if the shard does not exist.
      */
-    virtual Status addShardToZone(OperationContext* txn,
+    virtual Status addShardToZone(OperationContext* opCtx,
                                   const std::string& shardName,
                                   const std::string& zoneName) = 0;
 
@@ -115,7 +115,7 @@ public:
      * Removes the shard from the zone.
      * Returns ErrorCodes::ShardNotFound if the shard does not exist.
      */
-    virtual Status removeShardFromZone(OperationContext* txn,
+    virtual Status removeShardFromZone(OperationContext* opCtx,
                                        const std::string& shardName,
                                        const std::string& zoneName) = 0;
 
@@ -124,7 +124,7 @@ public:
      * the shard key, the range will be converted into a new range with full shard key filled
      * with MinKey values.
      */
-    virtual Status assignKeyRangeToZone(OperationContext* txn,
+    virtual Status assignKeyRangeToZone(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const ChunkRange& range,
                                         const std::string& zoneName) = 0;
@@ -134,7 +134,7 @@ public:
      * Note: unlike assignKeyRangeToZone, the given range will never be converted to include the
      * full shard key.
      */
-    virtual Status removeKeyRangeFromZone(OperationContext* txn,
+    virtual Status removeKeyRangeFromZone(OperationContext* opCtx,
                                           const NamespaceString& ns,
                                           const ChunkRange& range) = 0;
 
@@ -142,7 +142,7 @@ public:
      * Updates metadata in config.chunks collection to show the given chunk as split
      * into smaller chunks at the specified split points.
      */
-    virtual Status commitChunkSplit(OperationContext* txn,
+    virtual Status commitChunkSplit(OperationContext* opCtx,
                                     const NamespaceString& ns,
                                     const OID& requestEpoch,
                                     const ChunkRange& range,
@@ -153,7 +153,7 @@ public:
      * Updates metadata in config.chunks collection so the chunks with given boundaries are seen
      * merged into a single larger chunk.
      */
-    virtual Status commitChunkMerge(OperationContext* txn,
+    virtual Status commitChunkMerge(OperationContext* opCtx,
                                     const NamespaceString& ns,
                                     const OID& requestEpoch,
                                     const std::vector<BSONObj>& chunkBoundaries,
@@ -162,7 +162,7 @@ public:
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
      */
-    virtual StatusWith<BSONObj> commitChunkMigration(OperationContext* txn,
+    virtual StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      const ChunkType& migratedChunk,
                                                      const boost::optional<ChunkType>& controlChunk,
@@ -179,7 +179,7 @@ public:
      * Initializes the collections that live in the config server.  Mostly this involves building
      * necessary indexes and populating the config.version document.
      */
-    virtual Status initializeConfigDatabaseIfNeeded(OperationContext* txn) = 0;
+    virtual Status initializeConfigDatabaseIfNeeded(OperationContext* opCtx) = 0;
 
     /**
      * Called if the config.version document is rolled back.  Indicates to the
@@ -195,13 +195,13 @@ public:
      * shardIdentity doc's configsvrConnString if the _id, shardName, and clusterId do not
      * conflict).
      */
-    virtual BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,
+    virtual BSONObj createShardIdentityUpsertForAddShard(OperationContext* opCtx,
                                                          const std::string& shardName) = 0;
 
     /**
      * Runs the setFeatureCompatibilityVersion command on all shards.
      */
-    virtual Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+    virtual Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,
                                                           const std::string& version) = 0;
 
 protected:

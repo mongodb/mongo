@@ -44,6 +44,8 @@ public:
 
     void asyncWait(AsyncTimerInterface::Handler handler) override;
 
+    void expireAfter(Milliseconds expiration) override;
+
 private:
     asio::io_service::strand* const _strand;
     asio::system_timer _timer;

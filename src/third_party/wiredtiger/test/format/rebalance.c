@@ -41,10 +41,10 @@ wts_rebalance(void)
 	track("rebalance", 0ULL, NULL);
 
 	/* Dump the current object. */
-	(void)snprintf(cmd, sizeof(cmd),
+	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
 	    ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
 	    " -h %s dump -f %s/rebalance.orig %s",
-	    g.home, g.home, g.uri);
+	    g.home, g.home, g.uri));
 	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
 	/* Rebalance, then verify the object. */
@@ -66,21 +66,21 @@ wts_rebalance(void)
 	wts_verify("post-rebalance verify");
 	wts_close();
 
-	(void)snprintf(cmd, sizeof(cmd),
+	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
 	    ".." DIR_DELIM_STR ".." DIR_DELIM_STR "wt"
 	    " -h %s dump -f %s/rebalance.new %s",
-	    g.home, g.home, g.uri);
+	    g.home, g.home, g.uri));
 	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 
 	/* Compare the old/new versions of the object. */
 #ifdef _WIN32
-	(void)snprintf(cmd, sizeof(cmd),
+	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
 	    "fc /b %s\\rebalance.orig %s\\rebalance.new > NUL",
-	    g.home, g.home);
+	    g.home, g.home));
 #else
-	(void)snprintf(cmd, sizeof(cmd),
+	testutil_check(__wt_snprintf(cmd, sizeof(cmd),
 	    "cmp %s/rebalance.orig %s/rebalance.new > /dev/null",
-	    g.home, g.home);
+	    g.home, g.home));
 #endif
 	testutil_checkfmt(system(cmd), "command failed: %s", cmd);
 }

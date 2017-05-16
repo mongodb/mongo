@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of extra shard key index in sharded
+// collection.
+// @tags: [assumes_no_implicit_index_creation]
+
 // check where "key to big" happens
 
 t = db.index_big1;

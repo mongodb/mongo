@@ -60,7 +60,7 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_AND_SORTED;

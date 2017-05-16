@@ -43,26 +43,30 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
-const StringData AggregationRequest::kCommandName = "aggregate"_sd;
-const StringData AggregationRequest::kCursorName = "cursor"_sd;
-const StringData AggregationRequest::kBatchSizeName = "batchSize"_sd;
-const StringData AggregationRequest::kFromRouterName = "fromRouter"_sd;
-const StringData AggregationRequest::kPipelineName = "pipeline"_sd;
-const StringData AggregationRequest::kCollationName = "collation"_sd;
-const StringData AggregationRequest::kExplainName = "explain"_sd;
-const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
-const StringData AggregationRequest::kHintName = "hint"_sd;
+constexpr StringData AggregationRequest::kCommandName;
+constexpr StringData AggregationRequest::kCursorName;
+constexpr StringData AggregationRequest::kBatchSizeName;
+constexpr StringData AggregationRequest::kFromRouterName;
+constexpr StringData AggregationRequest::kPipelineName;
+constexpr StringData AggregationRequest::kCollationName;
+constexpr StringData AggregationRequest::kExplainName;
+constexpr StringData AggregationRequest::kAllowDiskUseName;
+constexpr StringData AggregationRequest::kHintName;
+constexpr StringData AggregationRequest::kCommentName;
 
-const long long AggregationRequest::kDefaultBatchSize = 101;
+constexpr long long AggregationRequest::kDefaultBatchSize;
 
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
     : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
 
-StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString nss,
-                                                                 const BSONObj& cmdObj) {
+StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     // Parse required parameters.
     auto pipelineElem = cmdObj[kPipelineName];
     if (pipelineElem.eoo() || pipelineElem.type() != BSONType::Array) {
@@ -79,31 +83,23 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
 
     AggregationRequest request(std::move(nss), std::move(pipeline));
 
-    const std::initializer_list<StringData> optionsParsedElseWhere = {
-        QueryRequest::cmdOptionMaxTimeMS,
-        "writeConcern"_sd,
-        kPipelineName,
-        kCommandName,
-        repl::ReadConcernArgs::kReadConcernFieldName};
+    const std::initializer_list<StringData> optionsParsedElseWhere = {kPipelineName, kCommandName};
 
     bool hasCursorElem = false;
+    bool hasExplainElem = false;
 
     // Parse optional parameters.
     for (auto&& elem : cmdObj) {
         auto fieldName = elem.fieldNameStringData();
 
-        // Ignore top-level fields prefixed with $. They are for the command processor, not us.
-        if (fieldName[0] == '$') {
-            continue;
-        }
-
-        // Ignore options that are parsed elsewhere.
-        if (std::find(optionsParsedElseWhere.begin(), optionsParsedElseWhere.end(), fieldName) !=
-            optionsParsedElseWhere.end()) {
-            continue;
-        }
-
-        if (kCursorName == fieldName) {
+        if (QueryRequest::kUnwrappedReadPrefField == fieldName) {
+            // We expect this field to be validated elsewhere.
+            request.setUnwrappedReadPref(elem.embeddedObject());
+        } else if (std::find(optionsParsedElseWhere.begin(),
+                             optionsParsedElseWhere.end(),
+                             fieldName) != optionsParsedElseWhere.end()) {
+            // Ignore options that are parsed elsewhere.
+        } else if (kCursorName == fieldName) {
             long long batchSize;
             auto status =
                 CursorRequest::parseCommandCursorOptions(cmdObj, kDefaultBatchSize, &batchSize);
@@ -120,6 +116,21 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
                                       << typeName(elem.type())};
             }
             request.setCollation(elem.embeddedObject().getOwned());
+        } else if (QueryRequest::cmdOptionMaxTimeMS == fieldName) {
+            auto maxTimeMs = QueryRequest::parseMaxTimeMS(elem);
+            if (!maxTimeMs.isOK()) {
+                return maxTimeMs.getStatus();
+            }
+
+            request.setMaxTimeMS(maxTimeMs.getValue());
+        } else if (repl::ReadConcernArgs::kReadConcernFieldName == fieldName) {
+            if (elem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << repl::ReadConcernArgs::kReadConcernFieldName
+                                      << " must be an object, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setReadConcern(elem.embeddedObject().getOwned());
         } else if (kHintName == fieldName) {
             if (BSONType::Object == elem.type()) {
                 request.setHint(elem.embeddedObject());
@@ -132,13 +143,24 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
                                   << " must be specified as a string representing an index"
                                   << " name, or an object representing an index's key pattern");
             }
+        } else if (kCommentName == fieldName) {
+            if (elem.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kCommentName << " must be a string, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setComment(elem.str());
         } else if (kExplainName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << kExplainName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
-            request.setExplain(elem.Bool());
+
+            hasExplainElem = true;
+            if (elem.Bool()) {
+                request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+            }
         } else if (kFromRouterName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
@@ -159,17 +181,41 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
             request.setAllowDiskUse(elem.Bool());
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
-        } else {
+        } else if (!Command::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
         }
     }
 
-    if (!hasCursorElem && !request.isExplain()) {
+    if (explainVerbosity) {
+        if (hasExplainElem) {
+            return {
+                ErrorCodes::FailedToParse,
+                str::stream() << "The '" << kExplainName
+                              << "' option is illegal when a explain verbosity is also provided"};
+        }
+
+        request.setExplain(explainVerbosity);
+    }
+
+    if (!hasCursorElem && !request.getExplain()) {
         return {ErrorCodes::FailedToParse,
-                str::stream() << "The '" << kCursorName << "' option is required, unless '"
-                              << kExplainName
-                              << "' is true"};
+                str::stream() << "The '" << kCursorName
+                              << "' option is required, except for aggregation explain"};
+    }
+
+    if (request.getExplain() && !request.getReadConcern().isEmpty()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Aggregation explain does not support the '"
+                              << repl::ReadConcernArgs::kReadConcernFieldName
+                              << "' option"};
+    }
+
+    if (request.getExplain() && cmdObj[WriteConcernOptions::kWriteConcernField]) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Aggregation explain does not support the'"
+                              << WriteConcernOptions::kWriteConcernField
+                              << "' option"};
     }
 
     return request;
@@ -181,7 +227,6 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kCommandName, _nss.coll()},
         {kPipelineName, _pipeline},
         // Only serialize booleans if different than their default.
-        {kExplainName, _explain ? Value(true) : Value()},
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
         {kFromRouterName, _fromRouter ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),
@@ -189,9 +234,20 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize a collation if one was specified.
         {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
         // Only serialize batchSize when explain is false.
-        {kCursorName, _explain ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
+        {kCursorName, _explainMode ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
         // Only serialize a hint if one was specified.
-        {kHintName, _hint.isEmpty() ? Value() : Value(_hint)}};
+        {kHintName, _hint.isEmpty() ? Value() : Value(_hint)},
+        // Only serialize a comment if one was specified.
+        {kCommentName, _comment.empty() ? Value() : Value(_comment)},
+        // Only serialize readConcern if specified.
+        {repl::ReadConcernArgs::kReadConcernFieldName,
+         _readConcern.isEmpty() ? Value() : Value(_readConcern)},
+        // Only serialize the unwrapped read preference if specified.
+        {QueryRequest::kUnwrappedReadPrefField,
+         _unwrappedReadPref.isEmpty() ? Value() : Value(_unwrappedReadPref)},
+        // Only serialize maxTimeMs if specified.
+        {QueryRequest::cmdOptionMaxTimeMS,
+         _maxTimeMS == 0 ? Value() : Value(static_cast<int>(_maxTimeMS))}};
 }
 
 }  // namespace mongo

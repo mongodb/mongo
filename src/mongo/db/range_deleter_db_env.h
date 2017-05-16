@@ -50,7 +50,7 @@ struct RangeDeleterDBEnv : public RangeDeleterEnv {
      *
      * Does not throw Exceptions.
      */
-    virtual bool deleteRange(OperationContext* txn,
+    virtual bool deleteRange(OperationContext* opCtx,
                              const RangeDeleteEntry& taskDetails,
                              long long int* deletedDocs,
                              std::string* errMsg);
@@ -58,7 +58,7 @@ struct RangeDeleterDBEnv : public RangeDeleterEnv {
     /**
      * Gets the list of open cursors on a given namespace.
      */
-    virtual void getCursorIds(OperationContext* txn,
+    virtual void getCursorIds(OperationContext* opCtx,
                               StringData ns,
                               std::set<CursorId>* openCursors);
 };

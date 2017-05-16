@@ -50,16 +50,15 @@ public:
         return true;
     }
 
-    Status checkAuthForOperation(OperationContext* txn,
+    Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
-        return checkAuthForApplyOpsCommand(txn, dbname, cmdObj);
+        return checkAuthForApplyOpsCommand(opCtx, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         uasserted(ErrorCodes::CommandNotSupported, "applyOps not allowed through mongos");

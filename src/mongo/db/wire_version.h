@@ -67,9 +67,12 @@ enum WireVersion {
     // Supports all write commands take a write concern.
     COMMANDS_ACCEPT_WRITE_CONCERN = 5,
 
+    // Supports the new OP_MSG wireprotocol (3.6+).
+    SUPPORTS_OP_MSG = 6,
+
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = COMMANDS_ACCEPT_WRITE_CONCERN,
+    LATEST_WIRE_VERSION = SUPPORTS_OP_MSG,
 };
 
 /**

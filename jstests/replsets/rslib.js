@@ -1,3 +1,4 @@
+var syncFrom;
 var wait;
 var occasionally;
 var reconnect;
@@ -14,8 +15,42 @@ var getLastOpTime;
 
 (function() {
     "use strict";
+    load("jstests/libs/write_concern_util.js");
+
     var count = 0;
     var w = 0;
+
+    /**
+     * A wrapper around `replSetSyncFrom` to ensure that the desired sync source is ahead of the
+     * syncing node so that the syncing node can choose to sync from the desired sync source.
+     * It first stops replication on the syncing node so that it can do a write on the desired
+     * sync source and make sure it's ahead. When replication is restarted, the desired sync
+     * source will be a valid sync source for the syncing node.
+     */
+    syncFrom = function(syncingNode, desiredSyncSource, rst) {
+        jsTestLog("Forcing " + syncingNode.name + " to sync from " + desiredSyncSource.name);
+
+        // Ensure that 'desiredSyncSource' doesn't already have the dummy write sitting around from
+        // a previous syncFrom attempt.
+        var dummyName = "dummyForSyncFrom";
+        rst.getPrimary().getDB(dummyName).getCollection(dummyName).drop();
+        assert.soonNoExcept(function() {
+            return desiredSyncSource.getDB(dummyName).getCollection(dummyName).findOne() == null;
+        });
+
+        stopServerReplication(syncingNode);
+
+        assert.writeOK(rst.getPrimary().getDB(dummyName).getCollection(dummyName).insert({a: 1}));
+        // Wait for 'desiredSyncSource' to get the dummy write we just did so we know it's
+        // definitely ahead of 'syncingNode' before we call replSetSyncFrom.
+        assert.soonNoExcept(function() {
+            return desiredSyncSource.getDB(dummyName).getCollection(dummyName).findOne({a: 1});
+        });
+
+        assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: desiredSyncSource.name}));
+        restartServerReplication(syncingNode);
+        rst.awaitSyncSource(syncingNode, desiredSyncSource);
+    };
 
     wait = function(f, msg) {
         w++;
@@ -127,6 +162,7 @@ var getLastOpTime;
             if (!isNetworkError(e)) {
                 throw e;
             }
+            print("Calling replSetReconfig failed. " + tojson(e));
         }
 
         var master = rs.getPrimary().getDB("admin");

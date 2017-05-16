@@ -70,10 +70,9 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
 

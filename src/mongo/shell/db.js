@@ -120,9 +120,9 @@ var DB;
         // Otherwise use getQueryOptions.
         var options =
             (typeof(queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
-        var res;
+
         try {
-            res = this._runCommandImpl(this._name, mergedObj, options);
+            return this._runCommandImpl(this._name, mergedObj, options);
         } catch (ex) {
             // When runCommand flowed through query, a connection error resulted in the message
             // "error doing query: failed". Even though this message is arguably incorrect
@@ -133,7 +133,6 @@ var DB;
             }
             throw ex;
         }
-        return res;
     };
 
     DB.prototype.runCommandWithMetadata = function(commandName, commandArgs, metadata) {

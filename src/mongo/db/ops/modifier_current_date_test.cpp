@@ -35,8 +35,10 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/logical_clock_test_fixture.h"
-#include "mongo/db/ops/log_builder.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -53,11 +55,28 @@ using mongo::mutablebson::ConstElement;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 
-using Init = mongo::LogicalClockTest;
-using BoolInput = mongo::LogicalClockTest;
-using DateInput = mongo::LogicalClockTest;
-using TimestampInput = mongo::LogicalClockTest;
-using DottedTimestampInput = mongo::LogicalClockTest;
+class ModifierCurrentDateTest : public mongo::unittest::Test {
+public:
+    ~ModifierCurrentDateTest() override = default;
+
+protected:
+    /**
+     * Sets up this fixture with a context and a LogicalClock.
+     */
+    void setUp() override {
+        auto service = mongo::getGlobalServiceContext();
+
+        auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
+        mongo::LogicalClock::set(service, std::move(logicalClock));
+    }
+    void tearDown() override{};
+};
+
+using Init = ModifierCurrentDateTest;
+using BoolInput = ModifierCurrentDateTest;
+using DateInput = ModifierCurrentDateTest;
+using TimestampInput = ModifierCurrentDateTest;
+using DottedTimestampInput = ModifierCurrentDateTest;
 
 /**
  * Helper to validate oplog entries in the tests below.

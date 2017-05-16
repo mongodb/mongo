@@ -15,7 +15,8 @@
 // This header is deprecated and no longer used by type_traits:
 //
 #if defined(__GNUC__) || defined(_MSC_VER)
-# pragma message("NOTE: Use of this header (bool_trait_def.hpp) is deprecated")
+// MONGODB MODIFICATION
+// # pragma message("NOTE: Use of this header (bool_trait_def.hpp) is deprecated")
 #endif
 
 #include <boost/type_traits/detail/template_arity_spec.hpp>

@@ -4,10 +4,10 @@
 
 load("jstests/libs/check_log.js");
 
-// Shards a collection and creates 2 chunks, one on each s of two shards.
-function shardCollectionWithChunks(st, coll) {
+// Shards a collection with 'numDocs' documents and creates 2 chunks, one on each of two shards.
+function shardCollectionWithChunks(st, coll, numDocs) {
     var _db = coll.getDB();
-    var numberDoc = 20;
+    var numberDoc = numDocs || 20;
     coll.ensureIndex({x: 1}, {unique: true});
     st.ensurePrimaryShard(_db.toString(), st.shard0.shardName);
     st.shardColl(
@@ -27,10 +27,13 @@ function stopServerReplication(conn) {
         });
         return;
     }
+
+    // Clear ramlog so checkLog can't find log messages from previous times this fail point was
+    // enabled.
+    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
     var errMsg = 'Failed to enable stopReplProducer failpoint.';
     assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}),
-        errMsg);
+        conn.adminCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}), errMsg);
 
     // Wait until the fail point is actually hit.
     checkLog.contains(conn, 'bgsync - stopReplProducer fail point enabled');

@@ -73,25 +73,24 @@ struct ThreadOstreamCacheFinalizer {
 namespace logger {
 
 LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
-                                   std::string contextName,
+                                   StringData contextName,
                                    LogSeverity severity)
-    : LogstreamBuilder(
-          domain, std::move(contextName), std::move(severity), LogComponent::kDefault) {}
+    : LogstreamBuilder(domain, contextName, std::move(severity), LogComponent::kDefault) {}
 
 LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
-                                   std::string contextName,
+                                   StringData contextName,
                                    LogSeverity severity,
                                    LogComponent component)
     : _domain(domain),
-      _contextName(std::move(contextName)),
+      _contextName(contextName.toString()),
       _severity(std::move(severity)),
       _component(std::move(component)),
       _tee(nullptr) {}
 
 LogstreamBuilder::LogstreamBuilder(logger::MessageLogDomain* domain,
-                                   const std::string& contextName,
+                                   StringData contextName,
                                    LabeledLevel labeledLevel)
-    : LogstreamBuilder(domain, std::move(contextName), static_cast<LogSeverity>(labeledLevel)) {
+    : LogstreamBuilder(domain, contextName, static_cast<LogSeverity>(labeledLevel)) {
     setBaseMessage(labeledLevel.getLabel());
 }
 

@@ -193,14 +193,14 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
     return version;
 }
 
-void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version) {
+void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData version) {
     uassert(40284,
             "featureCompatibilityVersion must be '3.4' or '3.2'. See "
             "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
             version == FeatureCompatibilityVersionCommandParser::kVersion34 ||
                 version == FeatureCompatibilityVersionCommandParser::kVersion32);
 
-    DBDirectClient client(txn);
+    DBDirectClient client(opCtx);
     NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
     if (version == FeatureCompatibilityVersionCommandParser::kVersion34) {
@@ -211,27 +211,35 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
         std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
 
         {
-            ScopedTransaction transaction(txn, MODE_IX);
-            AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
+            AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
 
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Cannot set featureCompatibilityVersion to '" << version
                                   << "'. Not primary while attempting to create index on: "
                                   << nss.ns(),
-                    repl::ReplicationCoordinator::get(txn->getServiceContext())
-                        ->canAcceptWritesFor(nss));
+                    repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                        ->canAcceptWritesFor(opCtx, nss));
+
+            // If the "admin.system.version" collection has not been created yet, explicitly create
+            // it to hold the v=2 index.
+            if (!autoDB.getDb()->getCollection(opCtx, nss)) {
+                uassertStatusOK(
+                    repl::StorageInterface::get(opCtx)->createCollection(opCtx, nss, {}));
+            }
 
             IndexBuilder builder(k32IncompatibleIndexSpec, false);
-            auto status = builder.buildInForeground(txn, autoDB.getDb());
+            auto status = builder.buildInForeground(opCtx, autoDB.getDb());
             uassertStatusOK(status);
 
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wuow(txn);
+                WriteUnitOfWork wuow(opCtx);
+                auto uuid = autoDB.getDb()->getCollection(opCtx, nss)->uuid();
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    txn, autoDB.getDb()->getSystemIndexesName(), k32IncompatibleIndexSpec, false);
+                    opCtx, nss, uuid, k32IncompatibleIndexSpec, false);
                 wuow.commit();
             }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "FeatureCompatibilityVersion::set", nss.ns());
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                opCtx, "FeatureCompatibilityVersion::set", nss.ns());
         }
 
         // We then update the featureCompatibilityVersion document stored in the
@@ -279,7 +287,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
     }
 }
 
-void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
+void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                                                     repl::StorageInterface* storageInterface) {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
         std::vector<std::string> dbNames;
@@ -292,7 +300,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
             }
         }
 
-        UnreplicatedWritesBlock unreplicatedWritesBlock(txn);
+        UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
         NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
         // We build a v=2 index on the "admin.system.version" collection as part of setting the
@@ -302,11 +310,16 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
         std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
 
         {
-            ScopedTransaction transaction(txn, MODE_IX);
-            AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
+            AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
+
+            // We reached this point because the only database that exists on the server is "local"
+            // and we have just created an empty "admin" database.
+            // Therefore, it is safe to create the "admin.system.version" collection.
+            invariant(autoDB.justCreated());
+            uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
 
             IndexBuilder builder(k32IncompatibleIndexSpec, false);
-            auto status = builder.buildInForeground(txn, autoDB.getDb());
+            auto status = builder.buildInForeground(opCtx, autoDB.getDb());
             uassertStatusOK(status);
         }
 
@@ -317,7 +330,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
         // document when starting up, then on a subsequent start-up we'd no longer consider the data
         // files "clean" and would instead be in featureCompatibilityVersion=3.2.
         uassertStatusOK(storageInterface->insertDocument(
-            txn,
+            opCtx,
             nss,
             BSON("_id" << FeatureCompatibilityVersion::kParameterName
                        << FeatureCompatibilityVersion::kVersionField
@@ -372,7 +385,7 @@ public:
                           false   // allowedToChangeAtRuntime
                           ) {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b.append(name,
                  getFeatureCompatibilityVersionString(
                      serverGlobalParams.featureCompatibility.version.load()));

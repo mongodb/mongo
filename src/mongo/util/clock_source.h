@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -69,6 +71,43 @@ public:
      */
     bool tracksSystemClock() const {
         return _tracksSystemClock;
+    }
+
+    /**
+     * Like cv.wait_until(m, deadline), but uses this ClockSource instead of
+     * stdx::chrono::system_clock to measure the passage of time.
+     */
+    stdx::cv_status waitForConditionUntil(stdx::condition_variable& cv,
+                                          stdx::unique_lock<stdx::mutex>& m,
+                                          Date_t deadline);
+
+    /**
+     * Like cv.wait_until(m, deadline, pred), but uses this ClockSource instead of
+     * stdx::chrono::system_clock to measure the passage of time.
+     */
+    template <typename Pred>
+    bool waitForConditionUntil(stdx::condition_variable& cv,
+                               stdx::unique_lock<stdx::mutex>& m,
+                               Date_t deadline,
+                               const Pred& pred) {
+        while (!pred()) {
+            if (waitForConditionUntil(cv, m, deadline) == stdx::cv_status::timeout) {
+                return pred();
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Like cv.wait_for(m, duration, pred), but uses this ClockSource instead of
+     * stdx::chrono::system_clock to measure the passage of time.
+     */
+    template <typename Duration, typename Pred>
+    bool waitForConditionFor(stdx::condition_variable& cv,
+                             stdx::unique_lock<stdx::mutex>& m,
+                             Duration duration,
+                             const Pred& pred) {
+        return waitForConditionUntil(cv, m, now() + duration, pred);
     }
 
 protected:

@@ -43,13 +43,14 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregationRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
                                      StringMap<ResolvedNamespace> resolvedNamespaces)
-    : isExplain(request.isExplain()),
+    : explain(request.getExplain()),
       inShard(request.isFromRouter()),
       extSortAllowed(request.shouldAllowDiskUse()),
       bypassDocumentValidation(request.shouldBypassDocumentValidation()),
       ns(request.getNamespaceString()),
       opCtx(opCtx),
       collation(request.getCollation()),
+      variablesParseState(variables.useIdGenerator()),
       _collator(std::move(collator)),
       _documentComparator(_collator.get()),
       _valueComparator(_collator.get()),
@@ -74,7 +75,7 @@ void ExpressionContext::setCollator(std::unique_ptr<CollatorInterface> coll) {
 intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(NamespaceString ns) const {
     intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext();
 
-    expCtx->isExplain = isExplain;
+    expCtx->explain = explain;
     expCtx->inShard = inShard;
     expCtx->inRouter = inRouter;
     expCtx->extSortAllowed = extSortAllowed;

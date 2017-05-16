@@ -61,7 +61,7 @@ public:
         BSONObj toBSON() const;
     };
 
-    CollectionBulkLoaderImpl(OperationContext* txn,
+    CollectionBulkLoaderImpl(OperationContext* opCtx,
                              Collection* coll,
                              const BSONObj idIndexSpec,
                              std::unique_ptr<OldThreadPool> threadPool,
@@ -91,7 +91,7 @@ private:
     std::unique_ptr<TaskRunner> _runner;
     std::unique_ptr<AutoGetCollection> _autoColl;
     std::unique_ptr<AutoGetOrCreateDb> _autoDB;
-    OperationContext* _txn = nullptr;
+    OperationContext* _opCtx = nullptr;
     Collection* _coll = nullptr;
     NamespaceString _nss;
     std::unique_ptr<MultiIndexBlock> _idIndexBlock;

@@ -53,11 +53,11 @@ BSONObj simpleKey(char c, int n = 1);
  */
 class TestHeadManager : public HeadManager {
 public:
-    virtual const RecordId getHead(OperationContext* txn) const {
+    virtual const RecordId getHead(OperationContext* opCtx) const {
         return _head;
     }
 
-    virtual void setHead(OperationContext* txn, const RecordId newHead) {
+    virtual void setHead(OperationContext* opCtx, const RecordId newHead) {
         _head = newHead;
     }
 
@@ -100,8 +100,8 @@ public:
      * does not do any cleanup, so constructing multiple trees over the same helper will
      * cause leaked records.
      */
-    ArtificialTreeBuilder(OperationContext* txn, BtreeLogicTestHelper<OnDiskFormat>* helper)
-        : _txn(txn), _helper(helper) {}
+    ArtificialTreeBuilder(OperationContext* opCtx, BtreeLogicTestHelper<OnDiskFormat>* helper)
+        : _opCtx(opCtx), _helper(helper) {}
 
     /**
      * Causes the specified tree shape to be built on the associated helper and the tree's
@@ -143,7 +143,7 @@ private:
 
     static std::string expectedKey(const char* spec);
 
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     BtreeLogicTestHelper<OnDiskFormat>* _helper;
 };
 

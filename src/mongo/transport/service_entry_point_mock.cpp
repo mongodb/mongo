@@ -42,38 +42,8 @@ namespace mongo {
 
 using namespace transport;
 
-namespace {
-void setOkResponse(Message* m) {
-    // Need to set up our { ok : 1 } response.
-    BufBuilder b{};
-
-    // Leave room for the message header
-    b.skip(mongo::MsgData::MsgDataHeaderSize);
-
-    // Add our response
-    auto okObj = BSON("ok" << 1.0);
-    okObj.appendSelfToBufBuilder(b);
-
-    // Add some metadata
-    auto metadata = BSONObj();
-    metadata.appendSelfToBufBuilder(b);
-
-    // Set Message header fields
-    MsgData::View msg = b.buf();
-    msg.setLen(b.len());
-    msg.setOperation(dbCommandReply);
-
-    // Set the message, transfer buffer ownership to Message
-    m->reset();
-    m->setData(b.release());
-}
-
-}  // namespace
-
 ServiceEntryPointMock::ServiceEntryPointMock(transport::TransportLayer* tl)
-    : _tl(tl), _outMessage(), _inShutdown(false) {
-    setOkResponse(&_outMessage);
-}
+    : _tl(tl), _inShutdown(false) {}
 
 ServiceEntryPointMock::~ServiceEntryPointMock() {
     {
@@ -104,11 +74,38 @@ void ServiceEntryPointMock::run(transport::SessionHandle session) {
             break;
         }
 
+        auto resp = handleRequest(nullptr, inMessage, session->remote());
+
         // sinkMessage()
-        if (!session->sinkMessage(_outMessage).wait().isOK()) {
+        if (!session->sinkMessage(resp.response).wait().isOK()) {
             break;
         }
     }
+}
+
+DbResponse ServiceEntryPointMock::handleRequest(OperationContext* opCtx,
+                                                const Message& request,
+                                                const HostAndPort& client) {
+    // Need to set up our { ok : 1 } response.
+    BufBuilder b{};
+
+    // Leave room for the message header
+    b.skip(mongo::MsgData::MsgDataHeaderSize);
+
+    // Add our response
+    auto okObj = BSON("ok" << 1.0);
+    okObj.appendSelfToBufBuilder(b);
+
+    // Add some metadata
+    auto metadata = BSONObj();
+    metadata.appendSelfToBufBuilder(b);
+
+    // Set Message header fields
+    MsgData::View msg = b.buf();
+    msg.setLen(b.len());
+    msg.setOperation(dbCommandReply);
+
+    return {Message(b.release()), ""};
 }
 
 }  // namespace mongo

@@ -46,7 +46,7 @@ public:
     UserCacheInvalidator(AuthorizationManager* authzManager);
     ~UserCacheInvalidator();
 
-    void initialize(OperationContext* txn);
+    void initialize(OperationContext* opCtx);
 
 protected:
     virtual std::string name() const;

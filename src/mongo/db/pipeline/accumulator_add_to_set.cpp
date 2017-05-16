@@ -70,7 +70,7 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     }
 }
 
-Value AccumulatorAddToSet::getValue(bool toBeMerged) const {
+Value AccumulatorAddToSet::getValue(bool toBeMerged) {
     return Value(vector<Value>(_set.begin(), _set.end()));
 }
 

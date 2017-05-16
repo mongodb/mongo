@@ -37,9 +37,12 @@
 
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/db/client.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/sharding_connection_hook.h"
@@ -91,7 +94,7 @@ void ShardedConnectionInfo::setVersion(const std::string& ns, const ChunkVersion
     _versions[ns] = version;
 }
 
-void ShardedConnectionInfo::addHook() {
+void ShardedConnectionInfo::addHook(ServiceContext* service) {
     if (alreadyAddedHook.loadRelaxed()) {
         return;
     }
@@ -104,11 +107,17 @@ void ShardedConnectionInfo::addHook() {
     log() << "first cluster operation detected, adding sharding hook to enable versioning "
              "and authentication to remote servers";
 
-    globalConnPool.addHook(new ShardingConnectionHook(
-        false, stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>()));
+    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    unshardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
 
-    shardConnectionPool.addHook(new ShardingConnectionHook(
-        true, stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>()));
+    globalConnPool.addHook(new ShardingConnectionHook(false, std::move(unshardedHookList)));
+
+    auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    shardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    shardedHookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>());
+
+    shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
 
     alreadyAddedHook.store(1);
 }

@@ -1,5 +1,3 @@
-// mmap_posix.cpp
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -52,7 +50,6 @@ using std::vector;
 
 using namespace mongoutils;
 
-
 namespace mongo {
 
 namespace {
@@ -70,16 +67,20 @@ void printMemInfo() {
         << " mapped: " << MemoryMappedFile::totalMappedLengthInMB();
 }
 }  // namespace
+}  // namespace mongo
 
-static size_t fetchMinOSPageSizeBytes() {
-    size_t minOSPageSizeBytes = sysconf(_SC_PAGESIZE);
-    minOSPageSizeBytesTest(minOSPageSizeBytes);
-    return minOSPageSizeBytes;
+std::size_t mongo::getMinOSPageSizeBytes() {
+    static const std::size_t cachedSize = [] {
+        std::size_t minOSPageSizeBytes = sysconf(_SC_PAGESIZE);
+        minOSPageSizeBytesTest(minOSPageSizeBytes);
+        return minOSPageSizeBytes;
+    }();
+    return cachedSize;
 }
-const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
+namespace mongo {
 
-void MemoryMappedFile::close(OperationContext* txn) {
+void MemoryMappedFile::close(OperationContext* opCtx) {
     for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
         munmap(*i, len);
     }
@@ -91,7 +92,7 @@ void MemoryMappedFile::close(OperationContext* txn) {
         ::close(fd);
         fd = 0;
     }
-    destroyed(txn);  // cleans up from the master list of mmaps
+    destroyed(opCtx);  // cleans up from the master list of mmaps
 }
 
 #ifndef O_NOATIME
@@ -104,21 +105,21 @@ void MemoryMappedFile::close(OperationContext* txn) {
 
 namespace {
 void* _pageAlign(void* p) {
-    return (void*)((int64_t)p & ~(g_minOSPageSizeBytes - 1));
+    return (void*)((int64_t)p & ~(getMinOSPageSizeBytes() - 1));
 }
 
 class PageAlignTest : public StartupTest {
 public:
     void run() {
         {
-            int64_t x = g_minOSPageSizeBytes + 123;
+            int64_t x = getMinOSPageSizeBytes() + 123;
             void* y = _pageAlign(reinterpret_cast<void*>(x));
-            invariant(g_minOSPageSizeBytes == reinterpret_cast<size_t>(y));
+            invariant(getMinOSPageSizeBytes() == reinterpret_cast<size_t>(y));
         }
         {
             int64_t a = static_cast<uint64_t>(numeric_limits<int>::max());
-            a = a / g_minOSPageSizeBytes;
-            a = a * g_minOSPageSizeBytes;
+            a = a / getMinOSPageSizeBytes();
+            a = a * getMinOSPageSizeBytes();
             // a should now be page aligned
 
             // b is not page aligned
@@ -159,11 +160,11 @@ MAdvise::~MAdvise() {
 }
 #endif
 
-void* MemoryMappedFile::map(OperationContext* txn,
+void* MemoryMappedFile::map(OperationContext* opCtx,
                             const char* filename,
                             unsigned long long& length) {
     // length may be updated by callee.
-    setFilename(txn, filename);
+    setFilename(opCtx, filename);
     FileAllocator::get()->allocateAsap(filename, length);
 
     const bool readOnly = isOptionSet(READONLY);
@@ -243,9 +244,9 @@ void* MemoryMappedFile::createPrivateMap() {
     return x;
 }
 
-void* MemoryMappedFile::remapPrivateView(OperationContext* txn, void* oldPrivateAddr) {
+void* MemoryMappedFile::remapPrivateView(OperationContext* opCtx, void* oldPrivateAddr) {
 #if defined(__sun)  // SERVER-8795
-    LockMongoFilesExclusive lockMongoFiles(txn);
+    LockMongoFilesExclusive lockMongoFiles(opCtx);
 #endif
 
     // don't unmap, just mmap over the old region
@@ -288,7 +289,7 @@ public:
     PosixFlushable(MemoryMappedFile* theFile, void* view, HANDLE fd, long len)
         : _theFile(theFile), _view(view), _fd(fd), _len(len), _id(_theFile->getUniqueId()) {}
 
-    void flush(OperationContext* txn) {
+    void flush(OperationContext* opCtx) {
         if (_view == NULL || _fd == 0)
             return;
 
@@ -303,7 +304,7 @@ public:
         }
 
         // some error, lets see if we're supposed to exist
-        LockMongoFilesShared mmfilesLock(txn);
+        LockMongoFilesShared mmfilesLock(opCtx);
         std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
         std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
         if ((it == mmfs.end()) || ((*it)->getUniqueId() != _id)) {

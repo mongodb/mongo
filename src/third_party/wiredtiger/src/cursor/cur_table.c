@@ -14,8 +14,8 @@ static int __curtable_update(WT_CURSOR *cursor);
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
 	u_int __i;							\
-	for (__i = 0, __cp = ctable->cg_cursors;			\
-	    __i < WT_COLGROUPS(ctable->table);				\
+	for (__i = 0, __cp = (ctable)->cg_cursors;			\
+	    __i < WT_COLGROUPS((ctable)->table);			\
 	    __i++, __cp++)						\
 		WT_TRET((*__cp)->f(*__cp));				\
 } while (0)
@@ -511,9 +511,16 @@ __curtable_insert(WT_CURSOR *cursor)
 	 */
 	F_SET(primary, flag_orig | WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 
-	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 		WT_ERR(__curtable_update(cursor));
-	else {
+
+		/*
+		 * The cursor is no longer positioned. This isn't just cosmetic,
+		 * without a reset, iteration on this cursor won't start at the
+		 * beginning/end of the table.
+		 */
+		APPLY_CG(ctable, reset);
+	} else {
 		WT_ERR(ret);
 
 		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
@@ -601,22 +608,53 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 static int
 __curtable_remove(WT_CURSOR *cursor)
 {
+	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	bool positioned;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	JOINABLE_CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
+	/* Check if the cursor was positioned. */
+	primary = *ctable->cg_cursors;
+	positioned = F_ISSET(primary, WT_CURSTD_KEY_INT);
+
 	/* Find the old record so it can be removed from indices */
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
+		if (ret == WT_NOTFOUND)
+			goto notfound;
 		WT_ERR(ret);
 		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), false));
 	}
 
 	APPLY_CG(ctable, remove);
+	if (ret == WT_NOTFOUND)
+		goto notfound;
+	WT_ERR(ret);
+
+notfound:
+	/*
+	 * If the cursor is configured to overwrite and the record is not found,
+	 * that is exactly what we want.
+	 */
+	if (ret == WT_NOTFOUND && F_ISSET(primary, WT_CURSTD_OVERWRITE))
+		ret = 0;
+
+	/*
+	 * If the cursor was positioned, it stays positioned with a key but no
+	 * no value, otherwise, there's no position, key or value. This isn't
+	 * just cosmetic, without a reset, iteration on this cursor won't start
+	 * at the beginning/end of the table.
+	 */
+	F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if (positioned)
+		F_SET(primary, WT_CURSTD_KEY_INT);
+	else
+		APPLY_CG(ctable, reset);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -989,11 +1027,15 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (*cursorp != NULL) {
-			if (*cursorp != cursor)
-				WT_TRET(__wt_cursor_close(*cursorp));
+			/*
+			 * When a dump cursor is opened, then *cursorp, not
+			 * cursor, is the dump cursor. Close the dump cursor,
+			 * and the table cursor will be closed as its child.
+			 */
+			cursor = *cursorp;
 			*cursorp = NULL;
 		}
-		WT_TRET(__curtable_close(cursor));
+		WT_TRET(cursor->close(cursor));
 	}
 
 	__wt_scr_free(session, &tmp);

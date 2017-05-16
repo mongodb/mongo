@@ -43,10 +43,10 @@ using stdx::make_unique;
 
 const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 
-MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
+MultiIteratorStage::MultiIteratorStage(OperationContext* opCtx,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _wsidForFetch(_ws->allocate()) {}
@@ -131,13 +131,13 @@ void MultiIteratorStage::doReattachToOperationContext() {
     }
 }
 
-void MultiIteratorStage::doInvalidate(OperationContext* txn,
+void MultiIteratorStage::doInvalidate(OperationContext* opCtx,
                                       const RecordId& dl,
                                       InvalidationType type) {
     switch (type) {
         case INVALIDATION_DELETION:
             for (size_t i = 0; i < _iterators.size(); i++) {
-                _iterators[i]->invalidate(txn, dl);
+                _iterators[i]->invalidate(opCtx, dl);
             }
             break;
         case INVALIDATION_MUTATION:

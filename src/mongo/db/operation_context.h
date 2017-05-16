@@ -28,12 +28,15 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern_options.h"
@@ -48,11 +51,14 @@ namespace mongo {
 
 class Client;
 class CurOp;
-class Locker;
 class ProgressMeter;
 class ServiceContext;
 class StringData;
 class WriteUnitOfWork;
+
+namespace repl {
+class UnreplicatedWritesBlock;
+}  // namespace repl
 
 /**
  * This class encompasses the state required by an operation and lives from the time a network
@@ -139,6 +145,16 @@ public:
     Status checkForInterruptNoAssert();
 
     /**
+     * Sleeps until "deadline"; throws an exception if the operation is interrupted before then.
+     */
+    void sleepUntil(Date_t deadline);
+
+    /**
+     * Sleeps for "duration" ms; throws an exception if the operation is interrupted before then.
+     */
+    void sleepFor(Milliseconds duration);
+
+    /**
      * Waits for either the condition "cv" to be signaled, this operation to be interrupted, or the
      * deadline on this operation to expire.  In the event of interruption or operation deadline
      * expiration, raises a UserException with an error code indicating the interruption type.
@@ -189,16 +205,29 @@ public:
      * cv_status::no_timeout indicating that "pred" finally returned true.
      */
     template <typename Pred>
-    stdx::cv_status waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
-                                                     stdx::unique_lock<stdx::mutex>& m,
-                                                     Date_t deadline,
-                                                     Pred pred) {
+    bool waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
+                                          stdx::unique_lock<stdx::mutex>& m,
+                                          Date_t deadline,
+                                          Pred pred) {
         while (!pred()) {
             if (stdx::cv_status::timeout == waitForConditionOrInterruptUntil(cv, m, deadline)) {
-                return stdx::cv_status::timeout;
+                return pred();
             }
         }
-        return stdx::cv_status::no_timeout;
+        return true;
+    }
+
+    /**
+     * Same as the predicate form of waitForConditionOrInterruptUntil, but takes a relative
+     * amount of time to wait instead of an absolute time point.
+     */
+    template <typename Pred>
+    bool waitForConditionOrInterruptFor(stdx::condition_variable& cv,
+                                        stdx::unique_lock<stdx::mutex>& m,
+                                        Milliseconds duration,
+                                        Pred pred) {
+        return waitForConditionOrInterruptUntil(
+            cv, m, getExpirationDateForWaitForValue(duration), pred);
     }
 
     /**
@@ -241,6 +270,13 @@ public:
     }
 
     /**
+     * Returns the session ID associated with this operation, if there is one.
+     */
+    boost::optional<LogicalSessionId> getLogicalSessionId() const {
+        return _lsid;
+    }
+
+    /**
      * Returns WriteConcernOptions of the current operation
      */
     const WriteConcernOptions& getWriteConcern() const {
@@ -249,14 +285,6 @@ public:
 
     void setWriteConcern(const WriteConcernOptions& writeConcern) {
         _writeConcern = writeConcern;
-    }
-
-    /**
-     * Set whether or not operations should generate oplog entries.
-     * TODO SERVER-26965: Make this private.
-     */
-    void setReplicatedWrites(bool writesAreReplicated = true) {
-        _writesAreReplicated = writesAreReplicated;
     }
 
     /**
@@ -360,7 +388,7 @@ public:
     Microseconds getRemainingMaxTimeMicros() const;
 
 protected:
-    OperationContext(Client* client, unsigned int opId);
+    OperationContext(Client* client, unsigned int opId, boost::optional<LogicalSessionId> lsid);
 
 private:
     /**
@@ -375,9 +403,24 @@ private:
      */
     void setDeadlineAndMaxTime(Date_t when, Microseconds maxTime);
 
+    /**
+     * Returns the timepoint that is "waitFor" ms after now according to the
+     * ServiceContext's precise clock.
+     */
+    Date_t getExpirationDateForWaitForValue(Milliseconds waitFor);
+
+    /**
+     * Set whether or not operations should generate oplog entries.
+     */
+    void setReplicatedWrites(bool writesAreReplicated = true) {
+        _writesAreReplicated = writesAreReplicated;
+    }
+
     friend class WriteUnitOfWork;
+    friend class repl::UnreplicatedWritesBlock;
     Client* const _client;
     const unsigned int _opId;
+    boost::optional<LogicalSessionId> _lsid;
 
     std::unique_ptr<Locker> _locker;
 
@@ -425,81 +468,50 @@ class WriteUnitOfWork {
     MONGO_DISALLOW_COPYING(WriteUnitOfWork);
 
 public:
-    WriteUnitOfWork(OperationContext* txn)
-        : _txn(txn),
+    WriteUnitOfWork(OperationContext* opCtx)
+        : _opCtx(opCtx),
           _committed(false),
-          _toplevel(txn->_ruState == OperationContext::kNotInUnitOfWork) {
+          _toplevel(opCtx->_ruState == OperationContext::kNotInUnitOfWork) {
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot execute a write operation in read-only mode",
                 !storageGlobalParams.readOnly);
-        _txn->lockState()->beginWriteUnitOfWork();
+        _opCtx->lockState()->beginWriteUnitOfWork();
         if (_toplevel) {
-            _txn->recoveryUnit()->beginUnitOfWork(_txn);
-            _txn->_ruState = OperationContext::kActiveUnitOfWork;
+            _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
+            _opCtx->_ruState = OperationContext::kActiveUnitOfWork;
         }
     }
 
     ~WriteUnitOfWork() {
         dassert(!storageGlobalParams.readOnly);
         if (!_committed) {
-            invariant(_txn->_ruState != OperationContext::kNotInUnitOfWork);
+            invariant(_opCtx->_ruState != OperationContext::kNotInUnitOfWork);
             if (_toplevel) {
-                _txn->recoveryUnit()->abortUnitOfWork();
-                _txn->_ruState = OperationContext::kNotInUnitOfWork;
+                _opCtx->recoveryUnit()->abortUnitOfWork();
+                _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
             } else {
-                _txn->_ruState = OperationContext::kFailedUnitOfWork;
+                _opCtx->_ruState = OperationContext::kFailedUnitOfWork;
             }
-            _txn->lockState()->endWriteUnitOfWork();
+            _opCtx->lockState()->endWriteUnitOfWork();
         }
     }
 
     void commit() {
         invariant(!_committed);
-        invariant(_txn->_ruState == OperationContext::kActiveUnitOfWork);
+        invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
         if (_toplevel) {
-            _txn->recoveryUnit()->commitUnitOfWork();
-            _txn->_ruState = OperationContext::kNotInUnitOfWork;
+            _opCtx->recoveryUnit()->commitUnitOfWork();
+            _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
         }
-        _txn->lockState()->endWriteUnitOfWork();
+        _opCtx->lockState()->endWriteUnitOfWork();
         _committed = true;
     }
 
 private:
-    OperationContext* const _txn;
+    OperationContext* const _opCtx;
 
     bool _committed;
     bool _toplevel;
-};
-
-
-/**
- * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.
- * An outermost ScopedTransaction calls abandonSnapshot() on destruction, so that the storage
- * engine can release resources, such as snapshots or locks, that it may have acquired during
- * the transaction. Note that any writes are committed in nested WriteUnitOfWork scopes,
- * so write conflicts cannot happen on completing a ScopedTransaction.
- *
- * TODO: The ScopedTransaction should hold the global lock
- */
-class ScopedTransaction {
-    MONGO_DISALLOW_COPYING(ScopedTransaction);
-
-public:
-    /**
-     * The mode for the transaction indicates whether the transaction will write (MODE_IX) or
-     * only read (MODE_IS), or needs to run without other writers (MODE_S) or any other
-     * operations (MODE_X) on the server.
-     */
-    ScopedTransaction(OperationContext* txn, LockMode mode) : _txn(txn) {}
-
-    ~ScopedTransaction() {
-        if (!_txn->lockState()->isLocked()) {
-            _txn->recoveryUnit()->abandonSnapshot();
-        }
-    }
-
-private:
-    OperationContext* _txn;
 };
 
 namespace repl {
@@ -511,17 +523,17 @@ class UnreplicatedWritesBlock {
     MONGO_DISALLOW_COPYING(UnreplicatedWritesBlock);
 
 public:
-    UnreplicatedWritesBlock(OperationContext* txn)
-        : _txn(txn), _shouldReplicateWrites(txn->writesAreReplicated()) {
-        txn->setReplicatedWrites(false);
+    UnreplicatedWritesBlock(OperationContext* opCtx)
+        : _opCtx(opCtx), _shouldReplicateWrites(opCtx->writesAreReplicated()) {
+        opCtx->setReplicatedWrites(false);
     }
 
     ~UnreplicatedWritesBlock() {
-        _txn->setReplicatedWrites(_shouldReplicateWrites);
+        _opCtx->setReplicatedWrites(_shouldReplicateWrites);
     }
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     const bool _shouldReplicateWrites;
 };
 }  // namespace repl

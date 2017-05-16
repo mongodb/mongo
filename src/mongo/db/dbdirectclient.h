@@ -49,12 +49,12 @@ class OperationContext;
  */
 class DBDirectClient : public DBClientBase {
 public:
-    DBDirectClient(OperationContext* txn);
+    DBDirectClient(OperationContext* opCtx);
 
     using DBClientBase::query;
 
     // XXX: is this valid or useful?
-    void setOpCtx(OperationContext* txn);
+    void setOpCtx(OperationContext* opCtx);
 
     virtual std::unique_ptr<DBClientCursor> query(const std::string& ns,
                                                   Query query,
@@ -97,7 +97,7 @@ public:
     int getMaxWireVersion() final;
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
 };
 
 }  // namespace mongo

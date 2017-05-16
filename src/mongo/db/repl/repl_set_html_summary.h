@@ -33,7 +33,7 @@
 
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 
 namespace mongo {
 
@@ -49,7 +49,7 @@ public:
 
     const std::string toHtmlString() const;
 
-    void setConfig(const ReplicaSetConfig& config) {
+    void setConfig(const ReplSetConfig& config) {
         _config = config;
     }
 
@@ -86,7 +86,7 @@ public:
     }
 
 private:
-    ReplicaSetConfig _config;
+    ReplSetConfig _config;
     std::vector<MemberHeartbeatData> _hbData;
     Date_t _now;
     int _selfIndex;

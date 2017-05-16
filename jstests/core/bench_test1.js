@@ -1,3 +1,6 @@
+// Cannot implicitly shard accessed collections because of extra shard key index in sharded
+// collection.
+// @tags: [assumes_no_implicit_index_creation]
 
 t = db.bench_test1;
 t.drop();

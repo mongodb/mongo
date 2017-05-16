@@ -52,7 +52,7 @@ namespace mongo {
 // SortKeyGenerator
 //
 
-SortKeyGenerator::SortKeyGenerator(OperationContext* txn,
+SortKeyGenerator::SortKeyGenerator(OperationContext* opCtx,
                                    const BSONObj& sortSpec,
                                    const BSONObj& queryObj,
                                    const CollatorInterface* collator)
@@ -105,7 +105,7 @@ SortKeyGenerator::SortKeyGenerator(OperationContext* txn,
     _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */, _collator));
 
     // The bounds checker only works on the Btree part of the sort key.
-    getBoundsForSort(txn, queryObj, _btreeObj);
+    getBoundsForSort(opCtx, queryObj, _btreeObj);
 
     if (_hasBounds) {
         _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _btreeObj, 1 /* == order */));
@@ -227,7 +227,7 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromObject(const WorkingSetMembe
     return *keys.begin();
 }
 
-void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
+void SortKeyGenerator::getBoundsForSort(OperationContext* opCtx,
                                         const BSONObj& queryObj,
                                         const BSONObj& sortObj) {
     QueryPlannerParams params;
@@ -254,7 +254,7 @@ void SortKeyGenerator::getBoundsForSort(OperationContext* txn,
     }
 
     auto statusWithQueryForSort =
-        CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
+        CanonicalQuery::canonicalize(opCtx, std::move(qr), ExtensionsCallbackNoop());
     verify(statusWithQueryForSort.isOK());
     std::unique_ptr<CanonicalQuery> queryForSort = std::move(statusWithQueryForSort.getValue());
 

@@ -2,17 +2,8 @@ load('jstests/aggregation/extras/utils.js');
 load('jstests/libs/analyze_plan.js');  // For planHasStage.
 
 jsTestLog("Creating sharded cluster");
-var shardedAggTest = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    other: {
-        chunkSize: 1,
-        enableBalancer: true,
-        mongosOptions: {verbose: ''},
-        shardOptions: {verbose: ''},
-        configOptions: {verbose: ''},
-    }
-});
+var shardedAggTest =
+    new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
 
 jsTestLog("Setting up sharded cluster");
 shardedAggTest.adminCommand({enablesharding: "aggShard"});
@@ -199,19 +190,11 @@ testAvgStdDev();
 
 function testSample() {
     jsTestLog('testing $sample');
-    shardedAggTest.printCollectionInfo(db.ts1.getFullName());
     [0, 1, 10, nItems, nItems + 1].forEach(function(size) {
         var res = db.ts1.aggregate([{$sample: {size: size}}]).toArray();
         assert.eq(res.length, Math.min(nItems, size));
     });
 }
-testSample();
-
-// SERVER-26742 Attempt to reproduce an incorrect number of results being returned.
-testSample();
-testSample();
-testSample();
-testSample();
 testSample();
 
 jsTestLog('test $out by copying source collection verbatim to output');

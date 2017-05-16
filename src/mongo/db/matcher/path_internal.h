@@ -40,8 +40,14 @@ namespace mongo {
 
 bool isAllDigits(StringData str);
 
-// XXX document me
-// Replaces getFieldDottedOrArray without recursion nor std::string manipulation
-BSONElement getFieldDottedOrArray(const BSONObj& doc, const FieldRef& path, size_t* idxPath);
+/**
+ * Finds the element at 'path' in 'doc', starting at 'startIndex' in 'path'. If none is found, an
+ * EOO element is returned. If an array is encountered along 'path', the traversal stops early, and
+ * the array is returned. 'idxPath' is set to the furthest index reached in 'path'.
+ */
+BSONElement getFieldDottedOrArray(const BSONObj& doc,
+                                  const FieldRef& path,
+                                  size_t* idxPath,
+                                  size_t startIndex = 0);
 
 }  // namespace mongo

@@ -86,6 +86,9 @@ class MathCache
 extern JSObject*
 InitMathClass(JSContext* cx, HandleObject obj);
 
+extern uint64_t
+GenerateRandomSeed();
+
 // Fill |seed[0]| and |seed[1]| with random bits, suitable for
 // seeding a XorShift128+ random number generator.
 extern void

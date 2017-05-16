@@ -214,7 +214,7 @@ public:
      *
      * If errors is non-NULL, all error messages will be appended to the array.
      */
-    static int verifyTable(OperationContext* txn,
+    static int verifyTable(OperationContext* opCtx,
                            const std::string& uri,
                            std::vector<std::string>* errors = NULL);
 

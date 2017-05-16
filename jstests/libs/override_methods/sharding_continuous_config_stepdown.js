@@ -61,13 +61,16 @@ tracking: {verbosity: 0} }";
          *      primary of the replica set.
          * @param {CountDownLatch} stopCounter Object, which can be used to stop the thread.
          *
+         * @param {integer} stepdownDelaySeconds The number of seconds after stepping down the
+         *      primary for which the node is not re-electable.
+         *
          * @return Object with the following fields:
          *      ok {integer}: 0 if it failed, 1 if it succeeded.
          *      error {string}: Only present if ok == 0. Contains the cause for the error.
          *      stack {string}: Only present if ok == 0. Contains the stack at the time of the
          *          error.
          */
-        function _continuousPrimaryStepdownFn(seedNode, stopCounter) {
+        function _continuousPrimaryStepdownFn(seedNode, stopCounter, stepdownDelaySeconds) {
             'use strict';
 
             load('jstests/libs/override_methods/sharding_continuous_config_stepdown.js');
@@ -184,10 +187,10 @@ tracking: {verbosity: 0} }";
                       "Failed to lower the electionTimeoutMillis to 5000 milliseconds.");
 
             _scopedPrimaryStepdownThreadStopCounter = new CountDownLatch(1);
-            _scopedPrimaryStepdownThread =
-                new ScopedThread(_continuousPrimaryStepdownFn,
-                                 this.nodes[0].host,
-                                 _scopedPrimaryStepdownThreadStopCounter);
+            _scopedPrimaryStepdownThread = new ScopedThread(_continuousPrimaryStepdownFn,
+                                                            this.nodes[0].host,
+                                                            _scopedPrimaryStepdownThreadStopCounter,
+                                                            stepdownDelaySeconds);
             _scopedPrimaryStepdownThread.start();
         };
 

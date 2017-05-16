@@ -63,7 +63,7 @@ public:
 
     bool isValidInitialSource() const final;
 
-    Value serialize(bool explain = false) const;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

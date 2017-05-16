@@ -40,12 +40,12 @@ const auto getRollbackNotifier = ServiceContext::declareDecoration<ShardIdentity
 
 ShardIdentityRollbackNotifier::ShardIdentityRollbackNotifier() = default;
 
-ShardIdentityRollbackNotifier* ShardIdentityRollbackNotifier::get(OperationContext* txn) {
-    return get(txn->getServiceContext());
+ShardIdentityRollbackNotifier* ShardIdentityRollbackNotifier::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
 }
 
-ShardIdentityRollbackNotifier* ShardIdentityRollbackNotifier::get(ServiceContext* txn) {
-    return &getRollbackNotifier(txn);
+ShardIdentityRollbackNotifier* ShardIdentityRollbackNotifier::get(ServiceContext* opCtx) {
+    return &getRollbackNotifier(opCtx);
 }
 
 

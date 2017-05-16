@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of not being able to create unique index
+// using hashed shard key pattern.
+// @tags: [cannot_create_unique_index_when_using_hashed_shard_key]
+
 //
 // Ensures that mongod respects the batch write protocol for inserts
 //
@@ -59,7 +63,7 @@ result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(coll.count(), 1);
 
-var fields = ['ok', 'operationTime'];
+var fields = ['ok'];
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //

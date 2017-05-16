@@ -53,40 +53,31 @@ CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(const BSONObj& comm
     return *this;
 }
 
-BufBuilder& CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
+BSONObjBuilder CommandReplyBuilder::getInPlaceReplyBuilder(std::size_t reserveBytes) {
     invariant(_state == State::kCommandReply);
     // Eagerly allocate reserveBytes bytes.
     _builder.reserveBytes(reserveBytes);
     // Claim our reservation immediately so we can actually write data to it.
     _builder.claimReservedBytes(reserveBytes);
     _state = State::kMetadata;
-    return _builder;
+    return BSONObjBuilder(_builder);
 }
 
 CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
     invariant(_state == State::kMetadata);
-    metadata.appendSelfToBufBuilder(_builder);
+    // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
+    // fields differently. We do all up- and down-conversion here so that the rest of the code only
+    // has to deal with the current format.
+    BSONObjBuilder bob(_builder);
+    for (auto elem : metadata) {
+        if (elem.fieldNameStringData() == "$configServerState") {
+            bob.appendAs(elem, "configsvr");
+        } else {
+            bob.append(elem);
+        }
+    }
     _state = State::kOutputDocs;
     return *this;
-}
-
-
-Status CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
-    invariant(_state == State::kOutputDocs);
-    auto rangeData = outputDocs.data();
-    auto dataSize = rangeData.length();
-    _builder.appendBuf(rangeData.data(), dataSize);
-    return Status::OK();
-}
-
-Status CommandReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
-    invariant(_state == State::kOutputDocs);
-    outputDoc.appendSelfToBufBuilder(_builder);
-    return Status::OK();
-}
-
-ReplyBuilderInterface::State CommandReplyBuilder::getState() const {
-    return _state;
 }
 
 Protocol CommandReplyBuilder::getProtocol() const {

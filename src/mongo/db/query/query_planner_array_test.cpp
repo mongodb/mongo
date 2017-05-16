@@ -2054,4 +2054,26 @@ TEST_F(QueryPlannerTest, ContainedOrPathLevelMultikeyCannotCompoundTrailingOutsi
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 
+TEST_F(QueryPlannerTest, TypeArrayUsingTypeCodeMustFetchAndFilter) {
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$type: 4}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$type: 'array'}}, node: {ixscan: {pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, TypeArrayUsingStringAliasMustFetchAndFilter) {
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$type: 'array'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$type: 'array'}}, node: {ixscan: {pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
 }  // namespace

@@ -55,10 +55,12 @@
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -69,13 +71,13 @@ MONGO_FP_DECLARE(rsStopGetMore);
 namespace {
 using logger::LogComponent;
 
-inline void opread(Message& m) {
+inline void opread(const Message& m) {
     if (_diaglog.getLevel() & 2) {
         _diaglog.readop(m.singleData().view2ptr(), m.header().getLen());
     }
 }
 
-inline void opwrite(Message& m) {
+inline void opwrite(const Message& m) {
     if (_diaglog.getLevel() & 1) {
         _diaglog.writeop(m.singleData().view2ptr(), m.header().getLen());
     }
@@ -136,26 +138,23 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 /**
  * Fills out CurOp / OpDebug with basic command info.
  */
-void beginCommandOp(OperationContext* txn, const NamespaceString& nss, const BSONObj& queryObj) {
-    auto curop = CurOp::get(txn);
-    stdx::lock_guard<Client> lk(*txn->getClient());
+void beginCommandOp(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& queryObj) {
+    auto curop = CurOp::get(opCtx);
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     curop->setQuery_inlock(queryObj);
     curop->setNS_inlock(nss.ns());
 }
 
-void receivedCommand(OperationContext* txn,
-                     const NamespaceString& nss,
-                     Client& client,
-                     DbResponse& dbResponse,
-                     Message& message) {
+DbResponse receivedCommand(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           Client& client,
+                           const Message& message) {
     invariant(nss.isCommand());
-
-    const int32_t responseToMsgId = message.header().getId();
 
     DbMessage dbMessage(message);
     QueryMessage queryMessage(dbMessage);
 
-    CurOp* op = CurOp::get(txn);
+    CurOp* op = CurOp::get(opCtx);
 
     rpc::LegacyReplyBuilder builder{};
 
@@ -165,10 +164,10 @@ void receivedCommand(OperationContext* txn,
         // Auth checking for Commands happens later.
         int nToReturn = queryMessage.ntoreturn;
 
-        beginCommandOp(txn, nss, request.getCommandArgs());
+        beginCommandOp(opCtx, nss, request.getCommandArgs());
 
         {
-            stdx::lock_guard<Client> lk(*txn->getClient());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             op->markCommand_inlock();
         }
 
@@ -177,29 +176,68 @@ void receivedCommand(OperationContext* txn,
                               << ") for $cmd type ns - can only be 1 or -1",
                 nToReturn == 1 || nToReturn == -1);
 
-        runCommands(txn, request, &builder);
+        runCommands(opCtx, request, &builder);
 
         op->debug().iscommand = true;
     } catch (const DBException& exception) {
-        Command::generateErrorResponse(txn, &builder, exception);
+        Command::generateErrorResponse(opCtx, &builder, exception);
     }
 
     auto response = builder.done();
 
     op->debug().responseLength = response.header().dataLen();
 
-    dbResponse.response = std::move(response);
-    dbResponse.responseToMsgId = responseToMsgId;
+    return {std::move(response)};
 }
 
-void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, Message& message) {
-    invariant(message.operation() == dbCommand);
+DbResponse receivedMsg(OperationContext* opCtx, Client& client, const Message& message) {
+    invariant(message.operation() == dbMsg);
 
-    const int32_t responseToMsgId = message.header().getId();
+    OpMsg requestOpMsg;
+    rpc::OpMsgReplyBuilder replyBuilder;
+    auto curOp = CurOp::get(opCtx);
+    try {
+        // Request is validated here.
+        // TODO If this fails we reply to an invalid request which isn't always safe. Unfortunately
+        // tests currently rely on this. Figure out what to do.
+        requestOpMsg = OpMsg::parse(message);
+        rpc::OpMsgRequest request(requestOpMsg);
+
+        // We construct a legacy $cmd namespace so we can fill in curOp using
+        // the existing logic that existed for OP_QUERY commands
+        NamespaceString nss(request.getDatabase(), "$cmd");
+        beginCommandOp(opCtx, nss, request.getCommandArgs());
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curOp->markCommand_inlock();
+        }
+
+        runCommands(opCtx, request, &replyBuilder);
+
+        curOp->debug().iscommand = true;
+    } catch (const DBException& exception) {
+        replyBuilder.reset();
+        Command::generateErrorResponse(opCtx, &replyBuilder, exception);
+    }
+
+    auto response = replyBuilder.done();
+
+    curOp->debug().responseLength = response.header().dataLen();
+
+    // TODO exhaust
+    if (requestOpMsg.isFlagSet(OpMsg::kMoreToCome)) {
+        return {};
+    }
+
+    return DbResponse{std::move(response)};
+}
+
+DbResponse receivedRpc(OperationContext* opCtx, Client& client, const Message& message) {
+    invariant(message.operation() == dbCommand);
 
     rpc::CommandReplyBuilder replyBuilder{};
 
-    auto curOp = CurOp::get(txn);
+    auto curOp = CurOp::get(opCtx);
 
     try {
         // database is validated here
@@ -208,37 +246,35 @@ void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, 
         // We construct a legacy $cmd namespace so we can fill in curOp using
         // the existing logic that existed for OP_QUERY commands
         NamespaceString nss(request.getDatabase(), "$cmd");
-        beginCommandOp(txn, nss, request.getCommandArgs());
+        beginCommandOp(opCtx, nss, request.getCommandArgs());
         {
-            stdx::lock_guard<Client> lk(*txn->getClient());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->markCommand_inlock();
         }
 
-        runCommands(txn, request, &replyBuilder);
+        runCommands(opCtx, request, &replyBuilder);
 
         curOp->debug().iscommand = true;
 
     } catch (const DBException& exception) {
-        Command::generateErrorResponse(txn, &replyBuilder, exception);
+        Command::generateErrorResponse(opCtx, &replyBuilder, exception);
     }
 
     auto response = replyBuilder.done();
 
     curOp->debug().responseLength = response.header().dataLen();
 
-    dbResponse.response = std::move(response);
-    dbResponse.responseToMsgId = responseToMsgId;
+    return {std::move(response)};
 }
 
 // In SERVER-7775 we reimplemented the pseudo-commands fsyncUnlock, inProg, and killOp
 // as ordinary commands. To support old clients for another release, this helper serves
 // to execute the real command from the legacy pseudo-command codepath.
 // TODO: remove after MongoDB 3.2 is released
-void receivedPseudoCommand(OperationContext* txn,
-                           Client& client,
-                           DbResponse& dbResponse,
-                           Message& message,
-                           StringData realCommandName) {
+DbResponse receivedPseudoCommand(OperationContext* opCtx,
+                                 Client& client,
+                                 const Message& message,
+                                 StringData realCommandName) {
     DbMessage originalDbm(message);
 
     auto originalNToSkip = originalDbm.pullInt();
@@ -285,37 +321,35 @@ void receivedPseudoCommand(OperationContext* txn,
     interposed.setData(dbQuery, cmdMsgBuf.buf(), cmdMsgBuf.len());
     interposed.header().setId(message.header().getId());
 
-    receivedCommand(txn, interposedNss, client, dbResponse, interposed);
+    return receivedCommand(opCtx, interposedNss, client, interposed);
 }
 
-void receivedQuery(OperationContext* txn,
-                   const NamespaceString& nss,
-                   Client& c,
-                   DbResponse& dbResponse,
-                   Message& m) {
+DbResponse receivedQuery(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         Client& c,
+                         const Message& m) {
     invariant(!nss.isCommand());
     globalOpCounters.gotQuery();
-
-    int32_t responseToMsgId = m.header().getId();
 
     DbMessage d(m);
     QueryMessage q(d);
 
-    CurOp& op = *CurOp::get(txn);
+    CurOp& op = *CurOp::get(opCtx);
+    DbResponse dbResponse;
 
     try {
-        Client* client = txn->getClient();
+        Client* client = opCtx->getClient();
         Status status = AuthorizationSession::get(client)->checkAuthForFind(nss, false);
         audit::logQueryAuthzCheck(client, nss, q.query, status.code());
         uassertStatusOK(status);
 
-        dbResponse.exhaustNS = runQuery(txn, q, nss, dbResponse.response);
+        dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (e.getCode() == ErrorCodes::SendStaleConfig) {
+        if (!opCtx->getClient()->isInDirectClient() && e.getCode() == ErrorCodes::SendStaleConfig) {
             auto& sce = static_cast<const StaleConfigException&>(e);
-            ShardingState::get(txn)->onStaleShardVersion(
-                txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+            ShardingState::get(opCtx)->onStaleShardVersion(
+                opCtx, NamespaceString(sce.getns()), sce.getVersionReceived());
         }
 
         dbResponse.response.reset();
@@ -323,11 +357,11 @@ void receivedQuery(OperationContext* txn,
     }
 
     op.debug().responseLength = dbResponse.response.header().dataLen();
-    dbResponse.responseToMsgId = responseToMsgId;
+    return dbResponse;
 }
 
-void receivedKillCursors(OperationContext* txn, Message& m) {
-    LastError::get(txn->getClient()).disable();
+void receivedKillCursors(OperationContext* opCtx, const Message& m) {
+    LastError::get(opCtx->getClient()).disable();
     DbMessage dbmessage(m);
     int n = dbmessage.pullInt();
 
@@ -344,35 +378,35 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
 
     const char* cursorArray = dbmessage.getArray(n);
 
-    int found = CursorManager::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
+    int found = CursorManager::eraseCursorGlobalIfAuthorized(opCtx, n, cursorArray);
 
     if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
         LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n;
     }
 }
 
-void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Message& m) {
+void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
     auto insertOp = parseLegacyInsert(m);
     invariant(insertOp.ns == nsString);
     for (const auto& obj : insertOp.documents) {
         Status status =
-            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(txn, nsString, obj);
-        audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
+            AuthorizationSession::get(opCtx->getClient())->checkAuthForInsert(opCtx, nsString, obj);
+        audit::logInsertAuthzCheck(opCtx->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }
-    performInserts(txn, insertOp);
+    performInserts(opCtx, insertOp);
 }
 
-void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Message& m) {
+void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
     auto updateOp = parseLegacyUpdate(m);
     auto& singleUpdate = updateOp.updates[0];
     invariant(updateOp.ns == nsString);
 
     Status status =
-        AuthorizationSession::get(txn->getClient())
+        AuthorizationSession::get(opCtx->getClient())
             ->checkAuthForUpdate(
-                txn, nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
-    audit::logUpdateAuthzCheck(txn->getClient(),
+                opCtx, nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
+    audit::logUpdateAuthzCheck(opCtx->getClient(),
                                nsString,
                                singleUpdate.query,
                                singleUpdate.update,
@@ -381,23 +415,26 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                                status.code());
     uassertStatusOK(status);
 
-    performUpdates(txn, updateOp);
+    performUpdates(opCtx, updateOp);
 }
 
-void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Message& m) {
+void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
     auto deleteOp = parseLegacyDelete(m);
     auto& singleDelete = deleteOp.deletes[0];
     invariant(deleteOp.ns == nsString);
 
-    Status status = AuthorizationSession::get(txn->getClient())
-                        ->checkAuthForDelete(txn, nsString, singleDelete.query);
-    audit::logDeleteAuthzCheck(txn->getClient(), nsString, singleDelete.query, status.code());
+    Status status = AuthorizationSession::get(opCtx->getClient())
+                        ->checkAuthForDelete(opCtx, nsString, singleDelete.query);
+    audit::logDeleteAuthzCheck(opCtx->getClient(), nsString, singleDelete.query, status.code());
     uassertStatusOK(status);
 
-    performDeletes(txn, deleteOp);
+    performDeletes(opCtx, deleteOp);
 }
 
-bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop) {
+DbResponse receivedGetMore(OperationContext* opCtx,
+                           const Message& m,
+                           CurOp& curop,
+                           bool* shouldLogOpDebug) {
     globalOpCounters.gotGetMore();
     DbMessage d(m);
 
@@ -411,29 +448,31 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     curop.debug().cursorid = cursorid;
 
     {
-        stdx::lock_guard<Client> lk(*txn->getClient());
-        CurOp::get(txn)->setNS_inlock(ns);
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setNS_inlock(ns);
     }
 
     bool exhaust = false;
     bool isCursorAuthorized = false;
 
+    DbResponse dbresponse;
     try {
         const NamespaceString nsString(ns);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid ns [" << ns << "]",
                 nsString.isValid());
 
-        Status status = AuthorizationSession::get(txn->getClient())
+        Status status = AuthorizationSession::get(opCtx->getClient())
                             ->checkAuthForGetMore(nsString, cursorid, false);
-        audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
+        audit::logGetMoreAuthzCheck(opCtx->getClient(), nsString, cursorid, status.code());
         uassertStatusOK(status);
 
         while (MONGO_FAIL_POINT(rsStopGetMore)) {
             sleepmillis(0);
         }
 
-        dbresponse.response = getMore(txn, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
+        dbresponse.response =
+            getMore(opCtx, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
     } catch (AssertionException& e) {
         if (isCursorAuthorized) {
             // If a cursor with id 'cursorid' was authorized, it may have been advanced
@@ -441,7 +480,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
             // because it may now be out of sync with the client's iteration state.
             // SERVER-7952
             // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-            CursorManager::eraseCursorGlobal(txn, cursorid);
+            CursorManager::eraseCursorGlobal(opCtx, cursorid);
         }
 
         BSONObjBuilder err;
@@ -450,48 +489,43 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
 
         curop.debug().exceptionInfo = e.getInfo();
 
-        replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
+        dbresponse = replyToQuery(errObj, ResultFlag_ErrSet);
         curop.debug().responseLength = dbresponse.response.header().dataLen();
         curop.debug().nreturned = 1;
-        return false;
+        *shouldLogOpDebug = true;
+        return dbresponse;
     }
 
     curop.debug().responseLength = dbresponse.response.header().dataLen();
     auto queryResult = QueryResult::ConstView(dbresponse.response.buf());
     curop.debug().nreturned = queryResult.getNReturned();
 
-    dbresponse.responseToMsgId = m.header().getId();
-
     if (exhaust) {
         curop.debug().exhaust = true;
         dbresponse.exhaustNS = ns;
     }
 
-    return true;
+    return dbresponse;
 }
 
 }  // namespace
 
-// Returns false when request includes 'end'
-void assembleResponse(OperationContext* txn,
-                      Message& m,
-                      DbResponse& dbresponse,
-                      const HostAndPort& remote) {
+DbResponse assembleResponse(OperationContext* opCtx, const Message& m, const HostAndPort& remote) {
     // before we lock...
     NetworkOp op = m.operation();
     bool isCommand = false;
 
     DbMessage dbmsg(m);
 
-    Client& c = *txn->getClient();
+    Client& c = *opCtx->getClient();
     if (c.isInDirectClient()) {
-        invariant(!txn->lockState()->inAWriteUnitOfWork());
+        invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     } else {
         LastError::get(c).startRequest();
-        AuthorizationSession::get(c)->startRequest(txn);
+        AuthorizationSession::get(c)->startRequest(opCtx);
 
         // We should not be holding any locks at this point
-        invariant(!txn->lockState()->isLocked());
+        invariant(!opCtx->lockState()->isLocked());
     }
 
     const char* ns = dbmsg.messageShouldHaveNs() ? dbmsg.getns() : NULL;
@@ -507,32 +541,29 @@ void assembleResponse(OperationContext* txn,
             opwrite(m);
 
             if (nsString.coll() == "$cmd.sys.inprog") {
-                receivedPseudoCommand(txn, c, dbresponse, m, "currentOp");
-                return;
+                return receivedPseudoCommand(opCtx, c, m, "currentOp");
             }
             if (nsString.coll() == "$cmd.sys.killop") {
-                receivedPseudoCommand(txn, c, dbresponse, m, "killOp");
-                return;
+                return receivedPseudoCommand(opCtx, c, m, "killOp");
             }
             if (nsString.coll() == "$cmd.sys.unlock") {
-                receivedPseudoCommand(txn, c, dbresponse, m, "fsyncUnlock");
-                return;
+                return receivedPseudoCommand(opCtx, c, m, "fsyncUnlock");
             }
         } else {
             opread(m);
         }
     } else if (op == dbGetMore) {
         opread(m);
-    } else if (op == dbCommand) {
+    } else if (op == dbCommand || op == dbMsg) {
         isCommand = true;
         opwrite(m);
     } else {
         opwrite(m);
     }
 
-    CurOp& currentOp = *CurOp::get(txn);
+    CurOp& currentOp = *CurOp::get(opCtx);
     {
-        stdx::lock_guard<Client> lk(*txn->getClient());
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         // Commands handling code will reset this if the operation is a command
         // which is logically a basic CRUD operation like query, insert, etc.
         currentOp.setNetworkOp_inlock(op);
@@ -544,38 +575,23 @@ void assembleResponse(OperationContext* txn,
     long long logThresholdMs = serverGlobalParams.slowMS;
     bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
 
+    DbResponse dbresponse;
     if (op == dbQuery) {
-        if (isCommand) {
-            receivedCommand(txn, nsString, c, dbresponse, m);
-        } else {
-            receivedQuery(txn, nsString, c, dbresponse, m);
-        }
-    } else if (op == dbCommand) {
-        receivedRpc(txn, c, dbresponse, m);
-    } else if (op == dbGetMore) {
-        if (!receivedGetMore(txn, dbresponse, m, currentOp))
-            shouldLogOpDebug = true;
+        dbresponse = isCommand ? receivedCommand(opCtx, nsString, c, m)
+                               : receivedQuery(opCtx, nsString, c, m);
     } else if (op == dbMsg) {
-        // deprecated - replaced by commands
-        const char* p = dbmsg.getns();
-
-        int len = strlen(p);
-        if (len > 400)
-            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len;
-
-        if (strcmp("end", p) == 0)
-            dbresponse.response.setData(opReply, "dbMsg end no longer supported");
-        else
-            dbresponse.response.setData(opReply, "i am fine - dbMsg deprecated");
-
-        dbresponse.responseToMsgId = m.header().getId();
+        dbresponse = receivedMsg(opCtx, c, m);
+    } else if (op == dbCommand) {
+        dbresponse = receivedRpc(opCtx, c, m);
+    } else if (op == dbGetMore) {
+        dbresponse = receivedGetMore(opCtx, m, currentOp, &shouldLogOpDebug);
     } else {
         // The remaining operations do not return any response. They are fire-and-forget.
         try {
             if (op == dbKillCursors) {
                 currentOp.ensureStarted();
                 logThresholdMs = 10;
-                receivedKillCursors(txn, m);
+                receivedKillCursors(opCtx, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
                 log() << "    operation isn't supported: " << static_cast<int>(op);
                 currentOp.done();
@@ -597,11 +613,11 @@ void assembleResponse(OperationContext* txn,
                 if (!nsString.isValid()) {
                     uassert(16257, str::stream() << "Invalid ns [" << ns << "]", false);
                 } else if (op == dbInsert) {
-                    receivedInsert(txn, nsString, m);
+                    receivedInsert(opCtx, nsString, m);
                 } else if (op == dbUpdate) {
-                    receivedUpdate(txn, nsString, m);
+                    receivedUpdate(opCtx, nsString, m);
                 } else if (op == dbDelete) {
-                    receivedDelete(txn, nsString, m);
+                    receivedDelete(opCtx, nsString, m);
                 } else {
                     invariant(false);
                 }
@@ -624,9 +640,9 @@ void assembleResponse(OperationContext* txn,
     debug.executionTimeMicros = currentOp.totalTimeMicros();
 
     logThresholdMs += currentOp.getExpectedLatencyMs();
-    Top::get(txn->getServiceContext())
+    Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(
-            txn, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
+            opCtx, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
 
     const bool shouldSample = serverGlobalParams.sampleRate == 1.0
         ? true
@@ -634,13 +650,13 @@ void assembleResponse(OperationContext* txn,
 
     if (shouldLogOpDebug || (shouldSample && debug.executionTimeMicros > logThresholdMs * 1000LL)) {
         Locker::LockerInfo lockerInfo;
-        txn->lockState()->getLockerInfo(&lockerInfo);
+        opCtx->lockState()->getLockerInfo(&lockerInfo);
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
-    if (shouldSample && currentOp.shouldDBProfile()) {
+    if (currentOp.shouldDBProfile(shouldSample)) {
         // Performance profiling is on
-        if (txn->lockState()->isReadLocked()) {
+        if (opCtx->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";
         } else if (lockedForWriting()) {
             // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
@@ -649,11 +665,12 @@ void assembleResponse(OperationContext* txn,
         } else if (storageGlobalParams.readOnly) {
             LOG(1) << "note: not profiling because server is read-only";
         } else {
-            profile(txn, op);
+            profile(opCtx, op);
         }
     }
 
-    recordCurOpMetrics(txn);
+    recordCurOpMetrics(opCtx);
+    return dbresponse;
 }
 
 }  // namespace mongo

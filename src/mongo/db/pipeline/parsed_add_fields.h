@@ -51,7 +51,8 @@ namespace parsed_aggregation_projection {
  */
 class ParsedAddFields : public ParsedAggregationProjection {
 public:
-    ParsedAddFields() : ParsedAggregationProjection(), _root(new InclusionNode()) {}
+    ParsedAddFields(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ParsedAggregationProjection(expCtx), _root(new InclusionNode()) {}
 
     /**
      * Creates the data needed to perform an AddFields.
@@ -68,14 +69,9 @@ public:
     /**
      * Parses the addFields specification given by 'spec', populating internal data structures.
      */
-    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) final {
-        VariablesIdGenerator idGenerator;
-        VariablesParseState variablesParseState(&idGenerator);
-        parse(expCtx, spec, variablesParseState);
-        _variables = stdx::make_unique<Variables>(idGenerator.getIdCount());
-    }
+    void parse(const BSONObj& spec) final;
 
-    Document serialize(bool explain = false) const final {
+    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         _root->serialize(&output, explain);
         return output.freeze();
@@ -95,8 +91,11 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> computedPaths;
-        _root->addComputedPaths(&computedPaths);
-        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(computedPaths)};
+        StringMap<std::string> renamedPaths;
+        _root->addComputedPaths(&computedPaths, &renamedPaths);
+        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet,
+                std::move(computedPaths),
+                std::move(renamedPaths)};
     }
 
     /**
@@ -111,21 +110,9 @@ public:
      * in the array "a". If there is an element in "a" that is not an object, it will be replaced
      * with {"0": "hello"}. See SERVER-25200 for more details.
      */
-    Document applyProjection(Document inputDoc) const final {
-        _variables->setRoot(inputDoc);
-        return applyProjection(inputDoc, _variables.get());
-    }
-
-    Document applyProjection(Document inputDoc, Variables* vars) const;
+    Document applyProjection(const Document& inputDoc) const final;
 
 private:
-    /**
-     * Parses 'spec' to determine which fields to add.
-     */
-    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-               const BSONObj& spec,
-               const VariablesParseState& variablesParseState);
-
     /**
      * Attempts to parse 'objSpec' as an expression like {$add: [...]}. Adds a computed field to
      * '_root' and returns true if it was successfully parsed as an expression. Returns false if it
@@ -134,8 +121,7 @@ private:
      * Throws an error if it was determined to be an expression specification, but failed to parse
      * as a valid expression.
      */
-    bool parseObjectAsExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 StringData pathToObject,
+    bool parseObjectAsExpression(StringData pathToObject,
                                  const BSONObj& objSpec,
                                  const VariablesParseState& variablesParseState);
 
@@ -143,17 +129,12 @@ private:
      * Traverses 'subObj' and parses each field. Adds any computed fields at this level
      * to 'node'.
      */
-    void parseSubObject(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        const BSONObj& subObj,
+    void parseSubObject(const BSONObj& subObj,
                         const VariablesParseState& variablesParseState,
                         InclusionNode* node);
 
     // The InclusionNode tree does most of the execution work once constructed.
     std::unique_ptr<InclusionNode> _root;
-
-    // This is needed to give the expressions knowledge about the context in which they are being
-    // executed.
-    std::unique_ptr<Variables> _variables;
 };
 }  // namespace parsed_aggregation_projection
 }  // namespace mongo

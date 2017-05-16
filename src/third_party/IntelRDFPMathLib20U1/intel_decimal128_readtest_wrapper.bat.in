@@ -1,0 +1,2 @@
+@REM Wrapper to invoke correct python interpreter on Windows
+@readtest_python_interpreter@ %~dp0\intel_decimal128_readtest_wrapper.py

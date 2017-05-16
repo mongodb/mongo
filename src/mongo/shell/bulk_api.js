@@ -683,6 +683,11 @@ var _bulk_api_module = (function() {
                     document.collation = currentOp.collation;
                 }
 
+                // Copy over the arrayFilters, if we have them.
+                if (currentOp.hasOwnProperty('arrayFilters')) {
+                    document.arrayFilters = currentOp.arrayFilters;
+                }
+
                 // Clear out current Op
                 currentOp = null;
                 // Add the update document to the list
@@ -701,6 +706,11 @@ var _bulk_api_module = (function() {
                 // Copy over the collation, if we have one.
                 if (currentOp.hasOwnProperty('collation')) {
                     document.collation = currentOp.collation;
+                }
+
+                // Copy over the arrayFilters, if we have them.
+                if (currentOp.hasOwnProperty('arrayFilters')) {
+                    document.arrayFilters = currentOp.arrayFilters;
                 }
 
                 // Clear out current Op
@@ -765,6 +775,21 @@ var _bulk_api_module = (function() {
                 }
 
                 currentOp.collation = collationSpec;
+                return findOperations;
+            },
+
+            arrayFilters: function(filters) {
+                if (!collection.getMongo().hasWriteCommands()) {
+                    throw new Error(
+                        "cannot use arrayFilters if server does not support write commands");
+                }
+
+                if (collection.getMongo().writeMode() !== "commands") {
+                    throw new Error("write mode must be 'commands' in order to use arrayFilters, " +
+                                    "but found write mode: " + collection.getMongo().writeMode());
+                }
+
+                currentOp.arrayFilters = filters;
                 return findOperations;
             },
         };

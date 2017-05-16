@@ -54,12 +54,12 @@ using fts::FTSSpec;
 
 const char* TextOrStage::kStageType = "TEXT_OR";
 
-TextOrStage::TextOrStage(OperationContext* txn,
+TextOrStage::TextOrStage(OperationContext* opCtx,
                          const FTSSpec& ftsSpec,
                          WorkingSet* ws,
                          const MatchExpression* filter,
                          IndexDescriptor* index)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _ftsSpec(ftsSpec),
       _ws(ws),
       _scoreIterator(_scores.end()),
@@ -99,7 +99,7 @@ void TextOrStage::doReattachToOperationContext() {
         _recordCursor->reattachToOperationContext(getOpCtx());
 }
 
-void TextOrStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void TextOrStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // Remove the RecordID from the ScoreMap.
     ScoreMap::iterator scoreIt = _scores.find(dl);
     if (scoreIt != _scores.end()) {
@@ -256,13 +256,13 @@ PlanStage::StageState TextOrStage::returnResults(WorkingSetID* out) {
  */
 class TextMatchableDocument : public MatchableDocument {
 public:
-    TextMatchableDocument(OperationContext* txn,
+    TextMatchableDocument(OperationContext* opCtx,
                           const BSONObj& keyPattern,
                           const BSONObj& key,
                           WorkingSet* ws,
                           WorkingSetID id,
                           unowned_ptr<SeekableRecordCursor> recordCursor)
-        : _txn(txn),
+        : _opCtx(opCtx),
           _recordCursor(recordCursor),
           _keyPattern(keyPattern),
           _key(key),
@@ -308,7 +308,7 @@ public:
 
 private:
     BSONObj getObj() const {
-        if (!WorkingSetCommon::fetchIfUnfetched(_txn, _ws, _id, _recordCursor))
+        if (!WorkingSetCommon::fetchIfUnfetched(_opCtx, _ws, _id, _recordCursor))
             throw DocumentDeletedException();
 
         WorkingSetMember* member = _ws->get(_id);
@@ -318,7 +318,7 @@ private:
         return member->obj.value();
     }
 
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     unowned_ptr<SeekableRecordCursor> _recordCursor;
     BSONObj _keyPattern;
     BSONObj _key;

@@ -83,7 +83,7 @@ public:
     }
 
     static StringData fieldName() {
-        return "configsvr";
+        return "$configServerState";
     }
 
 private:

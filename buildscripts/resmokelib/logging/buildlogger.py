@@ -7,7 +7,6 @@ from __future__ import absolute_import
 import functools
 
 from . import handlers
-from . import loggers
 from .. import config as _config
 
 
@@ -20,6 +19,9 @@ _BUILDLOGGER_CONFIG = "mci.buildlogger"
 
 _SEND_AFTER_LINES = 2000
 _SEND_AFTER_SECS = 10
+
+# Initialized by resmokelib.logging.loggers.configure_loggers()
+BUILDLOGGER_FALLBACK = None
 
 
 def _log_on_error(func):
@@ -36,83 +38,10 @@ def _log_on_error(func):
         try:
             return func(*args, **kwargs)
         except:
-            loggers._BUILDLOGGER_FALLBACK.exception("Encountered an error.")
+            BUILDLOGGER_FALLBACK.exception("Encountered an error.")
         return None
 
     return wrapper
-
-@_log_on_error
-def get_config():
-    """
-    Returns the buildlogger configuration as evaluated from the
-    _BUILDLOGGER_CONFIG file.
-    """
-
-    tmp_globals = {}  # Avoid conflicts with variables defined in 'config_file'.
-    config = {}
-    execfile(_BUILDLOGGER_CONFIG, tmp_globals, config)
-
-    # Rename "slavename" to "username" if present.
-    if "slavename" in config and "username" not in config:
-        config["username"] = config["slavename"]
-        del config["slavename"]
-    # Rename "passwd" to "password" if present.
-    if "passwd" in config and "password" not in config:
-        config["password"] = config["passwd"]
-        del config["passwd"]
-
-    return config
-
-@_log_on_error
-def new_build_id(config):
-    """
-    Returns a new build id for sending global logs to.
-    """
-
-    if config is None:
-        return None
-
-    username = config["username"]
-    password = config["password"]
-    builder = config["builder"]
-    build_num = int(config["build_num"])
-
-    handler = handlers.HTTPHandler(
-        url_root=_config.BUILDLOGGER_URL,
-        username=username,
-        password=password)
-
-    response = handler.post(CREATE_BUILD_ENDPOINT, data={
-        "builder": builder,
-        "buildnum": build_num,
-        "task_id": _config.TASK_ID,
-    })
-
-    return response["id"]
-
-@_log_on_error
-def new_test_id(build_id, build_config, test_filename, test_command):
-    """
-    Returns a new test id for sending test logs to.
-    """
-
-    if build_id is None or build_config is None:
-        return None
-
-    handler = handlers.HTTPHandler(
-        url_root=_config.BUILDLOGGER_URL,
-        username=build_config["username"],
-        password=build_config["password"])
-
-    endpoint = CREATE_TEST_ENDPOINT % {"build_id": build_id}
-    response = handler.post(endpoint, data={
-        "test_filename": test_filename,
-        "command": test_command,
-        "phase": build_config.get("build_phase", "unknown"),
-        "task_id": _config.TASK_ID,
-    })
-
-    return response["id"]
 
 
 class _BaseBuildloggerHandler(handlers.BufferedHandler):
@@ -189,7 +118,7 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                 #       process_record() method if we ever decide to log the time when the
                 #       LogRecord was created, e.g. using %(asctime)s in
                 #       _fallback_buildlogger_handler().
-                loggers._BUILDLOGGER_FALLBACK.info(message)
+                BUILDLOGGER_FALLBACK.info(message)
             self.retry_buffer = []
 
 
@@ -263,3 +192,88 @@ class BuildloggerGlobalHandler(_BaseBuildloggerHandler):
         endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": self.build_id}
         response = self.post(endpoint, data=log_lines)
         return response is not None
+
+
+class BuildloggerServer(object):
+    """A remote server to which build logs can be sent.
+
+    It is used to retrieve handlers that can then be added to logger
+    instances to send the log to the servers.
+    """
+
+    @_log_on_error
+    def __init__(self):
+        tmp_globals = {}
+        self.config = {}
+        execfile(_BUILDLOGGER_CONFIG, tmp_globals, self.config)
+
+        # Rename "slavename" to "username" if present.
+        if "slavename" in self.config and "username" not in self.config:
+            self.config["username"] = self.config["slavename"]
+            del self.config["slavename"]
+
+        # Rename "passwd" to "password" if present.
+        if "passwd" in self.config and "password" not in self.config:
+            self.config["password"] = self.config["passwd"]
+            del self.config["passwd"]
+
+    @_log_on_error
+    def new_build_id(self, suffix):
+        """
+        Returns a new build id for sending global logs to.
+        """
+        username = self.config["username"]
+        password = self.config["password"]
+        builder = "%s_%s" % (self.config["builder"], suffix)
+        build_num = int(self.config["build_num"])
+
+        handler = handlers.HTTPHandler(
+            url_root=_config.BUILDLOGGER_URL,
+            username=username,
+            password=password)
+
+        response = handler.post(CREATE_BUILD_ENDPOINT, data={
+            "builder": builder,
+            "buildnum": build_num,
+            "task_id": _config.TASK_ID,
+        })
+
+        return response["id"]
+
+    @_log_on_error
+    def new_test_id(self, build_id, test_filename, test_command):
+        """
+        Returns a new test id for sending test logs to.
+        """
+        handler = handlers.HTTPHandler(
+            url_root=_config.BUILDLOGGER_URL,
+            username=self.config["username"],
+            password=self.config["password"])
+
+        endpoint = CREATE_TEST_ENDPOINT % {"build_id": build_id}
+        response = handler.post(endpoint, data={
+            "test_filename": test_filename,
+            "command": test_command,
+            "phase": self.config.get("build_phase", "unknown"),
+            "task_id": _config.TASK_ID,
+        })
+
+        return response["id"]
+
+    def get_global_handler(self, build_id, handler_info):
+        return BuildloggerGlobalHandler(build_id, self.config, **handler_info)
+
+    def get_test_handler(self, build_id, test_id, handler_info):
+        return BuildloggerTestHandler(build_id, self.config, test_id, **handler_info)
+
+    @staticmethod
+    def get_build_log_url(build_id):
+        base_url = _config.BUILDLOGGER_URL.rstrip("/")
+        endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
+        return "%s/%s" % (base_url, endpoint.strip("/"))
+
+    @staticmethod
+    def get_test_log_url(build_id, test_id):
+        base_url = _config.BUILDLOGGER_URL.rstrip("/")
+        endpoint = APPEND_TEST_LOGS_ENDPOINT % {"build_id": build_id, "test_id": test_id}
+        return "%s/%s" % (base_url, endpoint.strip("/"))

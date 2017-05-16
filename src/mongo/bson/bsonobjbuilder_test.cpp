@@ -26,26 +26,16 @@
  *    it in the license file.
  */
 
-/**
- * tests for BSONObjBuilder
- */
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-
 #include "mongo/unittest/unittest.h"
-#include <sstream>
 
 namespace mongo {
 namespace {
 
-using mongo::BSONElement;
-using mongo::BSONObj;
-using mongo::BSONObjBuilder;
-using mongo::BSONType;
-using mongo::BufBuilder;
 using std::string;
-using std::stringstream;
 
 const long long maxEncodableInt = (1 << 30) - 1;
 const long long minEncodableInt = -maxEncodableInt;
@@ -65,7 +55,7 @@ const long long minLongLong = (std::numeric_limits<long long>::min)();
 template <typename T>
 void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
     if (expected != actual) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "incorrect type in bson object for " << (i + 1) << "-th test value " << value
            << ". actual: " << mongo::typeName(actual)
            << "; expected: " << mongo::typeName(expected);
@@ -74,7 +64,7 @@ void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
     }
 }
 
-TEST(BSONObjBuilder, AppendInt64T) {
+TEST(BSONObjBuilderTest, AppendInt64T) {
     auto obj = BSON("a" << int64_t{5} << "b" << int64_t{1ll << 40});
     ASSERT_EQ(obj["a"].type(), NumberLong);
     ASSERT_EQ(obj["b"].type(), NumberLong);
@@ -331,5 +321,50 @@ TEST(BSONObjBuilderTest, ResetToEmptyForNestedBuilderOnlyResetsInnerObj) {
     ASSERT_BSONOBJ_EQ(BSON("a" << 3 << "nestedObj" << BSONObj()), bob.obj());
 }
 
-}  // unnamed namespace
+TEST(BSONObjBuilderTest, MovingAnOwningBSONObjBuilderWorks) {
+    BSONObjBuilder initial;
+    initial.append("a", 1);
+
+    BSONObjBuilder bob(std::move(initial));
+    ASSERT(bob.owned());
+    bob.append("b", 2);
+    bob << "c" << 3;
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "b" << 2 << "c" << 3));
+}
+
+TEST(BSONObjBuilderTest, MovingANonOwningBSONObjBuilderWorks) {
+    BSONObjBuilder outer;
+    {
+        BSONObjBuilder initial(outer.subobjStart("nested"));
+        initial.append("a", 1);
+
+        BSONObjBuilder bob(std::move(initial));
+        ASSERT(!bob.owned());
+        ASSERT_EQ(&bob.bb(), &outer.bb());
+
+        bob.append("b", 2);
+        bob << "c" << 3;
+    }
+
+    ASSERT_BSONOBJ_EQ(outer.obj(), BSON("nested" << BSON("a" << 1 << "b" << 2 << "c" << 3)));
+}
+
+TEST(BSONArrayBuilderTest, MovingABSONArrayBuilderWorks) {
+    BSONObjBuilder bob;
+    bob.append("a", 1);
+
+    BSONArrayBuilder initial(bob.subarrayStart("array"));
+    initial.append(1);
+    initial << "2";
+
+    BSONArrayBuilder moved(std::move(initial));
+    moved.append(3);
+    moved << "4";
+
+    moved.done();
+
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "array" << BSON_ARRAY(1 << "2" << 3 << "4")));
+}
+
+}  // namespace
 }  // namespace mongo

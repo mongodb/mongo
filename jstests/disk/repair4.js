@@ -32,7 +32,6 @@ if (doIt) {
         smallfiles: "",
         dbpath: smallpath,
         repairpath: repairpath,
-        nohttpinterface: "",
         bind_ip: "127.0.0.1",
     });
 

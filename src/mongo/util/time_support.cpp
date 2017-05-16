@@ -57,10 +57,6 @@ extern "C" time_t timegm(struct tm* const tmp);
 
 namespace mongo {
 
-Date_t Date_t::max() {
-    return fromMillisSinceEpoch(std::numeric_limits<long long>::max());
-}
-
 Date_t Date_t::now() {
     return fromMillisSinceEpoch(curTimeMillis64());
 }

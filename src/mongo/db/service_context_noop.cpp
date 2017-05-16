@@ -67,8 +67,9 @@ StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
     return new EmptySFI();
 }
 
-std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client, unsigned opId) {
-    return stdx::make_unique<OperationContextNoop>(client, opId);
+std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(
+    Client* client, unsigned opId, boost::optional<LogicalSessionId> lsid) {
+    return stdx::make_unique<OperationContextNoop>(client, opId, std::move(lsid));
 }
 
 void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {}

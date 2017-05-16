@@ -95,15 +95,14 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 
-        AutoGetCollectionForRead ctx(txn, nss);
+        AutoGetCollectionForReadCommand ctx(opCtx, nss);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
@@ -112,7 +111,7 @@ public:
         }
 
         vector<IndexDescriptor*> idxs;
-        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_HAYSTACK, idxs);
+        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_HAYSTACK, idxs);
         if (idxs.size() == 0) {
             errmsg = "no geoSearch index";
             return false;
@@ -137,7 +136,7 @@ public:
         IndexDescriptor* desc = idxs[0];
         HaystackAccessMethod* ham =
             static_cast<HaystackAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
-        ham->searchCommand(txn,
+        ham->searchCommand(opCtx,
                            collection,
                            nearElt.Obj(),
                            maxDistance.numberDouble(),

@@ -107,7 +107,7 @@ void BSONInfo::make(
     auto scope = getScope(cx);
 
     scope->getProto<BSONInfo>().newObject(obj);
-    JS_SetPrivate(obj, new BSONHolder(bson, parent, scope->getGeneration(), ro));
+    JS_SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope->getGeneration(), ro));
 }
 
 void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
@@ -116,7 +116,7 @@ void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     if (!holder)
         return;
 
-    delete holder;
+    getScope(fop)->trackedDelete(holder);
 }
 
 void BSONInfo::enumerate(JSContext* cx,

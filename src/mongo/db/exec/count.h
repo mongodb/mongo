@@ -71,7 +71,7 @@ struct CountStageParams {
  */
 class CountStage final : public PlanStage {
 public:
-    CountStage(OperationContext* txn,
+    CountStage(OperationContext* opCtx,
                Collection* collection,
                CountStageParams params,
                WorkingSet* ws,

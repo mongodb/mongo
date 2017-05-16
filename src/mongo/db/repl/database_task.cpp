@@ -41,16 +41,15 @@ namespace repl {
 // static
 DatabaseTask::Task DatabaseTask::makeGlobalExclusiveLockTask(const Task& task) {
     invariant(task);
-    DatabaseTask::Task newTask = [task](OperationContext* txn, const Status& status) {
+    DatabaseTask::Task newTask = [task](OperationContext* opCtx, const Status& status) {
         if (!status.isOK()) {
-            return task(txn, status);
+            return task(opCtx, status);
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lock(txn->lockState());
-            return task(txn, status);
+            Lock::GlobalWrite lock(opCtx);
+            return task(opCtx, status);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "globalExclusiveLockTask", "global");
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "globalExclusiveLockTask", "global");
         MONGO_UNREACHABLE;
     };
     return newTask;
@@ -61,17 +60,15 @@ DatabaseTask::Task DatabaseTask::makeDatabaseLockTask(const Task& task,
                                                       const std::string& databaseName,
                                                       LockMode mode) {
     invariant(task);
-    DatabaseTask::Task newTask = [=](OperationContext* txn, const Status& status) {
+    DatabaseTask::Task newTask = [=](OperationContext* opCtx, const Status& status) {
         if (!status.isOK()) {
-            return task(txn, status);
+            return task(opCtx, status);
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            LockMode permissiveLockMode = isSharedLockMode(mode) ? MODE_IS : MODE_IX;
-            ScopedTransaction transaction(txn, permissiveLockMode);
-            Lock::DBLock lock(txn->lockState(), databaseName, mode);
-            return task(txn, status);
+            Lock::DBLock lock(opCtx, databaseName, mode);
+            return task(opCtx, status);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "databaseLockTask", databaseName);
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "databaseLockTask", databaseName);
         MONGO_UNREACHABLE;
     };
     return newTask;
@@ -82,18 +79,17 @@ DatabaseTask::Task DatabaseTask::makeCollectionLockTask(const Task& task,
                                                         const NamespaceString& nss,
                                                         LockMode mode) {
     invariant(task);
-    DatabaseTask::Task newTask = [=](OperationContext* txn, const Status& status) {
+    DatabaseTask::Task newTask = [=](OperationContext* opCtx, const Status& status) {
         if (!status.isOK()) {
-            return task(txn, status);
+            return task(opCtx, status);
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             LockMode permissiveLockMode = isSharedLockMode(mode) ? MODE_IS : MODE_IX;
-            ScopedTransaction transaction(txn, permissiveLockMode);
-            Lock::DBLock lock(txn->lockState(), nss.db(), permissiveLockMode);
-            Lock::CollectionLock collectionLock(txn->lockState(), nss.toString(), mode);
-            return task(txn, status);
+            Lock::DBLock lock(opCtx, nss.db(), permissiveLockMode);
+            Lock::CollectionLock collectionLock(opCtx->lockState(), nss.toString(), mode);
+            return task(opCtx, status);
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "collectionLockTask", nss.toString());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "collectionLockTask", nss.toString());
         MONGO_UNREACHABLE;
     };
     return newTask;

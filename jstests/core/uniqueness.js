@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of not being able to create unique index
+// using hashed shard key pattern.
+// @tags: [cannot_create_unique_index_when_using_hashed_shard_key]
+
 var res;
 
 t = db.jstests_uniqueness;

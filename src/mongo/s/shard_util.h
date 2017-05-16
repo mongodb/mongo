@@ -58,7 +58,7 @@ namespace shardutil {
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the total shard size could not be retrieved
  */
-StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId);
+StatusWith<long long> retrieveTotalShardSize(OperationContext* opCtx, const ShardId& shardId);
 
 /**
  * Ask the specified shard to figure out the split points for a given chunk.
@@ -71,7 +71,7 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardI
  * maxObjs Limits the number of objects in each chunk. Zero means max, unspecified means use the
  *         server default.
  */
-StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
+StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
                                                         const ShardId& shardId,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
@@ -92,7 +92,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
  * splitPoints The set of points at which the chunk should be split.
  */
 StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ShardId& shardId,
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,

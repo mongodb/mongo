@@ -1,17 +1,11 @@
 // Check that doing updates done during a migrate all go to the right place
 (function() {
 
-    var s = new ShardingTest({
-        name: "slow_sharding_balance4",
-        shards: 2,
-        mongos: 1,
-        other: {chunkSize: 1, enableAutoSplit: true}
-    });
+    var s = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
-    s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
-    s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
-    assert.eq(1, s.config.chunks.count(), "setup1");
+    assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
+    s.ensurePrimaryShard('test', s.shard1.shardName);
+    assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 
     s.config.settings.find().forEach(printjson);
 
@@ -51,9 +45,9 @@
     }
 
     Random.setRandomSeed();
+
     // Initially update all documents from 1 to N, otherwise later checks can fail because no
-    // document
-    // previously existed
+    // document previously existed
     var bulk = db.foo.initializeUnorderedBulkOp();
     for (i = 0; i < N; i++) {
         doUpdate(bulk, true, i);
@@ -108,21 +102,44 @@
         return true;
     }
 
+    var consecutiveNoProgressMadeErrors = 0;
+
     function diff1() {
         jsTest.log("Running diff1...");
 
-        bulk = db.foo.initializeUnorderedBulkOp();
+        var bulk = db.foo.initializeUnorderedBulkOp();
         var myid = doUpdate(bulk, false);
-        var res = assert.writeOK(bulk.execute());
+        var res = bulk.execute();
 
-        assert.eq(1,
-                  res.nModified,
-                  "diff myid: " + myid + " 2: " + res.toString() + "\n" + " correct count is: " +
-                      counts[myid] + " db says count is: " + tojson(db.foo.findOne({_id: myid})));
+        assert(res instanceof BulkWriteResult,
+               'Result from bulk.execute should be of type BulkWriteResult');
+        if (res.hasWriteErrors()) {
+            res.writeErrors.forEach(function(err) {
+                // Ignore up to 3 consecutive NoProgressMade errors for the cases where migration
+                // might be going faster than the writes are executing
+                if (err.code == ErrorCodes.NoProgressMade) {
+                    consecutiveNoProgressMadeErrors++;
+                    if (consecutiveNoProgressMadeErrors < 3) {
+                        return;
+                    }
+                }
+
+                assert.writeOK(res);
+            });
+        } else {
+            consecutiveNoProgressMadeErrors = 0;
+
+            assert.eq(1,
+                      res.nModified,
+                      "diff myid: " + myid + " 2: " + res.toString() + "\n" +
+                          " correct count is: " + counts[myid] + " db says count is: " +
+                          tojson(db.foo.findOne({_id: myid})));
+        }
 
         var x = s.chunkCounts("foo");
         if (Math.random() > .999)
             printjson(x);
+
         return Math.max(x.shard0000, x.shard0001) - Math.min(x.shard0000, x.shard0001);
     }
 
@@ -137,5 +154,4 @@
     }, "balance didn't happen", 1000 * 60 * 20, 1);
 
     s.stop();
-
 })();

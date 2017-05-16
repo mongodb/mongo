@@ -40,7 +40,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
@@ -92,10 +92,10 @@ bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
     }
 }
 
-void ShardLocal::_updateLastOpTimeFromClient(OperationContext* txn,
+void ShardLocal::_updateLastOpTimeFromClient(OperationContext* opCtx,
                                              const repl::OpTime& previousOpTimeOnClient) {
     repl::OpTime lastOpTimeFromClient =
-        repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     invariant(lastOpTimeFromClient >= previousOpTimeOnClient);
     if (lastOpTimeFromClient.isNull() || lastOpTimeFromClient == previousOpTimeOnClient) {
         return;
@@ -115,61 +115,58 @@ repl::OpTime ShardLocal::_getLastOpTime() {
     return _lastOpTime;
 }
 
-Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* txn,
-                                                const ReadPreferenceSetting& unused,
-                                                const std::string& dbName,
-                                                Milliseconds maxTimeMSOverrideUnused,
-                                                const BSONObj& cmdObj) {
+StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,
+                                                           const ReadPreferenceSetting& unused,
+                                                           const std::string& dbName,
+                                                           Milliseconds maxTimeMSOverrideUnused,
+                                                           const BSONObj& cmdObj) {
     repl::OpTime currentOpTimeFromClient =
-        repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-    ON_BLOCK_EXIT([this, &txn, &currentOpTimeFromClient] {
-        _updateLastOpTimeFromClient(txn, currentOpTimeFromClient);
+        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    ON_BLOCK_EXIT([this, &opCtx, &currentOpTimeFromClient] {
+        _updateLastOpTimeFromClient(opCtx, currentOpTimeFromClient);
     });
 
     try {
-        DBDirectClient client(txn);
+        DBDirectClient client(opCtx);
+
         rpc::UniqueReply commandResponse = client.runCommandWithMetadata(
             dbName, cmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), cmdObj);
-        BSONObj responseReply = commandResponse->getCommandReply().getOwned();
-        BSONObj responseMetadata = commandResponse->getMetadata().getOwned();
 
-        Status commandStatus = getStatusFromCommandResult(responseReply);
-        Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseReply);
-
-        return Shard::HostWithResponse(boost::none,
-                                       Shard::CommandResponse{std::move(responseReply),
-                                                              std::move(responseMetadata),
-                                                              std::move(commandStatus),
-                                                              std::move(writeConcernStatus)});
+        auto result = commandResponse->getCommandReply().getOwned();
+        return Shard::CommandResponse(boost::none,
+                                      result,
+                                      commandResponse->getMetadata().getOwned(),
+                                      getStatusFromCommandResult(result),
+                                      getWriteConcernStatusFromCommandResult(result));
     } catch (const DBException& ex) {
-        return Shard::HostWithResponse(boost::none, ex.toStatus());
+        return ex.toStatus();
     }
 }
 
 StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto replCoord = repl::ReplicationCoordinator::get(txn);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
         // Set up operation context with majority read snapshot so correct optime can be retrieved.
-        Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        Status status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
         // Wait for any writes performed by this ShardLocal instance to be committed and visible.
         Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
-            txn, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
+            opCtx, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
         if (!readConcernStatus.isOK()) {
             return readConcernStatus;
         }
 
         // Inform the storage engine to read from the committed snapshot for the rest of this
         // operation.
-        status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
         if (!status.isOK()) {
             return status;
         }
@@ -177,7 +174,7 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
         invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
     }
 
-    DBDirectClient client(txn);
+    DBDirectClient client(opCtx);
     Query fullQuery(query);
     if (!sort.isEmpty()) {
         fullQuery.sort(sort);
@@ -207,14 +204,14 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     }
 }
 
-Status ShardLocal::createIndexOnConfig(OperationContext* txn,
+Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
                                        const NamespaceString& ns,
                                        const BSONObj& keys,
                                        bool unique) {
     invariant(ns.db() == "config" || ns.db() == "admin");
 
     try {
-        DBDirectClient client(txn);
+        DBDirectClient client(opCtx);
         IndexSpec index;
         index.addKeys(keys);
         index.unique(unique);

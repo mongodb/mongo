@@ -53,15 +53,13 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_write.h"
-#include "mongo/s/config.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -70,16 +68,17 @@ namespace {
 /**
  * Constructs the BSON specification document for the given namespace, index key and options.
  */
-BSONObj createIndexDoc(const std::string& ns,
-                       const BSONObj& keys,
-                       const BSONObj& collation,
-                       bool unique) {
-    BSONObjBuilder indexDoc;
-    indexDoc.append("ns", ns);
-    indexDoc.append("key", keys);
+BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
+                             const BSONObj& keys,
+                             const BSONObj& collation,
+                             bool unique) {
+    BSONObjBuilder index;
+
+    // Required fields for an index.
+
+    index.append("key", keys);
 
     StringBuilder indexName;
-
     bool isFirstKey = true;
     for (BSONObjIterator keyIter(keys); keyIter.more();) {
         BSONElement currentKey = keyIter.next();
@@ -97,46 +96,27 @@ BSONObj createIndexDoc(const std::string& ns,
             indexName << currentKey.str();  // this should match up with shell command
         }
     }
+    index.append("name", indexName.str());
 
-    indexDoc.append("name", indexName.str());
+    // Index options.
 
     if (!collation.isEmpty()) {
         // Creating an index with the "collation" option requires a v=2 index.
-        indexDoc.append("v", static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-        indexDoc.append("collation", collation);
+        index.append("v", static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+        index.append("collation", collation);
     }
 
     if (unique && !IndexDescriptor::isIdIndexPattern(keys)) {
-        indexDoc.appendBool("unique", unique);
+        index.appendBool("unique", unique);
     }
 
-    return indexDoc.obj();
-}
+    // The outer createIndexes command.
 
-/**
- * Used only for writes to the config server, config and admin databases.
- */
-Status clusterCreateIndex(OperationContext* txn,
-                          const std::string& ns,
-                          const BSONObj& keys,
-                          const BSONObj& collation,
-                          bool unique) {
-    const NamespaceString nss(ns);
-
-    // Go through the shard insert path
-    std::unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
-    insert->addToDocuments(createIndexDoc(ns, keys, collation, unique));
-
-    BatchedCommandRequest request(insert.release());
-    request.setNS(NamespaceString(nss.getSystemIndexesCollection()));
-    request.setWriteConcern(WriteConcernOptions::Acknowledged);
-
-    BatchedCommandResponse response;
-
-    ClusterWriter writer(false, 0);
-    writer.write(txn, request, &response);
-
-    return response.toStatus();
+    BSONObjBuilder createIndexes;
+    createIndexes.append("createIndexes", nss.coll());
+    createIndexes.append("indexes", BSON_ARRAY(index.obj()));
+    createIndexes.append("writeConcern", WriteConcernOptions::Majority);
+    return createIndexes.obj();
 }
 
 class ShardCollectionCmd : public Command {
@@ -177,38 +157,34 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
+        auto shardCollRequest =
+            ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
-        auto const catalogClient = Grid::get(txn)->catalogClient(txn);
-        auto const shardRegistry = Grid::get(txn)->shardRegistry();
+        auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
-        auto scopedShardedDb = uassertStatusOK(ScopedShardDatabase::getExisting(txn, nss.db()));
-        const auto config = scopedShardedDb.db();
+        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
 
         // Ensure sharding is allowed on the database
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding not enabled for db " << nss.db(),
-                config->isShardingEnabled());
+                dbInfo.shardingEnabled());
+
+        auto routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
         // Ensure that the collection is not sharded already
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding already enabled for collection " << nss.ns(),
-                !config->isSharded(nss.ns()));
+                !routingInfo.cm());
 
-        // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj becomes
-        // corrupt as soon as the command ends.
-        BSONObj proposedKey = cmdObj.getObjectField("key").getOwned();
-        if (proposedKey.isEmpty()) {
-            errmsg = "no shard key";
-            return false;
-        }
-
+        auto proposedKey(shardCollRequest.getKey().getOwned());
         ShardKeyPattern proposedKeyPattern(proposedKey);
         if (!proposedKeyPattern.isValid()) {
             errmsg = str::stream() << "Unsupported shard key pattern. Pattern must"
@@ -219,7 +195,9 @@ public:
 
         bool isHashedShardKey = proposedKeyPattern.isHashedPattern();
 
-        if (isHashedShardKey && cmdObj["unique"].trueValue()) {
+        bool careAboutUnique = shardCollRequest.getUnique();
+
+        if (isHashedShardKey && careAboutUnique) {
             dassert(proposedKey.nFields() == 1);
 
             // it's possible to ensure uniqueness on the hashed field by
@@ -231,33 +209,25 @@ public:
 
         uassert(ErrorCodes::IllegalOperation, "can't shard system namespaces", !nss.isSystem());
 
+        // Ensure that the collation is valid. Currently we only allow the simple collation.
         bool simpleCollationSpecified = false;
-        {
-            BSONElement collationElement;
-            Status collationStatus =
-                bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
-            if (collationStatus.isOK()) {
-                // Ensure that the collation is valid. Currently we only allow the simple collation.
-                auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
-                                    ->makeFromBSON(collationElement.Obj());
-                if (!collator.getStatus().isOK()) {
-                    return appendCommandStatus(result, collator.getStatus());
-                }
-
-                if (collator.getValue()) {
-                    return appendCommandStatus(
-                        result,
-                        {ErrorCodes::BadValue,
-                         str::stream()
-                             << "The collation for shardCollection must be {locale: 'simple'}, "
-                             << "but found: "
-                             << collationElement.Obj()});
-                }
-
-                simpleCollationSpecified = true;
-            } else if (collationStatus != ErrorCodes::NoSuchKey) {
-                return appendCommandStatus(result, collationStatus);
+        if (shardCollRequest.getCollation()) {
+            auto& collation = *shardCollRequest.getCollation();
+            auto collator =
+                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
+            if (!collator.getStatus().isOK()) {
+                return appendCommandStatus(result, collator.getStatus());
             }
+            if (collator.getValue()) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::BadValue,
+                     str::stream()
+                         << "The collation for shardCollection must be {locale: 'simple'}, "
+                         << "but found: "
+                         << collation});
+            }
+            simpleCollationSpecified = true;
         }
 
         std::vector<ShardId> shardIds;
@@ -270,7 +240,7 @@ public:
         // danger of an OOM error.
         const int maxNumInitialChunksForShards = numShards * 8192;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = cmdObj["numInitialChunks"].numberInt();
+        int numChunks = shardCollRequest.getNumInitialChunks();
         if (numChunks > maxNumInitialChunksForShards || numChunks > maxNumInitialChunksTotal) {
             errmsg = str::stream()
                 << "numInitialChunks cannot be more than either: " << maxNumInitialChunksForShards
@@ -279,13 +249,8 @@ public:
         }
 
         // The rest of the checks require a connection to the primary db
-        const ConnectionString shardConnString = [&]() {
-            const auto shard =
-                uassertStatusOK(shardRegistry->getShard(txn, config->getPrimaryId()));
-            return shard->getConnString();
-        }();
-
-        ScopedDbConnection conn(shardConnString);
+        auto primaryShard = routingInfo.primary();
+        ScopedDbConnection conn(primaryShard->getConnString());
 
         // Retrieve the collection metadata in order to verify that it is legal to shard this
         // collection.
@@ -442,7 +407,6 @@ public:
         }
 
         // 3. If proposed key is required to be unique, additionally check for exact match.
-        bool careAboutUnique = cmdObj["unique"].trueValue();
 
         if (hasUsefulIndexForKey && careAboutUnique) {
             BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
@@ -500,13 +464,28 @@ public:
             //    receiving shard whenever a migrate occurs.
             //    If the collection has a default collation, explicitly send the simple
             //    collation as part of the createIndex request.
-            BSONObj collationArg =
+            BSONObj collation =
                 !defaultCollation.isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
-            Status status =
-                clusterCreateIndex(txn, nss.ns(), proposedKey, collationArg, careAboutUnique);
-            if (!status.isOK()) {
+
+            auto createIndexesCmd =
+                makeCreateIndexesCmd(nss, proposedKey, collation, careAboutUnique);
+
+            const auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                nss.db().toString(),
+                createIndexesCmd,
+                Shard::RetryPolicy::kNotIdempotent);
+            auto createIndexesStatus = swResponse.getStatus();
+            if (createIndexesStatus.isOK()) {
+                const auto response = swResponse.getValue();
+                createIndexesStatus = (!response.commandStatus.isOK())
+                    ? response.commandStatus
+                    : response.writeConcernStatus;
+            }
+            if (!createIndexesStatus.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
-                                       << "primary shard: " << status.reason();
+                                       << "primary shard: " << createIndexesStatus.reason();
                 conn.done();
                 return false;
             }
@@ -582,7 +561,7 @@ public:
 
         audit::logShardCollection(Client::getCurrent(), nss.ns(), proposedKey, careAboutUnique);
 
-        uassertStatusOK(catalogClient->shardCollection(txn,
+        uassertStatusOK(catalogClient->shardCollection(opCtx,
                                                        nss.ns(),
                                                        proposedShardKey,
                                                        defaultCollation,
@@ -590,23 +569,27 @@ public:
                                                        initSplits,
                                                        std::set<ShardId>{}));
 
-        // Make sure the cached metadata for the collection knows that we are now sharded
-        config->getChunkManager(txn, nss.ns(), true /* reload */);
-
         result << "collectionsharded" << nss.ns();
+
+        // Make sure the cached metadata for the collection knows that we are now sharded
+        catalogCache->invalidateShardedCollection(nss);
 
         // Only initially move chunks when using a hashed shard key
         if (isHashedShardKey && isEmpty) {
-            // Reload the new config info.  If we created more than one initial chunk, then
-            // we need to move them around to balance.
-            auto chunkManager = config->getChunkManager(txn, nss.ns(), true);
-            ChunkMap chunkMap = chunkManager->getChunkMap();
+            routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Collection was successfully written as sharded but got dropped before it "
+                    "could be evenly distributed",
+                    routingInfo.cm());
+            auto chunkManager = routingInfo.cm();
+
+            const auto chunkMap = chunkManager->chunkMap();
 
             // 2. Move and commit each "big chunk" to a different shard.
             int i = 0;
             for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i) {
                 const ShardId& shardId = shardIds[i % numShards];
-                const auto toStatus = shardRegistry->getShard(txn, shardId);
+                const auto toStatus = shardRegistry->getShard(opCtx, shardId);
                 if (!toStatus.isOK()) {
                     continue;
                 }
@@ -627,10 +610,10 @@ public:
                 chunkType.setVersion(chunkManager->getVersion());
 
                 Status moveStatus = configsvr_client::moveChunk(
-                    txn,
+                    opCtx,
                     chunkType,
                     to->getId(),
-                    Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+                    Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
                     MigrationSecondaryThrottleOptions::create(
                         MigrationSecondaryThrottleOptions::kOff),
                     true);
@@ -646,7 +629,13 @@ public:
             }
 
             // Reload the config info, after all the migrations
-            chunkManager = config->getChunkManager(txn, nss.ns(), true);
+            catalogCache->invalidateShardedCollection(nss);
+            routingInfo = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "Collection was successfully written as sharded but got dropped before it "
+                    "could be evenly distributed",
+                    routingInfo.cm());
+            chunkManager = routingInfo.cm();
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
@@ -658,7 +647,7 @@ public:
                 if (i == allSplits.size() || !currentChunk->containsKey(allSplits[i])) {
                     if (!subSplits.empty()) {
                         auto splitStatus = shardutil::splitChunkAtMultiplePoints(
-                            txn,
+                            opCtx,
                             currentChunk->getShardId(),
                             nss,
                             chunkManager->getShardKeyPattern(),
@@ -689,10 +678,6 @@ public:
                     subSplits.push_back(splitPoint);
                 }
             }
-
-            // Proactively refresh the chunk manager. Not really necessary, but this way it's
-            // immediately up-to-date the next time it's used.
-            config->getChunkManager(txn, nss.ns(), true);
         }
 
         return true;

@@ -56,9 +56,14 @@ enum class Protocol : std::uint64_t {
     kOpQuery = 1 << 0,
 
     /**
-     * The post-3.2 OP_COMMAND protocol.
+     * The 3.2-3.6 OP_COMMAND protocol.
      */
     kOpCommandV1 = 1 << 1,
+
+    /**
+     * The 3.6+ OP_MSG protocol.
+     */
+    kOpMsg = 1 << 2,
 };
 
 /**
@@ -74,19 +79,20 @@ namespace supports {
 const ProtocolSet kNone = ProtocolSet{0};
 const ProtocolSet kOpQueryOnly = static_cast<ProtocolSet>(Protocol::kOpQuery);
 const ProtocolSet kOpCommandOnly = static_cast<ProtocolSet>(Protocol::kOpCommandV1);
-const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly;
+const ProtocolSet kOpMsgOnly = static_cast<ProtocolSet>(Protocol::kOpMsg);
+const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly | kOpMsgOnly;
 
 }  // namespace supports
 
 /**
  * Returns the protocol used to initiate the current operation.
  */
-Protocol getOperationProtocol(OperationContext* txn);
+Protocol getOperationProtocol(OperationContext* opCtx);
 
 /**
  * Sets the protocol used to initiate the current operation.
  */
-void setOperationProtocol(OperationContext* txn, Protocol protocol);
+void setOperationProtocol(OperationContext* opCtx, Protocol protocol);
 
 /**
  * Returns the newest protocol supported by two parties.

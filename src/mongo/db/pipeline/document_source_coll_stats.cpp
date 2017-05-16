@@ -126,7 +126,7 @@ bool DocumentSourceCollStats::isValidInitialSource() const {
     return true;
 }
 
-Value DocumentSourceCollStats::serialize(bool explain) const {
+Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(Document{{getSourceName(), _collStatsSpec}});
 }
 

@@ -44,6 +44,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
@@ -169,7 +170,10 @@ void signalProcessingThread(LogFileStatus rotate) {
 
     while (true) {
         int actualSignal = 0;
-        int status = sigwait(&asyncSignals, &actualSignal);
+        int status = [&] {
+            MONGO_IDLE_THREAD_BLOCK;
+            return sigwait(&asyncSignals, &actualSignal);
+        }();
         fassert(16781, status == 0);
         switch (actualSignal) {
             case SIGUSR1:

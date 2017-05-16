@@ -51,8 +51,8 @@ StorageInterface* StorageInterface::get(ServiceContext& service) {
     return getStorageInterface(service).get();
 }
 
-StorageInterface* StorageInterface::get(OperationContext* txn) {
-    return get(txn->getClient()->getServiceContext());
+StorageInterface* StorageInterface::get(OperationContext* opCtx) {
+    return get(opCtx->getClient()->getServiceContext());
 }
 
 

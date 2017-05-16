@@ -49,8 +49,8 @@ OplogBufferBlockingQueue::OplogBufferBlockingQueue() : _queue(kOplogBufferSize, 
 
 void OplogBufferBlockingQueue::startup(OperationContext*) {}
 
-void OplogBufferBlockingQueue::shutdown(OperationContext* txn) {
-    clear(txn);
+void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
+    clear(opCtx);
 }
 
 void OplogBufferBlockingQueue::pushEvenIfFull(OperationContext*, const Value& value) {

@@ -122,19 +122,19 @@ bool turnIxscanIntoCount(QuerySolution* soln);
 }  // namespace
 
 
-void fillOutPlannerParams(OperationContext* txn,
+void fillOutPlannerParams(OperationContext* opCtx,
                           Collection* collection,
                           CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams) {
     // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
-    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn, false);
+    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
         plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
                                                     desc->getAccessMethodName(),
-                                                    desc->isMultikey(txn),
-                                                    ice->getMultikeyPaths(txn),
+                                                    desc->isMultikey(opCtx),
+                                                    ice->getMultikeyPaths(opCtx),
                                                     desc->isSparse(),
                                                     desc->unique(),
                                                     desc->indexName(),
@@ -174,7 +174,8 @@ void fillOutPlannerParams(OperationContext* txn,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto collMetadata = CollectionShardingState::get(txn, canonicalQuery->nss())->getMetadata();
+        auto collMetadata =
+            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata();
         if (collMetadata) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {
@@ -459,21 +460,22 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
 }  // namespace
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
-                                                 Collection* collection,
-                                                 unique_ptr<CanonicalQuery> canonicalQuery,
-                                                 PlanExecutor::YieldPolicy yieldPolicy,
-                                                 size_t plannerOptions) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
+    OperationContext* opCtx,
+    Collection* collection,
+    unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanExecutor::YieldPolicy yieldPolicy,
+    size_t plannerOptions) {
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
     StatusWith<PrepareExecutionResult> executionResult =
-        prepareExecution(txn, collection, ws.get(), std::move(canonicalQuery), plannerOptions);
+        prepareExecution(opCtx, collection, ws.get(), std::move(canonicalQuery), plannerOptions);
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
     invariant(executionResult.getValue().root);
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be null.
-    return PlanExecutor::make(txn,
+    return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(executionResult.getValue().root),
                               std::move(executionResult.getValue().querySolution),
@@ -506,9 +508,8 @@ mongo::BSONElement extractOplogTsOptime(const mongo::MatchExpression* me) {
     return static_cast<const mongo::ComparisonMatchExpression*>(me)->getData();
 }
 
-StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
-                                                       Collection* collection,
-                                                       unique_ptr<CanonicalQuery> cq) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
+    OperationContext* opCtx, Collection* collection, unique_ptr<CanonicalQuery> cq) {
     invariant(collection);
     invariant(cq.get());
 
@@ -555,7 +556,7 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
     if (tsElem.type() == bsonTimestamp) {
         StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem.timestamp());
         if (goal.isOK()) {
-            startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
+            startLoc = collection->getRecordStore()->oplogStartHack(opCtx, goal.getValue());
         }
     }
 
@@ -567,12 +568,13 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
         // Fallback to trying the OplogStart stage.
         unique_ptr<WorkingSet> oplogws = make_unique<WorkingSet>();
         unique_ptr<OplogStart> stage =
-            make_unique<OplogStart>(txn, collection, tsExpr, oplogws.get());
+            make_unique<OplogStart>(opCtx, collection, tsExpr, oplogws.get());
         // Takes ownership of oplogws and stage.
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(oplogws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+            opCtx, std::move(oplogws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
-        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
+            std::move(statusWithPlanExecutor.getValue());
 
         // The stage returns a RecordId of where to start.
         startLoc = RecordId();
@@ -580,7 +582,7 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
 
         // This is normal.  The start of the oplog is the beginning of the collection.
         if (PlanExecutor::IS_EOF == state) {
-            return getExecutor(txn, collection, std::move(cq), PlanExecutor::YIELD_AUTO);
+            return getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO);
         }
 
         // This is not normal.  An error was encountered.
@@ -605,29 +607,31 @@ StatusWith<unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
     }
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-    unique_ptr<CollectionScan> cs = make_unique<CollectionScan>(txn, params, ws.get(), cq->root());
+    unique_ptr<CollectionScan> cs =
+        make_unique<CollectionScan>(opCtx, params, ws.get(), cq->root());
     // Takes ownership of 'ws', 'cs', and 'cq'.
     return PlanExecutor::make(
-        txn, std::move(ws), std::move(cs), std::move(cq), collection, PlanExecutor::YIELD_AUTO);
+        opCtx, std::move(ws), std::move(cs), std::move(cq), collection, PlanExecutor::YIELD_AUTO);
 }
 
 }  // namespace
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutorFind(OperationContext* txn,
-                                                     Collection* collection,
-                                                     const NamespaceString& nss,
-                                                     unique_ptr<CanonicalQuery> canonicalQuery,
-                                                     PlanExecutor::YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
+    OperationContext* opCtx,
+    Collection* collection,
+    const NamespaceString& nss,
+    unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanExecutor::YieldPolicy yieldPolicy) {
     if (NULL != collection && canonicalQuery->getQueryRequest().isOplogReplay()) {
-        return getOplogStartHack(txn, collection, std::move(canonicalQuery));
+        return getOplogStartHack(opCtx, collection, std::move(canonicalQuery));
     }
 
     size_t options = QueryPlannerParams::DEFAULT;
-    if (ShardingState::get(txn)->needCollectionMetadata(txn, nss.ns())) {
+    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, nss.ns())) {
         options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
     return getExecutor(
-        txn, collection, std::move(canonicalQuery), PlanExecutor::YIELD_AUTO, options);
+        opCtx, collection, std::move(canonicalQuery), PlanExecutor::YIELD_AUTO, options);
 }
 
 namespace {
@@ -639,7 +643,7 @@ namespace {
  * If the projection was valid, then return Status::OK() with a pointer to the newly created
  * ProjectionStage. Otherwise, return a status indicating the error reason.
  */
-StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
+StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* opCtx,
                                                   const NamespaceString& nsString,
                                                   CanonicalQuery* cq,
                                                   const BSONObj& proj,
@@ -670,11 +674,11 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
-    ProjectionStageParams params(ExtensionsCallbackReal(txn, &nsString));
+    ProjectionStageParams params(ExtensionsCallbackReal(opCtx, &nsString));
     params.projObj = proj;
     params.collator = cq->getCollator();
     params.fullExpression = cq->root();
-    return {make_unique<ProjectionStage>(txn, params, ws, root.release())};
+    return {make_unique<ProjectionStage>(opCtx, params, ws, root.release())};
 }
 
 }  // namespace
@@ -683,10 +687,8 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
 // Delete
 //
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
-                                                       OpDebug* opDebug,
-                                                       Collection* collection,
-                                                       ParsedDelete* parsedDelete) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
+    OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedDelete* parsedDelete) {
     const DeleteRequest* request = parsedDelete->getRequest();
 
     const NamespaceString& nss(request->getNamespaceString());
@@ -705,8 +707,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
                       str::stream() << "cannot remove from a capped collection: " << nss.ns());
     }
 
-    bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
+    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
@@ -736,16 +738,16 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
             LOG(2) << "Collection " << nss.ns() << " does not exist."
                    << " Using EOF stage: " << redact(unparsedQuery);
             auto deleteStage = make_unique<DeleteStage>(
-                txn, deleteStageParams, ws.get(), nullptr, new EOFStage(txn));
-            return PlanExecutor::make(txn, std::move(ws), std::move(deleteStage), nss.ns(), policy);
+                opCtx, deleteStageParams, ws.get(), nullptr, new EOFStage(opCtx));
+            return PlanExecutor::make(opCtx, std::move(ws), std::move(deleteStage), nss, policy);
         }
 
-        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
+        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         // Construct delete request collator.
         std::unique_ptr<CollatorInterface> collator;
         if (!request->getCollation().isEmpty()) {
-            auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
+            auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(request->getCollation());
             if (!statusWithCollator.isOK()) {
                 return statusWithCollator.getStatus();
@@ -759,11 +761,11 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
             request->getProj().isEmpty() && hasCollectionDefaultCollation) {
             LOG(2) << "Using idhack: " << redact(unparsedQuery);
 
-            PlanStage* idHackStage =
-                new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
-            unique_ptr<DeleteStage> root =
-                make_unique<DeleteStage>(txn, deleteStageParams, ws.get(), collection, idHackStage);
-            return PlanExecutor::make(txn, std::move(ws), std::move(root), collection, policy);
+            PlanStage* idHackStage = new IDHackStage(
+                opCtx, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
+            unique_ptr<DeleteStage> root = make_unique<DeleteStage>(
+                opCtx, deleteStageParams, ws.get(), collection, idHackStage);
+            return PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, policy);
         }
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
@@ -779,7 +781,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
 
     const size_t defaultPlannerOptions = 0;
     StatusWith<PrepareExecutionResult> executionResult =
-        prepareExecution(txn, collection, ws.get(), std::move(cq), defaultPlannerOptions);
+        prepareExecution(opCtx, collection, ws.get(), std::move(cq), defaultPlannerOptions);
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -790,14 +792,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
     deleteStageParams.canonicalQuery = cq.get();
 
     invariant(root);
-    root = make_unique<DeleteStage>(txn, deleteStageParams, ws.get(), collection, root.release());
+    root = make_unique<DeleteStage>(opCtx, deleteStageParams, ws.get(), collection, root.release());
 
     if (!request->getProj().isEmpty()) {
         invariant(request->shouldReturnDeleted());
 
         const bool allowPositional = true;
         StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(
-            txn, nss, cq.get(), request->getProj(), allowPositional, ws.get(), std::move(root));
+            opCtx, nss, cq.get(), request->getProj(), allowPositional, ws.get(), std::move(root));
         if (!projStatus.isOK()) {
             return projStatus.getStatus();
         }
@@ -806,7 +808,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
 
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be null.
-    return PlanExecutor::make(txn,
+    return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(root),
                               std::move(querySolution),
@@ -837,10 +839,8 @@ inline void validateUpdate(const char* ns, const BSONObj& updateobj, const BSONO
 
 }  // namespace
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
-                                                       OpDebug* opDebug,
-                                                       Collection* collection,
-                                                       ParsedUpdate* parsedUpdate) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
+    OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedUpdate* parsedUpdate) {
     const UpdateRequest* request = parsedUpdate->getRequest();
     UpdateDriver* driver = parsedUpdate->getDriver();
 
@@ -871,8 +871,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
     // If this is a user-issued update, then we want to return an error: you cannot perform
     // writes on a secondary. If this is an update to a secondary from the replication system,
     // however, then we make an exception and let the write proceed.
-    bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
+    bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
@@ -881,7 +881,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
 
     if (lifecycle) {
         lifecycle->setCollection(collection);
-        driver->refreshIndexKeys(lifecycle->getIndexKeys(txn));
+        driver->refreshIndexKeys(lifecycle->getIndexKeys(opCtx));
     }
 
     const PlanExecutor::YieldPolicy policy = parsedUpdate->yieldPolicy();
@@ -901,12 +901,12 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
             LOG(2) << "Collection " << nsString.ns() << " does not exist."
                    << " Using EOF stage: " << redact(unparsedQuery);
             auto updateStage = make_unique<UpdateStage>(
-                txn, updateStageParams, ws.get(), collection, new EOFStage(txn));
+                opCtx, updateStageParams, ws.get(), collection, new EOFStage(opCtx));
             return PlanExecutor::make(
-                txn, std::move(ws), std::move(updateStage), nsString.ns(), policy);
+                opCtx, std::move(ws), std::move(updateStage), nsString, policy);
         }
 
-        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
+        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
             parsedUpdate->getCollator(), collection->getDefaultCollator());
@@ -915,11 +915,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
             request->getProj().isEmpty() && hasCollectionDefaultCollation) {
             LOG(2) << "Using idhack: " << redact(unparsedQuery);
 
-            PlanStage* idHackStage =
-                new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
-            unique_ptr<UpdateStage> root =
-                make_unique<UpdateStage>(txn, updateStageParams, ws.get(), collection, idHackStage);
-            return PlanExecutor::make(txn, std::move(ws), std::move(root), collection, policy);
+            // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
+            // WorkingSet.
+            return InternalPlanner::updateWithIdHack(opCtx,
+                                                     collection,
+                                                     updateStageParams,
+                                                     descriptor,
+                                                     unparsedQuery["_id"].wrap(),
+                                                     policy);
         }
 
         // If we're here then we don't have a parsed query, but we're also not eligible for
@@ -935,7 +938,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
 
     const size_t defaultPlannerOptions = 0;
     StatusWith<PrepareExecutionResult> executionResult =
-        prepareExecution(txn, collection, ws.get(), std::move(cq), defaultPlannerOptions);
+        prepareExecution(opCtx, collection, ws.get(), std::move(cq), defaultPlannerOptions);
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -947,7 +950,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
     updateStageParams.canonicalQuery = cq.get();
 
     root = stdx::make_unique<UpdateStage>(
-        txn, updateStageParams, ws.get(), collection, root.release());
+        opCtx, updateStageParams, ws.get(), collection, root.release());
 
     if (!request->getProj().isEmpty()) {
         invariant(request->shouldReturnAnyDocs());
@@ -956,7 +959,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
         // is invalid to use a positional projection because the query expression need not
         // match the array element after the update has been applied.
         const bool allowPositional = request->shouldReturnOldDocs();
-        StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(txn,
+        StatusWith<unique_ptr<PlanStage>> projStatus = applyProjection(opCtx,
                                                                        nsString,
                                                                        cq.get(),
                                                                        request->getProj(),
@@ -970,8 +973,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
     }
 
     // We must have a tree of stages in order to have a valid plan executor, but the query
-    // solution may be null. Takes ownership of all args other than 'collection' and 'txn'
-    return PlanExecutor::make(txn,
+    // solution may be null. Takes ownership of all args other than 'collection' and 'opCtx'
+    return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(root),
                               std::move(querySolution),
@@ -984,10 +987,11 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
 // Group
 //
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
-                                                      Collection* collection,
-                                                      const GroupRequest& request,
-                                                      PlanExecutor::YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorGroup(
+    OperationContext* opCtx,
+    Collection* collection,
+    const GroupRequest& request,
+    PlanExecutor::YieldPolicy yieldPolicy) {
     if (!getGlobalScriptEngine()) {
         return Status(ErrorCodes::BadValue, "server-side JavaScript execution is disabled");
     }
@@ -999,10 +1003,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
         // reporting machinery always assumes that the root stage for a group operation is a
         // GroupStage, so in this case we put a GroupStage on top of an EOFStage.
         unique_ptr<PlanStage> root =
-            make_unique<GroupStage>(txn, request, ws.get(), new EOFStage(txn));
+            make_unique<GroupStage>(opCtx, request, ws.get(), new EOFStage(opCtx));
 
-        return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.ns.ns(), yieldPolicy);
+        return PlanExecutor::make(opCtx, std::move(ws), std::move(root), request.ns, yieldPolicy);
     }
 
     const NamespaceString nss(request.ns);
@@ -1011,9 +1014,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     qr->setCollation(request.collation);
     qr->setExplain(request.explain);
 
-    const ExtensionsCallbackReal extensionsCallback(txn, &nss);
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1021,7 +1024,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
 
     const size_t defaultPlannerOptions = 0;
     StatusWith<PrepareExecutionResult> executionResult = prepareExecution(
-        txn, collection, ws.get(), std::move(canonicalQuery), defaultPlannerOptions);
+        opCtx, collection, ws.get(), std::move(canonicalQuery), defaultPlannerOptions);
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -1031,10 +1034,10 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
 
     invariant(root);
 
-    root = make_unique<GroupStage>(txn, request, ws.get(), root.release());
+    root = make_unique<GroupStage>(opCtx, request, ws.get(), root.release());
     // We must have a tree of stages in order to have a valid plan executor, but the query
     // solution may be null. Takes ownership of all args other than 'collection'.
-    return PlanExecutor::make(txn,
+    return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(root),
                               std::move(querySolution),
@@ -1227,11 +1230,12 @@ BSONObj getDistinctProjection(const std::string& field) {
 
 }  // namespace
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
-                                                      Collection* collection,
-                                                      const CountRequest& request,
-                                                      bool explain,
-                                                      PlanExecutor::YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
+    OperationContext* opCtx,
+    Collection* collection,
+    const CountRequest& request,
+    bool explain,
+    PlanExecutor::YieldPolicy yieldPolicy) {
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
 
     auto qr = stdx::make_unique<QueryRequest>(request.getNs());
@@ -1241,11 +1245,11 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
     qr->setExplain(explain);
 
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn,
+        opCtx,
         std::move(qr),
-        collection
-            ? static_cast<const ExtensionsCallback&>(ExtensionsCallbackReal(txn, &collection->ns()))
-            : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()));
+        collection ? static_cast<const ExtensionsCallback&>(
+                         ExtensionsCallbackReal(opCtx, &collection->ns()))
+                   : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()));
 
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
@@ -1258,9 +1262,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         const bool useRecordStoreCount = false;
         CountStageParams params(request, useRecordStoreCount);
         unique_ptr<PlanStage> root = make_unique<CountStage>(
-            txn, collection, std::move(params), ws.get(), new EOFStage(txn));
+            opCtx, collection, std::move(params), ws.get(), new EOFStage(opCtx));
         return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
+            opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
     }
 
     // If the query is empty, then we can determine the count by just asking the collection
@@ -1275,14 +1279,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
 
     if (useRecordStoreCount) {
         unique_ptr<PlanStage> root =
-            make_unique<CountStage>(txn, collection, std::move(params), ws.get(), nullptr);
+            make_unique<CountStage>(opCtx, collection, std::move(params), ws.get(), nullptr);
         return PlanExecutor::make(
-            txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
+            opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
     }
 
     const size_t plannerOptions = QueryPlannerParams::IS_COUNT;
     StatusWith<PrepareExecutionResult> executionResult =
-        prepareExecution(txn, collection, ws.get(), std::move(cq), plannerOptions);
+        prepareExecution(opCtx, collection, ws.get(), std::move(cq), plannerOptions);
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
     }
@@ -1293,10 +1297,10 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
     invariant(root);
 
     // Make a CountStage to be the new root.
-    root = make_unique<CountStage>(txn, collection, std::move(params), ws.get(), root.release());
+    root = make_unique<CountStage>(opCtx, collection, std::move(params), ws.get(), root.release());
     // We must have a tree of stages in order to have a valid plan executor, but the query
-    // solution may be NULL. Takes ownership of all args other than 'collection' and 'txn'
-    return PlanExecutor::make(txn,
+    // solution may be NULL. Takes ownership of all args other than 'collection' and 'opCtx'
+    return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(root),
                               std::move(querySolution),
@@ -1357,20 +1361,37 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
         return false;
     }
 
-    // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
-    auto distinctNode = stdx::make_unique<DistinctNode>(indexScanNode->index);
-    distinctNode->direction = indexScanNode->direction;
-    distinctNode->bounds = indexScanNode->bounds;
-
     // Figure out which field we're skipping to the next value of.
-    distinctNode->fieldNo = 0;
+    int fieldNo = 0;
     BSONObjIterator it(indexScanNode->index.keyPattern);
     while (it.more()) {
         if (field == it.next().fieldName()) {
             break;
         }
-        distinctNode->fieldNo++;
+        ++fieldNo;
     }
+
+    // We should not use a distinct scan if the field over which we are computing the distinct is
+    // multikey.
+    if (indexScanNode->index.multikey) {
+        const auto& multikeyPaths = indexScanNode->index.multikeyPaths;
+        if (multikeyPaths.empty()) {
+            // We don't have path-level multikey information available.
+            return false;
+        }
+
+        if (!multikeyPaths[fieldNo].empty()) {
+            // Path-level multikey information indicates that the distinct key contains at least one
+            // array component.
+            return false;
+        }
+    }
+
+    // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
+    auto distinctNode = stdx::make_unique<DistinctNode>(indexScanNode->index);
+    distinctNode->direction = indexScanNode->direction;
+    distinctNode->bounds = indexScanNode->bounds;
+    distinctNode->fieldNo = fieldNo;
 
     if (fetchNode) {
         // If there is a fetch node, then there is no need for the projection. The fetch node should
@@ -1406,16 +1427,17 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field) {
     return true;
 }
 
-StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
-                                                         Collection* collection,
-                                                         const std::string& ns,
-                                                         ParsedDistinct* parsedDistinct,
-                                                         PlanExecutor::YieldPolicy yieldPolicy) {
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
+    OperationContext* opCtx,
+    Collection* collection,
+    const std::string& ns,
+    ParsedDistinct* parsedDistinct,
+    PlanExecutor::YieldPolicy yieldPolicy) {
     if (!collection) {
         // Treat collections that do not exist as empty collections.
-        return PlanExecutor::make(txn,
+        return PlanExecutor::make(opCtx,
                                   make_unique<WorkingSet>(),
-                                  make_unique<EOFStage>(txn),
+                                  make_unique<EOFStage>(opCtx),
                                   parsedDistinct->releaseQuery(),
                                   collection,
                                   yieldPolicy);
@@ -1435,15 +1457,15 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn, false);
+    IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(opCtx, false);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
         if (desc->keyPattern().hasField(parsedDistinct->getKey())) {
             plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
                                                        desc->getAccessMethodName(),
-                                                       desc->isMultikey(txn),
-                                                       ice->getMultikeyPaths(txn),
+                                                       desc->isMultikey(opCtx),
+                                                       ice->getMultikeyPaths(opCtx),
                                                        desc->isSparse(),
                                                        desc->unique(),
                                                        desc->indexName(),
@@ -1453,12 +1475,12 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         }
     }
 
-    const ExtensionsCallbackReal extensionsCallback(txn, &collection->ns());
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
-        return getExecutor(txn, collection, parsedDistinct->releaseQuery(), yieldPolicy);
+        return getExecutor(opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy);
     }
 
     //
@@ -1473,7 +1495,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     auto qr = stdx::make_unique<QueryRequest>(parsedDistinct->getQuery()->getQueryRequest());
     qr->setProj(projection);
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(qr), extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1518,13 +1540,13 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
         PlanStage* rawRoot;
-        verify(StageBuilder::build(txn, collection, *cq, *soln, ws.get(), &rawRoot));
+        verify(StageBuilder::build(opCtx, collection, *cq, *soln, ws.get(), &rawRoot));
         unique_ptr<PlanStage> root(rawRoot);
 
         LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
                << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
-        return PlanExecutor::make(txn,
+        return PlanExecutor::make(opCtx,
                                   std::move(ws),
                                   std::move(root),
                                   std::move(soln),
@@ -1537,7 +1559,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     vector<QuerySolution*> solutions;
     Status status = QueryPlanner::plan(*cq, plannerParams, &solutions);
     if (!status.isOK()) {
-        return getExecutor(txn, collection, std::move(cq), yieldPolicy);
+        return getExecutor(opCtx, collection, std::move(cq), yieldPolicy);
     }
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -1554,13 +1576,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
             unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
             unique_ptr<QuerySolution> currentSolution(solutions[i]);
             PlanStage* rawRoot;
-            verify(StageBuilder::build(txn, collection, *cq, *currentSolution, ws.get(), &rawRoot));
+            verify(
+                StageBuilder::build(opCtx, collection, *cq, *currentSolution, ws.get(), &rawRoot));
             unique_ptr<PlanStage> root(rawRoot);
 
             LOG(2) << "Using fast distinct: " << redact(cq->toStringShort())
                    << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
-            return PlanExecutor::make(txn,
+            return PlanExecutor::make(opCtx,
                                       std::move(ws),
                                       std::move(root),
                                       std::move(currentSolution),
@@ -1577,7 +1600,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         delete solutions[i];
     }
 
-    return getExecutor(txn, collection, parsedDistinct->releaseQuery(), yieldPolicy);
+    return getExecutor(opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy);
 }
 
 }  // namespace mongo

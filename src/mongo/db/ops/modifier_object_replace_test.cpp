@@ -39,8 +39,10 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/logical_clock_test_fixture.h"
-#include "mongo/db/ops/log_builder.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/service_context_noop.h"
+#include "mongo/db/update/log_builder.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -59,10 +61,27 @@ using mongo::NumberInt;
 using mongo::Status;
 using mongo::StringData;
 
-using Normal = mongo::LogicalClockTest;
-using IdLeft = mongo::LogicalClockTest;
-using IdImmutable = mongo::LogicalClockTest;
-using Timestamp = mongo::LogicalClockTest;
+class ModifierObjectReplaceTest : public mongo::unittest::Test {
+public:
+    ~ModifierObjectReplaceTest() override = default;
+
+protected:
+    /**
+     * Sets up this fixture with a context and a LogicalClock.
+     */
+    void setUp() override {
+        auto service = mongo::getGlobalServiceContext();
+
+        auto logicalClock = mongo::stdx::make_unique<mongo::LogicalClock>(service);
+        mongo::LogicalClock::set(service, std::move(logicalClock));
+    }
+    void tearDown() override{};
+};
+
+using Normal = ModifierObjectReplaceTest;
+using IdLeft = ModifierObjectReplaceTest;
+using IdImmutable = ModifierObjectReplaceTest;
+using Timestamp = ModifierObjectReplaceTest;
 
 /** Helper to build and manipulate a $set mod. */
 class Mod {

@@ -71,12 +71,12 @@ bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams& params) {
 // static
 const char* DeleteStage::kStageType = "DELETE";
 
-DeleteStage::DeleteStage(OperationContext* txn,
+DeleteStage::DeleteStage(OperationContext* opCtx,
                          const DeleteStageParams& params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _params(params),
       _ws(ws),
       _collection(collection),
@@ -269,7 +269,7 @@ void DeleteStage::doRestoreState() {
     uassert(28537,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
             !getOpCtx()->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(getOpCtx(), ns));
 }
 
 unique_ptr<PlanStageStats> DeleteStage::getStats() {

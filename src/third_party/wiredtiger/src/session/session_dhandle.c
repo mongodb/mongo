@@ -270,6 +270,16 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
 		ret = __wt_conn_btree_sync_and_close(session, false, true);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD_FORCE);
+	} else if (F_ISSET(btree, WT_BTREE_BULK)) {
+		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
+		    !F_ISSET(dhandle, WT_DHANDLE_DISCARD));
+		/*
+		 * Acquire the schema lock while completing a bulk load.  This
+		 * avoids racing with a checkpoint while it gathers a set
+		 * of handles.
+		 */
+		WT_WITH_SCHEMA_LOCK(session, ret =
+		    __wt_conn_btree_sync_and_close(session, false, false));
 	} else if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
 	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
@@ -560,7 +570,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 int
 __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 {
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 
 	WT_ASSERT(session, WT_META_TRACKING(session));
@@ -568,31 +578,33 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 
 	/*
 	 * Get the checkpoint handle exclusive, so no one else can access it
-	 * while we are creating the new checkpoint.
+	 * while we are creating the new checkpoint.  Hold the lock until the
+	 * checkpoint completes.
 	 */
 	WT_ERR(__wt_session_get_btree(session, saved_dhandle->name,
 	    checkpoint, NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+	if ((ret = __wt_meta_track_handle_lock(session, false)) != 0) {
+		WT_TRET(__wt_session_release_btree(session));
+		goto err;
+	}
 
 	/*
-	 * Flush any pages in this checkpoint from the cache (we are about to
-	 * re-write the checkpoint which will mean cached pages no longer have
-	 * valid contents).  This is especially noticeable with memory mapped
-	 * files, since changes to the underlying file are visible to the in
-	 * memory pages.
+	 * Get exclusive access to the handle and then flush any pages in this
+	 * checkpoint from the cache (we are about to re-write the checkpoint
+	 * which will mean cached pages no longer have valid contents). This
+	 * is especially noticeable with memory mapped files, since changes to
+	 * the underlying file are visible to the in-memory pages.
 	 */
+	WT_ERR(__wt_evict_file_exclusive_on(session));
 	WT_ERR(__wt_cache_op(session, WT_SYNC_DISCARD));
 
 	/*
 	 * We lock checkpoint handles that we are overwriting, so the handle
 	 * must be closed when we release it.
 	 */
-	dhandle = session->dhandle;
-	F_SET(dhandle, WT_DHANDLE_DISCARD);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
 
-	WT_ERR(__wt_meta_track_handle_lock(session, false));
-
-	/* Restore the original btree in the session. */
+	/* Restore the original data handle in the session. */
 err:	session->dhandle = saved_dhandle;
-
 	return (ret);
 }

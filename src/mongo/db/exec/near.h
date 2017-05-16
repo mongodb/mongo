@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include <memory>
 #include <queue>
+#include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -100,7 +102,7 @@ public:
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
 
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final;
     std::unique_ptr<PlanStageStats> getStats() final;
@@ -110,7 +112,7 @@ protected:
     /**
      * Subclasses of NearStage must provide basics + a stats object which gets owned here.
      */
-    NearStage(OperationContext* txn,
+    NearStage(OperationContext* opCtx,
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,
@@ -127,7 +129,7 @@ protected:
      *
      * Returns !OK on failure to create next stage.
      */
-    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* txn,
+    virtual StatusWith<CoveredInterval*> nextInterval(OperationContext* opCtx,
                                                       WorkingSet* workingSet,
                                                       Collection* collection) = 0;
 
@@ -146,7 +148,7 @@ protected:
      * Return errors if an error occurs.
      * Can't return ADVANCED.
      */
-    virtual StageState initialize(OperationContext* txn,
+    virtual StageState initialize(OperationContext* opCtx,
                                   WorkingSet* workingSet,
                                   Collection* collection,
                                   WorkingSetID* out) = 0;
@@ -203,7 +205,7 @@ private:
     //
     // All children intervals except the last active one are only used by getStats(),
     // because they are all EOF.
-    OwnedPointerVector<CoveredInterval> _childrenIntervals;
+    std::vector<std::unique_ptr<CoveredInterval>> _childrenIntervals;
 };
 
 /**

@@ -40,6 +40,15 @@ env.Library('ticketholder',
             LIBDEPS=['$BUILD_DIR/mongo/base',
                      '$BUILD_DIR/third_party/shim_boost'])
 
+
+env.CppUnitTest(
+    target='ticketholder_test',
+    source=['ticketholder_test.cpp'],
+    LIBDEPS=[
+        'ticketholder',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ])
+
 env.Library(
     target='spin_lock',
     source=[
@@ -55,15 +64,5 @@ env.CppUnitTest(
     LIBDEPS=[
         'spin_lock',
         '$BUILD_DIR/third_party/shim_boost',
-    ],
-)
-
-env.Library(
-    target='task',
-    source=[
-        'task.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/background_job',
     ],
 )

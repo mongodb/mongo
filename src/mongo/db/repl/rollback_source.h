@@ -76,7 +76,7 @@ public:
     /**
      * Clones a single collection from the sync source.
      */
-    virtual void copyCollectionFromRemote(OperationContext* txn,
+    virtual void copyCollectionFromRemote(OperationContext* opCtx,
                                           const NamespaceString& nss) const = 0;
 
     /**

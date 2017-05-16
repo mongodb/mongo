@@ -76,8 +76,8 @@ LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
     BSONObj legacyCommandArgs;
     int queryOptions;
 
-    std::tie(legacyCommandArgs, queryOptions) = uassertStatusOK(
-        rpc::downconvertRequestMetadata(std::move(_commandArgs), std::move(metadata)));
+    std::tie(legacyCommandArgs, queryOptions) =
+        rpc::downconvertRequestMetadata(std::move(_commandArgs), std::move(metadata));
 
     _builder.appendNum(queryOptions);  // queryOptions
     _builder.appendStr(_ns);
@@ -87,22 +87,6 @@ LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
     legacyCommandArgs.appendSelfToBufBuilder(_builder);
     _state = State::kInputDocs;
     return *this;
-}
-
-LegacyRequestBuilder& LegacyRequestBuilder::addInputDocs(DocumentRange inputDocs) {
-    invariant(_state == State::kInputDocs);
-    // no op
-    return *this;
-}
-
-LegacyRequestBuilder& LegacyRequestBuilder::addInputDoc(BSONObj inputDoc) {
-    invariant(_state == State::kInputDocs);
-    // no op
-    return *this;
-}
-
-RequestBuilderInterface::State LegacyRequestBuilder::getState() const {
-    return _state;
 }
 
 Protocol LegacyRequestBuilder::getProtocol() const {

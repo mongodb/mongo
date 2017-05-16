@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -152,5 +153,78 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
     ASSERT_TRUE(addFields->getNext().isEOF());
 }
 
+TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
+    auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd"
+                                                          << "$$REMOVE"),
+                                                     getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"existingField", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    Document expected{{"existingField", 1}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
+TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
+    auto addFields = DocumentSourceAddFields::create(BSON("b"
+                                                          << "$$ROOT"),
+                                                     getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"a", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    Document expected{{"a", 1}, {"b", Document{{"a", 1}}}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
+TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
+    auto addFields = DocumentSourceAddFields::create(BSON("b"
+                                                          << "$$CURRENT"),
+                                                     getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"a", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    Document expected{{"a", 1}, {"b", Document{{"a", 1}}}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
+/**
+ * Creates BSON for a DocumentSourceAddFields that represents computing a new field nested 'depth'
+ * levels deep.
+ */
+BSONObj makeAddFieldsForNestedDocument(size_t depth) {
+    ASSERT_GTE(depth, 1U);
+    StringBuilder builder;
+    builder << "a";
+    for (size_t i = 0; i < depth - 1; ++i) {
+        builder << ".a";
+    }
+    return BSON(builder.str() << 1);
+}
+
+TEST_F(AddFieldsTest, CanAddNestedDocumentExactlyAtDepthLimit) {
+    auto addFields = DocumentSourceAddFields::create(
+        makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"_id", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+}
+
+TEST_F(AddFieldsTest, CannotAddNestedDocumentExceedingDepthLimit) {
+    ASSERT_THROWS_CODE(
+        DocumentSourceAddFields::create(
+            makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth() + 1), getExpCtx()),
+        UserException,
+        ErrorCodes::Overflow);
+}
 }  // namespace
 }  // namespace mongo

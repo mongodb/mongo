@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/keys_collection_document.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -41,7 +42,6 @@
 
 namespace mongo {
 
-class ActionLogType;
 class BatchedCommandRequest;
 class BatchedCommandResponse;
 struct BSONArray;
@@ -53,6 +53,7 @@ struct ChunkVersion;
 class CollectionType;
 class ConnectionString;
 class DatabaseType;
+class LogicalTime;
 class NamespaceString;
 class OperationContext;
 class ShardKeyPattern;
@@ -108,7 +109,7 @@ public:
     /**
      * Performs necessary cleanup when shutting down cleanly.
      */
-    virtual void shutDown(OperationContext* txn) = 0;
+    virtual void shutDown(OperationContext* opCtx) = 0;
 
     /**
      * Creates a new database or updates the sharding status for an existing one. Cannot be
@@ -120,7 +121,7 @@ public:
      *  - DatabaseDifferCase - database already exists, but with a different case
      *  - ShardNotFound - could not find a shard to place the DB on
      */
-    virtual Status enableSharding(OperationContext* txn, const std::string& dbName) = 0;
+    virtual Status enableSharding(OperationContext* opCtx, const std::string& dbName) = 0;
 
     /**
      * Shards a collection. Assumes that the database is enabled for sharding.
@@ -141,7 +142,7 @@ public:
      *          operations are writing to the same output collection, for instance.
      *
      */
-    virtual Status shardCollection(OperationContext* txn,
+    virtual Status shardCollection(OperationContext* opCtx,
                                    const std::string& ns,
                                    const ShardKeyPattern& fieldsAndOrder,
                                    const BSONObj& defaultCollation,
@@ -157,13 +158,13 @@ public:
      * Because of the asynchronous nature of the draining mechanism, this method returns
      * the current draining status. See ShardDrainingStatus enum definition for more details.
      */
-    virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
+    virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* opCtx,
                                                         const ShardId& name) = 0;
 
     /**
      * Updates or creates the metadata for a given database.
      */
-    virtual Status updateDatabase(OperationContext* txn,
+    virtual Status updateDatabase(OperationContext* opCtx,
                                   const std::string& dbName,
                                   const DatabaseType& db) = 0;
 
@@ -177,15 +178,8 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - database does not exist
      */
-    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* txn,
+    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(OperationContext* opCtx,
                                                                    const std::string& dbName) = 0;
-
-    /**
-     * Updates or creates the metadata for a given collection.
-     */
-    virtual Status updateCollection(OperationContext* txn,
-                                    const std::string& collNs,
-                                    const CollectionType& coll) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
@@ -198,7 +192,7 @@ public:
      *  - NamespaceNotFound - collection does not exist
      */
     virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* txn, const std::string& collNs) = 0;
+        OperationContext* opCtx, const std::string& collNs) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
@@ -212,7 +206,7 @@ public:
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual Status getCollections(OperationContext* txn,
+    virtual Status getCollections(OperationContext* opCtx,
                                   const std::string* dbName,
                                   std::vector<CollectionType>* collections,
                                   repl::OpTime* optime) = 0;
@@ -224,14 +218,14 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual Status dropCollection(OperationContext* txn, const NamespaceString& ns) = 0;
+    virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
      * Retrieves all databases for a shard.
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual Status getDatabasesForShard(OperationContext* txn,
+    virtual Status getDatabasesForShard(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         std::vector<std::string>* dbs) = 0;
 
@@ -249,7 +243,7 @@ public:
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual Status getChunks(OperationContext* txn,
+    virtual Status getChunks(OperationContext* opCtx,
                              const BSONObj& filter,
                              const BSONObj& sort,
                              boost::optional<int> limit,
@@ -260,7 +254,7 @@ public:
     /**
      * Retrieves all tags for the specified collection.
      */
-    virtual Status getTagsForCollection(OperationContext* txn,
+    virtual Status getTagsForCollection(OperationContext* opCtx,
                                         const std::string& collectionNs,
                                         std::vector<TagsType>* tags) = 0;
 
@@ -269,7 +263,7 @@ public:
      * Returns a !OK status if an error occurs.
      */
     virtual StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-        OperationContext* txn, repl::ReadConcernLevel readConcern) = 0;
+        OperationContext* opCtx, repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Runs a user management command on the config servers, potentially synchronizing through
@@ -281,7 +275,7 @@ public:
      * @param result: contains data returned from config servers
      * Returns true on success.
      */
-    virtual bool runUserManagementWriteCommand(OperationContext* txn,
+    virtual bool runUserManagementWriteCommand(OperationContext* opCtx,
                                                const std::string& commandName,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj,
@@ -290,7 +284,7 @@ public:
     /**
      * Runs a user management related read-only command on a config server.
      */
-    virtual bool runUserManagementReadCommand(OperationContext* txn,
+    virtual bool runUserManagementReadCommand(OperationContext* opCtx,
                                               const std::string& dbname,
                                               const BSONObj& cmdObj,
                                               BSONObjBuilder* result) = 0;
@@ -313,7 +307,7 @@ public:
      * failure because the precondition no longer matches. If a query of the chunks collection
      * returns a document matching both 'nss' and 'lastChunkVersion,' the write succeeded.
      */
-    virtual Status applyChunkOpsDeprecated(OperationContext* txn,
+    virtual Status applyChunkOpsDeprecated(OperationContext* opCtx,
                                            const BSONArray& updateOps,
                                            const BSONArray& preCondition,
                                            const std::string& nss,
@@ -324,7 +318,7 @@ public:
     /**
      * Writes a diagnostic event to the action log.
      */
-    virtual Status logAction(OperationContext* txn,
+    virtual Status logAction(OperationContext* opCtx,
                              const std::string& what,
                              const std::string& ns,
                              const BSONObj& detail) = 0;
@@ -332,7 +326,7 @@ public:
     /**
      * Writes a diagnostic event to the change log.
      */
-    virtual Status logChange(OperationContext* txn,
+    virtual Status logChange(OperationContext* opCtx,
                              const std::string& what,
                              const std::string& ns,
                              const BSONObj& detail,
@@ -348,14 +342,23 @@ public:
      * Returns ErrorCodes::NoMatchingDocument if no such key exists or the BSON content of the
      * setting otherwise.
      */
-    virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* txn, StringData key) = 0;
+    virtual StatusWith<BSONObj> getGlobalSettings(OperationContext* opCtx, StringData key) = 0;
 
     /**
      * Returns the contents of the config.version document - containing the current cluster schema
      * version as well as the clusterID.
      */
-    virtual StatusWith<VersionType> getConfigVersion(OperationContext* txn,
+    virtual StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                                      repl::ReadConcernLevel readConcern) = 0;
+
+    /**
+     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     */
+    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+        OperationContext* opCtx,
+        StringData purpose,
+        const LogicalTime& newerThanThis,
+        repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Directly sends the specified command to the config server and returns the response.
@@ -367,7 +370,7 @@ public:
      * @param request Request to be sent to the config server.
      * @param response Out parameter to receive the response. Can be nullptr.
      */
-    virtual void writeConfigServerDirect(OperationContext* txn,
+    virtual void writeConfigServerDirect(OperationContext* opCtx,
                                          const BatchedCommandRequest& request,
                                          BatchedCommandResponse* response) = 0;
 
@@ -383,7 +386,7 @@ public:
      *  - DatabaseDifferCase - database already exists, but with a different case
      *  - ShardNotFound - could not find a shard to place the DB on
      */
-    virtual Status createDatabase(OperationContext* txn, const std::string& dbName) = 0;
+    virtual Status createDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server. The document
@@ -391,7 +394,7 @@ public:
      *
      * NOTE: Should not be used in new code outside the ShardingCatalogManager.
      */
-    virtual Status insertConfigDocument(OperationContext* txn,
+    virtual Status insertConfigDocument(OperationContext* opCtx,
                                         const std::string& ns,
                                         const BSONObj& doc,
                                         const WriteConcernOptions& writeConcern) = 0;
@@ -410,7 +413,7 @@ public:
      *
      * NOTE: Should not be used in new code outside the ShardingCatalogManager.
      */
-    virtual StatusWith<bool> updateConfigDocument(OperationContext* txn,
+    virtual StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
                                                   const std::string& ns,
                                                   const BSONObj& query,
                                                   const BSONObj& update,
@@ -423,7 +426,7 @@ public:
      *
      * NOTE: Should not be used in new code outside the ShardingCatalogManager.
      */
-    virtual Status removeConfigDocuments(OperationContext* txn,
+    virtual Status removeConfigDocuments(OperationContext* opCtx,
                                          const std::string& ns,
                                          const BSONObj& query,
                                          const WriteConcernOptions& writeConcern) = 0;
@@ -433,7 +436,7 @@ public:
      * format for listDatabases, based on the listDatabases command parameters in
      * 'listDatabasesCmd'.
      */
-    virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
+    virtual Status appendInfoForConfigServerDatabases(OperationContext* opCtx,
                                                       const BSONObj& listDatabasesCmd,
                                                       BSONArrayBuilder* builder) = 0;
 

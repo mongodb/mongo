@@ -41,7 +41,7 @@ class SimpleRecordStoreV1Cursor;
 // used by index and original collections
 class SimpleRecordStoreV1 : public RecordStoreV1Base {
 public:
-    SimpleRecordStoreV1(OperationContext* txn,
+    SimpleRecordStoreV1(OperationContext* opCtx,
                         StringData ns,
                         RecordStoreV1MetaData* details,
                         ExtentManager* em,
@@ -53,14 +53,14 @@ public:
         return "SimpleRecordStoreV1";
     }
 
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;
 
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const final;
 
-    virtual Status truncate(OperationContext* txn);
+    virtual Status truncate(OperationContext* opCtx);
 
-    virtual void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
+    virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
         invariant(!"cappedTruncateAfter not supported");
     }
 
@@ -70,7 +70,7 @@ public:
     virtual bool compactsInPlace() const {
         return false;
     }
-    virtual Status compact(OperationContext* txn,
+    virtual Status compact(OperationContext* opCtx,
                            RecordStoreCompactAdaptor* adaptor,
                            const CompactOptions* options,
                            CompactStats* stats);
@@ -83,16 +83,16 @@ protected:
         return !_details->isUserFlagSet(CollectionOptions::Flag_NoPadding);
     }
 
-    virtual StatusWith<DiskLoc> allocRecord(OperationContext* txn,
+    virtual StatusWith<DiskLoc> allocRecord(OperationContext* opCtx,
                                             int lengthWithHeaders,
                                             bool enforceQuota);
 
-    virtual void addDeletedRec(OperationContext* txn, const DiskLoc& dloc);
+    virtual void addDeletedRec(OperationContext* opCtx, const DiskLoc& dloc);
 
 private:
-    DiskLoc _allocFromExistingExtents(OperationContext* txn, int lengthWithHeaders);
+    DiskLoc _allocFromExistingExtents(OperationContext* opCtx, int lengthWithHeaders);
 
-    void _compactExtent(OperationContext* txn,
+    void _compactExtent(OperationContext* opCtx,
                         const DiskLoc diskloc,
                         int extentNumber,
                         RecordStoreCompactAdaptor* adaptor,

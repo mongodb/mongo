@@ -16,7 +16,7 @@
 	WT_CURSOR_NEEDKEY(cursor);					\
 	WT_ERR(__wt_buf_set(session,					\
 	    &((WT_CURSOR_METADATA *)(cursor))->file_cursor->key,	\
-	    cursor->key.data, cursor->key.size));			\
+	    (cursor)->key.data, (cursor)->key.size));			\
 	F_SET(((WT_CURSOR_METADATA *)(cursor))->file_cursor,		\
 	    WT_CURSTD_KEY_EXT);						\
 } while (0)
@@ -25,7 +25,7 @@
 	WT_CURSOR_NEEDVALUE(cursor);					\
 	WT_ERR(__wt_buf_set(session,					\
 	    &((WT_CURSOR_METADATA *)(cursor))->file_cursor->value,	\
-	    cursor->value.data, cursor->value.size));			\
+	    (cursor)->value.data, (cursor)->value.size));		\
 	F_SET(((WT_CURSOR_METADATA *)(cursor))->file_cursor,		\
 	    WT_CURSTD_VALUE_EXT);					\
 } while (0)

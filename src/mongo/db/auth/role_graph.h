@@ -242,7 +242,7 @@ public:
      * operation is not supported, and other codes (typically BadValue) if the oplog operation
      * is ill-described.
      */
-    Status handleLogOp(OperationContext* txn,
+    Status handleLogOp(OperationContext* opCtx,
                        const char* op,
                        const NamespaceString& ns,
                        const BSONObj& o,

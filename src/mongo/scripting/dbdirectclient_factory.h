@@ -44,10 +44,10 @@ public:
     using Impl = stdx::function<Result(OperationContext*)>;
 
     static DBDirectClientFactory& get(ServiceContext* service);
-    static DBDirectClientFactory& get(OperationContext* txn);
+    static DBDirectClientFactory& get(OperationContext* opCtx);
 
     void registerImplementation(Impl implementation);
-    Result create(OperationContext* txn);
+    Result create(OperationContext* opCtx);
 
 private:
     Impl _implementation;

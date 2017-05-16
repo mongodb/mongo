@@ -184,11 +184,17 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 
     options->addOptionChaining("net.port", "port", moe::Int, portInfoBuilder.str().c_str());
 
-    options->addOptionChaining(
-        "net.bindIp",
-        "bind_ip",
-        moe::String,
-        "comma separated list of ip addresses to listen on - all local ips by default");
+    options
+        ->addOptionChaining(
+            "net.bindIp",
+            "bind_ip",
+            moe::String,
+            "comma separated list of ip addresses to listen on - localhost by default")
+        .incompatibleWith("bind_ip_all");
+
+    options
+        ->addOptionChaining("net.bindIpAll", "bind_ip_all", moe::Switch, "bind to all ip addresses")
+        .incompatibleWith("bind_ip");
 
     options->addOptionChaining(
         "net.ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
@@ -284,19 +290,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .composing();
 
     options
-        ->addOptionChaining("httpinterface", "httpinterface", moe::Switch, "enable http interface")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("nohttpinterface");
-
-    options->addOptionChaining("net.http.enabled", "", moe::Bool, "enable http interface")
-        .setSources(moe::SourceYAMLConfig);
-
-    options
-        ->addOptionChaining(
-            "net.http.port", "", moe::Switch, "port to listen on for http interface")
-        .setSources(moe::SourceYAMLConfig);
-
-    options
         ->addOptionChaining(
             "security.transitionToAuth",
             "transitionToAuth",
@@ -347,14 +340,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
             .hidden()
             .setSources(moe::SourceAllLegacy);
     }
-
-    // Extra hidden options
-    options
-        ->addOptionChaining(
-            "nohttpinterface", "nohttpinterface", moe::Switch, "disable http interface")
-        .hidden()
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("httpinterface");
 
     options
         ->addOptionChaining("objcheck",
@@ -631,31 +616,6 @@ Status canonicalizeServerOptions(moe::Environment* params) {
         }
     }
 
-    // "net.http.enabled" comes from the config file, so override it if "nohttpinterface" or
-    // "httpinterface" are set since those come from the command line.
-    if (params->count("nohttpinterface")) {
-        Status ret =
-            params->set("net.http.enabled", moe::Value(!(*params)["nohttpinterface"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("nohttpinterface");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("httpinterface")) {
-        Status ret =
-            params->set("net.http.enabled", moe::Value((*params)["httpinterface"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("httpinterface");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
     // "net.unixDomainSocket.enabled" comes from the config file, so override it if
     // "nounixsocket" is set since that comes from the command line.
     if (params->count("nounixsocket")) {
@@ -783,11 +743,6 @@ Status storeServerOptions(const moe::Environment& params) {
         return ret;
     }
 
-    // Check options that are not yet supported
-    if (params.count("net.http.port")) {
-        return Status(ErrorCodes::BadValue, "The net.http.port option is not currently supported");
-    }
-
     if (params.count("systemLog.verbosity")) {
         int verbosity = params["systemLog.verbosity"].as<int>();
         if (verbosity < 0) {
@@ -826,16 +781,8 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.port = params["net.port"].as<int>();
     }
 
-    if (params.count("net.bindIp")) {
-        serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
-    }
-
     if (params.count("net.ipv6") && params["net.ipv6"].as<bool>() == true) {
         enableIPv6();
-    }
-
-    if (params.count("net.http.enabled")) {
-        serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
     }
 
     if (params.count("security.transitionToAuth")) {
@@ -883,11 +830,18 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
     }
 
-    if (params.count("net.bindIp")) {
-        // passing in wildcard is the same as default behavior; remove for SERVER-3350
-        if (serverGlobalParams.bind_ip == "0.0.0.0") {
-            serverGlobalParams.bind_ip = "";
+    if (params.count("net.bindIpAll") && params["net.bindIpAll"].as<bool>()) {
+        // Bind to all IP addresses
+        serverGlobalParams.bind_ip = "0.0.0.0";
+        if (params.count("net.ipv6") && params["net.ipv6"].as<bool>()) {
+            serverGlobalParams.bind_ip += ",::";
         }
+    } else if (params.count("net.bindIp")) {
+        // Bind to enumerated IP addresses
+        serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
+    } else {
+        // Bind to localhost
+        serverGlobalParams.bind_ip = "";
     }
 
 #ifndef _WIN32

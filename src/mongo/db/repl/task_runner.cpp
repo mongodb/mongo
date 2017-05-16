@@ -34,7 +34,7 @@
 
 #include <memory>
 
-#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -60,10 +60,10 @@ using LockGuard = stdx::lock_guard<stdx::mutex>;
  * next action of kCancel.
  */
 TaskRunner::NextAction runSingleTask(const TaskRunner::Task& task,
-                                     OperationContext* txn,
+                                     OperationContext* opCtx,
                                      const Status& status) {
     try {
-        return task(txn, status);
+        return task(opCtx, status);
     } catch (...) {
         log() << "Unhandled exception in task runner: " << redact(exceptionToStatus());
     }
@@ -74,7 +74,7 @@ TaskRunner::NextAction runSingleTask(const TaskRunner::Task& task,
 
 // static
 TaskRunner::Task TaskRunner::makeCancelTask() {
-    return [](OperationContext* txn, const Status& status) { return NextAction::kCancel; };
+    return [](OperationContext* opCtx, const Status& status) { return NextAction::kCancel; };
 }
 
 TaskRunner::TaskRunner(OldThreadPool* threadPool)
@@ -132,26 +132,26 @@ void TaskRunner::join() {
 
 void TaskRunner::_runTasks() {
     Client* client = nullptr;
-    ServiceContext::UniqueOperationContext txn;
+    ServiceContext::UniqueOperationContext opCtx;
 
     while (Task task = _waitForNextTask()) {
-        if (!txn) {
+        if (!opCtx) {
             if (!client) {
                 // We initialize cc() because ServiceContextMongoD::_newOpCtx() expects cc()
                 // to be equal to the client used to create the operation context.
                 Client::initThreadIfNotAlready();
                 client = &cc();
-                if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+                if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
                     AuthorizationSession::get(client)->grantInternalAuthorization();
                 }
             }
-            txn = client->makeOperationContext();
+            opCtx = client->makeOperationContext();
         }
 
-        NextAction nextAction = runSingleTask(task, txn.get(), Status::OK());
+        NextAction nextAction = runSingleTask(task, opCtx.get(), Status::OK());
 
         if (nextAction != NextAction::kKeepOperationContext) {
-            txn.reset();
+            opCtx.reset();
         }
 
         if (nextAction == NextAction::kCancel) {
@@ -167,7 +167,7 @@ void TaskRunner::_runTasks() {
             }
         }
     }
-    txn.reset();
+    opCtx.reset();
 
     std::list<Task> tasks;
     UniqueLock lk{_mutex};
@@ -221,13 +221,13 @@ Status TaskRunner::runSynchronousTask(SynchronousTask func, TaskRunner::NextActi
     stdx::condition_variable waitTillDoneCond;
 
     Status returnStatus{Status::OK()};
-    this->schedule([&](OperationContext* txn, const Status taskStatus) {
+    this->schedule([&](OperationContext* opCtx, const Status taskStatus) {
         if (!taskStatus.isOK()) {
             returnStatus = taskStatus;
         } else {
             // Run supplied function.
             try {
-                returnStatus = func(txn);
+                returnStatus = func(opCtx);
             } catch (...) {
                 returnStatus = exceptionToStatus();
                 error() << "Exception thrown in runSynchronousTask: " << redact(returnStatus);

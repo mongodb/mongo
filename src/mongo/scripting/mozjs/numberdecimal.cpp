@@ -54,7 +54,7 @@ void NumberDecimalInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto x = static_cast<Decimal128*>(JS_GetPrivate(obj));
 
     if (x)
-        delete x;
+        getScope(fop)->trackedDelete(x);
 }
 
 Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleValue thisv) {
@@ -101,7 +101,7 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "NumberDecimal takes 0 or 1 arguments");
     }
 
-    JS_SetPrivate(thisv, new Decimal128(x));
+    JS_SetPrivate(thisv, scope->trackedNew<Decimal128>(x));
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -110,7 +110,7 @@ void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decima
     auto scope = getScope(cx);
 
     scope->getProto<NumberDecimalInfo>().newObject(thisv);
-    JS_SetPrivate(thisv.toObjectOrNull(), new Decimal128(decimal));
+    JS_SetPrivate(thisv.toObjectOrNull(), scope->trackedNew<Decimal128>(decimal));
 }
 
 }  // namespace mozjs

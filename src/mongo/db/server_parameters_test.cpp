@@ -72,8 +72,8 @@ TEST(ServerParameters, Vector1) {
 
     BSONObjBuilder b;
 
-    OperationContextNoop txn;
-    vv.append(&txn, b, vv.name());
+    OperationContextNoop opCtx;
+    vv.append(&opCtx, b, vv.name());
 
     BSONObj y = b.obj();
     ASSERT(x.firstElement().woCompare(y.firstElement(), false) == 0);

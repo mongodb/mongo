@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -114,10 +115,18 @@ void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "
  * independent, returns {exprLeft, exprRight}, where each new MatchExpression contains a portion of
  * 'expr'.
  *
+ * Any paths which should be renamed are encoded in 'renames', which maps from path names in 'expr'
+ * to the new values of those paths. If the return value is {exprLeft, exprRight} or {exprLeft,
+ * nullptr}, exprLeft will reflect the path renames. For example, suppose the original match
+ * expression is {old: {$gt: 3}} and 'renames' contains the mapping "old" => "new". The returned
+ * exprLeft value will be {new: {$gt: 3}}, provided that "old" is not in 'fields'.
+ *
  * Never returns {nullptr, nullptr}.
  */
 std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
-splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr, const std::set<std::string>& fields);
+splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
+                       const std::set<std::string>& fields,
+                       const StringMap<std::string>& renames);
 
 }  // namespace expression
 }  // namespace mongo

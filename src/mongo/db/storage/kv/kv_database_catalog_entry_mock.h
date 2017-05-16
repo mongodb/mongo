@@ -39,7 +39,7 @@ class KVDatabaseCatalogEntryMock : public KVDatabaseCatalogEntryBase {
 public:
     using KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase;
 
-    IndexAccessMethod* getIndex(OperationContext* txn,
+    IndexAccessMethod* getIndex(OperationContext* opCtx,
                                 const CollectionCatalogEntry* collection,
                                 IndexCatalogEntry* index) final;
 };

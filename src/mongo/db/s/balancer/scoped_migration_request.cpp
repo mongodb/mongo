@@ -49,14 +49,14 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 const int kDuplicateKeyErrorMaxRetries = 2;
 }
 
-ScopedMigrationRequest::ScopedMigrationRequest(OperationContext* txn,
+ScopedMigrationRequest::ScopedMigrationRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const BSONObj& minKey)
-    : _txn(txn), _nss(nss), _minKey(minKey) {}
+    : _opCtx(opCtx), _nss(nss), _minKey(minKey) {}
 
 ScopedMigrationRequest::~ScopedMigrationRequest() {
-    if (!_txn) {
-        // If the txn object was cleared, nothing should happen in the destructor.
+    if (!_opCtx) {
+        // If the opCtx object was cleared, nothing should happen in the destructor.
         return;
     }
 
@@ -64,8 +64,8 @@ ScopedMigrationRequest::~ScopedMigrationRequest() {
     // okay.
     BSONObj migrationDocumentIdentifier =
         BSON(MigrationType::ns(_nss.ns()) << MigrationType::min(_minKey));
-    Status result = grid.catalogClient(_txn)->removeConfigDocuments(
-        _txn, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
+    Status result = grid.catalogClient(_opCtx)->removeConfigDocuments(
+        _opCtx, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
 
     if (!result.isOK()) {
         LOG(0) << "Failed to remove config.migrations document for migration '"
@@ -75,31 +75,31 @@ ScopedMigrationRequest::~ScopedMigrationRequest() {
 
 ScopedMigrationRequest::ScopedMigrationRequest(ScopedMigrationRequest&& other) {
     *this = std::move(other);
-    // Set txn to null so that the destructor will do nothing.
-    other._txn = nullptr;
+    // Set opCtx to null so that the destructor will do nothing.
+    other._opCtx = nullptr;
 }
 
 ScopedMigrationRequest& ScopedMigrationRequest::operator=(ScopedMigrationRequest&& other) {
     if (this != &other) {
-        _txn = other._txn;
+        _opCtx = other._opCtx;
         _nss = other._nss;
         _minKey = other._minKey;
-        // Set txn to null so that the destructor will do nothing.
-        other._txn = nullptr;
+        // Set opCtx to null so that the destructor will do nothing.
+        other._opCtx = nullptr;
     }
 
     return *this;
 }
 
 StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
-    OperationContext* txn, const MigrateInfo& migrateInfo, bool waitForDelete) {
+    OperationContext* opCtx, const MigrateInfo& migrateInfo, bool waitForDelete) {
 
     // Try to write a unique migration document to config.migrations.
     const MigrationType migrationType(migrateInfo, waitForDelete);
 
     for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
-        Status result = grid.catalogClient(txn)->insertConfigDocument(
-            txn, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
+        Status result = grid.catalogClient(opCtx)->insertConfigDocument(
+            opCtx, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
 
         if (result == ErrorCodes::DuplicateKey) {
             // If the exact migration described by "migrateInfo" is active, return a scoped object
@@ -107,7 +107,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             // scheduled.
             auto statusWithMigrationQueryResult =
                 grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                    txn,
+                    opCtx,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kLocalReadConcern,
                     NamespaceString(MigrationType::ConfigNS),
@@ -160,7 +160,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
         // safe (won't delete another migration's document) and necessary to try to clean up the
         // document via the destructor.
         ScopedMigrationRequest scopedMigrationRequest(
-            txn, NamespaceString(migrateInfo.ns), migrateInfo.minKey);
+            opCtx, NamespaceString(migrateInfo.ns), migrateInfo.minKey);
 
         // If there was a write error, let the object go out of scope and clean up in the
         // destructor.
@@ -180,28 +180,28 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                                 << "' was being moved (somewhere) by another operation.");
 }
 
-ScopedMigrationRequest ScopedMigrationRequest::createForRecovery(OperationContext* txn,
+ScopedMigrationRequest ScopedMigrationRequest::createForRecovery(OperationContext* opCtx,
                                                                  const NamespaceString& nss,
                                                                  const BSONObj& minKey) {
-    return ScopedMigrationRequest(txn, nss, minKey);
+    return ScopedMigrationRequest(opCtx, nss, minKey);
 }
 
 Status ScopedMigrationRequest::tryToRemoveMigration() {
-    invariant(_txn);
+    invariant(_opCtx);
     BSONObj migrationDocumentIdentifier =
         BSON(MigrationType::ns(_nss.ns()) << MigrationType::min(_minKey));
-    Status status = grid.catalogClient(_txn)->removeConfigDocuments(
-        _txn, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
+    Status status = grid.catalogClient(_opCtx)->removeConfigDocuments(
+        _opCtx, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
     if (status.isOK()) {
         // Don't try to do a no-op remove in the destructor.
-        _txn = nullptr;
+        _opCtx = nullptr;
     }
     return status;
 }
 
 void ScopedMigrationRequest::keepDocumentOnDestruct() {
-    invariant(_txn);
-    _txn = nullptr;
+    invariant(_opCtx);
+    _opCtx = nullptr;
     LOG(1) << "Keeping config.migrations document with namespace '" << _nss << "' and minKey '"
            << _minKey << "' for balancer recovery";
 }

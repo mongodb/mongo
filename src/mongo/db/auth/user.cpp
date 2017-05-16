@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-User::User(const UserName& name) : _name(name), _refCount(0), _isValid(1) {}
+User::User(const UserName& name) : _name(name), _id(), _refCount(0), _isValid(1) {}
 
 User::~User() {
     dassert(_refCount == 0);
@@ -49,6 +49,10 @@ User::~User() {
 
 const UserName& User::getName() const {
     return _name;
+}
+
+const boost::optional<OID>& User::getID() const {
+    return _id;
 }
 
 RoleNameIterator User::getRoles() const {
@@ -85,10 +89,15 @@ const ActionSet User::getActionsForResource(const ResourcePattern& resource) con
 
 User* User::clone() const {
     std::unique_ptr<User> result(new User(_name));
+    result->_id = _id;
     result->_privileges = _privileges;
     result->_roles = _roles;
     result->_credentials = _credentials;
     return result.release();
+}
+
+void User::setID(boost::optional<OID> id) {
+    _id = std::move(id);
 }
 
 void User::setCredentials(const CredentialData& credentials) {

@@ -57,9 +57,9 @@ public:
     RecoveryUnit* newRecoveryUnit();
     void listDatabases(std::vector<std::string>* out) const;
 
-    int flushAllFiles(OperationContext* txn, bool sync);
-    Status beginBackup(OperationContext* txn);
-    void endBackup(OperationContext* txn);
+    int flushAllFiles(OperationContext* opCtx, bool sync);
+    Status beginBackup(OperationContext* opCtx);
+    void endBackup(OperationContext* opCtx);
 
     DatabaseCatalogEntry* getDatabaseCatalogEntry(OperationContext* opCtx, StringData db);
 
@@ -74,19 +74,19 @@ public:
 
     virtual bool isEphemeral() const;
 
-    virtual Status closeDatabase(OperationContext* txn, StringData db);
+    virtual Status closeDatabase(OperationContext* opCtx, StringData db);
 
-    virtual Status dropDatabase(OperationContext* txn, StringData db);
+    virtual Status dropDatabase(OperationContext* opCtx, StringData db);
 
     virtual void cleanShutdown();
 
     // Callers should use  repairDatabase instead.
-    virtual Status repairRecordStore(OperationContext* txn, const std::string& ns) {
+    virtual Status repairRecordStore(OperationContext* opCtx, const std::string& ns) {
         return Status(ErrorCodes::InternalError, "MMAPv1 doesn't support repairRecordStore");
     }
 
     // MMAPv1 specific (non-virtual)
-    Status repairDatabase(OperationContext* txn,
+    Status repairDatabase(OperationContext* opCtx,
                           const std::string& dbName,
                           bool preserveClonedFilesOnFailure,
                           bool backupOriginalFiles);

@@ -32,90 +32,85 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class AScopedConnection;
-class DBClientBase;
-class DBClientCursor;
+class CachedCollectionRoutingInfo;
+class CachedDatabaseInfo;
 class OperationContext;
 
 /**
- * DEPRECATED - do not use in any new code. All new code must use the TaskExecutor interface
- * instead.
+ * Returns a copy of 'cmdObj' with 'version' appended.
  */
-class Future {
-public:
-    class CommandResult {
-    public:
-        std::string getServer() const {
-            return _server;
-        }
+BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version);
 
-        bool isDone() const {
-            return _done;
-        }
+/**
+ * Returns the read preference from the $queryOptions.$readPreference field in the cmdObj if set or
+ * defaults to PrimaryOnly and an empty TagSet.
+ */
+ReadPreferenceSetting getReadPref(const BSONObj& cmdObj);
 
-        bool ok() const {
-            verify(_done);
-            return _ok;
-        }
+/**
+ * Broadcasts 'cmdObj' to all shards and returns the responses as a vector.
+ *
+ * Returns a non-OK status if a failure occurs on *this* node during execution.
+ * Otherwise, returns success and a list of responses from shards (including errors from the shards
+ * or errors reaching the shards).
+ */
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref);
 
-        BSONObj result() const {
-            verify(_done);
-            return _res;
-        }
+/**
+ * Uses the routing table cache to broadcast a command on a namespace. By default, attaches
+ * shardVersions to the outgoing requests to shards, and retargets and retries if it receives a
+ * stale shardVersion error from any shard.
+ *
+ * If 'query' is specified, only shards that own data for the namespace are targeted. Otherwise,
+ * all shards are targeted.
+ *
+ * Returns a non-OK status if a failure occurs on *this* node during execution or on seeing an error
+ * from a shard that means the operation as a whole should fail, such as a exceeding retries for
+ * stale shardVersion errors.
+ * Otherwise, returns success and a list of responses from shards (including errors from the shards
+ * or errors reaching the shards).
+ *
+ * @appendShardVersion: if false, does not attach shardVersions to the outgoing requests.
+ * @viewDefinition: if a shard returns an error saying that the request was on a view, the shard
+ *                  will also return a view definition. The returned viewDefinition is stored in
+ *                  this parameter, so that the caller can re-run the operation as an aggregation.
+ */
+StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherForNamespace(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    const boost::optional<BSONObj> query,
+    const boost::optional<BSONObj> collation,
+    const bool appendShardVersion = true,
+    BSONObj* viewDefinition = nullptr);
 
-        /**
-           blocks until command is done
-           returns ok()
-         */
-        bool join(OperationContext* txn, int maxRetries = 1);
-
-    private:
-        CommandResult(const std::string& server,
-                      const std::string& db,
-                      const BSONObj& cmd,
-                      int options,
-                      DBClientBase* conn,
-                      bool useShardedConn);
-        void init();
-
-        std::string _server;
-        std::string _db;
-        int _options;
-        BSONObj _cmd;
-        DBClientBase* _conn;
-        std::unique_ptr<AScopedConnection> _connHolder;  // used if not provided a connection
-        bool _useShardConn;
-
-        std::unique_ptr<DBClientCursor> _cursor;
-
-        BSONObj _res;
-        bool _ok;
-        bool _done;
-
-        friend class Future;
-    };
-
-
-    /**
-     * @param server server name
-     * @param db db name
-     * @param cmd cmd to exec
-     * @param conn optional connection to use.  will use standard pooled if non-specified
-     * @param useShardConn use ShardConnection
-     */
-    static std::shared_ptr<CommandResult> spawnCommand(const std::string& server,
-                                                       const std::string& db,
-                                                       const BSONObj& cmd,
-                                                       int options,
-                                                       DBClientBase* conn = 0,
-                                                       bool useShardConn = false);
-};
+/**
+ * Attaches each shard's response or error status by the shard's connection string in a top-level
+ * field called 'raw' in 'output'.
+ *
+ * If all shards that errored had the same error, writes the common error code to 'output'. Writes a
+ * string representation of all errors to 'errmsg.'
+ *
+ * Returns true if all the shards reported success.
+ */
+bool appendRawResponses(OperationContext* opCtx,
+                        std::string* errmsg,
+                        BSONObjBuilder* output,
+                        std::vector<AsyncRequestsSender::Response> shardResponses);
 
 /**
  * Utility function to compute a single error code from a vector of command results.
@@ -137,7 +132,20 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
  *
  * Throws exception on errors.
  */
-std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* txn,
+std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
                                                            StringData dbName);
+
+/**
+ * Abstracts the common pattern of refreshing a collection and checking if it is sharded used across
+ * multiple commands.
+ */
+CachedCollectionRoutingInfo getShardedCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss);
+
+/**
+ * If the specified database exists already, loads it in the cache (if not already there) and
+ * returns it. Otherwise, if it does not exist, this call will implicitly create it as non-sharded.
+ */
+StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName);
 
 }  // namespace mongo

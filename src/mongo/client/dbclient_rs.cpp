@@ -43,7 +43,7 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -104,30 +104,19 @@ const size_t MAX_RETRY = 3;
  *
  * @throws AssertionException if the read preference object is malformed
  */
-ReadPreferenceSetting* _extractReadPref(const BSONObj& query, int queryOptions) {
-    if (Query::hasReadPreference(query)) {
-        BSONElement readPrefElement;
-
-        if (query.hasField(Query::ReadPrefField.name())) {
-            readPrefElement = query[Query::ReadPrefField.name()];
-        } else {
-            readPrefElement = query["$queryOptions"][Query::ReadPrefField.name()];
-        }
-
-        uassert(16381, "$readPreference should be an object", readPrefElement.isABSONObj());
-
-        const BSONObj& prefDoc = readPrefElement.Obj();
-
-        auto readPrefSetting = uassertStatusOK(ReadPreferenceSetting::fromBSON(prefDoc));
-
-        return new ReadPreferenceSetting(std::move(readPrefSetting));
-    }
-
+std::unique_ptr<ReadPreferenceSetting> _extractReadPref(const BSONObj& query, int queryOptions) {
     // Default read pref is primary only or secondary preferred with slaveOK
-    ReadPreference pref = queryOptions & QueryOption_SlaveOk
-        ? mongo::ReadPreference::SecondaryPreferred
-        : mongo::ReadPreference::PrimaryOnly;
-    return new ReadPreferenceSetting(pref, TagSet());
+    const auto defaultReadPref = queryOptions & QueryOption_SlaveOk
+        ? ReadPreference::SecondaryPreferred
+        : ReadPreference::PrimaryOnly;
+
+    auto readPrefContainingObj = query;
+    if (auto elem = query["$queryOptions"]) {
+        // The readPreference is embedded in the $queryOptions field.
+        readPrefContainingObj = elem.Obj();
+    }
+    return stdx::make_unique<ReadPreferenceSetting>(uassertStatusOK(
+        ReadPreferenceSetting::fromContainingBSON(readPrefContainingObj, defaultReadPref)));
 }
 
 }  // namespace
@@ -273,7 +262,9 @@ bool _isSecondaryQuery(const string& ns,
     // Only certain commands are supported for secondary operation.
 
     BSONObj actualQueryObj;
-    if (strcmp(queryObj.firstElement().fieldName(), "query") == 0) {
+    if (strcmp(queryObj.firstElement().fieldName(), "$query") == 0) {
+        actualQueryObj = queryObj["$query"].embeddedObject();
+    } else if (strcmp(queryObj.firstElement().fieldName(), "query") == 0) {
         actualQueryObj = queryObj["query"].embeddedObject();
     } else {
         actualQueryObj = queryObj;
@@ -532,7 +523,7 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string& ns,
     shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
     if (_isSecondaryQuery(ns, query.obj, *readPref)) {
         LOG(3) << "dbclient_rs query using secondary or tagged node selection in "
-               << _getMonitor()->getName() << ", read pref is " << readPref->toBSON()
+               << _getMonitor()->getName() << ", read pref is " << readPref->toString()
                << " (primary : "
                << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
                << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
@@ -584,7 +575,7 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
     shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj, queryOptions));
     if (_isSecondaryQuery(ns, query.obj, *readPref)) {
         LOG(3) << "dbclient_rs findOne using secondary or tagged node selection in "
-               << _getMonitor()->getName() << ", read pref is " << readPref->toBSON()
+               << _getMonitor()->getName() << ", read pref is " << readPref->toString()
                << " (primary : "
                << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
                << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
@@ -761,7 +752,7 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
         shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query, qm.queryOptions));
         if (_isSecondaryQuery(qm.ns, qm.query, *readPref)) {
             LOG(3) << "dbclient_rs say using secondary or tagged node selection in "
-                   << _getMonitor()->getName() << ", read pref is " << readPref->toBSON()
+                   << _getMonitor()->getName() << ", read pref is " << readPref->toString()
                    << " (primary : "
                    << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
                    << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL
@@ -932,16 +923,7 @@ DBClientReplicaSet::runCommandWithMetadataAndTarget(StringData database,
     // so we don't have to re-parse it, however, that will come with its own set of
     // complications (e.g. some kind of base class or concept for MetadataSerializable
     // objects). For now we do it the stupid way.
-    auto ssm = uassertStatusOK(rpc::ServerSelectionMetadata::readFromMetadata(
-        metadata.getField(rpc::ServerSelectionMetadata::fieldName())));
-
-    // If we didn't get a readPref with this query, we assume SecondaryPreferred if secondaryOk
-    // is true, and PrimaryOnly otherwise. This logic is replicated from _extractReadPref.
-    auto defaultReadPref = ssm.isSecondaryOk()
-        ? ReadPreferenceSetting(ReadPreference::SecondaryPreferred, TagSet())
-        : ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
-
-    auto readPref = ssm.getReadPreference().get_value_or(defaultReadPref);
+    auto readPref = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(metadata));
 
     if (readPref.pref == ReadPreference::PrimaryOnly ||
         // If the command is not runnable on a secondary, we run it on the primary
@@ -970,8 +952,8 @@ DBClientReplicaSet::runCommandWithMetadataAndTarget(StringData database,
     }
 
     uasserted(ErrorCodes::NodeNotFound,
-              str::stream() << "Could not satisfy $readPreference of '" << readPref.toBSON() << "' "
-                            << "while attempting to run command "
+              str::stream() << "Could not satisfy $readPreference of '" << readPref.toString()
+                            << "' while attempting to run command "
                             << command);
 }
 
@@ -990,7 +972,7 @@ bool DBClientReplicaSet::call(Message& toSend,
         shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query, qm.queryOptions));
         if (_isSecondaryQuery(ns, qm.query, *readPref)) {
             LOG(3) << "dbclient_rs call using secondary or tagged node selection in "
-                   << _getMonitor()->getName() << ", read pref is " << readPref->toBSON()
+                   << _getMonitor()->getName() << ", read pref is " << readPref->toString()
                    << " (primary : "
                    << (_master.get() != NULL ? _master->getServerAddress() : "[not cached]")
                    << ", lastTagged : " << (_lastSlaveOkConn.get() != NULL

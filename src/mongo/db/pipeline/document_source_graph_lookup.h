@@ -43,9 +43,10 @@ public:
 
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    void dispose() final;
     BSONObjSet getOutputSorts() final;
-    void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     /**
      * Returns the 'as' path, and possibly the fields modified by an absorbed $unwind.
@@ -55,12 +56,6 @@ public:
     bool canSwapWithMatch() const final {
         return true;
     }
-
-    /**
-     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
-     */
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);
@@ -94,6 +89,15 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+protected:
+    void doDispose() final;
+
+    /**
+     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwind' field.
+     */
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     DocumentSourceGraphLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -107,7 +111,7 @@ private:
         boost::optional<long long> maxDepth,
         boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
-    Value serialize(bool explain = false) const final {
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE;
     }
@@ -145,7 +149,7 @@ private:
      * Updates '_cache' with 'result' appropriately, given that 'result' was retrieved when querying
      * for 'queried'.
      */
-    void addToCache(Document result, const ValueUnorderedSet& queried);
+    void addToCache(const Document& result, const ValueUnorderedSet& queried);
 
     /**
      * Assert that '_visited' and '_frontier' have not exceeded the maximum meory usage, and then
@@ -199,9 +203,6 @@ private:
     // When we have internalized a $unwind, we must keep track of the input document, since we will
     // need it for multiple "getNext()" calls.
     boost::optional<Document> _input;
-
-    // The variables that are in scope to be used by the '_startWith' expression.
-    std::unique_ptr<Variables> _variables;
 
     // Keep track of a $unwind that was absorbed into this stage.
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> _unwind;

@@ -27,8 +27,10 @@
  */
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -43,7 +45,7 @@ public:
 private:
     friend class ServiceContextMongoD;
 
-    OperationContextImpl(Client* client, unsigned opId);
+    OperationContextImpl(Client* client, unsigned opId, boost::optional<LogicalSessionId> lsid);
 };
 
 }  // namespace mongo

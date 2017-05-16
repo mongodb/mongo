@@ -49,7 +49,8 @@ public:
 
     void run();
 
-    virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const;
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const;
 
 private:
     void _flushed(int ms);

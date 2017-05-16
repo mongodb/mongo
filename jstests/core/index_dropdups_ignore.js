@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of not being able to create unique index
+// using hashed shard key pattern.
+// @tags: [cannot_create_unique_index_when_using_hashed_shard_key]
+
 // SERVER-14710 dropDups is ignored and stripped from the spec when building an index.
 
 var t = db.index_dropdups_ignore;

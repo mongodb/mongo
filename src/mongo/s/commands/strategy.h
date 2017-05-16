@@ -31,19 +31,17 @@
 #include <atomic>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
 
 class DbMessage;
+struct DbResponse;
+class Message;
 class NamespaceString;
 class OperationContext;
 class QueryRequest;
-
-namespace rpc {
-class ServerSelectionMetadata;
-}  // namespace rpc
 
 /**
  * Legacy interface for processing client read/write/cmd requests.
@@ -56,35 +54,37 @@ public:
      *
      * Must not be called with legacy '.$cmd' commands.
      */
-    static void queryOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
+    static DbResponse queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style getMore request and sends the response back on success (or cursor not
      * found) or throws on error.
      */
-    static void getMore(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
+    static DbResponse getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style killCursors request. Doesn't send any response on success or throws on
      * error.
      */
-    static void killCursors(OperationContext* txn, DbMessage* dbm);
+    static void killCursors(OperationContext* opCtx, DbMessage* dbm);
 
     /**
      * Handles a legacy-style write operation request and updates the last error state on the client
      * with the result from the operation. Doesn't send any response back and does not throw on
      * errors.
      */
-    static void writeOp(OperationContext* txn, DbMessage* dbm);
+    static void writeOp(OperationContext* opCtx, DbMessage* dbm);
 
     /**
-     * Executes a legacy-style ($cmd namespace) command. Does not throw and returns the response
-     * regardless of success or error.
+     * Executes a command from either OP_QUERY or OP_MSG wire protocols.
      *
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static void clientCommandOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
+    static DbResponse clientOpMsgCommand(OperationContext* opCtx, const Message& message);
+    static DbResponse clientOpQueryCommand(OperationContext* opCtx,
+                                           NamespaceString nss,
+                                           DbMessage* dbm);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
@@ -94,14 +94,19 @@ public:
      * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
      * $explain modifier.
      */
-    static Status explainFind(OperationContext* txn,
+    static Status explainFind(OperationContext* opCtx,
                               const BSONObj& findCommand,
                               const QueryRequest& qr,
-                              ExplainCommon::Verbosity verbosity,
-                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                              ExplainOptions::Verbosity verbosity,
+                              const ReadPreferenceSetting& readPref,
                               BSONObjBuilder* out);
 
     struct CommandResult {
+        CommandResult() = default;
+        CommandResult(ShardId shardId, ConnectionString target, BSONObj result)
+            : shardTargetId(std::move(shardId)),
+              target(std::move(target)),
+              result(std::move(result)) {}
         ShardId shardTargetId;
         ConnectionString target;
         BSONObj result;
@@ -117,10 +122,9 @@ public:
      * TODO: Replace these methods and all other methods of command dispatch with a more general
      * command op framework.
      */
-    static void commandOp(OperationContext* txn,
+    static void commandOp(OperationContext* opCtx,
                           const std::string& db,
                           const BSONObj& command,
-                          int options,
                           const std::string& versionedNS,
                           const BSONObj& targetingQuery,
                           const BSONObj& targetingCollation,

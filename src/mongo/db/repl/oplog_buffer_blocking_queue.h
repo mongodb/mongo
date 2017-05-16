@@ -41,23 +41,23 @@ class OplogBufferBlockingQueue final : public OplogBuffer {
 public:
     OplogBufferBlockingQueue();
 
-    void startup(OperationContext* txn) override;
-    void shutdown(OperationContext* txn) override;
-    void pushEvenIfFull(OperationContext* txn, const Value& value) override;
-    void push(OperationContext* txn, const Value& value) override;
-    void pushAllNonBlocking(OperationContext* txn,
+    void startup(OperationContext* opCtx) override;
+    void shutdown(OperationContext* opCtx) override;
+    void pushEvenIfFull(OperationContext* opCtx, const Value& value) override;
+    void push(OperationContext* opCtx, const Value& value) override;
+    void pushAllNonBlocking(OperationContext* opCtx,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
-    void waitForSpace(OperationContext* txn, std::size_t size) override;
+    void waitForSpace(OperationContext* opCtx, std::size_t size) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;
     std::size_t getSize() const override;
     std::size_t getCount() const override;
-    void clear(OperationContext* txn) override;
-    bool tryPop(OperationContext* txn, Value* value) override;
+    void clear(OperationContext* opCtx) override;
+    bool tryPop(OperationContext* opCtx, Value* value) override;
     bool waitForData(Seconds waitDuration) override;
-    bool peek(OperationContext* txn, Value* value) override;
-    boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
+    bool peek(OperationContext* opCtx, Value* value) override;
+    boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
 private:
     BlockingQueue<BSONObj> _queue;

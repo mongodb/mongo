@@ -55,7 +55,7 @@ BSONObj extractSortKey(const char* sortSpec,
                        const char* query,
                        const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     WorkingSetMember wsm;
     wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(doc));
@@ -63,7 +63,7 @@ BSONObj extractSortKey(const char* sortSpec,
 
     BSONObj sortKey;
     auto sortKeyGen = stdx::make_unique<SortKeyGenerator>(
-        txn.get(), fromjson(sortSpec), fromjson(query), collator);
+        opCtx.get(), fromjson(sortSpec), fromjson(query), collator);
     ASSERT_OK(sortKeyGen->getSortKey(wsm, &sortKey));
 
     return sortKey;
@@ -83,7 +83,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
                               const IndexKeyDatum& ikd,
                               const CollatorInterface* collator) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     WorkingSet ws;
     WorkingSetID wsid = ws.allocate();
@@ -93,7 +93,7 @@ BSONObj extractSortKeyCovered(const char* sortSpec,
 
     BSONObj sortKey;
     auto sortKeyGen =
-        stdx::make_unique<SortKeyGenerator>(txn.get(), fromjson(sortSpec), BSONObj(), collator);
+        stdx::make_unique<SortKeyGenerator>(opCtx.get(), fromjson(sortSpec), BSONObj(), collator);
     ASSERT_OK(sortKeyGen->getSortKey(*wsm, &sortKey));
 
     return sortKey;

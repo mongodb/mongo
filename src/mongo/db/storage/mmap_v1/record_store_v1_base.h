@@ -50,10 +50,10 @@ public:
     virtual ~RecordStoreV1MetaData() {}
 
     virtual const DiskLoc& capExtent() const = 0;
-    virtual void setCapExtent(OperationContext* txn, const DiskLoc& loc) = 0;
+    virtual void setCapExtent(OperationContext* opCtx, const DiskLoc& loc) = 0;
 
     virtual const DiskLoc& capFirstNewRecord() const = 0;
-    virtual void setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc) = 0;
+    virtual void setCapFirstNewRecord(OperationContext* opCtx, const DiskLoc& loc) = 0;
 
     bool capLooped() const {
         return capFirstNewRecord().isValid();
@@ -62,36 +62,36 @@ public:
     virtual long long dataSize() const = 0;
     virtual long long numRecords() const = 0;
 
-    virtual void incrementStats(OperationContext* txn,
+    virtual void incrementStats(OperationContext* opCtx,
                                 long long dataSizeIncrement,
                                 long long numRecordsIncrement) = 0;
 
-    virtual void setStats(OperationContext* txn, long long dataSize, long long numRecords) = 0;
+    virtual void setStats(OperationContext* opCtx, long long dataSize, long long numRecords) = 0;
 
     virtual DiskLoc deletedListEntry(int bucket) const = 0;
-    virtual void setDeletedListEntry(OperationContext* txn, int bucket, const DiskLoc& loc) = 0;
+    virtual void setDeletedListEntry(OperationContext* opCtx, int bucket, const DiskLoc& loc) = 0;
 
     virtual DiskLoc deletedListLegacyGrabBag() const = 0;
-    virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc) = 0;
+    virtual void setDeletedListLegacyGrabBag(OperationContext* opCtx, const DiskLoc& loc) = 0;
 
-    virtual void orphanDeletedList(OperationContext* txn) = 0;
+    virtual void orphanDeletedList(OperationContext* opCtx) = 0;
 
-    virtual const DiskLoc& firstExtent(OperationContext* txn) const = 0;
-    virtual void setFirstExtent(OperationContext* txn, const DiskLoc& loc) = 0;
+    virtual const DiskLoc& firstExtent(OperationContext* opCtx) const = 0;
+    virtual void setFirstExtent(OperationContext* opCtx, const DiskLoc& loc) = 0;
 
-    virtual const DiskLoc& lastExtent(OperationContext* txn) const = 0;
-    virtual void setLastExtent(OperationContext* txn, const DiskLoc& loc) = 0;
+    virtual const DiskLoc& lastExtent(OperationContext* opCtx) const = 0;
+    virtual void setLastExtent(OperationContext* opCtx, const DiskLoc& loc) = 0;
 
     virtual bool isCapped() const = 0;
 
     virtual bool isUserFlagSet(int flag) const = 0;
     virtual int userFlags() const = 0;
-    virtual bool setUserFlag(OperationContext* txn, int flag) = 0;
-    virtual bool clearUserFlag(OperationContext* txn, int flag) = 0;
-    virtual bool replaceUserFlags(OperationContext* txn, int flags) = 0;
+    virtual bool setUserFlag(OperationContext* opCtx, int flag) = 0;
+    virtual bool clearUserFlag(OperationContext* opCtx, int flag) = 0;
+    virtual bool replaceUserFlags(OperationContext* opCtx, int flags) = 0;
 
-    virtual int lastExtentSize(OperationContext* txn) const = 0;
-    virtual void setLastExtentSize(OperationContext* txn, int newMax) = 0;
+    virtual int lastExtentSize(OperationContext* opCtx) const = 0;
+    virtual void setLastExtentSize(OperationContext* opCtx, int newMax) = 0;
 
     virtual long long maxCappedDocs() const = 0;
 };
@@ -172,34 +172,34 @@ public:
 
     virtual ~RecordStoreV1Base();
 
-    virtual long long dataSize(OperationContext* txn) const {
+    virtual long long dataSize(OperationContext* opCtx) const {
         return _details->dataSize();
     }
-    virtual long long numRecords(OperationContext* txn) const {
+    virtual long long numRecords(OperationContext* opCtx) const {
         return _details->numRecords();
     }
 
-    virtual int64_t storageSize(OperationContext* txn,
+    virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int level = 0) const;
 
-    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
+    virtual RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const;
 
-    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* rd) const;
+    virtual bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const;
 
-    void deleteRecord(OperationContext* txn, const RecordId& dl);
+    void deleteRecord(OperationContext* opCtx, const RecordId& dl);
 
-    StatusWith<RecordId> insertRecord(OperationContext* txn,
+    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
                                       const char* data,
                                       int len,
                                       bool enforceQuota);
 
-    Status insertRecordsWithDocWriter(OperationContext* txn,
+    Status insertRecordsWithDocWriter(OperationContext* opCtx,
                                       const DocWriter* const* docs,
                                       size_t nDocs,
                                       RecordId* idsOut) final;
 
-    virtual Status updateRecord(OperationContext* txn,
+    virtual Status updateRecord(OperationContext* opCtx,
                                 const RecordId& oldLocation,
                                 const char* data,
                                 int len,
@@ -208,27 +208,27 @@ public:
 
     virtual bool updateWithDamagesSupported() const;
 
-    virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext* opCtx,
                                                      const RecordId& loc,
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
 
-    virtual std::unique_ptr<RecordCursor> getCursorForRepair(OperationContext* txn) const;
+    virtual std::unique_ptr<RecordCursor> getCursorForRepair(OperationContext* opCtx) const;
 
-    void increaseStorageSize(OperationContext* txn, int size, bool enforceQuota);
+    void increaseStorageSize(OperationContext* opCtx, int size, bool enforceQuota);
 
-    virtual Status validate(OperationContext* txn,
+    virtual Status validate(OperationContext* opCtx,
                             ValidateCmdLevel level,
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
                             BSONObjBuilder* output);
 
-    virtual void appendCustomStats(OperationContext* txn,
+    virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const;
 
-    virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
+    virtual Status touch(OperationContext* opCtx, BSONObjBuilder* output) const;
 
     const RecordStoreV1MetaData* details() const {
         return _details.get();
@@ -237,13 +237,13 @@ public:
     // This keeps track of cursors saved during yielding, for invalidation purposes.
     SavedCursorRegistry savedCursors;
 
-    DiskLoc getExtentLocForRecord(OperationContext* txn, const DiskLoc& loc) const;
+    DiskLoc getExtentLocForRecord(OperationContext* opCtx, const DiskLoc& loc) const;
 
-    DiskLoc getNextRecord(OperationContext* txn, const DiskLoc& loc) const;
-    DiskLoc getPrevRecord(OperationContext* txn, const DiskLoc& loc) const;
+    DiskLoc getNextRecord(OperationContext* opCtx, const DiskLoc& loc) const;
+    DiskLoc getPrevRecord(OperationContext* opCtx, const DiskLoc& loc) const;
 
-    DiskLoc getNextRecordInExtent(OperationContext* txn, const DiskLoc& loc) const;
-    DiskLoc getPrevRecordInExtent(OperationContext* txn, const DiskLoc& loc) const;
+    DiskLoc getNextRecordInExtent(OperationContext* opCtx, const DiskLoc& loc) const;
+    DiskLoc getPrevRecordInExtent(OperationContext* opCtx, const DiskLoc& loc) const;
 
     /**
      * Quantize 'minSize' to the nearest allocation size.
@@ -255,9 +255,9 @@ public:
     /* return which "deleted bucket" for this size object */
     static int bucket(int size);
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override {}
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {}
 
-    virtual void updateStatsAfterRepair(OperationContext* txn,
+    virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize) {
         invariant(false);  // MMAPv1 has its own repair which doesn't call this.
@@ -272,43 +272,43 @@ protected:
 
     virtual bool shouldPadInserts() const = 0;
 
-    virtual StatusWith<DiskLoc> allocRecord(OperationContext* txn,
+    virtual StatusWith<DiskLoc> allocRecord(OperationContext* opCtx,
                                             int lengthWithHeaders,
                                             bool enforceQuota) = 0;
 
     // TODO: document, remove, what have you
-    virtual void addDeletedRec(OperationContext* txn, const DiskLoc& dloc) = 0;
+    virtual void addDeletedRec(OperationContext* opCtx, const DiskLoc& dloc) = 0;
 
     // TODO: another sad one
     virtual DeletedRecord* drec(const DiskLoc& loc) const;
 
     // just a wrapper for _extentManager->getExtent( loc );
-    Extent* _getExtent(OperationContext* txn, const DiskLoc& loc) const;
+    Extent* _getExtent(OperationContext* opCtx, const DiskLoc& loc) const;
 
-    DiskLoc _getExtentLocForRecord(OperationContext* txn, const DiskLoc& loc) const;
+    DiskLoc _getExtentLocForRecord(OperationContext* opCtx, const DiskLoc& loc) const;
 
-    DiskLoc _getNextRecord(OperationContext* txn, const DiskLoc& loc) const;
-    DiskLoc _getPrevRecord(OperationContext* txn, const DiskLoc& loc) const;
+    DiskLoc _getNextRecord(OperationContext* opCtx, const DiskLoc& loc) const;
+    DiskLoc _getPrevRecord(OperationContext* opCtx, const DiskLoc& loc) const;
 
-    DiskLoc _getNextRecordInExtent(OperationContext* txn, const DiskLoc& loc) const;
-    DiskLoc _getPrevRecordInExtent(OperationContext* txn, const DiskLoc& loc) const;
+    DiskLoc _getNextRecordInExtent(OperationContext* opCtx, const DiskLoc& loc) const;
+    DiskLoc _getPrevRecordInExtent(OperationContext* opCtx, const DiskLoc& loc) const;
 
     /**
      * finds the first suitable DiskLoc for data
      * will return the DiskLoc of a newly created DeletedRecord
      */
-    DiskLoc _findFirstSpot(OperationContext* txn, const DiskLoc& extDiskLoc, Extent* e);
+    DiskLoc _findFirstSpot(OperationContext* opCtx, const DiskLoc& extDiskLoc, Extent* e);
 
     /** add a record to the end of the linked list chain within this extent.
         require: you must have already declared write intent for the record header.
     */
-    void _addRecordToRecListInExtent(OperationContext* txn, MmapV1RecordHeader* r, DiskLoc loc);
+    void _addRecordToRecListInExtent(OperationContext* opCtx, MmapV1RecordHeader* r, DiskLoc loc);
 
     /**
      * internal
      * doesn't check inputs or change padding
      */
-    StatusWith<RecordId> _insertRecord(OperationContext* txn,
+    StatusWith<RecordId> _insertRecord(OperationContext* opCtx,
                                        const char* data,
                                        int len,
                                        bool enforceQuota);
@@ -327,23 +327,23 @@ protected:
  */
 class RecordStoreV1Base::IntraExtentIterator final : public RecordCursor {
 public:
-    IntraExtentIterator(OperationContext* txn,
+    IntraExtentIterator(OperationContext* opCtx,
                         DiskLoc start,
                         const RecordStoreV1Base* rs,
                         bool forward = true)
-        : _txn(txn), _curr(start), _rs(rs), _forward(forward) {}
+        : _opCtx(opCtx), _curr(start), _rs(rs), _forward(forward) {}
 
     boost::optional<Record> next() final;
-    void invalidate(OperationContext* txn, const RecordId& dl) final;
+    void invalidate(OperationContext* opCtx, const RecordId& dl) final;
     void save() final {}
     bool restore() final {
         return true;
     }
     void detachFromOperationContext() final {
-        _txn = nullptr;
+        _opCtx = nullptr;
     }
-    void reattachToOperationContext(OperationContext* txn) final {
-        _txn = txn;
+    void reattachToOperationContext(OperationContext* opCtx) final {
+        _opCtx = opCtx;
     }
     std::unique_ptr<RecordFetcher> fetcherForNext() const final;
 
@@ -354,7 +354,7 @@ private:
 
     void advance();
 
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     DiskLoc _curr;
     const RecordStoreV1Base* _rs;
     bool _forward;

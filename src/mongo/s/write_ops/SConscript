@@ -35,6 +35,7 @@ env.Library(
     LIBDEPS=[
         'batch_write_types',
         '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
     ],

@@ -47,7 +47,7 @@ namespace mongo {
  */
 class MultiIteratorStage final : public PlanStage {
 public:
-    MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
+    MultiIteratorStage(OperationContext* opCtx, WorkingSet* ws, Collection* collection);
 
     void addIterator(std::unique_ptr<RecordCursor> it);
 
@@ -61,7 +61,7 @@ public:
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     // Returns empty PlanStageStats object
     std::unique_ptr<PlanStageStats> getStats() final;
@@ -79,7 +79,7 @@ public:
     static const char* kStageType;
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     Collection* _collection;
     std::vector<std::unique_ptr<RecordCursor>> _iterators;
 

@@ -137,6 +137,11 @@ enum BinDataType {
     bdtCustom = 128
 };
 
+/**
+ * Return the name of the BinData Type.
+ */
+const char* typeName(BinDataType type);
+
 /** Returns a number for where a given type falls in the sort order.
  *  Elements with the same return value should be compared for value equality.
  *  The return value is not a BSONType and should not be treated as one.

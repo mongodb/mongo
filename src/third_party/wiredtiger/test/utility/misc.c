@@ -28,6 +28,7 @@
 #include "test_util.h"
 
 void (*custom_die)(void) = NULL;
+const char *progname = "program name not set";
 
 /*
  * die --
@@ -42,7 +43,9 @@ testutil_die(int e, const char *fmt, ...)
 	if (custom_die != NULL)
 		(*custom_die)();
 
+	fprintf(stderr, "%s: FAILED", progname);
 	if (fmt != NULL) {
+		fprintf(stderr, ": ");
 		va_start(ap, fmt);
 		vfprintf(stderr, fmt, ap);
 		va_end(ap);
@@ -52,6 +55,20 @@ testutil_die(int e, const char *fmt, ...)
 	fprintf(stderr, "\n");
 
 	exit(EXIT_FAILURE);
+}
+
+/*
+ * testutil_set_progname --
+ *	Set the global program name for error handling.
+ */
+const char *
+testutil_set_progname(char * const *argv)
+{
+	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
+		progname = argv[0];
+	else
+		++progname;
+	return (progname);
 }
 
 /*
@@ -91,14 +108,14 @@ testutil_clean_work_dir(const char *dir)
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
-	snprintf(buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir,
-		 RM_COMMAND, dir);
+	testutil_check(__wt_snprintf(
+	    buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir, RM_COMMAND, dir));
 #else
 	len = strlen(dir) + strlen(RM_COMMAND) + 1;
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
-	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
+	testutil_check(__wt_snprintf(buf, len, "%s%s", RM_COMMAND, dir));
 #endif
 
 	if ((ret = system(buf)) != 0 && ret != ENOENT)
@@ -125,7 +142,7 @@ testutil_make_work_dir(char *dir)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	/* mkdir shares syntax between Windows and Linux */
-	snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir);
+	testutil_check(__wt_snprintf(buf, len, "%s%s", MKDIR_COMMAND, dir));
 	if ((ret = system(buf)) != 0)
 		testutil_die(ret, "%s", buf);
 	free(buf);
@@ -149,20 +166,25 @@ testutil_cleanup(TEST_OPTS *opts)
 }
 
 /*
- * testutil_disable_long_tests --
- *	Return if TESTUTIL_DISABLE_LONG_TESTS is set.
+ * testutil_enable_long_tests --
+ *	Return if TESTUTIL_ENABLE_LONG_TESTS is set.
  */
 bool
-testutil_disable_long_tests(void)
+testutil_enable_long_tests(void)
 {
 	const char *res;
+	bool enable_long_tests;
 
 	if (__wt_getenv(NULL,
-	    "TESTUTIL_DISABLE_LONG_TESTS", &res) == WT_NOTFOUND)
+	    "TESTUTIL_ENABLE_LONG_TESTS", &res) == WT_NOTFOUND)
 		return (false);
 
+	/* Accept anything other than "TESTUTIL_ENABLE_LONG_TESTS=0". */
+	enable_long_tests = res[0] != '0';
+
 	free((void *)res);
-	return (true);
+
+	return (enable_long_tests);
 }
 
 /*

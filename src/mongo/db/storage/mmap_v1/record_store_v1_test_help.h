@@ -44,33 +44,33 @@ public:
     virtual ~DummyRecordStoreV1MetaData() {}
 
     virtual const DiskLoc& capExtent() const;
-    virtual void setCapExtent(OperationContext* txn, const DiskLoc& loc);
+    virtual void setCapExtent(OperationContext* opCtx, const DiskLoc& loc);
 
     virtual const DiskLoc& capFirstNewRecord() const;
-    virtual void setCapFirstNewRecord(OperationContext* txn, const DiskLoc& loc);
+    virtual void setCapFirstNewRecord(OperationContext* opCtx, const DiskLoc& loc);
 
     virtual long long dataSize() const;
     virtual long long numRecords() const;
 
-    virtual void incrementStats(OperationContext* txn,
+    virtual void incrementStats(OperationContext* opCtx,
                                 long long dataSizeIncrement,
                                 long long numRecordsIncrement);
 
-    virtual void setStats(OperationContext* txn, long long dataSize, long long numRecords);
+    virtual void setStats(OperationContext* opCtx, long long dataSize, long long numRecords);
 
     virtual DiskLoc deletedListEntry(int bucket) const;
-    virtual void setDeletedListEntry(OperationContext* txn, int bucket, const DiskLoc& loc);
+    virtual void setDeletedListEntry(OperationContext* opCtx, int bucket, const DiskLoc& loc);
 
     virtual DiskLoc deletedListLegacyGrabBag() const;
-    virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+    virtual void setDeletedListLegacyGrabBag(OperationContext* opCtx, const DiskLoc& loc);
 
-    virtual void orphanDeletedList(OperationContext* txn);
+    virtual void orphanDeletedList(OperationContext* opCtx);
 
-    virtual const DiskLoc& firstExtent(OperationContext* txn) const;
-    virtual void setFirstExtent(OperationContext* txn, const DiskLoc& loc);
+    virtual const DiskLoc& firstExtent(OperationContext* opCtx) const;
+    virtual void setFirstExtent(OperationContext* opCtx, const DiskLoc& loc);
 
-    virtual const DiskLoc& lastExtent(OperationContext* txn) const;
-    virtual void setLastExtent(OperationContext* txn, const DiskLoc& loc);
+    virtual const DiskLoc& lastExtent(OperationContext* opCtx) const;
+    virtual void setLastExtent(OperationContext* opCtx, const DiskLoc& loc);
 
     virtual bool isCapped() const;
 
@@ -78,13 +78,13 @@ public:
     virtual int userFlags() const {
         return _userFlags;
     }
-    virtual bool setUserFlag(OperationContext* txn, int flag);
-    virtual bool clearUserFlag(OperationContext* txn, int flag);
-    virtual bool replaceUserFlags(OperationContext* txn, int flags);
+    virtual bool setUserFlag(OperationContext* opCtx, int flag);
+    virtual bool clearUserFlag(OperationContext* opCtx, int flag);
+    virtual bool replaceUserFlags(OperationContext* opCtx, int flags);
 
 
-    virtual int lastExtentSize(OperationContext* txn) const;
-    virtual void setLastExtentSize(OperationContext* txn, int newMax);
+    virtual int lastExtentSize(OperationContext* opCtx) const;
+    virtual void setLastExtentSize(OperationContext* opCtx, int newMax);
 
     virtual long long maxCappedDocs() const;
 
@@ -113,20 +113,23 @@ class DummyExtentManager : public ExtentManager {
 public:
     virtual ~DummyExtentManager();
 
-    virtual void close(OperationContext* txn);
+    virtual void close(OperationContext* opCtx);
 
-    virtual Status init(OperationContext* txn);
+    virtual Status init(OperationContext* opCtx);
 
     virtual int numFiles() const;
     virtual long long fileSize() const;
 
-    virtual DiskLoc allocateExtent(OperationContext* txn, bool capped, int size, bool enforceQuota);
+    virtual DiskLoc allocateExtent(OperationContext* opCtx,
+                                   bool capped,
+                                   int size,
+                                   bool enforceQuota);
 
-    virtual void freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt);
+    virtual void freeExtents(OperationContext* opCtx, DiskLoc firstExt, DiskLoc lastExt);
 
-    virtual void freeExtent(OperationContext* txn, DiskLoc extent);
+    virtual void freeExtent(OperationContext* opCtx, DiskLoc extent);
 
-    virtual void freeListStats(OperationContext* txn,
+    virtual void freeListStats(OperationContext* opCtx,
                                int* numExtents,
                                int64_t* totalFreeSizeBytes) const;
 
@@ -144,9 +147,9 @@ public:
 
     virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint);
 
-    DataFileVersion getFileFormat(OperationContext* txn) const final;
+    DataFileVersion getFileFormat(OperationContext* opCtx) const final;
 
-    virtual void setFileFormat(OperationContext* txn, DataFileVersion newVersion) final;
+    virtual void setFileFormat(OperationContext* opCtx, DataFileVersion newVersion) final;
 
     const DataFile* getOpenFile(int n) const final;
 
@@ -184,7 +187,7 @@ struct LocAndSize {
  *
  * ExtentManager and MetaData must both be empty.
  */
-void initializeV1RS(OperationContext* txn,
+void initializeV1RS(OperationContext* opCtx,
                     const LocAndSize* records,
                     const LocAndSize* drecs,
                     const LocAndSize* legacyGrabBag,
@@ -198,7 +201,7 @@ void initializeV1RS(OperationContext* txn,
  * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer means don't check
  * that list.
  */
-void assertStateV1RS(OperationContext* txn,
+void assertStateV1RS(OperationContext* opCtx,
                      const LocAndSize* records,
                      const LocAndSize* drecs,
                      const LocAndSize* legacyGrabBag,

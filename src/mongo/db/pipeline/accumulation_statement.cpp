@@ -63,6 +63,11 @@ Accumulator::Factory AccumulationStatement::getFactory(StringData name) {
     return it->second;
 }
 
+boost::intrusive_ptr<Accumulator> AccumulationStatement::makeAccumulator(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    return _factory(expCtx);
+}
+
 AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONElement& elem,
@@ -92,8 +97,8 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             specElem.type() != BSONType::Array);
 
     return {fieldName.toString(),
-            AccumulationStatement::getFactory(accName),
-            Expression::parseOperand(expCtx, specElem, vps)};
+            Expression::parseOperand(expCtx, specElem, vps),
+            AccumulationStatement::getFactory(accName)};
 }
 
 }  // namespace mongo

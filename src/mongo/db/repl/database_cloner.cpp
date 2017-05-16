@@ -41,7 +41,6 @@
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
@@ -58,6 +57,8 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
+const char* kInfoFieldName = "info";
+const char* kUUIDFieldName = "uuid";
 
 // The number of attempts for the listCollections commands.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);
@@ -113,7 +114,7 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                                          stdx::placeholders::_1,
                                          stdx::placeholders::_2,
                                          stdx::placeholders::_3),
-                              rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+                              ReadPreferenceSetting::secondaryPreferredMetadata(),
                               RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::makeRetryPolicy(
                                   numInitialSyncListCollectionsAttempts.load(),
@@ -138,24 +139,6 @@ DatabaseCloner::~DatabaseCloner() {
 const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos_forTest() const {
     LockGuard lk(_mutex);
     return _collectionInfos;
-}
-
-std::string DatabaseCloner::getDiagnosticString() const {
-    LockGuard lk(_mutex);
-    return _getDiagnosticString_inlock();
-}
-
-std::string DatabaseCloner::_getDiagnosticString_inlock() const {
-    str::stream output;
-    output << "DatabaseCloner";
-    output << " executor: " << _executor->getDiagnosticString();
-    output << " source: " << _source.toString();
-    output << " database: " << _dbname;
-    output << " listCollections filter" << _listCollectionsFilter;
-    output << " active: " << _isActive_inlock();
-    output << " collection info objects (empty if listCollections is in progress): "
-           << _collectionInfos.size();
-    return output;
 }
 
 bool DatabaseCloner::isActive() const {
@@ -341,11 +324,26 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         }
         const BSONObj optionsObj = optionsElement.Obj();
         CollectionOptions options;
-        Status parseStatus = options.parse(optionsObj);
+        Status parseStatus = options.parse(optionsObj, CollectionOptions::parseForCommand);
         if (!parseStatus.isOK()) {
             _finishCallback_inlock(lk, parseStatus);
             return;
         }
+
+        BSONElement infoElement = info.getField(kInfoFieldName);
+        if (infoElement.isABSONObj()) {
+            BSONElement uuidElement = infoElement[kUUIDFieldName];
+            if (!uuidElement.eoo()) {
+                auto res = CollectionUUID::parse(uuidElement);
+                if (!res.isOK()) {
+                    _finishCallback_inlock(lk, res.getStatus());
+                    return;
+                }
+                options.uuid = res.getValue();
+            }
+        }
+        // TODO(SERVER-27994): Ensure UUID present when FCV >= "3.6".
+
         seen.insert(collectionName);
 
         _collectionNamespaces.emplace_back(_dbname, collectionName);

@@ -87,33 +87,10 @@ TEST_F(ReplyTest, ParseAllFields) {
     auto metadata = metadataBob.done();
     writeObj(metadata);
 
-    BSONObjBuilder outputDoc1Bob{};
-    outputDoc1Bob.append("meep", "boop").append("meow", "chirp");
-    auto outputDoc1 = outputDoc1Bob.done();
-    writeObj(outputDoc1);
-
-    BSONObjBuilder outputDoc2Bob{};
-    outputDoc1Bob.append("bleep", "bop").append("woof", "squeak");
-    auto outputDoc2 = outputDoc2Bob.done();
-    writeObj(outputDoc2);
-
     rpc::CommandReply opCmdReply{buildMessage()};
 
     ASSERT_BSONOBJ_EQ(opCmdReply.getMetadata(), metadata);
     ASSERT_BSONOBJ_EQ(opCmdReply.getCommandReply(), commandReply);
-
-    auto outputDocRange = opCmdReply.getOutputDocs();
-    auto outputDocRangeIter = outputDocRange.begin();
-
-    ASSERT_BSONOBJ_EQ(*outputDocRangeIter, outputDoc1);
-    // can't use assert equals since we don't have an op to print the iter.
-    ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
-    ++outputDocRangeIter;
-    ASSERT_BSONOBJ_EQ(*outputDocRangeIter, outputDoc2);
-    ASSERT_FALSE(outputDocRangeIter == outputDocRange.end());
-    ++outputDocRangeIter;
-
-    ASSERT_TRUE(outputDocRangeIter == outputDocRange.end());
 }
 
 TEST_F(ReplyTest, EmptyMessageThrows) {

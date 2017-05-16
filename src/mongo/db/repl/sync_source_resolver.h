@@ -70,10 +70,10 @@ struct SyncSourceResolverResponse {
     // Contains the new MinValid boundry if syncSourceStatus is ErrorCodes::OplogStartMissing.
     OpTime earliestOpTimeSeen;
 
-    // Rollback ID of the selected sync source. Only filled in when there is a required optime.
+    // Rollback ID of the selected sync source.
     // The rbid is fetched before the required optime so callers can be sure that as long as the
     // rbid is the same, the required optime is still present.
-    boost::optional<int> rbid;
+    int rbid;
 
     bool isOK() {
         return syncSourceStatus.isOK();
@@ -230,7 +230,7 @@ private:
     const OnCompletionFn _onCompletion;
 
     // The rbid we will return to our caller.
-    boost::optional<int> _rbid;
+    int _rbid;
 
     // Protects members of this sync source resolver defined below.
     mutable stdx::mutex _mutex;

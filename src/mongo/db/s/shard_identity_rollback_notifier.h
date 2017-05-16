@@ -59,8 +59,8 @@ public:
     /**
      * Retrieves the ShardIdentityRollbackNotifier associated with the specified service context.
      */
-    static ShardIdentityRollbackNotifier* get(OperationContext* txn);
-    static ShardIdentityRollbackNotifier* get(ServiceContext* txn);
+    static ShardIdentityRollbackNotifier* get(OperationContext* opCtx);
+    static ShardIdentityRollbackNotifier* get(ServiceContext* opCtx);
 
     /**
      * Records the fact that the shardIdentity document was rolled back.

@@ -58,16 +58,14 @@ public:
      * early if one of hooks returned a non OK status and return it. Note that metadataBob should
      * not be used if Status is not OK as the contents can be partial.
      */
-    Status writeRequestMetadata(OperationContext* txn,
-                                const HostAndPort& requestDestination,
-                                BSONObjBuilder* metadataBob) override;
+    Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) override;
 
     /**
      * Calls readReplyMetadata on every hook in the order they were added. This will terminate
      * early if one of hooks returned a non OK status and return it. Note that metadataBob should
      * not be used if Status is not OK as the contents can be partial.
      */
-    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
+    Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) override;
 
 private:
     std::vector<std::unique_ptr<EgressMetadataHook>> _hooks;

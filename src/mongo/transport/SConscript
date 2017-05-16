@@ -74,6 +74,7 @@ env.Library(
     target='service_entry_point_utils',
     source=[
         'service_entry_point_utils.cpp',
+        'service_entry_point_impl.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/service_context",
@@ -127,5 +128,17 @@ env.CppUnitTest(
     LIBDEPS=[
         'message_compressor',
     ]
+)
+
+env.CppUnitTest(
+    target='transport_layer_legacy_test',
+    source=[
+        'transport_layer_legacy_test.cpp',
+    ],
+    LIBDEPS=[
+        'transport_layer_legacy',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+    ],
 )
 

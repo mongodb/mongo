@@ -177,16 +177,16 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         }
     }
 
-    auto ret =
-        _connectString.connect(applicationName, errmsg, socketTimeoutSecs.value_or(0.0), this);
+    auto ret = std::unique_ptr<DBClientBase>(
+        _connectString.connect(applicationName, errmsg, socketTimeoutSecs.value_or(0.0), this));
     if (!ret) {
-        return ret;
+        return nullptr;
     }
 
     if (!_user.empty()) {
         ret->auth(_makeAuthObjFromOptions(ret->getMaxWireVersion()));
     }
-    return ret;
+    return ret.release();
 }
 
 }  // namespace mongo

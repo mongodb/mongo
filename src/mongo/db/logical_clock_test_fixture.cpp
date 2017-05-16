@@ -30,22 +30,66 @@
 
 #include "mongo/db/logical_clock_test_fixture.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 
-void LogicalClockTest::setUp() {
-    auto service = getGlobalServiceContext();
+LogicalClockTestFixture::LogicalClockTestFixture() = default;
 
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
-    auto logicalClock =
-        stdx::make_unique<LogicalClock>(service, std::move(timeProofService), false);
+LogicalClockTestFixture::~LogicalClockTestFixture() = default;
+
+void LogicalClockTestFixture::setUp() {
+    ShardingMongodTestFixture::setUp();
+
+    auto service = getServiceContext();
+
+    auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
+    _clock = LogicalClock::get(service);
+
+    service->setFastClockSource(stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
+    service->setPreciseClockSource(stdx::make_unique<SharedClockSourceAdapter>(_mockClockSource));
+
+    _dbDirectClient = stdx::make_unique<DBDirectClient>(operationContext());
+
+    // Set master to false (set to true in ShardingMongodTestFixture::setUp()) so follower mode can
+    // be toggled meaningfully. Default follower mode to primary, so writes can be accepted.
+    replicationCoordinator()->setMaster(false);
+    replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+}
+
+void LogicalClockTestFixture::tearDown() {
+    _dbDirectClient.reset();
+    ShardingMongodTestFixture::tearDown();
+}
+
+LogicalClock* LogicalClockTestFixture::getClock() const {
+    return _clock;
+}
+
+ClockSourceMock* LogicalClockTestFixture::getMockClockSource() const {
+    return _mockClockSource.get();
+}
+
+void LogicalClockTestFixture::setMockClockSourceTime(Date_t time) const {
+    _mockClockSource->reset(time);
+}
+
+Date_t LogicalClockTestFixture::getMockClockSourceTime() const {
+    return _mockClockSource->now();
+}
+
+DBDirectClient* LogicalClockTestFixture::getDBClient() const {
+    return _dbDirectClient.get();
 }
 
 }  // namespace mongo

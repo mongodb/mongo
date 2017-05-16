@@ -72,7 +72,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 			ret = util_err(session, errno, NULL);
 			goto err;
 		}
-		snprintf(config, size,
+		if ((ret = __wt_snprintf(config, size,
 		    "%s%s%s%s%s%s%s",
 		    dump_address ? "dump_address," : "",
 		    dump_blocks ? "dump_blocks," : "",
@@ -80,7 +80,10 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 		    dump_offsets != NULL ? "dump_offsets=[" : "",
 		    dump_offsets != NULL ? dump_offsets : "",
 		    dump_offsets != NULL ? "]," : "",
-		    dump_pages ? "dump_pages," : "");
+		    dump_pages ? "dump_pages," : "")) != 0) {
+			(void)util_err(session, ret, NULL);
+			goto err;
+		}
 	}
 	if ((ret = session->verify(session, uri, config)) != 0)
 		(void)util_err(session, ret, "session.verify: %s", uri);

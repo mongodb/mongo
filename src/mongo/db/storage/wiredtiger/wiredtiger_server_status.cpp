@@ -54,12 +54,12 @@ bool WiredTigerServerStatusSection::includeByDefault() const {
     return true;
 }
 
-BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* txn,
+BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                                                        const BSONElement& configElement) const {
     // The session does not open a transaction here as one is not needed and opening one would
     // mean that execution could become blocked when a new transaction cannot be allocated
     // immediately.
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSessionNoTxn(txn);
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
     invariant(session);
 
     WT_SESSION* s = session->getSession();

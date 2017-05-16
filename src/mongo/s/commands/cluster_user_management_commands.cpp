@@ -86,14 +86,13 @@ public:
         return auth::checkAuthForCreateUserCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
     }
 
     virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -125,10 +124,9 @@ public:
         return auth::checkAuthForUpdateUserCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         auth::CreateOrUpdateUserArgs args;
@@ -136,8 +134,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -175,10 +173,9 @@ public:
         return auth::checkAuthForDropUserCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         UserName userName;
@@ -186,8 +183,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -221,14 +218,13 @@ public:
         return auth::checkAuthForDropAllUsersFromDatabaseCommand(client, dbname);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -262,10 +258,9 @@ public:
         return auth::checkAuthForGrantRolesToUserCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         string userNameString;
@@ -275,8 +270,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -310,10 +305,9 @@ public:
         return auth::checkAuthForRevokeRolesFromUserCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         string userNameString;
@@ -323,8 +317,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -362,14 +356,13 @@ public:
         return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-            txn, dbname, cmdObj, &result);
+        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+            opCtx, dbname, cmdObj, &result);
     }
 
 } cmdUsersInfo;
@@ -397,14 +390,13 @@ public:
         return auth::checkAuthForCreateRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
     }
 
 } cmdCreateRole;
@@ -432,14 +424,13 @@ public:
         return auth::checkAuthForUpdateRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -473,14 +464,13 @@ public:
         return auth::checkAuthForGrantPrivilegesToRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -514,14 +504,13 @@ public:
         return auth::checkAuthForRevokePrivilegesFromRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -555,14 +544,13 @@ public:
         return auth::checkAuthForGrantRolesToRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -596,14 +584,13 @@ public:
         return auth::checkAuthForRevokeRolesFromRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -640,14 +627,13 @@ public:
         return auth::checkAuthForDropRoleCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -685,14 +671,13 @@ public:
         return auth::checkAuthForDropAllRolesFromDatabaseCommand(client, dbname);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -730,14 +715,13 @@ public:
         return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(txn)->catalogClient(txn)->runUserManagementReadCommand(
-            txn, dbname, cmdObj, &result);
+        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
+            opCtx, dbname, cmdObj, &result);
     }
 
 } cmdRolesInfo;
@@ -769,10 +753,9 @@ public:
         return auth::checkAuthForInvalidateUserCacheCommand(client);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -820,14 +803,13 @@ public:
         return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-            txn, getName(), dbname, cmdObj, &result);
+        return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+            opCtx, getName(), dbname, cmdObj, &result);
     }
 
 } cmdMergeAuthzCollections;
@@ -838,7 +820,7 @@ public:
  *
  * Returned error indicates a failure.
  */
-Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, BSONObjBuilder& result) {
+Status runUpgradeOnAllShards(OperationContext* opCtx, int maxSteps, BSONObjBuilder& result) {
     BSONObjBuilder cmdObjBuilder;
     cmdObjBuilder.append("authSchemaUpgrade", 1);
     cmdObjBuilder.append("maxSteps", maxSteps);
@@ -847,19 +829,19 @@ Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, BSONObjBuilder
     const BSONObj cmdObj = cmdObjBuilder.done();
 
     // Upgrade each shard in turn, stopping on first failure.
-    auto shardRegistry = Grid::get(txn)->shardRegistry();
-    shardRegistry->reload(txn);
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    shardRegistry->reload(opCtx);
     vector<ShardId> shardIds;
     shardRegistry->getAllShardIds(&shardIds);
 
     bool hasWCError = false;
     for (const auto& shardId : shardIds) {
-        auto shardStatus = shardRegistry->getShard(txn, shardId);
+        auto shardStatus = shardRegistry->getShard(opCtx, shardId);
         if (!shardStatus.isOK()) {
             return shardStatus.getStatus();
         }
         auto cmdResult = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-            txn,
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "admin",
             cmdObj,
@@ -910,15 +892,14 @@ public:
         return auth::checkAuthForAuthSchemaUpgradeCommand(client);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         // Run the authSchemaUpgrade command on the config servers
-        if (!Grid::get(txn)->catalogClient(txn)->runUserManagementWriteCommand(
-                txn, getName(), dbname, cmdObj, &result)) {
+        if (!Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
+                opCtx, getName(), dbname, cmdObj, &result)) {
             return false;
         }
 
@@ -930,7 +911,7 @@ public:
 
         // Optionally run the authSchemaUpgrade command on the individual shards
         if (parsedArgs.shouldUpgradeShards) {
-            status = runUpgradeOnAllShards(txn, parsedArgs.maxSteps, result);
+            status = runUpgradeOnAllShards(opCtx, parsedArgs.maxSteps, result);
             if (!status.isOK()) {
                 // If the status is a write concern error, append a writeConcernError instead of
                 // and error message.

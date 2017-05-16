@@ -48,7 +48,7 @@ FailPointServerParameter::FailPointServerParameter(std::string name, FailPoint* 
       _failpoint(failpoint),
       _failPointName(name) {}
 
-void FailPointServerParameter::append(OperationContext* txn,
+void FailPointServerParameter::append(OperationContext* opCtx,
                                       BSONObjBuilder& b,
                                       const std::string& name) {
     b << name << _failpoint->toBSON();

@@ -50,25 +50,25 @@ public:
     MyHarnessHelper() {}
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
-        OperationContextNoop txn;
+        OperationContextNoop opCtx;
         auto md = stdx::make_unique<DummyRecordStoreV1MetaData>(false, 0);
-        md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
-        return stdx::make_unique<SimpleRecordStoreV1>(&txn, "a.b", md.release(), &_em, false);
+        md->setUserFlag(&opCtx, CollectionOptions::Flag_NoPadding);
+        return stdx::make_unique<SimpleRecordStoreV1>(&opCtx, "a.b", md.release(), &_em, false);
     }
 
     std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedMaxSize,
                                                       int64_t cappedMaxDocs) final {
-        OperationContextNoop txn;
+        OperationContextNoop opCtx;
         auto md = stdx::make_unique<DummyRecordStoreV1MetaData>(true, 0);
         auto md_ptr = md.get();
-        std::unique_ptr<RecordStore> rs =
-            stdx::make_unique<CappedRecordStoreV1>(&txn, nullptr, "a.b", md.release(), &_em, false);
+        std::unique_ptr<RecordStore> rs = stdx::make_unique<CappedRecordStoreV1>(
+            &opCtx, nullptr, "a.b", md.release(), &_em, false);
 
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
-        md->setCapExtent(&txn, DiskLoc(0, 0));
-        md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-        initializeV1RS(&txn, records, drecs, NULL, &_em, md_ptr);
+        md->setCapExtent(&opCtx, DiskLoc(0, 0));
+        md->setCapFirstNewRecord(&opCtx, DiskLoc().setInvalid());
+        initializeV1RS(&opCtx, records, drecs, NULL, &_em, md_ptr);
 
         return rs;
     }

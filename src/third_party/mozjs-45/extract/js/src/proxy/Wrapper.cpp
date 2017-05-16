@@ -42,7 +42,10 @@ JSObject*
 Wrapper::wrappedObject(JSObject* wrapper)
 {
     MOZ_ASSERT(wrapper->is<WrapperObject>());
-    return wrapper->as<ProxyObject>().target();
+    JSObject* target = wrapper->as<ProxyObject>().target();
+    if (target)
+        JS::ExposeObjectToActiveJS(target);
+    return target;
 }
 
 bool

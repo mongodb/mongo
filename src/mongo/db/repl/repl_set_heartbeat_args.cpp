@@ -70,8 +70,8 @@ ReplSetHeartbeatArgs::ReplSetHeartbeatArgs()
       _senderHost(HostAndPort()) {}
 
 Status ReplSetHeartbeatArgs::initialize(const BSONObj& argsObj) {
-    Status status =
-        bsonCheckOnlyHasFields("ReplSetHeartbeatArgs", argsObj, kLegalHeartbeatFieldNames);
+    Status status = bsonCheckOnlyHasFieldsForCommand(
+        "ReplSetHeartbeatArgs", argsObj, kLegalHeartbeatFieldNames);
     if (!status.isOK())
         return status;
 

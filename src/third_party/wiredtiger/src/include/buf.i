@@ -37,28 +37,30 @@ __wt_buf_extend(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 
 /*
  * __wt_buf_init --
- *	Initialize a buffer at a specific size.
+ *	Create an empty buffer at a specific size.
  */
 static inline int
 __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
+	/*
+	 * The buffer grow function does what we need, but anticipates data
+	 * referenced by the buffer. Avoid any data copy by setting data to
+	 * reference the buffer's allocated memory, and clearing it.
+	 */
 	buf->data = buf->mem;
-	buf->size = 0;				/* Clear existing data length */
-	WT_RET(__wt_buf_grow(session, buf, size));
-
-	return (0);
+	buf->size = 0;
+	return (__wt_buf_grow(session, buf, size));
 }
 
 /*
  * __wt_buf_initsize --
- *	Initialize a buffer at a specific size, and set the data length.
+ *	Create an empty buffer at a specific size, and set the data length.
  */
 static inline int
 __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-	buf->data = buf->mem;
-	buf->size = 0;				/* Clear existing data length */
-	WT_RET(__wt_buf_grow(session, buf, size));
+	WT_RET(__wt_buf_init(session, buf, size));
+
 	buf->size = size;			/* Set the data length. */
 
 	return (0);
@@ -72,14 +74,15 @@ static inline int
 __wt_buf_set(
     WT_SESSION_IMPL *session, WT_ITEM *buf, const void *data, size_t size)
 {
-	/* Ensure the buffer is large enough. */
-	WT_RET(__wt_buf_initsize(session, buf, size));
-
-	/* Copy the data, allowing for overlapping strings. */
-	if (size != 0)
-		memmove(buf->mem, data, size);
-
-	return (0);
+	/*
+	 * The buffer grow function does what we need, but expects the data to
+	 * be referenced by the buffer. If we're copying data from outside the
+	 * buffer, set it up so it makes sense to the buffer grow function. (No
+	 * test needed, this works if WT_ITEM.data is already set to "data".)
+	 */
+	buf->data = data;
+	buf->size = size;
+	return (__wt_buf_grow(session, buf, size));
 }
 
 /*

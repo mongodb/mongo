@@ -7,6 +7,7 @@ on whether they apply to C++ unit tests, dbtests, or JS tests.
 
 from __future__ import absolute_import
 
+import collections
 import errno
 import fnmatch
 import os.path
@@ -18,6 +19,36 @@ from . import errors
 from . import utils
 from .utils import globstar
 from .utils import jscomment
+
+
+def _get_file_tags(pathname):
+    """
+    Attempts to read a YAML configuration from 'pathname' that describes
+    the associations of files to tags.
+    """
+
+    if pathname is None:
+        return {}
+
+    return utils.load_yaml_file(pathname).pop("selector")
+
+
+def _parse_tag_file(test_kind):
+    """
+    Parse the tag file and return a dict of tagged tests, with the key the filename and
+    a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}
+    """
+    file_tag_selector = _get_file_tags(config.TAG_FILE)
+    tagged_tests = collections.defaultdict(list)
+    tagged_roots = utils.default_if_none(file_tag_selector.get(test_kind, None), [])
+    for tagged_root in tagged_roots:
+        # Multiple tests could be returned for a set of tags.
+        tests = globstar.iglob(tagged_root)
+        test_tags = tagged_roots[tagged_root]
+        for test in tests:
+            # A test could have a tag in more than one place, due to wildcards in the selector.
+            tagged_tests[test].extend(test_tags)
+    return tagged_tests
 
 
 def _filter_cpp_tests(kind, root, include_files, exclude_files):
@@ -103,10 +134,8 @@ def filter_dbtests(binary=None, include_suites=None):
 
 def filter_jstests(roots,
                    include_files=None,
-                   include_with_all_tags=None,
                    include_with_any_tags=None,
                    exclude_files=None,
-                   exclude_with_all_tags=None,
                    exclude_with_any_tags=None):
     """
     Filters out what jstests to run.
@@ -117,9 +146,7 @@ def filter_jstests(roots,
     # Command line options are merged with YAML options.
     tags = {
         # The constructor for an empty set does not accept "None".
-        "exclude_with_all_tags": set(utils.default_if_none(exclude_with_all_tags, [])),
         "exclude_with_any_tags": set(utils.default_if_none(exclude_with_any_tags, [])),
-        "include_with_all_tags": set(utils.default_if_none(include_with_all_tags, [])),
         "include_with_any_tags": set(utils.default_if_none(include_with_any_tags, [])),
     }
 
@@ -128,9 +155,7 @@ def filter_jstests(roots,
             raise TypeError("%s must be a YAML list of strings" % (name))
 
     cmd_line_lists = (
-        ("exclude_with_all_tags", config.EXCLUDE_WITH_ALL_TAGS),
         ("exclude_with_any_tags", config.EXCLUDE_WITH_ANY_TAGS),
-        ("include_with_all_tags", config.INCLUDE_WITH_ALL_TAGS),
         ("include_with_any_tags", config.INCLUDE_WITH_ANY_TAGS),
     )
 
@@ -165,13 +190,14 @@ def filter_jstests(roots,
 
     excluded = set()
 
+    # Tags can also be specified in an external file.
+    tagged_js_tests = _parse_tag_file("js_test")
+
     for filename in jstests_set:
         file_tags = set(jscomment.get_tags(filename))
-        if tags["include_with_all_tags"] and tags["include_with_all_tags"] - file_tags:
-            excluded.add(filename)
+        if filename in tagged_js_tests:
+            file_tags.update(tagged_js_tests[filename])
         if tags["include_with_any_tags"] and not tags["include_with_any_tags"] & file_tags:
-            excluded.add(filename)
-        if tags["exclude_with_all_tags"] and not tags["exclude_with_all_tags"] - file_tags:
             excluded.add(filename)
         if tags["exclude_with_any_tags"] and tags["exclude_with_any_tags"] & file_tags:
             excluded.add(filename)

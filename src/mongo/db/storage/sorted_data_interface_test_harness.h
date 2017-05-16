@@ -105,7 +105,7 @@ public:
  *
  * Should be used for declaring and changing conditions, not for testing inserts.
  */
-void insertToIndex(unowned_ptr<OperationContext> txn,
+void insertToIndex(unowned_ptr<OperationContext> opCtx,
                    unowned_ptr<SortedDataInterface> index,
                    std::initializer_list<IndexKeyEntry> toInsert);
 
@@ -122,7 +122,7 @@ inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
  *
  * Should be used for declaring and changing conditions, not for testing removes.
  */
-void removeFromIndex(unowned_ptr<OperationContext> txn,
+void removeFromIndex(unowned_ptr<OperationContext> opCtx,
                      unowned_ptr<SortedDataInterface> index,
                      std::initializer_list<IndexKeyEntry> toRemove);
 

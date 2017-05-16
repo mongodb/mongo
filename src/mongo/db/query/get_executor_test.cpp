@@ -59,14 +59,14 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* sortStr,
                                         const char* projStr) {
     QueryTestServiceContext serviceContext;
-    auto txn = serviceContext.makeOperationContext();
+    auto opCtx = serviceContext.makeOperationContext();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(fromjson(queryStr));
     qr->setSort(fromjson(sortStr));
     qr->setProj(fromjson(projStr));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        txn.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

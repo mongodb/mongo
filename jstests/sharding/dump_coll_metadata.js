@@ -9,11 +9,10 @@
     var mongos = st.s0;
     var coll = mongos.getCollection("foo.bar");
     var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
     var shardAdmin = st.shard0.getDB("admin");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+    st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
     assert.commandWorked(shardAdmin.runCommand({getShardVersion: coll + ""}));

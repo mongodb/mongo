@@ -35,6 +35,7 @@ class BSONObjBuilder;
 struct HostAndPort;
 class OperationContext;
 class Status;
+class StringData;
 
 namespace rpc {
 
@@ -54,19 +55,17 @@ public:
      * Writes to an outgoing request metadata object. This method must not throw or block on
      * database or network operations and can be called by multiple concurrent threads.
      *
-     * txn may be null as writeRequestMetadata may be called on ASIO background threads, and may not
+     * opCtx may be null as writeRequestMetadata may be called on ASIO background threads, and may
+     * not
      * have an OperationContext as a result.
      */
-    virtual Status writeRequestMetadata(OperationContext* txn,
-                                        const HostAndPort& requestDestination,
-                                        BSONObjBuilder* metadataBob) = 0;
+    virtual Status writeRequestMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob) = 0;
 
     /**
      * Reads metadata from an incoming command reply. This method must not throw or block on
      * database or network operations and can be called by multiple concurrent threads.
      */
-    virtual Status readReplyMetadata(const HostAndPort& replySource,
-                                     const BSONObj& metadataObj) = 0;
+    virtual Status readReplyMetadata(StringData replySource, const BSONObj& metadataObj) = 0;
 
 protected:
     EgressMetadataHook() = default;

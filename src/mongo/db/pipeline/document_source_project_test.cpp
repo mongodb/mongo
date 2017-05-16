@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -242,5 +244,54 @@ TEST_F(ProjectStageTest, ExclusionProjectionReportsExcludedPathsWithIdExclusion)
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
 }
 
+TEST_F(ProjectStageTest, CanUseRemoveSystemVariableToConditionallyExcludeProjectedField) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{a: 1, b: {$cond: [{$eq: ['$b', 4]}, '$$REMOVE', '$b']}}"), getExpCtx());
+    auto source = DocumentSourceMock::create({"{a: 2, b: 2}", "{a: 3, b: 4}"});
+    project->setSource(source.get());
+    auto next = project->getNext();
+    ASSERT(next.isAdvanced());
+    Document expected{{"a", 2}, {"b", 2}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+
+    next = project->getNext();
+    ASSERT(next.isAdvanced());
+    expected = Document{{"a", 3}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+
+    ASSERT(project->getNext().isEOF());
+}
+
+/**
+ * Creates BSON for a DocumentSourceProject that represents projecting a new computed field nested
+ * 'depth' levels deep.
+ */
+BSONObj makeProjectForNestedDocument(size_t depth) {
+    ASSERT_GTE(depth, 2U);
+    StringBuilder builder;
+    builder << "a";
+    for (size_t i = 0; i < depth - 1; ++i) {
+        builder << ".a";
+    }
+    return BSON(builder.str() << BSON("$literal" << 1));
+}
+
+TEST_F(ProjectStageTest, CanAddNestedDocumentExactlyAtDepthLimit) {
+    auto project = DocumentSourceProject::create(
+        makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"_id", 1}});
+    project->setSource(mock.get());
+
+    auto next = project->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+}
+
+TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
+    ASSERT_THROWS_CODE(
+        DocumentSourceProject::create(
+            makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth() + 1), getExpCtx()),
+        UserException,
+        ErrorCodes::Overflow);
+}
 }  // namespace
 }  // namespace mongo

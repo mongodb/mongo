@@ -109,7 +109,7 @@ void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto str = getEncoded(obj);
 
     if (str) {
-        delete str;
+        getScope(fop)->trackedDelete(str);
     }
 }
 
@@ -235,7 +235,7 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.defineProperty(InternedString::len, len, JSPROP_READONLY);
     o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
-    JS_SetPrivate(thisv, new std::string(std::move(str)));
+    JS_SetPrivate(thisv, scope->trackedNew<std::string>(std::move(str)));
 
     args.rval().setObjectOrNull(thisv);
 }

@@ -29,42 +29,42 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
 /**
- * Confirms that "o" only contains fields whose names are in "begin".."end",
+ * Confirms that obj only contains field names where allowed(name) returns true,
  * and that no field name occurs multiple times.
  *
  * On failure, returns BadValue and a message naming the unexpected field or DuplicateKey and a
  * message naming the repeated field.  "objectName" is included in the message, for reporting
  * purposes.
  */
-template <typename Iter>
-Status bsonCheckOnlyHasFields(StringData objectName,
-                              const BSONObj& o,
-                              const Iter& begin,
-                              const Iter& end) {
-    std::vector<int> occurrences(std::distance(begin, end), 0);
-    for (BSONObj::iterator iter(o); iter.more();) {
+template <typename Condition>
+Status bsonCheckOnlyHasFieldsImpl(StringData objectName,
+                                  const BSONObj& obj,
+                                  const Condition& allowed) {
+    StringMap<bool> seenFields;
+    for (BSONObj::iterator iter(obj); iter.more();) {
         const BSONElement e = iter.next();
-        const Iter found = std::find(begin, end, e.fieldNameStringData());
-        if (found != end) {
-            ++occurrences[std::distance(begin, found)];
-        } else {
+        const auto name = e.fieldNameStringData();
+
+        if (!allowed(name)) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Unexpected field " << e.fieldName() << " in "
                                         << objectName);
         }
-    }
-    int i = 0;
-    for (Iter curr = begin; curr != end; ++curr, ++i) {
-        if (occurrences[i] > 1) {
+
+        bool& seenBefore = seenFields[name];
+        if (!seenBefore) {
+            seenBefore = true;
+        } else {
             return Status(ErrorCodes::DuplicateKey,
-                          str::stream() << "Field " << *curr << " appears " << occurrences[i]
-                                        << " times in "
+                          str::stream() << "Field " << name << " appears multiple times in "
                                         << objectName);
         }
     }
@@ -72,14 +72,30 @@ Status bsonCheckOnlyHasFields(StringData objectName,
 }
 
 /**
- * Same as above, but operates over an array of string-ish items, "legals", instead
- * of "begin".."end".
+ * Like above but only allows fields from the passed-in container.
  */
-template <typename StringType, int N>
+template <typename Container>
 Status bsonCheckOnlyHasFields(StringData objectName,
-                              const BSONObj& o,
-                              const StringType (&legals)[N]) {
-    return bsonCheckOnlyHasFields(objectName, o, &legals[0], legals + N);
+                              const BSONObj& obj,
+                              const Container& allowedFields) {
+    return bsonCheckOnlyHasFieldsImpl(objectName, obj, [&](StringData name) {
+        return std::find(std::begin(allowedFields), std::end(allowedFields), name) !=
+            std::end(allowedFields);
+    });
+}
+
+/**
+ * Like above but only allows fields from the passed-in container or are generic command arguments.
+ */
+template <typename Container>
+Status bsonCheckOnlyHasFieldsForCommand(StringData objectName,
+                                        const BSONObj& obj,
+                                        const Container& allowedFields) {
+    return bsonCheckOnlyHasFieldsImpl(objectName, obj, [&](StringData name) {
+        return Command::isGenericArgument(name) ||
+            (std::find(std::begin(allowedFields), std::end(allowedFields), name) !=
+             std::end(allowedFields));
+    });
 }
 
 /**

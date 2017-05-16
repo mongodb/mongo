@@ -4,9 +4,6 @@
 
     s.adminCommand({enablesharding: "test"});
 
-    a = s._connections[0].getDB("test");
-    b = s._connections[1].getDB("test");
-
     db = s.getDB("test");
     s.ensurePrimaryShard('test', 'shard0001');
 
@@ -43,6 +40,13 @@
         bulk.insert({_id: i});
     assert.writeOK(bulk.execute());
 
+    // Flush all writes to disk since some of the stats are dependent on state in disk (like
+    // totalIndexSize).
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+
+    a = s.shard0.getDB("test");
+    b = s.shard1.getDB("test");
+
     x = assert.commandWorked(db.foo.stats());
     assert.eq(N, x.count, "coll total count expected");
     assert.eq(db.foo.count(), x.count, "coll total count match");
@@ -66,15 +70,12 @@
 
     x = assert.commandWorked(db.stats());
 
-    // dbstats uses Future::CommandResult so raw output uses connection strings not shard names
-    shards = Object.keySet(x.raw);
-
     assert.eq(N + (a_extras + b_extras), x.objects, "db total count expected");
     assert.eq(2, numKeys(x.raw), "db shard num");
-    assert.eq((N / 2) + a_extras, x.raw[shards[0]].objects, "db count on shard0000 expected");
-    assert.eq((N / 2) + b_extras, x.raw[shards[1]].objects, "db count on shard0001 expected");
-    assert.eq(a.stats().objects, x.raw[shards[0]].objects, "db count on shard0000 match");
-    assert.eq(b.stats().objects, x.raw[shards[1]].objects, "db count on shard0001 match");
+    assert.eq((N / 2) + a_extras, x.raw[s.shard0.name].objects, "db count on shard0000 expected");
+    assert.eq((N / 2) + b_extras, x.raw[s.shard1.name].objects, "db count on shard0001 expected");
+    assert.eq(a.stats().objects, x.raw[s.shard0.name].objects, "db count on shard0000 match");
+    assert.eq(b.stats().objects, x.raw[s.shard1.name].objects, "db count on shard0001 match");
 
     /* Test db.stat() and db.collection.stat() scaling */
 

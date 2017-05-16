@@ -105,10 +105,10 @@ public:
      * SaslAuthenticationSession.
      */
     OperationContext* getOpCtxt() const {
-        return _txn;
+        return _opCtx;
     }
-    void setOpCtxt(OperationContext* txn) {
-        _txn = txn;
+    void setOpCtxt(OperationContext* opCtx) {
+        _opCtx = opCtx;
     }
 
     /**
@@ -167,7 +167,7 @@ public:
     }
 
 protected:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     AuthorizationSession* _authzSession;
     std::string _authenticationDatabase;
     std::string _serviceName;

@@ -65,7 +65,7 @@ namespace mongo {
 using std::unique_ptr;
 using stdx::make_unique;
 
-PlanStage* buildStages(OperationContext* txn,
+PlanStage* buildStages(OperationContext* opCtx,
                        Collection* collection,
                        const CanonicalQuery& cq,
                        const QuerySolution& qsol,
@@ -79,7 +79,7 @@ PlanStage* buildStages(OperationContext* txn,
         params.direction =
             (csn->direction == 1) ? CollectionScanParams::FORWARD : CollectionScanParams::BACKWARD;
         params.maxScan = csn->maxScan;
-        return new CollectionScan(txn, params, ws, csn->filter.get());
+        return new CollectionScan(opCtx, params, ws, csn->filter.get());
     } else if (STAGE_IXSCAN == root->getType()) {
         const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
@@ -90,24 +90,24 @@ PlanStage* buildStages(OperationContext* txn,
 
         IndexScanParams params;
 
-        params.descriptor = collection->getIndexCatalog()->findIndexByName(txn, ixn->index.name);
+        params.descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.name);
         invariant(params.descriptor);
 
         params.bounds = ixn->bounds;
         params.direction = ixn->direction;
         params.maxScan = ixn->maxScan;
         params.addKeyMetadata = ixn->addKeyMetadata;
-        return new IndexScan(txn, params, ws, ixn->filter.get());
+        return new IndexScan(opCtx, params, ws, ixn->filter.get());
     } else if (STAGE_FETCH == root->getType()) {
         const FetchNode* fn = static_cast<const FetchNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, fn->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new FetchStage(txn, ws, childStage, fn->filter.get(), collection);
+        return new FetchStage(opCtx, ws, childStage, fn->filter.get(), collection);
     } else if (STAGE_SORT == root->getType()) {
         const SortNode* sn = static_cast<const SortNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, sn->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, sn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
@@ -115,23 +115,24 @@ PlanStage* buildStages(OperationContext* txn,
         params.collection = collection;
         params.pattern = sn->pattern;
         params.limit = sn->limit;
-        return new SortStage(txn, params, ws, childStage);
+        return new SortStage(opCtx, params, ws, childStage);
     } else if (STAGE_SORT_KEY_GENERATOR == root->getType()) {
         const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, keyGenNode->children[0], ws);
+        PlanStage* childStage =
+            buildStages(opCtx, collection, cq, qsol, keyGenNode->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
         return new SortKeyGeneratorStage(
-            txn, childStage, ws, keyGenNode->sortSpec, keyGenNode->queryObj, cq.getCollator());
+            opCtx, childStage, ws, keyGenNode->sortSpec, keyGenNode->queryObj, cq.getCollator());
     } else if (STAGE_PROJECTION == root->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, pn->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, pn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
 
-        ProjectionStageParams params(ExtensionsCallbackReal(txn, &collection->ns()));
+        ProjectionStageParams params(ExtensionsCallbackReal(opCtx, &collection->ns()));
         params.projObj = pn->projection;
         params.collator = cq.getCollator();
 
@@ -148,26 +149,26 @@ PlanStage* buildStages(OperationContext* txn,
             params.projImpl = ProjectionStageParams::SIMPLE_DOC;
         }
 
-        return new ProjectionStage(txn, params, ws, childStage);
+        return new ProjectionStage(opCtx, params, ws, childStage);
     } else if (STAGE_LIMIT == root->getType()) {
         const LimitNode* ln = static_cast<const LimitNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, ln->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, ln->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new LimitStage(txn, ln->limit, ws, childStage);
+        return new LimitStage(opCtx, ln->limit, ws, childStage);
     } else if (STAGE_SKIP == root->getType()) {
         const SkipNode* sn = static_cast<const SkipNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, sn->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, sn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new SkipStage(txn, sn->skip, ws, childStage);
+        return new SkipStage(opCtx, sn->skip, ws, childStage);
     } else if (STAGE_AND_HASH == root->getType()) {
         const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-        auto ret = make_unique<AndHashStage>(txn, ws, collection);
+        auto ret = make_unique<AndHashStage>(opCtx, ws, collection);
         for (size_t i = 0; i < ahn->children.size(); ++i) {
-            PlanStage* childStage = buildStages(txn, collection, cq, qsol, ahn->children[i], ws);
+            PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, ahn->children[i], ws);
             if (NULL == childStage) {
                 return NULL;
             }
@@ -176,9 +177,9 @@ PlanStage* buildStages(OperationContext* txn,
         return ret.release();
     } else if (STAGE_OR == root->getType()) {
         const OrNode* orn = static_cast<const OrNode*>(root);
-        auto ret = make_unique<OrStage>(txn, ws, orn->dedup, orn->filter.get());
+        auto ret = make_unique<OrStage>(opCtx, ws, orn->dedup, orn->filter.get());
         for (size_t i = 0; i < orn->children.size(); ++i) {
-            PlanStage* childStage = buildStages(txn, collection, cq, qsol, orn->children[i], ws);
+            PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, orn->children[i], ws);
             if (NULL == childStage) {
                 return NULL;
             }
@@ -187,9 +188,9 @@ PlanStage* buildStages(OperationContext* txn,
         return ret.release();
     } else if (STAGE_AND_SORTED == root->getType()) {
         const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-        auto ret = make_unique<AndSortedStage>(txn, ws, collection);
+        auto ret = make_unique<AndSortedStage>(opCtx, ws, collection);
         for (size_t i = 0; i < asn->children.size(); ++i) {
-            PlanStage* childStage = buildStages(txn, collection, cq, qsol, asn->children[i], ws);
+            PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, asn->children[i], ws);
             if (NULL == childStage) {
                 return NULL;
             }
@@ -202,9 +203,9 @@ PlanStage* buildStages(OperationContext* txn,
         params.dedup = msn->dedup;
         params.pattern = msn->sort;
         params.collator = cq.getCollator();
-        auto ret = make_unique<MergeSortStage>(txn, params, ws, collection);
+        auto ret = make_unique<MergeSortStage>(opCtx, params, ws, collection);
         for (size_t i = 0; i < msn->children.size(); ++i) {
-            PlanStage* childStage = buildStages(txn, collection, cq, qsol, msn->children[i], ws);
+            PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, msn->children[i], ws);
             if (NULL == childStage) {
                 return NULL;
             }
@@ -222,10 +223,10 @@ PlanStage* buildStages(OperationContext* txn,
         params.addDistMeta = node->addDistMeta;
 
         IndexDescriptor* twoDIndex =
-            collection->getIndexCatalog()->findIndexByName(txn, node->index.name);
+            collection->getIndexCatalog()->findIndexByName(opCtx, node->index.name);
         invariant(twoDIndex);
 
-        GeoNear2DStage* nearStage = new GeoNear2DStage(params, txn, ws, collection, twoDIndex);
+        GeoNear2DStage* nearStage = new GeoNear2DStage(params, opCtx, ws, collection, twoDIndex);
 
         return nearStage;
     } else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
@@ -239,14 +240,14 @@ PlanStage* buildStages(OperationContext* txn,
         params.addDistMeta = node->addDistMeta;
 
         IndexDescriptor* s2Index =
-            collection->getIndexCatalog()->findIndexByName(txn, node->index.name);
+            collection->getIndexCatalog()->findIndexByName(opCtx, node->index.name);
         invariant(s2Index);
 
-        return new GeoNear2DSphereStage(params, txn, ws, collection, s2Index);
+        return new GeoNear2DSphereStage(params, opCtx, ws, collection, s2Index);
     } else if (STAGE_TEXT == root->getType()) {
         const TextNode* node = static_cast<const TextNode*>(root);
         IndexDescriptor* desc =
-            collection->getIndexCatalog()->findIndexByName(txn, node->index.name);
+            collection->getIndexCatalog()->findIndexByName(opCtx, node->index.name);
         invariant(desc);
         const FTSAccessMethod* fam =
             static_cast<FTSAccessMethod*>(collection->getIndexCatalog()->getIndex(desc));
@@ -260,25 +261,25 @@ PlanStage* buildStages(OperationContext* txn,
         // planning a query that contains "no-op" expressions. TODO: make StageBuilder::build()
         // fail in this case (this improvement is being tracked by SERVER-21510).
         params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
-        return new TextStage(txn, params, ws, node->filter.get());
+        return new TextStage(opCtx, params, ws, node->filter.get());
     } else if (STAGE_SHARDING_FILTER == root->getType()) {
         const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, fn->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
         return new ShardFilterStage(
-            txn,
-            CollectionShardingState::get(txn, collection->ns())->getMetadata(),
+            opCtx,
+            CollectionShardingState::get(opCtx, collection->ns())->getMetadata(),
             ws,
             childStage);
     } else if (STAGE_KEEP_MUTATIONS == root->getType()) {
         const KeepMutationsNode* km = static_cast<const KeepMutationsNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, km->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, km->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new KeepMutationsStage(txn, km->filter.get(), ws, childStage);
+        return new KeepMutationsStage(opCtx, km->filter.get(), ws, childStage);
     } else if (STAGE_DISTINCT_SCAN == root->getType()) {
         const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
@@ -289,12 +290,12 @@ PlanStage* buildStages(OperationContext* txn,
 
         DistinctParams params;
 
-        params.descriptor = collection->getIndexCatalog()->findIndexByName(txn, dn->index.name);
+        params.descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, dn->index.name);
         invariant(params.descriptor);
         params.direction = dn->direction;
         params.bounds = dn->bounds;
         params.fieldNo = dn->fieldNo;
-        return new DistinctScan(txn, params, ws);
+        return new DistinctScan(opCtx, params, ws);
     } else if (STAGE_COUNT_SCAN == root->getType()) {
         const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
@@ -305,21 +306,21 @@ PlanStage* buildStages(OperationContext* txn,
 
         CountScanParams params;
 
-        params.descriptor = collection->getIndexCatalog()->findIndexByName(txn, csn->index.name);
+        params.descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, csn->index.name);
         invariant(params.descriptor);
         params.startKey = csn->startKey;
         params.startKeyInclusive = csn->startKeyInclusive;
         params.endKey = csn->endKey;
         params.endKeyInclusive = csn->endKeyInclusive;
 
-        return new CountScan(txn, params, ws);
+        return new CountScan(opCtx, params, ws);
     } else if (STAGE_ENSURE_SORTED == root->getType()) {
         const EnsureSortedNode* esn = static_cast<const EnsureSortedNode*>(root);
-        PlanStage* childStage = buildStages(txn, collection, cq, qsol, esn->children[0], ws);
+        PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, esn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new EnsureSortedStage(txn, esn->pattern, ws, childStage);
+        return new EnsureSortedStage(opCtx, esn->pattern, ws, childStage);
     } else {
         mongoutils::str::stream ss;
         root->appendToString(&ss, 0);
@@ -330,7 +331,7 @@ PlanStage* buildStages(OperationContext* txn,
 }
 
 // static (this one is used for Cached and MultiPlanStage)
-bool StageBuilder::build(OperationContext* txn,
+bool StageBuilder::build(OperationContext* opCtx,
                          Collection* collection,
                          const CanonicalQuery& cq,
                          const QuerySolution& solution,
@@ -349,7 +350,7 @@ bool StageBuilder::build(OperationContext* txn,
     if (NULL == solutionNode) {
         return false;
     }
-    return NULL != (*rootOut = buildStages(txn, collection, cq, solution, solutionNode, wsIn));
+    return NULL != (*rootOut = buildStages(opCtx, collection, cq, solution, solutionNode, wsIn));
 }
 
 }  // namespace mongo

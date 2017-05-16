@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_terminated.h"
@@ -48,14 +50,6 @@ class BufReader {
     MONGO_DISALLOW_COPYING(BufReader);
 
 public:
-    class eof : public std::exception {
-    public:
-        eof() {}
-        virtual const char* what() const throw() {
-            return "BufReader eof";
-        }
-    };
-
     BufReader(const void* p, unsigned len)
         : _start(reinterpret_cast<const char*>(p)), _pos(_start), _end(_start + len) {}
 
@@ -67,10 +61,7 @@ public:
     template <typename T>
     void read(T& t) {
         ConstDataRangeCursor cdrc(_pos, _end);
-        if (!cdrc.readAndAdvance(&t).isOK()) {
-            throw eof();
-        }
-
+        uassertStatusOK(cdrc.readAndAdvance(&t));
         _pos = cdrc.data();
     }
 
@@ -85,10 +76,7 @@ public:
     /** read in the object specified, but do not advance buffer pointer */
     template <typename T>
     void peek(T& t) const {
-        ConstDataRange cdr(_pos, _end);
-        if (!cdr.read(&t).isOK()) {
-            throw eof();
-        }
+        uassertStatusOK(ConstDataRange(_pos, _end).read(&t));
     }
 
     /** read in and return an object of the specified type, but do not advance buffer pointer */
@@ -118,14 +106,8 @@ public:
     /** return current position pointer, and advance by len */
     const void* skip(unsigned len) {
         ConstDataRangeCursor cdrc(_pos, _end);
-
-        if (!cdrc.advance(len).isOK()) {
-            throw eof();
-        }
-
-        const void* p = _pos;
-        _pos = cdrc.data();
-        return p;
+        uassertStatusOK(cdrc.advance(len));
+        return std::exchange(_pos, cdrc.data());
     }
 
     /// reads a NUL terminated string

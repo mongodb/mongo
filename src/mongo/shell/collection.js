@@ -504,7 +504,8 @@ DBCollection.prototype._validateUpdateDoc = function(doc) {
 
 /**
  * Does validation of the update args. Throws if the parse is not successful, otherwise
- * returns a document containing fields for query, obj, upsert, multi, and wc.
+ * returns a document containing fields for query, obj, upsert, multi, wc, collation, and
+ * arrayFilters.
  *
  * Throws if the arguments are invalid.
  */
@@ -516,6 +517,7 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
 
     var wc = undefined;
     var collation = undefined;
+    var arrayFilters = undefined;
     // can pass options via object for improved readability
     if (typeof(upsert) === "object") {
         if (multi) {
@@ -528,6 +530,7 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
         wc = opts.writeConcern;
         upsert = opts.upsert;
         collation = opts.collation;
+        arrayFilters = opts.arrayFilters;
     }
 
     // Normalize 'upsert' and 'multi' to booleans.
@@ -544,7 +547,8 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
         "upsert": upsert,
         "multi": multi,
         "wc": wc,
-        "collation": collation
+        "collation": collation,
+        "arrayFilters": arrayFilters
     };
 };
 
@@ -556,6 +560,7 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
     var multi = parsed.multi;
     var wc = parsed.wc;
     var collation = parsed.collation;
+    var arrayFilters = parsed.arrayFilters;
 
     var result = undefined;
     var startTime =
@@ -571,6 +576,10 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
 
         if (collation) {
             updateOp.collation(collation);
+        }
+
+        if (arrayFilters) {
+            updateOp.arrayFilters(arrayFilters);
         }
 
         if (multi) {
@@ -592,6 +601,10 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
     } else {
         if (collation) {
             throw new Error("collation requires use of write commands");
+        }
+
+        if (arrayFilters) {
+            throw new Error("arrayFilters requires use of write commands");
         }
 
         this._validateUpdateDoc(obj);

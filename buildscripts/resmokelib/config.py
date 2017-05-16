@@ -39,9 +39,7 @@ DEFAULTS = {
     "dbpathPrefix": None,
     "dbtest": None,
     "dryRun": None,
-    "excludeWithAllTags": None,
     "excludeWithAnyTags": None,
-    "includeWithAllTags": None,
     "includeWithAnyTags": None,
     "jobs": 1,
     "mongo": None,
@@ -52,13 +50,16 @@ DEFAULTS = {
     "nojournal": False,
     "numClientsPerFixture": 1,
     "repeat": 1,
+    "reportFailureStatus": "fail",
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "shellReadMode": None,
     "shellWriteMode": None,
     "shuffle": False,
+    "staggerJobs": None,
     "storageEngine": None,
     "storageEngineCacheSizeGB": None,
+    "tagFile": None,
     "taskId": None,
     "wiredTigerCollectionConfigString": None,
     "wiredTigerEngineConfigString": None,
@@ -88,18 +89,11 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
-# If set, then any jstests that have all of the specified tags will be excluded from the suite(s).
-EXCLUDE_WITH_ALL_TAGS = None
-
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
 
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
-
-# If set, then only jstests that have all of the specified tags will be run during the jstest
-# portion of the suite(s).
-INCLUDE_WITH_ALL_TAGS = None
 
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).
@@ -141,6 +135,9 @@ RANDOM_SEED = None
 # If set, then each suite is repeated the specified number of times.
 REPEAT = None
 
+# Controls if the test failure status should be reported as failed or be silently ignored.
+REPORT_FAILURE_STATUS = None
+
 # If set, then resmoke.py will write out a report file with the status of each test that ran.
 REPORT_FILE = None
 
@@ -154,6 +151,9 @@ SHELL_WRITE_MODE = None
 # alphabetical (case-insensitive) order.
 SHUFFLE = None
 
+# If true, the launching of jobs is staggered in resmoke.py.
+STAGGER_JOBS = None 
+
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine.
 STORAGE_ENGINE = None
@@ -161,6 +161,9 @@ STORAGE_ENGINE = None
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine cache size.
 STORAGE_ENGINE_CACHE_SIZE = None
+
+# The tag file to use that associates tests with tags.
+TAG_FILE = None
 
 # If set, then the Evergreen task Id value will be transmitted to logkeeper when creating builds and
 # tests.

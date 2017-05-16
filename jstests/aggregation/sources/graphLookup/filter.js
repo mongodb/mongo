@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because unsupported use of sharded collection
+// for target collection of $lookup and $graphLookup.
+// @tags: [assumes_unsharded_collection]
+
 // In SERVER-24714, the 'restrictSearchWithMatch' option was added to $graphLookup. In this file,
 // we test the functionality and correctness of the option.
 

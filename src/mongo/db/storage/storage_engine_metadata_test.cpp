@@ -207,6 +207,10 @@ TEST(StorageEngineMetadataTest, ValidateStorageEngineOption) {
     metadata.setStorageEngineOptions(options);
 
     // Non-existent field.
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidOptions,
+        metadata.validateStorageEngineOption("w", true, boost::optional<bool>(false)).code());
+    ASSERT_OK(metadata.validateStorageEngineOption("w", false, boost::optional<bool>(false)));
     ASSERT_OK(metadata.validateStorageEngineOption("w", true));
     ASSERT_OK(metadata.validateStorageEngineOption("w", false));
 

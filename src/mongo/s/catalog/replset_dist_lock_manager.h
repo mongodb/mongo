@@ -64,31 +64,31 @@ public:
     virtual ~ReplSetDistLockManager();
 
     void startUp() override;
-    void shutDown(OperationContext* txn) override;
+    void shutDown(OperationContext* opCtx) override;
 
     std::string getProcessID() override;
 
-    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* txn,
+    StatusWith<DistLockHandle> lockWithSessionID(OperationContext* opCtx,
                                                  StringData name,
                                                  StringData whyMessage,
                                                  const OID& lockSessionID,
                                                  Milliseconds waitFor) override;
 
-    StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* txn,
+    StatusWith<DistLockHandle> tryLockWithLocalWriteConcern(OperationContext* opCtx,
                                                             StringData name,
                                                             StringData whyMessage,
                                                             const OID& lockSessionID) override;
 
-    void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
+    void unlock(OperationContext* opCtx, const DistLockHandle& lockSessionID) override;
 
-    void unlock(OperationContext* txn,
+    void unlock(OperationContext* opCtx,
                 const DistLockHandle& lockSessionID,
                 StringData name) override;
 
-    void unlockAll(OperationContext* txn, const std::string& processID) override;
+    void unlockAll(OperationContext* opCtx, const std::string& processID) override;
 
 protected:
-    Status checkStatus(OperationContext* txn, const DistLockHandle& lockSessionID) override;
+    Status checkStatus(OperationContext* opCtx, const DistLockHandle& lockSessionID) override;
 
 private:
     /**
@@ -110,7 +110,7 @@ private:
      * Returns true if the current process that owns the lock has no fresh pings since
      * the lock expiration threshold.
      */
-    StatusWith<bool> isLockExpired(OperationContext* txn,
+    StatusWith<bool> isLockExpired(OperationContext* opCtx,
                                    const LocksType lockDoc,
                                    const Milliseconds& lockExpiration);
 

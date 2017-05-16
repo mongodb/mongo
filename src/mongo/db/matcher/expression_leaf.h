@@ -91,10 +91,6 @@ public:
 
     virtual bool matchesSingleElement(const BSONElement& e) const;
 
-    virtual const BSONElement& getRHS() const {
-        return _rhs;
-    }
-
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
     /**
@@ -395,20 +391,15 @@ private:
     std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;
 };
 
-//
-// The odd duck out, TYPE_OPERATOR.
-//
-
 /**
- * Type has some odd semantics with arrays and as such it can't inherit from
- * LeafMatchExpression.
+ * Implements matching for $type.
  */
-class TypeMatchExpression : public MatchExpression {
+class TypeMatchExpression : public LeafMatchExpression {
 public:
     static const std::string kMatchesAllNumbersAlias;
     static const stdx::unordered_map<std::string, BSONType> typeAliasMap;
 
-    TypeMatchExpression() : MatchExpression(TYPE_OPERATOR) {}
+    TypeMatchExpression() : LeafMatchExpression(TYPE_OPERATOR) {}
 
     /**
      * Initialize as matching against a specific BSONType.
@@ -422,12 +413,12 @@ public:
      */
     Status initAsMatchingAllNumbers(StringData path);
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const override {
         std::unique_ptr<TypeMatchExpression> e = stdx::make_unique<TypeMatchExpression>();
         if (_matchesAllNumbers) {
-            e->initAsMatchingAllNumbers(_path);
+            invariantOK(e->initAsMatchingAllNumbers(path()));
         } else {
-            e->initWithBSONType(_path, _type);
+            invariantOK(e->initWithBSONType(path(), _type));
         }
         if (getTag()) {
             e->setTag(getTag()->clone());
@@ -435,15 +426,13 @@ public:
         return std::move(e);
     }
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
+    bool matchesSingleElement(const BSONElement& e) const override;
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
+    void debugString(StringBuilder& debug, int level) const override;
 
-    virtual void debugString(StringBuilder& debug, int level) const;
+    void serialize(BSONObjBuilder* out) const override;
 
-    virtual void serialize(BSONObjBuilder* out) const;
-
-    virtual bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const override;
 
     /**
      * What is the type we're matching against?
@@ -460,15 +449,9 @@ public:
         return _matchesAllNumbers;
     }
 
-    virtual const StringData path() const {
-        return _path;
-    }
-
 private:
     bool _matches(StringData path, const MatchableDocument* doc, MatchDetails* details = 0) const;
 
-    StringData _path;
-    ElementPath _elementPath;
     bool _matchesAllNumbers = false;
     BSONType _type = BSONType::EOO;
 };

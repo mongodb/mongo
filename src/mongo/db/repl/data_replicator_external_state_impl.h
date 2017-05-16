@@ -59,14 +59,14 @@ public:
                             const rpc::ReplSetMetadata& replMetadata,
                             boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 
-    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* txn) const override;
+    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 
-    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* txn) const override;
+    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* opCtx) const override;
 
-    StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
+    StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
 private:
-    StatusWith<OpTime> _multiApply(OperationContext* txn,
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
                                    MultiApplier::Operations ops,
                                    MultiApplier::ApplyOperationFn applyOperation) override;
 

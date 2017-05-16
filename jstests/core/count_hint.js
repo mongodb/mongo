@@ -5,9 +5,9 @@
  *   - The hint() method should support both the name of the index, and the object spec of the
  *     index.
  */
-
 (function() {
     "use strict";
+
     var coll = db.jstests_count_hint;
     coll.drop();
 
@@ -51,4 +51,11 @@
     assert.throws(function() {
         coll.find({i: 1}).hint("BAD HINT").count();
     });
+
+    // Test that a bad hint fails with the correct error code. Also verify that the error message
+    // mentions a bad hint.
+    let cmdRes = db.runCommand({count: coll.getName(), hint: {bad: 1, hint: 1}});
+    assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue, tojson(cmdRes));
+    var regex = new RegExp("bad hint");
+    assert(regex.test(cmdRes.errmsg));
 })();

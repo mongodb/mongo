@@ -57,47 +57,45 @@ public:
     ReplicationCoordinatorExternalStateMock();
     virtual ~ReplicationCoordinatorExternalStateMock();
     virtual void startThreads(const ReplSettings& settings) override;
-    virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
-    virtual void startSteadyStateReplication(OperationContext* txn,
+    virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
-    virtual void stopDataReplication(OperationContext* txn) override;
-    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) override;
-    virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
+    virtual void stopDataReplication(OperationContext* opCtx) override;
+    virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
     virtual void startMasterSlave(OperationContext*);
-    virtual void shutdown(OperationContext* txn);
+    virtual void shutdown(OperationContext* opCtx);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual OldThreadPool* getDbWorkThreadPool() const override;
-    virtual Status runRepairOnLocalDB(OperationContext* txn) override;
-    virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
-    void onDrainComplete(OperationContext* txn) override;
-    OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;
+    virtual Status runRepairOnLocalDB(OperationContext* opCtx) override;
+    virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
+    void onDrainComplete(OperationContext* opCtx) override;
+    OpTime onTransitionToPrimary(OperationContext* opCtx, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext*);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
-    virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
-    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
-    virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
-    virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
+    virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
+    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
+    virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
+    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
+    virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
-    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-    virtual void cleanUpLastApplyBatch(OperationContext* txn);
+    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
+    virtual void cleanUpLastApplyBatch(OperationContext* opCtx);
     virtual void closeConnections();
-    virtual void killAllUserOperations(OperationContext* txn);
+    virtual void killAllUserOperations(OperationContext* opCtx);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(SnapshotName newCommitPoint);
-    virtual void createSnapshot(OperationContext* txn, SnapshotName name);
+    virtual void createSnapshot(OperationContext* opCtx, SnapshotName name);
     virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();
     virtual double getElectionTimeoutOffsetLimitFraction() const;
-    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
-    virtual StatusWith<OpTime> multiApply(OperationContext* txn,
+    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
+    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
     virtual Status multiSyncApply(MultiApplier::OperationPtrs* ops) override;
@@ -105,10 +103,9 @@ public:
                                          const HostAndPort& source,
                                          AtomicUInt32* fetchCount) override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* txn) const override;
+        OperationContext* opCtx) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* txn) const override;
-    virtual bool shouldUseDataReplicatorInitialSync() const override;
+        OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
 
     /**
@@ -142,12 +139,6 @@ public:
      * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
      */
     void setStoreLocalConfigDocumentStatus(Status status);
-
-    /**
-     * Sets whether or not subsequent calls to storeLocalConfigDocument() should hang
-     * indefinitely or not based on the value of "hang".
-     */
-    void setStoreLocalConfigDocumentToHang(bool hang);
 
     /**
      * Sets the return value for subsequent calls to storeLocalLastVoteDocument().
@@ -199,13 +190,9 @@ private:
     bool _canAcquireGlobalSharedLock;
     Status _storeLocalConfigDocumentStatus;
     Status _storeLocalLastVoteDocumentStatus;
-    // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
-    stdx::mutex _shouldHangConfigMutex;
-    stdx::condition_variable _shouldHangConfigCondVar;
     // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
     stdx::mutex _shouldHangLastVoteMutex;
     stdx::condition_variable _shouldHangLastVoteCondVar;
-    bool _storeLocalConfigDocumentShouldHang;
     bool _storeLocalLastVoteDocumentShouldHang;
     bool _connectionsClosed;
     HostAndPort _clientHostAndPort;

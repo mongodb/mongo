@@ -47,12 +47,16 @@ using stdx::make_unique;
 const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 
 PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
-                                       intrusive_ptr<Pipeline> pipeline,
+                                       std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline,
                                        WorkingSet* ws)
     : PlanStage(kStageType, opCtx),
-      _pipeline(pipeline),
+      _pipeline(std::move(pipeline)),
       _includeMetaData(_pipeline->getContext()->inShard),  // send metadata to merger
-      _ws(ws) {}
+      _ws(ws) {
+    // We take over responsibility for disposing of the Pipeline, since it is required that
+    // doDispose() will be called before destruction of this PipelineProxyStage.
+    _pipeline.get_deleter().dismissDisposal();
+}
 
 PlanStage::StageState PipelineProxyStage::doWork(WorkingSetID* out) {
     if (!out) {
@@ -99,6 +103,10 @@ void PipelineProxyStage::doReattachToOperationContext() {
     _pipeline->reattachToOperationContext(getOpCtx());
 }
 
+void PipelineProxyStage::doDispose() {
+    _pipeline->dispose(getOpCtx());
+}
+
 unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {
     unique_ptr<PlanStageStats> ret =
         make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_PIPELINE_PROXY);
@@ -119,12 +127,12 @@ boost::optional<BSONObj> PipelineProxyStage::getNextBson() {
 }
 
 std::string PipelineProxyStage::getPlanSummaryStr() const {
-    return PipelineD::getPlanSummaryStr(_pipeline);
+    return PipelineD::getPlanSummaryStr(_pipeline.get());
 }
 
 void PipelineProxyStage::getPlanSummaryStats(PlanSummaryStats* statsOut) const {
     invariant(statsOut);
-    PipelineD::getPlanSummaryStats(_pipeline, statsOut);
+    PipelineD::getPlanSummaryStats(_pipeline.get(), statsOut);
     statsOut->nReturned = getCommonStats()->advanced;
 }
 }  // namespace mongo

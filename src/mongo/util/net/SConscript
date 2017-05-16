@@ -36,11 +36,11 @@ networkEnv.Library(
         "asio_message_port.cpp",
         "asio_ssl_context.cpp",
         "hostname_canonicalization.cpp",
-        "httpclient.cpp",
         "listen.cpp",
         "message.cpp",
         "message_port.cpp",
         "message_port_startup_param.cpp",
+        "op_msg.cpp",
         "sock.cpp",
         "sockaddr.cpp",
         'socket_exception.cpp',
@@ -52,6 +52,7 @@ networkEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/background_job',
@@ -78,16 +79,6 @@ env.CppUnitTest(
     target='sock_test',
     source=[
         'sock_test.cpp',
-    ],
-    LIBDEPS=[
-        'network',
-    ],
-)
-
-env.Library(
-    target='miniwebserver',
-    source=[
-        'miniwebserver.cpp',
     ],
     LIBDEPS=[
         'network',

@@ -45,6 +45,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -90,11 +91,11 @@ public:
 
 } exportedIntervalParam;
 
-StatusWith<OID> getCurrentCacheGeneration(OperationContext* txn) {
+StatusWith<OID> getCurrentCacheGeneration(OperationContext* opCtx) {
     try {
         BSONObjBuilder result;
-        const bool ok = grid.catalogClient(txn)->runUserManagementReadCommand(
-            txn, "admin", BSON("_getUserCacheGeneration" << 1), &result);
+        const bool ok = grid.catalogClient(opCtx)->runUserManagementReadCommand(
+            opCtx, "admin", BSON("_getUserCacheGeneration" << 1), &result);
         if (!ok) {
             return getStatusFromCommandResult(result.obj());
         }
@@ -117,8 +118,8 @@ UserCacheInvalidator::~UserCacheInvalidator() {
     wait();
 }
 
-void UserCacheInvalidator::initialize(OperationContext* txn) {
-    StatusWith<OID> currentGeneration = getCurrentCacheGeneration(txn);
+void UserCacheInvalidator::initialize(OperationContext* opCtx) {
+    StatusWith<OID> currentGeneration = getCurrentCacheGeneration(opCtx);
     if (currentGeneration.isOK()) {
         _previousCacheGeneration = currentGeneration.getValue();
         return;
@@ -146,6 +147,7 @@ void UserCacheInvalidator::run() {
             lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
         Date_t now = Date_t::now();
         while (now < sleepUntil) {
+            MONGO_IDLE_THREAD_BLOCK;
             invalidationIntervalChangedCondition.wait_until(lock, sleepUntil.toSystemTimePoint());
             sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs.load());
             now = Date_t::now();
@@ -157,8 +159,8 @@ void UserCacheInvalidator::run() {
             break;
         }
 
-        auto txn = cc().makeOperationContext();
-        StatusWith<OID> currentGeneration = getCurrentCacheGeneration(txn.get());
+        auto opCtx = cc().makeOperationContext();
+        StatusWith<OID> currentGeneration = getCurrentCacheGeneration(opCtx.get());
         if (!currentGeneration.isOK()) {
             if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
                 warning() << "_getUserCacheGeneration command not found on config server(s), "

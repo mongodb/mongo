@@ -24,9 +24,7 @@ DEST_TO_CONFIG = {
     "dbpath_prefix": "dbpathPrefix",
     "dbtest_executable": "dbtest",
     "dry_run": "dryRun",
-    "exclude_with_all_tags": "excludeWithAllTags",
     "exclude_with_any_tags": "excludeWithAnyTags",
-    "include_with_all_tags": "includeWithAllTags",
     "include_with_any_tags": "includeWithAnyTags",
     "jobs": "jobs",
     "mongo_executable": "mongo",
@@ -38,13 +36,16 @@ DEST_TO_CONFIG = {
     "num_clients_per_fixture": "numClientsPerFixture",
     "prealloc_journal": "preallocJournal",
     "repeat": "repeat",
+    "report_failure_status": "reportFailureStatus",
     "report_file": "reportFile",
     "seed": "seed",
     "shell_read_mode": "shellReadMode",
     "shell_write_mode": "shellWriteMode",
     "shuffle": "shuffle",
+    "stagger_jobs": "staggerJobs",
     "storage_engine": "storageEngine",
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
+    "tag_file": "tagFile",
     "task_id": "taskId",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
@@ -98,11 +99,6 @@ def parse_command_line():
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
                       help="The path to the dbtest executable for resmoke to use.")
 
-    parser.add_option("--excludeWithAllTags", action="append", dest="exclude_with_all_tags",
-                      metavar="TAG1,TAG2",
-                      help=("Comma separated list of tags. Any jstest that contains all of the"
-                            " specified tags will be excluded from any suites that are run."))
-
     parser.add_option("--excludeWithAnyTags", action="append", dest="exclude_with_any_tags",
                       metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. Any jstest that contains any of the"
@@ -110,11 +106,6 @@ def parse_command_line():
 
     parser.add_option("-f", "--findSuites", action="store_true", dest="find_suites",
                       help="List the names of the suites that will execute the specified tests.")
-
-    parser.add_option("--includeWithAllTags", action="append", dest="include_with_all_tags",
-                      metavar="TAG1,TAG2",
-                      help=("Comma separated list of tags. For the jstest portion of the suite(s),"
-                            " only tests which have all of the specified tags will be run."))
 
     parser.add_option("--includeWithAnyTags", action="append", dest="include_with_any_tags",
                       metavar="TAG1,TAG2",
@@ -176,6 +167,13 @@ def parse_command_line():
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
                       help="Repeat the given suite(s) N times, or until one fails.")
 
+    parser.add_option("--reportFailureStatus", type="choice", action="store",
+                      dest="report_failure_status", choices=("fail", "silentfail"),
+                      metavar="STATUS",
+                      help="Controls if the test failure status should be reported as failed"
+                           " or be silently ignored (STATUS=silentfail). Defaults to"
+                           " STATUS=%default.")
+
     parser.add_option("--reportFile", dest="report_file", metavar="REPORT",
                       help="Write a JSON file with test status and timing information.")
 
@@ -194,12 +192,20 @@ def parse_command_line():
     parser.add_option("--shuffle", action="store_true", dest="shuffle",
                       help="Randomize the order in which tests are executed.")
 
+    parser.add_option("--staggerJobs", type="choice", action="store", dest="stagger_jobs",
+                      choices=("on", "off"), metavar="ON|OFF",
+                      help=("Enable or disable the stagger of launching resmoke jobs."
+                            " Defaults to %default."))
+
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
     parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size",
                       metavar="CONFIG", help="Set the storage engine cache size configuration"
                       " setting for all mongod's.")
+
+    parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
+                      help="A YAML file that associates tests and tags.")
 
     parser.add_option("--taskId", dest="task_id", metavar="TASK_ID",
                       help="Set the Id of the Evergreen task running the tests.")
@@ -218,7 +224,8 @@ def parse_command_line():
                         dry_run="off",
                         find_suites=False,
                         list_suites=False,
-                        prealloc_journal="off")
+                        prealloc_journal="off",
+                        stagger_jobs="off")
 
     return parser.parse_args()
 
@@ -246,10 +253,8 @@ def update_config_vars(values):
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
-    _config.EXCLUDE_WITH_ALL_TAGS = config.pop("excludeWithAllTags")
     _config.EXCLUDE_WITH_ANY_TAGS = config.pop("excludeWithAnyTags")
     _config.FAIL_FAST = not config.pop("continueOnFailure")
-    _config.INCLUDE_WITH_ALL_TAGS = config.pop("includeWithAllTags")
     _config.INCLUDE_WITH_ANY_TAGS = config.pop("includeWithAnyTags")
     _config.JOBS = config.pop("jobs")
     _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo"))
@@ -262,12 +267,15 @@ def update_config_vars(values):
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("numClientsPerFixture")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
+    _config.REPORT_FAILURE_STATUS = config.pop("reportFailureStatus")
     _config.REPORT_FILE = config.pop("reportFile")
     _config.SHELL_READ_MODE = config.pop("shellReadMode")
     _config.SHELL_WRITE_MODE = config.pop("shellWriteMode")
     _config.SHUFFLE = config.pop("shuffle")
+    _config.STAGGER_JOBS = config.pop("staggerJobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storageEngine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
+    _config.TAG_FILE = config.pop("tagFile")
     _config.TASK_ID = config.pop("taskId")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")
@@ -316,9 +324,7 @@ def get_suites(values, args):
         # Do not change the execution order of the jstests passed as args, unless a tag option is
         # specified. If an option is specified, then sort the tests for consistent execution order.
         _config.ORDER_TESTS_BY_NAME = any(tag_filter is not None for
-                                          tag_filter in (_config.EXCLUDE_WITH_ALL_TAGS,
-                                                         _config.EXCLUDE_WITH_ANY_TAGS,
-                                                         _config.INCLUDE_WITH_ALL_TAGS,
+                                          tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS,
                                                          _config.INCLUDE_WITH_ANY_TAGS))
         # No specified config, just use the following, and default the logging and executor.
         suite_config = _make_jstests_config(args)

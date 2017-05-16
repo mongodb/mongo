@@ -38,28 +38,27 @@ namespace {
 
 using TimeProof = TimeProofService::TimeProof;
 
+const TimeProofService::Key key = {};
+
 // Verifies logical time with proof signed with the correct key.
 TEST(TimeProofService, VerifyLogicalTimeWithValidProof) {
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    TimeProofService timeProofService(std::move(key));
+    TimeProofService timeProofService;
 
     LogicalTime time(Timestamp(1));
-    TimeProof proof = timeProofService.getProof(time);
+    TimeProof proof = timeProofService.getProof(time, key);
 
-    ASSERT_OK(timeProofService.checkProof(time, proof));
+    ASSERT_OK(timeProofService.checkProof(time, proof, key));
 }
 
 // Fails for logical time with proof signed with an invalid key.
 TEST(TimeProofService, LogicalTimeWithMismatchingProofShouldFail) {
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    TimeProofService timeProofService(std::move(key));
+    TimeProofService timeProofService;
 
     LogicalTime time(Timestamp(1));
     TimeProof invalidProof = {{1, 2, 3}};
 
-    ASSERT_EQUALS(ErrorCodes::TimeProofMismatch, timeProofService.checkProof(time, invalidProof));
+    ASSERT_EQUALS(ErrorCodes::TimeProofMismatch,
+                  timeProofService.checkProof(time, invalidProof, key));
 }
 
 }  // unnamed namespace

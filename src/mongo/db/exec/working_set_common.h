@@ -45,7 +45,7 @@ public:
      * Requires either a valid BSONObj or valid RecordId.
      * Returns true if the fetch and invalidate succeeded, false otherwise.
      */
-    static bool fetchAndInvalidateRecordId(OperationContext* txn,
+    static bool fetchAndInvalidateRecordId(OperationContext* opCtx,
                                            WorkingSetMember* member,
                                            const Collection* collection);
 
@@ -70,19 +70,19 @@ public:
      *
      * WriteConflict exceptions may be thrown. When they are, 'member' will be unmodified.
      */
-    static bool fetch(OperationContext* txn,
+    static bool fetch(OperationContext* opCtx,
                       WorkingSet* workingSet,
                       WorkingSetID id,
                       unowned_ptr<SeekableRecordCursor> cursor);
 
-    static bool fetchIfUnfetched(OperationContext* txn,
+    static bool fetchIfUnfetched(OperationContext* opCtx,
                                  WorkingSet* workingSet,
                                  WorkingSetID id,
                                  unowned_ptr<SeekableRecordCursor> cursor) {
         WorkingSetMember* member = workingSet->get(id);
         if (member->hasObj())
             return true;
-        return fetch(txn, workingSet, id, cursor);
+        return fetch(opCtx, workingSet, id, cursor);
     }
 
     /**

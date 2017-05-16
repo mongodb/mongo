@@ -119,6 +119,17 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
  */
 const Seconds ReadPreferenceSetting::kMinimalMaxStalenessValue(90);
 
+const OperationContext::Decoration<ReadPreferenceSetting> ReadPreferenceSetting::get =
+    OperationContext::declareDecoration<ReadPreferenceSetting>();
+
+const BSONObj& ReadPreferenceSetting::secondaryPreferredMetadata() {
+    // This is a static method rather than a static member only because it is used by another TU
+    // during dynamic init.
+    static const auto bson =
+        ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON();
+    return bson;
+}
+
 TagSet::TagSet() : _tags(BSON_ARRAY(BSONObj())) {}
 
 TagSet TagSet::primaryOnly() {
@@ -141,7 +152,7 @@ ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, TagSet tags)
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref)
     : ReadPreferenceSetting(pref, defaultTagSetForMode(pref)) {}
 
-StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromBSON(const BSONObj& readPrefObj) {
+StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONObj& readPrefObj) {
     std::string modeStr;
     auto modeExtractStatus = bsonExtractStringField(readPrefObj, kModeFieldName, &modeStr);
     if (!modeExtractStatus.isOK()) {
@@ -220,20 +231,37 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromBSON(const BSONObj&
     return ReadPreferenceSetting(mode, tags, Seconds(maxStalenessSecondsValue));
 }
 
-BSONObj ReadPreferenceSetting::toBSON() const {
-    BSONObjBuilder bob;
-    bob.append(kModeFieldName, readPreferenceName(pref));
+StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {
+    if (elem.type() != mongo::Object) {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "$readPreference has incorrect type: expected "
+                                    << mongo::Object
+                                    << " but got "
+                                    << elem.type());
+    }
+    return fromInnerBSON(elem.Obj());
+}
+
+StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromContainingBSON(
+    const BSONObj& obj, ReadPreference defaultReadPref) {
+    if (auto elem = obj["$readPreference"]) {
+        return fromInnerBSON(elem);
+    }
+    return ReadPreferenceSetting(defaultReadPref);
+}
+
+void ReadPreferenceSetting::toInnerBSON(BSONObjBuilder* bob) const {
+    bob->append(kModeFieldName, readPreferenceName(pref));
     if (tags != defaultTagSetForMode(pref)) {
-        bob.append(kTagsFieldName, tags.getTagBSON());
+        bob->append(kTagsFieldName, tags.getTagBSON());
     }
     if (maxStalenessSeconds.count() > 0) {
-        bob.append(kMaxStalenessSecondsFieldName, maxStalenessSeconds.count());
+        bob->append(kMaxStalenessSecondsFieldName, maxStalenessSeconds.count());
     }
-    return bob.obj();
 }
 
 std::string ReadPreferenceSetting::toString() const {
-    return toBSON().toString();
+    return toInnerBSON().toString();
 }
 
 }  // namespace mongo

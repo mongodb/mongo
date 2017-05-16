@@ -82,11 +82,11 @@ const bool profiling = false;
 
 class ClientBase {
 public:
-    ClientBase() : _client(&_txn) {
-        mongo::LastError::get(_txn.getClient()).reset();
+    ClientBase() : _client(&_opCtx) {
+        mongo::LastError::get(_opCtx.getClient()).reset();
     }
     virtual ~ClientBase() {
-        mongo::LastError::get(_txn.getClient()).reset();
+        mongo::LastError::get(_opCtx.getClient()).reset();
     }
 
 protected:
@@ -103,13 +103,13 @@ protected:
     DBClientBase* client() {
         return &_client;
     }
-    OperationContext* txn() {
-        return &_txn;
+    OperationContext* opCtx() {
+        return &_opCtx;
     }
 
 private:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _txn = *_txnPtr;
+    OperationContext& _opCtx = *_txnPtr;
     DBDirectClient _client;
 };
 
@@ -332,9 +332,9 @@ public:
         srand(++z ^ (unsigned)time(0));
 #endif
         Client::initThreadIfNotAlready("perftestthr");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
-        DBDirectClient c(&txn);
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
+        DBDirectClient c(&opCtx);
 
         const unsigned int Batch = batchSize();
         prepThreaded();

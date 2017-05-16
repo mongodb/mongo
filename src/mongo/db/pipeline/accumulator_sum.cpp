@@ -89,7 +89,7 @@ intrusive_ptr<Accumulator> AccumulatorSum::create(
     return new AccumulatorSum(expCtx);
 }
 
-Value AccumulatorSum::getValue(bool toBeMerged) const {
+Value AccumulatorSum::getValue(bool toBeMerged) {
     switch (totalType) {
         case NumberInt:
             if (nonDecimalTotal.fitsLong())

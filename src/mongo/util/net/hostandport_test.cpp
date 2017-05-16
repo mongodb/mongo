@@ -111,5 +111,15 @@ TEST(HostAndPort, RoundTripAbility) {
     ASSERT_EQUALS(HostAndPort("[124d:]"), HostAndPort(HostAndPort("[124d:]").toString()));
 }
 
+TEST(HostAndPort, CanIdentifyDefaultRoutes) {
+    ASSERT_TRUE(HostAndPort("0.0.0.0").isDefaultRoute());
+    ASSERT_FALSE(HostAndPort("127.0.0.1").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[::]").isDefaultRoute());
+    ASSERT_FALSE(HostAndPort("[::1]").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[0:0:0:0:0:0:0:0]").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[0:0:0::0:0:0]").isDefaultRoute());
+    ASSERT_TRUE(HostAndPort("[0:0:0::00:0:0]").isDefaultRoute());
+}
+
 }  // namespace
 }  // namespace mongo

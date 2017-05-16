@@ -50,7 +50,7 @@ namespace write_stage_common {
  * still exists.
  */
 bool ensureStillMatches(const Collection* collection,
-                        OperationContext* txn,
+                        OperationContext* opCtx,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq);

@@ -338,17 +338,15 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	 * 2. If async is off, and the user wants it on, start it.
 	 * 3. If not a toggle and async is off, we're done.
 	 */
-	if (conn->async_cfg && !run) {
-		/* Case 1 */
+	if (conn->async_cfg && !run) {			/* Case 1 */
 		WT_TRET(__wt_async_flush(session));
 		ret = __wt_async_destroy(session);
 		conn->async_cfg = false;
 		return (ret);
-	} else if (!conn->async_cfg && run)
-		/* Case 2 */
+	}
+	if (!conn->async_cfg && run)			/* Case 2 */
 		return (__async_start(session));
-	else if (!conn->async_cfg)
-		/* Case 3 */
+	if (!conn->async_cfg)				/* Case 3 */
 		return (0);
 
 	/*

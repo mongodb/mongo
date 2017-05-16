@@ -60,51 +60,50 @@ class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordina
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
 
 public:
-    ReplicationCoordinatorExternalStateImpl(StorageInterface* storageInterface);
+    ReplicationCoordinatorExternalStateImpl(ServiceContext* service,
+                                            StorageInterface* storageInterface);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
-    virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
-    virtual void startSteadyStateReplication(OperationContext* txn,
+    virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) override;
-    virtual void stopDataReplication(OperationContext* txn) override;
-    virtual void runOnInitialSyncThread(stdx::function<void(OperationContext* txn)> run) override;
+    virtual void stopDataReplication(OperationContext* opCtx) override;
 
-    virtual bool isInitialSyncFlagSet(OperationContext* txn) override;
+    virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
-    virtual void startMasterSlave(OperationContext* txn);
-    virtual void shutdown(OperationContext* txn);
+    virtual void startMasterSlave(OperationContext* opCtx);
+    virtual void shutdown(OperationContext* opCtx);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual OldThreadPool* getDbWorkThreadPool() const override;
-    virtual Status runRepairOnLocalDB(OperationContext* txn) override;
-    virtual Status initializeReplSetStorage(OperationContext* txn, const BSONObj& config);
-    void onDrainComplete(OperationContext* txn) override;
-    OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;
+    virtual Status runRepairOnLocalDB(OperationContext* opCtx) override;
+    virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
+    void onDrainComplete(OperationContext* opCtx) override;
+    OpTime onTransitionToPrimary(OperationContext* opCtx, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
-    virtual OID ensureMe(OperationContext* txn);
+    virtual OID ensureMe(OperationContext* opCtx);
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
-    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
-    virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
-    virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
+    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
+    virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
+    virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
+    virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
-    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-    virtual void cleanUpLastApplyBatch(OperationContext* txn);
-    virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
+    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
+    virtual void cleanUpLastApplyBatch(OperationContext* opCtx);
+    virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual void closeConnections();
-    virtual void killAllUserOperations(OperationContext* txn);
+    virtual void killAllUserOperations(OperationContext* opCtx);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(SnapshotName newCommitPoint) final;
-    void createSnapshot(OperationContext* txn, SnapshotName name) final;
+    void createSnapshot(OperationContext* opCtx, SnapshotName name) final;
     void forceSnapshotCreation() final;
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();
     virtual double getElectionTimeoutOffsetLimitFraction() const;
-    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
-    virtual StatusWith<OpTime> multiApply(OperationContext* txn,
+    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
+    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
     virtual Status multiSyncApply(MultiApplier::OperationPtrs* ops) override;
@@ -112,10 +111,9 @@ public:
                                          const HostAndPort& source,
                                          AtomicUInt32* fetchCount) override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* txn) const override;
+        OperationContext* opCtx) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* txn) const override;
-    virtual bool shouldUseDataReplicatorInitialSync() const override;
+        OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
 
     // Methods from JournalListener.
@@ -130,7 +128,7 @@ private:
     /**
      * Stops data replication and returns with 'lock' locked.
      */
-    void _stopDataReplication_inlock(OperationContext* txn, UniqueLock* lock);
+    void _stopDataReplication_inlock(OperationContext* opCtx, UniqueLock* lock);
 
     /**
      * Called when the instance transitions to primary in order to notify a potentially sharded host
@@ -138,15 +136,17 @@ private:
      *
      * Throws on errors.
      */
-    void _shardingOnTransitionToPrimaryHook(OperationContext* txn);
+    void _shardingOnTransitionToPrimaryHook(OperationContext* opCtx);
 
     /**
     * Drops all temporary collections on all databases except "local".
     *
     * The implementation may assume that the caller has acquired the global exclusive lock
-    * for "txn".
+    * for "opCtx".
     */
-    void _dropAllTempCollections(OperationContext* txn);
+    void _dropAllTempCollections(OperationContext* opCtx);
+
+    ServiceContext* _service;
 
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;
@@ -183,12 +183,6 @@ private:
     long long _nextThreadId = 0;
 
     std::unique_ptr<SnapshotThread> _snapshotThread;
-
-    // Initial sync stuff
-    StartInitialSyncFn _startInitialSyncIfNeededFn;
-    StartSteadyReplicationFn _startSteadReplicationFn;
-    OldThreadPool _initialSyncThreadPool;
-    TaskRunner _initialSyncRunner;
 
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;

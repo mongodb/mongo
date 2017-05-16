@@ -63,7 +63,7 @@ public:
     /** Marks the end of the evaluate() phase and return accumulated result.
      *  toBeMerged should be true when the outputs will be merged by process().
      */
-    virtual Value getValue(bool toBeMerged) const = 0;
+    virtual Value getValue(bool toBeMerged) = 0;
 
     /// The name of the op as used in a serialization of the pipeline.
     virtual const char* getOpName() const = 0;
@@ -106,7 +106,7 @@ public:
     explicit AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -131,7 +131,7 @@ public:
     explicit AccumulatorFirst(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -149,7 +149,7 @@ public:
     explicit AccumulatorLast(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -166,7 +166,7 @@ public:
     explicit AccumulatorSum(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -198,7 +198,7 @@ public:
     AccumulatorMinMax(const boost::intrusive_ptr<ExpressionContext>& expCtx, Sense sense);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -237,7 +237,7 @@ public:
     explicit AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -254,7 +254,7 @@ public:
     explicit AccumulatorAvg(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -280,7 +280,7 @@ public:
     AccumulatorStdDev(const boost::intrusive_ptr<ExpressionContext>& expCtx, bool isSamp);
 
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) const final;
+    Value getValue(bool toBeMerged) final;
     const char* getOpName() const final;
     void reset() final;
 
@@ -305,5 +305,21 @@ public:
         : AccumulatorStdDev(expCtx, true) {}
     static boost::intrusive_ptr<Accumulator> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+};
+
+class AccumulatorMergeObjects : public Accumulator {
+public:
+    AccumulatorMergeObjects(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    const char* getOpName() const final;
+    void reset() final;
+
+    static boost::intrusive_ptr<Accumulator> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+private:
+    MutableDocument _output;
 };
 }

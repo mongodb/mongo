@@ -41,7 +41,7 @@ class OperationContext;
 
 class TextMatchExpression : public TextMatchExpressionBase {
 public:
-    Status init(OperationContext* txn, const NamespaceString& nss, TextParams params);
+    Status init(OperationContext* opCtx, const NamespaceString& nss, TextParams params);
 
     const fts::FTSQuery& getFTSQuery() const final {
         return _ftsQuery;

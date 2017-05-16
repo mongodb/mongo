@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of collection existing when none
+// expected.
+// @tags: [assumes_no_implicit_collection_creation_after_drop]
+
 // SERVER-21488 Test that multi inserts into capped collections don't cause corruption.
 // Note: this file must have a name that starts with "bulk" so it gets run by bulk_gle_passthrough.
 (function() {

@@ -87,14 +87,14 @@ public:
      * they violate the policy for some reason. The reason is decided by the policy and may include
      * chunk is too big or chunk straddles a tag range.
      */
-    virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* txn) = 0;
+    virtual StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx) = 0;
 
     /**
      * Potentially blocking method, which gives out a set of chunks to be moved. The
      * aggressiveBalanceHint indicates to the balancing logic that it should lower the threshold for
      * difference in number of chunks across shards and thus potentially cause more chunks to move.
      */
-    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* txn,
+    virtual StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
                                                              bool aggressiveBalanceHint) = 0;
 
     /**
@@ -104,14 +104,14 @@ public:
      * Otherwise returns migration information for where the chunk should be moved.
      */
     virtual StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
-        OperationContext* txn, const ChunkType& chunk) = 0;
+        OperationContext* opCtx, const ChunkType& chunk) = 0;
 
     /**
      * Asks the chunk selection policy to validate that the specified chunk migration is allowed
      * given the current rules. Returns OK if the migration won't violate any rules or any other
      * failed status otherwise.
      */
-    virtual Status checkMoveAllowed(OperationContext* txn,
+    virtual Status checkMoveAllowed(OperationContext* opCtx,
                                     const ChunkType& chunk,
                                     const ShardId& newShardId) = 0;
 

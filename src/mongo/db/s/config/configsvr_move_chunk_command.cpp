@@ -78,23 +78,22 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         auto request = uassertStatusOK(BalanceChunkRequest::parseFromConfigCommand(cmdObj));
 
         if (request.hasToShardId()) {
-            uassertStatusOK(Balancer::get(txn)->moveSingleChunk(txn,
-                                                                request.getChunk(),
-                                                                request.getToShardId(),
-                                                                request.getMaxChunkSizeBytes(),
-                                                                request.getSecondaryThrottle(),
-                                                                request.getWaitForDelete()));
+            uassertStatusOK(Balancer::get(opCtx)->moveSingleChunk(opCtx,
+                                                                  request.getChunk(),
+                                                                  request.getToShardId(),
+                                                                  request.getMaxChunkSizeBytes(),
+                                                                  request.getSecondaryThrottle(),
+                                                                  request.getWaitForDelete()));
         } else {
-            uassertStatusOK(Balancer::get(txn)->rebalanceSingleChunk(txn, request.getChunk()));
+            uassertStatusOK(Balancer::get(opCtx)->rebalanceSingleChunk(opCtx, request.getChunk()));
         }
 
         return true;

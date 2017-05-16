@@ -303,6 +303,19 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
         net, selector, currentSyncSource, nextSyncSource, {BSON("ts" << ts << "t" << 0)});
 }
 
+void _scheduleRBIDResponse(executor::NetworkInterfaceMock* net,
+                           HostAndPort currentSyncSource,
+                           const BSONObj& reply = BSON("ok" << 1 << "rbid" << 1)) {
+    executor::NetworkInterfaceMock::InNetworkGuard networkGuard(net);
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto request = net->scheduleSuccessfulResponse(reply);
+    ASSERT_EQUALS(currentSyncSource, request.target);
+    ASSERT_EQUALS("admin", request.dbname);
+    ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
+    ASSERT_BSONOBJ_EQ(BSON("replSetGetRBID" << 1), request.cmdObj);
+    net->runReadyNetworkOperations();
+}
+
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverReturnsStatusOkAndTheFoundHostWhenAnEligibleSyncSourceExists) {
     HostAndPort candidate1("node1", 12345);
@@ -312,6 +325,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate1, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate1);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -332,6 +346,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate1, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate1);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -382,6 +397,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate2);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -447,6 +463,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate2);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -512,6 +529,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate2);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -536,6 +554,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate2);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -561,6 +580,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate2);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -614,19 +634,6 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
         {BSON("ts" << requiredOpTime.getTimestamp() << "t" << requiredOpTime.getTerm())});
 }
 
-void _scheduleRBIDResponse(executor::NetworkInterfaceMock* net,
-                           HostAndPort currentSyncSource,
-                           const BSONObj& reply = BSON("ok" << 1 << "rbid" << 1)) {
-    executor::NetworkInterfaceMock::InNetworkGuard networkGuard(net);
-    ASSERT_TRUE(net->hasReadyRequests());
-    auto request = net->scheduleSuccessfulResponse(reply);
-    ASSERT_EQUALS(currentSyncSource, request.target);
-    ASSERT_EQUALS("admin", request.dbname);
-    ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
-    ASSERT_BSONOBJ_EQ(BSON("replSetGetRBID" << 1), request.cmdObj);
-    net->runReadyNetworkOperations();
-}
-
 const OpTime requiredOpTime(Timestamp(200, 1U), 1LL);
 
 TEST_F(
@@ -651,7 +658,7 @@ TEST_F(
     ASSERT_FALSE(_resolver->isActive());
     ASSERT_EQUALS(candidate1, unittest::assertGet(_response.syncSourceStatus));
     ASSERT(_response.rbid);
-    ASSERT_EQ(*_response.rbid, 7);
+    ASSERT_EQ(_response.rbid, 7);
 }
 
 TEST_F(SyncSourceResolverTest,

@@ -79,10 +79,9 @@ public:
      *>  "out" : NumberLong(6271151123721111923),
      *>  "ok" : 1 }
      **/
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& db,
              BSONObj& cmdObj,
-             int options,
              string& errmsg,
              BSONObjBuilder& result) {
         result.appendAs(cmdObj.firstElement(), "key");

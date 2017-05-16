@@ -91,11 +91,12 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
 
     User* userObj;
     // The authentication database is also the source database for the user.
-    Status status =
-        _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().acquireUser(
-            _saslAuthSession->getOpCtxt(),
-            UserName(_user, _saslAuthSession->getAuthenticationDatabase()),
-            &userObj);
+    Status status = _saslAuthSession->getAuthorizationSession()
+                        ->getAuthorizationManager()
+                        .acquireUserForInitialAuth(
+                            _saslAuthSession->getOpCtxt(),
+                            UserName(_user, _saslAuthSession->getAuthenticationDatabase()),
+                            &userObj);
 
     if (!status.isOK()) {
         return StatusWith<bool>(status);

@@ -22,8 +22,13 @@ function validateCollections(db, obj) {
     }
 
     function setFeatureCompatibilityVersion(adminDB, version) {
-        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
+        var res = adminDB.runCommand({setFeatureCompatibilityVersion: version});
+        if (!res.ok) {
+            return res;
+        }
+
         assert.eq(version, getFeatureCompatibilityVersion(adminDB));
+        return res;
     }
 
     assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
@@ -56,8 +61,21 @@ function validateCollections(db, obj) {
             }
         }
 
-        setFeatureCompatibilityVersion(
+        var res = setFeatureCompatibilityVersion(
             adminDB, jsTest.options().forceValidationWithFeatureCompatibilityVersion);
+        // Bypass collections validation when setFeatureCompatibilityVersion fails with KeyTooLong
+        // while forcing feature compatibility version. The KeyTooLong error response occurs as a
+        // result of having a document with a large "version" field in the admin.system.version
+        // collection.
+        if (!res.ok && jsTest.options().forceValidationWithFeatureCompatibilityVersion === "3.4") {
+            print("Skipping collection validation since forcing the featureCompatibilityVersion" +
+                  " to 3.4 failed");
+            assert.commandFailedWithCode(res, ErrorCodes.KeyTooLong);
+            success = true;
+            return success;
+        } else {
+            assert.commandWorked(res);
+        }
     }
 
     // Don't run validate on view namespaces.
@@ -85,7 +103,8 @@ function validateCollections(db, obj) {
 
     // Restore the original value for featureCompatibilityVersion.
     if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
-        setFeatureCompatibilityVersion(adminDB, originalFeatureCompatibilityVersion);
+        assert.commandWorked(
+            setFeatureCompatibilityVersion(adminDB, originalFeatureCompatibilityVersion));
     }
 
     return success;

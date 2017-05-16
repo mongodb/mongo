@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_options.h"
 
 namespace mongo {
 
@@ -43,10 +43,6 @@ class CanonicalQuery;
 class OperationContext;
 struct GetMoreRequest;
 struct ReadPreferenceSetting;
-
-namespace rpc {
-class ServerSelectionMetadata;
-}  // namespace rpc
 
 /**
  * Methods for running find and getMore operations across a sharded cluster.
@@ -66,7 +62,7 @@ public:
      * If a CommandOnShardedViewNotSupportedOnMongod error is returned, then 'viewDefinition', if
      * not null, will contain a view definition.
      */
-    static StatusWith<CursorId> runQuery(OperationContext* txn,
+    static StatusWith<CursorId> runQuery(OperationContext* opCtx,
                                          const CanonicalQuery& query,
                                          const ReadPreferenceSetting& readPref,
                                          std::vector<BSONObj>* results,
@@ -75,12 +71,11 @@ public:
     /**
      * Executes the getMore request 'request', and on success returns a CursorResponse.
      */
-    static StatusWith<CursorResponse> runGetMore(OperationContext* txn,
+    static StatusWith<CursorResponse> runGetMore(OperationContext* opCtx,
                                                  const GetMoreRequest& request);
 
     /**
-     * Extracts the read preference from 'cmdObj', or determines the read pref based on 'isSlaveOk'
-     * if 'cmdObj' does not contain a read preference.
+     * Extracts the read preference from 'cmdObj.
      *
      * Expects a read preference that has already been "unwrapped" by the mongos command handling
      * code, e.g. { ... , $queryOptions: { $readPreference: { ... } } , ... }.
@@ -88,8 +83,7 @@ public:
      * Returns a non-OK status if 'cmdObj' has a read preference but the read preference does not
      * parse correctly.
      */
-    static StatusWith<ReadPreferenceSetting> extractUnwrappedReadPref(const BSONObj& cmdObj,
-                                                                      bool isSlaveOk);
+    static StatusWith<ReadPreferenceSetting> extractUnwrappedReadPref(const BSONObj& cmdObj);
 };
 
 }  // namespace mongo

@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/net/message.h"
@@ -65,12 +64,6 @@ public:
     CommandRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
 
     CommandRequestBuilder& setMetadata(BSONObj metadata) final;
-
-    CommandRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
-
-    CommandRequestBuilder& addInputDoc(BSONObj inputDoc) final;
-
-    State getState() const final;
 
     Protocol getProtocol() const final;
 

@@ -49,7 +49,7 @@ class OperationContext;
  */
 class CollectionScan final : public PlanStage {
 public:
-    CollectionScan(OperationContext* txn,
+    CollectionScan(OperationContext* opCtx,
                    const CollectionScanParams& params,
                    WorkingSet* workingSet,
                    const MatchExpression* filter);
@@ -57,7 +57,7 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;

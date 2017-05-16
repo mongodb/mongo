@@ -63,11 +63,11 @@ public:
                                                         StringData ident,
                                                         const IndexDescriptor* desc);
 
-    virtual Status beginBackup(OperationContext* txn) {
+    virtual Status beginBackup(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    virtual void endBackup(OperationContext* txn) {}
+    virtual void endBackup(OperationContext* opCtx) {}
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 

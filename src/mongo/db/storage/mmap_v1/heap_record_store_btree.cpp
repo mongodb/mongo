@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const RecordId& loc) const {
+RecordData HeapRecordStoreBtree::dataFor(OperationContext* opCtx, const RecordId& loc) const {
     Records::const_iterator it = _records.find(loc);
     invariant(it != _records.end());
     const MmapV1RecordHeader& rec = it->second;
@@ -50,7 +50,7 @@ RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const RecordId& 
     return RecordData(rec.data.get(), rec.dataSize);
 }
 
-bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
+bool HeapRecordStoreBtree::findRecord(OperationContext* opCtx,
                                       const RecordId& loc,
                                       RecordData* out) const {
     Records::const_iterator it = _records.find(loc);
@@ -61,11 +61,11 @@ bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
     return true;
 }
 
-void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const RecordId& loc) {
+void HeapRecordStoreBtree::deleteRecord(OperationContext* opCtx, const RecordId& loc) {
     invariant(_records.erase(loc) == 1);
 }
 
-StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
+StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* opCtx,
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota) {
@@ -75,12 +75,12 @@ StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
     const RecordId loc = allocateLoc();
     _records[loc] = rec;
 
-    HeapRecordStoreBtreeRecoveryUnit::notifyInsert(txn, this, loc);
+    HeapRecordStoreBtreeRecoveryUnit::notifyInsert(opCtx, this, loc);
 
     return StatusWith<RecordId>(loc);
 }
 
-Status HeapRecordStoreBtree::insertRecordsWithDocWriter(OperationContext* txn,
+Status HeapRecordStoreBtree::insertRecordsWithDocWriter(OperationContext* opCtx,
                                                         const DocWriter* const* docs,
                                                         size_t nDocs,
                                                         RecordId* idsOut) {
@@ -96,7 +96,7 @@ Status HeapRecordStoreBtree::insertRecordsWithDocWriter(OperationContext* txn,
     _records[loc] = rec;
     *idsOut = loc;
 
-    HeapRecordStoreBtreeRecoveryUnit::notifyInsert(txn, this, loc);
+    HeapRecordStoreBtreeRecoveryUnit::notifyInsert(opCtx, this, loc);
 
     return Status::OK();
 }
@@ -111,7 +111,7 @@ RecordId HeapRecordStoreBtree::allocateLoc() {
     return dl;
 }
 
-Status HeapRecordStoreBtree::touch(OperationContext* txn, BSONObjBuilder* output) const {
+Status HeapRecordStoreBtree::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
     // not currently called from the tests, but called from btree_logic.h
     return Status::OK();
 }

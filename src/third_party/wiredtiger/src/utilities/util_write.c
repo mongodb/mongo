@@ -54,8 +54,12 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	 * Open the object; free allocated memory immediately to simplify
 	 * future error handling.
 	 */
-	(void)snprintf(config, sizeof(config), "%s,%s",
-	    append ? "append=true" : "", overwrite ? "overwrite=true" : "");
+	if ((ret = __wt_snprintf(config, sizeof(config), "%s,%s",
+	    append ? "append=true" : "",
+	    overwrite ? "overwrite=true" : "")) != 0) {
+		free(uri);
+		return (util_err(session, ret, NULL));
+	}
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0)
 		(void)util_err(session, ret, "%s: session.open_cursor", uri);

@@ -77,18 +77,18 @@ public:
 
     virtual ~ExtentManager() {}
 
-    virtual void close(OperationContext* txn) = 0;
+    virtual void close(OperationContext* opCtx) = 0;
 
     /**
      * opens all current files
      */
-    virtual Status init(OperationContext* txn) = 0;
+    virtual Status init(OperationContext* opCtx) = 0;
 
     virtual int numFiles() const = 0;
     virtual long long fileSize() const = 0;
 
     // must call Extent::reuse on the returned extent
-    virtual DiskLoc allocateExtent(OperationContext* txn,
+    virtual DiskLoc allocateExtent(OperationContext* opCtx,
                                    bool capped,
                                    int size,
                                    bool enforceQuota) = 0;
@@ -96,13 +96,13 @@ public:
     /**
      * firstExt has to be == lastExt or a chain
      */
-    virtual void freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt) = 0;
+    virtual void freeExtents(OperationContext* opCtx, DiskLoc firstExt, DiskLoc lastExt) = 0;
 
     /**
      * frees a single extent
      * ignores all fields in the Extent except: magic, myLoc, length
      */
-    virtual void freeExtent(OperationContext* txn, DiskLoc extent) = 0;
+    virtual void freeExtent(OperationContext* opCtx, DiskLoc extent) = 0;
 
     /**
      * Retrieve statistics on the the free list managed by this ExtentManger.
@@ -110,7 +110,7 @@ public:
      * @param totalFreeSizeBytes - non-null pointer to an int64_t receiving the total free
      *                             space in the free list.
      */
-    virtual void freeListStats(OperationContext* txn,
+    virtual void freeListStats(OperationContext* opCtx,
                                int* numExtents,
                                int64_t* totalFreeSizeBytes) const = 0;
 
@@ -188,8 +188,8 @@ public:
      */
     virtual CacheHint* cacheHint(const DiskLoc& extentLoc, const HintType& hint) = 0;
 
-    virtual DataFileVersion getFileFormat(OperationContext* txn) const = 0;
-    virtual void setFileFormat(OperationContext* txn, DataFileVersion newVersion) = 0;
+    virtual DataFileVersion getFileFormat(OperationContext* opCtx) const = 0;
+    virtual void setFileFormat(OperationContext* opCtx, DataFileVersion newVersion) = 0;
 
     virtual const DataFile* getOpenFile(int n) const = 0;
 };

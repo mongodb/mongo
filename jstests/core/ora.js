@@ -17,5 +17,5 @@ t.drop();
 t.ensureIndex({loc: "2d"});
 
 assert.throws(function() {
-    t.find({$or: [{loc: {$near: [11, 11]}}]}).limit(1).next()['_id'];
+    t.find({$or: [{loc: {$near: [11, 11]}}]}).limit(1).next();
 });

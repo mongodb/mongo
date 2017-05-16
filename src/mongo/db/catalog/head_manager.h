@@ -42,9 +42,9 @@ class HeadManager {
 public:
     virtual ~HeadManager() {}
 
-    virtual const RecordId getHead(OperationContext* txn) const = 0;
+    virtual const RecordId getHead(OperationContext* opCtx) const = 0;
 
-    virtual void setHead(OperationContext* txn, const RecordId newHead) = 0;
+    virtual void setHead(OperationContext* opCtx, const RecordId newHead) = 0;
 };
 
 }  // namespace mongo

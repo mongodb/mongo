@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/quick_exit.h"
 
@@ -85,16 +86,16 @@ bool MozJSProxyScope::isKillPending() const {
     return _implScope->isKillPending();
 }
 
-void MozJSProxyScope::registerOperation(OperationContext* txn) {
-    run([&] { _implScope->registerOperation(txn); });
+void MozJSProxyScope::registerOperation(OperationContext* opCtx) {
+    run([&] { _implScope->registerOperation(opCtx); });
 }
 
 void MozJSProxyScope::unregisterOperation() {
     run([&] { _implScope->unregisterOperation(); });
 }
 
-void MozJSProxyScope::localConnectForDbEval(OperationContext* txn, const char* dbName) {
-    run([&] { _implScope->localConnectForDbEval(txn, dbName); });
+void MozJSProxyScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
+    run([&] { _implScope->localConnectForDbEval(opCtx, dbName); });
 }
 
 void MozJSProxyScope::externalSetup() {
@@ -230,10 +231,9 @@ void MozJSProxyScope::injectNative(const char* field, NativeFunction func, void*
     run([&] { _implScope->injectNative(field, func, data); });
 }
 
-ScriptingFunction MozJSProxyScope::_createFunction(const char* raw,
-                                                   ScriptingFunction functionNumber) {
+ScriptingFunction MozJSProxyScope::_createFunction(const char* raw) {
     ScriptingFunction out;
-    run([&] { out = _implScope->_createFunction(raw, functionNumber); });
+    run([&] { out = _implScope->_createFunction(raw); });
     return out;
 }
 
@@ -340,9 +340,12 @@ void MozJSProxyScope::implThread(void* arg) {
 
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
-        proxy->_condvar.wait(lk, [proxy] {
-            return proxy->_state == State::ProxyRequest || proxy->_state == State::Shutdown;
-        });
+        {
+            MONGO_IDLE_THREAD_BLOCK;
+            proxy->_condvar.wait(lk, [proxy] {
+                return proxy->_state == State::ProxyRequest || proxy->_state == State::Shutdown;
+            });
+        }
 
         if (proxy->_state == State::Shutdown)
             break;
@@ -351,12 +354,6 @@ void MozJSProxyScope::implThread(void* arg) {
             proxy->_function();
         } catch (...) {
             proxy->_status = exceptionToStatus();
-        }
-
-        int exitCode;
-        if (proxy->_implScope && proxy->_implScope->getQuickExit(&exitCode)) {
-            scope.reset();
-            quickExit(exitCode);
         }
 
         proxy->_state = State::ImplResponse;

@@ -51,8 +51,6 @@
 
 #if (NTDDI_VERSION >= NTDDI_WIN7)
     #define MONGO_PRODUCT_WINDOWS_VERSION "Windows 7/Windows Server 2008 R2";
-#elif (NTDDI_VERSION >= NTDDI_VISTA)
-    #define MONGO_PRODUCT_WINDOWS_VERSION "Windows Vista/Windows Server 2008";
 #else
     #error This targeted Windows version is not supported
 #endif  // NTDDI_VERSION

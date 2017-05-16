@@ -86,10 +86,9 @@ public:
     }
     CompactCmd() : Command("compact") {}
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const string& db,
                      BSONObj& cmdObj,
-                     int,
                      string& errmsg,
                      BSONObjBuilder& result) {
         NamespaceString nss = parseNsCollectionRequired(db, cmdObj);
@@ -144,13 +143,12 @@ public:
         if (cmdObj.hasElement("validate"))
             compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
-        ScopedTransaction transaction(txn, MODE_IX);
-        AutoGetDb autoDb(txn, db, MODE_X);
+        AutoGetDb autoDb(opCtx, db, MODE_X);
         Database* const collDB = autoDb.getDb();
 
-        Collection* collection = collDB ? collDB->getCollection(nss) : nullptr;
+        Collection* collection = collDB ? collDB->getCollection(opCtx, nss) : nullptr;
         auto view =
-            collDB && !collection ? collDB->getViewCatalog()->lookup(txn, nss.ns()) : nullptr;
+            collDB && !collection ? collDB->getViewCatalog()->lookup(opCtx, nss.ns()) : nullptr;
 
         // If db/collection does not exist, short circuit and return.
         if (!collDB || !collection) {
@@ -162,12 +160,12 @@ public:
                     result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
         }
 
-        OldClientContext ctx(txn, nss.ns());
+        OldClientContext ctx(opCtx, nss.ns());
         BackgroundOperation::assertNoBgOpInProgForNs(nss.ns());
 
         log() << "compact " << nss.ns() << " begin, options: " << compactOptions;
 
-        StatusWith<CompactStats> status = collection->compact(txn, &compactOptions);
+        StatusWith<CompactStats> status = collection->compact(opCtx, &compactOptions);
         if (!status.isOK())
             return appendCommandStatus(result, status.getStatus());
 

@@ -41,6 +41,7 @@
 
     // Verify that the replSetMonitor can reach the restarted set
     awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
+    replTest.awaitNodesAgreeOnPrimary();
 
     assert.writeOK(st.s0.getDB('test').user.insert({x: 1}));
 

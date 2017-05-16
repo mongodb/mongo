@@ -51,7 +51,7 @@ public:
      *
      * Returns false otherwise.  *rootOut and *wsOut are invalid.
      */
-    static bool build(OperationContext* txn,
+    static bool build(OperationContext* opCtx,
                       Collection* collection,
                       const CanonicalQuery& cq,
                       const QuerySolution& solution,

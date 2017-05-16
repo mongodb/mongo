@@ -44,12 +44,12 @@ using stdx::make_unique;
 // static
 const char* CountStage::kStageType = "COUNT";
 
-CountStage::CountStage(OperationContext* txn,
+CountStage::CountStage(OperationContext* opCtx,
                        Collection* collection,
                        CountStageParams params,
                        WorkingSet* ws,
                        PlanStage* child)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _params(std::move(params)),
       _leftToSkip(_params.skip),

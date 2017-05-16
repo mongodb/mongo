@@ -39,7 +39,7 @@ namespace repl {
 namespace {
 
 TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "localhost:12345"),
@@ -57,7 +57,7 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
 }
 
 TEST(MemberConfig, ParseFailsWithIllegalFieldName) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::BadValue,
                   mc.initialize(BSON("_id" << 0 << "host"
@@ -68,7 +68,7 @@ TEST(MemberConfig, ParseFailsWithIllegalFieldName) {
 }
 
 TEST(MemberConfig, ParseFailsWithMissingIdField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   mc.initialize(BSON("host"
@@ -77,7 +77,7 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
 }
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   mc.initialize(BSON("host"
@@ -96,14 +96,14 @@ TEST(MemberConfig, ParseFailsWithBadIdField) {
 }
 
 TEST(MemberConfig, ParseFailsWithMissingHostField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, mc.initialize(BSON("_id" << 0), &tagConfig));
 }
 
 
 TEST(MemberConfig, ParseFailsWithBadHostField) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   mc.initialize(BSON("_id" << 0 << "host" << 0), &tagConfig));
@@ -118,7 +118,7 @@ TEST(MemberConfig, ParseFailsWithBadHostField) {
 }
 
 TEST(MemberConfig, ParseArbiterOnly) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -137,7 +137,7 @@ TEST(MemberConfig, ParseArbiterOnly) {
 }
 
 TEST(MemberConfig, ParseHidden) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -160,7 +160,7 @@ TEST(MemberConfig, ParseHidden) {
 }
 
 TEST(MemberConfig, ParseBuildIndexes) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -177,7 +177,7 @@ TEST(MemberConfig, ParseBuildIndexes) {
 }
 
 TEST(MemberConfig, ParseVotes) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -228,7 +228,7 @@ TEST(MemberConfig, ParseVotes) {
 }
 
 TEST(MemberConfig, ParsePriority) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -258,7 +258,7 @@ TEST(MemberConfig, ParsePriority) {
 }
 
 TEST(MemberConfig, ParseSlaveDelay) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -269,7 +269,7 @@ TEST(MemberConfig, ParseSlaveDelay) {
 }
 
 TEST(MemberConfig, ParseTags) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -290,7 +290,7 @@ TEST(MemberConfig, ParseTags) {
 }
 
 TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << -1 << "host"
                                        << "localhost:12345"),
@@ -303,7 +303,7 @@ TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
 }
 
 TEST(MemberConfig, ValidateVotes) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
@@ -370,7 +370,7 @@ TEST(MemberConfig, ValidateVotes) {
 }
 
 TEST(MemberConfig, ValidatePriorityRanges) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -399,7 +399,7 @@ TEST(MemberConfig, ValidatePriorityRanges) {
 }
 
 TEST(MemberConfig, ValidateSlaveDelays) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -436,7 +436,7 @@ TEST(MemberConfig, ValidateSlaveDelays) {
 }
 
 TEST(MemberConfig, ValidatePriorityAndSlaveDelayRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -449,7 +449,7 @@ TEST(MemberConfig, ValidatePriorityAndSlaveDelayRelationship) {
 }
 
 TEST(MemberConfig, ValidatePriorityAndHiddenRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -470,7 +470,7 @@ TEST(MemberConfig, ValidatePriorityAndHiddenRelationship) {
 }
 
 TEST(MemberConfig, ValidatePriorityAndBuildIndexesRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
@@ -492,7 +492,7 @@ TEST(MemberConfig, ValidatePriorityAndBuildIndexesRelationship) {
 }
 
 TEST(MemberConfig, ValidateArbiterVotesRelationship) {
-    ReplicaSetTagConfig tagConfig;
+    ReplSetTagConfig tagConfig;
     MemberConfig mc;
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"

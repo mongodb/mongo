@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Added to make sure that S2 indexing's string AND non-string keys work.
 t = db.geo_s2nonstring;
 t.drop();

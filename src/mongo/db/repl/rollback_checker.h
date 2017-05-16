@@ -92,10 +92,10 @@ public:
     // Synchronously calls reset and returns the Status of the command.
     Status reset_sync();
 
-    // ================== Test Support API ===================
-
     // Returns the current baseline rbid.
-    int getBaseRBID_forTest();
+    int getBaseRBID();
+
+    // ================== Test Support API ===================
 
     // Returns the last rbid seen.
     int getLastRBID_forTest();

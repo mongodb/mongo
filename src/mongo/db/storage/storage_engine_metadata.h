@@ -104,11 +104,14 @@ public:
     Status write() const;
 
     /**
-     * Validates a single field in the storage engine options.
-     * Currently, only boolean fields are supported.
+     * Validates a single field in the storage engine options. Currently, only boolean fields are
+     * supported. If the 'fieldName' does not exist in the 'storage.bson' file and a
+     * 'defaultValue' is passed in, the 'expectedValue' must match the 'defaultValue'.
      */
     template <typename T>
-    Status validateStorageEngineOption(StringData fieldName, T expectedValue) const;
+    Status validateStorageEngineOption(StringData fieldName,
+                                       T expectedValue,
+                                       boost::optional<T> defaultValue = boost::none) const;
 
 private:
     std::string _dbpath;

@@ -41,7 +41,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -57,6 +56,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -74,7 +74,7 @@ using unittest::assertGet;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};
@@ -235,9 +235,13 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
         Status::OK());
 
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
         ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
-                      catalogClient()->shardCollection(operationContext(),
+                      catalogClient()->shardCollection(opCtx.get(),
                                                        ns,
                                                        keyPattern,
                                                        defaultCollation,
@@ -316,8 +320,12 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogClient()->shardCollection(operationContext(),
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
+        ASSERT_OK(catalogClient()->shardCollection(opCtx.get(),
                                                    ns,
                                                    keyPattern,
                                                    defaultCollation,
@@ -505,10 +513,14 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
         ASSERT_OK(catalogClient()->shardCollection(
-            operationContext(),
+            opCtx.get(),
             ns,
             keyPattern,
             defaultCollation,
@@ -674,8 +686,12 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(catalogClient()->shardCollection(operationContext(),
+        auto client = serviceContext()->makeClient(
+            "Test",
+            transport::MockSession::create(
+                operationContext()->getClient()->getRemote(), HostAndPort{}, nullptr));
+        auto opCtx = client->makeOperationContext();
+        ASSERT_OK(catalogClient()->shardCollection(opCtx.get(),
                                                    ns,
                                                    keyPattern,
                                                    defaultCollation,
@@ -722,7 +738,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
-        ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "splitKeys"

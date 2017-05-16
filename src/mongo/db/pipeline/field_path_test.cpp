@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bson_depth.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -133,5 +134,58 @@ TEST(FieldPathTest, TailThreeFields) {
     ASSERT_EQUALS("bar.baz", path.fullPath());
 }
 
+/**
+ * Creates a FieldPath that represents a document nested 'depth' levels deep.
+ */
+FieldPath makeFieldPathOfDepth(size_t depth) {
+    StringBuilder builder;
+    builder << "a";
+    for (size_t i = 0; i < depth - 1; i++) {
+        builder << ".a";
+    }
+    return FieldPath(builder.str());
+}
+
+// Tests that long field paths at or under the depth limit can be created successfully.
+TEST(FieldPathTest, CanConstructFieldPathAtOrUnderDepthLimit) {
+    ASSERT_EQUALS(makeFieldPathOfDepth(BSONDepth::getMaxAllowableDepth() - 1).getPathLength(),
+                  BSONDepth::getMaxAllowableDepth() - 1);
+    ASSERT_EQUALS(makeFieldPathOfDepth(BSONDepth::getMaxAllowableDepth()).getPathLength(),
+                  BSONDepth::getMaxAllowableDepth());
+}
+
+// Tests that a FieldPath can't be constructed if the path is too deeply nested.
+TEST(FieldPathTest, ConstructorAssertsOnDeeplyNestedPath) {
+    ASSERT_THROWS_CODE(FieldPath(makeFieldPathOfDepth(BSONDepth::getMaxAllowableDepth() + 1)),
+                       UserException,
+                       ErrorCodes::Overflow);
+}
+
+/**
+ * Creates a FieldPath that represents an array nested 'depth' levels deep.
+ */
+FieldPath makeArrayFieldPathOfDepth(size_t depth) {
+    StringBuilder builder;
+    builder << "a";
+    for (size_t i = 0; i < depth - 1; i++) {
+        builder << ".0";
+    }
+    return FieldPath(builder.str());
+}
+
+// Tests that long array field paths at or under the depth limit can be created successfully.
+TEST(FieldPathTest, CanConstructArrayFieldPathAtOrUnderDepthLimit) {
+    ASSERT_EQUALS(makeArrayFieldPathOfDepth(BSONDepth::getMaxAllowableDepth() - 1).getPathLength(),
+                  BSONDepth::getMaxAllowableDepth() - 1);
+    ASSERT_EQUALS(makeArrayFieldPathOfDepth(BSONDepth::getMaxAllowableDepth()).getPathLength(),
+                  BSONDepth::getMaxAllowableDepth());
+}
+
+// Tests that a FieldPath can't be constructed if an array path is too deeply nested.
+TEST(FieldPathTest, ConstructorAssertsOnDeeplyNestedArrayPath) {
+    ASSERT_THROWS_CODE(makeArrayFieldPathOfDepth(BSONDepth::getMaxAllowableDepth() + 1),
+                       UserException,
+                       ErrorCodes::Overflow);
+}
 }  // namespace
 }  // namespace mongo

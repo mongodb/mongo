@@ -40,14 +40,14 @@ namespace {
 
 class UpdateNotifierSpy : public UpdateNotifier {
 public:
-    UpdateNotifierSpy(OperationContext* txn, const RecordId& loc, const char* buf, size_t size)
-        : _txn(txn), _loc(loc), _data(buf, size), nInPlaceCalls(0) {}
+    UpdateNotifierSpy(OperationContext* opCtx, const RecordId& loc, const char* buf, size_t size)
+        : _opCtx(opCtx), _loc(loc), _data(buf, size), nInPlaceCalls(0) {}
 
     ~UpdateNotifierSpy() {}
 
-    Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc) {
+    Status recordStoreGoingToUpdateInPlace(OperationContext* opCtx, const RecordId& loc) {
         nInPlaceCalls++;
-        ASSERT_EQUALS(_txn, txn);
+        ASSERT_EQUALS(_opCtx, opCtx);
         ASSERT_EQUALS(_loc, loc);
         return Status::OK();
     }
@@ -57,7 +57,7 @@ public:
     }
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     RecordId _loc;
     std::string _data;
 

@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -208,47 +209,44 @@ public:
     virtual GetNextResult getNext() = 0;
 
     /**
-     * Inform the source that it is no longer needed and may release its resources.  After
-     * dispose() is called the source must still be able to handle iteration requests, but may
-     * become eof().
-     * NOTE: For proper mutex yielding, dispose() must be called on any DocumentSource that will
-     * not be advanced until eof(), see SERVER-6123.
+     * Informs the stage that it is no longer needed and can release its resources. After dispose()
+     * is called the stage must still be able to handle calls to getNext(), but can return kEOF.
+     *
+     * This is a non-virtual public interface to ensure dispose() is threaded through the entire
+     * pipeline. Subclasses should override doDispose() to implement their disposal.
      */
-    virtual void dispose();
+    void dispose() {
+        doDispose();
+        if (pSource) {
+            pSource->dispose();
+        }
+    }
 
     /**
-       Get the source's name.
-
-       @returns the std::string name of the source as a constant string;
-         this is static, and there's no need to worry about adopting it
+     * Get the stage's name.
      */
     virtual const char* getSourceName() const;
 
     /**
-      Set the underlying source this source should use to get Documents
-      from.
-
-      It is an error to set the source more than once.  This is to
-      prevent changing sources once the original source has been started;
-      this could break the state maintained by the DocumentSource.
-
-      This pointer is not reference counted because that has led to
-      some circular references.  As a result, this doesn't keep
-      sources alive, and is only intended to be used temporarily for
-      the lifetime of a Pipeline::run().
-
-      @param pSource the underlying source to use
+     * Set the underlying source this source should use to get Documents from. Must not throw
+     * exceptions.
      */
-    virtual void setSource(DocumentSource* pSource);
+    virtual void setSource(DocumentSource* source) {
+        pSource = source;
+    }
 
     /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
      *
-     * A subclass may choose to overwrite this, rather than serialize,
-     * if it should output multiple stages (eg, $sort sometimes also outputs a $limit).
+     * A subclass may choose to overwrite this, rather than serialize, if it should output multiple
+     * stages (eg, $sort sometimes also outputs a $limit).
+     *
+     * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
+     * explain is requested.
      */
-
-    virtual void serializeToArray(std::vector<Value>& array, bool explain = false) const;
+    virtual void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
 
     /**
      * Returns true if doesn't require an input source (most DocumentSources do).
@@ -368,11 +366,25 @@ public:
             kAllExcept,
         };
 
-        GetModPathsReturn(Type type, std::set<std::string>&& paths)
-            : type(type), paths(std::move(paths)) {}
+        GetModPathsReturn(Type type,
+                          std::set<std::string>&& paths,
+                          StringMap<std::string>&& renames)
+            : type(type), paths(std::move(paths)), renames(std::move(renames)) {}
 
         Type type;
         std::set<std::string> paths;
+
+        // Stages may fill out 'renames' to contain information about path renames. Each entry in
+        // 'renames' maps from the new name of the path (valid in documents flowing *out* of this
+        // stage) to the old name of the path (valid in documents flowing *into* this stage).
+        //
+        // For example, consider the stage
+        //
+        //   {$project: {_id: 0, a: 1, b: "$c"}}
+        //
+        // This stage should return kAllExcept, since it modifies all paths other than "a". It can
+        // also fill out 'renames' with the mapping "b" => "c".
+        StringMap<std::string> renames;
     };
 
     /**
@@ -383,7 +395,7 @@ public:
      * See GetModPathsReturn above for the possible return values and what they mean.
      */
     virtual GetModPathsReturn getModifiedPaths() const {
-        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}};
+        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
     }
 
     /**
@@ -431,9 +443,6 @@ public:
     }
 
 protected:
-    /**
-       Base constructor.
-     */
     explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     /**
@@ -453,6 +462,11 @@ protected:
         return std::next(itr);
     };
 
+    /**
+     * Release any resources held by this stage. After doDispose() is called the stage must still be
+     * able to handle calls to getNext(), but can return kEOF.
+     */
+    virtual void doDispose() {}
 
     /*
       Most DocumentSources have an underlying source they get their data
@@ -473,8 +487,12 @@ private:
      * This is used by the default implementation of serializeToArray() to add this object
      * to a pipeline being serialized. Returning a missing() Value results in no entry
      * being added to the array for this stage (DocumentSource).
+     *
+     * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
+     * explain is requested.
      */
-    virtual Value serialize(bool explain = false) const = 0;
+    virtual Value serialize(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
 };
 
 /** This class marks DocumentSources that should be split between the merger and the shards.
@@ -571,7 +589,7 @@ public:
          *
          * This function returns a non-OK status if parsing the pipeline failed.
          */
-        virtual StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
+        virtual StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
             const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
 

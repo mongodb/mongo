@@ -54,11 +54,11 @@ using stdx::make_unique;
 // static
 const char* CollectionScan::kStageType = "COLLSCAN";
 
-CollectionScan::CollectionScan(OperationContext* txn,
+CollectionScan::CollectionScan(OperationContext* opCtx,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _workingSet(workingSet),
       _filter(filter),
       _params(params),
@@ -200,7 +200,7 @@ bool CollectionScan::isEOF() {
     return _commonStats.isEOF || _isDead;
 }
 
-void CollectionScan::doInvalidate(OperationContext* txn,
+void CollectionScan::doInvalidate(OperationContext* opCtx,
                                   const RecordId& id,
                                   InvalidationType type) {
     // We don't care about mutations since we apply any filters to the result when we (possibly)
@@ -213,7 +213,7 @@ void CollectionScan::doInvalidate(OperationContext* txn,
 
     // Deletions can harm the underlying RecordCursor so we must pass them down.
     if (_cursor) {
-        _cursor->invalidate(txn, id);
+        _cursor->invalidate(opCtx, id);
     }
 
     if (_params.tailable && id == _lastSeenId) {

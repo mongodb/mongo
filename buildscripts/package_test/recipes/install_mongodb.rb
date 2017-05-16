@@ -97,6 +97,7 @@ end
 
 inspec_wait = <<HEREDOC
 #!/bin/bash
+ulimit -v unlimited
 for i in {1..60}
 do
   mongo --eval "db.smoke.insert({answer: 42})"

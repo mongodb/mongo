@@ -72,7 +72,7 @@ public:
         kDone,
     };
 
-    TextOrStage(OperationContext* txn,
+    TextOrStage(OperationContext* opCtx,
                 const FTSSpec& ftsSpec,
                 WorkingSet* ws,
                 const MatchExpression* filter,
@@ -89,7 +89,7 @@ public:
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_TEXT_OR;

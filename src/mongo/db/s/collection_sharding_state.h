@@ -34,7 +34,9 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
 
@@ -81,13 +83,22 @@ public:
      * Must be called with some lock held on the specific collection being looked up and the
      * returned pointer should never be stored.
      */
-    static CollectionShardingState* get(OperationContext* txn, const NamespaceString& nss);
-    static CollectionShardingState* get(OperationContext* txn, const std::string& ns);
+    static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
+    static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
     /**
-     * Returns the chunk metadata for the collection.
+     * Returns the chunk metadata for the collection. The metadata it represents lives as long as
+     * the object itself, and the collection, exist. After dropping the collection lock, the
+     * collection may no longer exist, but it is still safe to destroy the object.
      */
     ScopedCollectionMetadata getMetadata();
+
+    /**
+     * BSON output of the pending metadata into a BSONArray
+     */
+    void toBSONPending(BSONArrayBuilder& bb) const {
+        _metadataManager.toBSONPending(bb);
+    }
 
     /**
      * Updates the metadata based on changes received from the config server and also resolves the
@@ -96,7 +107,7 @@ public:
      *
      * Must always be called with an exclusive collection lock.
      */
-    void refreshMetadata(OperationContext* txn, std::unique_ptr<CollectionMetadata> newMetadata);
+    void refreshMetadata(OperationContext* opCtx, std::unique_ptr<CollectionMetadata> newMetadata);
 
     /**
      * Marks the collection as not sharded at stepdown time so that no filtering will occur for
@@ -105,18 +116,24 @@ public:
     void markNotShardedAtStepdown();
 
     /**
-     * Modifies the collection's sharding state to indicate that it is beginning to receive the
-     * given ChunkRange.
+     * Schedules any documents in the range for immediate cleanup iff no running queries can depend
+     * on them, and adds the range to the list of pending ranges. Otherwise, returns false.  Does
+     * not block.
      */
-    void beginReceive(const ChunkRange& range);
+    bool beginReceive(ChunkRange const& range);
 
     /*
-     * Modifies the collection's sharding state to indicate that the previous pending migration
-     * failed. If the range was not previously pending, this function will crash the server.
-     *
-     * This function is the mirror image of beginReceive.
+     * Removes the range from the list of pending ranges, and schedules any documents in the range
+     * for immediate cleanup.  Does not block.
      */
     void forgetReceive(const ChunkRange& range);
+
+    /**
+     * Schedules documents in the range for cleanup after any running queries that may depend on
+     * them have terminated.  Does not block. Use waitForClean to block pending completion.
+     * Fails if range overlaps any current local shard chunk.
+     */
+    Status cleanUpRange(ChunkRange const& range);
 
     /**
      * Returns the active migration source manager, if one is available.
@@ -128,14 +145,14 @@ public:
      * collection X lock. May not be called if there is a migration source manager already
      * installed. Must be followed by a call to clearMigrationSourceManager.
      */
-    void setMigrationSourceManager(OperationContext* txn, MigrationSourceManager* sourceMgr);
+    void setMigrationSourceManager(OperationContext* opCtx, MigrationSourceManager* sourceMgr);
 
     /**
      * Removes a migration source manager from this collection's sharding state. Must be called with
      * collection X lock. May not be called if there isn't a migration source manager installed
      * already through a previous call to setMigrationSourceManager.
      */
-    void clearMigrationSourceManager(OperationContext* txn);
+    void clearMigrationSourceManager(OperationContext* opCtx);
 
     /**
      * Checks whether the shard version in the context is compatible with the shard version of the
@@ -146,7 +163,7 @@ public:
      * response is constructed, this function should be the only means of checking for shard version
      * match.
      */
-    void checkShardVersionOrThrow(OperationContext* txn);
+    void checkShardVersionOrThrow(OperationContext* opCtx);
 
     /**
      * Returns whether this collection is sharded. Valid only if mongoD is primary.
@@ -154,29 +171,46 @@ public:
      */
     bool collectionIsSharded();
 
+    /**
+     * Tracks deletion of any documents within the range, returning when deletion is complete.
+     * Throws if the collection is dropped while it sleeps. Call this with the collection unlocked.
+     */
+    static Status waitForClean(OperationContext*, NamespaceString, OID const& epoch, ChunkRange);
+
+    using CleanupNotification = MetadataManager::CleanupNotification;
+    /**
+     * Reports whether any part of the argument range is still scheduled for deletion. If not,
+     * returns nullptr. Otherwise, returns a notification n such that n->get(opCtx) will wake when
+     * deletion of a range (possibly the one of interest) is completed.  This should be called
+     * again after each wakeup until it returns nullptr, because there can be more than one range
+     * scheduled for deletion that overlaps its argument.
+     */
+    CleanupNotification trackOrphanedDataCleanup(ChunkRange const& range) const;
+
+    /**
+     * Returns a range _not_ owned by this shard that starts no lower than the specified
+     * startingFrom key value, if any, or boost::none if there is no such range.
+     */
+    boost::optional<KeyRange> getNextOrphanRange(BSONObj const& startingFrom);
+
     // Replication subsystem hooks. If this collection is serving as a source for migration, these
     // methods inform it of any changes to its contents.
 
-    bool isDocumentInMigratingChunk(OperationContext* txn, const BSONObj& doc);
+    bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc);
 
-    void onInsertOp(OperationContext* txn, const BSONObj& insertedDoc);
+    void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc);
 
-    void onUpdateOp(OperationContext* txn, const BSONObj& updatedDoc);
+    void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc);
 
-    void onDeleteOp(OperationContext* txn, const DeleteState& deleteState);
+    void onDeleteOp(OperationContext* opCtx, const DeleteState& deleteState);
 
-    void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
-
-    MetadataManager* getMetadataManagerForTest() {
-        return &_metadataManager;
-    }
-
+    void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
 private:
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *
-     * txn - Operation context from which to retrieve the operation's expected version.
+     * opCtx - Operation context from which to retrieve the operation's expected version.
      * errmsg (out) - On false return contains an explanatory error message.
      * expectedShardVersion (out) - On false return contains the expected collection version on this
      *  shard. Obtained from the operation sharding state.
@@ -186,12 +220,12 @@ private:
      * Returns true if the expected collection version on the shard matches its actual version on
      * the shard and false otherwise. Upon false return, the output parameters will be set.
      */
-    bool _checkShardVersionOk(OperationContext* txn,
+    bool _checkShardVersionOk(OperationContext* opCtx,
                               std::string* errmsg,
                               ChunkVersion* expectedShardVersion,
                               ChunkVersion* actualShardVersion);
 
-    // Namespace to which this state belongs.
+    // Namespace this state belongs to.
     const NamespaceString _nss;
 
     // Contains all the metadata associated with this collection.
@@ -204,7 +238,11 @@ private:
     // NOTE: The value is not owned by this class.
     MigrationSourceManager* _sourceMgr{nullptr};
 
-    friend class CollectionRangeDeleter;
+    // for access to _metadataManager
+    friend bool CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
+                                                         NamespaceString const&,
+                                                         int maxToDelete,
+                                                         CollectionRangeDeleter*);
 };
 
 }  // namespace mongo

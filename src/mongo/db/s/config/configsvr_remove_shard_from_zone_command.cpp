@@ -87,10 +87,9 @@ public:
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& unusedDbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
@@ -101,8 +100,8 @@ public:
         auto parsedRequest =
             uassertStatusOK(RemoveShardFromZoneRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(Grid::get(txn)->catalogManager()->removeShardFromZone(
-            txn, parsedRequest.getShardName(), parsedRequest.getZoneName()));
+        uassertStatusOK(Grid::get(opCtx)->catalogManager()->removeShardFromZone(
+            opCtx, parsedRequest.getShardName(), parsedRequest.getZoneName()));
 
         return true;
     }

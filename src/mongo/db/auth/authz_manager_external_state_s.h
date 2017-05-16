@@ -50,28 +50,28 @@ public:
     AuthzManagerExternalStateMongos();
     virtual ~AuthzManagerExternalStateMongos();
 
-    virtual Status initialize(OperationContext* txn);
+    virtual Status initialize(OperationContext* opCtx);
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) override;
-    virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
-    virtual Status getUserDescription(OperationContext* txn,
+    virtual Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion);
+    virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserName& userName,
                                       BSONObj* result);
-    virtual Status getRoleDescription(OperationContext* txn,
+    virtual Status getRoleDescription(OperationContext* opCtx,
                                       const RoleName& roleName,
                                       PrivilegeFormat showPrivileges,
                                       BSONObj* result);
-    virtual Status getRolesDescription(OperationContext* txn,
+    virtual Status getRolesDescription(OperationContext* opCtx,
                                        const std::vector<RoleName>& roles,
                                        PrivilegeFormat showPrivileges,
                                        BSONObj* result);
-    virtual Status getRoleDescriptionsForDB(OperationContext* txn,
+    virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                             const std::string dbname,
                                             PrivilegeFormat showPrivileges,
                                             bool showBuiltinRoles,
                                             std::vector<BSONObj>* result);
 
-    bool hasAnyPrivilegeDocuments(OperationContext* txn) override;
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 };
 
 }  // namespace mongo

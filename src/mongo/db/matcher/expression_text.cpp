@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-Status TextMatchExpression::init(OperationContext* txn,
+Status TextMatchExpression::init(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  TextParams params) {
     _ftsQuery.setQuery(std::move(params.query));
@@ -52,9 +52,8 @@ Status TextMatchExpression::init(OperationContext* txn,
     fts::TextIndexVersion version;
     {
         // Find text index.
-        ScopedTransaction transaction(txn, MODE_IS);
-        AutoGetDb autoDb(txn, nss.db(), MODE_IS);
-        Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IS);
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
         Database* db = autoDb.getDb();
         if (!db) {
             return {ErrorCodes::IndexNotFound,
@@ -62,7 +61,7 @@ Status TextMatchExpression::init(OperationContext* txn,
                                   << nss.ns()
                                   << "')"};
         }
-        Collection* collection = db->getCollection(nss);
+        Collection* collection = db->getCollection(opCtx, nss);
         if (!collection) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "text index required for $text query (no such collection '"
@@ -70,7 +69,7 @@ Status TextMatchExpression::init(OperationContext* txn,
                                   << "')"};
         }
         std::vector<IndexDescriptor*> idxMatches;
-        collection->getIndexCatalog()->findIndexByType(txn, IndexNames::TEXT, idxMatches);
+        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::TEXT, idxMatches);
         if (idxMatches.empty()) {
             return {ErrorCodes::IndexNotFound, "text index required for $text query"};
         }

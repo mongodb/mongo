@@ -43,6 +43,15 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     }
 
     let oldPrimary = this.stepdown(primary);
+
+    // stepping down the node can close the connection and lose the authentication state, so
+    // re-authenticate here before calling awaitNodesAgreeOnPrimary().
+    if (user != undefined) {
+        oldPrimary.getDB('admin').auth(user, pwd);
+    }
+    jsTest.authenticate(oldPrimary);
+
+    this.awaitNodesAgreeOnPrimary();
     primary = this.getPrimary();
 
     this.upgradeNode(oldPrimary, options, user, pwd);
@@ -91,7 +100,7 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
     var node = this.nodes[nodeId];
 
     try {
-        node.getDB("admin").runCommand({replSetStepDown: 50, force: true});
+        node.getDB("admin").runCommand({replSetStepDown: 300, secondaryCatchUpPeriodSecs: 60});
         assert(false);
     } catch (ex) {
         print('Caught exception after stepDown cmd: ' + tojson(ex));

@@ -40,7 +40,7 @@ namespace mongo {
 
 class CappedRecordStoreV1 final : public RecordStoreV1Base {
 public:
-    CappedRecordStoreV1(OperationContext* txn,
+    CappedRecordStoreV1(OperationContext* opCtx,
                         CappedCallback* collection,
                         StringData ns,
                         RecordStoreV1MetaData* details,
@@ -53,7 +53,7 @@ public:
         return "CappedRecordStoreV1";
     }
 
-    Status truncate(OperationContext* txn) final;
+    Status truncate(OperationContext* opCtx) final;
 
     /**
      * Truncate documents newer than the document at 'end' from the capped
@@ -61,17 +61,17 @@ public:
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
      */
-    void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
+    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) final;
 
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;
 
-    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
+    std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* opCtx) const final;
 
     // Start from firstExtent by default.
-    DiskLoc firstRecord(OperationContext* txn, const DiskLoc& startExtent = DiskLoc()) const;
+    DiskLoc firstRecord(OperationContext* opCtx, const DiskLoc& startExtent = DiskLoc()) const;
     // Start from lastExtent by default.
-    DiskLoc lastRecord(OperationContext* txn, const DiskLoc& startExtent = DiskLoc()) const;
+    DiskLoc lastRecord(OperationContext* opCtx, const DiskLoc& startExtent = DiskLoc()) const;
 
 protected:
     bool isCapped() const final {
@@ -85,28 +85,28 @@ protected:
         _cappedCallback = cb;
     }
 
-    StatusWith<DiskLoc> allocRecord(OperationContext* txn,
+    StatusWith<DiskLoc> allocRecord(OperationContext* opCtx,
                                     int lengthWithHeaders,
                                     bool enforceQuota) final;
 
-    void addDeletedRec(OperationContext* txn, const DiskLoc& dloc) final;
+    void addDeletedRec(OperationContext* opCtx, const DiskLoc& dloc) final;
 
 private:
     // -- start copy from cap.cpp --
-    void _compact(OperationContext* txn);
+    void _compact(OperationContext* opCtx);
     DiskLoc cappedFirstDeletedInCurExtent() const;
-    void setFirstDeletedInCurExtent(OperationContext* txn, const DiskLoc& loc);
-    void cappedCheckMigrate(OperationContext* txn);
-    DiskLoc __capAlloc(OperationContext* txn, int len);
+    void setFirstDeletedInCurExtent(OperationContext* opCtx, const DiskLoc& loc);
+    void cappedCheckMigrate(OperationContext* opCtx);
+    DiskLoc __capAlloc(OperationContext* opCtx, int len);
     bool inCapExtent(const DiskLoc& dl) const;
     DiskLoc cappedListOfAllDeletedRecords() const;
     DiskLoc cappedLastDelRecLastExtent() const;
-    void setListOfAllDeletedRecords(OperationContext* txn, const DiskLoc& loc);
-    void setLastDelRecLastExtent(OperationContext* txn, const DiskLoc& loc);
+    void setListOfAllDeletedRecords(OperationContext* opCtx, const DiskLoc& loc);
+    void setLastDelRecLastExtent(OperationContext* opCtx, const DiskLoc& loc);
     Extent* theCapExtent() const;
     bool nextIsInCapExtent(const DiskLoc& dl) const;
-    void advanceCapExtent(OperationContext* txn, StringData ns);
-    void cappedTruncateLastDelUpdate(OperationContext* txn);
+    void advanceCapExtent(OperationContext* opCtx, StringData ns);
+    void cappedTruncateLastDelUpdate(OperationContext* opCtx);
 
     /**
      * Truncate documents newer than the document at 'end' from the capped
@@ -114,9 +114,9 @@ private:
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
      */
-    void cappedTruncateAfter(OperationContext* txn, const char* ns, DiskLoc end, bool inclusive);
+    void cappedTruncateAfter(OperationContext* opCtx, const char* ns, DiskLoc end, bool inclusive);
 
-    void _maybeComplain(OperationContext* txn, int len) const;
+    void _maybeComplain(OperationContext* opCtx, int len) const;
 
     // -- end copy from cap.cpp --
 

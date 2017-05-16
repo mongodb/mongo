@@ -56,7 +56,7 @@ AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(
     : AuthzSessionExternalState(authzManager), _allowLocalhost(enableLocalhostAuthBypass) {}
 AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
-void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(OperationContext* txn) {
+void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(OperationContext* opCtx) {
     if (!_authzManager->isAuthEnabled())
         return;
     // If we know that an admin user exists, don't re-check.
@@ -68,7 +68,7 @@ void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(Operation
         return;
     }
 
-    _allowLocalhost = !_authzManager->hasAnyPrivilegeDocuments(txn);
+    _allowLocalhost = !_authzManager->hasAnyPrivilegeDocuments(opCtx);
     if (_allowLocalhost) {
         std::call_once(checkShouldAllowLocalhostOnceFlag, []() {
             log() << "note: no users configured in admin.system.users, allowing localhost "

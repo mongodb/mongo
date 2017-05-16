@@ -81,7 +81,8 @@ intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     return new DocumentSourceIndexStats(pExpCtx);
 }
 
-Value DocumentSourceIndexStats::serialize(bool explain) const {
+Value DocumentSourceIndexStats::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(DOC(getSourceName() << Document()));
 }
 }

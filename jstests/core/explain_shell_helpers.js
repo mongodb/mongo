@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because the explain output from a mongod when run
+// against a sharded collection is wrapped in a "shards" object with keys for each shard.
+// @tags: [assumes_unsharded_collection]
+
 // Tests for the .explain() shell helper, which provides syntactic sugar for the explain command.
 
 var t = db.jstests_explain_helpers;

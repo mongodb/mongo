@@ -46,7 +46,6 @@ const size_t MaxMessageSizeBytes = 48 * 1000 * 1000;
 enum NetworkOp : int32_t {
     opInvalid = 0,
     opReply = 1,     /* reply. responseTo is set. */
-    dbMsg = 1000,    /* generic msg command followed by a std::string */
     dbUpdate = 2001, /* update object */
     dbInsert = 2002,
     // dbGetByOID = 2003,
@@ -59,11 +58,30 @@ enum NetworkOp : int32_t {
     dbCommand = 2010,
     dbCommandReply = 2011,
     dbCompressed = 2012,
+    dbMsg = 2013,
 };
+
+inline bool isSupportedNetworkOp(NetworkOp op) {
+    switch (op) {
+        case opReply:
+        case dbUpdate:
+        case dbInsert:
+        case dbQuery:
+        case dbGetMore:
+        case dbDelete:
+        case dbKillCursors:
+        case dbCommand:
+        case dbCommandReply:
+        case dbCompressed:
+        case dbMsg:
+            return true;
+        default:
+            return false;
+    }
+}
 
 enum class LogicalOp {
     opInvalid,
-    opMsg,
     opUpdate,
     opInsert,
     opQuery,
@@ -76,8 +94,6 @@ enum class LogicalOp {
 
 inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
     switch (networkOp) {
-        case dbMsg:
-            return LogicalOp::opMsg;
         case dbUpdate:
             return LogicalOp::opUpdate;
         case dbInsert:
@@ -90,6 +106,7 @@ inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
             return LogicalOp::opDelete;
         case dbKillCursors:
             return LogicalOp::opKillCursors;
+        case dbMsg:
         case dbCommand:
             return LogicalOp::opCommand;
         case dbCompressed:
@@ -107,8 +124,6 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "none";
         case opReply:
             return "reply";
-        case dbMsg:
-            return "msg";
         case dbUpdate:
             return "update";
         case dbInsert:
@@ -127,6 +142,8 @@ inline const char* networkOpToString(NetworkOp networkOp) {
             return "commandReply";
         case dbCompressed:
             return "compressed";
+        case dbMsg:
+            return "msg";
         default:
             int op = static_cast<int>(networkOp);
             massert(16141, str::stream() << "cannot translate opcode " << op, !op);
@@ -138,8 +155,6 @@ inline const char* logicalOpToString(LogicalOp logicalOp) {
     switch (logicalOp) {
         case LogicalOp::opInvalid:
             return "none";
-        case LogicalOp::opMsg:
-            return "msg";
         case LogicalOp::opUpdate:
             return "update";
         case LogicalOp::opInsert:

@@ -26,74 +26,51 @@
  *    it in the license file.
  */
 
-#include "mongo/db/logical_clock.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/signed_logical_time.h"
-#include "mongo/db/time_proof_service.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_clock_test_fixture.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-/**
- * Setup LogicalClock with invalid initial time.
- */
-class LogicalClockTestBase : public unittest::Test {
-protected:
-    void setUp() {
-        _serviceContext = stdx::make_unique<ServiceContextNoop>();
-        std::array<std::uint8_t, 20> tempKey = {};
-        TimeProofService::Key key(std::move(tempKey));
-        auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
-        _timeProofService = pTps.get();
-        _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps), true);
-    }
+std::string kDummyNamespaceString = "test.foo";
 
-    void tearDown() {
-        _clock.reset();
-        _serviceContext.reset();
-    }
-
-    LogicalClock* getClock() {
-        return _clock.get();
-    }
-
-    SignedLogicalTime makeSignedLogicalTime(LogicalTime logicalTime) {
-        return SignedLogicalTime(logicalTime, _timeProofService->getProof(logicalTime));
-    }
-
-private:
-    TimeProofService* _timeProofService;
-    std::unique_ptr<ServiceContextNoop> _serviceContext;
-    std::unique_ptr<LogicalClock> _clock;
-};
+using LogicalClockTest = LogicalClockTestFixture;
 
 // Check that the initial time does not change during logicalClock creation.
-TEST_F(LogicalClockTestBase, roundtrip) {
-    // Create different logicalClock instance to validate that the initial time is preserved.
-    ServiceContextNoop serviceContext;
+TEST_F(LogicalClockTest, roundtrip) {
     Timestamp tX(1);
-    std::array<std::uint8_t, 20> tempKey = {};
-    TimeProofService::Key key(std::move(tempKey));
-    auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
     auto time = LogicalTime(tX);
 
-    LogicalClock logicalClock(&serviceContext, std::move(pTps), true);
-    logicalClock.initClusterTimeFromTrustedSource(time);
-    auto storedTime(logicalClock.getClusterTime());
+    getClock()->setClusterTimeFromTrustedSource(time);
+    auto storedTime(getClock()->getClusterTime());
 
-    ASSERT_TRUE(storedTime.getTime() == time);
+    ASSERT_TRUE(storedTime == time);
 }
 
 // Verify the reserve ticks functionality.
-TEST_F(LogicalClockTestBase, reserveTicks) {
+TEST_F(LogicalClockTest, reserveTicks) {
+    // Set clock to a non-zero time, so we can verify wall clock synchronization.
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
+
     auto t1 = getClock()->reserveTicks(1);
     auto t2(getClock()->getClusterTime());
-    ASSERT_TRUE(t1 == t2.getTime());
+    ASSERT_TRUE(t1 == t2);
+
+    // Make sure we synchronized with the wall clock.
+    ASSERT_TRUE(t2.asTimestamp().getSecs() == 10);
 
     auto t3 = getClock()->reserveTicks(1);
     t1.addTicks(1);
@@ -106,16 +83,62 @@ TEST_F(LogicalClockTestBase, reserveTicks) {
     t3 = getClock()->reserveTicks(1);
     t1.addTicks(100);
     ASSERT_TRUE(t3 == t1);
+
+    // Ensure overflow to a new second.
+    auto initTimeSecs = getClock()->getClusterTime().asTimestamp().getSecs();
+    getClock()->reserveTicks((1U << 31) - 1);
+    auto newTimeSecs = getClock()->getClusterTime().asTimestamp().getSecs();
+    ASSERT_TRUE(newTimeSecs == initTimeSecs + 1);
 }
 
 // Verify the advanceClusterTime functionality.
-TEST_F(LogicalClockTestBase, advanceClusterTime) {
+TEST_F(LogicalClockTest, advanceClusterTime) {
     auto t1 = getClock()->reserveTicks(1);
     t1.addTicks(100);
-    SignedLogicalTime l1 = makeSignedLogicalTime(t1);
-    ASSERT_OK(getClock()->advanceClusterTime(l1));
-    auto l2(getClock()->getClusterTime());
-    ASSERT_TRUE(l1.getTime() == l2.getTime());
+    ASSERT_OK(getClock()->advanceClusterTime(t1));
+    ASSERT_TRUE(t1 == getClock()->getClusterTime());
+}
+
+// Verify rate limiter rejects logical times whose seconds values are too far ahead.
+TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(10 * 1000));
+
+    Timestamp tooFarAheadTimestamp(
+        durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) +
+            durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) +
+            10,  // Add 10 seconds to ensure limit is exceeded.
+        1);
+    LogicalTime t1(tooFarAheadTimestamp);
+
+    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(t1));
+}
+
+// Verify cluster time can be initialized to a very old time.
+TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(
+        durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) * 10 * 1000));
+
+    Timestamp veryOldTimestamp(
+        durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) -
+        (durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDrift) * 5));
+    auto veryOldTime = LogicalTime(veryOldTimestamp);
+    getClock()->setClusterTimeFromTrustedSource(veryOldTime);
+
+    ASSERT_TRUE(getClock()->getClusterTime() == veryOldTime);
+}
+
+// Verify writes to the oplog advance cluster time.
+TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
+    Timestamp tX(1);
+    auto initialTime = LogicalTime(tX);
+
+    getClock()->setClusterTimeFromTrustedSource(initialTime);
+    ASSERT_TRUE(getClock()->getClusterTime() == initialTime);
+
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
+    ASSERT_TRUE(getClock()->getClusterTime() > initialTime);
+    ASSERT_EQ(getClock()->getClusterTime().asTimestamp(),
+              replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp());
 }
 
 }  // unnamed namespace

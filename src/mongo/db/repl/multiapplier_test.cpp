@@ -156,7 +156,7 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
 
     bool multiApplyInvoked = false;
-    auto multiApply = [&](OperationContext* txn,
+    auto multiApply = [&](OperationContext* opCtx,
                           MultiApplier::Operations operations,
                           MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
         multiApplyInvoked = true;
@@ -223,7 +223,7 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
-    auto multiApply = [&](OperationContext* txn,
+    auto multiApply = [&](OperationContext* opCtx,
                           MultiApplier::Operations operations,
                           MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
         multiApplyInvoked = true;
@@ -255,10 +255,10 @@ TEST_F(
 
     OperationContext* multiApplyTxn = nullptr;
     MultiApplier::Operations operationsToApply;
-    auto multiApply = [&](OperationContext* txn,
+    auto multiApply = [&](OperationContext* opCtx,
                           MultiApplier::Operations operations,
                           MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
-        multiApplyTxn = txn;
+        multiApplyTxn = opCtx;
         operationsToApply = operations;
         return operationsToApply.back().getOpTime();
     };

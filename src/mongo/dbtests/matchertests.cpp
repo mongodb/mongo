@@ -231,15 +231,15 @@ template <typename M>
 class WhereSimple1 {
 public:
     void run() {
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
+        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        OperationContext& opCtx = *opCtxPtr;
         const NamespaceString nss("unittests.matchertests");
-        AutoGetCollectionForRead ctx(&txn, nss);
+        AutoGetCollectionForReadCommand ctx(&opCtx, nss);
 
         const CollatorInterface* collator = nullptr;
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
-            ExtensionsCallbackReal(&txn, &nss),
+            ExtensionsCallbackReal(&opCtx, &nss),
             collator);
         ASSERT(m.matches(BSON("a" << 1)));
         ASSERT(!m.matches(BSON("a" << 2)));

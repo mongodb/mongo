@@ -35,7 +35,6 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -51,67 +50,76 @@ const int kMaxNumFailedHostRetryAttempts = 3;
 
 }  // namespace
 
-AsyncRequestsSender::AsyncRequestsSender(OperationContext* txn,
+AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
-                                         std::string db,
+                                         const std::string db,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
-                                         const ReadPreferenceSetting& readPreference,
-                                         bool allowPartialResults)
-    : _executor(executor),
-      _db(std::move(db)),
-      _readPreference(readPreference),
-      _allowPartialResults(allowPartialResults) {
+                                         const ReadPreferenceSetting& readPreference)
+    : _opCtx(opCtx), _executor(executor), _db(std::move(db)), _readPreference(readPreference) {
     for (const auto& request : requests) {
         _remotes.emplace_back(request.shardId, request.cmdObj);
     }
 
     // Initialize command metadata to handle the read preference.
-    BSONObjBuilder metadataBuilder;
-    rpc::ServerSelectionMetadata metadata(_readPreference.pref != ReadPreference::PrimaryOnly,
-                                          boost::none);
-    uassertStatusOK(metadata.writeToMetadata(&metadataBuilder));
-    _metadataObj = metadataBuilder.obj();
+    _metadataObj = readPreference.toContainingBSON();
 
     // Schedule the requests immediately.
-    _scheduleRequestsIfNeeded(txn);
-}
 
+    // We must create the notification before scheduling any requests, because the notification is
+    // signaled both on an error in scheduling the request and a request's callback.
+    _notification.emplace();
+
+    // We lock so that no callbacks signal the notification until after we are done scheduling
+    // requests, to prevent signaling the notification twice, which is illegal.
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _scheduleRequests_inlock();
+}
 AsyncRequestsSender::~AsyncRequestsSender() {
-    invariant(_done());
+    _cancelPendingRequests();
+
+    // Wait on remaining callbacks to run.
+    while (!done()) {
+        next();
+    }
 }
 
-std::vector<AsyncRequestsSender::Response> AsyncRequestsSender::waitForResponses(
-    OperationContext* txn) {
-    // Until all remotes have received a response or error, keep scheduling retries and waiting on
-    // outstanding requests.
-    while (!_done()) {
-        _notification->get();
+AsyncRequestsSender::Response AsyncRequestsSender::next() {
+    invariant(!done());
 
-        // Note: if we have been interrupt()'d or if some remote had a non-retriable error and
-        // allowPartialResults is false, no retries will be scheduled.
-        _scheduleRequestsIfNeeded(txn);
-    }
-
-    // Construct the responses.
-    std::vector<Response> responses;
-    for (const auto& remote : _remotes) {
-        invariant(remote.swResponse);
-        if (remote.swResponse->isOK()) {
-            invariant(remote.shardHostAndPort);
-            responses.emplace_back(remote.swResponse->getValue(), *remote.shardHostAndPort);
+    // If needed, schedule requests for all remotes which had retriable errors.
+    // If some remote had success or a non-retriable error, return it.
+    boost::optional<Response> readyResponse;
+    while (!(readyResponse = _ready())) {
+        // Otherwise, wait for some response to be received.
+        if (_interruptStatus.isOK()) {
+            try {
+                _notification->get(_opCtx);
+            } catch (const UserException& ex) {
+                // If the operation is interrupted, we cancel outstanding requests and switch to
+                // waiting for the (canceled) callbacks to finish without checking for interrupts.
+                _interruptStatus = ex.toStatus();
+                _cancelPendingRequests();
+                continue;
+            }
         } else {
-            responses.emplace_back(remote.swResponse->getStatus());
+            _notification->get();
         }
     }
-    return responses;
+    return *readyResponse;
 }
 
-void AsyncRequestsSender::interrupt() {
+void AsyncRequestsSender::stopRetrying() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
 }
 
-void AsyncRequestsSender::kill() {
+bool AsyncRequestsSender::done() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return std::all_of(
+        _remotes.begin(), _remotes.end(), [](const RemoteData& remote) { return remote.done; });
+}
+
+void AsyncRequestsSender::_cancelPendingRequests() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
 
@@ -123,68 +131,97 @@ void AsyncRequestsSender::kill() {
     }
 }
 
-bool AsyncRequestsSender::_done() {
+boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _done_inlock();
-}
-
-bool AsyncRequestsSender::_done_inlock() {
-    for (const auto& remote : _remotes) {
-        if (!remote.swResponse) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/*
- * Note: If _scheduleRequestsIfNeeded() does retries, only the remotes with retriable errors will be
- * rescheduled because:
- *
- * 1. Other pending remotes still have callback assigned to them.
- * 2. Remotes that already successfully received a response will have a non-empty 'response'.
- * 3. Remotes that have reached maximum retries will have an error status.
- */
-void AsyncRequestsSender::_scheduleRequestsIfNeeded(OperationContext* txn) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    // We can't make a new notification if there was a previous one that has not been signaled.
-    invariant(!_notification || *_notification);
-
-    if (_done_inlock()) {
-        return;
-    }
 
     _notification.emplace();
 
-    if (_stopRetrying) {
-        return;
+    if (!_stopRetrying) {
+        _scheduleRequests_inlock();
     }
 
+    // Check if any remote is ready.
+    invariant(!_remotes.empty());
+    for (auto& remote : _remotes) {
+        if (remote.swResponse && !remote.done) {
+            remote.done = true;
+            if (remote.swResponse->isOK()) {
+                invariant(remote.shardHostAndPort);
+                return Response(std::move(remote.shardId),
+                                std::move(remote.swResponse->getValue()),
+                                std::move(*remote.shardHostAndPort));
+            } else {
+                // If _interruptStatus is set, promote CallbackCanceled errors to it.
+                if (!_interruptStatus.isOK() &&
+                    ErrorCodes::CallbackCanceled == remote.swResponse->getStatus().code()) {
+                    remote.swResponse = _interruptStatus;
+                }
+                return Response(std::move(remote.shardId),
+                                std::move(remote.swResponse->getStatus()),
+                                std::move(remote.shardHostAndPort));
+            }
+        }
+    }
+    // No remotes were ready.
+    return boost::none;
+}
+
+void AsyncRequestsSender::_scheduleRequests_inlock() {
+    invariant(!_stopRetrying);
     // Schedule remote work on hosts for which we have not sent a request or need to retry.
     for (size_t i = 0; i < _remotes.size(); ++i) {
         auto& remote = _remotes[i];
 
-        // If we have not yet received a response or error for this remote, and we do not have an
-        // outstanding request for this remote, schedule remote work to send the command.
-        if (!remote.swResponse && !remote.cbHandle.isValid()) {
-            auto scheduleStatus = _scheduleRequest_inlock(txn, i);
-            if (!scheduleStatus.isOK()) {
-                // Being unable to schedule a request to a remote is a non-retriable error.
-                remote.swResponse = std::move(scheduleStatus);
+        // First check if the remote had a retriable error, and if so, clear its response field so
+        // it will be retried.
+        if (remote.swResponse && !remote.done) {
+            // We check both the response status and command status for a retriable error.
+            Status status = remote.swResponse->getStatus();
+            if (status.isOK()) {
+                status = getStatusFromCommandResult(remote.swResponse->getValue().data);
+            }
 
-                // If partial results are not allowed, stop scheduling requests on other remotes and
-                // just wait for outstanding requests to come back.
-                if (!_allowPartialResults) {
-                    _stopRetrying = true;
-                    break;
+            if (!status.isOK()) {
+                // There was an error with either the response or the command.
+                auto shard = remote.getShard();
+                if (!shard) {
+                    remote.swResponse =
+                        Status(ErrorCodes::ShardNotFound,
+                               str::stream() << "Could not find shard " << remote.shardId);
+                } else {
+                    if (remote.shardHostAndPort) {
+                        shard->updateReplSetMonitor(*remote.shardHostAndPort, status);
+                    }
+                    if (shard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) &&
+                        remote.retryCount < kMaxNumFailedHostRetryAttempts) {
+                        LOG(1) << "Command to remote " << remote.shardId << " at host "
+                               << *remote.shardHostAndPort
+                               << " failed with retriable error and will be retried "
+                               << causedBy(redact(status));
+                        ++remote.retryCount;
+                        remote.swResponse.reset();
+                    }
+                }
+            }
+        }
+
+        // If the remote does not have a response or pending request, schedule remote work for it.
+        if (!remote.swResponse && !remote.cbHandle.isValid()) {
+            auto scheduleStatus = _scheduleRequest_inlock(i);
+            if (!scheduleStatus.isOK()) {
+                remote.swResponse = std::move(scheduleStatus);
+                // Signal the notification indicating the remote had an error (we need to do this
+                // because no request was scheduled, so no callback for this remote will run and
+                // signal the notification).
+                if (!*_notification) {
+                    _notification->set();
                 }
             }
         }
     }
 }
 
-Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_t remoteIndex) {
+Status AsyncRequestsSender::_scheduleRequest_inlock(size_t remoteIndex) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
@@ -196,12 +233,12 @@ Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_
     }
 
     executor::RemoteCommandRequest request(
-        remote.getTargetHost(), _db, remote.cmdObj, _metadataObj, txn);
+        *remote.shardHostAndPort, _db, remote.cmdObj, _metadataObj, _opCtx);
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,
         stdx::bind(
-            &AsyncRequestsSender::_handleResponse, this, stdx::placeholders::_1, txn, remoteIndex));
+            &AsyncRequestsSender::_handleResponse, this, stdx::placeholders::_1, remoteIndex));
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
     }
@@ -211,9 +248,7 @@ Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_
 }
 
 void AsyncRequestsSender::_handleResponse(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-    OperationContext* txn,
-    size_t remoteIndex) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, size_t remoteIndex) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto& remote = _remotes[remoteIndex];
@@ -223,92 +258,36 @@ void AsyncRequestsSender::_handleResponse(
     // 'remote'.
     remote.cbHandle = executor::TaskExecutor::CallbackHandle();
 
-    // On early return from this point on, signal anyone waiting on the current notification if
-    // _done() is true, since this might be the last outstanding request.
-    ScopeGuard signaller =
-        MakeGuard(&AsyncRequestsSender::_signalCurrentNotificationIfDone_inlock, this);
-
-    // We check both the response status and command status for a retriable error.
-    Status status = cbData.response.status;
-    if (status.isOK()) {
-        status = getStatusFromCommandResult(cbData.response.data);
-        if (status.isOK()) {
-            remote.swResponse = std::move(cbData.response);
-            return;
-        }
-    }
-
-    // There was an error with either the response or the command.
-
-    auto shard = remote.getShard();
-    if (!shard) {
-        remote.swResponse =
-            Status(ErrorCodes::ShardNotFound,
-                   str::stream() << "Could not find shard " << remote.shardId << " containing host "
-                                 << remote.getTargetHost().toString());
-        return;
-    }
-    shard->updateReplSetMonitor(remote.getTargetHost(), status);
-
-    if (shard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent) && !_stopRetrying &&
-        remote.retryCount < kMaxNumFailedHostRetryAttempts) {
-        LOG(1) << "Command to remote " << remote.shardId << " at host " << *remote.shardHostAndPort
-               << " failed with retriable error and will be retried" << causedBy(redact(status));
-        ++remote.retryCount;
-
-        // Even if _done() is not true, signal the thread sleeping in waitForResponses() to make
-        // it schedule a retry for this remote without waiting for all outstanding requests to
-        // come back.
-        signaller.Dismiss();
-        _signalCurrentNotification_inlock();
+    // Store the response or error.
+    if (cbData.response.status.isOK()) {
+        remote.swResponse = std::move(cbData.response);
     } else {
-        // Non-retriable error, out of retries, or _stopRetrying is true.
-
-        // Even though we examined the command status to check for retriable errors, we just return
-        // the response or response status here. It is up to the caller to parse the response as
-        // a command result.
-        if (cbData.response.status.isOK()) {
-            remote.swResponse = std::move(cbData.response);
-        } else {
-            remote.swResponse = std::move(cbData.response.status);
-        }
-
-        // If the caller can't use partial results, there's no point continuing to retry on
-        // retriable errors for other remotes.
-        if (!_allowPartialResults) {
-            _stopRetrying = true;
-        }
+        remote.swResponse = std::move(cbData.response.status);
     }
-}
 
-void AsyncRequestsSender::_signalCurrentNotification_inlock() {
-    // Only signal the notification if it has not already been signalled.
+    // Signal the notification indicating that a remote received a response.
     if (!*_notification) {
         _notification->set();
-    }
-}
-
-void AsyncRequestsSender::_signalCurrentNotificationIfDone_inlock() {
-    if (_done_inlock()) {
-        _signalCurrentNotification_inlock();
     }
 }
 
 AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj)
     : shardId(shardId), cmdObj(cmdObj) {}
 
-AsyncRequestsSender::Response::Response(executor::RemoteCommandResponse response, HostAndPort hp)
-    : swResponse(response), shardHostAndPort(hp) {}
+AsyncRequestsSender::Response::Response(ShardId shardId,
+                                        executor::RemoteCommandResponse response,
+                                        HostAndPort hp)
+    : shardId(std::move(shardId)),
+      swResponse(std::move(response)),
+      shardHostAndPort(std::move(hp)) {}
 
-AsyncRequestsSender::Response::Response(Status status) : swResponse(status) {}
+AsyncRequestsSender::Response::Response(ShardId shardId,
+                                        Status status,
+                                        boost::optional<HostAndPort> hp)
+    : shardId(std::move(shardId)), swResponse(std::move(status)), shardHostAndPort(std::move(hp)) {}
 
 AsyncRequestsSender::RemoteData::RemoteData(ShardId shardId, BSONObj cmdObj)
     : shardId(std::move(shardId)), cmdObj(std::move(cmdObj)) {}
-
-const HostAndPort& AsyncRequestsSender::RemoteData::getTargetHost() const {
-    invariant(shardHostAndPort);
-    return *shardHostAndPort;
-}
 
 Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
     const ReadPreferenceSetting& readPref) {

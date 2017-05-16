@@ -7,6 +7,7 @@
     "use strict";
 
     load('jstests/libs/write_concern_util.js');
+    load("jstests/replsets/rslib.js");
 
     // helper to ensure two nodes are at the same place in the oplog
     var waitForSameOplogPosition = function(db1, db2, errmsg) {
@@ -47,8 +48,9 @@
     replSet.awaitReplication();
 
     jsTest.log("Make sure 2 & 3 are syncing from the primary");
-    member2.adminCommand({replSetSyncFrom: getHostName() + ":" + replSet.ports[0]});
-    member3.adminCommand({replSetSyncFrom: getHostName() + ":" + replSet.ports[0]});
+    assert.eq(master, replSet.nodes[0]);
+    syncFrom(replSet.nodes[1], master, replSet);
+    syncFrom(replSet.nodes[2], master, replSet);
 
     jsTest.log("Stop 2's replication");
     member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});

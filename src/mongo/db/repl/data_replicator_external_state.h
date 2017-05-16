@@ -34,7 +34,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/net/hostandport.h"
@@ -50,7 +50,7 @@ class TaskExecutor;
 
 namespace repl {
 
-class DataReplicator;
+class InitialSyncer;
 
 /**
  * Holds current term and last committed optime necessary to populate find/getMore command requests.
@@ -58,10 +58,10 @@ class DataReplicator;
 using OpTimeWithTerm = OpTimeWith<long long>;
 
 /**
- * This class represents the interface the DataReplicator uses to interact with the
- * rest of the system.  All functionality of the DataReplicator that would introduce
+ * This class represents the interface the InitialSyncer uses to interact with the
+ * rest of the system.  All functionality of the InitialSyncer that would introduce
  * dependencies on large sections of the server code and thus break the unit testability of
- * DataReplicator should be moved here.
+ * InitialSyncer should be moved here.
  */
 class DataReplicatorExternalState {
     MONGO_DISALLOW_COPYING(DataReplicatorExternalState);
@@ -110,34 +110,34 @@ public:
      * This function creates an oplog buffer of the type specified at server startup.
      */
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* txn) const = 0;
+        OperationContext* opCtx) const = 0;
 
     /**
      * Creates an oplog buffer suitable for steady state replication.
      */
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* txn) const = 0;
+        OperationContext* opCtx) const = 0;
 
     /**
      * Returns the current replica set config if there is one, or an error why there isn't.
      */
-    virtual StatusWith<ReplicaSetConfig> getCurrentConfig() const = 0;
+    virtual StatusWith<ReplSetConfig> getCurrentConfig() const = 0;
 
 private:
     /**
      * Applies the operations described in the oplog entries contained in "ops" using the
      * "applyOperation" function.
      *
-     * Used exclusively by the DataReplicator to construct a MultiApplier.
+     * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
-    virtual StatusWith<OpTime> _multiApply(OperationContext* txn,
+    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
                                            MultiApplier::Operations ops,
                                            MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
      * Used by _multiApply() to write operations to database during steady state replication.
      *
-     * Used exclusively by the DataReplicator to construct a MultiApplier.
+     * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
     virtual Status _multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
@@ -145,15 +145,15 @@ private:
      * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a
      * pointer to a counter that is incremented every time we fetch a missing document.
      *
-     * Used exclusively by the DataReplicator to construct a MultiApplier.
+     * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
     virtual Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                           const HostAndPort& source,
                                           AtomicUInt32* fetchCount) = 0;
 
-    // Provides DataReplicator with access to _multiApply, _multiSyncApply and
+    // Provides InitialSyncer with access to _multiApply, _multiSyncApply and
     // _multiInitialSyncApply.
-    friend class DataReplicator;
+    friend class InitialSyncer;
 };
 
 }  // namespace repl

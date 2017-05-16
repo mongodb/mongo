@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -50,12 +51,12 @@ namespace mongo {
 
 // DurableViewCatalog
 
-void DurableViewCatalog::onExternalChange(OperationContext* txn, const NamespaceString& name) {
-    dassert(txn->lockState()->isDbLockedForMode(name.db(), MODE_IX));
-    Database* db = dbHolder().get(txn, name.db());
+void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const NamespaceString& name) {
+    dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
+    Database* db = dbHolder().get(opCtx, name.db());
 
     if (db) {
-        txn->recoveryUnit()->onCommit([db]() { db->getViewCatalog()->invalidate(); });
+        opCtx->recoveryUnit()->onCommit([db]() { db->getViewCatalog()->invalidate(); });
     }
 }
 
@@ -65,15 +66,15 @@ const std::string& DurableViewCatalogImpl::getName() const {
     return _db->name();
 }
 
-Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback) {
-    dassert(txn->lockState()->isDbLockedForMode(_db->name(), MODE_IS) ||
-            txn->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
-    Collection* systemViews = _db->getCollection(_db->getSystemViewsName());
+Status DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IS) ||
+            opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
+    Collection* systemViews = _db->getCollection(opCtx, _db->getSystemViewsName());
     if (!systemViews)
         return Status::OK();
 
-    Lock::CollectionLock lk(txn->lockState(), _db->getSystemViewsName(), MODE_IS);
-    auto cursor = systemViews->getCursor(txn);
+    Lock::CollectionLock lk(opCtx->lockState(), _db->getSystemViewsName(), MODE_IS);
+    auto cursor = systemViews->getCursor(opCtx);
     while (auto record = cursor->next()) {
         RecordData& data = record->data;
 
@@ -90,8 +91,18 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
             std::string name(e.fieldName());
             valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation";
         }
-        NamespaceString viewName(viewDef["_id"].str());
-        valid &= viewName.isValid() && viewName.db() == _db->name();
+
+        const auto viewName = viewDef["_id"].str();
+        const auto collectionNameIsValid = NamespaceString::validCollectionComponent(viewName);
+        valid &= collectionNameIsValid;
+
+        // Only perform validation via NamespaceString if the collection name has been determined to
+        // be valid. If not valid then the NamespaceString constructor will uassert.
+        if (collectionNameIsValid) {
+            NamespaceString viewNss(viewName);
+            valid &= viewNss.isValid() && viewNss.db() == _db->name();
+        }
+
         valid &= NamespaceString::validCollectionName(viewDef["viewOn"].str());
 
         const bool hasPipeline = viewDef.hasField("pipeline");
@@ -119,53 +130,53 @@ Status DurableViewCatalogImpl::iterate(OperationContext* txn, Callback callback)
     return Status::OK();
 }
 
-void DurableViewCatalogImpl::upsert(OperationContext* txn,
+void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
                                     const NamespaceString& name,
                                     const BSONObj& view) {
-    dassert(txn->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
     NamespaceString systemViewsNs(_db->getSystemViewsName());
-    Collection* systemViews = _db->getOrCreateCollection(txn, systemViewsNs.ns());
+    Collection* systemViews = _db->getOrCreateCollection(opCtx, systemViewsNs);
 
     const bool requireIndex = false;
-    RecordId id = Helpers::findOne(txn, systemViews, BSON("_id" << name.ns()), requireIndex);
+    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
 
     const bool enforceQuota = true;
     Snapshotted<BSONObj> oldView;
-    if (!id.isNormal() || !systemViews->findDoc(txn, id, &oldView)) {
+    if (!id.isNormal() || !systemViews->findDoc(opCtx, id, &oldView)) {
         LOG(2) << "insert view " << view << " into " << _db->getSystemViewsName();
         uassertStatusOK(
-            systemViews->insertDocument(txn, view, &CurOp::get(txn)->debug(), enforceQuota));
+            systemViews->insertDocument(opCtx, view, &CurOp::get(opCtx)->debug(), enforceQuota));
     } else {
         OplogUpdateEntryArgs args;
-        args.ns = systemViewsNs.ns();
+        args.nss = systemViewsNs;
         args.update = view;
         args.criteria = BSON("_id" << name.ns());
         args.fromMigrate = false;
 
         const bool assumeIndexesAreAffected = true;
-        auto res = systemViews->updateDocument(txn,
+        auto res = systemViews->updateDocument(opCtx,
                                                id,
                                                oldView,
                                                view,
                                                enforceQuota,
                                                assumeIndexesAreAffected,
-                                               &CurOp::get(txn)->debug(),
+                                               &CurOp::get(opCtx)->debug(),
                                                &args);
         uassertStatusOK(res);
     }
 }
 
-void DurableViewCatalogImpl::remove(OperationContext* txn, const NamespaceString& name) {
-    dassert(txn->lockState()->isDbLockedForMode(_db->name(), MODE_X));
-    Collection* systemViews = _db->getCollection(_db->getSystemViewsName());
+void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceString& name) {
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    Collection* systemViews = _db->getCollection(opCtx, _db->getSystemViewsName());
     if (!systemViews)
         return;
     const bool requireIndex = false;
-    RecordId id = Helpers::findOne(txn, systemViews, BSON("_id" << name.ns()), requireIndex);
+    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()), requireIndex);
     if (!id.isNormal())
         return;
 
     LOG(2) << "remove view " << name << " from " << _db->getSystemViewsName();
-    systemViews->deleteDocument(txn, id, &CurOp::get(txn)->debug());
+    systemViews->deleteDocument(opCtx, id, &CurOp::get(opCtx)->debug());
 }
 }  // namespace mongo

@@ -79,6 +79,11 @@ class SharedBufferAllocator {
 public:
     SharedBufferAllocator() = default;
 
+    // Allow moving but not copying. It would be an error for two SharedBufferAllocators to use the
+    // same underlying buffer.
+    SharedBufferAllocator(SharedBufferAllocator&&) = default;
+    SharedBufferAllocator& operator=(SharedBufferAllocator&&) = default;
+
     void malloc(size_t sz) {
         _buf = SharedBuffer::allocate(sz);
     }
@@ -105,6 +110,9 @@ class StackAllocator {
 
 public:
     StackAllocator() = default;
+    ~StackAllocator() {
+        free();
+    }
 
     enum { SZ = 512 };
     void malloc(size_t sz) {
@@ -141,8 +149,6 @@ private:
 
 template <class BufferAllocator>
 class _BufBuilder {
-    MONGO_DISALLOW_COPYING(_BufBuilder);
-
 public:
     _BufBuilder(int initsize = 512) : size(initsize) {
         if (size > 0) {
@@ -150,9 +156,6 @@ public:
         }
         l = 0;
         reservedBytes = 0;
-    }
-    ~_BufBuilder() {
-        kill();
     }
 
     void kill() {
@@ -342,6 +345,7 @@ private:
 };
 
 typedef _BufBuilder<SharedBufferAllocator> BufBuilder;
+MONGO_STATIC_ASSERT(std::is_move_constructible<BufBuilder>::value);
 
 /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
       this can be significantly faster for small bufs.  However, you can not release() the
@@ -355,6 +359,7 @@ public:
     StackBufBuilder() : _BufBuilder<StackAllocator>(StackAllocator::SZ) {}
     void release() = delete;  // not allowed. not implemented.
 };
+MONGO_STATIC_ASSERT(!std::is_move_constructible<StackBufBuilder>::value);
 
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
 template <typename Allocator>
@@ -467,10 +472,6 @@ public:
 
 private:
     _BufBuilder<Allocator> _buf;
-
-    // non-copyable, non-assignable
-    StringBuilderImpl(const StringBuilderImpl&);
-    StringBuilderImpl& operator=(const StringBuilderImpl&);
 
     template <typename T>
     StringBuilderImpl& SBNUM(T val, int maxSize, const char* macro) {

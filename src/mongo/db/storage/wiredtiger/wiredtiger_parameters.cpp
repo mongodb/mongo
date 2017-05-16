@@ -46,7 +46,7 @@ WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
       _engine(engine) {}
 
 
-void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn,
+void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
                                                     BSONObjBuilder& b,
                                                     const std::string& name) {
     b << name << "";

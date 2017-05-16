@@ -39,11 +39,11 @@ class ImpersonationSessionGuard {
     MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
 
 public:
-    ImpersonationSessionGuard(OperationContext* txn);
+    ImpersonationSessionGuard(OperationContext* opCtx);
     ~ImpersonationSessionGuard();
 
 private:
-    OperationContext* _txn;
+    OperationContext* _opCtx;
     bool _active{false};
 };
 

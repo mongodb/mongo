@@ -49,8 +49,8 @@ class DatabaseTaskTest : public TaskRunnerTest {};
 
 TEST_F(DatabaseTaskTest, TaskRunnerErrorStatus) {
     // Should not attempt to acquire lock on error status from task runner.
-    auto task = [](OperationContext* txn, const Status& status) {
-        ASSERT_FALSE(txn);
+    auto task = [](OperationContext* opCtx, const Status& status) {
+        ASSERT_FALSE(opCtx);
         ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
         return TaskRunner::NextAction::kInvalid;
     };
@@ -66,15 +66,15 @@ TEST_F(DatabaseTaskTest, TaskRunnerErrorStatus) {
 TEST_F(DatabaseTaskTest, RunGlobalExclusiveLockTask) {
     stdx::mutex mutex;
     bool called = false;
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     bool lockIsW = false;
     Status status = getDetectableErrorStatus();
     // Task returning 'void' implies NextAction::NoAction.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
         called = true;
-        txn = theTxn;
-        lockIsW = txn->lockState()->isW();
+        opCtx = theTxn;
+        lockIsW = opCtx->lockState()->isW();
         status = theStatus;
         return TaskRunner::NextAction::kCancel;
     };
@@ -84,7 +84,7 @@ TEST_F(DatabaseTaskTest, RunGlobalExclusiveLockTask) {
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
     ASSERT_TRUE(called);
-    ASSERT(txn);
+    ASSERT(opCtx);
     ASSERT_TRUE(lockIsW);
     ASSERT_OK(status);
 }
@@ -92,15 +92,15 @@ TEST_F(DatabaseTaskTest, RunGlobalExclusiveLockTask) {
 void _testRunDatabaseLockTask(DatabaseTaskTest& test, LockMode mode) {
     stdx::mutex mutex;
     bool called = false;
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     bool isDatabaseLockedForMode = false;
     Status status = test.getDetectableErrorStatus();
     // Task returning 'void' implies NextAction::NoAction.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
         called = true;
-        txn = theTxn;
-        isDatabaseLockedForMode = txn->lockState()->isDbLockedForMode(databaseName, mode);
+        opCtx = theTxn;
+        isDatabaseLockedForMode = opCtx->lockState()->isDbLockedForMode(databaseName, mode);
         status = theStatus;
         return TaskRunner::NextAction::kCancel;
     };
@@ -110,7 +110,7 @@ void _testRunDatabaseLockTask(DatabaseTaskTest& test, LockMode mode) {
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
     ASSERT_TRUE(called);
-    ASSERT(txn);
+    ASSERT(opCtx);
     ASSERT_TRUE(isDatabaseLockedForMode);
     ASSERT_OK(status);
 }
@@ -134,16 +134,16 @@ TEST_F(DatabaseTaskTest, RunDatabaseLockTaskModeIS) {
 void _testRunCollectionLockTask(DatabaseTaskTest& test, LockMode mode) {
     stdx::mutex mutex;
     bool called = false;
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     bool isCollectionLockedForMode = false;
     Status status = test.getDetectableErrorStatus();
     // Task returning 'void' implies NextAction::NoAction.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
         called = true;
-        txn = theTxn;
+        opCtx = theTxn;
         isCollectionLockedForMode =
-            txn->lockState()->isCollectionLockedForMode(nss.toString(), mode);
+            opCtx->lockState()->isCollectionLockedForMode(nss.toString(), mode);
         status = theStatus;
         return TaskRunner::NextAction::kCancel;
     };
@@ -153,7 +153,7 @@ void _testRunCollectionLockTask(DatabaseTaskTest& test, LockMode mode) {
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
     ASSERT_TRUE(called);
-    ASSERT(txn);
+    ASSERT(opCtx);
     ASSERT_TRUE(isCollectionLockedForMode);
     ASSERT_OK(status);
 }

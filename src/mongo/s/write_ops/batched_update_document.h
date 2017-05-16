@@ -54,6 +54,7 @@ public:
     static const BSONField<bool> multi;
     static const BSONField<bool> upsert;
     static const BSONField<BSONObj> collation;
+    static const BSONField<BSONArray> arrayFilters;
 
     //
     // construction / destruction
@@ -104,6 +105,11 @@ public:
     bool isCollationSet() const;
     const BSONObj& getCollation() const;
 
+    void setArrayFilters(const std::vector<BSONObj>& arrayFilters);
+    void unsetArrayFilters();
+    bool isArrayFiltersSet() const;
+    const std::vector<BSONObj>& getArrayFilters() const;
+
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -126,6 +132,10 @@ private:
     // (O)  the collation which this update should respect.
     BSONObj _collation;
     bool _isCollationSet;
+
+    // (O)  the filters this update uses to determine which array elements to update.
+    std::vector<BSONObj> _arrayFilters;
+    bool _isArrayFiltersSet;
 };
 
 }  // namespace mongo

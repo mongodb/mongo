@@ -479,7 +479,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     osName = distroName;
     osVersion = distroVersion;
     memSize = LinuxSysHelper::getSystemMemorySize();
-    addrSize = (string(unameData.machine).find("x86_64") != string::npos ? 64 : 32);
+    addrSize = sizeof(void*) * CHAR_BIT;
     numCores = cpuCount;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     cpuArch = unameData.machine;

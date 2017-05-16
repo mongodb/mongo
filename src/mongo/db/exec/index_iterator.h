@@ -44,7 +44,7 @@ class Collection;
  */
 class IndexIteratorStage final : public PlanStage {
 public:
-    IndexIteratorStage(OperationContext* txn,
+    IndexIteratorStage(OperationContext* opCtx,
                        WorkingSet* ws,
                        Collection* collection,
                        IndexAccessMethod* iam,

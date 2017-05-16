@@ -101,16 +101,6 @@ public:
     virtual ~MultiApplier();
 
     /**
-     * Returns diagnostic information.
-     */
-    std::string getDiagnosticString() const;
-
-    /**
-     * Returns an informational string.
-     */
-    std::string toString() const;
-
-    /**
      * Returns true if the applier has been started (but has not completed).
      */
     bool isActive() const;

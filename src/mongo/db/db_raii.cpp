@@ -41,30 +41,28 @@
 
 namespace mongo {
 
-AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
-    : _dbLock(txn->lockState(), ns, mode), _db(dbHolder().get(txn, ns)) {}
+AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode)
+    : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {}
 
-AutoGetCollection::AutoGetCollection(OperationContext* txn,
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      LockMode modeDB,
                                      LockMode modeColl,
                                      ViewMode viewMode)
     : _viewMode(viewMode),
-      _autoDb(txn, nss.db(), modeDB),
-      _collLock(txn->lockState(), nss.ns(), modeColl),
-      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {
+      _autoDb(opCtx, nss.db(), modeDB),
+      _collLock(opCtx->lockState(), nss.ns(), modeColl),
+      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(opCtx, nss) : nullptr) {
     Database* db = _autoDb.getDb();
     // If the database exists, but not the collection, check for views.
     if (_viewMode == ViewMode::kViewsForbidden && db && !_coll &&
-        db->getViewCatalog()->lookup(txn, nss.ns()))
+        db->getViewCatalog()->lookup(opCtx, nss.ns()))
         uasserted(ErrorCodes::CommandNotSupportedOnView,
                   str::stream() << "Namespace " << nss.ns() << " is a view, not a collection");
 }
 
-AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode)
-    : _transaction(txn, MODE_IX),
-      _dbLock(txn->lockState(), ns, mode),
-      _db(dbHolder().get(txn, ns)) {
+AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, LockMode mode)
+    : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {
     invariant(mode == MODE_IX || mode == MODE_X);
     _justCreated = false;
     // If the database didn't exist, relock in MODE_X
@@ -72,56 +70,51 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockM
         if (mode != MODE_X) {
             _dbLock.relockWithMode(MODE_X);
         }
-        _db = dbHolder().openDb(txn, ns);
+        _db = dbHolder().openDb(opCtx, ns);
         _justCreated = true;
     }
 }
 
-AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
-                                                   const NamespaceString& nss,
-                                                   AutoGetCollection::ViewMode viewMode)
-    : _txn(txn), _transaction(txn, MODE_IS) {
-    {
-        _autoColl.emplace(txn, nss, MODE_IS, MODE_IS, viewMode);
-
-        auto curOp = CurOp::get(_txn);
-        stdx::lock_guard<Client> lk(*_txn->getClient());
-
-        // TODO: OldClientContext legacy, needs to be removed
-        curOp->ensureStarted();
-        curOp->setNS_inlock(nss.ns());
-
-        // At this point, we are locked in shared mode for the database by the DB lock in the
-        // constructor, so it is safe to load the DB pointer.
-        if (_autoColl->getDb()) {
-            // TODO: OldClientContext legacy, needs to be removed
-            curOp->enter_inlock(nss.ns().c_str(), _autoColl->getDb()->getProfilingLevel());
+AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   Top::LockType lockType,
+                                   boost::optional<int> dbProfilingLevel)
+    : _opCtx(opCtx), _lockType(lockType) {
+    if (!dbProfilingLevel) {
+        // No profiling level was determined, attempt to read the profiling level from the Database
+        // object.
+        AutoGetDb autoDb(_opCtx, nss.db(), MODE_IS);
+        if (autoDb.getDb()) {
+            dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
         }
     }
+    stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
+    CurOp::get(_opCtx)->enter_inlock(nss.ns().c_str(), dbProfilingLevel);
+}
+
+AutoStatsTracker::~AutoStatsTracker() {
+    auto curOp = CurOp::get(_opCtx);
+    Top::get(_opCtx->getServiceContext())
+        .record(_opCtx,
+                curOp->getNS(),
+                curOp->getLogicalOp(),
+                _lockType,
+                _timer.micros(),
+                curOp->isCommand(),
+                curOp->getReadWriteType());
+}
+
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   AutoGetCollection::ViewMode viewMode) {
+    _autoColl.emplace(opCtx, nss, MODE_IS, MODE_IS, viewMode);
 
     // Note: this can yield.
-    _ensureMajorityCommittedSnapshotIsValid(nss);
-
-    // We have both the DB and collection locked, which is the prerequisite to do a stable shard
-    // version check, but we'd like to do the check after we have a satisfactory snapshot.
-    auto css = CollectionShardingState::get(txn, nss);
-    css->checkShardVersionOrThrow(txn);
+    _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
 }
 
-AutoGetCollectionForRead::~AutoGetCollectionForRead() {
-    // Report time spent in read lock
-    auto currentOp = CurOp::get(_txn);
-    Top::get(_txn->getClient()->getServiceContext())
-        .record(_txn,
-                currentOp->getNS(),
-                currentOp->getLogicalOp(),
-                -1,  // "read locked"
-                _timer.micros(),
-                currentOp->isCommand(),
-                currentOp->getReadWriteType());
-}
-
-void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss) {
+void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
+                                                                       OperationContext* opCtx) {
     while (true) {
         auto coll = _autoColl->getCollection();
         if (!coll) {
@@ -131,7 +124,7 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
         if (!minSnapshot) {
             return;
         }
-        auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
+        auto mySnapshot = opCtx->recoveryUnit()->getMajorityCommittedSnapshot();
         if (!mySnapshot) {
             return;
         }
@@ -142,59 +135,76 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
         // Yield locks.
         _autoColl = boost::none;
 
-        repl::ReplicationCoordinator::get(_txn)->waitUntilSnapshotCommitted(_txn, *minSnapshot);
+        repl::ReplicationCoordinator::get(opCtx)->waitUntilSnapshotCommitted(opCtx, *minSnapshot);
 
-        uassertStatusOK(_txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+        uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         {
-            stdx::lock_guard<Client> lk(*_txn->getClient());
-            CurOp::get(_txn)->yielded();
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->yielded();
         }
 
         // Relock.
-        _autoColl.emplace(_txn, nss, MODE_IS);
+        _autoColl.emplace(opCtx, nss, MODE_IS);
     }
 }
 
-AutoGetCollectionOrViewForRead::AutoGetCollectionOrViewForRead(OperationContext* txn,
-                                                               const NamespaceString& nss)
-    : AutoGetCollectionForRead(txn, nss, AutoGetCollection::ViewMode::kViewsPermitted),
-      _view(_autoColl->getDb() && !getCollection()
-                ? _autoColl->getDb()->getViewCatalog()->lookup(txn, nss.ns())
-                : nullptr) {}
+AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
+    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode) {
 
-void AutoGetCollectionOrViewForRead::releaseLocksForView() noexcept {
-    invariant(_view);
-    _view = nullptr;
-    _autoColl = boost::none;
+    _autoCollForRead.emplace(opCtx, nss, viewMode);
+    const int doNotChangeProfilingLevel = 0;
+    _statsTracker.emplace(opCtx,
+                          nss,
+                          Top::LockType::ReadLocked,
+                          _autoCollForRead->getDb() ? _autoCollForRead->getDb()->getProfilingLevel()
+                                                    : doNotChangeProfilingLevel);
+
+    // We have both the DB and collection locked, which is the prerequisite to do a stable shard
+    // version check, but we'd like to do the check after we have a satisfactory snapshot.
+    auto css = CollectionShardingState::get(opCtx, nss);
+    css->checkShardVersionOrThrow(opCtx);
 }
 
-OldClientContext::OldClientContext(OperationContext* txn,
+AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
+    OperationContext* opCtx, const NamespaceString& nss)
+    : AutoGetCollectionForReadCommand(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted),
+      _view(_autoCollForRead->getDb() && !getCollection()
+                ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
+                : nullptr) {}
+
+void AutoGetCollectionOrViewForReadCommand::releaseLocksForView() noexcept {
+    invariant(_view);
+    _view = nullptr;
+    _autoCollForRead = boost::none;
+}
+
+OldClientContext::OldClientContext(OperationContext* opCtx,
                                    const std::string& ns,
                                    Database* db,
                                    bool justCreated)
-    : _justCreated(justCreated), _doVersion(true), _ns(ns), _db(db), _txn(txn) {
+    : _justCreated(justCreated), _doVersion(true), _ns(ns), _db(db), _opCtx(opCtx) {
     _finishInit();
 }
 
-OldClientContext::OldClientContext(OperationContext* txn,
+OldClientContext::OldClientContext(OperationContext* opCtx,
                                    const std::string& ns,
                                    bool doVersion)
     : _justCreated(false),  // set for real in finishInit
       _doVersion(doVersion),
       _ns(ns),
       _db(NULL),
-      _txn(txn) {
+      _opCtx(opCtx) {
     _finishInit();
 }
 
 void OldClientContext::_finishInit() {
-    _db = dbHolder().get(_txn, _ns);
+    _db = dbHolder().get(_opCtx, _ns);
     if (_db) {
         _justCreated = false;
     } else {
-        invariant(_txn->lockState()->isDbLockedForMode(nsToDatabaseSubstring(_ns), MODE_X));
-        _db = dbHolder().openDb(_txn, _ns, &_justCreated);
+        invariant(_opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(_ns), MODE_X));
+        _db = dbHolder().openDb(_opCtx, _ns, &_justCreated);
         invariant(_db);
     }
 
@@ -202,32 +212,33 @@ void OldClientContext::_finishInit() {
         _checkNotStale();
     }
 
-    stdx::lock_guard<Client> lk(*_txn->getClient());
-    CurOp::get(_txn)->enter_inlock(_ns.c_str(), _db->getProfilingLevel());
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    CurOp::get(_opCtx)->enter_inlock(_ns.c_str(), _db->getProfilingLevel());
 }
 
 void OldClientContext::_checkNotStale() const {
-    switch (CurOp::get(_txn)->getNetworkOp()) {
+    switch (CurOp::get(_opCtx)->getNetworkOp()) {
         case dbGetMore:  // getMore is special and should be handled elsewhere.
         case dbUpdate:   // update & delete check shard version in instance.cpp, so don't check
         case dbDelete:   // here as well.
             break;
         default:
-            auto css = CollectionShardingState::get(_txn, _ns);
-            css->checkShardVersionOrThrow(_txn);
+            auto css = CollectionShardingState::get(_opCtx, _ns);
+            css->checkShardVersionOrThrow(_opCtx);
     }
 }
 
 OldClientContext::~OldClientContext() {
     // Lock must still be held
-    invariant(_txn->lockState()->isLocked());
+    invariant(_opCtx->lockState()->isLocked());
 
-    auto currentOp = CurOp::get(_txn);
-    Top::get(_txn->getClient()->getServiceContext())
-        .record(_txn,
+    auto currentOp = CurOp::get(_opCtx);
+    Top::get(_opCtx->getClient()->getServiceContext())
+        .record(_opCtx,
                 currentOp->getNS(),
                 currentOp->getLogicalOp(),
-                _txn->lockState()->isWriteLocked() ? 1 : -1,
+                _opCtx->lockState()->isWriteLocked() ? Top::LockType::WriteLocked
+                                                     : Top::LockType::ReadLocked,
                 _timer.micros(),
                 currentOp->isCommand(),
                 currentOp->getReadWriteType());
@@ -235,16 +246,16 @@ OldClientContext::~OldClientContext() {
 
 
 OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, const std::string& ns)
-    : _txn(opCtx),
+    : _opCtx(opCtx),
       _nss(ns),
       _autodb(opCtx, _nss.db(), MODE_IX),
       _collk(opCtx->lockState(), ns, MODE_IX),
       _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
-    _collection = _c.db()->getCollection(ns);
+    _collection = _c.db()->getCollection(opCtx, ns);
     if (!_collection && !_autodb.justCreated()) {
         // relock database in MODE_X to allow collection creation
         _collk.relockAsDatabaseExclusive(_autodb.lock());
-        Database* db = dbHolder().get(_txn, ns);
+        Database* db = dbHolder().get(_opCtx, ns);
         invariant(db == _c.db());
     }
 }

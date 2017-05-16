@@ -49,6 +49,7 @@ public:
     static const char kKeyField[];
     static const char kQueryField[];
     static const char kCollationField[];
+    static const char kCommentField[];
 
     ParsedDistinct(std::unique_ptr<CanonicalQuery> query, const std::string key)
         : _query(std::move(query)), _key(std::move(key)) {}
@@ -78,7 +79,7 @@ public:
      * 'extensionsCallback' allows for additional mongod parsing. If called from mongos, an
      * ExtensionsCallbackNoop object should be passed to skip this parsing.
      */
-    static StatusWith<ParsedDistinct> parse(OperationContext* txn,
+    static StatusWith<ParsedDistinct> parse(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const BSONObj& cmdObj,
                                             const ExtensionsCallback& extensionsCallback,

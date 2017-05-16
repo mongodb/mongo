@@ -40,9 +40,9 @@
 namespace mongo {
 namespace {
 
-RecordId doInsert(unowned_ptr<OperationContext> txn, unowned_ptr<RecordStore> rs) {
+RecordId doInsert(unowned_ptr<OperationContext> opCtx, unowned_ptr<RecordStore> rs) {
     static char zeros[16];
-    return uassertStatusOK(rs->insertRecord(txn, zeros, sizeof(zeros), false));
+    return uassertStatusOK(rs->insertRecord(opCtx, zeros, sizeof(zeros), false));
 }
 
 // macro to keep assert line numbers correct.
@@ -76,27 +76,27 @@ TEST(RecordStore_CappedVisibility, EmptyInitialState) {
 
     RecordId otherId;
     {
-        auto txn = harness->newOperationContext();
-        WriteUnitOfWork wuow(txn.get());
+        auto opCtx = harness->newOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
 
         // Can't see uncommitted write from other operation.
-        ASSERT(!rs->getCursor(txn.get())->seekExact(lowestHiddenId));
+        ASSERT(!rs->getCursor(opCtx.get())->seekExact(lowestHiddenId));
 
-        ASSERT(!rs->getCursor(txn.get(), true)->next());
-        ASSERT(!rs->getCursor(txn.get(), false)->next());
+        ASSERT(!rs->getCursor(opCtx.get(), true)->next());
+        ASSERT(!rs->getCursor(opCtx.get(), false)->next());
 
-        otherId = doInsert(txn, rs);
+        otherId = doInsert(opCtx, rs);
 
-        ASSERT(!rs->getCursor(txn.get(), true)->next());
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get())->seekExact(otherId), otherId);
+        ASSERT(!rs->getCursor(opCtx.get(), true)->next());
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(otherId), otherId);
 
         wuow.commit();
 
-        ASSERT(!rs->getCursor(txn.get(), true)->next());
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get())->seekExact(otherId), otherId);
-        ASSERT(!rs->getCursor(txn.get())->seekExact(lowestHiddenId));
+        ASSERT(!rs->getCursor(opCtx.get(), true)->next());
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(otherId), otherId);
+        ASSERT(!rs->getCursor(opCtx.get())->seekExact(lowestHiddenId));
     }
 
     // longLivedOp is still on old snapshot so it can't see otherId yet.
@@ -147,28 +147,28 @@ TEST(RecordStore_CappedVisibility, NonEmptyInitialState) {
 
     RecordId otherId;
     {
-        auto txn = harness->newOperationContext();
-        WriteUnitOfWork wuow(txn.get());
+        auto opCtx = harness->newOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
 
         // Can only see committed writes from other operation.
-        ASSERT_ID_EQ(rs->getCursor(txn.get())->seekExact(initialId), initialId);
-        ASSERT(!rs->getCursor(txn.get())->seekExact(lowestHiddenId));
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(initialId), initialId);
+        ASSERT(!rs->getCursor(opCtx.get())->seekExact(lowestHiddenId));
 
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), true)->next(), initialId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), false)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), true)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), initialId);
 
-        otherId = doInsert(txn, rs);
+        otherId = doInsert(opCtx, rs);
 
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), true)->next(), initialId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get())->seekExact(otherId), otherId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), true)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(otherId), otherId);
 
         wuow.commit();
 
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), true)->next(), initialId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get(), false)->next(), otherId);
-        ASSERT_ID_EQ(rs->getCursor(txn.get())->seekExact(otherId), otherId);
-        ASSERT(!rs->getCursor(txn.get())->seekExact(lowestHiddenId));
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), true)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(opCtx.get())->seekExact(otherId), otherId);
+        ASSERT(!rs->getCursor(opCtx.get())->seekExact(lowestHiddenId));
     }
 
     // longLivedOp is still on old snapshot so it can't see otherId yet.

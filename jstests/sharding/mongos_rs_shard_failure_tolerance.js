@@ -17,7 +17,6 @@
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");
-    var shards = mongos.getDB("config").shards.find().toArray();
 
     assert.commandWorked(admin.runCommand({setParameter: 1, traceExceptions: true}));
 
@@ -27,16 +26,18 @@
     // Create the unsharded database
     assert.writeOK(collUnsharded.insert({some: "doc"}));
     assert.writeOK(collUnsharded.remove({}));
-    printjson(admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: shards[0]._id}));
+    printjson(
+        admin.runCommand({movePrimary: collUnsharded.getDB().toString(), to: st.shard0.shardName}));
 
     // Create the sharded database
     assert.commandWorked(admin.runCommand({enableSharding: collSharded.getDB().toString()}));
-    printjson(admin.runCommand({movePrimary: collSharded.getDB().toString(), to: shards[0]._id}));
+    printjson(
+        admin.runCommand({movePrimary: collSharded.getDB().toString(), to: st.shard0.shardName}));
     assert.commandWorked(
         admin.runCommand({shardCollection: collSharded.toString(), key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {_id: 0}}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: collSharded.toString(), find: {_id: 0}, to: shards[1]._id}));
+    assert.commandWorked(admin.runCommand(
+        {moveChunk: collSharded.toString(), find: {_id: 0}, to: st.shard1.shardName}));
 
     st.printShardingStatus();
 

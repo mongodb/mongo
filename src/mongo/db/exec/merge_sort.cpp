@@ -174,7 +174,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
 }
 
 
-void MergeSortStage::doInvalidate(OperationContext* txn,
+void MergeSortStage::doInvalidate(OperationContext* opCtx,
                                   const RecordId& dl,
                                   InvalidationType type) {
     // Go through our data and see if we're holding on to the invalidated RecordId.
@@ -184,7 +184,7 @@ void MergeSortStage::doInvalidate(OperationContext* txn,
         WorkingSetMember* member = _ws->get(valueIt->id);
         if (member->hasRecordId() && (dl == member->recordId)) {
             // Fetch the about-to-be mutated result.
-            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
             ++_specificStats.forcedFetches;
         }
     }

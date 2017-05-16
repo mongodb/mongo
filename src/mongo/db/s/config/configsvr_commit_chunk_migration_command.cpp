@@ -117,10 +117,9 @@ public:
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
 
@@ -129,8 +128,8 @@ public:
         auto commitRequest =
             uassertStatusOK(CommitChunkMigrationRequest::createFromCommand(nss, cmdObj));
 
-        StatusWith<BSONObj> response = Grid::get(txn)->catalogManager()->commitChunkMigration(
-            txn,
+        StatusWith<BSONObj> response = Grid::get(opCtx)->catalogManager()->commitChunkMigration(
+            opCtx,
             nss,
             commitRequest.getMigratedChunk(),
             commitRequest.getControlChunk(),

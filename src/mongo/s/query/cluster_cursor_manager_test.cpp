@@ -267,6 +267,25 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorUpdateActiveTime) {
     ASSERT(!isMockCursorKilled(0));
 }
 
+// Test that checking in a cursor updates the 'last active' time associated with the cursor to the
+// current time.
+TEST_F(ClusterCursorManagerTest, ReturnCursorUpdateActiveTime) {
+    auto cursorId = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+    Date_t cursorCheckOutTime = getClockSource()->now();
+    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId, nullptr);
+    ASSERT_OK(checkedOutCursor.getStatus());
+    getClockSource()->advance(Milliseconds(1));
+    checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getManager()->killMortalCursorsInactiveSince(cursorCheckOutTime);
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(!isMockCursorKilled(0));
+}
 // Test that killing a pinned cursor by id successfully kills the cursor.
 TEST_F(ClusterCursorManagerTest, KillCursorBasic) {
     auto cursorId = assertGet(
@@ -380,6 +399,27 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipImmortal) {
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
     ASSERT(!isMockCursorKilled(0));
+}
+
+// Test that killing all mortal expired cursors does not kill a mortal expired cursor that is
+// pinned.
+TEST_F(ClusterCursorManagerTest, ShouldNotKillPinnedCursors) {
+    auto cursorId = assertGet(
+        getManager()->registerCursor(nullptr,
+                                     allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal));
+    auto pin = assertGet(getManager()->checkOutCursor(nss, cursorId, nullptr));
+    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(!isMockCursorKilled(0));
+    pin.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(isMockCursorKilled(0));
 }
 
 // Test that killing all mortal expired cursors kills the correct cursors when multiple cursors are

@@ -66,13 +66,14 @@ public:
      * available.
      * 'version' should be '3.4' or '3.2'.
      */
-    static void set(OperationContext* txn, StringData version);
+    static void set(OperationContext* opCtx, StringData version);
 
     /**
      * If there are no non-local databases and we are not running with --shardsvr, set
      * featureCompatibilityVersion to 3.4.
      */
-    static void setIfCleanStartup(OperationContext* txn, repl::StorageInterface* storageInterface);
+    static void setIfCleanStartup(OperationContext* opCtx,
+                                  repl::StorageInterface* storageInterface);
 
     /**
      * Examines a document inserted or updated in admin.system.version. If it is the

@@ -82,8 +82,8 @@ int runDbTests(int argc, char** argv) {
 
     // DBTests run as if in the database, so allow them to create direct clients.
     DBDirectClientFactory::get(globalServiceContext)
-        .registerImplementation([](OperationContext* txn) {
-            return std::unique_ptr<DBClientBase>(new DBDirectClient(txn));
+        .registerImplementation([](OperationContext* opCtx) {
+            return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
         });
 
     srand((unsigned)frameworkGlobalParams.seed);

@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <random>
 #include <typeinfo>
 #include <vector>
@@ -48,6 +49,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -1000,9 +1002,9 @@ TEST_F(KeyStringTest, NumberOrderLots) {
 
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
-    OwnedPointerVector<KeyString> keyStrings;
+    std::vector<std::unique_ptr<KeyString>> keyStrings;
     for (size_t i = 0; i < numbers.size(); i++) {
-        keyStrings.push_back(new KeyString(version, numbers[i], ordering));
+        keyStrings.push_back(stdx::make_unique<KeyString>(version, numbers[i], ordering));
     }
 
     for (size_t i = 0; i < numbers.size(); i++) {

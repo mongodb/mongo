@@ -56,7 +56,7 @@ public:
         ASSERT_TRUE(_state == State::kStarted);
     }
 
-    void collect(OperationContext* txn, BSONObjBuilder& builder) final {
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) final {
         _state = State::kStarted;
         ++_counter;
 

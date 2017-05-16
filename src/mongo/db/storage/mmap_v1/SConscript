@@ -6,6 +6,16 @@ Import("mmapv1")
 env = env.Clone()
 
 env.Library(
+    target='paths',
+    source=[
+        'paths.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target = 'storage_mmapv1',
     source = [ "aligned_builder.cpp",
                "catalog/hashtab.cpp",
@@ -41,7 +51,12 @@ env.Library(
         'file_allocator',
         'logfile',
         'compress',
+        'paths',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
+        '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -49,13 +64,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
-        '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-        # '$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
-        # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE (CursorManager & applyUpdateOperators)
     ],
     LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
+        # TODO(ADAM, 2017-04-25): See `CYCLE` tags above
         'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
@@ -69,7 +84,7 @@ compressEnv.Library(
         'compress.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
+        'paths',
         '$BUILD_DIR/third_party/shim_snappy',
     ],
 )
@@ -91,7 +106,7 @@ env.Library(
         'file_allocator.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
+        'paths',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
@@ -103,8 +118,8 @@ env.Library(
         'logfile.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
         'mmap',
+        'paths',
     ],
 )
 

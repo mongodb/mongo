@@ -105,7 +105,7 @@ const DeleteStats* getDeleteStats(const PlanExecutor* exec) {
  *
  * If the operation failed, then an error Status is returned.
  */
-StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* txn,
+StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* opCtx,
                                                      PlanExecutor* exec,
                                                      bool isRemove) {
     BSONObj value;
@@ -144,6 +144,7 @@ void makeUpdateRequest(const FindAndModifyRequest& args,
     requestOut->setUpdates(args.getUpdateObj());
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
+    requestOut->setArrayFilters(args.getArrayFilters());
     requestOut->setUpsert(args.isUpsert());
     requestOut->setReturnDocs(args.shouldReturnNew() ? UpdateRequest::RETURN_NEW
                                                      : UpdateRequest::RETURN_OLD);
@@ -191,8 +192,8 @@ void appendCommandResponse(PlanExecutor* exec,
     }
 }
 
-Status checkCanAcceptWritesForDatabase(const NamespaceString& nsString) {
-    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString)) {
+Status checkCanAcceptWritesForDatabase(OperationContext* opCtx, const NamespaceString& nsString) {
+    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString)) {
         return Status(ErrorCodes::NotMaster,
                       str::stream()
                           << "Not primary while running findAndModify command on collection "
@@ -201,15 +202,13 @@ Status checkCanAcceptWritesForDatabase(const NamespaceString& nsString) {
     return Status::OK();
 }
 
-void recordStatsForTopCommand(OperationContext* txn) {
-    auto curOp = CurOp::get(txn);
-    const int writeLocked = 1;
-
-    Top::get(txn->getClient()->getServiceContext())
-        .record(txn,
+void recordStatsForTopCommand(OperationContext* opCtx) {
+    auto curOp = CurOp::get(opCtx);
+    Top::get(opCtx->getClient()->getServiceContext())
+        .record(opCtx,
                 curOp->getNS(),
                 curOp->getLogicalOp(),
-                writeLocked,
+                Top::LockType::WriteLocked,
                 curOp->elapsedMicros(),
                 curOp->isCommand(),
                 curOp->getReadWriteType());
@@ -249,11 +248,10 @@ public:
         return ReadWriteType::kWrite;
     }
 
-    Status explain(OperationContext* txn,
+    Status explain(OperationContext* opCtx,
                    const std::string& dbName,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
-                   const rpc::ServerSelectionMetadata&,
+                   ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
         const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
         Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());
@@ -269,14 +267,14 @@ public:
 
         const FindAndModifyRequest& args = parseStatus.getValue();
         const NamespaceString& nsString = args.getNamespaceString();
-        OpDebug* opDebug = &CurOp::get(txn)->debug();
+        OpDebug* opDebug = &CurOp::get(opCtx)->debug();
 
         if (args.isRemove()) {
             DeleteRequest request(nsString);
             const bool isExplain = true;
             makeDeleteRequest(args, isExplain, &request);
 
-            ParsedDelete parsedDelete(txn, &request);
+            ParsedDelete parsedDelete(opCtx, &request);
             Status parsedDeleteStatus = parsedDelete.parseRequest();
             if (!parsedDeleteStatus.isOK()) {
                 return parsedDeleteStatus;
@@ -284,22 +282,22 @@ public:
 
             // Explain calls of the findAndModify command are read-only, but we take write
             // locks so that the timing information is more accurate.
-            AutoGetCollection autoColl(txn, nsString, MODE_IX);
+            AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
             if (!autoColl.getDb()) {
                 return {ErrorCodes::NamespaceNotFound,
                         str::stream() << "database " << dbName << " does not exist."};
             }
 
-            auto css = CollectionShardingState::get(txn, nsString);
-            css->checkShardVersionOrThrow(txn);
+            auto css = CollectionShardingState::get(opCtx, nsString);
+            css->checkShardVersionOrThrow(opCtx);
 
             Collection* const collection = autoColl.getCollection();
             auto statusWithPlanExecutor =
-                getExecutorDelete(txn, opDebug, collection, &parsedDelete);
+                getExecutorDelete(opCtx, opDebug, collection, &parsedDelete);
             if (!statusWithPlanExecutor.isOK()) {
                 return statusWithPlanExecutor.getStatus();
             }
-            const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+            const auto exec = std::move(statusWithPlanExecutor.getValue());
             Explain::explainStages(exec.get(), collection, verbosity, out);
         } else {
             UpdateRequest request(nsString);
@@ -307,7 +305,7 @@ public:
             const bool isExplain = true;
             makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
 
-            ParsedUpdate parsedUpdate(txn, &request);
+            ParsedUpdate parsedUpdate(opCtx, &request);
             Status parsedUpdateStatus = parsedUpdate.parseRequest();
             if (!parsedUpdateStatus.isOK()) {
                 return parsedUpdateStatus;
@@ -315,36 +313,35 @@ public:
 
             // Explain calls of the findAndModify command are read-only, but we take write
             // locks so that the timing information is more accurate.
-            AutoGetCollection autoColl(txn, nsString, MODE_IX);
+            AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
             if (!autoColl.getDb()) {
                 return {ErrorCodes::NamespaceNotFound,
                         str::stream() << "database " << dbName << " does not exist."};
             }
 
-            auto css = CollectionShardingState::get(txn, nsString);
-            css->checkShardVersionOrThrow(txn);
+            auto css = CollectionShardingState::get(opCtx, nsString);
+            css->checkShardVersionOrThrow(opCtx);
 
             Collection* collection = autoColl.getCollection();
             auto statusWithPlanExecutor =
-                getExecutorUpdate(txn, opDebug, collection, &parsedUpdate);
+                getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate);
             if (!statusWithPlanExecutor.isOK()) {
                 return statusWithPlanExecutor.getStatus();
             }
-            const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+            const auto exec = std::move(statusWithPlanExecutor.getValue());
             Explain::explainStages(exec.get(), collection, verbosity, out);
         }
 
         return Status::OK();
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbName,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         // findAndModify command is not replicated directly.
-        invariant(txn->writesAreReplicated());
+        invariant(opCtx->writesAreReplicated());
         const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
         Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());
         if (!allowedWriteStatus.isOK()) {
@@ -362,21 +359,21 @@ public:
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
-            maybeDisableValidation.emplace(txn);
+            maybeDisableValidation.emplace(opCtx);
 
-        auto client = txn->getClient();
+        auto client = opCtx->getClient();
         auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
         ScopeGuard lastOpSetterGuard =
             MakeObjGuard(repl::ReplClientInfo::forClient(client),
                          &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         txn);
+                         opCtx);
 
         // If this is the local database, don't set last op.
         if (dbName == "local") {
             lastOpSetterGuard.Dismiss();
         }
 
-        auto curOp = CurOp::get(txn);
+        auto curOp = CurOp::get(opCtx);
         OpDebug* opDebug = &curOp->debug();
 
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it is
@@ -388,51 +385,50 @@ public:
                 const bool isExplain = false;
                 makeDeleteRequest(args, isExplain, &request);
 
-                ParsedDelete parsedDelete(txn, &request);
+                ParsedDelete parsedDelete(opCtx, &request);
                 Status parsedDeleteStatus = parsedDelete.parseRequest();
                 if (!parsedDeleteStatus.isOK()) {
                     return appendCommandStatus(result, parsedDeleteStatus);
                 }
 
-                AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
+                AutoGetOrCreateDb autoDb(opCtx, dbName, MODE_IX);
+                Lock::CollectionLock collLock(opCtx->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
                 {
-                    stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)->enter_inlock(nsString.ns().c_str(),
-                                                  autoDb.getDb()->getProfilingLevel());
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(),
+                                                    autoDb.getDb()->getProfilingLevel());
                 }
 
-                auto css = CollectionShardingState::get(txn, nsString);
-                css->checkShardVersionOrThrow(txn);
+                auto css = CollectionShardingState::get(opCtx, nsString);
+                css->checkShardVersionOrThrow(opCtx);
 
-                Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
+                Status isPrimary = checkCanAcceptWritesForDatabase(opCtx, nsString);
                 if (!isPrimary.isOK()) {
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                Collection* const collection = autoDb.getDb()->getCollection(nsString.ns());
-                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
+                Collection* const collection = autoDb.getDb()->getCollection(opCtx, nsString);
+                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
                                                 "findAndModify not supported on a view"});
                 }
                 auto statusWithPlanExecutor =
-                    getExecutorDelete(txn, opDebug, collection, &parsedDelete);
+                    getExecutorDelete(opCtx, opDebug, collection, &parsedDelete);
                 if (!statusWithPlanExecutor.isOK()) {
                     return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
-                const std::unique_ptr<PlanExecutor> exec =
-                    std::move(statusWithPlanExecutor.getValue());
+                const auto exec = std::move(statusWithPlanExecutor.getValue());
 
                 {
-                    stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
                 }
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
-                    advanceExecutor(txn, exec.get(), args.isRemove());
+                    advanceExecutor(opCtx, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
                     return appendCommandStatus(result, advanceStatus.getStatus());
                 }
@@ -443,7 +439,7 @@ public:
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
                 if (collection) {
-                    collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
                 }
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
@@ -455,7 +451,7 @@ public:
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
                 }
-                recordStatsForTopCommand(txn);
+                recordStatsForTopCommand(opCtx);
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
@@ -465,32 +461,32 @@ public:
                 const bool isExplain = false;
                 makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
 
-                ParsedUpdate parsedUpdate(txn, &request);
+                ParsedUpdate parsedUpdate(opCtx, &request);
                 Status parsedUpdateStatus = parsedUpdate.parseRequest();
                 if (!parsedUpdateStatus.isOK()) {
                     return appendCommandStatus(result, parsedUpdateStatus);
                 }
 
-                AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
+                AutoGetOrCreateDb autoDb(opCtx, dbName, MODE_IX);
+                Lock::CollectionLock collLock(opCtx->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
                 {
-                    stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)->enter_inlock(nsString.ns().c_str(),
-                                                  autoDb.getDb()->getProfilingLevel());
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(),
+                                                    autoDb.getDb()->getProfilingLevel());
                 }
 
-                auto css = CollectionShardingState::get(txn, nsString);
-                css->checkShardVersionOrThrow(txn);
+                auto css = CollectionShardingState::get(opCtx, nsString);
+                css->checkShardVersionOrThrow(opCtx);
 
-                Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
+                Status isPrimary = checkCanAcceptWritesForDatabase(opCtx, nsString);
                 if (!isPrimary.isOK()) {
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
-                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
+                Collection* collection = autoDb.getDb()->getCollection(opCtx, nsString.ns());
+                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
                     return appendCommandStatus(result,
                                                {ErrorCodes::CommandNotSupportedOnView,
                                                 "findAndModify not supported on a view"});
@@ -502,8 +498,8 @@ public:
                     // Release the collection lock and reacquire a lock on the database
                     // in exclusive mode in order to create the collection.
                     collLock.relockAsDatabaseExclusive(autoDb.lock());
-                    collection = autoDb.getDb()->getCollection(nsString.ns());
-                    Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(nsString);
+                    collection = autoDb.getDb()->getCollection(opCtx, nsString);
+                    Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(opCtx, nsString);
                     if (!isPrimaryAfterRelock.isOK()) {
                         return appendCommandStatus(result, isPrimaryAfterRelock);
                     }
@@ -511,34 +507,33 @@ public:
                     if (collection) {
                         // Someone else beat us to creating the collection, do nothing.
                     } else {
-                        WriteUnitOfWork wuow(txn);
+                        WriteUnitOfWork wuow(opCtx);
                         Status createCollStatus =
-                            userCreateNS(txn, autoDb.getDb(), nsString.ns(), BSONObj());
+                            userCreateNS(opCtx, autoDb.getDb(), nsString.ns(), BSONObj());
                         if (!createCollStatus.isOK()) {
                             return appendCommandStatus(result, createCollStatus);
                         }
                         wuow.commit();
 
-                        collection = autoDb.getDb()->getCollection(nsString.ns());
+                        collection = autoDb.getDb()->getCollection(opCtx, nsString);
                         invariant(collection);
                     }
                 }
 
                 auto statusWithPlanExecutor =
-                    getExecutorUpdate(txn, opDebug, collection, &parsedUpdate);
+                    getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate);
                 if (!statusWithPlanExecutor.isOK()) {
                     return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
-                const std::unique_ptr<PlanExecutor> exec =
-                    std::move(statusWithPlanExecutor.getValue());
+                const auto exec = std::move(statusWithPlanExecutor.getValue());
 
                 {
-                    stdx::lock_guard<Client> lk(*txn->getClient());
-                    CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
                 }
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
-                    advanceExecutor(txn, exec.get(), args.isRemove());
+                    advanceExecutor(opCtx, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
                     return appendCommandStatus(result, advanceStatus.getStatus());
                 }
@@ -549,7 +544,7 @@ public:
                 PlanSummaryStats summaryStats;
                 Explain::getSummaryStats(*exec, &summaryStats);
                 if (collection) {
-                    collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+                    collection->infoCache()->notifyOfQuery(opCtx, summaryStats.indexesUsed);
                 }
                 UpdateStage::recordUpdateStatsInOpDebug(getUpdateStats(exec.get()), opDebug);
                 opDebug->setPlanSummaryMetrics(summaryStats);
@@ -559,13 +554,13 @@ public:
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
                 }
-                recordStatsForTopCommand(txn);
+                recordStatsForTopCommand(opCtx);
 
                 boost::optional<BSONObj> value = advanceStatus.getValue();
                 appendCommandResponse(exec.get(), args.isRemove(), value, result);
             }
         }
-        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", nsString.ns());
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "findAndModify", nsString.ns());
 
         if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
             // If this operation has already generated a new lastOp, don't bother setting it here.

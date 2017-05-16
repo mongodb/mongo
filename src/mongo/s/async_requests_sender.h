@@ -47,20 +47,35 @@
 namespace mongo {
 
 /**
- * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel and
- * automatically retrying on retriable errors according to a RetryPolicy. It can also allow for
- * retrieving partial results by ignoring shards that return errors.
- *
+ * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel.
  * Work on remote nodes is accomplished by scheduling remote work in a TaskExecutor's event loop.
  *
  * Typical usage is:
  *
- * AsyncRequestsSender ars(txn, executor, db, requests, readPrefSetting);  // schedule the requests
- * auto responses = ars.waitForResponses(txn);  // wait for responses; retries on retriable erors
+ * // Add some requests
+ * std::vector<AsyncRequestSender::Request> requests;
  *
- * Additionally, you can interrupt() (if you want waitForResponses() to wait for responses for
- * outstanding requests but stop scheduling retries) or kill() (if you want to cancel outstanding
- * requests) the ARS from another thread.
+ * // Creating the ARS schedules the requests immediately
+ * AsyncRequestsSender ars(opCtx, executor, db, requests, readPrefSetting);
+ *
+ * while (!ars.done()) {
+ *     // Schedule a round of retries if needed and wait for next response or error.
+ *     auto response = ars.next();
+ *
+ *     if (!response.swResponse.isOK()) {
+ *         // If partial results are tolerable, process the error as needed and continue.
+ *         continue;
+ *
+ *         // If partial results are not tolerable but you need to retrieve responses for all
+ *         // dispatched requests, use stopRetrying() and continue.
+ *         ars.stopRetrying();
+ *         continue;
+ *
+ *         // If partial results are not tolerable and you don't care about dispatched requests,
+ *         // safe to destroy the ARS. It will automatically cancel pending I/O and wait for the
+ *         // outstanding callbacks to complete on destruction.
+ *     }
+ * }
  *
  * Does not throw exceptions.
  */
@@ -86,117 +101,64 @@ public:
      */
     struct Response {
         // Constructor for a response that was successfully received.
-        Response(executor::RemoteCommandResponse response, HostAndPort hp);
+        Response(ShardId shardId, executor::RemoteCommandResponse response, HostAndPort hp);
 
         // Constructor that specifies the reason the response was not successfully received.
-        Response(Status status);
+        Response(ShardId shardId, Status status, boost::optional<HostAndPort> hp);
+
+        // The shard to which the request was sent.
+        ShardId shardId;
 
         // The response or error from the remote.
         StatusWith<executor::RemoteCommandResponse> swResponse;
 
-        // The exact host on which the remote command was run. Is unset if swResponse has a non-OK
-        // status.
+        // The exact host on which the remote command was run. Is unset if the shard could not be
+        // found or no shard hosts matching the readPreference could be found.
         boost::optional<HostAndPort> shardHostAndPort;
     };
 
     /**
-     * Constructs a new AsyncRequestsSender. The TaskExecutor* must remain valid for the lifetime of
-     * the ARS.
+     * Constructs a new AsyncRequestsSender. The OperationContext* and TaskExecutor* must remain
+     * valid for the lifetime of the ARS.
      */
-    AsyncRequestsSender(OperationContext* txn,
+    AsyncRequestsSender(OperationContext* opCtx,
                         executor::TaskExecutor* executor,
-                        std::string db,
+                        const std::string db,
                         const std::vector<AsyncRequestsSender::Request>& requests,
-                        const ReadPreferenceSetting& readPreference,
-                        bool allowPartialResults = false);
+                        const ReadPreferenceSetting& readPreference);
 
+    /**
+     * Ensures pending network I/O for any outstanding requests has been canceled and waits for
+     * outstanding callbacks to complete.
+     */
     ~AsyncRequestsSender();
 
     /**
-     * Returns a vector containing the responses or errors for each remote in the same order as the
-     * input vector that was passed in the constructor.
-     *
-     * If we were killed, returns immediately.
-     * If we were interrupted, returns when any outstanding requests have completed.
-     * Otherwise, returns when each remote has received a response or error.
+     * Returns true if responses for all requests have been returned via next().
      */
-    std::vector<Response> waitForResponses(OperationContext* txn);
+    bool done();
 
     /**
-     * Stops the ARS from retrying requests. Causes waitForResponses() to wait until any outstanding
-     * requests have received a response or error.
+     * Returns the next available response or error.
+     *
+     * If the operation is interrupted, the status of some responses may be CallbackCanceled.
+     *
+     * If neither cancelPendingRequests() nor stopRetrying() have been called, schedules retries for
+     * any remotes that have had a retriable error and have not exhausted their retries.
+     *
+     * Note: Must only be called from one thread at a time, and invalid to call if done() is true.
+     */
+    Response next();
+
+    /**
+     * Stops the ARS from retrying requests.
      *
      * Use this if you no longer care about getting success responses, but need to do cleanup based
      * on responses for requests that have already been dispatched.
      */
-    void interrupt();
-
-    /**
-     * Cancels all outstanding requests and makes waitForResponses() return immediately.
-     *
-     * Use this if you no longer care about getting success responses, and don't need to process
-     * responses for outstanding requests.
-     */
-    void kill();
+    void stopRetrying();
 
 private:
-    /**
-     * Returns true if each remote has received a response or error. (If kill() has been called,
-     * the error is the error assigned by the TaskExecutor when a callback is canceled).
-     */
-    bool _done();
-
-    /**
-     * Executes the logic of _done().
-     */
-    bool _done_inlock();
-
-    /**
-     * Replaces _notification with a new notification.
-     *
-     * If _stopRetrying is false, for each remote that does not have a response or outstanding
-     * request, schedules work to send the command to the remote.
-     *
-     * Invalid to call if there is an existing Notification and it has not yet been signaled.
-     */
-    void _scheduleRequestsIfNeeded(OperationContext* txn);
-
-    /**
-     * Helper to schedule a command to a remote.
-     *
-     * The 'remoteIndex' gives the position of the remote node from which we are retrieving the
-     * batch in '_remotes'.
-     *
-     * Returns success if the command to retrieve the next batch was scheduled successfully.
-     */
-    Status _scheduleRequest_inlock(OperationContext* txn, size_t remoteIndex);
-
-    /**
-     * The callback for a remote command.
-     *
-     * 'remoteIndex' is the position of the relevant remote node in '_remotes', and therefore
-     * indicates which node the response came from and where the response should be buffered.
-     *
-     * On a retriable error, unless _stopRetrying is true, signals the notification so that the
-     * request can be immediately retried.
-     *
-     * On a non-retriable error, if allowPartialResults is false, sets _stopRetrying to true.
-     */
-    void _handleResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
-                         OperationContext* txn,
-                         size_t remoteIndex);
-
-    /**
-     * If the existing notification has not yet been signaled, signals it and marks it as signaled.
-     */
-    void _signalCurrentNotification_inlock();
-
-    /**
-     * Wrapper around signalCurrentNotification_inlock(); only signals the notification if _done()
-     * is true.
-     */
-    void _signalCurrentNotificationIfDone_inlock();
-
     /**
      * We instantiate one of these per remote host.
      */
@@ -205,11 +167,6 @@ private:
          * Creates a new uninitialized remote state with a command to send.
          */
         RemoteData(ShardId shardId, BSONObj cmdObj);
-
-        /**
-         * Returns the resolved host and port on which the remote command was or will be run.
-         */
-        const HostAndPort& getTargetHost() const;
 
         /**
          * Given a read preference, selects a host on which the command should be run.
@@ -222,7 +179,7 @@ private:
         std::shared_ptr<Shard> getShard();
 
         // ShardId of the shard to which the command will be sent.
-        const ShardId shardId;
+        ShardId shardId;
 
         // The command object to send to the remote host.
         BSONObj cmdObj;
@@ -240,18 +197,60 @@ private:
 
         // The callback handle to an outstanding request for this remote.
         executor::TaskExecutor::CallbackHandle cbHandle;
+
+        // Whether this remote's result has been returned.
+        bool done = false;
     };
 
     /**
-     * Used internally to determine if the ARS should attempt to retry any requests. Is set to true
-     * when:
-     * - interrupt() or kill() is called
-     * - allowPartialResults is false and some remote has a non-retriable error (or exhausts its
-     *  retries for a retriable error).
+     * Cancels all outstanding requests on the TaskExecutor and sets the _stopRetrying flag.
      */
-    bool _stopRetrying = false;
+    void _cancelPendingRequests();
 
-    // Not owned here.
+    /**
+     * Replaces _notification with a new notification.
+     *
+     * If _stopRetrying is false, schedules retries for remotes that have had a retriable error.
+     *
+     * If any remote has successfully received a response, returns a Response for it.
+     * If any remote has an error response that can't be retried, returns a Response for it.
+     * Otherwise, returns boost::none.
+     */
+    boost::optional<Response> _ready();
+
+    /**
+     * For each remote that had a response, checks if it had a retriable error, and clears its
+     * response if so.
+     *
+     * For each remote without a response or pending request, schedules the remote request.
+     *
+     * On failure to schedule a request, signals the notification.
+     */
+    void _scheduleRequests_inlock();
+
+    /**
+     * Helper to schedule a command to a remote.
+     *
+     * The 'remoteIndex' gives the position of the remote node from which we are retrieving the
+     * batch in '_remotes'.
+     *
+     * Returns success if the command was scheduled successfully.
+     */
+    Status _scheduleRequest_inlock(size_t remoteIndex);
+
+    /**
+     * The callback for a remote command.
+     *
+     * 'remoteIndex' is the position of the relevant remote node in '_remotes', and therefore
+     * indicates which node the response came from and where the response should be buffered.
+     *
+     * Stores the response or error in the remote and signals the notification.
+     */
+    void _handleResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
+                         size_t remoteIndex);
+
+    OperationContext* _opCtx;
+
     executor::TaskExecutor* _executor;
 
     // The metadata obj to pass along with the command remote. Used to indicate that the command is
@@ -264,20 +263,28 @@ private:
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;
 
-    // If set to true, allows for skipping over hosts that have non-retriable errors or exhaust
-    // their retries.
-    bool _allowPartialResults = false;
+    // Is set to a non-OK status if the client operation is interrupted.
+    // When waiting for a remote to be ready, we only check for interrupt if the _interruptStatus
+    // has not already been set to an error (so we can wait for callbacks for (canceled) outstanding
+    // requests to complete after interrupt).
+    // When processing responses from remotes, if _interruptStatus is non-OK and the response status
+    // is CallbackCanceled, we promote the response status to the _interruptStatus.
+    Status _interruptStatus = Status::OK();
 
-    // Must be acquired before accessing any data members.
+    // Must be acquired before accessing the below data members.
     // Must also be held when calling any of the '_inlock()' helper functions.
     stdx::mutex _mutex;
 
     // Data tracking the state of our communication with each of the remote nodes.
     std::vector<RemoteData> _remotes;
 
-    // A notification that gets signaled when a remote has a retriable error or the last outstanding
-    // response is received.
+    // A notification that gets signaled when a remote is ready for processing (i.e., we failed to
+    // schedule a request to it or received a response from it).
     boost::optional<Notification<void>> _notification;
+
+    // Used to determine if the ARS should attempt to retry any requests. Is set to true when
+    // stopRetrying() or cancelPendingRequests() is called.
+    bool _stopRetrying = false;
 };
 
 }  // namespace mongo

@@ -45,21 +45,22 @@ public:
         return true;
     }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const final {
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
         BSONObjBuilder result;
 
-        auto shardingState = ShardingState::get(txn);
+        auto shardingState = ShardingState::get(opCtx);
         if (shardingState->enabled() &&
             serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             result.append("configsvrConnectionString",
-                          shardingState->getConfigServer(txn).toString());
+                          shardingState->getConfigServer(opCtx).toString());
 
-            Grid::get(txn)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+            Grid::get(opCtx)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
 
             // Get a migration status report if a migration is active for which this is the source
             // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the
             // namespace of the active migration if there is one that is active.
-            BSONObj migrationStatus = ShardingState::get(txn)->getActiveMigrationStatusReport(txn);
+            BSONObj migrationStatus =
+                ShardingState::get(opCtx)->getActiveMigrationStatusReport(opCtx);
             if (!migrationStatus.isEmpty()) {
                 result.append("migrations", migrationStatus);
             }

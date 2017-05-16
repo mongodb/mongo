@@ -104,7 +104,7 @@ public:
           _s(this),
           _tracker(nullptr),
           _doneCalled(false) {
-        invariant(_b.len() >= BSONObj::kMinBSONLength);
+        invariant(_b.len() - offset >= BSONObj::kMinBSONLength);
         _b.setlen(_b.len() - 1);  // get rid of the previous EOO.
         // Reserve space for our EOO.
         _b.reserveBytes(1);
@@ -122,6 +122,17 @@ public:
 
         // Reserve space for the EOO byte. This means _done() can't fail.
         _b.reserveBytes(1);
+    }
+
+    // Move constructible, but not assignable due to reference member.
+    BSONObjBuilder(BSONObjBuilder&& other)
+        : _b(&other._b == &other._buf ? _buf : other._b),
+          _buf(std::move(other._buf)),
+          _offset(std::move(other._offset)),
+          _s(this),  // Don't move from other._s because that will leave it pointing to other.
+          _tracker(std::move(other._tracker)),
+          _doneCalled(std::move(other._doneCalled)) {
+        other.abandon();
     }
 
     ~BSONObjBuilder() {
@@ -766,8 +777,6 @@ private:
 };
 
 class BSONArrayBuilder {
-    MONGO_DISALLOW_COPYING(BSONArrayBuilder);
-
 public:
     BSONArrayBuilder() : _i(0), _b() {}
     BSONArrayBuilder(BufBuilder& _b) : _i(0), _b(_b) {}

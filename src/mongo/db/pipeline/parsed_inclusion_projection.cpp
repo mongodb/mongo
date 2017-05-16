@@ -54,7 +54,8 @@ void InclusionNode::optimize() {
     }
 }
 
-void InclusionNode::serialize(MutableDocument* output, bool explain) const {
+void InclusionNode::serialize(MutableDocument* output,
+                              boost::optional<ExplainOptions::Verbosity> explain) const {
     // Always put "_id" first if it was included (implicitly or explicitly).
     if (_inclusions.find("_id") != _inclusions.end()) {
         output->addField("_id", Value(true));
@@ -77,7 +78,7 @@ void InclusionNode::serialize(MutableDocument* output, bool explain) const {
         } else {
             auto expressionIt = _expressions.find(field);
             invariant(expressionIt != _expressions.end());
-            output->addField(field, expressionIt->second->serialize(explain));
+            output->addField(field, expressionIt->second->serialize(static_cast<bool>(explain)));
         }
     }
 }
@@ -102,7 +103,7 @@ void InclusionNode::addDependencies(DepsTracker* deps) const {
     }
 }
 
-void InclusionNode::applyInclusions(Document inputDoc, MutableDocument* outputDoc) const {
+void InclusionNode::applyInclusions(const Document& inputDoc, MutableDocument* outputDoc) const {
     auto it = inputDoc.fieldIterator();
     while (it.more()) {
         auto fieldPair = it.next();
@@ -140,29 +141,29 @@ Value InclusionNode::applyInclusionsToValue(Value inputValue) const {
     }
 }
 
-void InclusionNode::addComputedFields(MutableDocument* outputDoc, Variables* vars) const {
+void InclusionNode::addComputedFields(MutableDocument* outputDoc, const Document& root) const {
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
             outputDoc->setField(field,
-                                childIt->second->addComputedFields(outputDoc->peek()[field], vars));
+                                childIt->second->addComputedFields(outputDoc->peek()[field], root));
         } else {
             auto expressionIt = _expressions.find(field);
             invariant(expressionIt != _expressions.end());
-            outputDoc->setField(field, expressionIt->second->evaluate(vars));
+            outputDoc->setField(field, expressionIt->second->evaluate(root));
         }
     }
 }
 
-Value InclusionNode::addComputedFields(Value inputValue, Variables* vars) const {
+Value InclusionNode::addComputedFields(Value inputValue, const Document& root) const {
     if (inputValue.getType() == BSONType::Object) {
         MutableDocument outputDoc(inputValue.getDocument());
-        addComputedFields(&outputDoc, vars);
+        addComputedFields(&outputDoc, root);
         return outputDoc.freezeToValue();
     } else if (inputValue.getType() == BSONType::Array) {
         std::vector<Value> values = inputValue.getArray();
         for (auto it = values.begin(); it != values.end(); ++it) {
-            *it = addComputedFields(*it, vars);
+            *it = addComputedFields(*it, root);
         }
         return Value(std::move(values));
     } else {
@@ -171,7 +172,7 @@ Value InclusionNode::addComputedFields(Value inputValue, Variables* vars) const 
             // document of all the computed values. This case represents applying a projection like
             // {"a.b": {$literal: 1}} to the document {a: 1}. This should yield {a: {b: 1}}.
             MutableDocument outputDoc;
-            addComputedFields(&outputDoc, vars);
+            addComputedFields(&outputDoc, root);
             return outputDoc.freezeToValue();
         }
         // We didn't have any expressions, so just return the missing value.
@@ -238,12 +239,33 @@ void InclusionNode::addPreservedPaths(std::set<std::string>* preservedPaths) con
     }
 }
 
-void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths) const {
+void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths,
+                                     StringMap<std::string>* renamedPaths) const {
     for (auto&& computedPair : _expressions) {
+        auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(computedPair.second.get());
+        if (exprFieldPath) {
+            const auto& fieldPath = exprFieldPath->getFieldPath();
+            // Make sure that the first path component is CURRENT/ROOT. If this is not explicitly
+            // provided by the user, we expect the system to have filled it in as the first path
+            // component.
+            //
+            // TODO SERVER-27115: Support field paths that have multiple components.
+            if (exprFieldPath->getVariableId() == Variables::kRootId &&
+                fieldPath.getPathLength() == 2u) {
+                // Found a renamed path. Record it and continue, since we don't want to also put
+                // renamed paths inside the 'computedPaths' set.
+                std::string oldPath = fieldPath.tail().fullPath();
+                std::string newPath =
+                    FieldPath::getFullyQualifiedPath(_pathToNode, computedPair.first);
+                (*renamedPaths)[std::move(newPath)] = std::move(oldPath);
+                continue;
+            }
+        }
+
         computedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, computedPair.first));
     }
     for (auto&& childPair : _children) {
-        childPair.second->addComputedPaths(computedPaths);
+        childPair.second->addComputedPaths(computedPaths, renamedPaths);
     }
 }
 
@@ -251,9 +273,7 @@ void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths) const
 // ParsedInclusionProjection
 //
 
-void ParsedInclusionProjection::parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      const BSONObj& spec,
-                                      const VariablesParseState& variablesParseState) {
+void ParsedInclusionProjection::parse(const BSONObj& spec) {
     // It is illegal to specify a projection with no output fields.
     bool atLeastOneFieldInOutput = false;
 
@@ -289,7 +309,7 @@ void ParsedInclusionProjection::parse(const boost::intrusive_ptr<ExpressionConte
             }
             case BSONType::Object: {
                 // This is either an expression, or a nested specification.
-                if (parseObjectAsExpression(expCtx, fieldName, elem.Obj(), variablesParseState)) {
+                if (parseObjectAsExpression(fieldName, elem.Obj(), _expCtx->variablesParseState)) {
                     // It was an expression.
                     break;
                 }
@@ -306,14 +326,14 @@ void ParsedInclusionProjection::parse(const boost::intrusive_ptr<ExpressionConte
                 // iteration too soon. Add the last path here.
                 child = child->addOrGetChild(remainingPath.fullPath());
 
-                parseSubObject(expCtx, elem.Obj(), variablesParseState, child);
+                parseSubObject(elem.Obj(), _expCtx->variablesParseState, child);
                 break;
             }
             default: {
                 // This is a literal value.
                 _root->addComputedField(
                     FieldPath(elem.fieldName()),
-                    Expression::parseOperand(expCtx, elem, variablesParseState));
+                    Expression::parseOperand(_expCtx, elem, _expCtx->variablesParseState));
             }
         }
     }
@@ -329,14 +349,12 @@ void ParsedInclusionProjection::parse(const boost::intrusive_ptr<ExpressionConte
             atLeastOneFieldInOutput);
 }
 
-Document ParsedInclusionProjection::applyProjection(Document inputDoc, Variables* vars) const {
+Document ParsedInclusionProjection::applyProjection(const Document& inputDoc) const {
     // All expressions will be evaluated in the context of the input document, before any
     // transformations have been applied.
-    vars->setRoot(inputDoc);
-
     MutableDocument output;
     _root->applyInclusions(inputDoc, &output);
-    _root->addComputedFields(&output, vars);
+    _root->addComputedFields(&output, inputDoc);
 
     // Always pass through the metadata.
     output.copyMetaDataFrom(inputDoc);
@@ -344,7 +362,6 @@ Document ParsedInclusionProjection::applyProjection(Document inputDoc, Variables
 }
 
 bool ParsedInclusionProjection::parseObjectAsExpression(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     StringData pathToObject,
     const BSONObj& objSpec,
     const VariablesParseState& variablesParseState) {
@@ -353,17 +370,15 @@ bool ParsedInclusionProjection::parseObjectAsExpression(
         // field.
         invariant(objSpec.nFields() == 1);
         _root->addComputedField(pathToObject,
-                                Expression::parseExpression(expCtx, objSpec, variablesParseState));
+                                Expression::parseExpression(_expCtx, objSpec, variablesParseState));
         return true;
     }
     return false;
 }
 
-void ParsedInclusionProjection::parseSubObject(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const BSONObj& subObj,
-    const VariablesParseState& variablesParseState,
-    InclusionNode* node) {
+void ParsedInclusionProjection::parseSubObject(const BSONObj& subObj,
+                                               const VariablesParseState& variablesParseState,
+                                               InclusionNode* node) {
     for (auto elem : subObj) {
         invariant(elem.fieldName()[0] != '$');
         // Dotted paths in a sub-object have already been disallowed in
@@ -385,20 +400,20 @@ void ParsedInclusionProjection::parseSubObject(
                 // This is either an expression, or a nested specification.
                 auto fieldName = elem.fieldNameStringData().toString();
                 if (parseObjectAsExpression(
-                        expCtx,
                         FieldPath::getFullyQualifiedPath(node->getPath(), fieldName),
                         elem.Obj(),
                         variablesParseState)) {
                     break;
                 }
                 auto child = node->addOrGetChild(fieldName);
-                parseSubObject(expCtx, elem.Obj(), variablesParseState, child);
+                parseSubObject(elem.Obj(), variablesParseState, child);
                 break;
             }
             default: {
                 // This is a literal value.
-                node->addComputedField(FieldPath(elem.fieldName()),
-                                       Expression::parseOperand(expCtx, elem, variablesParseState));
+                node->addComputedField(
+                    FieldPath(elem.fieldName()),
+                    Expression::parseOperand(_expCtx, elem, variablesParseState));
             }
         }
     }

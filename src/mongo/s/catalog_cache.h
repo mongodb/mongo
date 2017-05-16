@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,19 +28,25 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 
-class DBConfig;
+class CachedDatabaseInfo;
+class CachedCollectionRoutingInfo;
 class OperationContext;
-template <typename T>
-class StatusWith;
+
+static constexpr int kMaxNumStaleVersionRetries = 3;
 
 /**
  * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
@@ -51,7 +57,13 @@ class CatalogCache {
     MONGO_DISALLOW_COPYING(CatalogCache);
 
 public:
+    /**
+     * Defaults to instantiating a ConfigServerCatalogCacheLoader.
+     */
     CatalogCache();
+
+    CatalogCache(std::unique_ptr<CatalogCacheLoader> cacheLoader);
+
     ~CatalogCache();
 
     /**
@@ -62,26 +74,178 @@ public:
      *
      * Returns the database cache entry if the database exists or a failed status otherwise.
      */
-    StatusWith<std::shared_ptr<DBConfig>> getDatabase(OperationContext* txn, StringData dbName);
+    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
-     * Removes the database information for the specified name from the cache, so that the
-     * next time getDatabase is called, it will be reloaded.
+     * Blocking shortcut method to get a specific sharded collection from a given database using the
+     * complete namespace. If the collection is sharded returns a ScopedChunkManager initialized
+     * with ChunkManager. If the collection is not sharded, returns a ScopedChunkManager initialized
+     * with the primary shard for the specified database. If an error occurs loading the metadata
+     * returns a failed status.
      */
-    void invalidate(StringData dbName);
+    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                                     const NamespaceString& nss);
+    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                                     StringData ns);
 
     /**
-     * Purges all cached database information, which will cause the data to be reloaded again.
+     * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed
+     * and returns a NamespaceNotSharded error if the collection is not sharded.
      */
-    void invalidateAll();
+    StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
+    StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
+        OperationContext* opCtx, StringData ns);
+
+    /**
+     * Non-blocking method to be called whenever using the specified routing table has encountered a
+     * stale config exception. Returns immediately and causes the routing table to be refreshed the
+     * next time getCollectionRoutingInfo is called. Does nothing if the routing table has been
+     * refreshed already.
+     */
+    void onStaleConfigError(CachedCollectionRoutingInfo&&);
+
+    /**
+     * Non-blocking method, which indiscriminately causes the routing table for the specified
+     * namespace to be refreshed the next time getCollectionRoutingInfo is called.
+     */
+    void invalidateShardedCollection(const NamespaceString& nss);
+    void invalidateShardedCollection(StringData ns);
+
+    /**
+     * Blocking method, which removes the entire specified database (including its collections) from
+     * the cache.
+     */
+    void purgeDatabase(StringData dbName);
+
+    /**
+     * Blocking method, which removes all databases (including their collections) from the cache.
+     */
+    void purgeAllDatabases();
 
 private:
-    using ShardedDatabasesMap = StringMap<std::shared_ptr<DBConfig>>;
+    // Make the cache entries friends so they can access the private classes below
+    friend class CachedDatabaseInfo;
+    friend class CachedCollectionRoutingInfo;
+
+    /**
+     * Cache entry describing a collection.
+     */
+    struct CollectionRoutingInfoEntry {
+        // Specifies whether this cache entry needs a refresh (in which case routingInfo should not
+        // be relied on) or it doesn't, in which case there should be a non-null routingInfo.
+        bool needsRefresh{true};
+
+        // Contains a notification to be waited on for the refresh to complete (only available if
+        // needsRefresh is true)
+        std::shared_ptr<Notification<Status>> refreshCompletionNotification;
+
+        // Contains the cached routing information (only available if needsRefresh is false)
+        std::shared_ptr<ChunkManager> routingInfo;
+    };
+
+    /**
+     * Cache entry describing a database.
+     */
+    struct DatabaseInfoEntry {
+        ShardId primaryShardId;
+
+        bool shardingEnabled;
+
+        StringMap<CollectionRoutingInfoEntry> collections;
+    };
+
+    using DatabaseInfoMap = StringMap<std::shared_ptr<DatabaseInfoEntry>>;
+
+    /**
+     * Ensures that the specified database is in the cache, loading it if necessary. If the database
+     * was not in cache, all the sharded collections will be in the 'needsRefresh' state.
+     */
+    std::shared_ptr<DatabaseInfoEntry> _getDatabase(OperationContext* opCtx, StringData dbName);
+
+    /**
+     * Non-blocking call which schedules an asynchronous refresh for the specified namespace. The
+     * namespace must be in the 'needRefresh' state.
+     */
+    void _scheduleCollectionRefresh_inlock(std::shared_ptr<DatabaseInfoEntry> dbEntry,
+                                           std::shared_ptr<ChunkManager> existingRoutingInfo,
+                                           const NamespaceString& nss,
+                                           int refreshAttempt);
+
+    // Interface from which chunks will be retrieved
+    const std::unique_ptr<CatalogCacheLoader> _cacheLoader;
 
     // Mutex to serialize access to the structures below
     stdx::mutex _mutex;
 
-    ShardedDatabasesMap _databases;
+    // Map from DB name to the info for that database
+    DatabaseInfoMap _databases;
+};
+
+/**
+ * Constructed exclusively by the CatalogCache, contains a reference to the cached information for
+ * the specified database.
+ */
+class CachedDatabaseInfo {
+public:
+    const ShardId& primaryId() const;
+
+    bool shardingEnabled() const;
+
+private:
+    friend class CatalogCache;
+
+    CachedDatabaseInfo(std::shared_ptr<CatalogCache::DatabaseInfoEntry> db);
+
+    std::shared_ptr<CatalogCache::DatabaseInfoEntry> _db;
+};
+
+/**
+ * Constructed exclusively by the CatalogCache contains a reference to the routing information for
+ * the specified collection.
+ */
+class CachedCollectionRoutingInfo {
+public:
+    /**
+     * Returns the ID of the primary shard for the database owining this collection, regardless of
+     * whether it is sharded or not.
+     */
+    const ShardId& primaryId() const {
+        return _primaryId;
+    }
+
+    /**
+     * If the collection is sharded, returns a chunk manager for it. Otherwise, nullptr.
+     */
+    std::shared_ptr<ChunkManager> cm() const {
+        return _cm;
+    }
+
+    /**
+     * If the collection is not sharded, returns its primary shard. Otherwise, nullptr.
+     */
+    std::shared_ptr<Shard> primary() const {
+        return _primary;
+    }
+
+private:
+    friend class CatalogCache;
+
+    CachedCollectionRoutingInfo(ShardId primaryId, std::shared_ptr<ChunkManager> cm);
+
+    CachedCollectionRoutingInfo(ShardId primaryId,
+                                NamespaceString nss,
+                                std::shared_ptr<Shard> primary);
+
+    // The id of the primary shard containing the database
+    ShardId _primaryId;
+
+    // Reference to the corresponding chunk manager (if sharded) or null
+    std::shared_ptr<ChunkManager> _cm;
+
+    // Reference to the primary of the database (if not sharded) or null
+    NamespaceString _nss;
+    std::shared_ptr<Shard> _primary;
 };
 
 }  // namespace mongo

@@ -39,6 +39,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -56,14 +57,14 @@ namespace {
  * (2) TODO should we do this using N threads? Would be quite easy see Hackenberg paper table
  *  5 and 6. 2 threads might be a good balance.
  */
-void WRITETODATAFILES(OperationContext* txn,
+void WRITETODATAFILES(OperationContext* opCtx,
                       const JSectHeader& h,
                       const AlignedBuilder& uncompressed) {
     Timer t;
 
     LOG(4) << "WRITETODATAFILES BEGIN";
 
-    RecoveryJob::get().processSection(txn, &h, uncompressed.buf(), uncompressed.len(), NULL);
+    RecoveryJob::get().processSection(opCtx, &h, uncompressed.buf(), uncompressed.len(), NULL);
 
     const long long m = t.micros();
     stats.curr()->_writeToDataFilesMicros += m;
@@ -213,7 +214,11 @@ void JournalWriter::_journalWriterThread() {
 
     try {
         while (true) {
-            Buffer* const buffer = _journalQueue.blockingPop();
+            Buffer* const buffer = [&] {
+                MONGO_IDLE_THREAD_BLOCK;
+                return _journalQueue.blockingPop();
+            }();
+
             BufferGuard bufferGuard(buffer, &_readyQueue);
 
             if (buffer->_isShutdown) {

@@ -33,6 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/json.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/time_support.h"
 
@@ -48,19 +49,25 @@ class ReadConcernArgs {
 public:
     static const std::string kReadConcernFieldName;
     static const std::string kAfterOpTimeFieldName;
+    static const std::string kAfterClusterTimeFieldName;
     static const std::string kLevelFieldName;
 
     ReadConcernArgs();
+
     ReadConcernArgs(boost::optional<OpTime> opTime, boost::optional<ReadConcernLevel> level);
 
+    ReadConcernArgs(boost::optional<OpTime> opTime,
+                    boost::optional<LogicalTime> clusterTime,
+                    boost::optional<ReadConcernLevel> level);
     /**
      * Format:
      * {
-     *    find: “coll”,
+     *    find: "coll"
      *    filter: <Query Object>,
      *    readConcern: { // optional
      *      level: "[majority|local|linearizable]",
      *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
+     *      afterClusterTime: <timestamp>,
      *    }
      * }
      */
@@ -81,18 +88,34 @@ public:
     void appendInfo(BSONObjBuilder* builder) const;
 
     /**
-     * Returns whether these arguments are 'empty' in the sense that no read concern has been
-     * requested.
+     * Returns true if any of clusterTime,  opTime or level arguments are set.
      */
     bool isEmpty() const;
 
+    /**
+     *  Returns default kLocalReadConcern if _level is not set.
+     */
     ReadConcernLevel getLevel() const;
-    OpTime getOpTime() const;
+
+    /**
+     * Returns the opTime. Deprecated: will be replaced with getArgsClusterTime.
+     */
+    boost::optional<OpTime> getArgsOpTime() const;
+
+    boost::optional<LogicalTime> getArgsClusterTime() const;
     BSONObj toBSON() const;
     std::string toString() const;
 
 private:
+    /**
+     *  Read data after the OpTime of an operation on this replica set. Deprecated.
+     *  The only user is for read-after-optime calls using the config server optime.
+     */
     boost::optional<OpTime> _opTime;
+    /**
+     *  Read data after cluster-wide logical time.
+     */
+    boost::optional<LogicalTime> _clusterTime;
     boost::optional<ReadConcernLevel> _level;
 };
 

@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-Status appendCollectionStorageStats(OperationContext* txn,
+Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const BSONObj& param,
                                     BSONObjBuilder* result) {
@@ -54,7 +54,7 @@ Status appendCollectionStorageStats(OperationContext* txn,
 
     bool verbose = param["verbose"].trueValue();
 
-    AutoGetCollectionForRead ctx(txn, nss);
+    AutoGetCollectionForReadCommand ctx(opCtx, nss);
     if (!ctx.getDb()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Database [" << nss.db().toString() << "] not found."};
@@ -66,34 +66,34 @@ Status appendCollectionStorageStats(OperationContext* txn,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};
     }
 
-    long long size = collection->dataSize(txn) / scale;
+    long long size = collection->dataSize(opCtx) / scale;
     result->appendNumber("size", size);
-    long long numRecords = collection->numRecords(txn);
+    long long numRecords = collection->numRecords(opCtx);
     result->appendNumber("count", numRecords);
 
     if (numRecords)
-        result->append("avgObjSize", collection->averageObjectSize(txn));
+        result->append("avgObjSize", collection->averageObjectSize(opCtx));
 
     RecordStore* recordStore = collection->getRecordStore();
     result->appendNumber(
         "storageSize",
-        static_cast<long long>(recordStore->storageSize(txn, result, verbose ? 1 : 0)) / scale);
+        static_cast<long long>(recordStore->storageSize(opCtx, result, verbose ? 1 : 0)) / scale);
 
-    recordStore->appendCustomStats(txn, result, scale);
+    recordStore->appendCustomStats(opCtx, result, scale);
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    result->append("nindexes", indexCatalog->numIndexesReady(txn));
+    result->append("nindexes", indexCatalog->numIndexesReady(opCtx));
 
     BSONObjBuilder indexDetails;
 
-    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(txn, false);
+    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(opCtx, false);
     while (i.more()) {
         const IndexDescriptor* descriptor = i.next();
         IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
         invariant(iam);
 
         BSONObjBuilder bob;
-        if (iam->appendCustomStats(txn, &bob, scale)) {
+        if (iam->appendCustomStats(opCtx, &bob, scale)) {
             indexDetails.append(descriptor->indexName(), bob.obj());
         }
     }
@@ -101,7 +101,7 @@ Status appendCollectionStorageStats(OperationContext* txn,
     result->append("indexDetails", indexDetails.obj());
 
     BSONObjBuilder indexSizes;
-    long long indexSize = collection->getIndexSize(txn, &indexSizes, scale);
+    long long indexSize = collection->getIndexSize(opCtx, &indexSizes, scale);
 
     result->appendNumber("totalIndexSize", indexSize / scale);
     result->append("indexSizes", indexSizes.obj());

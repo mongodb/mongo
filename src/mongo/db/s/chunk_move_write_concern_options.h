@@ -60,7 +60,7 @@ public:
      *    concern.
      */
     static StatusWith<WriteConcernOptions> getEffectiveWriteConcern(
-        OperationContext* txn, const MigrationSecondaryThrottleOptions& options);
+        OperationContext* opCtx, const MigrationSecondaryThrottleOptions& options);
 };
 
 }  // namespace mongo

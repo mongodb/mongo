@@ -101,23 +101,7 @@ auth_handler.add_password(
     user=username,
     passwd=password)
 
-# This version of HTTPErrorProcessor is copied from
-# Python 2.7, and allows REST response codes (e.g.
-# "201 Created") which are treated as errors by
-# older versions.
-class HTTPErrorProcessor(urllib2.HTTPErrorProcessor):
-    def http_response(self, request, response):
-        code, msg, hdrs = response.code, response.msg, response.info()
-
-        # According to RFC 2616, "2xx" code indicates that the client's
-        # request was successfully received, understood, and accepted.
-        if not (200 <= code < 300):
-            response = self.parent.error(
-                'http', request, response, code, msg, hdrs)
-
-        return response
-
-url_opener = urllib2.build_opener(auth_handler, HTTPErrorProcessor())
+url_opener = urllib2.build_opener(auth_handler, urllib2.HTTPErrorProcessor())
 
 def url(endpoint):
     if not endpoint.endswith('/'):

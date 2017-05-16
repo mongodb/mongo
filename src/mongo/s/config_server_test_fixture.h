@@ -34,6 +34,7 @@ namespace mongo {
 
 class BSONObj;
 class ChunkType;
+class KeysCollectionDocument;
 class NamespaceString;
 class Shard;
 class ShardingCatalogClient;
@@ -57,14 +58,14 @@ public:
     /**
      * Insert a document to this config server to the specified namespace.
      */
-    Status insertToConfigCollection(OperationContext* txn,
+    Status insertToConfigCollection(OperationContext* opCtx,
                                     const NamespaceString& ns,
                                     const BSONObj& doc);
 
     /**
      * Reads a single document from a collection living on the config server.
      */
-    StatusWith<BSONObj> findOneOnConfigCollection(OperationContext* txn,
+    StatusWith<BSONObj> findOneOnConfigCollection(OperationContext* opCtx,
                                                   const NamespaceString& ns,
                                                   const BSONObj& filter);
 
@@ -77,7 +78,7 @@ public:
      * Retrieves the shard document from the config server.
      * Returns {ErrorCodes::ShardNotFound} if the given shard does not exists.
      */
-    StatusWith<ShardType> getShardDoc(OperationContext* txn, const std::string& shardId);
+    StatusWith<ShardType> getShardDoc(OperationContext* opCtx, const std::string& shardId);
 
     /**
      * Setup the config.chunks collection to contain the given chunks.
@@ -87,12 +88,12 @@ public:
     /**
      * Retrieves the chunk document from the config server.
      */
-    StatusWith<ChunkType> getChunkDoc(OperationContext* txn, const BSONObj& minKey);
+    StatusWith<ChunkType> getChunkDoc(OperationContext* opCtx, const BSONObj& minKey);
 
     /**
      * Returns the indexes definitions defined on a given collection.
      */
-    StatusWith<std::vector<BSONObj>> getIndexes(OperationContext* txn, const NamespaceString& ns);
+    StatusWith<std::vector<BSONObj>> getIndexes(OperationContext* opCtx, const NamespaceString& ns);
 
     /**
      * Returns the stored raw pointer to the addShard TaskExecutor's NetworkInterface.
@@ -108,6 +109,11 @@ public:
      * Same as ShardingMongodTestFixture::onCommand but run against _addShardNetworkTestEnv.
      */
     void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
+
+    /**
+     * Returns all the keys in admin.system.keys
+     */
+    std::vector<KeysCollectionDocument> getKeys(OperationContext* opCtx);
 
 protected:
     /**
@@ -126,7 +132,10 @@ protected:
     std::unique_ptr<ShardingCatalogManager> makeShardingCatalogManager(
         ShardingCatalogClient* catalogClient) override;
 
-    std::unique_ptr<CatalogCache> makeCatalogCache() override;
+    std::unique_ptr<CatalogCacheLoader> makeCatalogCacheLoader() override;
+
+    std::unique_ptr<CatalogCache> makeCatalogCache(
+        std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) override;
 
     std::unique_ptr<ClusterCursorManager> makeClusterCursorManager() override;
 

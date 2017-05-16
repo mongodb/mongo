@@ -38,14 +38,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/databases_cloner.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
 
 /**
- * Holder of state for initial sync (DataReplicator).
+ * Holder of state for initial sync (InitialSyncer).
  */
 struct InitialSyncState {
     InitialSyncState(std::unique_ptr<DatabasesCloner> cloner) : dbsCloner(std::move(cloner)){};

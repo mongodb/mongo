@@ -76,7 +76,7 @@ public:
      * This is necessary when doing no-op writes, as we need to set the client's lastOp to a proper
      * value for write concern wait to work.
      */
-    void setLastOpToSystemLastOpTime(OperationContext* txn);
+    void setLastOpToSystemLastOpTime(OperationContext* opCtx);
 
 private:
     static const long long kUninitializedTerm = -1;

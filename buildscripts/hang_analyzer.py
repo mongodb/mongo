@@ -27,6 +27,12 @@ import tempfile
 import time
 from distutils import spawn
 from optparse import OptionParser
+_is_windows = (sys.platform == "win32")
+
+if _is_windows:
+    import win32event
+    import win32api
+
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -37,7 +43,8 @@ if __name__ == "__main__" and __package__ is None:
 def call(a, logger):
     logger.info(str(a))
 
-    process = subprocess.Popen(a, stdout=subprocess.PIPE)
+    # Use a common pipe for stdout & stderr for logging.
+    process = subprocess.Popen(a, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     logger_pipe = core.pipe.LoggerPipe(logger, logging.INFO, process.stdout)
     logger_pipe.wait_until_started()
 
@@ -49,45 +56,10 @@ def call(a, logger):
         raise Exception()
 
 
-# Copied from python 2.7 version of subprocess.py
-def check_output(*popenargs, **kwargs):
-    r"""Run command with arguments and return its output as a byte string.
-
-    If the exit code was non-zero it raises a CalledProcessError.  The
-    CalledProcessError object will have the return code in the returncode
-    attribute and output in the output attribute.
-
-    The arguments are the same as for the Popen constructor.  Example:
-
-    >>> check_output(["ls", "-l", "/dev/null"])
-    'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
-
-    The stdout argument is not allowed as it is used internally.
-    To capture standard error in the result, use stderr=STDOUT.
-
-    >>> check_output(["/bin/sh", "-c",
-    ...               "ls -l non_existent_file ; exit 0"],
-    ...              stderr=STDOUT)
-    'ls: non_existent_file: No such file or directory\n'
-    """
-    if 'stdout' in kwargs:
-        raise ValueError('stdout argument not allowed, it will be overridden.')
-    process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-    output, unused_err = process.communicate()
-    retcode = process.poll()
-    if retcode:
-        cmd = kwargs.get("args")
-        if cmd is None:
-            cmd = popenargs[0]
-        raise CalledProcessError(retcode, cmd, output=output)
-
-    return output
-
-
 def callo(a, logger):
     logger.info("%s" % str(a))
 
-    return check_output(a)
+    return subprocess.check_output(a)
 
 
 def find_program(prog, paths):
@@ -108,6 +80,7 @@ def find_program(prog, paths):
 def get_process_logger(debugger_output, pid, process_name):
     """Returns the process logger from options specified."""
     process_logger = logging.Logger("process", level=logging.DEBUG)
+    process_logger.mongo_process_filename = None
 
     if 'stdout' in debugger_output:
         handler = logging.StreamHandler(sys.stdout)
@@ -115,9 +88,9 @@ def get_process_logger(debugger_output, pid, process_name):
         process_logger.addHandler(handler)
 
     if 'file' in debugger_output:
-        handler = logging.FileHandler(
-            filename="debugger_%s_%d.log" % (os.path.splitext(process_name)[0], pid),
-            mode="w")
+        filename = "debugger_%s_%d.log" % (os.path.splitext(process_name)[0], pid)
+        process_logger.mongo_process_filename = filename
+        handler = logging.FileHandler(filename=filename, mode="w")
         handler.setFormatter(logging.Formatter(fmt="%(message)s"))
         process_logger.addHandler(handler)
 
@@ -335,25 +308,77 @@ class GDBDumper(object):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         root_logger.info("dir %s" % script_dir)
         gdb_dir = os.path.join(script_dir, "gdb")
-        printers_script = os.path.join(gdb_dir, "mongo.py")
+        mongo_script = os.path.join(gdb_dir, "mongo.py")
+        mongo_printers_script = os.path.join(gdb_dir, "mongo_printers.py")
+        mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
+
+        source_mongo = "source %s" % mongo_script
+        source_mongo_printers = "source %s" % mongo_printers_script
+        source_mongo_lock = "source %s" % mongo_lock_script
+        mongodb_dump_locks = "mongodb-dump-locks"
+        mongodb_show_locks = "mongodb-show-locks"
+        mongodb_uniqstack = "mongodb-uniqstack mongodb-bt-if-active"
+        mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
+            (process_name, pid)
+        mongodb_javascript_stack = "mongodb-javascript-stack"
+
+        # The following MongoDB python extensions do not run on Solaris.
+        if sys.platform.startswith("sunos"):
+            source_mongo_lock = ""
+            # SERVER-28234 - GDB frame information not available on Solaris for a templatized
+            # function
+            mongodb_dump_locks = ""
+
+            # SERVER-28373 - GDB thread-local variables not available on Solaris
+            mongodb_show_locks = ""
+            mongodb_waitsfor_graph = ""
+            mongodb_javascript_stack = ""
+
+        if not logger.mongo_process_filename:
+            raw_stacks_commands = []
+        else:
+            base, ext = os.path.splitext(logger.mongo_process_filename)
+            raw_stacks_filename = base + '_raw_stacks' + ext
+            raw_stacks_commands = [
+                    'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
+                    # This sends output to log file rather than stdout until we turn logging off.
+                    'set logging redirect on',
+                    'set logging file ' + raw_stacks_filename,
+                    'set logging on',
+                    'thread apply all bt',
+                    'set logging off',
+                    ]
 
         cmds = [
-            "set pagination off",
+            "set interactive-mode off",
+            "set print thread-events off",  # Python calls to gdb.parse_and_eval may cause threads
+                                            # to start and finish. This suppresses those messages
+                                            # from appearing in the return output.
+            "file %s" % process_name,       # Solaris must load the process to read the symbols.
             "attach %d" % pid,
             "info sharedlibrary",
-            "info threads",  # Dump a simple list of commands to get the thread name
+            "info threads",                 # Dump a simple list of commands to get the thread name
             "set python print-stack full",
-            "source " + printers_script,
-            "thread apply all bt",
+            ] + raw_stacks_commands + [
+            source_mongo,
+            source_mongo_printers,
+            source_mongo_lock,
+            mongodb_uniqstack,
+            "set scheduler-locking on",     # Lock the scheduler, before running any of the
+                                            # following commands, which executes code in the
+                                            # attached process.
             dump_command,
-            "mongodb-analyze",
+            mongodb_dump_locks,
+            mongodb_show_locks,
+            mongodb_waitsfor_graph,
+            mongodb_javascript_stack,
             "set confirm off",
             "quit",
             ]
 
         call([dbg, "--quiet", "--nx"] +
-            list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
-            logger)
+             list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
+             logger)
 
         root_logger.info("Done analyzing %s process with PID %d" % (process_name, pid))
 
@@ -431,7 +456,9 @@ class JstackDumper(object):
             logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing" % (jstack, process_name, pid))
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (jstack,
+                                                                            process_name,
+                                                                            pid))
 
         call([jstack, "-l", str(pid)], logger)
 
@@ -459,7 +486,7 @@ def get_hang_analyzers():
         dbg = GDBDumper()
         jstack = JstackDumper()
         ps = SolarisProcessList()
-    elif os.name == 'nt' or (os.name == "posix" and sys.platform == "cygwin"):
+    elif _is_windows or sys.platform == "cygwin":
         dbg = WindowsDumper()
         jstack = JstackWindowsDumper()
         ps = WindowsProcessList()
@@ -483,6 +510,33 @@ def check_dump_quota(quota, ext):
     return (size_sum <= quota)
 
 
+def signal_event_object(logger, pid):
+    """Signal the Windows event object"""
+
+    # Use unique event_name created.
+    event_name = "Global\\Mongo_Python_" + str(pid)
+
+    try:
+        desired_access = win32event.EVENT_MODIFY_STATE
+        inherit_handle = False
+        task_timeout_handle = win32event.OpenEvent(desired_access,
+                                                   inherit_handle,
+                                                   event_name)
+    except win32event.error as err:
+        logger.info("Exception from win32event.OpenEvent with error: %s" % err)
+        return
+
+    try:
+        win32event.SetEvent(task_timeout_handle)
+    except win32event.error as err:
+        logger.info("Exception from win32event.SetEvent with error: %s" % err)
+    finally:
+        win32api.CloseHandle(task_timeout_handle)
+
+    logger.info("Waiting for process to report")
+    time.sleep(5)
+
+
 def signal_process(logger, pid, signalnum):
     """Signal process with signal, N/A on Windows"""
     try:
@@ -495,6 +549,15 @@ def signal_process(logger, pid, signalnum):
 
     except AttributeError:
         logger.error("Cannot send signal to a process on Windows")
+
+
+def pname_match(match_type, pname, interesting_processes):
+    pname = os.path.splitext(pname)[0]
+    for ip in interesting_processes:
+        if (match_type == 'exact' and pname == ip or
+           match_type == 'contains' and ip in pname):
+            return True
+    return False
 
 
 # Basic procedure
@@ -512,8 +575,13 @@ def main():
     root_logger.info("OS: %s" % platform.platform())
 
     try:
-        distro = platform.linux_distribution()
-        root_logger.info("Linux Distribution: %s" % str(distro))
+        if _is_windows or sys.platform == "cygwin":
+            distro = platform.win32_ver()
+            root_logger.info("Windows Distribution: %s" % str(distro))
+        else:
+            distro = platform.linux_distribution()
+            root_logger.info("Linux Distribution: %s" % str(distro))
+
     except AttributeError:
         root_logger.warning("Cannot determine Linux distro since Python is too old")
 
@@ -532,37 +600,46 @@ def main():
     process_ids = []
 
     parser = OptionParser(description=__doc__)
+    parser.add_option('-m', '--process-match',
+                      dest='process_match',
+                      choices=['contains', 'exact'],
+                      default='contains',
+                      help="Type of match for process names (-p & -g), specify 'contains', or"
+                           " 'exact'. Note that the process name match performs the following"
+                           " conversions: change all process names to lowecase, strip off the file"
+                           " extension, like '.exe' on Windows. Default is 'contains'.")
     parser.add_option('-p', '--process-names',
-        dest='process_names',
-        help='Comma separated list of process names to analyze')
+                      dest='process_names',
+                      help='Comma separated list of process names to analyze')
     parser.add_option('-g', '--go-process-names',
-        dest='go_process_names',
-        help='Comma separated list of go process names to analyze')
+                      dest='go_process_names',
+                      help='Comma separated list of go process names to analyze')
     parser.add_option('-d', '--process-ids',
-        dest='process_ids',
-        default=None,
-        help='Comma separated list of process ids (PID) to analyze, overrides -p & -g')
+                      dest='process_ids',
+                      default=None,
+                      help='Comma separated list of process ids (PID) to analyze, overrides -p &'
+                           ' -g')
     parser.add_option('-c', '--dump-core',
-        dest='dump_core',
-        action="store_true",
-        default=False,
-        help='Dump core file for each analyzed process')
+                      dest='dump_core',
+                      action="store_true",
+                      default=False,
+                      help='Dump core file for each analyzed process')
     parser.add_option('-s', '--max-core-dumps-size',
-        dest='max_core_dumps_size',
-        default=10000,
-        help='Maximum total size of core dumps to keep in megabytes')
+                      dest='max_core_dumps_size',
+                      default=10000,
+                      help='Maximum total size of core dumps to keep in megabytes')
     parser.add_option('-o', '--debugger-output',
-        dest='debugger_output',
-        action="append",
-        choices=['file', 'stdout'],
-        default=None,
-        help="If 'stdout', then the debugger's output is written to the Python"
-            " process's stdout. If 'file', then the debugger's output is written"
-            " to a file named debugger_<process>_<pid>.log for each process it"
-            " attaches to. This option can be specified multiple times on the"
-            " command line to have the debugger's output written to multiple"
-            " locations. By default, the debugger's output is written only to the"
-            " Python process's stdout.")
+                      dest='debugger_output',
+                      action="append",
+                      choices=['file', 'stdout'],
+                      default=None,
+                      help="If 'stdout', then the debugger's output is written to the Python"
+                           " process's stdout. If 'file', then the debugger's output is written"
+                           " to a file named debugger_<process>_<pid>.log for each process it"
+                           " attaches to. This option can be specified multiple times on the"
+                           " command line to have the debugger's output written to multiple"
+                           " locations. By default, the debugger's output is written only to the"
+                           " Python process's stdout.")
 
     (options, args) = parser.parse_args()
 
@@ -588,6 +665,10 @@ def main():
 
     all_processes = ps.dump_processes(root_logger)
 
+    # Canonicalize the process names to lowercase to handle cases where the name of the Python
+    # process is /System/Library/.../Python on OS X and -p python is specified to hang_analyzer.py.
+    all_processes = [(pid, process_name.lower()) for (pid, process_name) in all_processes]
+
     # Find all running interesting processes:
     #   If a list of process_ids is supplied, match on that.
     #   Otherwise, do a substring match on interesting_processes.
@@ -602,8 +683,9 @@ def main():
                                 list(missing_pids))
     else:
         processes = [(pid, pname) for (pid, pname) in all_processes
-                     if any(pname.find(ip) >= 0 for ip in interesting_processes) and
+                     if pname_match(options.process_match, pname, interesting_processes) and
                      pid != os.getpid()]
+
     root_logger.info("Found %d interesting processes %s" % (len(processes), processes))
 
     max_dump_size_bytes = int(options.max_core_dumps_size) * 1024 * 1024
@@ -629,20 +711,22 @@ def main():
     # TerminateProcess.
     # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn in go_processes]:
-        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" % (process_name, pid))
+        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" %
+            (process_name, pid))
         signal_process(root_logger, pid, signal.SIGABRT)
 
-    # Dump python processes after signalling them.
+    # Dump python processes by signalling them.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
-        root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" % (process_name, pid))
-        signal_process(root_logger, pid, signal.SIGUSR1)
-        process_logger = get_process_logger(options.debugger_output, pid, process_name)
-        dbg.dump_info(
-            root_logger,
-            process_logger,
-            pid,
-            process_name,
-            take_dump=False)
+        # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
+        # a signal handler to wait for the signal since it supports POSIX signals.
+        if _is_windows:
+            root_logger.info("Calling SetEvent to signal python process %s with PID %d" %
+                (process_name, pid))
+            signal_event_object(root_logger, pid)
+        else:
+            root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" %
+                (process_name, pid))
+            signal_process(root_logger, pid, signal.SIGUSR1)
 
     root_logger.info("Done analyzing all processes for hangs")
 

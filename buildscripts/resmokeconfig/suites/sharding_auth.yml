@@ -26,8 +26,7 @@ selector:
     - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713
     - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js       # SERVER-21713
     - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
-    # TODO: Enable when SERVER-22672 is complete
-    - jstests/sharding/printShardingStatus.js
+    - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
 
 executor:
   js_test:

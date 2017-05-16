@@ -8,12 +8,11 @@
 
     var mongos = st.s;
     var admin = mongos.getDB("admin");
-    var shards = mongos.getDB("config").shards.find().toArray();
     var coll = mongos.getCollection("foo.bar");
 
     // Enable sharding of the collection
     assert.commandWorked(mongos.adminCommand({enablesharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
+    st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
     assert.commandWorked(mongos.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
 
     var numChunks = 30;
@@ -43,7 +42,7 @@
     // Move a bunch of chunks, but don't close the cursor so they stack.
     for (var i = 0; i < numChunks; i++) {
         assert.commandWorked(
-            mongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: shards[1]._id}));
+            mongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: st.shard1.shardName}));
     }
 
     jsTest.log("Dropping and re-creating collection...");

@@ -85,10 +85,9 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& db,
              BSONObj& cmdObj,
-             int options,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         const bool includeAll = cmdObj["$all"].trueValue();
@@ -103,9 +102,12 @@ public:
             i.next();  // skip {currentOp: 1} which is required to be the first element
             while (i.more()) {
                 BSONElement e = i.next();
-                if (str::equals("$all", e.fieldName())) {
+                const auto fieldName = e.fieldNameStringData();
+                if (fieldName == "$all") {
                     continue;
-                } else if (str::equals("$ownOps", e.fieldName())) {
+                } else if (fieldName == "$ownOps") {
+                    continue;
+                } else if (Command::isGenericArgument(fieldName)) {
                     continue;
                 }
 
@@ -117,22 +119,22 @@ public:
         std::vector<BSONObj> inprogInfos;
         BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
 
-        for (ServiceContext::LockedClientsCursor cursor(txn->getClient()->getServiceContext());
+        for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
              Client* client = cursor.next();) {
             invariant(client);
 
             stdx::lock_guard<Client> lk(*client);
 
             if (ownOpsOnly &&
-                !AuthorizationSession::get(txn->getClient())->isCoauthorizedWithClient(client)) {
+                !AuthorizationSession::get(opCtx->getClient())->isCoauthorizedWithClient(client)) {
                 continue;
             }
 
-            const OperationContext* opCtx = client->getOperationContext();
+            const OperationContext* clientOpCtx = client->getOperationContext();
 
             if (!includeAll) {
                 // Skip over inactive connections.
-                if (!opCtx)
+                if (!clientOpCtx)
                     continue;
             }
 
@@ -148,21 +150,24 @@ public:
                 if (!appName.empty()) {
                     infoBuilder.append("appName", appName);
                 }
+
+                auto clientMetadataDocument = clientMetadata.get().getDocument();
+                infoBuilder.append("clientMetadata", clientMetadataDocument);
             }
 
             // Operation context specific information
-            infoBuilder.appendBool("active", static_cast<bool>(opCtx));
-            if (opCtx) {
-                infoBuilder.append("opid", opCtx->getOpID());
-                if (opCtx->isKillPending()) {
+            infoBuilder.appendBool("active", static_cast<bool>(clientOpCtx));
+            if (clientOpCtx) {
+                infoBuilder.append("opid", clientOpCtx->getOpID());
+                if (clientOpCtx->isKillPending()) {
                     infoBuilder.append("killPending", true);
                 }
 
-                CurOp::get(opCtx)->reportState(&infoBuilder);
+                CurOp::get(clientOpCtx)->reportState(&infoBuilder);
 
                 // LockState
                 Locker::LockerInfo lockerInfo;
-                opCtx->lockState()->getLockerInfo(&lockerInfo);
+                clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
                 fillLockerInfo(lockerInfo, infoBuilder);
             }
 
@@ -183,7 +188,7 @@ public:
             // don't have a collection, we pass in a fake collection name (and this is okay,
             // because $where parsing only relies on the database part of the namespace).
             const NamespaceString fakeNS(db, "$dummyNamespaceForCurrop");
-            const Matcher matcher(filter, ExtensionsCallbackReal(txn, &fakeNS), nullptr);
+            const Matcher matcher(filter, ExtensionsCallbackReal(opCtx, &fakeNS), nullptr);
 
             for (const auto& info : inprogInfos) {
                 if (matcher.matches(info)) {

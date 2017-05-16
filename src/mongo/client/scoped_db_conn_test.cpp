@@ -95,6 +95,12 @@ public:
         _replyDelay = delay;
     }
 
+    DbResponse handleRequest(OperationContext* opCtx,
+                             const Message& request,
+                             const HostAndPort& client) override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     void run(transport::SessionHandle session) {
         Message inMessage;

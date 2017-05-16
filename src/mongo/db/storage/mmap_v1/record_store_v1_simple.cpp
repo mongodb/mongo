@@ -70,7 +70,7 @@ static ServerStatusMetricField<Counter64> dFreelist2("storage.freelist.search.bu
 static ServerStatusMetricField<Counter64> dFreelist3("storage.freelist.search.scanned",
                                                      &freelistIterations);
 
-SimpleRecordStoreV1::SimpleRecordStoreV1(OperationContext* txn,
+SimpleRecordStoreV1::SimpleRecordStoreV1(OperationContext* opCtx,
                                          StringData ns,
                                          RecordStoreV1MetaData* details,
                                          ExtentManager* em,
@@ -82,7 +82,7 @@ SimpleRecordStoreV1::SimpleRecordStoreV1(OperationContext* txn,
 
 SimpleRecordStoreV1::~SimpleRecordStoreV1() {}
 
-DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents(OperationContext* txn, int lenToAllocRaw) {
+DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents(OperationContext* opCtx, int lenToAllocRaw) {
     // Slowly drain the deletedListLegacyGrabBag by popping one record off and putting it in the
     // correct deleted list each time we try to allocate a new record. This ensures we won't
     // orphan any data when upgrading from old versions, without needing a long upgrade phase.
@@ -91,8 +91,8 @@ DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents(OperationContext* txn, in
     {
         const DiskLoc head = _details->deletedListLegacyGrabBag();
         if (!head.isNull()) {
-            _details->setDeletedListLegacyGrabBag(txn, drec(head)->nextDeleted());
-            addDeletedRec(txn, head);
+            _details->setDeletedListLegacyGrabBag(opCtx, drec(head)->nextDeleted());
+            addDeletedRec(opCtx, head);
         }
     }
 
@@ -122,8 +122,8 @@ DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents(OperationContext* txn, in
             return DiskLoc();  // no space
 
         // Unlink ourself from the deleted list
-        _details->setDeletedListEntry(txn, myBucket, dr->nextDeleted());
-        *txn->recoveryUnit()->writing(&dr->nextDeleted()) = DiskLoc().setInvalid();  // defensive
+        _details->setDeletedListEntry(opCtx, myBucket, dr->nextDeleted());
+        *opCtx->recoveryUnit()->writing(&dr->nextDeleted()) = DiskLoc().setInvalid();  // defensive
     }
 
     invariant(dr->extentOfs() < loc.getOfs());
@@ -132,20 +132,20 @@ DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents(OperationContext* txn, in
     // allocation size. Otherwise, just take the whole DeletedRecord.
     const int remainingLength = dr->lengthWithHeaders() - lenToAlloc;
     if (remainingLength >= bucketSizes[0]) {
-        txn->recoveryUnit()->writingInt(dr->lengthWithHeaders()) = lenToAlloc;
+        opCtx->recoveryUnit()->writingInt(dr->lengthWithHeaders()) = lenToAlloc;
         const DiskLoc newDelLoc = DiskLoc(loc.a(), loc.getOfs() + lenToAlloc);
-        DeletedRecord* newDel = txn->recoveryUnit()->writing(drec(newDelLoc));
+        DeletedRecord* newDel = opCtx->recoveryUnit()->writing(drec(newDelLoc));
         newDel->extentOfs() = dr->extentOfs();
         newDel->lengthWithHeaders() = remainingLength;
         newDel->nextDeleted().Null();
 
-        addDeletedRec(txn, newDelLoc);
+        addDeletedRec(opCtx, newDelLoc);
     }
 
     return loc;
 }
 
-StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord(OperationContext* txn,
+StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord(OperationContext* opCtx,
                                                      int lengthWithHeaders,
                                                      bool enforceQuota) {
     if (lengthWithHeaders > MaxAllowedAllocation) {
@@ -156,18 +156,18 @@ StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord(OperationContext* txn,
                           << " > 16.5MB");
     }
 
-    DiskLoc loc = _allocFromExistingExtents(txn, lengthWithHeaders);
+    DiskLoc loc = _allocFromExistingExtents(opCtx, lengthWithHeaders);
     if (!loc.isNull())
         return StatusWith<DiskLoc>(loc);
 
     LOG(1) << "allocating new extent";
 
     increaseStorageSize(
-        txn,
-        _extentManager->followupSize(lengthWithHeaders, _details->lastExtentSize(txn)),
+        opCtx,
+        _extentManager->followupSize(lengthWithHeaders, _details->lastExtentSize(opCtx)),
         enforceQuota);
 
-    loc = _allocFromExistingExtents(txn, lengthWithHeaders);
+    loc = _allocFromExistingExtents(opCtx, lengthWithHeaders);
     if (!loc.isNull()) {
         // got on first try
         return StatusWith<DiskLoc>(loc);
@@ -175,17 +175,17 @@ StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord(OperationContext* txn,
 
     log() << "warning: alloc() failed after allocating new extent. "
           << "lengthWithHeaders: " << lengthWithHeaders
-          << " last extent size:" << _details->lastExtentSize(txn) << "; trying again";
+          << " last extent size:" << _details->lastExtentSize(opCtx) << "; trying again";
 
-    for (int z = 0; z < 10 && lengthWithHeaders > _details->lastExtentSize(txn); z++) {
+    for (int z = 0; z < 10 && lengthWithHeaders > _details->lastExtentSize(opCtx); z++) {
         log() << "try #" << z << endl;
 
         increaseStorageSize(
-            txn,
-            _extentManager->followupSize(lengthWithHeaders, _details->lastExtentSize(txn)),
+            opCtx,
+            _extentManager->followupSize(lengthWithHeaders, _details->lastExtentSize(opCtx)),
             enforceQuota);
 
-        loc = _allocFromExistingExtents(txn, lengthWithHeaders);
+        loc = _allocFromExistingExtents(opCtx, lengthWithHeaders);
         if (!loc.isNull())
             return StatusWith<DiskLoc>(loc);
     }
@@ -193,8 +193,8 @@ StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord(OperationContext* txn,
     return StatusWith<DiskLoc>(ErrorCodes::InternalError, "cannot allocate space");
 }
 
-Status SimpleRecordStoreV1::truncate(OperationContext* txn) {
-    const DiskLoc firstExtLoc = _details->firstExtent(txn);
+Status SimpleRecordStoreV1::truncate(OperationContext* opCtx) {
+    const DiskLoc firstExtLoc = _details->firstExtent(opCtx);
     if (firstExtLoc.isNull() || !firstExtLoc.isValid()) {
         // Already empty
         return Status::OK();
@@ -204,53 +204,53 @@ Status SimpleRecordStoreV1::truncate(OperationContext* txn) {
     Extent* firstExt = _extentManager->getExtent(firstExtLoc);
     if (!firstExt->xnext.isNull()) {
         const DiskLoc extNextLoc = firstExt->xnext;
-        const DiskLoc oldLastExtLoc = _details->lastExtent(txn);
+        const DiskLoc oldLastExtLoc = _details->lastExtent(opCtx);
         Extent* const nextExt = _extentManager->getExtent(extNextLoc);
 
         // Unlink other extents;
-        *txn->recoveryUnit()->writing(&nextExt->xprev) = DiskLoc();
-        *txn->recoveryUnit()->writing(&firstExt->xnext) = DiskLoc();
-        _details->setLastExtent(txn, firstExtLoc);
-        _details->setLastExtentSize(txn, firstExt->length);
+        *opCtx->recoveryUnit()->writing(&nextExt->xprev) = DiskLoc();
+        *opCtx->recoveryUnit()->writing(&firstExt->xnext) = DiskLoc();
+        _details->setLastExtent(opCtx, firstExtLoc);
+        _details->setLastExtentSize(opCtx, firstExt->length);
 
-        _extentManager->freeExtents(txn, extNextLoc, oldLastExtLoc);
+        _extentManager->freeExtents(opCtx, extNextLoc, oldLastExtLoc);
     }
 
     // Make the first (now only) extent a single large deleted record.
-    *txn->recoveryUnit()->writing(&firstExt->firstRecord) = DiskLoc();
-    *txn->recoveryUnit()->writing(&firstExt->lastRecord) = DiskLoc();
-    _details->orphanDeletedList(txn);
-    addDeletedRec(txn, _findFirstSpot(txn, firstExtLoc, firstExt));
+    *opCtx->recoveryUnit()->writing(&firstExt->firstRecord) = DiskLoc();
+    *opCtx->recoveryUnit()->writing(&firstExt->lastRecord) = DiskLoc();
+    _details->orphanDeletedList(opCtx);
+    addDeletedRec(opCtx, _findFirstSpot(opCtx, firstExtLoc, firstExt));
 
     // Make stats reflect that there are now no documents in this record store.
-    _details->setStats(txn, 0, 0);
+    _details->setStats(opCtx, 0, 0);
 
     return Status::OK();
 }
 
-void SimpleRecordStoreV1::addDeletedRec(OperationContext* txn, const DiskLoc& dloc) {
+void SimpleRecordStoreV1::addDeletedRec(OperationContext* opCtx, const DiskLoc& dloc) {
     DeletedRecord* d = drec(dloc);
 
     int b = bucket(d->lengthWithHeaders());
-    *txn->recoveryUnit()->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
-    _details->setDeletedListEntry(txn, b, dloc);
+    *opCtx->recoveryUnit()->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
+    _details->setDeletedListEntry(opCtx, b, dloc);
 }
 
-std::unique_ptr<SeekableRecordCursor> SimpleRecordStoreV1::getCursor(OperationContext* txn,
+std::unique_ptr<SeekableRecordCursor> SimpleRecordStoreV1::getCursor(OperationContext* opCtx,
                                                                      bool forward) const {
-    return stdx::make_unique<SimpleRecordStoreV1Iterator>(txn, this, forward);
+    return stdx::make_unique<SimpleRecordStoreV1Iterator>(opCtx, this, forward);
 }
 
 vector<std::unique_ptr<RecordCursor>> SimpleRecordStoreV1::getManyCursors(
-    OperationContext* txn) const {
+    OperationContext* opCtx) const {
     vector<std::unique_ptr<RecordCursor>> cursors;
     const Extent* ext;
-    for (DiskLoc extLoc = details()->firstExtent(txn); !extLoc.isNull(); extLoc = ext->xnext) {
-        ext = _getExtent(txn, extLoc);
+    for (DiskLoc extLoc = details()->firstExtent(opCtx); !extLoc.isNull(); extLoc = ext->xnext) {
+        ext = _getExtent(opCtx, extLoc);
         if (ext->firstRecord.isNull())
             continue;
-        cursors.push_back(
-            stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(txn, ext->firstRecord, this));
+        cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
+            opCtx, ext->firstRecord, this));
     }
 
     return cursors;
@@ -284,7 +284,7 @@ private:
     size_t _allocationSize;
 };
 
-void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
+void SimpleRecordStoreV1::_compactExtent(OperationContext* opCtx,
                                          const DiskLoc extentLoc,
                                          int extentNumber,
                                          RecordStoreCompactAdaptor* adaptor,
@@ -322,12 +322,12 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
         long long nrecords = 0;
         DiskLoc nextSourceLoc = sourceExtent->firstRecord;
         while (!nextSourceLoc.isNull()) {
-            txn->checkForInterrupt();
+            opCtx->checkForInterrupt();
 
-            WriteUnitOfWork wunit(txn);
+            WriteUnitOfWork wunit(opCtx);
             MmapV1RecordHeader* recOld = recordFor(nextSourceLoc);
             RecordData oldData = recOld->toRecordData();
-            nextSourceLoc = getNextRecordInExtent(txn, nextSourceLoc);
+            nextSourceLoc = getNextRecordInExtent(opCtx, nextSourceLoc);
 
             if (compactOptions->validateDocuments && !adaptor->isDataValid(oldData)) {
                 // object is corrupt!
@@ -369,7 +369,7 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
                 // start of the compact, this insert will allocate a record in a new extent.
                 // See the comment in compact() for more details.
                 CompactDocWriter writer(recOld, rawDataSize, allocationSize);
-                StatusWith<RecordId> status = insertRecordWithDocWriter(txn, &writer);
+                StatusWith<RecordId> status = insertRecordWithDocWriter(opCtx, &writer);
                 uassertStatusOK(status.getStatus());
                 const MmapV1RecordHeader* newRec =
                     recordFor(DiskLoc::fromRecordId(status.getValue()));
@@ -384,18 +384,18 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
             // Remove the old record from the linked list of records withing the sourceExtent.
             // The old record is not added to the freelist as we will be freeing the whole
             // extent at the end.
-            *txn->recoveryUnit()->writing(&sourceExtent->firstRecord) = nextSourceLoc;
+            *opCtx->recoveryUnit()->writing(&sourceExtent->firstRecord) = nextSourceLoc;
             if (nextSourceLoc.isNull()) {
                 // Just moved the last record out of the extent. Mark extent as empty.
-                *txn->recoveryUnit()->writing(&sourceExtent->lastRecord) = DiskLoc();
+                *opCtx->recoveryUnit()->writing(&sourceExtent->lastRecord) = DiskLoc();
             } else {
                 MmapV1RecordHeader* newFirstRecord = recordFor(nextSourceLoc);
-                txn->recoveryUnit()->writingInt(newFirstRecord->prevOfs()) = DiskLoc::NullOfs;
+                opCtx->recoveryUnit()->writingInt(newFirstRecord->prevOfs()) = DiskLoc::NullOfs;
             }
 
             // Adjust the stats to reflect the removal of the old record. The insert above
             // handled adjusting the stats for the new record.
-            _details->incrementStats(txn, -(recOld->netLength()), -1);
+            _details->incrementStats(opCtx, -(recOld->netLength()), -1);
 
             wunit.commit();
         }
@@ -405,16 +405,16 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
         invariant(sourceExtent->lastRecord.isNull());
 
         // We are still the first extent, but we must not be the only extent.
-        invariant(_details->firstExtent(txn) == extentLoc);
-        invariant(_details->lastExtent(txn) != extentLoc);
+        invariant(_details->firstExtent(opCtx) == extentLoc);
+        invariant(_details->lastExtent(opCtx) != extentLoc);
 
         // Remove the newly emptied sourceExtent from the extent linked list and return it to
         // the extent manager.
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         const DiskLoc newFirst = sourceExtent->xnext;
-        _details->setFirstExtent(txn, newFirst);
-        *txn->recoveryUnit()->writing(&_extentManager->getExtent(newFirst)->xprev) = DiskLoc();
-        _extentManager->freeExtent(txn, extentLoc);
+        _details->setFirstExtent(opCtx, newFirst);
+        *opCtx->recoveryUnit()->writing(&_extentManager->getExtent(newFirst)->xprev) = DiskLoc();
+        _extentManager->freeExtent(opCtx, extentLoc);
         wunit.commit();
 
         {
@@ -428,53 +428,54 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
     }
 }
 
-Status SimpleRecordStoreV1::compact(OperationContext* txn,
+Status SimpleRecordStoreV1::compact(OperationContext* opCtx,
                                     RecordStoreCompactAdaptor* adaptor,
                                     const CompactOptions* options,
                                     CompactStats* stats) {
     std::vector<DiskLoc> extents;
-    for (DiskLoc extLocation = _details->firstExtent(txn); !extLocation.isNull();
+    for (DiskLoc extLocation = _details->firstExtent(opCtx); !extLocation.isNull();
          extLocation = _extentManager->getExtent(extLocation)->xnext) {
         extents.push_back(extLocation);
     }
     log() << "compact " << extents.size() << " extents";
 
     {
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
         // Orphaning the deleted lists ensures that all inserts go to new extents rather than
         // the ones that existed before starting the compact. If we abort the operation before
         // completion, any free space in the old extents will be leaked and never reused unless
         // the collection is compacted again or dropped. This is considered an acceptable
         // failure mode as no data will be lost.
         log() << "compact orphan deleted lists" << endl;
-        _details->orphanDeletedList(txn);
+        _details->orphanDeletedList(opCtx);
 
         // Start over from scratch with our extent sizing and growth
-        _details->setLastExtentSize(txn, 0);
+        _details->setLastExtentSize(opCtx, 0);
 
         // create a new extent so new records go there
-        increaseStorageSize(txn, _details->lastExtentSize(txn), true);
+        const bool enforceQuota = false;
+        increaseStorageSize(opCtx, _details->lastExtentSize(opCtx), enforceQuota);
         wunit.commit();
     }
 
-    stdx::unique_lock<Client> lk(*txn->getClient());
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
     ProgressMeterHolder pm(
-        *txn->setMessage_inlock("compact extent", "Extent Compacting Progress", extents.size()));
+        *opCtx->setMessage_inlock("compact extent", "Extent Compacting Progress", extents.size()));
     lk.unlock();
 
     // Go through all old extents and move each record to a new set of extents.
     int extentNumber = 0;
     for (std::vector<DiskLoc>::iterator it = extents.begin(); it != extents.end(); it++) {
-        txn->checkForInterrupt();
-        invariant(_details->firstExtent(txn) == *it);
+        opCtx->checkForInterrupt();
+        invariant(_details->firstExtent(opCtx) == *it);
         // empties and removes the first extent
-        _compactExtent(txn, *it, extentNumber++, adaptor, options, stats);
-        invariant(_details->firstExtent(txn) != *it);
+        _compactExtent(opCtx, *it, extentNumber++, adaptor, options, stats);
+        invariant(_details->firstExtent(opCtx) != *it);
         pm.hit();
     }
 
-    invariant(_extentManager->getExtent(_details->firstExtent(txn))->xprev.isNull());
-    invariant(_extentManager->getExtent(_details->lastExtent(txn))->xnext.isNull());
+    invariant(_extentManager->getExtent(_details->firstExtent(opCtx))->xprev.isNull());
+    invariant(_extentManager->getExtent(_details->lastExtent(opCtx))->xnext.isNull());
 
     // indexes will do their own progress meter
     pm.finished();

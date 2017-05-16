@@ -59,11 +59,11 @@ main(int argc, char *argv[])
 	char flaguri[256];
 	char joinuri[256];
 
-	opts = &_opts;
-	if (testutil_disable_long_tests())
-		return (0);
-	memset(opts, 0, sizeof(*opts));
+	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+		return (EXIT_SUCCESS);
 
+	opts = &_opts;
+	memset(opts, 0, sizeof(*opts));
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
@@ -83,10 +83,14 @@ main(int argc, char *argv[])
 	tablename = strchr(opts->uri, ':');
 	testutil_assert(tablename != NULL);
 	tablename++;
-	snprintf(posturi, sizeof(posturi), "index:%s:post", tablename);
-	snprintf(balanceuri, sizeof(balanceuri), "index:%s:balance", tablename);
-	snprintf(flaguri, sizeof(flaguri), "index:%s:flag", tablename);
-	snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri);
+	testutil_check(__wt_snprintf(
+	    posturi, sizeof(posturi), "index:%s:post", tablename));
+	testutil_check(__wt_snprintf(
+	    balanceuri, sizeof(balanceuri), "index:%s:balance", tablename));
+	testutil_check(__wt_snprintf(
+	    flaguri, sizeof(flaguri), "index:%s:flag", tablename));
+	testutil_check(__wt_snprintf(
+	    joinuri, sizeof(joinuri), "join:%s", opts->uri));
 
 	testutil_check(session->create(session, posturi, "columns=(post)"));
 	testutil_check(session->create(session, balanceuri,
@@ -126,14 +130,14 @@ main(int argc, char *argv[])
 
 	balancecur->set_key(balancecur, 0);
 	testutil_check(balancecur->search(balancecur));
-	sprintf(cfg, "compare=lt,strategy=bloom,count=%d",
-	    N_RECORDS / 100);
+	testutil_check(__wt_snprintf(cfg, sizeof(cfg),
+	    "compare=lt,strategy=bloom,count=%d", N_RECORDS / 100));
 	testutil_check(session->join(session, joincur, balancecur, cfg));
 
 	flagcur->set_key(flagcur, 0);
 	testutil_check(flagcur->search(flagcur));
-	sprintf(cfg, "compare=eq,strategy=bloom,count=%d",
-	    N_RECORDS / 100);
+	testutil_check(__wt_snprintf(cfg, sizeof(cfg),
+	    "compare=eq,strategy=bloom,count=%d", N_RECORDS / 100));
 	testutil_check(session->join(session, joincur, flagcur, cfg));
 
 	/* Expect no values returned */

@@ -46,7 +46,7 @@ namespace {
 intrusive_ptr<ExpressionConstant> getExpressionConstant(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expressionElem,
-    VariablesParseState vps) {
+    const VariablesParseState& vps) {
     auto expr = Expression::parseOperand(expCtx, expressionElem, vps)->optimize();
     return dynamic_cast<ExpressionConstant*>(expr.get());
 }
@@ -64,8 +64,7 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     BSONObjBuilder groupObjBuilder;
     BSONObjBuilder switchObjBuilder;
 
-    VariablesIdGenerator idGenerator;
-    VariablesParseState vps(&idGenerator);
+    VariablesParseState vps = pExpCtx->variablesParseState;
 
     vector<Value> boundaryValues;
     BSONElement groupByField;

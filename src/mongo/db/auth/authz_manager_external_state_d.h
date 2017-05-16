@@ -52,11 +52,11 @@ public:
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) override;
 
-    virtual Status findOne(OperationContext* txn,
+    virtual Status findOne(OperationContext* opCtx,
                            const NamespaceString& collectionName,
                            const BSONObj& query,
                            BSONObj* result);
-    virtual Status query(OperationContext* txn,
+    virtual Status query(OperationContext* opCtx,
                          const NamespaceString& collectionName,
                          const BSONObj& query,
                          const BSONObj& projection,

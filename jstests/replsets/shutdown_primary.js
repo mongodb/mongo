@@ -12,11 +12,10 @@
  *
  */
 (function() {
-    load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
-                                                 // restartReplicationOnSecondaries
-
     "use strict";
 
+    load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
+                                                 // restartReplicationOnSecondaries
     var name = "shutdown_primary";
 
     var replTest = new ReplSetTest({name: name, nodes: 3});

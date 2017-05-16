@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
+// command.
+// @tags: [assumes_unsharded_collection]
+
 // Explode arrays when indexing non-geo fields in 2dsphere, and make sure that
 // we find them with queries.
 t = db.geo_s2nongeoarray;

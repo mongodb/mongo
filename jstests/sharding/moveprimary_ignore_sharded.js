@@ -37,21 +37,20 @@ printjson(adminA.runCommand({shardCollection: "bar.coll1", key: {_id: 1}}));
 printjson(adminA.runCommand({shardCollection: "bar.coll2", key: {_id: 1}}));
 
 // All collections are now on primary shard
-var fooPrimaryShard = configA.databases.findOne({_id: "foo"}).primary;
-var barPrimaryShard = configA.databases.findOne({_id: "bar"}).primary;
+var fooPrimaryShardId = configA.databases.findOne({_id: "foo"}).primary;
+var barPrimaryShardId = configA.databases.findOne({_id: "bar"}).primary;
 
-var shards = configA.shards.find().toArray();
-var fooPrimaryShard = fooPrimaryShard == shards[0]._id ? shards[0] : shards[1];
-var fooOtherShard = fooPrimaryShard._id == shards[0]._id ? shards[1] : shards[0];
-var barPrimaryShard = barPrimaryShard == shards[0]._id ? shards[0] : shards[1];
-var barOtherShard = barPrimaryShard._id == shards[0]._id ? shards[1] : shards[0];
+var fooPrimaryShard = (fooPrimaryShardId == st.shard0.shardName) ? st.shard0 : st.shard1;
+var fooOtherShard = (fooPrimaryShard.shardName == st.shard0.shardName) ? st.shard1 : st.shard0;
+var barPrimaryShard = (barPrimaryShardId == st.shard0.shardName) ? st.shard0 : st.shard1;
+var barOtherShard = (barPrimaryShard.shardName == st.shard0.shardName) ? st.shard1 : st.shard0;
 
 st.printShardingStatus();
 
 jsTest.log("Running movePrimary for foo through mongosA ...");
 
 // MongosA should already know about all the collection states
-printjson(adminA.runCommand({movePrimary: "foo", to: fooOtherShard._id}));
+printjson(adminA.runCommand({movePrimary: "foo", to: fooOtherShard.shardName}));
 
 if (st.configRS) {
     // If we are in CSRS mode need to make sure that mongosB will actually get the most recent
@@ -78,11 +77,11 @@ function realCollectionCount(mydb) {
 }
 
 // All collections sane
-assert.eq(2, realCollectionCount(new Mongo(fooPrimaryShard.host).getDB("foo")));
-assert.eq(1, realCollectionCount(new Mongo(fooOtherShard.host).getDB("foo")));
+assert.eq(2, realCollectionCount(fooPrimaryShard.getDB("foo")));
+assert.eq(1, realCollectionCount(fooOtherShard.getDB("foo")));
 
 jsTest.log("Running movePrimary for bar through mongosB ...");
-printjson(adminB.runCommand({movePrimary: "bar", to: barOtherShard._id}));
+printjson(adminB.runCommand({movePrimary: "bar", to: barOtherShard.shardName}));
 
 // We need to flush the cluster config on mongosA, so it can discover that database 'bar' got
 // moved. Otherwise since the collections are not sharded, we have no way of discovering this.
@@ -104,7 +103,7 @@ assert.neq(null, mongosB.getCollection("bar.coll1").findOne());
 assert.neq(null, mongosB.getCollection("bar.coll2").findOne());
 
 // All collections sane
-assert.eq(2, realCollectionCount(new Mongo(barPrimaryShard.host).getDB("bar")));
-assert.eq(1, realCollectionCount(new Mongo(barOtherShard.host).getDB("bar")));
+assert.eq(2, realCollectionCount(barPrimaryShard.getDB("bar")));
+assert.eq(1, realCollectionCount(barOtherShard.getDB("bar")));
 
 st.stop();

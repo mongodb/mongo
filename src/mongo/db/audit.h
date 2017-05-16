@@ -45,7 +45,6 @@ class Client;
 class Command;
 class NamespaceString;
 class OperationContext;
-class ReplSetConfig;
 class StringData;
 class UserName;
 
@@ -300,7 +299,7 @@ void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern
  * to the provided metadata builder. The users and roles are extracted from the current client.
  * They are to be the impersonated users and roles for a Command run by an internal user.
  */
-void writeImpersonatedUsersToMetadata(OperationContext* txn, BSONObjBuilder* metadataBob);
+void writeImpersonatedUsersToMetadata(OperationContext* opCtx, BSONObjBuilder* metadataBob);
 
 /*
  * Looks for an 'impersonatedUsers' field.  This field is used by mongos to

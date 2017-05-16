@@ -90,17 +90,16 @@ public:
         h << "modifies the settings of a fail point";
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,
-             int,
              string& errmsg,
              BSONObjBuilder& result) {
         const string failPointName(cmdObj.firstElement().str());
         FailPointRegistry* registry = getGlobalFailPointRegistry();
         FailPoint* failPoint = registry->getFailPoint(failPointName);
 
-        if (failPoint == NULL) {
+        if (failPoint == nullptr) {
             errmsg = failPointName + " not found";
             return false;
         }

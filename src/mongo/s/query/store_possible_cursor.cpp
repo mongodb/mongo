@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -39,7 +40,8 @@
 
 namespace mongo {
 
-StatusWith<BSONObj> storePossibleCursor(OperationContext* txn,
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
                                         const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
@@ -58,14 +60,19 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* txn,
         return cmdResult;
     }
 
-    ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS());
-    params.remotes.emplace_back(server, incomingCursorResponse.getValue().getCursorId());
+    ClusterClientCursorParams params(
+        incomingCursorResponse.getValue().getNSS(),
+        AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames());
+    params.remotes.emplace_back(
+        shardId,
+        server,
+        CursorResponse(requestedNss, incomingCursorResponse.getValue().getCursorId(), {}));
 
 
-    auto ccc = ClusterClientCursorImpl::make(txn, executor, std::move(params));
+    auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));
 
     auto clusterCursorId =
-        cursorManager->registerCursor(txn,
+        cursorManager->registerCursor(opCtx,
                                       ccc.releaseCursor(),
                                       requestedNss,
                                       ClusterCursorManager::CursorType::NamespaceNotSharded,

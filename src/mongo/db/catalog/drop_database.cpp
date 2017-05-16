@@ -48,21 +48,20 @@
 
 namespace mongo {
 
-Status dropDatabase(OperationContext* txn, const std::string& dbName) {
+Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot drop a database in read-only mode",
             !storageGlobalParams.readOnly);
     // TODO (Kal): OldClientContext legacy, needs to be removed
     {
-        CurOp::get(txn)->ensureStarted();
-        stdx::lock_guard<Client> lk(*txn->getClient());
-        CurOp::get(txn)->setNS_inlock(dbName);
+        CurOp::get(opCtx)->ensureStarted();
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setNS_inlock(dbName);
     }
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(txn, MODE_X);
-        Lock::GlobalWrite lk(txn->lockState());
-        AutoGetDb autoDB(txn, dbName, MODE_X);
+        Lock::GlobalWrite lk(opCtx);
+        AutoGetDb autoDB(opCtx, dbName, MODE_X);
         Database* const db = autoDB.getDb();
         if (!db) {
             return Status(ErrorCodes::NamespaceNotFound,
@@ -70,8 +69,8 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
                                         << " because it does not exist");
         }
 
-        bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
+        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx, dbName);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
@@ -79,16 +78,16 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
         }
 
         log() << "dropDatabase " << dbName << " starting";
-        Database::dropDatabase(txn, db);
+        Database::dropDatabase(opCtx, db);
         log() << "dropDatabase " << dbName << " finished";
 
-        WriteUnitOfWork wunit(txn);
+        WriteUnitOfWork wunit(opCtx);
 
-        getGlobalServiceContext()->getOpObserver()->onDropDatabase(txn, dbName + ".$cmd");
+        getGlobalServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
 
         wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", dbName);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "dropDatabase", dbName);
 
     return Status::OK();
 }

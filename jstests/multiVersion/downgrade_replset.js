@@ -14,38 +14,45 @@ var nodes = {
     n3: {binVersion: newVersion}
 };
 
-var rst = new ReplSetTest({name: name, nodes: nodes});
-rst.startSet();
-var replSetConfig = rst.getReplSetConfig();
-replSetConfig.protocolVersion = 0;
-rst.initiate(replSetConfig);
+function runDowngradeTest(protocolVersion) {
+    var rst = new ReplSetTest({name: name, nodes: nodes});
+    rst.startSet();
+    var replSetConfig = rst.getReplSetConfig();
+    replSetConfig.protocolVersion = protocolVersion;
+    // Hard-code catchup timeout to be compatible with 3.4
+    replSetConfig.settings = {catchUpTimeoutMillis: 2000};
+    rst.initiate(replSetConfig);
 
-var primary = rst.getPrimary();
-var coll = "test.foo";
+    var primary = rst.getPrimary();
+    var coll = "test.foo";
 
-jsTest.log("Inserting documents into collection.");
-for (var i = 0; i < 10; i++) {
-    primary.getCollection(coll).insert({_id: i, str: "hello world"});
-}
-
-function insertDocuments(rsURL, coll) {
-    var coll = new Mongo(rsURL).getCollection(coll);
-    var count = 10;
-    while (!isFinished()) {
-        assert.writeOK(coll.insert({_id: count, str: "hello world"}));
-        count++;
+    jsTest.log("Inserting documents into collection.");
+    for (var i = 0; i < 10; i++) {
+        primary.getCollection(coll).insert({_id: i, str: "hello world"});
     }
+
+    function insertDocuments(rsURL, coll) {
+        var coll = new Mongo(rsURL).getCollection(coll);
+        var count = 10;
+        while (!isFinished()) {
+            assert.writeOK(coll.insert({_id: count, str: "hello world"}));
+            count++;
+        }
+    }
+
+    jsTest.log("Starting parallel operations during downgrade..");
+    var joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
+
+    jsTest.log("Downgrading replica set..");
+    rst.upgradeSet({binVersion: oldVersion});
+    jsTest.log("Downgrade complete.");
+
+    primary = rst.getPrimary();
+    printjson(rst.status());
+
+    joinFindInsert();
+    rst.stopSet();
 }
 
-jsTest.log("Starting parallel operations during downgrade..");
-var joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
-
-jsTest.log("Downgrading replica set..");
-rst.upgradeSet({binVersion: oldVersion});
-jsTest.log("Downgrade complete.");
-
-primary = rst.getPrimary();
-printjson(rst.status());
-
-joinFindInsert();
-rst.stopSet();
+runDowngradeTest(0);
+runDowngradeTest(1);

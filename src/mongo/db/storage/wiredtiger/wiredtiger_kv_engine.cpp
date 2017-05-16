@@ -69,6 +69,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -113,6 +114,7 @@ public:
                 ms = 100;
             }
 
+            MONGO_IDLE_THREAD_BLOCK;
             sleepmillis(ms);
         }
         LOG(1) << "stopping " << name() << " thread";
@@ -137,7 +139,7 @@ public:
     TicketServerParameter(TicketHolder* holder, const std::string& name)
         : ServerParameter(ServerParameterSet::getGlobal(), name, true, true), _holder(holder) {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         b.append(name, _holder->outof());
     }
 
@@ -392,7 +394,10 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
         // SERVER-16457: verify and salvage are occasionally failing with EBUSY. For now we
         // lie and return OK to avoid breaking tests. This block should go away when that ticket
         // is resolved.
-        error() << "Verify on " << uri << " failed with EBUSY. Assuming no salvage is needed.";
+        error()
+            << "Verify on " << uri << " failed with EBUSY. "
+            << "This means the collection was being accessed. No repair is necessary unless other "
+               "errors are reported.";
         return Status::OK();
     }
 
@@ -401,7 +406,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     return wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
 }
 
-int WiredTigerKVEngine::flushAllFiles(OperationContext* txn, bool sync) {
+int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
     if (_ephemeral) {
         return 0;
@@ -412,7 +417,7 @@ int WiredTigerKVEngine::flushAllFiles(OperationContext* txn, bool sync) {
     return 1;
 }
 
-Status WiredTigerKVEngine::beginBackup(OperationContext* txn) {
+Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
     invariant(!_backupSession);
 
     // This cursor will be freed by the backupSession being closed as the session is uncached
@@ -427,7 +432,7 @@ Status WiredTigerKVEngine::beginBackup(OperationContext* txn) {
     return Status::OK();
 }
 
-void WiredTigerKVEngine::endBackup(OperationContext* txn) {
+void WiredTigerKVEngine::endBackup(OperationContext* opCtx) {
     _backupSession.reset();
 }
 

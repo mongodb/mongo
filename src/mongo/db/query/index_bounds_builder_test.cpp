@@ -1515,6 +1515,24 @@ TEST(IndexBoundsBuilderTest, DoubleTypeBounds) {
     ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
 }
 
+TEST(IndexBoundsBuilderTest, TypeArrayBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$type: 'array'}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    // Check the output of translate().
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
+    ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+}
+
 //
 // Collation-related tests.
 //

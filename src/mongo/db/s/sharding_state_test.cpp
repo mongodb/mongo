@@ -33,7 +33,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -42,8 +41,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
 
@@ -63,31 +60,6 @@ public:
         return _shardName.toString();
     }
 
-    void setupCollectionMetadata(const NamespaceString& nss,
-                                 const OID& epoch,
-                                 const std::vector<BSONObj>& initChunks) {
-        auto future = launchAsync([this, &nss] {
-            ChunkVersion latestShardVersion;
-            Client::initThreadIfNotAlready();
-            ASSERT_OK(
-                shardingState()->refreshMetadataNow(operationContext(), nss, &latestShardVersion));
-        });
-
-        ChunkVersion initVersion(1, 0, epoch);
-        onFindCommand([&nss, &initVersion](const RemoteCommandRequest&) {
-            CollectionType coll;
-            coll.setNs(nss);
-            coll.setUpdatedAt(Date_t());
-            coll.setEpoch(initVersion.epoch());
-            coll.setKeyPattern(BSON("x" << 1));
-            return std::vector<BSONObj>{coll.toBSON()};
-        });
-
-        onFindCommand([&initChunks](const RemoteCommandRequest&) { return initChunks; });
-
-        future.timed_get(kFutureTimeout);
-    }
-
 protected:
     // Used to write to set up local collections before exercising server logic.
     std::unique_ptr<DBDirectClient> _dbDirectClient;
@@ -100,7 +72,7 @@ protected:
 
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        _shardingState.setGlobalInitMethodForTest([&](OperationContext* txn,
+        _shardingState.setGlobalInitMethodForTest([&](OperationContext* opCtx,
                                                       const ConnectionString& configConnStr,
                                                       StringData distLockProcessId) {
             auto status = initializeGlobalShardingStateForMongodForTest(configConnStr);
@@ -170,7 +142,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     shardIdentity.setClusterId(OID::gen());
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status{ErrorCodes::ShutdownInProgress, "shutting down"};
         });
 
@@ -183,7 +155,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     // ShardingState is now in error state, attempting to call it again will still result in error.
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status::OK();
         });
 
@@ -213,7 +185,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
@@ -241,7 +213,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
-        [](OperationContext* txn, const ConnectionString& connStr, StringData distLockProcessId) {
+        [](OperationContext* opCtx, const ConnectionString& connStr, StringData distLockProcessId) {
             return Status{ErrorCodes::InternalError, "should not reach here"};
         });
 
@@ -520,294 +492,6 @@ TEST_F(ShardingStateTest,
         shardingState()->initializeShardingAwarenessIfNeeded(operationContext());
     ASSERT_OK(swShardingInitialized);
     ASSERT_FALSE(swShardingInitialized.getValue());
-}
-
-TEST_F(ShardingStateTest, MetadataRefreshShouldUseDiffQuery) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName(shardName());
-    shardIdentity.setClusterId(OID::gen());
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
-
-    const NamespaceString nss("test.user");
-    const OID initEpoch(OID::gen());
-
-    {
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 0));
-        chunk.setMax(BSON("x" << 10));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
-    }
-
-    const ChunkVersion newVersion(3, 0, initEpoch);
-    auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(shardingState()->onStaleShardVersion(operationContext(), nss, newVersion));
-    });
-
-    onFindCommand([&nss, &initEpoch](const RemoteCommandRequest&) {
-        CollectionType coll;
-        coll.setNs(nss);
-        coll.setUpdatedAt(Date_t());
-        coll.setEpoch(initEpoch);
-        coll.setKeyPattern(BSON("x" << 1));
-        return std::vector<BSONObj>{coll.toBSON()};
-    });
-
-    onFindCommand([this, &nss, &initEpoch](const RemoteCommandRequest& request) {
-        auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
-        ASSERT_OK(diffQueryStatus.getStatus());
-
-        auto diffQuery = std::move(diffQueryStatus.getValue());
-        ASSERT_BSONOBJ_EQ(BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << Timestamp(2, 0))),
-                          diffQuery->getFilter());
-
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 10));
-        chunk.setMax(BSON("x" << 20));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(3, 10, initEpoch));
-        return std::vector<BSONObj>{chunk.toConfigBSON()};
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
-/**
- * Test where the epoch changed right before the chunk diff query.
- */
-TEST_F(ShardingStateTest, MetadataRefreshShouldUseFullQueryOnEpochMismatch) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName(shardName());
-    shardIdentity.setClusterId(OID::gen());
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
-
-    const NamespaceString nss("test.user");
-    const OID initEpoch(OID::gen());
-
-    {
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 0));
-        chunk.setMax(BSON("x" << 10));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
-    }
-
-
-    auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(shardingState()->onStaleShardVersion(
-            operationContext(), nss, ChunkVersion(3, 0, initEpoch)));
-    });
-
-    onFindCommand([&nss, &initEpoch](const RemoteCommandRequest&) {
-        CollectionType coll;
-        coll.setNs(nss);
-        coll.setUpdatedAt(Date_t());
-        coll.setEpoch(initEpoch);
-        coll.setKeyPattern(BSON("x" << 1));
-        return std::vector<BSONObj>{coll.toBSON()};
-    });
-
-    // Now when the diff query is performed, it will get chunks with a different epoch.
-    const ChunkVersion newVersion(3, 0, OID::gen());
-    onFindCommand([this, &nss, &newVersion](const RemoteCommandRequest& request) {
-        auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
-        ASSERT_OK(diffQueryStatus.getStatus());
-
-        auto diffQuery = std::move(diffQueryStatus.getValue());
-        ASSERT_BSONOBJ_EQ(BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << Timestamp(2, 0))),
-                          diffQuery->getFilter());
-
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 10));
-        chunk.setMax(BSON("x" << 20));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(3, 10, newVersion.epoch()));
-        return std::vector<BSONObj>{chunk.toConfigBSON()};
-    });
-
-    // Retry the refresh again. Now doing a full reload.
-
-    onFindCommand([&nss, &newVersion](const RemoteCommandRequest&) {
-        CollectionType coll;
-        coll.setNs(nss);
-        coll.setUpdatedAt(Date_t());
-        coll.setEpoch(newVersion.epoch());
-        coll.setKeyPattern(BSON("x" << 1));
-        return std::vector<BSONObj>{coll.toBSON()};
-    });
-
-    onFindCommand([this, &nss, &newVersion](const RemoteCommandRequest& request) {
-        auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
-        ASSERT_OK(diffQueryStatus.getStatus());
-
-        auto diffQuery = std::move(diffQueryStatus.getValue());
-        ASSERT_BSONOBJ_EQ(BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << Timestamp(0, 0))),
-                          diffQuery->getFilter());
-
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 10));
-        chunk.setMax(BSON("x" << 20));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(3, 10, newVersion.epoch()));
-        return std::vector<BSONObj>{chunk.toConfigBSON()};
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(ShardingStateTest, FullMetadataOnEpochMismatchShouldStopAfterMaxRetries) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName(shardName());
-    shardIdentity.setClusterId(OID::gen());
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
-
-    const NamespaceString nss("test.user");
-    const OID initEpoch(OID::gen());
-
-    {
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 0));
-        chunk.setMax(BSON("x" << 10));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
-    }
-
-
-    auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        auto status = shardingState()->onStaleShardVersion(
-            operationContext(), nss, ChunkVersion(3, 0, initEpoch));
-        ASSERT_EQ(ErrorCodes::RemoteChangeDetected, status);
-    });
-
-    OID lastEpoch(initEpoch);
-    OID nextEpoch(OID::gen());
-    for (int tries = 0; tries < 3; tries++) {
-        onFindCommand([&nss, &lastEpoch](const RemoteCommandRequest&) {
-            CollectionType coll;
-            coll.setNs(nss);
-            coll.setUpdatedAt(Date_t());
-            coll.setEpoch(lastEpoch);
-            coll.setKeyPattern(BSON("x" << 1));
-            return std::vector<BSONObj>{coll.toBSON()};
-        });
-
-        onFindCommand([this, &nss, &nextEpoch, tries](const RemoteCommandRequest& request) {
-            auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
-            ASSERT_OK(diffQueryStatus.getStatus());
-
-            auto diffQuery = std::move(diffQueryStatus.getValue());
-            Timestamp expectedLastMod = (tries == 0) ? Timestamp(2, 0) : Timestamp(0, 0);
-            ASSERT_BSONOBJ_EQ(
-                BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << expectedLastMod)),
-                diffQuery->getFilter());
-
-            ChunkType chunk;
-            chunk.setNS(nss.ns());
-            chunk.setMin(BSON("x" << 10));
-            chunk.setMax(BSON("x" << 20));
-            chunk.setShard(ShardId(shardName()));
-            chunk.setVersion(ChunkVersion(3, 10, nextEpoch));
-            return std::vector<BSONObj>{chunk.toConfigBSON()};
-        });
-
-        lastEpoch = nextEpoch;
-        nextEpoch = OID::gen();
-    }
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(ShardingStateTest, MetadataRefreshShouldBeOkWhenCollectionWasDropped) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName(shardName());
-    shardIdentity.setClusterId(OID::gen());
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
-
-    const NamespaceString nss("test.user");
-    const OID initEpoch(OID::gen());
-
-    {
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 0));
-        chunk.setMax(BSON("x" << 10));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
-    }
-
-    const ChunkVersion newVersion(3, 0, initEpoch);
-    auto future = launchAsync([&] {
-        Client::initThreadIfNotAlready();
-        ASSERT_OK(shardingState()->onStaleShardVersion(operationContext(), nss, newVersion));
-    });
-
-    onFindCommand([&nss, &initEpoch](const RemoteCommandRequest&) {
-        CollectionType coll;
-        coll.setNs(nss);
-        coll.setUpdatedAt(Date_t());
-        coll.setEpoch(initEpoch);
-        coll.setKeyPattern(BSON("x" << 1));
-        coll.setDropped(true);
-        return std::vector<BSONObj>{coll.toBSON()};
-    });
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(ShardingStateTest, MetadataRefreshShouldNotRetryOtherTypesOfError) {
-    ShardIdentityType shardIdentity;
-    shardIdentity.setConfigsvrConnString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName(shardName());
-    shardIdentity.setClusterId(OID::gen());
-
-    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
-
-    const NamespaceString nss("test.user");
-    const OID initEpoch(OID::gen());
-
-    {
-        ChunkType chunk;
-        chunk.setNS(nss.ns());
-        chunk.setMin(BSON("x" << 0));
-        chunk.setMax(BSON("x" << 10));
-        chunk.setShard(ShardId(shardName()));
-        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
-    }
-
-    auto configTargeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
-    configTargeter->setFindHostReturnValue({ErrorCodes::HostNotFound, "host erased by test"});
-
-    auto status = shardingState()->onStaleShardVersion(
-        operationContext(), nss, ChunkVersion(3, 0, initEpoch));
-    ASSERT_EQ(ErrorCodes::HostNotFound, status);
 }
 
 }  // namespace

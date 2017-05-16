@@ -33,6 +33,7 @@ class OperationContext;
 class Command;
 class BSONObj;
 class BSONObjBuilder;
+class StringData;
 
 namespace rpc {
 class RequestInterface;
@@ -45,15 +46,14 @@ class ReplyBuilderInterface;
 // both members, and defined to be the same symbol.
 
 // Implemented in `src/mongo/s/s_only.cpp`.
-void execCommandClient(OperationContext* txn,
+void execCommandClient(OperationContext* opCtx,
                        Command* c,
-                       int queryOptions,
-                       const char* ns,
+                       StringData dbname,
                        BSONObj& cmdObj,
                        BSONObjBuilder& result);
 
 // Implemented in `src/mongo/db/commands/dbcommands.cpp`.
-void execCommandDatabase(OperationContext* txn,
+void execCommandDatabase(OperationContext* opCtx,
                          Command* command,
                          const rpc::RequestInterface& request,
                          rpc::ReplyBuilderInterface* replyBuilder);

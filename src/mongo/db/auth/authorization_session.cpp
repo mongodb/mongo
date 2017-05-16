@@ -49,6 +49,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -95,14 +96,15 @@ AuthorizationManager& AuthorizationSession::getAuthorizationManager() {
     return _externalState->getAuthorizationManager();
 }
 
-void AuthorizationSession::startRequest(OperationContext* txn) {
-    _externalState->startRequest(txn);
-    _refreshUserInfoAsNeeded(txn);
+void AuthorizationSession::startRequest(OperationContext* opCtx) {
+    _externalState->startRequest(opCtx);
+    _refreshUserInfoAsNeeded(opCtx);
 }
 
-Status AuthorizationSession::addAndAuthorizeUser(OperationContext* txn, const UserName& userName) {
+Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
+                                                 const UserName& userName) {
     User* user;
-    Status status = getAuthorizationManager().acquireUser(txn, userName, &user);
+    Status status = getAuthorizationManager().acquireUserForInitialAuth(opCtx, userName, &user);
     if (!status.isOK()) {
         return status;
     }
@@ -335,8 +337,7 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
     if (ns.isListCollectionsCursorNS()) {
         // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
         // listCollections action on the database resource for "<db>".
-        if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                              ActionType::listCollections)) {
+        if (!isAuthorizedToListCollections(ns.db())) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized for listCollections getMore on "
                                         << ns.ns());
@@ -370,7 +371,7 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
+Status AuthorizationSession::checkAuthForInsert(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const BSONObj& document) {
     if (ns.coll() == "system.indexes"_sd) {
@@ -388,7 +389,7 @@ Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
         }
     } else {
         ActionSet required{ActionType::insert};
-        if (documentValidationDisabled(txn)) {
+        if (documentValidationDisabled(opCtx)) {
             required.addAction(ActionType::bypassDocumentValidation);
         }
         if (!isAuthorizedForActionsOnNamespace(ns, required)) {
@@ -400,7 +401,7 @@ Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
+Status AuthorizationSession::checkAuthForUpdate(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const BSONObj& query,
                                                 const BSONObj& update,
@@ -413,7 +414,7 @@ Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
         operationType = "upsert"_sd;
     }
 
-    if (documentValidationDisabled(txn)) {
+    if (documentValidationDisabled(opCtx)) {
         required.addAction(ActionType::bypassDocumentValidation);
     }
 
@@ -425,7 +426,7 @@ Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn,
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForDelete(OperationContext* txn,
+Status AuthorizationSession::checkAuthForDelete(OperationContext* opCtx,
                                                 const NamespaceString& ns,
                                                 const BSONObj& query) {
     if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
@@ -444,8 +445,7 @@ Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
     if (ns.isListCollectionsCursorNS()) {
         if (!(isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
                                                ActionType::killCursors) ||
-              isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                               ActionType::listCollections))) {
+              isAuthorizedToListCollections(ns.db()))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listCollections cursor on "
                                         << ns.ns());
@@ -720,6 +720,17 @@ bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserNam
                                                             ActionType::changeOwnCustomData);
 }
 
+bool AuthorizationSession::isAuthorizedToListCollections(StringData dbname) {
+    // Check for the listCollections ActionType on the database or find on system.namespaces for
+    // pre 3.0 systems.
+
+    return AuthorizationSession::isAuthorizedForActionsOnResource(
+               ResourcePattern::forDatabaseName(dbname), ActionType::listCollections) ||
+        AuthorizationSession::isAuthorizedForActionsOnResource(
+               ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
+               ActionType::find);
+}
+
 bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
     for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
          ++it) {
@@ -730,7 +741,7 @@ bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleNam
     return false;
 }
 
-void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
+void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
     AuthorizationManager& authMan = getAuthorizationManager();
     UserSet::iterator it = _authenticatedUsers.begin();
     while (it != _authenticatedUsers.end()) {
@@ -742,7 +753,9 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
             UserName name = user->getName();
             User* updatedUser;
 
-            Status status = authMan.acquireUser(txn, name, &updatedUser);
+            Status status =
+                authMan.acquireUserToRefreshSessionCache(opCtx, name, user->getID(), &updatedUser);
+
             switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.
@@ -849,6 +862,27 @@ bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient) {
             opIt.next();
         }
         it.next();
+    }
+
+    return false;
+}
+
+bool AuthorizationSession::isCoauthorizedWith(UserNameIterator userNameIter) {
+    if (!getAuthorizationManager().isAuthEnabled()) {
+        return true;
+    }
+    if (!userNameIter.more() && !getAuthenticatedUserNames().more()) {
+        return true;
+    }
+
+    for (; userNameIter.more(); userNameIter.next()) {
+        for (UserNameIterator thisUserNameIter = getAuthenticatedUserNames();
+             thisUserNameIter.more();
+             thisUserNameIter.next()) {
+            if (*userNameIter == *thisUserNameIter) {
+                return true;
+            }
+        }
     }
 
     return false;

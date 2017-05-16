@@ -58,7 +58,7 @@ public:
         return false;
     }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
         RangeDeleter* deleter = getDeleter();
         if (!deleter) {
             return BSONObj();
@@ -66,12 +66,9 @@ public:
 
         BSONObjBuilder result;
 
-        OwnedPointerVector<DeleteJobStats> statsList;
-        deleter->getStatsHistory(&statsList.mutableVector());
+        auto statsList = deleter->getStatsHistory();
         BSONArrayBuilder oldStatsBuilder;
-        for (OwnedPointerVector<DeleteJobStats>::const_iterator it = statsList.begin();
-             it != statsList.end();
-             ++it) {
+        for (auto it = statsList.begin(); it != statsList.end(); ++it) {
             BSONObjBuilder entryBuilder;
             entryBuilder.append("deletedDocs", (*it)->deletedDocCount);
 

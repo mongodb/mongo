@@ -58,12 +58,12 @@ TEST_F(TaskRunnerTest, GetDiagnosticString) {
 TEST_F(TaskRunnerTest, CallbackValues) {
     stdx::mutex mutex;
     bool called = false;
-    OperationContext* txn = nullptr;
+    OperationContext* opCtx = nullptr;
     Status status = getDetectableErrorStatus();
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
         stdx::lock_guard<stdx::mutex> lk(mutex);
         called = true;
-        txn = theTxn;
+        opCtx = theTxn;
         status = theStatus;
         return TaskRunner::NextAction::kCancel;
     };
@@ -73,7 +73,7 @@ TEST_F(TaskRunnerTest, CallbackValues) {
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
     ASSERT_TRUE(called);
-    ASSERT(txn);
+    ASSERT(opCtx);
     ASSERT_OK(status);
 }
 
@@ -149,7 +149,7 @@ TEST_F(TaskRunnerTest, RunTaskTwiceKeepOperationContext) {
 TEST_F(TaskRunnerTest, SkipSecondTask) {
     stdx::mutex mutex;
     int i = 0;
-    OperationContext* txn[2] = {nullptr, nullptr};
+    OperationContext* opCtx[2] = {nullptr, nullptr};
     Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
     stdx::condition_variable condition;
     bool schedulingDone = false;
@@ -159,7 +159,7 @@ TEST_F(TaskRunnerTest, SkipSecondTask) {
         if (j >= 2) {
             return TaskRunner::NextAction::kCancel;
         }
-        txn[j] = theTxn;
+        opCtx[j] = theTxn;
         status[j] = theStatus;
 
         // Wait for the test code to schedule the second task.
@@ -182,16 +182,16 @@ TEST_F(TaskRunnerTest, SkipSecondTask) {
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
     ASSERT_EQUALS(2, i);
-    ASSERT(txn[0]);
+    ASSERT(opCtx[0]);
     ASSERT_OK(status[0]);
-    ASSERT_FALSE(txn[1]);
+    ASSERT_FALSE(opCtx[1]);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status[1].code());
 }
 
 TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
     stdx::mutex mutex;
     int i = 0;
-    OperationContext* txn[2] = {nullptr, nullptr};
+    OperationContext* opCtx[2] = {nullptr, nullptr};
     Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
     stdx::condition_variable condition;
     bool schedulingDone = false;
@@ -201,7 +201,7 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
         if (j >= 2) {
             return TaskRunner::NextAction::kCancel;
         }
-        txn[j] = theTxn;
+        opCtx[j] = theTxn;
         status[j] = theStatus;
 
         // Wait for the test code to schedule the second task.
@@ -231,9 +231,9 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
     ASSERT_EQUALS(2, i);
-    ASSERT(txn[0]);
+    ASSERT(opCtx[0]);
     ASSERT_OK(status[0]);
-    ASSERT_FALSE(txn[1]);
+    ASSERT_FALSE(opCtx[1]);
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status[1].code());
 }
 

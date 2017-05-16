@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -63,7 +62,7 @@ namespace {
  * distrubution and chunk placement information which is needed by the balancer policy.
  */
 StatusWith<DistributionStatus> createCollectionDistributionStatus(
-    OperationContext* txn, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
+    OperationContext* opCtx, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
     ShardToChunksMap shardToChunksMap;
 
     // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
@@ -72,7 +71,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         shardToChunksMap[stat.shardId];
     }
 
-    for (const auto& entry : chunkMgr->getChunkMap()) {
+    for (const auto& entry : chunkMgr->chunkMap()) {
         const auto& chunkEntry = entry.second;
 
         ChunkType chunk;
@@ -87,8 +86,8 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     }
 
     vector<TagsType> collectionTags;
-    Status tagsStatus = Grid::get(txn)->catalogClient(txn)->getTagsForCollection(
-        txn, chunkMgr->getns(), &collectionTags);
+    Status tagsStatus = Grid::get(opCtx)->catalogClient(opCtx)->getTagsForCollection(
+        opCtx, chunkMgr->getns(), &collectionTags);
     if (!tagsStatus.isOK()) {
         return {tagsStatus.code(),
                 str::stream() << "Unable to load tags for collection " << chunkMgr->getns()
@@ -186,8 +185,8 @@ BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatis
 BalancerChunkSelectionPolicyImpl::~BalancerChunkSelectionPolicyImpl() = default;
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSplit(
-    OperationContext* txn) {
-    auto shardStatsStatus = _clusterStats->getStats(txn);
+    OperationContext* opCtx) {
+    auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
         return shardStatsStatus.getStatus();
     }
@@ -196,8 +195,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
     vector<CollectionType> collections;
 
-    Status collsStatus =
-        Grid::get(txn)->catalogClient(txn)->getCollections(txn, nullptr, &collections, nullptr);
+    Status collsStatus = Grid::get(opCtx)->catalogClient(opCtx)->getCollections(
+        opCtx, nullptr, &collections, nullptr);
     if (!collsStatus.isOK()) {
         return collsStatus;
     }
@@ -215,7 +214,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
         const NamespaceString nss(coll.getNs());
 
-        auto candidatesStatus = _getSplitCandidatesForCollection(txn, nss, shardStats);
+        auto candidatesStatus = _getSplitCandidatesForCollection(opCtx, nss, shardStats);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
@@ -234,8 +233,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 }
 
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
-    OperationContext* txn, bool aggressiveBalanceHint) {
-    auto shardStatsStatus = _clusterStats->getStats(txn);
+    OperationContext* opCtx, bool aggressiveBalanceHint) {
+    auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
         return shardStatsStatus.getStatus();
     }
@@ -248,8 +247,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
     vector<CollectionType> collections;
 
-    Status collsStatus =
-        Grid::get(txn)->catalogClient(txn)->getCollections(txn, nullptr, &collections, nullptr);
+    Status collsStatus = Grid::get(opCtx)->catalogClient(opCtx)->getCollections(
+        opCtx, nullptr, &collections, nullptr);
     if (!collsStatus.isOK()) {
         return collsStatus;
     }
@@ -273,7 +272,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         }
 
         auto candidatesStatus =
-            _getMigrateCandidatesForCollection(txn, nss, shardStats, aggressiveBalanceHint);
+            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, aggressiveBalanceHint);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
@@ -292,26 +291,25 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 }
 
 StatusWith<boost::optional<MigrateInfo>>
-BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* txn,
+BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* opCtx,
                                                             const ChunkType& chunk) {
-    auto shardStatsStatus = _clusterStats->getStats(txn);
+    auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
         return shardStatsStatus.getStatus();
     }
 
-    const auto shardStats = std::move(shardStatsStatus.getValue());
+    const auto& shardStats = shardStatsStatus.getValue();
 
-    const NamespaceString nss(chunk.getNS());
-
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                     chunk.getNS());
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
@@ -321,27 +319,26 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
     return BalancerPolicy::balanceSingleChunk(chunk, shardStats, distribution);
 }
 
-Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
+Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCtx,
                                                           const ChunkType& chunk,
                                                           const ShardId& newShardId) {
-    auto shardStatsStatus = _clusterStats->getStats(txn);
+    auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
         return shardStatsStatus.getStatus();
     }
 
     auto shardStats = std::move(shardStatsStatus.getValue());
 
-    const NamespaceString nss(chunk.getNS());
-
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                     chunk.getNS());
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
@@ -365,18 +362,18 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
 }
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
-    OperationContext* txn, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    OperationContext* opCtx, const NamespaceString& nss, const ShardStatisticsVector& shardStats) {
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
@@ -416,21 +413,21 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
 }
 
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
-    OperationContext* txn,
+    OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
     bool aggressiveBalanceHint) {
-    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, nss);
-    if (!scopedCMStatus.isOK()) {
-        return scopedCMStatus.getStatus();
+    auto routingInfoStatus =
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
+    if (!routingInfoStatus.isOK()) {
+        return routingInfoStatus.getStatus();
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
-    const auto cm = scopedCM.cm().get();
+    const auto cm = routingInfoStatus.getValue().cm().get();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }

@@ -1,3 +1,8 @@
+// Cannot implicitly shard accessed collections because of following errmsg: A single
+// update/delete on a sharded collection must contain an exact match on _id or contain the shard
+// key.
+// @tags: [assumes_unsharded_collection]
+
 //
 // Ensures that mongod respects the batch write protocols for delete
 //
@@ -61,7 +66,7 @@ result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(0, coll.count());
 
-var fields = ['ok', 'operationTime'];
+var fields = ['ok'];
 assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //

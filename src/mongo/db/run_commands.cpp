@@ -40,12 +40,10 @@
 
 namespace mongo {
 
-void runCommands(OperationContext* txn,
+void runCommands(OperationContext* opCtx,
                  const rpc::RequestInterface& request,
                  rpc::ReplyBuilderInterface* replyBuilder) {
     try {
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
-
         Command* c = nullptr;
         // In the absence of a Command object, no redaction is possible. Therefore
         // to avoid displaying potentially sensitive information in the logs,
@@ -66,15 +64,15 @@ void runCommands(OperationContext* txn,
 
         {
             // Try to set this as early as possible, as soon as we have figured out the command.
-            stdx::lock_guard<Client> lk(*txn->getClient());
-            CurOp::get(txn)->setLogicalOp_inlock(c->getLogicalOp());
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
         }
 
-        Command::execCommand(txn, c, request, replyBuilder);
+        Command::execCommand(opCtx, c, request, replyBuilder);
     }
 
     catch (const DBException& ex) {
-        Command::generateErrorResponse(txn, replyBuilder, ex, request);
+        Command::generateErrorResponse(opCtx, replyBuilder, ex, request);
     }
 }
 

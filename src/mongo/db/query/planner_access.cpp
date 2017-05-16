@@ -33,6 +33,7 @@
 #include "mongo/db/query/planner_access.h"
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace {
 
@@ -647,22 +649,23 @@ void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
 // static
 std::vector<QuerySolutionNode*> QueryPlannerAccess::collapseEquivalentScans(
     const std::vector<QuerySolutionNode*> scans) {
-    OwnedPointerVector<QuerySolutionNode> ownedScans(scans);
+    std::vector<std::unique_ptr<QuerySolutionNode>> ownedScans =
+        transitional_tools_do_not_use::spool_vector(scans);
     invariant(ownedScans.size() > 0);
 
     // Scans that need to be collapsed will be adjacent to each other in the list due to how we
     // sort the query predicate. We step through the list, either merging the current scan into
     // the last scan in 'collapsedScans', or adding a new entry to 'collapsedScans' if it can't
     // be merged.
-    OwnedPointerVector<QuerySolutionNode> collapsedScans;
+    std::vector<std::unique_ptr<QuerySolutionNode>> collapsedScans;
 
-    collapsedScans.push_back(ownedScans.releaseAt(0));
+    collapsedScans.push_back(std::move(ownedScans[0]));
     for (size_t i = 1; i < ownedScans.size(); ++i) {
-        if (scansAreEquivalent(collapsedScans.back(), ownedScans[i])) {
+        if (scansAreEquivalent(collapsedScans.back().get(), ownedScans[i].get())) {
             // We collapse the entry from 'ownedScans' into the back of 'collapsedScans'.
-            std::unique_ptr<QuerySolutionNode> collapseFrom(ownedScans.releaseAt(i));
+            std::unique_ptr<QuerySolutionNode> collapseFrom(std::move(ownedScans[i]));
             FetchNode* collapseFromFetch = getFetchNode(collapseFrom.get());
-            FetchNode* collapseIntoFetch = getFetchNode(collapsedScans.back());
+            FetchNode* collapseIntoFetch = getFetchNode(collapsedScans.back().get());
 
             // If there's no filter associated with a fetch node on 'collapseFrom', all we have to
             // do is clear the filter on the node that we are collapsing into.
@@ -691,12 +694,12 @@ std::vector<QuerySolutionNode*> QueryPlannerAccess::collapseEquivalentScans(
                 CanonicalQuery::normalizeTree(collapsedFilter.release()));
         } else {
             // Scans are not equivalent and can't be collapsed.
-            collapsedScans.push_back(ownedScans.releaseAt(i));
+            collapsedScans.push_back(std::move(ownedScans[i]));
         }
     }
 
     invariant(collapsedScans.size() > 0);
-    return collapsedScans.release();
+    return transitional_tools_do_not_use::leak_vector(collapsedScans);
 }
 
 // static
@@ -1215,7 +1218,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedDataAccess(const CanonicalQue
         } else if (Indexability::arrayUsesIndexOnChildren(root)) {
             QuerySolutionNode* solution = NULL;
 
-            invariant(MatchExpression::ELEM_MATCH_OBJECT);
+            invariant(root->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
             // The child is an AND.
             invariant(1 == root->numChildren());
             solution = buildIndexedDataAccess(query, root->getChild(0), true, indices, params);

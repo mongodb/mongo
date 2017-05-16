@@ -52,14 +52,14 @@ bool commandSpecifiesWriteConcern(const BSONObj& cmdObj);
  * Verifies that the writeConcern is of type Object (BSON type) and
  * that the resulting writeConcern is valid for this particular host.
  */
-StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
+StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                                                     const BSONObj& cmdObj,
                                                     const std::string& dbName);
 
 /**
  * Verifies that a WriteConcern is valid for this particular host and database.
  */
-Status validateWriteConcern(OperationContext* txn,
+Status validateWriteConcern(OperationContext* opCtx,
                             const WriteConcernOptions& writeConcern,
                             StringData dbName);
 
@@ -100,7 +100,7 @@ struct WriteConcernResult {
  * Returns NotMaster if the host steps down while waiting for replication
  * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
  */
-Status waitForWriteConcern(OperationContext* txn,
+Status waitForWriteConcern(OperationContext* opCtx,
                            const repl::OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result);

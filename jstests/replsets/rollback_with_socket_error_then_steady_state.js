@@ -106,8 +106,8 @@
     nodes[4].reconnect(nodes[2]);
 
     // Turn off failpoint on node 2 to allow rollback against node 1 to fail with a network error.
-    assert.commandWorked(
-        nodes[2].adminCommand({configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'}));
+    assert.adminCommandWorkedAllowingNetworkError(
+        nodes[2], {configureFailPoint: 'rollbackHangBeforeStart', mode: 'off'});
 
     // Make node 0 ahead of node 2 again so node 2 will pick it as a sync source.
 

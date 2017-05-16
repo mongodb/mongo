@@ -11,8 +11,14 @@
 	 * A call returning 0 indicates success; any call where		\
 	 * 0 is not the only successful return must provide an		\
 	 * expression evaluating to 0 in all successful	cases.		\
+	 *								\
+	 * XXX								\
+	 * Casting the call's return to int is because CentOS 7.3.1611	\
+	 * complains about syscall returning a long and the loss of	\
+	 * integer precision in the assignment to ret. The cast should	\
+	 * be a no-op everywhere.					\
 	 */								\
-	if (((ret) = (call)) == 0)					\
+	if (((ret) = (int)(call)) == 0)					\
 		break;							\
 	/*								\
 	 * The call's error was either returned by the call or		\
@@ -61,7 +67,7 @@
 
 #define	WT_TIMECMP(t1, t2)						\
 	((t1).tv_sec < (t2).tv_sec ? -1 :				\
-	     (t1).tv_sec == (t2.tv_sec) ?				\
+	     (t1).tv_sec == (t2).tv_sec ?				\
 	     (t1).tv_nsec < (t2).tv_nsec ? -1 :				\
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 

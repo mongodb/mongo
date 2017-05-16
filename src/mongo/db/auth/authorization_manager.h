@@ -31,6 +31,8 @@
 #include <memory>
 #include <string>
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
@@ -82,6 +84,7 @@ public:
     ~AuthorizationManager();
 
     static const std::string USER_NAME_FIELD_NAME;
+    static const std::string USER_ID_FIELD_NAME;
     static const std::string USER_DB_FIELD_NAME;
     static const std::string ROLE_NAME_FIELD_NAME;
     static const std::string ROLE_DB_FIELD_NAME;
@@ -192,7 +195,7 @@ public:
      * returns a non-OK status.  When returning a non-OK status, *version will be set to
      * schemaVersionInvalid (0).
      */
-    Status getAuthorizationVersion(OperationContext* txn, int* version);
+    Status getAuthorizationVersion(OperationContext* opCtx, int* version);
 
     /**
      * Returns the user cache generation identifier.
@@ -207,7 +210,7 @@ public:
      * meaning that once this method returns true it will continue to return true for the
      * lifetime of this process, even if all users are subsequently dropped from the system.
      */
-    bool hasAnyPrivilegeDocuments(OperationContext* txn);
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx);
 
     // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
     // "system.users" collection of database "dbname".
@@ -222,12 +225,12 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getUserDescription(OperationContext* txn, const UserName& userName, BSONObj* result);
+    Status getUserDescription(OperationContext* opCtx, const UserName& userName, BSONObj* result);
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRoleDescription(OperationContext* txn,
+    Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,
                               PrivilegeFormat privilegeFormat,
                               BSONObj* result);
@@ -235,7 +238,7 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRolesDescription(OperationContext* txn,
+    Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roleName,
                                PrivilegeFormat privilegeFormat,
                                BSONObj* result);
@@ -243,23 +246,48 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
-    Status getRoleDescriptionsForDB(OperationContext* txn,
+    Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     const std::string dbname,
                                     PrivilegeFormat privilegeFormat,
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result);
 
     /**
-     *  Returns the User object for the given userName in the out parameter "acquiredUser".
-     *  If the user cache already has a user object for this user, it increments the refcount
-     *  on that object and gives out a pointer to it.  If no user object for this user name
-     *  exists yet in the cache, reads the user's privilege document from disk, builds up
-     *  a User object, sets the refcount to 1, and gives that out.  The returned user may
-     *  be invalid by the time the caller gets access to it.
-     *  The AuthorizationManager retains ownership of the returned User object.
-     *  On non-OK Status return values, acquiredUser will not be modified.
+     * Returns the User object for the given userName in the out parameter "acquiredUser".
+     *
+     * This method should be used only when initially authenticating a user, in contexts when
+     * the caller does not yet have an id for this user. When the caller already has access
+     * to a user document, acquireUserToRefreshSessionCache should be used instead.
+     *
+     * If no user object for this user name exists yet in the cache, read the user's privilege
+     * document from disk, build up a User object, sets the refcount to 1, and give that out.
+     *
+     * The returned user may be invalid by the time the caller gets access to it.
+     * The AuthorizationManager retains ownership of the returned User object.
+     * On non-OK Status return values, acquiredUser will not be modified.
      */
-    Status acquireUser(OperationContext* txn, const UserName& userName, User** acquiredUser);
+    Status acquireUserForInitialAuth(OperationContext* opCtx,
+                                     const UserName& userName,
+                                     User** acquiredUser);
+    /**
+     * Returns the User object for the given userName in the out parameter "acquiredUser".
+     *
+     * This method must be called with a user id (the unset optional, boost::none, will be
+     * understood as a distinct id for a pre-3.6 user). The acquired user must match
+     * both the given name and given id, or this method will return an error. This method
+     * should be used when the caller is refresing a user document they already have.
+     *
+     * If no user object for this user name exists yet in the cache, read the user's privilege
+     * document from disk, build up a User object, sets the refcount to 1, and give that out.
+     *
+     * The returned user may be invalid by the time the caller gets access to it.
+     * The AuthorizationManager retains ownership of the returned User object.
+     * On non-OK Status return values, acquiredUser will not be modified.
+     */
+    Status acquireUserToRefreshSessionCache(OperationContext* opCtx,
+                                            const UserName& userName,
+                                            boost::optional<OID> id,
+                                            User** acquiredUser);
 
     /**
      * Decrements the refcount of the given User object.  If the refcount has gone to zero,
@@ -282,7 +310,7 @@ public:
      * system is at, this may involve building up the user cache and/or the roles graph.
      * Call this function at startup and after resynchronizing a slave/secondary.
      */
-    Status initialize(OperationContext* txn);
+    Status initialize(OperationContext* opCtx);
 
     /**
      * Invalidates all of the contents of the user cache.
@@ -301,9 +329,9 @@ public:
      * Hook called by replication code to let the AuthorizationManager observe changes
      * to relevant collections.
      */
-    void logOp(OperationContext* txn,
+    void logOp(OperationContext* opCtx,
                const char* opstr,
-               const char* ns,
+               const NamespaceString& nss,
                const BSONObj& obj,
                const BSONObj* patt);
 
@@ -326,7 +354,7 @@ private:
      * with oplog entries that have been pre-verified to actually affect authorization data.
      */
     void _invalidateRelevantCacheData(const char* op,
-                                      const char* ns,
+                                      const NamespaceString& ns,
                                       const BSONObj& o,
                                       const BSONObj* o2);
 
@@ -339,7 +367,7 @@ private:
      * Fetches user information from a v2-schema user document for the named user,
      * and stores a pointer to a new user object into *acquiredUser on success.
      */
-    Status _fetchUserV2(OperationContext* txn,
+    Status _fetchUserV2(OperationContext* opCtx,
                         const UserName& userName,
                         std::unique_ptr<User>* acquiredUser);
 
@@ -372,8 +400,8 @@ private:
     /**
      * Cached value of the authorization schema version.
      *
-     * May be set by acquireUser() and getAuthorizationVersion().  Invalidated by
-     * invalidateUserCache().
+     * May be set by acquireUserForInitialAuth(), acquireUserToRefreshSessionCache(),
+     * and getAuthorizationVersion().  Invalidated by invalidateUserCache().
      *
      * Reads and writes guarded by CacheGuard.
      */

@@ -43,11 +43,11 @@ using stdx::make_unique;
 const char* OplogStart::kStageType = "OPLOG_START";
 
 // Does not take ownership.
-OplogStart::OplogStart(OperationContext* txn,
+OplogStart::OplogStart(OperationContext* opCtx,
                        const Collection* collection,
                        MatchExpression* filter,
                        WorkingSet* ws)
-    : PlanStage(kStageType, txn),
+    : PlanStage(kStageType, opCtx),
       _needInit(true),
       _backwardsScanning(false),
       _extentHopping(false),
@@ -165,7 +165,7 @@ bool OplogStart::isEOF() {
     return _done;
 }
 
-void OplogStart::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+void OplogStart::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     if (_needInit) {
         return;
     }
@@ -175,7 +175,7 @@ void OplogStart::doInvalidate(OperationContext* txn, const RecordId& dl, Invalid
     }
 
     for (size_t i = 0; i < _subIterators.size(); i++) {
-        _subIterators[i]->invalidate(txn, dl);
+        _subIterators[i]->invalidate(opCtx, dl);
     }
 }
 

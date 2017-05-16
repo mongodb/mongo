@@ -153,7 +153,7 @@ public:
                 return 0;
             return (Extra*)(((char*)d) + _next);
         }
-        void setNext(OperationContext* txn, long ofs);
+        void setNext(OperationContext* opCtx, long ofs);
         void copy(NamespaceDetails* d, const Extra& e) {
             memcpy(this, &e, sizeof(Extra));
             _next = 0;
@@ -165,15 +165,18 @@ public:
         return (Extra*)(((char*)this) + _extraOffset);
     }
     /* add extra space for indexes when more than 10 */
-    Extra* allocExtra(OperationContext* txn, StringData ns, NamespaceIndex& ni, int nindexessofar);
+    Extra* allocExtra(OperationContext* opCtx,
+                      StringData ns,
+                      NamespaceIndex& ni,
+                      int nindexessofar);
 
-    void copyingFrom(OperationContext* txn,
+    void copyingFrom(OperationContext* opCtx,
                      StringData thisns,
                      NamespaceIndex& ni,
                      NamespaceDetails* src);  // must be called when renaming a NS to fix up extra
 
 public:
-    void setMaxCappedDocs(OperationContext* txn, long long max);
+    void setMaxCappedDocs(OperationContext* opCtx, long long max);
 
     enum UserFlags {
         Flag_UsePowerOf2Sizes = 1 << 0,
@@ -210,12 +213,12 @@ public:
      * This fetches the IndexDetails for the next empty index slot. The caller must populate
      * returned object.  This handles allocating extra index space, if necessary.
      */
-    IndexDetails& getNextIndexDetails(OperationContext* txn, Collection* collection);
+    IndexDetails& getNextIndexDetails(OperationContext* opCtx, Collection* collection);
 
-    NamespaceDetails* writingWithoutExtra(OperationContext* txn);
+    NamespaceDetails* writingWithoutExtra(OperationContext* opCtx);
 
     /** Make all linked Extra objects writeable as well */
-    NamespaceDetails* writingWithExtra(OperationContext* txn);
+    NamespaceDetails* writingWithExtra(OperationContext* opCtx);
 
     /**
      * Returns the offset of the specified index name within the array of indexes. Must be
@@ -223,7 +226,7 @@ public:
      *
      * @return > 0 if index name was found, -1 otherwise.
      */
-    int _catalogFindIndexByName(OperationContext* txn,
+    int _catalogFindIndexByName(OperationContext* opCtx,
                                 const Collection* coll,
                                 StringData name,
                                 bool includeBackgroundInProgress) const;
@@ -234,7 +237,7 @@ private:
      * a and b are 2 index ids, whose contents will be swapped
      * must have a lock on the entire collection to do this
      */
-    void swapIndex(OperationContext* txn, int a, int b);
+    void swapIndex(OperationContext* opCtx, int a, int b);
 
     friend class IndexCatalog;
     friend class IndexCatalogEntry;

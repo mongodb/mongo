@@ -46,6 +46,10 @@
 #define MONGO_NO_MALLOC_USABLE_SIZE
 #endif
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 /**
  * This shim interface (which controls dynamic allocation within SpiderMonkey),
  * consciously uses std::malloc and friends over mongoMalloc. It does this
@@ -123,9 +127,39 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
     }
 
 #ifdef MONGO_NO_MALLOC_USABLE_SIZE
-    void* p = func(ptr ? static_cast<char*>(ptr) - kMaxAlign : nullptr, bytes + kMaxAlign);
+    ptr = ptr ? static_cast<char*>(ptr) - kMaxAlign : nullptr;
+#endif
+
+#ifdef MONGO_NO_MALLOC_USABLE_SIZE
+    void* p = func(ptr, bytes + kMaxAlign);
 #else
     void* p = func(ptr, bytes);
+#endif
+
+#if __has_feature(address_sanitizer)
+    {
+        auto handles = mongo::mozjs::MozJSImplScope::ASANHandles::getThreadASANHandles();
+
+        if (handles) {
+            if (bytes) {
+                if (ptr) {
+                    // realloc
+                    if (ptr != p) {
+                        // actually moved the allocation
+                        handles->removePointer(ptr);
+                        handles->addPointer(p);
+                    }
+                    // else we didn't need to realloc, don't have to register
+                } else {
+                    // malloc/calloc
+                    handles->addPointer(p);
+                }
+            } else {
+                // free
+                handles->removePointer(ptr);
+            }
+        }
+    }
 #endif
 
     if (!p) {

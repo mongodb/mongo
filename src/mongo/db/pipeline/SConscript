@@ -85,13 +85,15 @@ env.Library(
         'aggregation_request.cpp',
     ],
     LIBDEPS=[
-        'document_value',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/query/explain_options',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/write_concern_options',
+        'document_value',
     ]
 )
 
@@ -108,6 +110,7 @@ env.Library(
     target='expression_context',
     source=[
         'expression_context.cpp',
+        'variables.cpp',
     ],
     LIBDEPS=[
         'aggregation_request',
@@ -188,6 +191,7 @@ env.Library(
         'accumulator_push.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
+        'accumulator_merge_objects.cpp'
         ],
     LIBDEPS=[
         'document_value',
@@ -255,8 +259,8 @@ docSourceEnv.Library(
         '$BUILD_DIR/mongo/db/matcher/expression_algo',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_customization_hooks',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/third_party/shim_snappy',
     ],
@@ -466,6 +470,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/index/index_access_methods',

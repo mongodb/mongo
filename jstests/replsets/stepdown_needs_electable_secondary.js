@@ -20,11 +20,11 @@
  *
  */
 (function() {
+    'use strict';
+
     load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
                                                  // restartServerReplication,
                                                  // restartReplSetReplication
-
-    'use strict';
 
     var name = 'stepdown_needs_electable_secondary';
 

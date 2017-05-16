@@ -104,6 +104,7 @@
         cleanupOrphaned: {
             skip: "Tested in views/views_sharded.js",
         },
+        clearLog: {skip: isUnrelated},
         clone: {skip: "Tested in replsets/cloneDb.js"},
         cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
         cloneCollectionAsCapped: {
@@ -122,6 +123,7 @@
         copydbgetnonce: {skip: isUnrelated},
         copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},
+        cpuload: {skip: isAnInternalCommand},
         create: {skip: "tested in views/views_creation.js"},
         createIndexes: {
             command: {createIndexes: "view", indexes: [{key: {x: 1}, name: "x_1"}]},
@@ -313,6 +315,7 @@
                     ok: 1
                 };
                 delete res.operationTime;
+                delete res.logicalTime;
                 assert.eq(expectedRes, res, "unexpected result for: " + tojson(killCursorsCmd));
             }
         },
@@ -379,6 +382,7 @@
         ],
         repairCursor: {command: {repairCursor: "view"}, expectFailure: true},
         repairDatabase: {command: {repairDatabase: 1}},
+        replSetAbortPrimaryCatchUp: {skip: isUnrelated},
         replSetElect: {skip: isUnrelated},
         replSetFreeze: {skip: isUnrelated},
         replSetFresh: {skip: isUnrelated},

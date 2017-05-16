@@ -38,8 +38,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/commands/run_on_all_shards_cmd.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -51,12 +53,15 @@ const char kOpIdFieldName[] = "opid";
 const char kClientFieldName[] = "client";
 // awkward underscores used to make this visually distinct from kClientFieldName
 const char kClient_S_FieldName[] = "client_s";
-
 const char kCommandName[] = "currentOp";
 
-class ClusterCurrentOpCommand : public RunOnAllShardsCommand {
+class ClusterCurrentOpCommand : public Command {
 public:
-    ClusterCurrentOpCommand() : RunOnAllShardsCommand(kCommandName) {}
+    ClusterCurrentOpCommand() : Command(kCommandName) {}
+
+    bool slaveOk() const override {
+        return true;
+    }
 
     bool adminOnly() const final {
         return true;
@@ -75,7 +80,22 @@ public:
         return false;
     }
 
-    void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) final {
+    bool run(OperationContext* opCtx,
+             const std::string& dbName,
+             BSONObj& cmdObj,
+             std::string& errmsg,
+             BSONObjBuilder& output) override {
+        auto shardResponses =
+            uassertStatusOK(scatterGather(opCtx, dbName, cmdObj, getReadPref(cmdObj)));
+        if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
+            return false;
+        }
+        aggregateResults(shardResponses, output);
+        return true;
+    }
+
+    void aggregateResults(const std::vector<AsyncRequestsSender::Response>& responses,
+                          BSONObjBuilder& output) {
         // Each shard responds with a document containing an array of subdocuments.
         // Each subdocument represents an operation running on that shard.
         // We merge the responses into a single document containg an array
@@ -98,16 +118,15 @@ public:
         // RunOnAllShardsCommand will handle returning an error to the user.
         BSONArrayBuilder aggregatedOpsBab(output.subarrayStart(kInprogFieldName));
 
-        for (auto&& shardResponse : results) {
-            StringData shardName;
-            BSONObj shardResponseObj;
-            std::tie(shardName, shardResponseObj) = shardResponse;
+        for (const auto& response : responses) {
+            invariant(response.swResponse.getStatus().isOK());
+            BSONObj shardResponseObj = std::move(response.swResponse.getValue().data);
 
             auto shardOps = shardResponseObj[kInprogFieldName];
 
             // legacy behavior
             if (!shardOps.isABSONObj()) {
-                warning() << "invalid currentOp response from shard " << shardName
+                warning() << "invalid currentOp response from shard " << response.shardId
                           << ", got: " << redact(shardOps);
                 continue;
             }
@@ -118,7 +137,7 @@ public:
                 // maintain legacy behavior
                 // but log it first
                 if (!shardOp.isABSONObj()) {
-                    warning() << "invalid currentOp response from shard " << shardName
+                    warning() << "invalid currentOp response from shard " << response.shardId
                               << ", got: " << redact(shardOp);
                     continue;
                 }
@@ -129,13 +148,13 @@ public:
                         uassert(28630,
                                 str::stream() << "expected numeric opid from currentOp response"
                                               << " from shard "
-                                              << shardName
+                                              << response.shardId
                                               << ", got: "
                                               << shardOpElement,
                                 shardOpElement.isNumber());
 
                         modifiedShardOpBob.append(kOpIdFieldName,
-                                                  str::stream() << shardName << ":"
+                                                  str::stream() << response.shardId << ":"
                                                                 << shardOpElement.numberInt());
                     } else if (fieldName == kClientFieldName) {
                         modifiedShardOpBob.appendAs(shardOpElement, kClient_S_FieldName);

@@ -79,7 +79,7 @@ public:
      * Returns a map of migration Status objects to indicate the success/failure of each migration.
      */
     MigrationStatuses executeMigrationsForAutoBalance(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const std::vector<MigrateInfo>& migrateInfos,
         uint64_t maxChunkSizeBytes,
         const MigrationSecondaryThrottleOptions& secondaryThrottle,
@@ -92,7 +92,7 @@ public:
      *
      * Returns the status of the migration.
      */
-    Status executeManualMigration(OperationContext* txn,
+    Status executeManualMigration(OperationContext* opCtx,
                                   const MigrateInfo& migrateInfo,
                                   uint64_t maxChunkSizeBytes,
                                   const MigrationSecondaryThrottleOptions& secondaryThrottle,
@@ -106,7 +106,7 @@ public:
      *
      * The active migration recovery may fail and be abandoned, setting the state to kEnabled.
      */
-    void startRecoveryAndAcquireDistLocks(OperationContext* txn);
+    void startRecoveryAndAcquireDistLocks(OperationContext* opCtx);
 
     /**
      * Blocking method that must only be called after startRecovery has been called. Recovers the
@@ -118,7 +118,7 @@ public:
      * The active migration recovery may fail and be abandoned, setting the state to kEnabled and
      * unblocking any process waiting on the recovery state.
      */
-    void finishRecovery(OperationContext* txn,
+    void finishRecovery(OperationContext* opCtx,
                         uint64_t maxChunkSizeBytes,
                         const MigrationSecondaryThrottleOptions& secondaryThrottle);
 
@@ -181,7 +181,7 @@ private:
      * can be used to obtain the outcome of the operation.
      */
     std::shared_ptr<Notification<executor::RemoteCommandResponse>> _schedule(
-        OperationContext* txn,
+        OperationContext* opCtx,
         const MigrateInfo& migrateInfo,
         uint64_t maxChunkSizeBytes,
         const MigrationSecondaryThrottleOptions& secondaryThrottle,
@@ -194,7 +194,7 @@ private:
      * The distributed lock is acquired before scheduling the first migration for the collection and
      * is only released when all active migrations on the collection have finished.
      */
-    void _schedule_inlock(OperationContext* txn,
+    void _schedule_inlock(OperationContext* opCtx,
                           const HostAndPort& targetHost,
                           Migration migration);
 
@@ -204,7 +204,7 @@ private:
      * passed iterator and if this is the last migration for the collection will free the collection
      * distributed lock.
      */
-    void _complete_inlock(OperationContext* txn,
+    void _complete_inlock(OperationContext* opCtx,
                           MigrationsList::iterator itMigration,
                           const executor::RemoteCommandResponse& remoteCommandResponse);
 
@@ -226,7 +226,7 @@ private:
      * that the balancer holds, clears the config.migrations collection, changes the state of the
      * migration manager to kEnabled. Then unblocks all processes waiting for kEnabled state.
      */
-    void _abandonActiveMigrationsAndEnableManager(OperationContext* txn);
+    void _abandonActiveMigrationsAndEnableManager(OperationContext* opCtx);
 
     /**
      * Parses a moveChunk RemoteCommandResponse's two levels of Status objects and distiguishes

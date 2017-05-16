@@ -40,9 +40,9 @@ RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
                                    ClusterClientCursorParams* params)
     : _executor(executor), _arm(executor, params) {}
 
-StatusWith<ClusterQueryResult> RouterStageMerge::next(OperationContext* txn) {
+StatusWith<ClusterQueryResult> RouterStageMerge::next(OperationContext* opCtx) {
     while (!_arm.ready()) {
-        auto nextEventStatus = _arm.nextEvent(txn);
+        auto nextEventStatus = _arm.nextEvent(opCtx);
         if (!nextEventStatus.isOK()) {
             return nextEventStatus.getStatus();
         }
@@ -55,8 +55,8 @@ StatusWith<ClusterQueryResult> RouterStageMerge::next(OperationContext* txn) {
     return _arm.nextReady();
 }
 
-void RouterStageMerge::kill(OperationContext* txn) {
-    auto killEvent = _arm.kill(txn);
+void RouterStageMerge::kill(OperationContext* opCtx) {
+    auto killEvent = _arm.kill(opCtx);
     if (!killEvent) {
         // Mongos is shutting down.
         return;

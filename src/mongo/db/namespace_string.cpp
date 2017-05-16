@@ -137,6 +137,17 @@ NamespaceString NamespaceString::getTargetNSForListIndexes() const {
     return NamespaceString(db(), coll().substr(listIndexesCursorNSPrefix.size()));
 }
 
+boost::optional<NamespaceString> NamespaceString::getTargetNSForGloballyManagedNamespace() const {
+    // Globally managed namespaces are of the form '$cmd.commandName.<targetNs>' or simply
+    // '$cmd.commandName'.
+    dassert(isGloballyManagedNamespace());
+    const size_t indexOfNextDot = coll().find('.', 5);
+    if (indexOfNextDot == std::string::npos) {
+        return boost::none;
+    }
+    return NamespaceString{db(), coll().substr(indexOfNextDot + 1)};
+}
+
 string NamespaceString::escapeDbName(const StringData dbname) {
     std::string escapedDbName;
 

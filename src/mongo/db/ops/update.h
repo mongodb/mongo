@@ -47,7 +47,7 @@ class UpdateDriver;
  *
  * Caller must hold the appropriate database locks.
  */
-UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& request);
+UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& request);
 
 /**
  * takes the from document and returns a new document

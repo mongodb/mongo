@@ -70,11 +70,12 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
     return this;
 }
 
-void DocumentSourceSingleDocumentTransformation::dispose() {
+void DocumentSourceSingleDocumentTransformation::doDispose() {
     _parsedTransform.reset();
 }
 
-Value DocumentSourceSingleDocumentTransformation::serialize(bool explain) const {
+Value DocumentSourceSingleDocumentTransformation::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(Document{{getSourceName(), _parsedTransform->serialize(explain)}});
 }
 

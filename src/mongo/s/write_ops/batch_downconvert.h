@@ -29,7 +29,6 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -41,27 +40,12 @@
 
 namespace mongo {
 
-class MultiCommandDispatch;
-
 // Used for reporting legacy write concern responses
 struct LegacyWCResponse {
     std::string shardHost;
     BSONObj gleResponse;
     std::string errToReport;
 };
-
-/**
- * Uses GLE and the shard hosts and opTimes last written by write commands to enforce a
- * write concern across the previously used shards.
- *
- * Returns OK with the LegacyWCResponses containing only write concern error information
- * Returns !OK if there was an error getting a GLE response
- */
-Status enforceLegacyWriteConcern(MultiCommandDispatch* dispatcher,
-                                 StringData dbName,
-                                 const BSONObj& options,
-                                 const HostOpTimeMap& hostOpTimes,
-                                 std::vector<LegacyWCResponse>* wcResponses);
 
 //
 // Below exposed for testing only

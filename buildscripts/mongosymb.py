@@ -173,8 +173,15 @@ def main(argv):
         sys.stderr.write("Invalid output-format argument: %s\n" % options.output_format)
         sys.exit(1)
 
+
+    # Skip over everything before the first '{' since it is likely to be log line prefixes.
+    # Additionally, using raw_decode() to ignore extra data after the closing '}' to allow maximal
+    # sloppiness in copy-pasting input.
+    trace_doc = sys.stdin.read()
+    trace_doc = trace_doc[trace_doc.find('{'):]
+    trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
+
     resolver = resolver_constructor(*args[1:])
-    trace_doc = json.load(sys.stdin)
     frames = symbolize_frames(trace_doc,
                               resolver,
                               symbolizer_path=options.symbolizer_path,

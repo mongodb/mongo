@@ -164,7 +164,7 @@ private:
             StaticCatalogClient() : ShardingCatalogClientMock(nullptr) {}
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-                OperationContext* txn, repl::ReadConcernLevel readConcern) override {
+                OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
 
                 ShardType donorShard;
                 donorShard.setName(kDonorConnStr.getSetName());

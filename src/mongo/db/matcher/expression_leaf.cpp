@@ -445,15 +445,13 @@ Status TypeMatchExpression::initWithBSONType(StringData path, int type) {
                       str::stream() << "Invalid numerical $type code: " << type);
     }
 
-    _path = path;
     _type = static_cast<BSONType>(type);
-    return _elementPath.init(_path);
+    return setPath(path);
 }
 
 Status TypeMatchExpression::initAsMatchingAllNumbers(StringData path) {
-    _path = path;
     _matchesAllNumbers = true;
-    return _elementPath.init(_path);
+    return setPath(path);
 }
 
 bool TypeMatchExpression::matchesSingleElement(const BSONElement& e) const {
@@ -464,41 +462,9 @@ bool TypeMatchExpression::matchesSingleElement(const BSONElement& e) const {
     return e.type() == _type;
 }
 
-bool TypeMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
-    while (cursor->more()) {
-        ElementIterator::Context e = cursor->next();
-
-        // In the case where _elementPath is referring to an array,
-        // $type should match elements of that array only.
-        // outerArray() helps to identify elements of the array
-        // and the containing array itself.
-        // This matters when we are looking for {$type: Array}.
-        // Example (_elementPath refers to field 'a' and _type is Array):
-        // a : [        // outer array. should not match
-        //     123,     // inner array
-        //     [ 456 ], // inner array. should match
-        //     ...
-        // ]
-        if (_type == mongo::Array && e.outerArray()) {
-            continue;
-        }
-
-        if (!matchesSingleElement(e.element())) {
-            continue;
-        }
-
-        if (details && details->needRecord() && !e.arrayOffset().eoo()) {
-            details->setElemMatchKey(e.arrayOffset().fieldName());
-        }
-        return true;
-    }
-    return false;
-}
-
 void TypeMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
-    debug << _path << " type: ";
+    debug << path() << " type: ";
     if (matchesAllNumbers()) {
         debug << kMatchesAllNumbersAlias;
     } else {
@@ -527,7 +493,7 @@ bool TypeMatchExpression::equivalent(const MatchExpression* other) const {
 
     const TypeMatchExpression* realOther = static_cast<const TypeMatchExpression*>(other);
 
-    if (_path != realOther->_path) {
+    if (path() != realOther->path()) {
         return false;
     }
 

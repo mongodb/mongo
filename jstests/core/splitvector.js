@@ -1,3 +1,7 @@
+// Cannot implicitly shard accessed collections because the "splitVector" command cannot be run
+// on a sharded collection
+// @tags: [assumes_unsharded_collection]
+
 // -------------------------
 //  SPLITVECTOR TEST UTILS
 // -------------------------

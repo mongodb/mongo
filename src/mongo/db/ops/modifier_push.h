@@ -55,10 +55,10 @@ public:
     virtual ~ModifierPush();
 
     /**
-     * A 'modExpr' here is a BSONElement {<fieldname>: <each clause>, <slice clause>, <sort
-     * clause>} coming from a $push mod such as {$set: {x: $each[{a:1}], $slice:3,
-     * $sort{b:1}}}. init() extracts and validates the field name and the clauses. It
-     * returns OK if successful or a status describing the error.
+     * A 'modExpr' here is a BSONElement {<fieldname>: <each clause>, <slice clause>, <sort clause>,
+     * <position clause>} coming from a $push mod such as {$set: {x: $each: [{a: 1}], $slice: 3,
+     * $sort: {b: 1}, $position: 5}}. init() extracts and validates the field name and the clauses.
+     * It returns OK if successful or a status describing the error.
      *
      * There are currently a few restrictions concerning the clauses (but all can be
      * lifted):
@@ -110,7 +110,7 @@ private:
     bool _slicePresent;
     int64_t _slice;
     bool _sortPresent;
-    size_t _startPosition;
+    int32_t _position;  // Can be negative.
 
     PatternElementCmp _sort;
 

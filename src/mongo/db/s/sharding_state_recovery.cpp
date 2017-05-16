@@ -182,17 +182,17 @@ private:
  * it has is to always move the opTime forward for a currently running server. It achieves this by
  * serializing the modify calls and reading the current opTime under X-lock on the admin database.
  */
-Status modifyRecoveryDocument(OperationContext* txn,
+Status modifyRecoveryDocument(OperationContext* opCtx,
                               RecoveryDocument::ChangeType change,
                               const WriteConcernOptions& writeConcern) {
     try {
         // Use boost::optional so we can release the locks early
         boost::optional<AutoGetOrCreateDb> autoGetOrCreateDb;
-        autoGetOrCreateDb.emplace(txn, NamespaceString::kConfigCollectionNamespace.db(), MODE_X);
+        autoGetOrCreateDb.emplace(opCtx, NamespaceString::kConfigCollectionNamespace.db(), MODE_X);
 
         BSONObj updateObj = RecoveryDocument::createChangeObj(
             grid.shardRegistry()->getConfigServerConnectionString(),
-            ShardingState::get(txn)->getShardName(),
+            ShardingState::get(opCtx)->getShardName(),
             grid.configOpTime(),
             change);
 
@@ -205,7 +205,7 @@ Status modifyRecoveryDocument(OperationContext* txn,
         UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
         updateReq.setLifecycle(&updateLifecycle);
 
-        UpdateResult result = update(txn, autoGetOrCreateDb->getDb(), updateReq);
+        UpdateResult result = update(opCtx, autoGetOrCreateDb->getDb(), updateReq);
         invariant(result.numDocsModified == 1 || !result.upserted.isEmpty());
         invariant(result.numMatched <= 1);
 
@@ -213,8 +213,8 @@ Status modifyRecoveryDocument(OperationContext* txn,
         autoGetOrCreateDb = boost::none;
 
         WriteConcernResult writeConcernResult;
-        return waitForWriteConcern(txn,
-                                   repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+        return waitForWriteConcern(opCtx,
+                                   repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
                                    writeConcern,
                                    &writeConcernResult);
     } catch (const DBException& ex) {
@@ -224,28 +224,29 @@ Status modifyRecoveryDocument(OperationContext* txn,
 
 }  // namespace
 
-Status ShardingStateRecovery::startMetadataOp(OperationContext* txn) {
+Status ShardingStateRecovery::startMetadataOp(OperationContext* opCtx) {
     Status upsertStatus =
-        modifyRecoveryDocument(txn, RecoveryDocument::Increment, kMajorityWriteConcern);
+        modifyRecoveryDocument(opCtx, RecoveryDocument::Increment, kMajorityWriteConcern);
 
     if (upsertStatus == ErrorCodes::WriteConcernFailed) {
         // Couldn't wait for the replication to complete, but the local write was performed. Clear
         // it up fast (without any waiting for journal or replication) and still treat it as
         // failure.
-        modifyRecoveryDocument(txn, RecoveryDocument::Decrement, WriteConcernOptions());
+        modifyRecoveryDocument(opCtx, RecoveryDocument::Decrement, WriteConcernOptions());
     }
 
     return upsertStatus;
 }
 
-void ShardingStateRecovery::endMetadataOp(OperationContext* txn) {
-    Status status = modifyRecoveryDocument(txn, RecoveryDocument::Decrement, WriteConcernOptions());
+void ShardingStateRecovery::endMetadataOp(OperationContext* opCtx) {
+    Status status =
+        modifyRecoveryDocument(opCtx, RecoveryDocument::Decrement, WriteConcernOptions());
     if (!status.isOK()) {
         warning() << "Failed to decrement minOpTimeUpdaters due to " << redact(status);
     }
 }
 
-Status ShardingStateRecovery::recover(OperationContext* txn) {
+Status ShardingStateRecovery::recover(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
         return Status::OK();
     }
@@ -253,9 +254,9 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
     BSONObj recoveryDocBSON;
 
     try {
-        AutoGetCollection autoColl(txn, NamespaceString::kConfigCollectionNamespace, MODE_IS);
+        AutoGetCollection autoColl(opCtx, NamespaceString::kConfigCollectionNamespace, MODE_IS);
         if (!Helpers::findOne(
-                txn, autoColl.getCollection(), RecoveryDocument::getQuery(), recoveryDocBSON)) {
+                opCtx, autoColl.getCollection(), RecoveryDocument::getQuery(), recoveryDocBSON)) {
             return Status::OK();
         }
     } catch (const DBException& ex) {
@@ -270,7 +271,7 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     log() << "Sharding state recovery process found document " << redact(recoveryDoc.toBSON());
 
-    ShardingState* const shardingState = ShardingState::get(txn);
+    ShardingState* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->enabled());
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
@@ -286,18 +287,18 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     // Need to fetch the latest uptime from the config server, so do a logging write
     Status status =
-        grid.catalogClient(txn)->logChange(txn,
-                                           "Sharding minOpTime recovery",
-                                           NamespaceString::kConfigCollectionNamespace.ns(),
-                                           recoveryDocBSON,
-                                           ShardingCatalogClient::kMajorityWriteConcern);
+        grid.catalogClient(opCtx)->logChange(opCtx,
+                                             "Sharding minOpTime recovery",
+                                             NamespaceString::kConfigCollectionNamespace.ns(),
+                                             recoveryDocBSON,
+                                             ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK())
         return status;
 
     log() << "Sharding state recovered. New config server opTime is " << grid.configOpTime();
 
     // Finally, clear the recovery document so next time we don't need to recover
-    status = modifyRecoveryDocument(txn, RecoveryDocument::Clear, kLocalWriteConcern);
+    status = modifyRecoveryDocument(opCtx, RecoveryDocument::Clear, kLocalWriteConcern);
     if (!status.isOK()) {
         warning() << "Failed to reset sharding state recovery document due to " << redact(status);
     }

@@ -51,7 +51,7 @@ obj_bulk(void)
 			if ((ret = c->close(c)) != 0)
 				testutil_die(ret, "cursor.close");
 		} else if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
-			testutil_die(ret, "session.open_cursor");
+			testutil_die(ret, "session.open_cursor bulk");
 	}
 	if ((ret = session->close(session, NULL)) != 0)
 		testutil_die(ret, "session.close");
@@ -71,7 +71,8 @@ obj_bulk_unique(int force)
 	/* Generate a unique object name. */
 	if ((ret = pthread_rwlock_wrlock(&single)) != 0)
 		testutil_die(ret, "pthread_rwlock_wrlock single");
-	(void)snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid);
+	testutil_check(__wt_snprintf(
+	    new_uri, sizeof(new_uri), "%s.%u", uri, ++uid));
 	if ((ret = pthread_rwlock_unlock(&single)) != 0)
 		testutil_die(ret, "pthread_rwlock_unlock single");
 
@@ -79,12 +80,17 @@ obj_bulk_unique(int force)
 		testutil_die(ret, "session.create: %s", new_uri);
 
 	__wt_yield();
-	if ((ret =
-	    session->open_cursor(session, new_uri, NULL, "bulk", &c)) != 0)
-		testutil_die(ret, "session.open_cursor: %s", new_uri);
-
-	if ((ret = c->close(c)) != 0)
-		testutil_die(ret, "cursor.close");
+	/*
+	 * Opening a bulk cursor may have raced with a forced checkpoint
+	 * which created a checkpoint of the empty file, and triggers an EINVAL
+	 */
+	if ((ret = session->open_cursor(
+	    session, new_uri, NULL, "bulk", &c)) == 0) {
+		if ((ret = c->close(c)) != 0)
+			testutil_die(ret, "cursor.close");
+	} else if (ret != EINVAL)
+		testutil_die(ret,
+		    "session.open_cursor bulk unique: %s, new_uri");
 
 	while ((ret = session->drop(
 	    session, new_uri, force ? "force" : NULL)) != 0)
@@ -147,7 +153,8 @@ obj_create_unique(int force)
 	/* Generate a unique object name. */
 	if ((ret = pthread_rwlock_wrlock(&single)) != 0)
 		testutil_die(ret, "pthread_rwlock_wrlock single");
-	(void)snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid);
+	testutil_check(__wt_snprintf(
+	    new_uri, sizeof(new_uri), "%s.%u", uri, ++uid));
 	if ((ret = pthread_rwlock_unlock(&single)) != 0)
 		testutil_die(ret, "pthread_rwlock_unlock single");
 
@@ -190,9 +197,13 @@ obj_checkpoint(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		testutil_die(ret, "conn.session");
 
-	/* Force the checkpoint so it has to be taken. */
+	/*
+	 * Force the checkpoint so it has to be taken. Forced checkpoints can
+	 * race with other metadata operations and return EBUSY - we'd expect
+	 * applications using forced checkpoints to retry on EBUSY.
+	 */
 	if ((ret = session->checkpoint(session, "force")) != 0)
-		if (ret != ENOENT)
+		if (ret != EBUSY && ret != ENOENT)
 			testutil_die(ret, "session.checkpoint");
 
 	if ((ret = session->close(session, NULL)) != 0)
