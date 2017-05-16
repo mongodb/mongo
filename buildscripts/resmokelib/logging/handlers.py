@@ -20,8 +20,8 @@ except ImportError:
     # Versions of the requests package prior to 1.2.0 did not vendor the urllib3 package.
     urllib3_exceptions = None
 
+from . import flush
 from .. import utils
-from ..utils import timer
 
 _TIMEOUT_SECS = 10
 
@@ -55,19 +55,26 @@ class BufferedHandler(logging.Handler):
         self.capacity = capacity
         self.interval_secs = interval_secs
 
-        self.__emit_lock = threading.Lock()  # Prohibits concurrent access to 'self.__emit_buffer'.
+        # self.__emit_lock prohibits concurrent access to 'self.__emit_buffer',
+        # 'self.__flush_event', and self.__flush_scheduled_by_emit.
+        self.__emit_lock = threading.Lock()
         self.__emit_buffer = []
+        self.__flush_event = None  # A handle to the event that calls self.flush().
+        self.__flush_scheduled_by_emit = False
 
         self.__flush_lock = threading.Lock()  # Serializes callers of self.flush().
-        self.__timer = None  # Defer creation until we actually begin to log messages.
 
-    def _new_timer(self):
-        """
-        Returns a new timer.AlarmClock instance that will call the
-        flush() method after 'interval_secs' seconds.
-        """
+    # We override createLock(), acquire(), and release() to be no-ops since emit(), flush(), and
+    # close() serialize accesses to 'self.__emit_buffer' in a more granular way via
+    # 'self.__emit_lock'.
+    def createLock(self):
+        pass
 
-        return timer.AlarmClock(self.interval_secs, self.flush)
+    def acquire(self):
+        pass
+
+    def release(self):
+        pass
 
     def process_record(self, record):
         """
@@ -85,22 +92,29 @@ class BufferedHandler(logging.Handler):
 
         Append the record to the buffer after it has been transformed by
         process_record(). If the length of the buffer is greater than or
-        equal to its capacity, then flush() is called to process the
-        buffer.
-
-        After flushing the buffer, the timer is restarted so that it
-        will expire after another 'interval_secs' seconds.
+        equal to its capacity, then the flush() event is rescheduled to
+        immediately process the buffer.
         """
 
-        if self.__timer is None:
-            self.__timer = self._new_timer()
-            self.__timer.start()
+        processed_record = self.process_record(record)
 
         with self.__emit_lock:
-            self.__emit_buffer.append(self.process_record(record))
-            if len(self.__emit_buffer) >= self.capacity:
-                # Trigger the timer thread to cause it to flush the buffer early.
-                self.__timer.trigger()
+            self.__emit_buffer.append(processed_record)
+
+            if self.__flush_event is None:
+                # Now that we've added our first record to the buffer, we schedule a call to flush()
+                # to occur 'self.interval_secs' seconds from now. 'self.__flush_event' should never
+                # be None after this point.
+                self.__flush_event = flush.flush_after(self, delay=self.interval_secs)
+
+            if not self.__flush_scheduled_by_emit and len(self.__emit_buffer) >= self.capacity:
+                # Attempt to flush the buffer early if we haven't already done so. We don't bother
+                # calling flush.cancel() and flush.flush_after() when 'self.__flush_event' is
+                # already scheduled to happen as soon as possible to avoid introducing unnecessary
+                # delays in emit().
+                if flush.cancel(self.__flush_event):
+                    self.__flush_event = flush.flush_after(self, delay=0.0)
+                    self.__flush_scheduled_by_emit = True
 
     def flush(self):
         """
@@ -108,6 +122,14 @@ class BufferedHandler(logging.Handler):
         """
 
         self.__flush(close_called=False)
+
+        with self.__emit_lock:
+            if self.__flush_event is not None:
+                # We cancel 'self.__flush_event' in case flush() was called by someone other than
+                # the flush thread to avoid having multiple flush() events scheduled.
+                flush.cancel(self.__flush_event)
+                self.__flush_event = flush.flush_after(self, delay=self.interval_secs)
+                self.__flush_scheduled_by_emit = False
 
     def __flush(self, close_called):
         """
@@ -134,13 +156,13 @@ class BufferedHandler(logging.Handler):
 
     def close(self):
         """
-        Tidies up any resources used by the handler.
-
-        Stops the timer and flushes the buffer.
+        Flushes the buffer and tidies up any resources used by this
+        handler.
         """
 
-        if self.__timer is not None:
-            self.__timer.dismiss()
+        with self.__emit_lock:
+            if self.__flush_event is not None:
+                flush.cancel(self.__flush_event)
 
         self.__flush(close_called=True)
 

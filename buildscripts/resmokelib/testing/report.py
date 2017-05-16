@@ -132,7 +132,10 @@ class TestReport(unittest.TestResult):
 
         # Asynchronously closes the buildlogger test handler to avoid having too many threads open
         # on 32-bit systems.
-        logging.flush.close_later(test.logger)
+        for handler in test.logger.handlers:
+            # We ignore the cancellation token returned by close_later() since we always want the
+            # logs to eventually get flushed.
+            logging.flush.close_later(handler)
 
         # Restore the original logger for the test.
         #

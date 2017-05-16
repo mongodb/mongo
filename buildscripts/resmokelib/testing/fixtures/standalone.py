@@ -116,13 +116,14 @@ class MongoDFixture(interface.Fixture):
 
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
-    def teardown(self):
+    def _do_teardown(self):
         running_at_start = self.is_running()
         success = True  # Still a success even if nothing is running.
 
         if not running_at_start and self.port is not None:
-            self.logger.info("mongod on port %d was expected to be running in teardown(), but"
-                             " wasn't." % (self.port))
+            self.logger.info(
+                "mongod on port %d was expected to be running in _do_teardown(), but wasn't.",
+                self.port)
 
         if self.mongod is not None:
             if running_at_start:

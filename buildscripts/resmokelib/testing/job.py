@@ -9,6 +9,7 @@ import sys
 
 from .. import config
 from .. import errors
+from .. import logging
 from ..utils import queue as _queue
 
 
@@ -59,7 +60,7 @@ class Job(object):
 
         if teardown_flag is not None:
             try:
-                if not self.fixture.teardown():
+                if not self.fixture.teardown(finished=True):
                     self.logger.warn("Teardown of %s was not successful.", self.fixture)
                     teardown_flag.set()
             except:
@@ -98,7 +99,7 @@ class Job(object):
 
         test(self.report)
         if config.FAIL_FAST and not self.report.wasSuccessful():
-            test.logger.info("%s failed, so stopping..." % (test.shortDescription()))
+            self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
             raise errors.StopExecution("%s failed" % (test.shortDescription()))
 
         if not self.fixture.is_running():

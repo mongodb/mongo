@@ -14,6 +14,7 @@ from . import report as _report
 from . import testcases
 from .. import config as _config
 from .. import errors
+from .. import logging
 from .. import utils
 from ..utils import queue as _queue
 
@@ -191,7 +192,7 @@ class TestGroupExecutor(object):
         success = True
         for job in self._jobs:
             try:
-                if not job.fixture.teardown():
+                if not job.fixture.teardown(finished=True):
                     self.testgroup_logger.warn("Teardown of %s was not successful.", job.fixture)
                     success = False
             except:

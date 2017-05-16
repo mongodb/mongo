@@ -19,7 +19,7 @@ class Fixture(object):
 
     def __init__(self, logger, job_num):
         """
-        Initializes the fixtures with a logger instance.
+        Initializes the fixture with a logger instance.
         """
 
         if not isinstance(logger, logging.Logger):
@@ -47,9 +47,28 @@ class Fixture(object):
         """
         pass
 
-    def teardown(self):
+    def teardown(self, finished=False):
         """
-        Destroys the fixture. Return true if was successful, and false otherwise.
+        Destroys the fixture. Return true if was successful, and false
+        otherwise.
+
+        The fixture's logging handlers are closed if 'finished' is true,
+        which should happen when setup() won't be called again.
+        """
+
+        try:
+            return self._do_teardown()
+        finally:
+            if finished:
+                for handler in self.logger.handlers:
+                    # We ignore the cancellation token returned by close_later() since we always
+                    # want the logs to eventually get flushed.
+                    logging.flush.close_later(handler)
+
+    def _do_teardown(self):
+        """
+        Destroys the fixture. Return true if was successful, and false
+        otherwise.
         """
         return True
 
