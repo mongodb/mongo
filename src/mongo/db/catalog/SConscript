@@ -81,6 +81,7 @@ env.Library(
         "collection.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
