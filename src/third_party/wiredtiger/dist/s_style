@@ -101,10 +101,13 @@ else
 		cat $t
 	fi
 
-	# Alignment directive before "struct".
-	egrep 'WT_COMPILER_TYPE_ALIGN.*struct' $f > $t
-	test -s $t && {
-		echo "$f: compiler alignment direction must precede \"struct\""
+	# If we don't have matching pack-begin and pack-end calls, we don't get
+	# an error, we just get a Windows performance regression. Using awk and
+	# not wc to ensure there's no whitespace in the assignment.
+	egrep WT_PACKED_STRUCT $f > $t
+	cnt=`awk 'BEGIN { line = 0 } { ++line } END { print line }' < $t`
+	test `expr "$cnt" % 2` -ne 0 && {
+		echo "$f: mismatched WT_PACKED_STRUCT_BEGIN/END lines"
 		cat $t
 	}
 
