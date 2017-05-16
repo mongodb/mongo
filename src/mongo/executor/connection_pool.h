@@ -72,6 +72,7 @@ public:
     static const size_t kDefaultMinConns;
     static const Milliseconds kDefaultRefreshRequirement;
     static const Milliseconds kDefaultRefreshTimeout;
+    static const size_t kDefaultMaxConnecting;
 
     static const Status kConnectionStateUnknown;
 
@@ -90,6 +91,13 @@ public:
          * as well as the obvious live connections in the pool.
          */
         size_t maxConnections = kDefaultMaxConns;
+
+        /**
+         * The maximum number of processing connections for a host.  This includes pending
+         * connections in setup/refresh. It's designed to rate limit connection storms rather than
+         * steady state processing (as maxConnections does).
+         */
+        size_t maxConnecting = kDefaultMaxConnecting;
 
         /**
          * Amount of time to wait before timing out a refresh attempt

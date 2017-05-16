@@ -95,10 +95,12 @@ public:
     // Push either a callback that returns the status for a setup, or just the Status
     static void pushSetup(PushSetupCallback status);
     static void pushSetup(Status status);
+    static size_t setupQueueDepth();
 
     // Push either a callback that returns the status for a refresh, or just the Status
     static void pushRefresh(PushRefreshCallback status);
     static void pushRefresh(Status status);
+    static size_t refreshQueueDepth();
 
 private:
     void indicateUsed() override;
