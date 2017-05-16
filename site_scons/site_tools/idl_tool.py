@@ -32,6 +32,8 @@ def idlc_emitter(target, source, env):
     target_source = base_file_name + "_gen.cpp"
     target_header = base_file_name + "_gen.h"
 
+    env.Alias('generated-sources', [target_source, target_header])
+
     return [target_source, target_header], source
 
 
