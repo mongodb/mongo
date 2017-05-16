@@ -124,34 +124,46 @@ Status CollectionBulkLoaderImpl::init(Collection* coll,
 Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
     int count = 0;
-    return _runTaskReleaseResourcesOnFailure(
-        [begin, end, &count, this](OperationContext* opCtx) -> Status {
-            invariant(opCtx);
-            UnreplicatedWritesBlock uwb(opCtx);
+    return _runTaskReleaseResourcesOnFailure([begin, end, &count, this](
+                                                 OperationContext* opCtx) -> Status {
+        invariant(opCtx);
+        UnreplicatedWritesBlock uwb(opCtx);
 
-            for (auto iter = begin; iter != end; ++iter) {
-                std::vector<MultiIndexBlock*> indexers;
-                if (_idIndexBlock) {
-                    indexers.push_back(_idIndexBlock.get());
-                }
-                if (_secondaryIndexesBlock) {
-                    indexers.push_back(_secondaryIndexesBlock.get());
-                }
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    WriteUnitOfWork wunit(opCtx);
+        for (auto iter = begin; iter != end; ++iter) {
+            std::vector<MultiIndexBlock*> indexers;
+            if (_idIndexBlock) {
+                indexers.push_back(_idIndexBlock.get());
+            }
+            if (_secondaryIndexesBlock) {
+                indexers.push_back(_secondaryIndexesBlock.get());
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wunit(opCtx);
+                if (!indexers.empty()) {
+                    // This flavor of insertDocument will not update any pre-existing indexes, only
+                    // the indexers passed in.
                     const auto status = _coll->insertDocument(opCtx, *iter, indexers, false);
                     if (!status.isOK()) {
                         return status;
                     }
-                    wunit.commit();
+                } else {
+                    // For capped collections, we use regular insertDocument, which will update
+                    // pre-existing indexes.
+                    const auto status = _coll->insertDocument(opCtx, *iter, nullptr, false, false);
+                    if (!status.isOK()) {
+                        return status;
+                    }
                 }
-                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-                    _opCtx, "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
 
-                ++count;
+                wunit.commit();
             }
-            return Status::OK();
-        });
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+                _opCtx, "CollectionBulkLoaderImpl::insertDocuments", _nss.ns());
+
+            ++count;
+        }
+        return Status::OK();
+    });
 }
 
 Status CollectionBulkLoaderImpl::commit() {
