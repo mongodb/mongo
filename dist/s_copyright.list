@@ -1,4 +1,8 @@
+skip	api/leveldb/leveldb_wt_config.h
 skip	api/leveldb/leveldb_wt_config.in
+skip	bench/workgen/workgen.py
+skip	bench/workgen/workgen/workgen.py
+skip	bench/workgen/workgen_wrap.cxx
 skip	build_win/wiredtiger_config.h
 skip	dist/api_config.py
 skip	dist/api_data.py
