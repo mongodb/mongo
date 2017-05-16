@@ -538,17 +538,6 @@ env.Library(
 )
 
 env.Library(
-    target='run_commands',
-    source=[
-        'run_commands.cpp',
-    ],
-    LIBDEPS=[
-        "commands",
-        "curop",
-    ],
-)
-
-env.Library(
     target='dbdirectclient',
     source=[
         'dbdirectclient.cpp',
@@ -750,6 +739,7 @@ env.Library(
     target="assemble_response",
     source=[
         "assemble_response.cpp",
+        "run_commands.cpp",
     ],
     LIBDEPS=[
         "curop",
@@ -757,7 +747,6 @@ env.Library(
         "diag_log",
         "lasterror",
         "ops/write_ops_parsers",
-        "run_commands",
         "storage/storage_options",
         #'introspect', # CYCLE
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
@@ -855,7 +844,6 @@ env.Library(
         "repl/storage_interface",
         "repl/sync_tail",
         "repl/topology_coordinator_impl",
-        "run_commands",
         "rw_concern_d",
         "s/commands",
         "s/collection_metadata",

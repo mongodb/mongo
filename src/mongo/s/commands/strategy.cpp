@@ -105,25 +105,6 @@ void runAgainstRegistered(OperationContext* opCtx,
     execCommandClient(opCtx, c, db, jsobj, anObjBuilder);
 }
 
-/**
- * Called into by the web server. For now we just translate the parameters to their old style
- * equivalents.
- */
-void execCommandHandler(OperationContext* opCtx,
-                        Command* command,
-                        const rpc::RequestInterface& request,
-                        rpc::ReplyBuilderInterface* replyBuilder) {
-    int queryFlags = 0;
-    BSONObj cmdObj;
-
-    std::tie(cmdObj, queryFlags) =
-        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata());
-
-    BSONObjBuilder result;
-    execCommandClient(opCtx, command, request.getDatabase(), cmdObj, result);
-
-    replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
-}
 
 /**
  * Extract and process metadata from the command request body.
@@ -176,19 +157,6 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
         responseBuilder->append(kOperationTime, operationTime.asTimestamp());
     }
 }
-
-MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const) {
-    Command::registerExecCommand(execCommandHandler);
-    return Status::OK();
-}
-
-void registerErrorImpl(OperationContext* opCtx, const DBException& exception) {}
-
-MONGO_INITIALIZER(InitializeRegisterErrorHandler)(InitializerContext* const) {
-    Command::registerRegisterError(registerErrorImpl);
-    return Status::OK();
-}
-
 }  // namespace
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
