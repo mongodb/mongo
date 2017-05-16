@@ -36,8 +36,6 @@ class Collection;
 class NamespaceString;
 class OperationContext;
 
-struct CollModRequest;
-
 /**
  * Performs the collection modification described in "cmdObj" on the collection "ns".
  */

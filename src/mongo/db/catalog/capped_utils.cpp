@@ -51,8 +51,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/util/scopeguard.h"
 
-namespace mongo {
-Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
+mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -110,12 +109,12 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     return Status::OK();
 }
 
-Status cloneCollectionAsCapped(OperationContext* opCtx,
-                               Database* db,
-                               const std::string& shortFrom,
-                               const std::string& shortTo,
-                               double size,
-                               bool temp) {
+mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
+                                             Database* db,
+                                             const std::string& shortFrom,
+                                             const std::string& shortTo,
+                                             double size,
+                                             bool temp) {
     NamespaceString fromNss(db->name(), shortFrom);
     NamespaceString toNss(db->name(), shortTo);
 
@@ -237,9 +236,9 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
     invariant(false);  // unreachable
 }
 
-Status convertToCapped(OperationContext* opCtx,
-                       const NamespaceString& collectionName,
-                       double size) {
+mongo::Status mongo::convertToCapped(OperationContext* opCtx,
+                                     const NamespaceString& collectionName,
+                                     double size) {
     StringData dbname = collectionName.db();
     StringData shortSource = collectionName.coll();
 
@@ -304,5 +303,3 @@ Status convertToCapped(OperationContext* opCtx,
     }
     return Status::OK();
 }
-
-}  // namespace mongo

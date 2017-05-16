@@ -303,11 +303,12 @@ Status preconditionOK(OperationContext* opCtx, const BSONObj& applyOpCmd, BSONOb
     return Status::OK();
 }
 }  // namespace
+}  // namespace mongo
 
-Status applyOps(OperationContext* opCtx,
-                const std::string& dbName,
-                const BSONObj& applyOpCmd,
-                BSONObjBuilder* result) {
+mongo::Status mongo::applyOps(OperationContext* opCtx,
+                              const std::string& dbName,
+                              const BSONObj& applyOpCmd,
+                              BSONObjBuilder* result) {
     Lock::GlobalWrite globalWriteLock(opCtx);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -357,4 +358,3 @@ Status applyOps(OperationContext* opCtx,
 
     return Status::OK();
 }
-}  // namespace mongo

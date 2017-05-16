@@ -47,11 +47,9 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/log.h"
 
-namespace mongo {
-
-Status dropCollection(OperationContext* opCtx,
-                      const NamespaceString& collectionName,
-                      BSONObjBuilder& result) {
+mongo::Status mongo::dropCollection(OperationContext* opCtx,
+                                    const NamespaceString& collectionName,
+                                    BSONObjBuilder& result) {
     if (!serverGlobalParams.quiet.load()) {
         log() << "CMD: drop " << collectionName;
     }
@@ -110,5 +108,3 @@ Status dropCollection(OperationContext* opCtx,
 
     return Status::OK();
 }
-
-}  // namespace mongo

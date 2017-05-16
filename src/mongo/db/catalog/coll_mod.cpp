@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+namespace {
+
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
@@ -257,10 +259,13 @@ void setCollectionOptionFlag(OperationContext* opCtx,
     invariant(newOptions.flagsSet);
 }
 
-Status collMod(OperationContext* opCtx,
-               const NamespaceString& nss,
-               const BSONObj& cmdObj,
-               BSONObjBuilder* result) {
+}  // namespace
+}  // namespace mongo
+
+mongo::Status mongo::collMod(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const BSONObj& cmdObj,
+                             BSONObjBuilder* result) {
     StringData dbName = nss.db();
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
@@ -394,4 +399,3 @@ Status collMod(OperationContext* opCtx,
 
     return Status::OK();
 }
-}  // namespace mongo

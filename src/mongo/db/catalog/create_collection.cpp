@@ -39,11 +39,10 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 
-namespace mongo {
-Status createCollection(OperationContext* opCtx,
-                        const std::string& dbName,
-                        const BSONObj& cmdObj,
-                        const BSONObj& idIndex) {
+mongo::Status mongo::createCollection(OperationContext* opCtx,
+                                      const std::string& dbName,
+                                      const BSONObj& cmdObj,
+                                      const BSONObj& idIndex) {
     BSONObjIterator it(cmdObj);
 
     // Extract ns from first cmdObj element.
@@ -103,4 +102,3 @@ Status createCollection(OperationContext* opCtx,
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "create", nss.ns());
     return Status::OK();
 }
-}  // namespace mongo
