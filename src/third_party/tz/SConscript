@@ -2,4 +2,12 @@ Import("env")
 
 env = env.Clone()
 
-env.Library("tz", [ "timegm.c" ])
+env.Library(
+    target="tz",
+    source=[
+        "timegm.c",
+    ],
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ],
+)

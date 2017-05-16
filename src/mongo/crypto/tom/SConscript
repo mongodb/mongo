@@ -17,4 +17,8 @@ env.Library('tomcrypt',
            'hmac_process.c',
            'sha1.c',
            'zeromem.c'],
-           LIBDEPS=[])
+           LIBDEPS=[],
+           LIBDEPS_TAGS=[
+               'init-no-global-side-effects',
+           ],
+)

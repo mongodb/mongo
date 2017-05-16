@@ -50,4 +50,10 @@ if myEnv.ToolchainIs('GCC', 'clang'):
     # Machine generated code generates overflow warnings.
     myEnv.Append(CCFLAGS=['-fno-strict-overflow'])
 
-myEnv.Library( "stemmer", stemmer_files )
+myEnv.Library(
+    target="stemmer",
+    source=stemmer_files,
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ],
+)

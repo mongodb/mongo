@@ -19,5 +19,8 @@ env.Library(
         'inftrees.c',
         'trees.c',
         'zutil.c',
-    ])
-
+    ],
+    LIBDEPS_TAGS=[
+        'init-no-global-side-effects',
+    ],
+)
