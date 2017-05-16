@@ -359,9 +359,6 @@ class JSTestCase(TestCase):
         test_data = global_vars.get("TestData", {}).copy()
         test_data["minPort"] = core.network.PortAllocator.min_test_port(fixture.job_num)
         test_data["maxPort"] = core.network.PortAllocator.max_test_port(fixture.job_num)
-        # Marks the main test when multiple test clients are run concurrently, to notify the test
-        # of any code that should only be run once. If there is only one client, it is the main one.
-        test_data["isMainTest"] = True
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
@@ -416,17 +413,31 @@ class JSTestCase(TestCase):
                     raise t._get_exception()
 
     def _make_process(self, logger=None, thread_id=0):
+        # Since _make_process() is called by each thread, we make a shallow copy of the mongo shell
+        # options to avoid modifying the shared options for the JSTestCase.
+        shell_options = self.shell_options.copy()
+        global_vars = shell_options["global_vars"].copy()
+        test_data = global_vars["TestData"].copy()
+
+        # We set a property on TestData to mark the main test when multiple clients are going to run
+        # concurrently in case there is logic within the test that must execute only once. We also
+        # set a property on TestData to indicate how many clients are going to run the test so they
+        # can avoid executing certain logic when there may be other operations running concurrently.
+        is_main_test = thread_id == 0
+        test_data["isMainTest"] = is_main_test
+        test_data["numTestClients"] = self.num_clients
+
+        global_vars["TestData"] = test_data
+        shell_options["global_vars"] = global_vars
+
         # If logger is none, it means that it's not running in a thread and thus logger should be
         # set to self.logger.
         logger = utils.default_if_none(logger, self.logger)
-        is_main_test = True
-        if thread_id > 0:
-            is_main_test = False
+
         return core.programs.mongo_shell_program(logger,
                                                  executable=self.shell_executable,
                                                  filename=self.js_filename,
-                                                 isMainTest=is_main_test,
-                                                 **self.shell_options)
+                                                 **shell_options)
 
     def _run_test_in_thread(self, thread_id):
         # Make a logger for each thread. When this method gets called self.logger has been
