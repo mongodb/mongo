@@ -80,12 +80,15 @@ public:
         help << "resize oplog size";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::resizeOplog);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::resizeOplog)) {
+            return Status::OK();
+        }
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
     bool run(OperationContext* opCtx,
