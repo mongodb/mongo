@@ -31,27 +31,17 @@
 #include "mongo/platform/basic.h"
 
 #include <string>
-#include <vector>
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/apply_ops.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/dbhash.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/matcher.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -96,9 +86,13 @@ public:
             BSONObj& jsobj,
             string& errmsg,
             BSONObjBuilder& result) {
-        NamespaceString nss("local.oplog.rs");
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        Collection* coll = autoColl.getCollection();
+        const NamespaceString nss("local", "oplog.rs");
+        Lock::GlobalWrite global(opCtx);
+        Database* database = dbHolder().get(opCtx, nss.db());
+        if (!database) {
+            return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotFound, "database local does not exist"));
+        }
+        Collection* coll = database->getCollection(opCtx, nss);
         if (!coll) {
             return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotFound, "oplog does not exist"));
         }
