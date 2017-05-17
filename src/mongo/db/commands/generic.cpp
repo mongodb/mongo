@@ -71,7 +71,7 @@ using std::vector;
 
 class CmdBuildInfo : public Command {
 public:
-    CmdBuildInfo() : Command("buildInfo", true, "buildinfo") {}
+    CmdBuildInfo() : Command("buildInfo", "buildinfo") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -130,7 +130,7 @@ public:
 
 class FeaturesCmd : public Command {
 public:
-    FeaturesCmd() : Command("features", true) {}
+    FeaturesCmd() : Command("features") {}
     void help(stringstream& h) const {
         h << "return build level feature settings";
     }
@@ -165,7 +165,7 @@ public:
 
 class HostInfoCmd : public Command {
 public:
-    HostInfoCmd() : Command("hostInfo", true) {}
+    HostInfoCmd() : Command("hostInfo") {}
     virtual bool slaveOk() const {
         return true;
     }
@@ -250,7 +250,7 @@ public:
     virtual void help(stringstream& help) const {
         help << "get a list of all db commands";
     }
-    ListCommandsCmd() : Command("listCommands", false) {}
+    ListCommandsCmd() : Command("listCommands") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

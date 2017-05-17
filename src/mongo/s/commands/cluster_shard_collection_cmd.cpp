@@ -121,7 +121,7 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 
 class ShardCollectionCmd : public Command {
 public:
-    ShardCollectionCmd() : Command("shardCollection", false, "shardcollection") {}
+    ShardCollectionCmd() : Command("shardCollection", "shardcollection") {}
 
     bool slaveOk() const override {
         return true;

@@ -137,9 +137,8 @@ ResourcePattern Command::parseResourcePattern(const std::string& dbname,
     return ResourcePattern::forExactNamespace(NamespaceString(ns));
 }
 
-Command::Command(StringData name, bool webUI, StringData oldName)
+Command::Command(StringData name, StringData oldName)
     : _name(name.toString()),
-      _webUI(webUI),
       _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
       _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
     // register ourself.

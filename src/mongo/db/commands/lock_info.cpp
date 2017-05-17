@@ -77,7 +77,7 @@ public:
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    CmdLockInfo() : Command("lockInfo", true) {}
+    CmdLockInfo() : Command("lockInfo") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

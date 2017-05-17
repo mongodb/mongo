@@ -35,7 +35,7 @@ namespace {
 
 class ProfileCmd : public Command {
 public:
-    ProfileCmd() : Command("profile", false) {}
+    ProfileCmd() : Command("profile") {}
 
     virtual bool slaveOk() const {
         return true;

@@ -40,7 +40,7 @@ namespace {
 
 class ClusterPipelineCommand : public Command {
 public:
-    ClusterPipelineCommand() : Command("aggregate", false) {}
+    ClusterPipelineCommand() : Command("aggregate") {}
 
     void help(std::stringstream& help) const {
         help << "Runs the sharded aggregation command. See "

@@ -42,7 +42,7 @@ namespace {
 
 class CmdShardingResetError : public Command {
 public:
-    CmdShardingResetError() : Command("resetError", false, "reseterror") {}
+    CmdShardingResetError() : Command("resetError", "reseterror") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

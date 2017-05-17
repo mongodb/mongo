@@ -52,7 +52,7 @@ namespace {
 
 class ListDatabasesCmd : public Command {
 public:
-    ListDatabasesCmd() : Command("listDatabases", true, "listdatabases") {}
+    ListDatabasesCmd() : Command("listDatabases", "listdatabases") {}
 
     virtual bool slaveOk() const {
         return true;

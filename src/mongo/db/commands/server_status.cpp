@@ -66,7 +66,7 @@ using std::stringstream;
 
 class CmdServerStatus : public Command {
 public:
-    CmdServerStatus() : Command("serverStatus", true), _started(Date_t::now()), _runCalled(false) {}
+    CmdServerStatus() : Command("serverStatus"), _started(Date_t::now()), _runCalled(false) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

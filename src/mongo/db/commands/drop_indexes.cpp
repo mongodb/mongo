@@ -83,7 +83,7 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") {}
+    CmdDropIndexes() : Command("dropIndexes", "deleteIndexes") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& jsobj,

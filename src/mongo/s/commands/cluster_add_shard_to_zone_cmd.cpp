@@ -67,7 +67,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
  */
 class AddShardToZoneCmd : public Command {
 public:
-    AddShardToZoneCmd() : Command("addShardToZone", false, "addshardtozone") {}
+    AddShardToZoneCmd() : Command("addShardToZone", "addshardtozone") {}
 
     virtual bool slaveOk() const {
         return true;

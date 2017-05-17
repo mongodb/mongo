@@ -45,7 +45,7 @@ namespace {
 
 class GetShardVersion : public Command {
 public:
-    GetShardVersion() : Command("getShardVersion", false, "getshardversion") {}
+    GetShardVersion() : Command("getShardVersion", "getshardversion") {}
 
     bool slaveOk() const override {
         return true;

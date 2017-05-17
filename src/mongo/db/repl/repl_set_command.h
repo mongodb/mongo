@@ -45,7 +45,7 @@ namespace repl {
  */
 class ReplSetCommand : public Command {
 protected:
-    ReplSetCommand(const char* s, bool show = false) : Command(s, show) {}
+    ReplSetCommand(const char* s) : Command(s) {}
 
     bool slaveOk() const override {
         return true;

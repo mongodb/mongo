@@ -186,7 +186,7 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
 
 class GetLastErrorCmd : public Command {
 public:
-    GetLastErrorCmd() : Command("getLastError", false, "getlasterror") {}
+    GetLastErrorCmd() : Command("getLastError", "getlasterror") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

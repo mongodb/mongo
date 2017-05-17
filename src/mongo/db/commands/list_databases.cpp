@@ -81,7 +81,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    CmdListDatabases() : Command("listDatabases", true) {}
+    CmdListDatabases() : Command("listDatabases") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

@@ -56,7 +56,7 @@ namespace {
 
 class CheckShardingIndex : public Command {
 public:
-    CheckShardingIndex() : Command("checkShardingIndex", false) {}
+    CheckShardingIndex() : Command("checkShardingIndex") {}
 
     virtual void help(std::stringstream& help) const {
         help << "Internal command.\n";

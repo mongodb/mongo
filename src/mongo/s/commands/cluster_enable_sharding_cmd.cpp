@@ -49,7 +49,7 @@ namespace {
 
 class EnableShardingCmd : public Command {
 public:
-    EnableShardingCmd() : Command("enableSharding", false, "enablesharding") {}
+    EnableShardingCmd() : Command("enableSharding", "enablesharding") {}
 
     virtual bool slaveOk() const {
         return true;

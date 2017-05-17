@@ -53,7 +53,7 @@ const char kShardAdded[] = "shardAdded";
 
 class AddShardCmd : public Command {
 public:
-    AddShardCmd() : Command("addShard", false, "addshard") {}
+    AddShardCmd() : Command("addShard", "addshard") {}
 
     virtual bool slaveOk() const {
         return true;

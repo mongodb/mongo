@@ -42,7 +42,7 @@ using std::vector;
 
 class DBStatsCmd : public Command {
 public:
-    DBStatsCmd() : Command("dbStats", false, "dbstats") {}
+    DBStatsCmd() : Command("dbStats", "dbstats") {}
 
     bool slaveOk() const override {
         return true;

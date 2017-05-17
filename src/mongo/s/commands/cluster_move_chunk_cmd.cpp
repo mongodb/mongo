@@ -57,7 +57,7 @@ namespace {
 
 class MoveChunkCmd : public Command {
 public:
-    MoveChunkCmd() : Command("moveChunk", false, "movechunk") {}
+    MoveChunkCmd() : Command("moveChunk", "movechunk") {}
 
     bool slaveOk() const override {
         return true;

@@ -44,7 +44,7 @@ using namespace mongo;
 
 class TopCommand : public Command {
 public:
-    TopCommand() : Command("top", true) {}
+    TopCommand() : Command("top") {}
 
     virtual bool slaveOk() const {
         return true;

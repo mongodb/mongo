@@ -187,7 +187,7 @@ public:
         help << "{ replSetGetStatus : 1 }";
         help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
-    CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) {}
+    CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus") {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,
@@ -228,7 +228,7 @@ public:
         help << "{ replSetGetConfig : 1 }";
         help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
     }
-    CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig", true) {}
+    CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig") {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,

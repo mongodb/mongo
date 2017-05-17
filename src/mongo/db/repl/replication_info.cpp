@@ -230,7 +230,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    CmdIsMaster() : Command("isMaster", true, "ismaster") {}
+    CmdIsMaster() : Command("isMaster", "ismaster") {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      BSONObj& cmdObj,

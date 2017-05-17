@@ -37,7 +37,7 @@ namespace {
 
 class AvailableQueryOptions : public Command {
 public:
-    AvailableQueryOptions() : Command("availableQueryOptions", false, "availablequeryoptions") {}
+    AvailableQueryOptions() : Command("availableQueryOptions", "availablequeryoptions") {}
 
     bool slaveOk() const override {
         return true;

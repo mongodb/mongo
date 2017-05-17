@@ -86,7 +86,7 @@ BSONObj selectMedianKey(OperationContext* opCtx,
 
 class SplitCollectionCmd : public Command {
 public:
-    SplitCollectionCmd() : Command("split", false, "split") {}
+    SplitCollectionCmd() : Command("split", "split") {}
 
     bool slaveOk() const override {
         return true;

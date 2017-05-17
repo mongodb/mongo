@@ -1341,7 +1341,7 @@ BSONObj _bailFromJS(const BSONObj& args, void* data) {
  */
 class MapReduceCommand : public Command {
 public:
-    MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
+    MapReduceCommand() : Command("mapReduce", "mapreduce") {}
 
     virtual bool slaveOk() const {
         return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=

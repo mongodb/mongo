@@ -148,7 +148,7 @@ BSONObj fixForShards(const BSONObj& orig,
  */
 class MRCmd : public Command {
 public:
-    MRCmd() : Command("mapReduce", false, "mapreduce") {}
+    MRCmd() : Command("mapReduce", "mapreduce") {}
 
     bool slaveOk() const override {
         return true;

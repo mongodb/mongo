@@ -69,7 +69,7 @@ public:
     virtual void help(stringstream& help) const {
         help << "reset error state (used with getpreverror)";
     }
-    CmdResetError() : Command("resetError", false, "reseterror") {}
+    CmdResetError() : Command("resetError", "reseterror") {}
     bool run(OperationContext* opCtx,
              const string& db,
              BSONObj& cmdObj,
@@ -82,7 +82,7 @@ public:
 
 class CmdGetLastError : public Command {
 public:
-    CmdGetLastError() : Command("getLastError", false, "getlasterror") {}
+    CmdGetLastError() : Command("getLastError", "getlasterror") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -310,7 +310,7 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
+    CmdGetPrevError() : Command("getPrevError", "getpreverror") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
              BSONObj& cmdObj,

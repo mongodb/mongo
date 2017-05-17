@@ -38,7 +38,7 @@ namespace {
 
 class NetStatCmd : public Command {
 public:
-    NetStatCmd() : Command("netstat", false, "netstat") {}
+    NetStatCmd() : Command("netstat") {}
 
     virtual bool slaveOk() const {
         return true;

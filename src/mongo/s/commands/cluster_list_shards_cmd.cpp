@@ -41,7 +41,7 @@ namespace {
 
 class ListShardsCmd : public Command {
 public:
-    ListShardsCmd() : Command("listShards", false, "listshards") {}
+    ListShardsCmd() : Command("listShards", "listshards") {}
 
     virtual bool slaveOk() const {
         return true;

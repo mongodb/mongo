@@ -37,7 +37,7 @@ namespace {
 
 class FlushRouterConfigCmd : public Command {
 public:
-    FlushRouterConfigCmd() : Command("flushRouterConfig", false, "flushrouterconfig") {}
+    FlushRouterConfigCmd() : Command("flushRouterConfig", "flushrouterconfig") {}
 
     virtual bool slaveOk() const {
         return true;

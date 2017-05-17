@@ -40,7 +40,7 @@ namespace {
 
 class GetPrevErrorCmd : public Command {
 public:
-    GetPrevErrorCmd() : Command("getPrevError", false, "getpreverror") {}
+    GetPrevErrorCmd() : Command("getPrevError", "getpreverror") {}
 
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

@@ -62,7 +62,7 @@ namespace {
 
 class MoveDatabasePrimaryCommand : public Command {
 public:
-    MoveDatabasePrimaryCommand() : Command("movePrimary", false, "moveprimary") {}
+    MoveDatabasePrimaryCommand() : Command("movePrimary", "moveprimary") {}
 
     virtual bool slaveOk() const {
         return true;

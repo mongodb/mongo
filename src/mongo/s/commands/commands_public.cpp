@@ -148,7 +148,7 @@ StatusWith<BSONObj> getCollation(const BSONObj& cmdObj) {
 
 class PublicGridCommand : public Command {
 protected:
-    PublicGridCommand(const char* n, const char* oldname = NULL) : Command(n, false, oldname) {}
+    PublicGridCommand(const char* n, const char* oldname = NULL) : Command(n, oldname) {}
 
     virtual bool slaveOk() const {
         return true;
@@ -199,7 +199,7 @@ protected:
                                const char* oldname = NULL,
                                bool implicitCreateDb = false,
                                bool appendShardVersion = true)
-        : Command(name, false, oldname),
+        : Command(name, oldname),
           _implicitCreateDb(implicitCreateDb),
           _appendShardVersion(appendShardVersion) {}
 

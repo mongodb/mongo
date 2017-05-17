@@ -40,7 +40,7 @@ namespace {
 
 class FsyncCommand : public Command {
 public:
-    FsyncCommand() : Command("fsync", false, "fsync") {}
+    FsyncCommand() : Command("fsync", "fsync") {}
 
     virtual bool slaveOk() const {
         return true;

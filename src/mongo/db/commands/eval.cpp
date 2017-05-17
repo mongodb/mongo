@@ -172,7 +172,7 @@ public:
         RoleGraph::generateUniversalPrivileges(out);
     }
 
-    CmdEval() : Command("eval", false, "$eval") {}
+    CmdEval() : Command("eval", "$eval") {}
 
     bool run(OperationContext* opCtx,
              const string& dbname,

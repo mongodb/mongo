@@ -49,7 +49,7 @@ namespace {
 
 class ClusterCountCmd : public Command {
 public:
-    ClusterCountCmd() : Command("count", false) {}
+    ClusterCountCmd() : Command("count") {}
 
     bool slaveOk() const override {
         return true;

@@ -60,7 +60,7 @@ using std::vector;
 
 class FindAndModifyCmd : public Command {
 public:
-    FindAndModifyCmd() : Command("findAndModify", false, "findandmodify") {}
+    FindAndModifyCmd() : Command("findAndModify", "findandmodify") {}
 
     bool slaveOk() const override {
         return true;

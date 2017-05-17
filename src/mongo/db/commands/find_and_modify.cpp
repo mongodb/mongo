@@ -228,7 +228,7 @@ public:
                 "Output is in the \"value\" field\n";
     }
 
-    CmdFindAndModify() : Command("findAndModify", false, "findandmodify") {}
+    CmdFindAndModify() : Command("findAndModify", "findandmodify") {}
 
     bool slaveOk() const override {
         return false;

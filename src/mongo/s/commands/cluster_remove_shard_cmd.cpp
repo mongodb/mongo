@@ -52,7 +52,7 @@ namespace {
 
 class RemoveShardCmd : public Command {
 public:
-    RemoveShardCmd() : Command("removeShard", false, "removeshard") {}
+    RemoveShardCmd() : Command("removeShard", "removeshard") {}
 
     virtual bool slaveOk() const {
         return true;

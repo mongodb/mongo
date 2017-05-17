@@ -825,7 +825,7 @@ class CmdDatasize : public Command {
     }
 
 public:
-    CmdDatasize() : Command("dataSize", false, "datasize") {}
+    CmdDatasize() : Command("dataSize", "datasize") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -975,7 +975,7 @@ public:
 
 class CollectionStats : public Command {
 public:
-    CollectionStats() : Command("collStats", false, "collstats") {}
+    CollectionStats() : Command("collStats", "collstats") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -1058,7 +1058,7 @@ public:
 
 class DBStats : public Command {
 public:
-    DBStats() : Command("dbStats", false, "dbstats") {}
+    DBStats() : Command("dbStats", "dbstats") {}
 
     virtual bool slaveOk() const {
         return true;
@@ -1176,7 +1176,7 @@ public:
 
 class AvailableQueryOptions : public Command {
 public:
-    AvailableQueryOptions() : Command("availableQueryOptions", false, "availablequeryoptions") {}
+    AvailableQueryOptions() : Command("availableQueryOptions", "availablequeryoptions") {}
 
     virtual bool slaveOk() const {
         return true;

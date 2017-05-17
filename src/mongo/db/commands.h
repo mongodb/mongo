@@ -89,10 +89,9 @@ public:
      * Constructs a new command and causes it to be registered with the global commands list. It is
      * not safe to construct commands other than when the server is starting up.
      *
-     * @param webUI expose the command in the web ui as localhost:28017/<name>
      * @param oldName an optional old, deprecated name for the command
      */
-    Command(StringData name, bool webUI = false, StringData oldName = StringData());
+    Command(StringData name, StringData oldName = StringData());
 
     // NOTE: Do not remove this declaration, or relocate it in this class. We
     // are using this method to control where the vtable is emitted.
@@ -103,13 +102,6 @@ public:
      */
     const std::string& getName() const {
         return _name;
-    }
-
-    /**
-     * Returns whether this command is visible in the Web UI.
-     */
-    bool isWebUI() const {
-        return _webUI;
     }
 
     // Return the namespace for the command. If the first field in 'cmdObj' is of type
@@ -435,9 +427,6 @@ private:
 private:
     // The full name of the command
     const std::string _name;
-
-    // Whether the command is available in the web UI
-    const bool _webUI;
 
     // Pointers to hold the metrics tree references
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;

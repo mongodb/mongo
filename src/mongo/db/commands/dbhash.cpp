@@ -60,7 +60,7 @@ namespace {
 
 class DBHashCmd : public Command {
 public:
-    DBHashCmd() : Command("dbHash", false, "dbhash") {}
+    DBHashCmd() : Command("dbHash", "dbhash") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
