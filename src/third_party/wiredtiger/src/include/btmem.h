@@ -933,7 +933,7 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 #define	WT_UPDATE_MEMSIZE(upd)						\
 	WT_ALIGN(sizeof(WT_UPDATE) +					\
 	    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : (upd)->size), 32)
-};
+WT_PACKED_STRUCT_END
 
 /*
  * WT_INSERT --
