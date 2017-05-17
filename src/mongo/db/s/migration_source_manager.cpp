@@ -92,7 +92,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             _args.getFromShardId() != _args.getToShardId());
 
     log() << "Starting chunk migration " << redact(_args.toString())
-          << " with expected collection version epoch" << _args.getVersionEpoch();
+          << " with expected collection version epoch " << _args.getVersionEpoch();
 
     // Now that the collection is locked, snapshot the metadata and fetch the latest versions
     ShardingState* const shardingState = ShardingState::get(opCtx);

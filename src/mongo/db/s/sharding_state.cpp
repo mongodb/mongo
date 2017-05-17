@@ -267,11 +267,12 @@ Status ShardingState::refreshMetadataNow(OperationContext* opCtx,
     }
 }
 
-// NOTE: This method can be called inside a database lock so it should never take any database
+// NOTE: This method will be called inside a database lock so it should never take any database
 // locks, perform I/O, or any long running operations.
 Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
                                                   const ShardIdentityType& shardIdentity) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+    invariant(opCtx->lockState()->isLocked());
 
     Status validationStatus = shardIdentity.validate();
     if (!validationStatus.isOK()) {
@@ -314,13 +315,23 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
     try {
         Status status = _globalInit(opCtx, configSvrConnStr, generateDistLockProcessId(opCtx));
         if (status.isOK()) {
-            log() << "initialized sharding components";
-            _setInitializationState(InitializationState::kInitialized);
             ReplicaSetMonitor::setSynchronousConfigChangeHook(
                 &ShardRegistry::replicaSetChangeShardRegistryUpdateHook);
             ReplicaSetMonitor::setAsynchronousConfigChangeHook(&updateShardIdentityConfigStringCB);
-            _setInitializationState(InitializationState::kInitialized);
 
+            // Determine primary/secondary/standalone state in order to set it on the CatalogCache.
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            bool isReplSet =
+                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+            bool isStandaloneOrPrimary =
+                !isReplSet || (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+                               repl::MemberState::RS_PRIMARY);
+
+            Grid::get(opCtx)->catalogCache()->initializeReplicaSetRole(isStandaloneOrPrimary);
+
+            log() << "initialized sharding components for "
+                  << (isStandaloneOrPrimary ? "primary" : "secondary") << " node.";
+            _setInitializationState(InitializationState::kInitialized);
         } else {
             log() << "failed to initialize sharding components" << causedBy(status);
             _initializationStatus = status;
@@ -350,6 +361,8 @@ void ShardingState::_setInitializationState(InitializationState newState) {
 }
 
 StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationContext* opCtx) {
+    invariant(!opCtx->lockState()->isLocked());
+
     // In sharded readOnly mode, we ignore the shardIdentity document on disk and instead *require*
     // a shardIdentity document to be passed through --overrideShardIdentity.
     if (storageGlobalParams.readOnly) {
@@ -364,9 +377,14 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
             if (!swOverrideShardIdentity.isOK()) {
                 return swOverrideShardIdentity.getStatus();
             }
-            auto status = initializeFromShardIdentity(opCtx, swOverrideShardIdentity.getValue());
-            if (!status.isOK()) {
-                return status;
+            {
+                // Global lock is required to call initializeFromShardIdenetity().
+                Lock::GlobalWrite lk(opCtx);
+                auto status =
+                    initializeFromShardIdentity(opCtx, swOverrideShardIdentity.getValue());
+                if (!status.isOK()) {
+                    return status;
+                }
             }
             return true;
         } else {
@@ -399,7 +417,6 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
         }
 
         // Load the shardIdentity document from disk.
-        invariant(!opCtx->lockState()->isLocked());
         BSONObj shardIdentityBSON;
         bool foundShardIdentity = false;
         try {
@@ -428,9 +445,13 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
             if (!swShardIdentity.isOK()) {
                 return swShardIdentity.getStatus();
             }
-            auto status = initializeFromShardIdentity(opCtx, swShardIdentity.getValue());
-            if (!status.isOK()) {
-                return status;
+            {
+                // Global lock is required to call initializeFromShardIdenetity().
+                Lock::GlobalWrite lk(opCtx);
+                auto status = initializeFromShardIdentity(opCtx, swShardIdentity.getValue());
+                if (!status.isOK()) {
+                    return status;
+                }
             }
             return true;
         } else {

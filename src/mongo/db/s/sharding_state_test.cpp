@@ -30,10 +30,12 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
@@ -41,7 +43,9 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
 
 namespace mongo {
@@ -116,12 +120,25 @@ protected:
         return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
     }
 
+    std::unique_ptr<CatalogCacheLoader> makeCatalogCacheLoader() {
+        return stdx::make_unique<ShardServerCatalogCacheLoader>(
+            stdx::make_unique<ConfigServerCatalogCacheLoader>());
+    }
+
+    std::unique_ptr<CatalogCache> makeCatalogCache(
+        std::unique_ptr<CatalogCacheLoader> catalogCacheLoader) {
+        invariant(catalogCacheLoader);
+        return stdx::make_unique<CatalogCache>(std::move(catalogCacheLoader));
+    }
+
 private:
     ShardingState _shardingState;
     ShardId _shardName;
 };
 
 TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
+    Lock::GlobalWrite lk(operationContext());
+
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
@@ -135,6 +152,9 @@ TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
 }
 
 TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
+    // Must hold a lock to call initializeFromShardIdentity.
+    Lock::GlobalWrite lk(operationContext());
+
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
@@ -169,6 +189,9 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
 }
 
 TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
+    // Must hold a lock to call initializeFromShardIdentity.
+    Lock::GlobalWrite lk(operationContext());
+
     auto clusterID = OID::gen();
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
@@ -197,6 +220,9 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
 }
 
 TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
+    // Must hold a lock to call initializeFromShardIdentity.
+    Lock::GlobalWrite lk(operationContext());
+
     auto clusterID = OID::gen();
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(

@@ -79,6 +79,7 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -681,6 +682,9 @@ void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationCon
 void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         Balancer::get(_service)->interruptBalancer();
+    } else if (ShardingState::get(_service)->enabled()) {
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+        Grid::get(_service)->catalogCache()->onStepDown();
     }
 
     ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
@@ -740,6 +744,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // If this is a config server node becoming a primary, start the balancer
         Balancer::get(opCtx)->initiateBalancer(opCtx);
     } else if (ShardingState::get(opCtx)->enabled()) {
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
         const auto configsvrConnStr =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
         auto status = ShardingState::get(opCtx)->updateShardIdentityConfigString(
@@ -748,6 +754,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             warning() << "error encountered while trying to update config connection string to "
                       << configsvrConnStr << causedBy(status);
         }
+
+        Grid::get(_service)->catalogCache()->onStepUp();
     }
 
     // There is a slight chance that some stale metadata might have been loaded before the latest

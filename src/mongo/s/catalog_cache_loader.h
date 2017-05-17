@@ -67,6 +67,21 @@ public:
     };
 
     /**
+     * Initializes internal state. Must be called only once when sharding state is initialized.
+     */
+    virtual void initializeReplicaSetRole(bool isPrimary) = 0;
+
+    /**
+     * Changes internal state on step down.
+     */
+    virtual void onStepDown() = 0;
+
+    /**
+     * Changes internal state on step up.
+     */
+    virtual void onStepUp() = 0;
+
+    /**
      * Non-blocking call, which requests the chunks changed since the specified version to be
      * fetched from the persistent metadata store and invokes the callback function with the result.
      * The callback function must never throw - it is a fatal error to do so.

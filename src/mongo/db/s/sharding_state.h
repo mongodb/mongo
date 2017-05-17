@@ -114,7 +114,11 @@ public:
     }
 
     /**
-     * Initializes the sharding state of this server from the shard identity document argument.
+     * Initializes the sharding state of this server from the shard identity document argument
+     * and sets secondary or primary state information on the catalog cache loader.
+     *
+     * Note: caller must hold a global/database lock! Needed in order to stably check for
+     * replica set state (primary, secondary, standalone).
      */
     Status initializeFromShardIdentity(OperationContext* opCtx,
                                        const ShardIdentityType& shardIdentity);
@@ -247,6 +251,8 @@ public:
      * classes for sharding were initialized, but no networking calls were made yet (with the
      * exception of the duplicate ShardRegistry reload in ShardRegistry::startup() (see
      * SERVER-26123). Outgoing networking calls to cluster members can now be made.
+     *
+     * Note: this function briefly takes the global lock to determine primary/secondary state.
      */
     StatusWith<bool> initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
 

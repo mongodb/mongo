@@ -621,6 +621,7 @@ ExitCode _initAndListen(int listenPort) {
               << startupWarningsLog;
     }
 
+    // This function may take the global lock.
     auto shardingInitialized =
         uassertStatusOK(ShardingState::get(startupOpCtx.get())
                             ->initializeShardingAwarenessIfNeeded(startupOpCtx.get()));

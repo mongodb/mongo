@@ -38,6 +38,13 @@ public:
     ConfigServerCatalogCacheLoader();
     ~ConfigServerCatalogCacheLoader();
 
+    /**
+     * These functions should never be called. They trigger invariants if called.
+     */
+    void initializeReplicaSetRole(bool isPrimary) override;
+    void onStepDown() override;
+    void onStepUp() override;
+
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,

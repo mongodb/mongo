@@ -67,6 +67,27 @@ public:
     ~CatalogCache();
 
     /**
+     * Intializes the catalog cache loader state for primary or secondary depending on 'isPrimary'.
+     *
+     * This can only be called on a shard, and only once during sharding state intiailization!
+     */
+    void initializeReplicaSetRole(bool isPrimary);
+
+    /**
+     * Tells the catalog cache loader that it should be in secondary mode.
+     *
+     * This can only be called on a shard!
+     */
+    void onStepDown();
+
+    /**
+     * Tells the catalog cache loader that it should be in primary mode.
+     *
+     * This can only be called on a shard!
+     */
+    void onStepUp();
+
+    /**
      * Retrieves the cached metadata for the specified database. The returned value is still owned
      * by the cache and should not be kept elsewhere. I.e., it should only be used as a local
      * variable. The reason for this is so that if the cache gets invalidated, the caller does not

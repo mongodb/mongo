@@ -141,6 +141,18 @@ ConfigServerCatalogCacheLoader::~ConfigServerCatalogCacheLoader() {
     _threadPool.join();
 }
 
+void ConfigServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
+    MONGO_UNREACHABLE;
+}
+
+void ConfigServerCatalogCacheLoader::onStepDown() {
+    MONGO_UNREACHABLE;
+}
+
+void ConfigServerCatalogCacheLoader::onStepUp() {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,

@@ -45,9 +45,27 @@ class ThreadPoolInterface;
  * retrieves chunk metadata from the shard persisted chunk metadata.
  */
 class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
+    MONGO_DISALLOW_COPYING(ShardServerCatalogCacheLoader);
+
 public:
     ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configLoader);
     ~ShardServerCatalogCacheLoader();
+
+    /**
+     * Initializes internal state so that the loader behaves as a primary or secondary. This can
+     * only be called once, when the sharding state is initialized.
+     */
+    void initializeReplicaSetRole(bool isPrimary) override;
+
+    /**
+     * Updates internal state so that the loader can start behaving like a secondary.
+     */
+    void onStepDown() override;
+
+    /**
+     * Updates internal state so that the loader can start behaving like a primary.
+     */
+    void onStepUp() override;
 
     /**
      * This must be called serially, never in parallel, including waiting for the returned
@@ -66,6 +84,10 @@ public:
         override;
 
 private:
+    // Differentiates the server's role in the replica set so that the chunk loader knows whether to
+    // load metadata locally or remotely.
+    enum class ReplicaSetRole { None, Secondary, Primary };
+
     /**
      * This represents an update task for the persisted chunk metadata. The task will either be to
      * apply a set up updated chunks to the shard persisted metadata store or to drop the persisted
@@ -86,7 +108,8 @@ private:
          * 'collectionAndChangedChunks' or ChunkVersion::UNSHARDED().
          */
         Task(StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
-             ChunkVersion minimumQueryVersion);
+             ChunkVersion minimumQueryVersion,
+             long long currentTerm);
 
         // Chunks and Collection updates to be applied to the shard persisted metadata store.
         boost::optional<CollectionAndChangedChunks> collectionAndChangedChunks{boost::none};
@@ -103,6 +126,9 @@ private:
 
         // Indicates whether the collection metadata must be cleared.
         bool dropped{false};
+
+        // The term in which the loader scheduled this task.
+        uint32_t termCreated;
     };
 
     /**
@@ -144,14 +170,22 @@ private:
         }
 
         /**
+         * Checks whether 'term' matches the term of the latest task in the task list. This is
+         * useful to check whether the task list has outdated data that's no longer valid to use in
+         * the current/new term specified by 'term'.
+         */
+        bool hasTasksFromThisTerm(long long term) const;
+
+        /**
          * Gets the last task's highest version -- this is the most up to date version.
          */
         ChunkVersion getHighestVersionEnqueued() const;
 
         /**
-         * Iterates over the task list to retrieve the enqueued metadata.
+         * Iterates over the task list to retrieve the enqueued metadata. Only retrieves collects
+         * data from tasks that have terms matching the specified 'term'.
          */
-        CollectionAndChangedChunks getEnqueuedMetadata() const;
+        CollectionAndChangedChunks getEnqueuedMetadataForTerm(const long long term) const;
 
     private:
         std::list<Task> _tasks{};
@@ -164,8 +198,9 @@ private:
      * of the shard's persisted metadata store with the latest updates retrieved from the config
      * server.
      *
-     * Then calls 'callbackFn' with metadata loaded from the shard persisted metadata store, and any
-     * in-memory task enqueued to update that store, GTE to 'catalogCacheSinceVersion'
+     * Then calls 'callbackFn' with metadata retrived locally from the shard persisted metadata
+     * store and any in-memory tasks with terms matching 'currentTerm' enqueued to update that
+     * store, GTE to 'catalogCacheSinceVersion'.
      *
      * Only run on the shard primary.
      */
@@ -173,13 +208,14 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
+        long long currentTerm,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
         std::shared_ptr<Notification<void>> notify);
 
 
     /**
-     * Loads chunk metadata from the shard persisted metadata store, and any in-memory task enqueued
-     * to update that store, GTE to 'catalogCacheSinceVersion'.
+     * Loads chunk metadata from the shard persisted metadata store and any in-memory tasks with
+     * terms matching 'term' enqueued to update that store, GTE to 'catalogCacheSinceVersion'.
      *
      * Will return an empty CollectionAndChangedChunks object if no metadata is found (collection
      * was dropped).
@@ -189,13 +225,14 @@ private:
     StatusWith<CollectionAndChangedChunks> _getLoaderMetadata(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const ChunkVersion& catalogCacheSinceVersion);
+        const ChunkVersion& catalogCacheSinceVersion,
+        const long long term);
 
     /**
      * Loads chunk metadata from all in-memory tasks enqueued to update the shard persisted metadata
      * store for collection 'nss' that is GTE 'catalogCacheSinceVersion'. If
      * 'catalogCacheSinceVersion's epoch does not match that of the metadata enqueued, returns all
-     * metadata.
+     * metadata. Ignores tasks with terms that do not match 'term': these are no longer valid.
      *
      * The bool returned in the pair indicates whether there are any tasks enqueued. If none are, it
      * is false. If it is true, and the CollectionAndChangedChunks returned is empty, this indicates
@@ -204,7 +241,9 @@ private:
      * Only run on the shard primary.
      */
     std::pair<bool, CollectionAndChangedChunks> _getEnqueuedMetadata(
-        const NamespaceString& nss, const ChunkVersion& catalogCacheSinceVersion);
+        const NamespaceString& nss,
+        const ChunkVersion& catalogCacheSinceVersion,
+        const long long term);
 
     /**
      * Adds 'task' to the task list for 'nss'. If this creates a new task list, then '_runTasks' is
@@ -240,6 +279,15 @@ private:
 
     // Map to track in progress persisted cache updates on the shard primary.
     TaskLists _taskLists;
+
+    // This value is increment every time this server changes from primary to secondary and vice
+    // versa. In this way, if a task is scheduled with one term value and then execution is
+    // attempted during another term, we can skip the operation because it is no longer valid.
+    long long _term{0};
+
+    // Indicates whether this server is the primary or not, so that the appropriate loading action
+    // can be taken.
+    ReplicaSetRole _role{ReplicaSetRole::None};
 };
 
 }  // namespace mongo

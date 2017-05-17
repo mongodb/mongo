@@ -240,26 +240,64 @@ ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
     _threadPool.join();
 }
 
+void ShardServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_role == ReplicaSetRole::None);
+
+    if (isPrimary) {
+        _role = ReplicaSetRole::Primary;
+    } else {
+        _role = ReplicaSetRole::Secondary;
+    }
+}
+
+void ShardServerCatalogCacheLoader::onStepDown() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_role != ReplicaSetRole::None);
+    ++_term;
+    _role = ReplicaSetRole::Secondary;
+}
+
+void ShardServerCatalogCacheLoader::onStepUp() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariant(_role != ReplicaSetRole::None);
+    ++_term;
+    _role = ReplicaSetRole::Primary;
+}
 
 std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,
     stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
+    long long currentTerm;
+    bool isPrimary;
+    {
+        // Take the mutex so that we can discern whether we're primary or secondary and schedule a
+        // task with the corresponding _term value.
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        invariant(_role != ReplicaSetRole::None);
 
-    // TODO: plug in secondary machinery, with onStepDown and onBecomePrimary tasks: clear TaskLists
-    // and thread pool
+        currentTerm = _term;
+        isPrimary = (_role == ReplicaSetRole::Primary);
+    }
+
+    // TODO: add and plug in secondary machinery
 
     auto notify = std::make_shared<Notification<void>>();
 
-    uassertStatusOK(_threadPool.schedule([ this, nss, version, callbackFn, notify ]() noexcept {
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        try {
-            _schedulePrimayGetChunksSince(opCtx.get(), nss, version, callbackFn, notify);
-        } catch (const DBException& ex) {
-            callbackFn(opCtx.get(), ex.toStatus());
-            notify->set();
-        }
-    }));
+    if (isPrimary) {
+        uassertStatusOK(_threadPool.schedule(
+            [ this, nss, version, currentTerm, callbackFn, notify ]() noexcept {
+                auto opCtx = Client::getCurrent()->makeOperationContext();
+                try {
+                    _schedulePrimayGetChunksSince(
+                        opCtx.get(), nss, version, currentTerm, callbackFn, notify);
+                } catch (const DBException& ex) {
+                    callbackFn(opCtx.get(), ex.toStatus());
+                    notify->set();
+                }
+            }));
+    }
 
     return notify;
 }
@@ -268,6 +306,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
+    long long termScheduled,
     stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
     std::shared_ptr<Notification<void>> notify) {
 
@@ -277,7 +316,8 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
             stdx::lock_guard<stdx::mutex> lock(_mutex);
             auto taskListIt = _taskLists.find(nss);
 
-            if (taskListIt != _taskLists.end()) {
+            if (taskListIt != _taskLists.end() &&
+                taskListIt->second.hasTasksFromThisTerm(termScheduled)) {
                 // Enqueued tasks have the latest metadata
                 return taskListIt->second.getHighestVersionEnqueued();
             }
@@ -288,7 +328,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
     }();
 
     auto remoteRefreshCallbackFn =
-        [this, nss, catalogCacheSinceVersion, maxLoaderVersion, notify, callbackFn](
+        [this, nss, catalogCacheSinceVersion, maxLoaderVersion, termScheduled, callbackFn, notify](
             OperationContext* opCtx,
             StatusWith<CollectionAndChangedChunks> swCollectionAndChangedChunks) {
 
@@ -297,8 +337,8 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
                 // No updates to apply. Do nothing.
             } else {
                 // Enqueue a Task to apply the update retrieved from the config server.
-                Status scheduleStatus =
-                    _scheduleTask(nss, Task{swCollectionAndChangedChunks, maxLoaderVersion});
+                Status scheduleStatus = _scheduleTask(
+                    nss, Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
                 if (!scheduleStatus.isOK()) {
                     callbackFn(opCtx, StatusWith<CollectionAndChangedChunks>(scheduleStatus));
                     notify->set();
@@ -310,7 +350,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
                     // -- both persisted and enqueued.
 
                     swCollectionAndChangedChunks =
-                        _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion);
+                        _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion, termScheduled);
                     // If no results were returned, convert the response into
                     // NamespaceNotFound.
                     if (swCollectionAndChangedChunks.isOK() &&
@@ -334,12 +374,13 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
 StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoaderMetadata(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkVersion& catalogCacheSinceVersion) {
+    const ChunkVersion& catalogCacheSinceVersion,
+    const long long term) {
 
     // Get the enqueued metadata first. Otherwise we could miss data between reading persisted and
     // enqueued, if an enqueued task finished after the persisted read but before the enqueued read.
 
-    auto enqueuedRes = _getEnqueuedMetadata(nss, catalogCacheSinceVersion);
+    auto enqueuedRes = _getEnqueuedMetadata(nss, catalogCacheSinceVersion, term);
     bool isEnqueued = std::move(enqueuedRes.first);
     CollectionAndChangedChunks enqueued = std::move(enqueuedRes.second);
 
@@ -387,18 +428,25 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
 }
 
 std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getEnqueuedMetadata(
-    const NamespaceString& nss, const ChunkVersion& catalogCacheSinceVersion) {
+    const NamespaceString& nss,
+    const ChunkVersion& catalogCacheSinceVersion,
+    const long long term) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     auto taskListIt = _taskLists.find(nss);
 
     if (taskListIt == _taskLists.end()) {
         return std::make_pair(false, CollectionAndChangedChunks());
+    } else if (!taskListIt->second.hasTasksFromThisTerm(term)) {
+        // If task list does not have a term that matches, there's no valid task data to collect.
+        return std::make_pair(false, CollectionAndChangedChunks());
     }
 
-    CollectionAndChangedChunks collAndChunks = taskListIt->second.getEnqueuedMetadata();
+    // Only return task data of tasks scheduled in the same term as the given 'term': older term
+    // task data is no longer valid.
+    CollectionAndChangedChunks collAndChunks = taskListIt->second.getEnqueuedMetadataForTerm(term);
 
     // Returns all the results if 'catalogCacheSinceVersion's epoch does not match. Otherwise, trim
-    // the results to be GTE to 'catalogCacheSinceVersion'
+    // the results to be GTE to 'catalogCacheSinceVersion'.
 
     if (collAndChunks.epoch != catalogCacheSinceVersion.epoch()) {
         return std::make_pair(true, collAndChunks);
@@ -480,6 +528,12 @@ bool ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
     const Task task = _taskLists[nss].getActiveTask();
     invariant(task.dropped || !task.collectionAndChangedChunks->changedChunks.empty());
 
+    // If this task is from an old term and no longer valid, do not execute and return true so that
+    // the task gets removed from the task list
+    if (task.termCreated != _term) {
+        return true;
+    }
+
     lock.unlock();
 
     // Check if this is a drop task.
@@ -543,9 +597,11 @@ bool ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
 
 ShardServerCatalogCacheLoader::Task::Task(
     StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
-    ChunkVersion minimumQueryVersion) {
+    ChunkVersion minimumQueryVersion,
+    const long long currentTerm) {
 
     minQueryVersion = minimumQueryVersion;
+    termCreated = currentTerm;
 
     if (statusWithCollectionAndChangedChunks.isOK()) {
         collectionAndChangedChunks = statusWithCollectionAndChangedChunks.getValue();
@@ -595,14 +651,24 @@ void ShardServerCatalogCacheLoader::TaskList::removeActiveTask() {
     _tasks.pop_front();
 }
 
+bool ShardServerCatalogCacheLoader::TaskList::hasTasksFromThisTerm(long long term) const {
+    return _tasks.back().termCreated == term;
+}
+
 ChunkVersion ShardServerCatalogCacheLoader::TaskList::getHighestVersionEnqueued() const {
     invariant(!_tasks.empty());
     return _tasks.back().maxQueryVersion;
 }
 
-CollectionAndChangedChunks ShardServerCatalogCacheLoader::TaskList::getEnqueuedMetadata() const {
+CollectionAndChangedChunks ShardServerCatalogCacheLoader::TaskList::getEnqueuedMetadataForTerm(
+    const long long term) const {
     CollectionAndChangedChunks collAndChunks;
     for (const auto& task : _tasks) {
+        if (task.termCreated != term) {
+            // Task data is no longer valid. Go on to the next task in the list.
+            continue;
+        }
+
         if (task.dropped) {
             // A drop task should reset the metadata.
             collAndChunks = CollectionAndChangedChunks();
