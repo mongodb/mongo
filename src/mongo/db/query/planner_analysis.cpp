@@ -605,16 +605,17 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
 }
 
 // static
-QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& query,
-                                                       const QueryPlannerParams& params,
-                                                       QuerySolutionNode* solnRoot) {
+QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    std::unique_ptr<QuerySolutionNode> solnRoot) {
     unique_ptr<QuerySolution> soln(new QuerySolution());
     soln->filterData = query.getQueryObj();
     soln->indexFilterApplied = params.indexFiltersApplied;
 
     solnRoot->computeProperties();
 
-    analyzeGeo(params, solnRoot);
+    analyzeGeo(params, solnRoot.get());
 
     // solnRoot finds all our results.  Let's see what transformations we must perform to the
     // data.
@@ -638,27 +639,27 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
 
             if (fetch) {
                 FetchNode* fetch = new FetchNode();
-                fetch->children.push_back(solnRoot);
-                solnRoot = fetch;
+                fetch->children.push_back(solnRoot.release());
+                solnRoot.reset(fetch);
             }
         }
 
         ShardingFilterNode* sfn = new ShardingFilterNode();
-        sfn->children.push_back(solnRoot);
-        solnRoot = sfn;
+        sfn->children.push_back(solnRoot.release());
+        solnRoot.reset(sfn);
     }
 
     bool hasSortStage = false;
-    solnRoot = analyzeSort(query, params, solnRoot, &hasSortStage);
+    solnRoot.reset(analyzeSort(query, params, solnRoot.release(), &hasSortStage));
 
     // This can happen if we need to create a blocking sort stage and we're not allowed to.
-    if (NULL == solnRoot) {
+    if (!solnRoot) {
         return NULL;
     }
 
     // A solution can be blocking if it has a blocking sort stage or
     // a hashed AND stage.
-    bool hasAndHashStage = hasNode(solnRoot, STAGE_AND_HASH);
+    bool hasAndHashStage = hasNode(solnRoot.get(), STAGE_AND_HASH);
     soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
     const QueryRequest& qr = query.getQueryRequest();
@@ -684,12 +685,13 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
     // shallow in terms of query nodes.
     const bool hasNotRootSort = hasSortStage && STAGE_SORT != solnRoot->getType();
 
-    const bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT) ||
-        hasNode(solnRoot, STAGE_GEO_NEAR_2D) || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE) ||
+    const bool cannotKeepFlagged = hasNode(solnRoot.get(), STAGE_TEXT) ||
+        hasNode(solnRoot.get(), STAGE_GEO_NEAR_2D) ||
+        hasNode(solnRoot.get(), STAGE_GEO_NEAR_2DSPHERE) ||
         (!qr.getSort().isEmpty() && !hasSortStage) || hasNotRootSort;
 
     // Only index intersection stages ever produce flagged results.
-    const bool couldProduceFlagged = hasAndHashStage || hasNode(solnRoot, STAGE_AND_SORTED);
+    const bool couldProduceFlagged = hasAndHashStage || hasNode(solnRoot.get(), STAGE_AND_SORTED);
 
     const bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
 
@@ -705,8 +707,8 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             keep->children.push_back(solnRoot->children[0]);
             solnRoot->children[0] = keep;
         } else {
-            keep->children.push_back(solnRoot);
-            solnRoot = keep;
+            keep->children.push_back(solnRoot.release());
+            solnRoot.reset(keep);
         }
     }
 
@@ -721,8 +723,8 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             // If the projection requires the entire document, somebody must fetch.
             if (!solnRoot->fetched()) {
                 FetchNode* fetch = new FetchNode();
-                fetch->children.push_back(solnRoot);
-                solnRoot = fetch;
+                fetch->children.push_back(solnRoot.release());
+                solnRoot.reset(fetch);
             }
         } else if (!query.getProj()->wantIndexKey()) {
             // The only way we're here is if it's a simple inclusion projection. Often such
@@ -742,8 +744,8 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             // a fetch is required.
             if (!covered) {
                 FetchNode* fetch = new FetchNode();
-                fetch->children.push_back(solnRoot);
-                solnRoot = fetch;
+                fetch->children.push_back(solnRoot.release());
+                solnRoot.reset(fetch);
 
                 // It's simple but we'll have the full document and we should just iterate
                 // over that.
@@ -758,7 +760,7 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                     // underneath and it's giving us index data we can use the faster covered
                     // impl.
                     vector<QuerySolutionNode*> leafNodes;
-                    getLeafNodes(solnRoot, &leafNodes);
+                    getLeafNodes(solnRoot.get(), &leafNodes);
 
                     if (1 == leafNodes.size()) {
                         // Both the IXSCAN and DISTINCT stages provide covered key data.
@@ -787,7 +789,6 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         // bail out.
         if (solnRoot->fetched() &&
             (params.options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS)) {
-            delete solnRoot;
             return nullptr;
         }
 
@@ -797,32 +798,32 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
             keyGenNode->queryObj = qr.getFilter();
             keyGenNode->sortSpec = qr.getSort();
-            keyGenNode->children.push_back(solnRoot);
-            solnRoot = keyGenNode;
+            keyGenNode->children.push_back(solnRoot.release());
+            solnRoot.reset(keyGenNode);
         }
 
         // We now know we have whatever data is required for the projection.
         ProjectionNode* projNode = new ProjectionNode(*query.getProj());
-        projNode->children.push_back(solnRoot);
+        projNode->children.push_back(solnRoot.release());
         projNode->fullExpression = query.root();
         projNode->projection = qr.getProj();
         projNode->projType = projType;
         projNode->coveredKeyObj = coveredKeyObj;
-        solnRoot = projNode;
+        solnRoot.reset(projNode);
     } else {
         // If there's no projection, we must fetch, as the user wants the entire doc.
         if (!solnRoot->fetched()) {
             FetchNode* fetch = new FetchNode();
-            fetch->children.push_back(solnRoot);
-            solnRoot = fetch;
+            fetch->children.push_back(solnRoot.release());
+            solnRoot.reset(fetch);
         }
     }
 
     if (qr.getSkip()) {
         SkipNode* skip = new SkipNode();
         skip->skip = *qr.getSkip();
-        skip->children.push_back(solnRoot);
-        solnRoot = skip;
+        skip->children.push_back(solnRoot.release());
+        solnRoot.reset(skip);
     }
 
     // When there is both a blocking sort and a limit, the limit will
@@ -835,19 +836,19 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         if (qr.getLimit()) {
             LimitNode* limit = new LimitNode();
             limit->limit = *qr.getLimit();
-            limit->children.push_back(solnRoot);
-            solnRoot = limit;
+            limit->children.push_back(solnRoot.release());
+            solnRoot.reset(limit);
         } else if (qr.getNToReturn() && !qr.wantMore()) {
             // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
             // find.
             LimitNode* limit = new LimitNode();
             limit->limit = *qr.getNToReturn();
-            limit->children.push_back(solnRoot);
-            solnRoot = limit;
+            limit->children.push_back(solnRoot.release());
+            solnRoot.reset(limit);
         }
     }
 
-    soln->root.reset(solnRoot);
+    soln->root = std::move(solnRoot);
     return soln.release();
 }
 

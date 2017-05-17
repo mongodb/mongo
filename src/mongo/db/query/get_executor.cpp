@@ -1535,7 +1535,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
         QueryPlannerParams params;
 
         unique_ptr<QuerySolution> soln(
-            QueryPlannerAnalysis::analyzeDataAccess(*cq, params, solnRoot.release()));
+            QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(solnRoot)));
         invariant(soln);
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();

@@ -397,10 +397,10 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     prepareForAccessPlanning(_orExpression.get());
 
     // Use the cached index assignments to build solnRoot. Takes ownership of '_orExpression'.
-    QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
-        *_query, _orExpression.release(), false, _plannerParams.indices, _plannerParams);
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
+        *_query, _orExpression.release(), false, _plannerParams.indices, _plannerParams));
 
-    if (NULL == solnRoot) {
+    if (!solnRoot) {
         mongoutils::str::stream ss;
         ss << "Failed to build indexed data path for subplanned query\n";
         return Status(ErrorCodes::BadValue, ss);
@@ -410,7 +410,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
     // Takes ownership of 'solnRoot'
     _compositeSolution.reset(
-        QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, solnRoot));
+        QueryPlannerAnalysis::analyzeDataAccess(*_query, _plannerParams, std::move(solnRoot)));
 
     if (NULL == _compositeSolution.get()) {
         mongoutils::str::stream ss;

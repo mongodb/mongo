@@ -185,9 +185,9 @@ public:
     /**
      * Return a CollectionScanNode that scans as requested in 'query'.
      */
-    static QuerySolutionNode* makeCollectionScan(const CanonicalQuery& query,
-                                                 bool tailable,
-                                                 const QueryPlannerParams& params);
+    static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
+                                                                 bool tailable,
+                                                                 const QueryPlannerParams& params);
 
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.

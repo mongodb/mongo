@@ -78,7 +78,7 @@ public:
      */
     static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
                                             const QueryPlannerParams& params,
-                                            QuerySolutionNode* solnRoot);
+                                            std::unique_ptr<QuerySolutionNode> solnRoot);
 
     /**
      * Sort the results, if there is a sort required.

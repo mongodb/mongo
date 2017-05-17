@@ -143,11 +143,10 @@ using std::vector;
 using stdx::make_unique;
 
 // static
-QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& query,
-                                                          bool tailable,
-                                                          const QueryPlannerParams& params) {
+std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
+    const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params) {
     // Make the (only) node, a collection scan.
-    CollectionScanNode* csn = new CollectionScanNode();
+    auto csn = stdx::make_unique<CollectionScanNode>();
     csn->name = query.ns();
     csn->filter = query.root()->shallowClone();
     csn->tailable = tailable;
@@ -172,7 +171,7 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
         }
     }
 
-    return csn;
+    return std::move(csn);
 }
 
 // static

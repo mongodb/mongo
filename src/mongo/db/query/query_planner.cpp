@@ -240,17 +240,18 @@ static BSONObj finishMaxObj(const IndexEntry& indexEntry,
 QuerySolution* buildCollscanSoln(const CanonicalQuery& query,
                                  bool tailable,
                                  const QueryPlannerParams& params) {
-    QuerySolutionNode* solnRoot = QueryPlannerAccess::makeCollectionScan(query, tailable, params);
-    return QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+    std::unique_ptr<QuerySolutionNode> solnRoot(
+        QueryPlannerAccess::makeCollectionScan(query, tailable, params));
+    return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
 QuerySolution* buildWholeIXSoln(const IndexEntry& index,
                                 const CanonicalQuery& query,
                                 const QueryPlannerParams& params,
                                 int direction = 1) {
-    QuerySolutionNode* solnRoot =
-        QueryPlannerAccess::scanWholeIndex(index, query, params, direction);
-    return QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+    std::unique_ptr<QuerySolutionNode> solnRoot(
+        QueryPlannerAccess::scanWholeIndex(index, query, params, direction));
+    return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
 bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
@@ -478,8 +479,8 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     LOG(5) << "Tagged tree:" << endl << redact(clone->toString());
 
     // Use the cached index assignments to build solnRoot.
-    QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
-        query, clone.release(), false, params.indices, params);
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
+        query, clone.release(), false, params.indices, params));
 
     if (!solnRoot) {
         return Status(ErrorCodes::BadValue,
@@ -488,7 +489,8 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     }
 
     // Takes ownership of 'solnRoot'.
-    QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+    QuerySolution* soln =
+        QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
     if (!soln) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Failed to analyze plan from cache. Query: "
@@ -732,10 +734,12 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         LOG(5) << "Max/min query using index " << params.indices[idxNo].toString();
 
         // Make our scan and output.
-        QuerySolutionNode* solnRoot = QueryPlannerAccess::makeIndexScan(
-            params.indices[idxNo], query, params, finishedMinObj, finishedMaxObj);
+        std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::makeIndexScan(
+            params.indices[idxNo], query, params, finishedMinObj, finishedMaxObj));
+        invariant(solnRoot);
 
-        QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+        QuerySolution* soln =
+            QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
         if (NULL != soln) {
             out->push_back(soln);
         }
@@ -852,14 +856,15 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             prepareForAccessPlanning(rawTree);
 
             // This can fail if enumeration makes a mistake.
-            QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
-                query, rawTree, false, relevantIndices, params);
+            std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
+                query, rawTree, false, relevantIndices, params));
 
-            if (NULL == solnRoot) {
+            if (!solnRoot) {
                 continue;
             }
 
-            QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
+            QuerySolution* soln =
+                QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
             if (NULL != soln) {
                 LOG(5) << "Planner: adding solution:" << endl << redact(soln->toString());
                 if (indexTreeStatus.isOK()) {
