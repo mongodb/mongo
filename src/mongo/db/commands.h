@@ -48,9 +48,6 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
-// Included for the purpose of granting friendship to `execCommandClient` and `execCommandDatabase`
-#include "mongo/db/commands_helpers.h"
-
 namespace mongo {
 
 class BSONObj;
@@ -271,13 +268,17 @@ public:
         return ReadWriteType::kCommand;
     }
 
+    void incrementCommandsExecuted() {
+        _commandsExecuted.increment();
+    }
+
+    void incrementCommandsFailed() {
+        _commandsFailed.increment();
+    }
+
 protected:
     static CommandMap* _commands;
     static CommandMap* _commandsByBestName;
-
-    // Counters for how many times this command has been executed and failed
-    Counter64 _commandsExecuted;
-    Counter64 _commandsFailed;
 
 public:
     static const CommandMap* commandsByBestName() {
@@ -424,24 +425,16 @@ private:
         fassertFailed(16940);
     }
 
-private:
+    // Counters for how many times this command has been executed and failed
+    Counter64 _commandsExecuted;
+    Counter64 _commandsFailed;
+
     // The full name of the command
     const std::string _name;
 
     // Pointers to hold the metrics tree references
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
-
-    friend void mongo::execCommandClient(OperationContext* opCtx,
-                                         Command* c,
-                                         StringData dbname,
-                                         BSONObj& cmdObj,
-                                         BSONObjBuilder& result);
-
-    friend void mongo::execCommandDatabase(OperationContext* opCtx,
-                                           Command* command,
-                                           const rpc::RequestInterface& request,
-                                           rpc::ReplyBuilderInterface* replyBuilder);
 };
 
 }  // namespace mongo
