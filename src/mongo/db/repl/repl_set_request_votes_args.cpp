@@ -69,7 +69,7 @@ const std::string kLegalResponseFieldNames[] = {
     kVoteGrantedFieldName,
     kOperationTime,
     "$gleStats",
-    "logicalTime",
+    "$logicalTime",
     "$configServerState",
 };
 

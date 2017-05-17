@@ -315,7 +315,7 @@
                     ok: 1
                 };
                 delete res.operationTime;
-                delete res.logicalTime;
+                delete res.$logicalTime;
                 assert.eq(expectedRes, res, "unexpected result for: " + tojson(killCursorsCmd));
             }
         },

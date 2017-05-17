@@ -65,7 +65,7 @@ public:
     const SignedLogicalTime& getSignedTime() const;
 
     static StringData fieldName() {
-        return "logicalTime";
+        return "$logicalTime";
     }
 
 private:

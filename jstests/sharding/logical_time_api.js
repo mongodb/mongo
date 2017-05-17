@@ -11,7 +11,7 @@
     "use strict";
 
     // Returns true if the given object contains a logicalTime BSON object in the following format:
-    // logicalTime: {
+    // $logicalTime: {
     //     clusterTime: <Timestamp>
     //     signature: {
     //         hash: <BinData>
@@ -23,7 +23,7 @@
             return false;
         }
 
-        var logicalTime = obj.logicalTime;
+        var logicalTime = obj.$logicalTime;
         return logicalTime && isType(logicalTime, "BSON") &&
             isType(logicalTime.clusterTime, "Timestamp") && isType(logicalTime.signature, "BSON") &&
             isType(logicalTime.signature.hash, "BinData") &&

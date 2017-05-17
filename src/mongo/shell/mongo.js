@@ -14,6 +14,9 @@ if (!Mongo.prototype) {
 (function(original) {
     Mongo.prototype.find = function find(ns, query, fields, limit, skip, batchSize, options) {
         const self = this;
+        if (this._isCausal) {
+            query = this._gossipLogicalTime(query);
+        }
         const res = original.call(this, ns, query, fields, limit, skip, batchSize, options);
         const origNext = res.next;
         res.next = function next() {
@@ -145,6 +148,15 @@ Mongo.prototype._injectAfterClusterTime = function(cmdObj) {
     return cmdObj;
 };
 
+Mongo.prototype._gossipLogicalTime = function(obj) {
+    obj = Object.assign({}, obj);
+    const clusterTime = this.getClusterTime();
+    if (clusterTime) {
+        obj["$logicalTime"] = clusterTime;
+    }
+    return obj;
+};
+
 /**
  * Sets logicalTime and operationTime extracted from command reply.
  * This is applicable for the protocol starting from version 3.6.
@@ -153,8 +165,8 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
     if (res.hasOwnProperty("operationTime")) {
         this.setOperationTime(res["operationTime"]);
     }
-    if (res.hasOwnProperty("logicalTime")) {
-        this.setClusterTime(res["logicalTime"]);
+    if (res.hasOwnProperty("$logicalTime")) {
+        this.setClusterTime(res["$logicalTime"]);
     }
 };
 
@@ -166,6 +178,9 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
         dbName, cmdName, metadata, cmdObj) {
         if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
             cmdObj = this._injectAfterClusterTime(cmdObj);
+        }
+        if (this._isCausal) {
+            metadata = this._gossipLogicalTime(metadata);
         }
         const res = original.call(this, dbName, cmdName, metadata, cmdObj);
         this._setLogicalTimeFromReply(res);
@@ -182,6 +197,9 @@ Mongo.prototype._setLogicalTimeFromReply = function(res) {
 
         if (this.isCausalConsistencyEnabled(cmdName, cmdObj) && cmdObj) {
             cmdObj = this._injectAfterClusterTime(cmdObj);
+        }
+        if (this._isCausal) {
+            cmdObj = this._gossipLogicalTime(cmdObj);
         }
         const res = original.call(this, dbName, cmdObj, options);
         this._setLogicalTimeFromReply(res);

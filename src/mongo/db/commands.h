@@ -383,7 +383,7 @@ public:
             arg == "$queryOptions" ||       //
             arg == "$readPreference" ||     //
             arg == "$replData" ||           //
-            arg == "logicalTime" ||         //
+            arg == "$logicalTime" ||        //
             arg == "maxTimeMS" ||           //
             arg == "readConcern" ||         //
             arg == "shardVersion" ||        //

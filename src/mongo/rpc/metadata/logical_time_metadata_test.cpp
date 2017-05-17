@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/unittest/unittest.h"
 
@@ -74,7 +75,7 @@ TEST(LogicalTimeMetadataTest, MissingClusterTimeShouldFailToParse) {
     long long keyId = 1;
 
     BSONObjBuilder builder;
-    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    BSONObjBuilder subObjBuilder(builder.subobjStart("$logicalTime"));
     BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
     signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
     signatureObjBuilder.append("keyId", keyId);
@@ -90,7 +91,7 @@ TEST(LogicalTimeMetadataTest, MissingSignatureShouldFailToParse) {
     const auto ts = Timestamp(100, 200);
 
     BSONObjBuilder builder;
-    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    BSONObjBuilder subObjBuilder(builder.subobjStart("$logicalTime"));
     ts.append(subObjBuilder.bb(), "clusterTime");
     subObjBuilder.doneFast();
 
@@ -105,7 +106,7 @@ TEST(LogicalTimeMetadataTest, MissingHashShouldFailToParse) {
     long long keyId = 1;
 
     BSONObjBuilder builder;
-    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    BSONObjBuilder subObjBuilder(builder.subobjStart("$logicalTime"));
     ts.append(subObjBuilder.bb(), "clusterTime");
     BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
     signatureObjBuilder.append("keyId", keyId);
@@ -124,7 +125,7 @@ TEST(LogicalTimeMetadataTest, MissingKeyIdShouldFailToParse) {
     proof.fill(0);
 
     BSONObjBuilder builder;
-    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    BSONObjBuilder subObjBuilder(builder.subobjStart("$logicalTime"));
     ts.append(subObjBuilder.bb(), "clusterTime");
     BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
     signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
@@ -145,7 +146,7 @@ TEST(LogicalTimeMetadataTest, ProofWithWrongLengthShouldFailToParse) {
     long long keyId = 1;
 
     BSONObjBuilder builder;
-    BSONObjBuilder subObjBuilder(builder.subobjStart("logicalTime"));
+    BSONObjBuilder subObjBuilder(builder.subobjStart("$logicalTime"));
     ts.append(subObjBuilder.bb(), "clusterTime");
     BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
     signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
@@ -156,6 +157,35 @@ TEST(LogicalTimeMetadataTest, ProofWithWrongLengthShouldFailToParse) {
     auto serializedObj = builder.done();
     auto status = LogicalTimeMetadata::readFromMetadata(serializedObj).getStatus();
     ASSERT_EQ(ErrorCodes::UnsupportedFormat, status);
+}
+
+TEST(LogicalTimeMetadataTest, UpconvertPass) {
+
+    const auto ts = Timestamp(100, 200);
+
+    std::array<uint8_t, 20> proof;
+    proof.fill(0);
+
+    long long keyId = 1;
+
+    BSONObjBuilder builder;
+    builder.append("aaa", 1);
+    builder.append("bbb", 1);
+    BSONObjBuilder subObjBuilder(builder.subobjStart("$logicalTime"));
+    ts.append(subObjBuilder.bb(), "clusterTime");
+    BSONObjBuilder signatureObjBuilder(subObjBuilder.subobjStart("signature"));
+    signatureObjBuilder.append("hash", BSONBinData(proof.data(), proof.size(), BinDataGeneral));
+    signatureObjBuilder.append("keyId", keyId);
+    signatureObjBuilder.doneFast();
+    auto logicalTimeMetadata = subObjBuilder.asTempObj();
+    subObjBuilder.doneFast();
+
+    auto commandObj = builder.done();
+    BSONObjBuilder metadataBob;
+    BSONObjBuilder commandBob;
+    auto converted = upconvertRequestMetadata(commandObj, 0);
+    ASSERT_BSONOBJ_EQ(BSON("aaa" << 1 << "bbb" << 1), std::get<0>(converted));
+    ASSERT_BSONOBJ_EQ(BSON("$logicalTime" << logicalTimeMetadata), std::get<1>(converted));
 }
 
 }  // namespace rpc

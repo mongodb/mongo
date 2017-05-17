@@ -183,17 +183,32 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
     uassertStatusOK(
         AuditMetadata::upconvert(legacyCmdObj, queryFlags, &auditCommandBob, &metadataBob));
 
-    return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
+    BSONObjBuilder logicalTimeCommandBob;
+    for (auto elem : auditCommandBob.done()) {
+        if (elem.fieldNameStringData() == LogicalTimeMetadata::fieldName()) {
+            metadataBob.append(elem);
+        } else {
+            logicalTimeCommandBob.append(elem);
+        }
+    }
+
+    return std::make_tuple(logicalTimeCommandBob.obj(), metadataBob.obj());
 }
 
 LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
     int legacyQueryFlags = 0;
-    BSONObjBuilder auditCommandBob;
-    // Ordering is important here - AuditingMetadata must be downconverted first,
-    // then ReadPreference.
-    uassertStatusOK(
-        AuditMetadata::downconvert(cmdObj, metadata, &auditCommandBob, &legacyQueryFlags));
+    BSONObjBuilder logicalTimeCommandBob;
+    logicalTimeCommandBob.appendElements(cmdObj);
+    if (auto logicalTime = metadata[LogicalTimeMetadata::fieldName()]) {
+        logicalTimeCommandBob.append(logicalTime);
+    }
 
+    // Ordering is important here - AuditingMetadata must be downconverted before ReadPreference.
+    BSONObjBuilder auditCommandBob;
+    uassertStatusOK(AuditMetadata::downconvert(
+        logicalTimeCommandBob.done(), metadata, &auditCommandBob, &legacyQueryFlags));
+
+    cmdObj = auditCommandBob.obj();
 
     auto readPref = metadata["$readPreference"];
     if (!readPref)

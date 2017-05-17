@@ -11,9 +11,9 @@
 
     // insert on one shard and extract the logical time
     var res = assert.commandWorked(db.runCommand({insert: 'user', documents: [{x: 10}]}));
-    assert.hasFields(res, ['logicalTime']);
+    assert.hasFields(res, ['$logicalTime']);
 
-    var logicalTimeMetadata = res.logicalTime;
+    var logicalTimeMetadata = res.$logicalTime;
     assert.hasFields(logicalTimeMetadata, ['clusterTime', 'signature']);
 
     res = st.rs0.getPrimary().adminCommand({replSetGetStatus: 1});
@@ -24,7 +24,7 @@
               'appliedTime: ' + tojson(appliedTime) + ' != clusterTime: ' +
                   tojson(logicalTimeMetadata.clusterTime));
 
-    assert.commandWorked(db.runCommand({ping: 1, logicalTime: logicalTimeMetadata}));
+    assert.commandWorked(db.runCommand({ping: 1, '$logicalTime': logicalTimeMetadata}));
 
     st.stop();
 
