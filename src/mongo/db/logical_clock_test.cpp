@@ -141,5 +141,79 @@ TEST_F(LogicalClockTest, WritesToOplogAdvanceClusterTime) {
               replicationCoordinator()->getMyLastAppliedOpTime().getTimestamp());
 }
 
+// Tests the scenario where an admin incorrectly sets the wall clock more than
+// maxAcceptableLogicalClockDriftSecs in the past at startup, and cluster time is initialized to
+// the incorrect past time, then the admin resets the clock to the current time. In this case,
+// logical time can be advanced through metadata as long as the new time isn't
+// maxAcceptableLogicalClockDriftSecs ahead of the correct current wall clock time, since the rate
+// limiter compares new times to the wall clock, not the cluster time.
+TEST_F(LogicalClockTest, WallClockSetTooFarInPast) {
+    auto oneDay = Seconds(24 * 60 * 60);
+
+    // Current wall clock and cluster time.
+    auto currentSecs = LogicalClock::kMaxAcceptableLogicalClockDriftSecs * 10;
+    LogicalTime currentTime(Timestamp(currentSecs, 0));
+
+    // Set wall clock more than maxAcceptableLogicalClockDriftSecs seconds in the past.
+    auto pastSecs = currentSecs - LogicalClock::kMaxAcceptableLogicalClockDriftSecs - oneDay;
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(pastSecs));
+
+    // If cluster time is either uninitialized or even farther in the past, a write would set
+    // cluster time more than maxAcceptableLogicalClockDriftSecs in the past.
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
+    ASSERT_TRUE(
+        getClock()->getClusterTime() <
+        LogicalTime(Timestamp(currentSecs - LogicalClock::kMaxAcceptableLogicalClockDriftSecs, 0)));
+
+    // Set wall clock to the current time on the affected node.
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(currentSecs));
+
+    // Verify that maxAcceptableLogicalClockDriftSecs parameter does not need to be increased to
+    // advance cluster time through metadata back to the current time.
+    ASSERT_OK(getClock()->advanceClusterTime(currentTime));
+    ASSERT_TRUE(getClock()->getClusterTime() == currentTime);
+}
+
+// Tests the scenario where an admin incorrectly sets the wall clock more than
+// maxAcceptableLogicalClockDriftSecs in the future and a write is accepted, advancing cluster
+// time, then the admin resets the clock to the current time. In this case, logical time cannot be
+// advanced through metadata unless the drift parameter is increased.
+TEST_F(LogicalClockTest, WallClockSetTooFarInFuture) {
+    auto oneDay = Seconds(24 * 60 * 60);
+
+    // Current wall clock and cluster time.
+    auto currentSecs = LogicalClock::kMaxAcceptableLogicalClockDriftSecs * 10;
+    LogicalTime currentTime(Timestamp(currentSecs, 0));
+
+    // Set wall clock more than maxAcceptableLogicalClockDriftSecs seconds in the future.
+    auto futureSecs = currentSecs + LogicalClock::kMaxAcceptableLogicalClockDriftSecs + oneDay;
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(futureSecs));
+
+    // A write gets through and advances cluster time more than maxAcceptableLogicalClockDriftSecs
+    // in the future.
+    getDBClient()->insert(kDummyNamespaceString, BSON("x" << 1));
+    ASSERT_TRUE(
+        getClock()->getClusterTime() >
+        LogicalTime(Timestamp(currentSecs + LogicalClock::kMaxAcceptableLogicalClockDriftSecs, 0)));
+
+    // Set wall clock to the current time on the affected node.
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(currentSecs));
+
+    // Verify that maxAcceptableLogicalClockDriftSecs parameter has to be increased to advance
+    // cluster time through metadata.
+    auto nextTime = getClock()->getClusterTime();
+    nextTime.addTicks(1);  // The next lowest logical time.
+
+    ASSERT_EQ(ErrorCodes::ClusterTimeFailsRateLimiter, getClock()->advanceClusterTime(nextTime));
+
+    // Set wall clock to the current time + 1 day to simulate increasing the
+    // maxAcceptableLogicalClockDriftSecs parameter, which can only be set at startup, and verify
+    // time can be advanced through metadata again.
+    setMockClockSourceTime(Date_t::fromDurationSinceEpoch(currentSecs + oneDay));
+
+    ASSERT_OK(getClock()->advanceClusterTime(nextTime));
+    ASSERT_TRUE(getClock()->getClusterTime() == nextTime);
+}
+
 }  // unnamed namespace
 }  // namespace mongo

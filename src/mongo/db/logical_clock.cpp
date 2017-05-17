@@ -94,8 +94,6 @@ LogicalTime LogicalClock::getClusterTime() {
 Status LogicalClock::advanceClusterTime(const LogicalTime newTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    // The rate limiter check cannot be moved into _advanceClusterTime_inlock to avoid code
-    // repetition because it shouldn't be called on direct oplog operations.
     auto rateLimitStatus = _passesRateLimiter_inlock(newTime);
     if (!rateLimitStatus.isOK()) {
         return rateLimitStatus;
