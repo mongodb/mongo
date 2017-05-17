@@ -674,7 +674,7 @@ TEST_F(RollbackFixUpInfoTest,
 
     CollectionOptions options;
     ASSERT_OK(options.parse(optionsObj));
-    ASSERT_OK(options.validate());
+    ASSERT_OK(options.validateForStorage());
 
     auto opCtx = makeOpCtx();
 

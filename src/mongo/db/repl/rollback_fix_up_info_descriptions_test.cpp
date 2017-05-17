@@ -93,7 +93,7 @@ TEST(RollbackFixUpInfoDescriptionsTest, CollectionOptionsDescriptionToBson) {
                              << "en_US"
                              << "strength"
                              << 1);
-    ASSERT_OK(options.validate());
+    ASSERT_OK(options.validateForStorage());
 
     RollbackFixUpInfo::CollectionOptionsDescription description(collectionUuid, options.toBSON());
 

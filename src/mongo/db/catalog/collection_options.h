@@ -67,7 +67,7 @@ struct CollectionOptions {
     /**
      * Confirms that collection options can be converted to BSON and back without errors.
      */
-    Status validate() const;
+    Status validateForStorage() const;
 
     /**
      * Parses the "options" subfield of the collection info object.

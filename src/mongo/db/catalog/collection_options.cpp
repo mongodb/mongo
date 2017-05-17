@@ -98,8 +98,8 @@ bool CollectionOptions::isView() const {
     return !viewOn.empty();
 }
 
-Status CollectionOptions::validate() const {
-    return CollectionOptions().parse(toBSON());
+Status CollectionOptions::validateForStorage() const {
+    return CollectionOptions().parse(toBSON(), ParseKind::parseForStorage);
 }
 
 Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {

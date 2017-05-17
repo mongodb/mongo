@@ -59,10 +59,10 @@ TEST(CollectionOptions, SimpleRoundTrip) {
 
 TEST(CollectionOptions, Validate) {
     CollectionOptions options;
-    ASSERT_OK(options.validate());
+    ASSERT_OK(options.validateForStorage());
 
     options.storageEngine = fromjson("{storageEngine1: 1}");
-    ASSERT_NOT_OK(options.validate());
+    ASSERT_NOT_OK(options.validateForStorage());
 }
 
 TEST(CollectionOptions, Validator) {
@@ -202,7 +202,7 @@ TEST(CollectionOptions, CollationFieldParsesCorrectly) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{collation: {locale: 'en'}}")));
     ASSERT_BSONOBJ_EQ(options.collation, fromjson("{locale: 'en'}"));
-    ASSERT_OK(options.validate());
+    ASSERT_OK(options.validateForStorage());
 }
 
 TEST(CollectionOptions, ParsedCollationObjShouldBeOwned) {
@@ -329,5 +329,8 @@ TEST(CollectionOptions, ParseUUID) {
     // Check successful parse and roundtrip.
     ASSERT_OK(options.parse(uuid.toBSON(), CollectionOptions::parseForStorage));
     ASSERT(options.uuid.get() == uuid);
+
+    // Check that a collection options containing a UUID passes validation.
+    ASSERT_OK(options.validateForStorage());
 }
 }  // namespace mongo

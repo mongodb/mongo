@@ -140,7 +140,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
     uassert(ErrorCodes::BadValue,
             "invalid collection namespace: " + sourceNss.ns(),
             sourceNss.isValid());
-    uassertStatusOK(options.validate());
+    uassertStatusOK(options.validateForStorage());
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
     uassert(ErrorCodes::BadValue, "storage interface cannot be null", storageInterface);
     _stats.ns = _sourceNss.ns();
