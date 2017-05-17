@@ -1394,7 +1394,7 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
             // Index builds are achieved through the use of an insert op, not a command op.
             // The following line is the same as what the insert code uses to detect an index
             // build.
-            (entry.hasNamespace() && entry.getCollectionName() == "system.indexes")) {
+            (entry.getNamespace().isSystemDotIndexes())) {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));

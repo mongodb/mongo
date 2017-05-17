@@ -486,11 +486,13 @@ env.CppUnitTest(
 env.Library(
     target='oplog_entry',
     source=[
-            'oplog_entry.cpp',
+        'oplog_entry.cpp',
+        env.Idlc('oplog_entry.idl')[0],
     ],
     LIBDEPS=[
+        'optime',
         '$BUILD_DIR/mongo/base',
-        'optime'
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
@@ -884,6 +886,7 @@ env.Library(
     ],
     LIBDEPS=[
         'abstract_oplog_fetcher',
+        'oplog_entry',
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
     ],

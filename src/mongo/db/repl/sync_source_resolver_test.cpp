@@ -32,6 +32,7 @@
 
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/sync_source_selector_mock.h"
@@ -294,13 +295,21 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
     net->runReadyNetworkOperations();
 }
 
+/**
+ * Generates oplog entries with the given optime.
+ */
+BSONObj _makeOplogEntry(Timestamp ts, long long term) {
+    return OplogEntry(OpTime(ts, term), 1LL, OpTypeEnum::kNoop, NamespaceString("a.a"), BSONObj())
+        .toBSON();
+}
+
 void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net,
                                              SyncSourceSelectorMock* selector,
                                              HostAndPort currentSyncSource,
                                              HostAndPort nextSyncSource,
                                              Timestamp ts) {
     _scheduleFirstOplogEntryFetcherResponse(
-        net, selector, currentSyncSource, nextSyncSource, {BSON("ts" << ts << "t" << 0)});
+        net, selector, currentSyncSource, nextSyncSource, {_makeOplogEntry(ts, 0LL)});
 }
 
 void _scheduleRBIDResponse(executor::NetworkInterfaceMock* net,
@@ -631,7 +640,7 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
         selector,
         currentSyncSource,
         requiredOpTime,
-        {BSON("ts" << requiredOpTime.getTimestamp() << "t" << requiredOpTime.getTerm())});
+        {_makeOplogEntry(requiredOpTime.getTimestamp(), requiredOpTime.getTerm())});
 }
 
 const OpTime requiredOpTime(Timestamp(200, 1U), 1LL);
@@ -682,7 +691,7 @@ TEST_F(SyncSourceResolverTest,
         _selector.get(),
         candidate1,
         requiredOpTime,
-        {BSON("ts" << requiredOpTime.getTimestamp() << "t" << OpTime::kUninitializedTerm)});
+        {_makeOplogEntry(requiredOpTime.getTimestamp(), OpTime::kUninitializedTerm)});
 
     ASSERT_TRUE(_resolver->isActive());
     ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
@@ -791,7 +800,7 @@ TEST_F(SyncSourceResolverTest,
         _selector.get(),
         candidate1,
         requiredOpTime,
-        {BSON("ts" << requiredOpTime.getTimestamp() << "t" << requiredOpTime.getTerm() + 1)});
+        {_makeOplogEntry(requiredOpTime.getTimestamp(), requiredOpTime.getTerm() + 1)});
 
     ASSERT_TRUE(_resolver->isActive());
     ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());

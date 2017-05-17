@@ -30,70 +30,104 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
 namespace repl {
 
 /**
- * A parsed oplog entry.
- *
- * This only includes the fields used by the code using this object at the time this was
- * written. As more code uses this, more fields should be added.
- *
- * All unowned members (such as StringDatas and BSONElements) point into the raw BSON.
- * All StringData members are guaranteed to be NUL terminated.
+ * A parsed oplog entry that inherits from the OplogEntryBase parsed by the IDL.
  */
-struct OplogEntry {
+class OplogEntry : public OplogEntryBase {
+public:
+    enum class CommandType {
+        kNotCommand,
+        kCreate,
+        kRenameCollection,
+        kDrop,
+        kCollMod,
+        kApplyOps,
+        kDropDatabase,
+        kEmptyCapped,
+        kConvertToCapped,
+        kCreateIndex,
+        kDropIndexes
+    };
+
     // Current oplog version, should be the value of the v field in all oplog entries.
     static const int kOplogVersion;
 
+    static StatusWith<OplogEntry> parse(const BSONObj& object);
+
+    OplogEntry(OpTime opTime,
+               long long hash,
+               OpTypeEnum opType,
+               NamespaceString nss,
+               int version,
+               const BSONObj& oField,
+               const BSONObj& o2Field);
+    OplogEntry(OpTime opTime,
+               long long hash,
+               OpTypeEnum opType,
+               NamespaceString nss,
+               int version,
+               const BSONObj& oField);
+    OplogEntry(OpTime opTime,
+               long long hash,
+               OpTypeEnum opType,
+               NamespaceString nss,
+               const BSONObj& oField);
+    OplogEntry(OpTime opTime,
+               long long hash,
+               OpTypeEnum opType,
+               NamespaceString nss,
+               const BSONObj& oField,
+               const BSONObj& o2Field);
+
+    // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit OplogEntry(BSONObj raw);
+
+    OplogEntry() = delete;
 
     // This member is not parsed from the BSON and is instead populated by fillWriterVectors.
     bool isForCappedCollection = false;
 
+    /**
+     * Returns if the oplog entry is for a command operation.
+     */
     bool isCommand() const;
+
+    /**
+     * Returns if the oplog entry is for a CRUD operation.
+     */
     bool isCrudOpType() const;
-    bool hasNamespace() const;
-    int getVersion() const;
+
+    /**
+     * Returns the _id of the document being modified. Must be called on CRUD ops.
+     */
     BSONElement getIdElement() const;
+
+    /**
+     * Returns the type of command of the oplog entry. Must be called on a command op.
+     */
+    CommandType getCommandType() const;
+
+    /**
+     * Returns the OpTime of the oplog entry.
+     */
     OpTime getOpTime() const;
-    Seconds getTimestampSecs() const;
-    StringData getCollectionName() const;
+
+    /**
+     * Serializes the oplog entry to a string.
+     */
     std::string toString() const;
 
+    // TODO (SERVER-29200): make `raw` private. Do not add more direct uses of `raw`.
     BSONObj raw;  // Owned.
 
-    // TODO: Remove these when we add the IDL.
-    const NamespaceString& getNamespace() const {
-        return _ns;
-    }
-
-    StringData getOpType() const {
-        return _opType;
-    }
-
-    Timestamp getTimestamp() const {
-        return _ts;
-    }
-
-    const BSONObj& getObject() const {
-        return _o;
-    }
-
-    const BSONObj& getObject2() const {
-        return _o2;
-    }
-
 private:
-    NamespaceString _ns;
-    StringData _opType = "";
-    int _version;
-    Timestamp _ts;
-    BSONObj _o;
-    BSONObj _o2;
+    CommandType _commandType;
 };
 
 std::ostream& operator<<(std::ostream& s, const OplogEntry& o);

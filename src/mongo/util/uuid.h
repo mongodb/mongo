@@ -41,6 +41,10 @@
 
 namespace mongo {
 
+namespace repl {
+class OplogEntryBase;
+}  // namespace repl
+
 /**
  * A UUID is a 128-bit unique identifier, per RFC 4122, v4, using
  * a secure random number generator.
@@ -51,6 +55,7 @@ class UUID {
     // Make the IDL generated parser a friend
     friend class One_UUID;
     friend class Logical_session_id;
+    friend class repl::OplogEntryBase;
 
 public:
     /**

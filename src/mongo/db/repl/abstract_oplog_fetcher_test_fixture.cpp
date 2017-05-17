@@ -30,6 +30,7 @@
 
 #include "mongo/db/repl/abstract_oplog_fetcher_test_fixture.h"
 
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,12 +48,12 @@ void ShutdownState::operator()(const Status& status) {
 }
 
 BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(OpTimeWithHash opTimeWithHash) {
-    BSONObjBuilder bob;
-    bob.appendElements(opTimeWithHash.opTime.toBSON());
-    bob.append("h", opTimeWithHash.value);
-    bob.append("op", "c");
-    bob.append("ns", "test.t");
-    return bob.obj();
+    return OplogEntry(opTimeWithHash.opTime,
+                      opTimeWithHash.value,
+                      OpTypeEnum::kNoop,
+                      NamespaceString("test.t"),
+                      BSONObj())
+        .toBSON();
 }
 
 BSONObj AbstractOplogFetcherTest::makeNoopOplogEntry(OpTime opTime, long long hash) {

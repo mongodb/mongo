@@ -1,0 +1,97 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the GNU Affero General Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+# Oplog Entry IDL File
+
+global:
+    cpp_namespace: "mongo::repl"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+enums:
+    OpType:
+        description: "The type of an operation in the oplog"
+        type: string
+        values:
+            kCommand: "c"
+            kInsert: "i"
+            kUpdate: "u"
+            kDelete: "d"
+            kNoop: "n"
+ 
+structs:
+    OplogEntryBase:
+        description: A document in which the server stores an oplog entry.
+        fields:
+            ts:
+                cpp_name: timestamp
+                type: timestamp
+                description: "The time when the oplog entry was created"
+            t:
+                cpp_name: term
+                type: long
+                optional: true # The term is optional for PV0 oplog entries.
+                description: "The term of the primary that created the oplog entry"
+            h:
+                cpp_name: hash
+                type: long
+                description: "The hash of the oplog entry"
+            v:
+                cpp_name: version
+                type: safeInt64
+                default: 1
+                description: "The version of the oplog"
+            op:
+                cpp_name: opType
+                type: OpType
+                description: "The operation type"
+            ns:
+                cpp_name: namespace
+                type: namespacestring
+                description: "The namespace on which to apply the operation"
+            ui:
+                cpp_name: uuid
+                type: uuid
+                optional: true
+                description: "The UUID of the collection"
+            fromMigrate:
+                type: bool
+                optional: true
+                description: "An operation caused by a chunk migration"
+            o:
+                cpp_name: object
+                type: object
+                description: "The operation applied"
+            o2:
+                cpp_name: object2
+                type: object
+                optional: true
+                description: "Additional information about the operation applied"
+            _id:
+                type: objectid
+                optional: true
+                description: "An optional _id field for tests that manually insert oplog entries"

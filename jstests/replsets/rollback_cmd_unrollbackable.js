@@ -49,7 +49,7 @@ var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
 oplog_entry["ts"] = Timestamp(oplog_entry["ts"].t, oplog_entry["ts"].i + 1);
 oplog_entry["op"] = "c";
 oplog_entry["o"] = {
-    "replSetSyncFrom": 1
+    "emptycapped": 1
 };
 assert.writeOK(b_conn.getDB("local").oplog.rs.insert(oplog_entry));
 

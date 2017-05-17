@@ -195,14 +195,7 @@ void createCollection(OperationContext* opCtx,
 OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const NamespaceString& nss,
                                  const BSONObj& command) {
-    BSONObjBuilder bob;
-    bob.appendElements(opTime.toBSON());
-    bob.append("h", 1LL);
-    bob.append("v", 2);
-    bob.append("op", "c");
-    bob.append("ns", nss.getCommandNS().ns());
-    bob.append("o", command);
-    return OplogEntry(bob.obj());
+    return OplogEntry(opTime, 1LL, OpTypeEnum::kCommand, nss.getCommandNS(), 2, command);
 }
 
 /**
@@ -223,13 +216,7 @@ OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
 OplogEntry makeInsertDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToInsert) {
-    BSONObjBuilder bob;
-    bob.appendElements(opTime.toBSON());
-    bob.append("h", 1LL);
-    bob.append("op", "i");
-    bob.append("ns", nss.ns());
-    bob.append("o", documentToInsert);
-    return OplogEntry(bob.obj());
+    return OplogEntry(opTime, 1LL, OpTypeEnum::kInsert, nss, documentToInsert);
 }
 
 /**
@@ -239,14 +226,7 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                         const NamespaceString& nss,
                                         const BSONObj& documentToUpdate,
                                         const BSONObj& updatedDocument) {
-    BSONObjBuilder bob;
-    bob.appendElements(opTime.toBSON());
-    bob.append("h", 1LL);
-    bob.append("op", "u");
-    bob.append("ns", nss.ns());
-    bob.append("o2", documentToUpdate);
-    bob.append("o", updatedDocument);
-    return OplogEntry(bob.obj());
+    return OplogEntry(opTime, 1LL, OpTypeEnum::kUpdate, nss, updatedDocument, documentToUpdate);
 }
 
 /**
@@ -649,10 +629,7 @@ TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperat
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToApplyOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    OplogEntry op(BSON("op"
-                       << "x"
-                       << "ns"
-                       << nss.ns()));
+    OplogEntry op(OpTime(Timestamp(1, 1), 1), 1LL, OpTypeEnum::kDelete, nss, BSONObj());
     auto syncApply = [](OperationContext*, const BSONObj&, bool) -> Status {
         return {ErrorCodes::OperationFailed, ""};
     };
@@ -663,10 +640,7 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToAppl
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    OplogEntry op(BSON("op"
-                       << "x"
-                       << "ns"
-                       << nss.ns()));
+    OplogEntry op(OpTime(Timestamp(1, 1), 1), 1LL, OpTypeEnum::kDelete, nss, BSONObj());
     auto syncApply = [](OperationContext*, const BSONObj&, bool) -> Status {
         uasserted(ErrorCodes::OperationFailed, "");
         MONGO_UNREACHABLE;
@@ -679,12 +653,8 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
 TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplying) {
     int x = 0;
     auto makeOp = [&x](const char* ns) -> OplogEntry {
-        return OplogEntry(BSON("op"
-                               << "x"
-                               << "ns"
-                               << ns
-                               << "x"
-                               << x++));
+        return OplogEntry(
+            OpTime(Timestamp(1, 1), 1), 1LL, OpTypeEnum::kDelete, NamespaceString(ns), BSONObj());
     };
     auto op1 = makeOp("test.t1");
     auto op2 = makeOp("test.t1");
@@ -960,13 +930,15 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
 TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailingToRetryBadOp) {
     SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    OplogEntry op(BSON("op"
-                       << "x"
-                       << "ns"
-                       << nss.ns()));
+    OplogEntry op(OpTime(Timestamp(1, 1), 1),
+                  1LL,
+                  OpTypeEnum::kUpdate,
+                  nss,
+                  BSON("_id" << 1),
+                  BSON("_id" << 1));
     MultiApplier::OperationPtrs ops = {&op};
     AtomicUInt32 fetchCount(0);
-    ASSERT_EQUALS(ErrorCodes::BadValue,
+    ASSERT_EQUALS(ErrorCodes::OperationFailed,
                   multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount));
     ASSERT_EQUALS(fetchCount.load(), 1U);
 }

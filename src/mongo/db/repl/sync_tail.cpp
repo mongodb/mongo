@@ -602,7 +602,7 @@ void fillWriterVectors(OperationContext* opCtx,
                 MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
             }
 
-            if (op.getOpType() == "i" && collProperties.isCapped) {
+            if (op.getOpType() == OpTypeEnum::kInsert && collProperties.isCapped) {
                 // Mark capped collection ops before storing them to ensure we do not attempt to
                 // bulk insert them.
                 op.isForCappedCollection = true;
@@ -869,15 +869,12 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
 
     auto& entry = ops->back();
 
-    if (!entry.raw.isEmpty()) {
-        // check for oplog version change
-        int curVersion = entry.getVersion();
-        if (curVersion != OplogEntry::kOplogVersion) {
-            severe() << "expected oplog version " << OplogEntry::kOplogVersion
-                     << " but found version " << curVersion
-                     << " in oplog entry: " << redact(entry.raw);
-            fassertFailedNoTrace(18820);
-        }
+    // check for oplog version change
+    int curVersion = entry.getVersion();
+    if (curVersion != OplogEntry::kOplogVersion) {
+        severe() << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
+                 << curVersion << " in oplog entry: " << redact(entry.raw);
+        fassertFailedNoTrace(18820);
     }
 
     auto entryTime = Date_t::fromDurationSinceEpoch(Seconds(entry.getTimestamp().getSecs()));
@@ -893,8 +890,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     }
 
     // Check for ops that must be processed one at a time.
-    if (entry.raw.isEmpty() ||            // sentinel that network queue is drained.
-        (entry.getOpType()[0] == 'c') ||  // commands.
+    if (entry.isCommand() ||  // commands.
         // Index builds are achieved through the use of an insert op, not a command op.
         // The following line is the same as what the insert code uses to detect an index build.
         (!entry.getNamespace().isEmpty() && entry.getNamespace().coll() == "system.indexes")) {
@@ -1079,7 +1075,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
          oplogEntriesIterator != oplogEntryPointers->end();
          ++oplogEntriesIterator) {
         auto entry = *oplogEntriesIterator;
-        if (entry->getOpType()[0] == 'i' && !entry->isForCappedCollection &&
+        if (entry->getOpType() == OpTypeEnum::kInsert && !entry->isForCappedCollection &&
             oplogEntriesIterator > doNotGroupBeforePoint) {
             // Attempt to group inserts if possible.
             std::vector<BSONObj> toInsert;
@@ -1089,7 +1085,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                 oplogEntriesIterator + 1,
                 oplogEntryPointers->end(),
                 [&](const OplogEntry* nextEntry) {
-                    return nextEntry->getOpType()[0] != 'i' ||  // Must be an insert.
+                    return nextEntry->getOpType() != OpTypeEnum::kInsert ||  // Must be an insert.
                         nextEntry->getNamespace() !=
                         entry->getNamespace() ||  // Must be the same namespace.
                         // Must not create too large an object.

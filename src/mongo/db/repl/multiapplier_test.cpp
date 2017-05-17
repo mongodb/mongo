@@ -73,8 +73,16 @@ Status applyOperation(MultiApplier::OperationPtrs*) {
     return Status::OK();
 };
 
+/**
+ * Generates oplog entries with the given number used for the timestamp.
+ */
+OplogEntry makeOplogEntry(int ts) {
+    return OplogEntry(
+        OpTime(Timestamp(ts, 1), 1), 1LL, OpTypeEnum::kNoop, NamespaceString("a.a"), BSONObj());
+}
+
 TEST_F(MultiApplierTest, InvalidConstruction) {
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
     auto multiApply = [](OperationContext*,
                          MultiApplier::Operations,
                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
@@ -96,21 +104,6 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
         UserException,
         ErrorCodes::BadValue,
         "empty list of operations");
-
-    // Last operation missing timestamp field.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(&getExecutor(), {OplogEntry(BSONObj())}, applyOperation, multiApply, callback),
-        UserException,
-        ErrorCodes::FailedToParse,
-        "last operation missing 'ts' field: {}");
-
-    // "ts" field in last operation not a timestamp.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(
-            &getExecutor(), {OplogEntry(BSON("ts" << 123))}, applyOperation, multiApply, callback),
-        UserException,
-        ErrorCodes::TypeMismatch,
-        "'ts' in last operation not a timestamp: { ts: 123 }");
 
     // Invalid apply operation function.
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -138,7 +131,7 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
 }
 
 TEST_F(MultiApplierTest, MultiApplierTransitionsDirectlyToCompleteIfShutdownBeforeStarting) {
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     auto multiApply = [](OperationContext*,
                          MultiApplier::Operations,
@@ -153,7 +146,7 @@ TEST_F(MultiApplierTest, MultiApplierTransitionsDirectlyToCompleteIfShutdownBefo
 }
 
 TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUponCancellation) {
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     bool multiApplyInvoked = false;
     auto multiApply = [&](OperationContext* opCtx,
@@ -190,7 +183,7 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
 }
 
 TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
@@ -219,7 +212,7 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
 }
 
 TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCallbackStatus) {
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
@@ -251,7 +244,7 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
 TEST_F(
     MultiApplierTest,
     MultiApplierProvidesOperationContextToMultiApplyFunctionButDisposesBeforeInvokingFinishCallback) {
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     OperationContext* multiApplyTxn = nullptr;
     MultiApplier::Operations operationsToApply;
@@ -305,7 +298,7 @@ TEST_F(MultiApplierTest, MultiApplierResetsOnCompletionCallbackFunctionPointerUp
     bool sharedCallbackStateDestroyed = false;
     auto sharedCallbackData = std::make_shared<SharedCallbackState>(&sharedCallbackStateDestroyed);
 
-    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+    const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     auto multiApply = [&](OperationContext*,
                           MultiApplier::Operations operations,
