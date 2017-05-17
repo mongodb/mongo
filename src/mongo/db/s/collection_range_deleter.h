@@ -91,16 +91,13 @@ public:
         DeleteNotification notification{};
     };
 
+    CollectionRangeDeleter() = default;
+    ~CollectionRangeDeleter();
+
     //
     // All of the following members must be called only while the containing MetadataManager's lock
     // is held (or in its destructor), except cleanUpNextRange.
     //
-
-    /**
-     * Normally, construct with the collection name and ShardingState's dedicated executor.
-     */
-    CollectionRangeDeleter() = default;
-    ~CollectionRangeDeleter();
 
     /**
      * Splices range's elements to the list to be cleaned up by the deleter thread. Returns true
@@ -142,11 +139,11 @@ public:
      * be called without locks.
      *
      * The 'rangeDeleterForTestOnly' is used as a utility for unit-tests that directly test the
-     * CollectionRangeDeleter class so they do not need to set up
-     * CollectionShardingState/MetadataManager.
+     * CollectionRangeDeleter class so they do not need to set up CollectionShardingState and
+     * MetadataManager objects.
      *
-     * Returns true if it should be scheduled to run again because there is more data to be deleted
-     * or false otherwise.
+     * Returns true if it should be scheduled to run again because there might be more documents to
+     * delete, or false otherwise.
      */
     static bool cleanUpNextRange(OperationContext*,
                                  NamespaceString const& nss,

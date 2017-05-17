@@ -94,8 +94,8 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
             if ((!collection || !scopedCollectionMetadata) && !rangeDeleterForTestOnly) {
                 log() << "Abandoning collection " << nss.ns()
                       << " range deletions left over from sharded state";
-                stdx::lock_guard<stdx::mutex> lk(css->_metadataManager._managerLock);
-                css->_metadataManager._clearAllCleanups();
+                stdx::lock_guard<stdx::mutex> lk(css->_metadataManager->_managerLock);
+                css->_metadataManager->_clearAllCleanups();
                 return false;  // collection was unsharded
             }
 
@@ -103,9 +103,9 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
             // scheduled to do deletions on, or another one with the same name. But it doesn't
             // matter: if it has deletions scheduled, now is as good a time as any to do them.
             auto self = rangeDeleterForTestOnly ? rangeDeleterForTestOnly
-                                                : &css->_metadataManager._rangesToClean;
+                                                : &css->_metadataManager->_rangesToClean;
             {
-                stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager._managerLock);
+                stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
                 if (self->isEmpty())
                     return false;
 
@@ -127,7 +127,7 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
                     log() << "No documents remain to delete in " << nss << " range "
                           << redact(range->toString());
                 }
-                stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager._managerLock);
+                stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
                 self->_pop(wrote.getStatus());
                 return true;
             }

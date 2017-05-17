@@ -62,7 +62,7 @@ public:
      * contains the currently active metadata.  When the usageCounter goes to zero, the RAII
      * object going out of scope will call _removeMetadata.
      */
-    ScopedCollectionMetadata getActiveMetadata();
+    ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self);
 
     /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
@@ -139,8 +139,6 @@ public:
     using Deletion = CollectionRangeDeleter::Deletion;
 
 private:
-    struct Tracker;
-
     /**
      * Deletes ranges, in background, until done, normally using a task executor attached to the
      * ShardingState.
@@ -208,21 +206,16 @@ private:
     // data members
 
     const NamespaceString _nss;
-
     // ServiceContext from which to obtain instances of global support objects.
     ServiceContext* const _serviceContext;
 
     // Mutex to protect the state below
     stdx::mutex _managerLock;
 
-    bool _shuttingDown{false};
-
-    // The collection metadata reflecting chunks accessible to new queries
-    std::shared_ptr<Tracker> _activeMetadataTracker;
-
-    // Previously active collection metadata instances still in use by active server operations or
-    // cursors
-    std::list<std::shared_ptr<Tracker>> _metadataInUse;
+    // _metadata.back() is the collection metadata reflecting chunks accessible to new queries.
+    // The rest are previously active collection metadata instances still in use by active server
+    // operations or cursors.
+    std::list<std::shared_ptr<CollectionMetadata>> _metadata;
 
     // Chunk ranges being migrated into to the shard. Indexed by the min key of the range.
     RangeMap _receivingChunks;
@@ -235,14 +228,12 @@ private:
 
     // friends
 
-    // for access to _decrementTrackerUsage(), and to Tracker.
-    friend class ScopedCollectionMetadata;
-
     // for access to _rangesToClean and _managerLock under task callback
     friend bool CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
                                                          NamespaceString const&,
                                                          int maxToDelete,
                                                          CollectionRangeDeleter*);
+    friend class ScopedCollectionMetadata;
 };
 
 class ScopedCollectionMetadata {
@@ -257,7 +248,7 @@ public:
     ~ScopedCollectionMetadata();
 
     /**
-     * Binds *this to the same tracker as other, if any.
+     * Binds *this to the same CollectionMetadata as other, if any.
      */
     ScopedCollectionMetadata(ScopedCollectionMetadata&& other);
     ScopedCollectionMetadata& operator=(ScopedCollectionMetadata&& other);
@@ -276,20 +267,26 @@ public:
 
 private:
     /**
-     * If tracker is non-null, increments the refcount in the specified tracker.
+     * Increments the usageCounter in the specified CollectionMetadata.
      *
-     * Must be called with tracker->manager locked.
+     * Must be called with manager->_managerLock held.  Arguments must be non-null.
      */
-    ScopedCollectionMetadata(std::shared_ptr<MetadataManager::Tracker> tracker);
+    ScopedCollectionMetadata(std::shared_ptr<MetadataManager> manager,
+                             std::shared_ptr<CollectionMetadata> metadata);
 
     /**
-     * Disconnect from the tracker, possibly triggering GC of unused CollectionMetadata.
+     * Disconnect from the CollectionMetadata, possibly triggering GC of unused CollectionMetadata.
+     *
+     * Must be called with manager->_managerLock held.
      */
     void _clear();
 
-    std::shared_ptr<MetadataManager::Tracker> _tracker{nullptr};
+    std::shared_ptr<CollectionMetadata> _metadata{nullptr};
 
-    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata();  // uses our private ctor
+    std::shared_ptr<MetadataManager> _manager{nullptr};
+
+    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
+        std::shared_ptr<MetadataManager>);  // uses our private ctor
 };
 
 }  // namespace mongo

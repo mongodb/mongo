@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/range_arithmetic.h"
+#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -47,9 +48,10 @@ class ChunkType;
  * here allow building a new incarnation of a collection's metadata based on an existing
  * one (e.g, we're splitting in a given collection.).
  *
- * This class is immutable once constructed.
+ * This class's chunk mapping is immutable once constructed.
  */
 class CollectionMetadata {
+
 public:
     /**
      * The main way to construct CollectionMetadata is through MetadataLoader or clone() methods.
@@ -166,6 +168,12 @@ public:
     std::string toStringBasic() const;
 
 private:
+    struct Tracker {
+        uint32_t usageCounter{0};
+        std::list<CollectionRangeDeleter::Deletion> orphans;
+    };
+    Tracker _tracker;
+
     /**
      * Builds _rangesMap from the contents of _chunksMap.
      */
@@ -188,6 +196,9 @@ private:
     // w.r.t. _chunkMap but we expect high chunk contiguity, especially in small
     // installations.
     RangeMap _rangesMap;
+
+    friend class ScopedCollectionMetadata;
+    friend class MetadataManager;
 };
 
 }  // namespace mongo

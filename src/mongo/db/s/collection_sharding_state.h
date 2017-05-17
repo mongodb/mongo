@@ -99,7 +99,7 @@ public:
      * BSON output of the pending metadata into a BSONArray
      */
     void toBSONPending(BSONArrayBuilder& bb) const {
-        _metadataManager.toBSONPending(bb);
+        _metadataManager->toBSONPending(bb);
     }
 
     /**
@@ -233,7 +233,7 @@ private:
     const NamespaceString _nss;
 
     // Contains all the metadata associated with this collection.
-    MetadataManager _metadataManager;
+    std::shared_ptr<MetadataManager> _metadataManager;
 
     // If this collection is serving as a source shard for chunk migration, this value will be
     // non-null. To write this value there needs to be X-lock on the collection in order to
