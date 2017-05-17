@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 
@@ -53,8 +53,8 @@ public:
         _config = config;
     }
 
-    void setHBData(const std::vector<MemberHeartbeatData>& hbData) {
-        _hbData = hbData;
+    void setHBData(const std::vector<MemberData>& hbData) {
+        _memberData = hbData;
     }
 
     void setSelfIndex(int index) {
@@ -87,7 +87,7 @@ public:
 
 private:
     ReplSetConfig _config;
-    std::vector<MemberHeartbeatData> _hbData;
+    std::vector<MemberData> _memberData;
     Date_t _now;
     int _selfIndex;
     int _primaryIndex;

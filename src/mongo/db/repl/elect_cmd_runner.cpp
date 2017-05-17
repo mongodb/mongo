@@ -33,7 +33,6 @@
 #include "mongo/db/repl/elect_cmd_runner.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/util/log.h"

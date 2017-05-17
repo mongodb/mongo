@@ -32,21 +32,20 @@
 
 #include <climits>
 
-#include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-MemberHeartbeatData::MemberHeartbeatData()
-    : _health(-1), _authIssue(false), _configIndex(-1), _isSelf(false) {
+MemberData::MemberData() : _health(-1), _authIssue(false), _configIndex(-1), _isSelf(false) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTime(OpTime());
 }
 
-bool MemberHeartbeatData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
+bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
     _health = 1;
     if (_upSince == Date_t()) {
         _upSince = now;
@@ -79,7 +78,7 @@ bool MemberHeartbeatData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbR
     return opTimeAdvanced;
 }
 
-void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
+void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
     _health = 0;
     _upSince = Date_t();
     _lastHeartbeat = now;
@@ -101,7 +100,7 @@ void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeat
     // heartbeat.
 }
 
-void MemberHeartbeatData::setAuthIssue(Date_t now) {
+void MemberData::setAuthIssue(Date_t now) {
     _health = 0;  // set health to 0 so that this doesn't count towards majority.
     _upSince = Date_t();
     _lastHeartbeat = now;
@@ -121,13 +120,13 @@ void MemberHeartbeatData::setAuthIssue(Date_t now) {
     _lastResponse.setSyncingTo(HostAndPort());
 }
 
-void MemberHeartbeatData::setLastAppliedOpTime(OpTime opTime, Date_t now) {
+void MemberData::setLastAppliedOpTime(OpTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
     _lastAppliedOpTime = opTime;
 }
 
-void MemberHeartbeatData::setLastDurableOpTime(OpTime opTime, Date_t now) {
+void MemberData::setLastDurableOpTime(OpTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastAppliedOpTime < opTime) {
@@ -143,7 +142,7 @@ void MemberHeartbeatData::setLastDurableOpTime(OpTime opTime, Date_t now) {
     }
 }
 
-bool MemberHeartbeatData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
+bool MemberData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastAppliedOpTime < opTime) {
@@ -153,7 +152,7 @@ bool MemberHeartbeatData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
     return false;
 }
 
-bool MemberHeartbeatData::advanceLastDurableOpTime(OpTime opTime, Date_t now) {
+bool MemberData::advanceLastDurableOpTime(OpTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastDurableOpTime < opTime) {

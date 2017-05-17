@@ -33,7 +33,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -243,10 +243,10 @@ public:
                                      const stdx::unordered_set<HostAndPort>& member_set);
     virtual OpTime getMyLastAppliedOpTime() const;
     virtual OpTime getMyLastDurableOpTime() const;
-    virtual MemberHeartbeatData* getMyMemberHeartbeatData();
-    virtual MemberHeartbeatData* findMemberHeartbeatDataByMemberId(const int memberId);
-    virtual MemberHeartbeatData* findMemberHeartbeatDataByRid(const OID rid);
-    virtual MemberHeartbeatData* addSlaveMemberData(const OID rid);
+    virtual MemberData* getMyMemberData();
+    virtual MemberData* findMemberDataByMemberId(const int memberId);
+    virtual MemberData* findMemberDataByRid(const OID rid);
+    virtual MemberData* addSlaveMemberData(const OID rid);
     virtual Status becomeCandidateIfElectable(const Date_t now, bool isPriorityTakeover);
     virtual void setStorageEngineSupportsReadCommitted(bool supported);
 
@@ -352,10 +352,10 @@ private:
     const MemberConfig& _selfConfig() const;
 
     // Helper shortcut to self member data
-    const MemberHeartbeatData& _selfMemberHeartbeatData() const;
+    const MemberData& _selfMemberData() const;
 
-    // Index of self member in member heartbeat data.
-    const int _selfMemberHeartbeatDataIndex() const;
+    // Index of self member in member data.
+    const int _selfMemberDataIndex() const;
 
     // Returns NULL if there is no primary, or the MemberConfig* for the current primary
     const MemberConfig* _currentPrimaryMember() const;
@@ -374,10 +374,10 @@ private:
                                                        Date_t now);
 
     /**
-     * Updates _hbdata based on the newConfig, ensuring that every member in the newConfig
-     * has an entry in _hbdata.  If any nodes in the newConfig are also present in
+     * Updates _memberData based on the newConfig, ensuring that every member in the newConfig
+     * has an entry in _memberData.  If any nodes in the newConfig are also present in
      * _currentConfig, copies their heartbeat info into the corresponding entry in the updated
-     * _hbdata vector.
+     * _memberData vector.
      */
     void _updateHeartbeatDataForReconfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
 
@@ -431,10 +431,11 @@ private:
 
     ReplSetConfig _rsConfig;  // The current config, including a vector of MemberConfigs
 
-    // heartbeat data for each member.  It is guaranteed that this vector will be maintained
-    // in the same order as the MemberConfigs in _currentConfig, therefore the member config
-    // index can be used to index into this vector as well.
-    std::vector<MemberHeartbeatData> _hbdata;
+    // Heartbeat, current applied/durable optime, and other state data for each member.  It is
+    // guaranteed that this vector will be maintained in the same order as the MemberConfigs in
+    // _currentConfig, therefore the member config index can be used to index into this vector as
+    // well.
+    std::vector<MemberData> _memberData;
 
     // Indicates that we've received a request to stepdown from PRIMARY (likely via a heartbeat)
     bool _stepDownPending;

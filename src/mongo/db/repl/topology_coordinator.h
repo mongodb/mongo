@@ -45,7 +45,7 @@ class Timestamp;
 namespace repl {
 
 class HeartbeatResponseAction;
-class MemberHeartbeatData;
+class MemberData;
 class OpTime;
 class ReplSetHeartbeatArgs;
 class ReplSetConfig;
@@ -160,7 +160,7 @@ public:
     /**
      * Determines if a new sync source should be chosen, if a better candidate sync source is
      * available.  If the current sync source's last optime ("syncSourceLastOpTime" under
-     * protocolVersion 1, but pulled from the MemberHeartbeatData in protocolVersion 0) is more than
+     * protocolVersion 1, but pulled from the MemberData in protocolVersion 0) is more than
      * _maxSyncSourceLagSecs behind any syncable source, this function returns true. If we are
      * running in ProtocolVersion 1, our current sync source is not primary, has no sync source
      * ("syncSourceHasSyncSource" is false), and only has data up to "myLastOpTime", returns true.
@@ -199,7 +199,7 @@ public:
     virtual void setFollowerMode(MemberState::MS newMode) = 0;
 
     /**
-     * Scan the memberHeartbeatData and determine the highest last applied or last
+     * Scan the memberData and determine the highest last applied or last
      * durable optime present on a majority of servers; set _lastCommittedOpTime to this
      * new entry.
      * Whether the last applied or last durable op time is used depends on whether
@@ -404,26 +404,26 @@ public:
     virtual HeartbeatResponseAction setMemberAsDown(Date_t now, const int memberIndex) = 0;
 
     /**
-     * Goes through the memberHeartbeatData and determines which member that is currently live
+     * Goes through the memberData and determines which member that is currently live
      * has the stalest (earliest) last update time.  Returns (-1, Date_t::max()) if there are
      * no other members.
      */
     virtual std::pair<int, Date_t> getStalestLiveMember() const = 0;
 
     /**
-     * Go through the memberHeartbeatData, and mark nodes which haven't been updated
+     * Go through the memberData, and mark nodes which haven't been updated
      * recently (within an election timeout) as "down".  Returns a HeartbeatResponseAction, which
      * will be StepDownSelf if we can no longer see a majority of the nodes, otherwise NoAction.
      */
     virtual HeartbeatResponseAction checkMemberTimeouts(Date_t now) = 0;
 
     /**
-     * Set all nodes in memberHeartbeatData to not stale with a lastUpdate of "now".
+     * Set all nodes in memberData to not stale with a lastUpdate of "now".
      */
     virtual void resetAllMemberTimeouts(Date_t now) = 0;
 
     /**
-     * Set all nodes in memberHeartbeatData that are present in member_set
+     * Set all nodes in memberData that are present in member_set
      * to not stale with a lastUpdate of "now".
      */
     virtual void resetMemberTimeouts(Date_t now,
@@ -442,26 +442,26 @@ public:
     /*
      * Returns information we have on the state of this node.
      */
-    virtual MemberHeartbeatData* getMyMemberHeartbeatData() = 0;
+    virtual MemberData* getMyMemberData() = 0;
 
     /*
      * Returns information we have on the state of the node identified by memberId.  Returns
      * nullptr if memberId is not found in the configuration.
      */
-    virtual MemberHeartbeatData* findMemberHeartbeatDataByMemberId(const int memberId) = 0;
+    virtual MemberData* findMemberDataByMemberId(const int memberId) = 0;
 
     /*
      * Returns information we have on the state of the node identified by rid.  Returns
      * nullptr if rid is not found in the heartbeat data.  This method is used only for
      * master/slave replication.
      */
-    virtual MemberHeartbeatData* findMemberHeartbeatDataByRid(const OID rid) = 0;
+    virtual MemberData* findMemberDataByRid(const OID rid) = 0;
 
     /*
-     * Adds and returns a memberHeartbeatData entry for the given RID.
+     * Adds and returns a memberData entry for the given RID.
      * Used only in master/slave mode.
      */
-    virtual MemberHeartbeatData* addSlaveMemberData(const OID rid) = 0;
+    virtual MemberData* addSlaveMemberData(const OID rid) = 0;
 
     /**
      * If getRole() == Role::candidate and this node has not voted too recently, updates the

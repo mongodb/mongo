@@ -31,7 +31,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
-#include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"

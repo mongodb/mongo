@@ -966,7 +966,7 @@ private:
     void _updateCommitPoint_inlock();
 
     /**
-     * Scan the memberHeartbeatData and determine the highest last applied or last
+     * Scan the memberData and determine the highest last applied or last
      * durable optime present on a majority of servers; set _lastCommittedOpTime to this
      * new entry.  Wake any threads waiting for replication that now have their
      * write concern satisfied.
