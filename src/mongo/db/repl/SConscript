@@ -5,13 +5,31 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='oplog',
+    target='apply_ops',
     source=[
         'apply_ops.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        #'oplog', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ACM, 2017-05-15): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ],
+)
+
+env.Library(
+    target='oplog',
+    source=[
         'oplog.cpp',
         'oplogreader.cpp',
     ],
     LIBDEPS=[
+        'apply_ops',
         'repl_coordinator_interface',
         'repl_coordinator_global',
         '$BUILD_DIR/mongo/base',
@@ -20,7 +38,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/index/index_descriptor',

@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/dbhash.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -143,6 +144,7 @@ Status _applyOps(OperationContext* opCtx,
                 status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
                 if (!status.isOK())
                     return status;
+                logOpForDbHash(opCtx, nss);
             } else {
                 try {
                     // Run operations under a nested lock as a hack to prevent yielding.
@@ -185,6 +187,7 @@ Status _applyOps(OperationContext* opCtx,
                     return Status(ErrorCodes::UnknownError, ex.what());
                 }
                 WriteUnitOfWork wuow(opCtx);
+                logOpForDbHash(opCtx, nss);
                 wuow.commit();
             }
 

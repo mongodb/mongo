@@ -32,6 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/dbhash.h"
+
 #include <map>
 #include <string>
 
@@ -118,6 +120,8 @@ public:
         md5_state_t globalState;
         md5_init(&globalState);
 
+        vector<string> cached;
+
         const std::initializer_list<StringData> replicatedSystemCollections{"system.backup_users",
                                                                             "system.js",
                                                                             "system.new_users",
@@ -145,10 +149,14 @@ public:
             if (desiredCollections.size() > 0 && desiredCollections.count(shortCollectionName) == 0)
                 continue;
 
-            string hash = _hashCollection(opCtx, db, fullCollectionName);
+            bool fromCache = false;
+            string hash = _hashCollection(opCtx, db, fullCollectionName, &fromCache);
 
             bb.append(shortCollectionName, hash);
+
             md5_append(&globalState, (const md5_byte_t*)hash.c_str(), hash.size());
+            if (fromCache)
+                cached.push_back(fullCollectionName);
         }
         bb.done();
 
@@ -159,16 +167,51 @@ public:
         result.append("md5", hash);
         result.appendNumber("timeMillis", timer.millis());
 
+        result.append("fromCache", cached);
+
         return 1;
     }
 
+    void wipeCacheForCollection(OperationContext* opCtx, const NamespaceString& ns) {
+        if (!_isCachable(ns))
+            return;
+
+        opCtx->recoveryUnit()->onCommit([this, opCtx, ns] {
+            stdx::lock_guard<stdx::mutex> lk(_cachedHashedMutex);
+            if (ns.isCommand()) {
+                // The <dbName>.$cmd namespace can represent a command that
+                // modifies the entire database, e.g. dropDatabase, so we remove
+                // the cached entries for all collections in the database.
+                _cachedHashed.erase(ns.db().toString());
+            } else {
+                _cachedHashed[ns.db().toString()].erase(ns.coll().toString());
+            }
+        });
+    }
+
 private:
+    bool _isCachable(const NamespaceString& ns) const {
+        return ns.isConfigDB();
+    }
+
     std::string _hashCollection(OperationContext* opCtx,
                                 Database* db,
-                                const std::string& fullCollectionName) {
+                                const std::string& fullCollectionName,
+                                bool* fromCache) {
+        stdx::unique_lock<stdx::mutex> cachedHashedLock(_cachedHashedMutex, stdx::defer_lock);
 
         NamespaceString ns(fullCollectionName);
 
+        if (_isCachable(ns)) {
+            cachedHashedLock.lock();
+            string hash = _cachedHashed[ns.db().toString()][ns.coll().toString()];
+            if (hash.size() > 0) {
+                *fromCache = true;
+                return hash;
+            }
+        }
+
+        *fromCache = false;
         Collection* collection = db->getCollection(opCtx, ns);
         if (!collection)
             return "";
@@ -215,10 +258,22 @@ private:
         md5_finish(&st, d);
         string hash = digestToString(d);
 
+        if (cachedHashedLock.owns_lock()) {
+            _cachedHashed[ns.db().toString()][ns.coll().toString()] = hash;
+        }
+
         return hash;
     }
+
+    stdx::mutex _cachedHashedMutex;
+    std::map<std::string, std::map<std::string, std::string>> _cachedHashed;
 
 } dbhashCmd;
 
 }  // namespace
+
+void logOpForDbHash(OperationContext* opCtx, const NamespaceString& nss) {
+    dbhashCmd.wipeCacheForCollection(opCtx, nss);
+}
+
 }  // namespace mongo
