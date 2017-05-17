@@ -32,6 +32,7 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
@@ -40,6 +41,7 @@
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/uuid.h"
 
 namespace {
 
@@ -640,6 +642,37 @@ TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
     ASSERT_STRING_CONTAINS(getStatus().reason(), "invalid collection namespace: db.");
     ASSERT_FALSE(_databaseCloner->isActive());
     ASSERT_EQUALS(DatabaseCloner::State::kComplete, _databaseCloner->getState_forTest());
+}
+
+TEST_F(DatabaseClonerTest, DatabaseClonerAcceptsCollectionOptionsContainUuid) {
+    ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
+
+    ASSERT_OK(_databaseCloner->startup());
+    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
+
+    bool collectionClonerStarted = false;
+    _databaseCloner->setStartCollectionClonerFn(
+        [&collectionClonerStarted](CollectionCloner& cloner) {
+            collectionClonerStarted = true;
+            return cloner.startup();
+        });
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        CollectionOptions options;
+        options.uuid = UUID::gen();
+        processNetworkResponse(
+            createListCollectionsResponse(0,
+                                          BSON_ARRAY(BSON("name"
+                                                          << "a"
+                                                          << "options"
+                                                          << options.toBSON()))));
+    }
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
+    ASSERT_TRUE(collectionClonerStarted);
+    ASSERT_TRUE(_databaseCloner->isActive());
+    ASSERT_EQUALS(DatabaseCloner::State::kRunning, _databaseCloner->getState_forTest());
 }
 
 TEST_F(DatabaseClonerTest, StartFirstCollectionClonerFailed) {

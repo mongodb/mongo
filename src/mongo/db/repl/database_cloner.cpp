@@ -324,7 +324,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         }
         const BSONObj optionsObj = optionsElement.Obj();
         CollectionOptions options;
-        Status parseStatus = options.parse(optionsObj, CollectionOptions::parseForCommand);
+        auto parseStatus = options.parse(optionsObj, CollectionOptions::parseForStorage);
         if (!parseStatus.isOK()) {
             _finishCallback_inlock(lk, parseStatus);
             return;
