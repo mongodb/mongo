@@ -157,7 +157,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/pipeline/serveronly',
         '$BUILD_DIR/mongo/db/repair_database',
-        '$BUILD_DIR/mongo/db/repl/apply_ops',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/isself',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',

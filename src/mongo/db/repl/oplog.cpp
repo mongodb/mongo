@@ -56,7 +56,6 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/dbhash.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
