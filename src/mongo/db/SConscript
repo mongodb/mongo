@@ -622,7 +622,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/background_job",
         "query/query",
-        #"catalog/catalog", # CYCLE
+        #"catalog/catalog", # CYCLE (CursorManager)
     ],
     LIBDEPS_TAGS=[
         # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
@@ -730,7 +730,6 @@ env.Library(
         "ttl.cpp",
     ],
     LIBDEPS=[
-        "catalog/catalog",
         "commands/dcommands",
         "db_raii",
         "ttl_collection_cache",
@@ -1025,6 +1024,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'keys_collection_document',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
     ],
 )
 

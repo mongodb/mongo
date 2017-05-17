@@ -26,12 +26,8 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/s/cluster_last_error_info',
         '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/mongo/s/coreshard',
         'shard_interface',
-        #'$BUILD_DIR/mongo/s/coreshard', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017,04-25): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -42,6 +38,7 @@ env.Library(
         'sharding_network_connection_hook.cpp',
     ],
     LIBDEPS=[
+        'sharding_client',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/s/coreshard',
     ],

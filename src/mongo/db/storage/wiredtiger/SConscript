@@ -140,6 +140,7 @@ if wiredtiger:
             LIBDEPS=[
                 'storage_wiredtiger_mock',
                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+                '$BUILD_DIR/mongo/s/client/sharding_client',
                 ],
             )
 

@@ -352,19 +352,14 @@ env.Library(
         'rs_rollback.cpp',
     ],
     LIBDEPS=[
+        'oplog',
         'replication_process',
         'roll_back_local_operations',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/dbhelpers',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
     ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-    ]
 )
 
 env.Library(

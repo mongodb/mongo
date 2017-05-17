@@ -261,8 +261,12 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'client/sharding_client',
         'common',
+        #'client/sharding_client', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017,05-16): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
