@@ -126,7 +126,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
@@ -175,7 +175,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         // disallow dropping the config database
@@ -243,7 +243,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         BSONElement e = cmdObj.firstElement();
@@ -346,7 +346,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         BSONElement firstElement = cmdObj.firstElement();
@@ -428,7 +428,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const char* deprecationWarning =
@@ -485,7 +485,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
@@ -536,7 +536,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
@@ -677,7 +677,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, jsobj));
@@ -856,7 +856,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         Timer timer;
@@ -999,7 +999,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
@@ -1047,7 +1047,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
@@ -1082,7 +1082,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         int scale = 1;
@@ -1166,7 +1166,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
@@ -1192,7 +1192,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         result << "options" << QueryOption_AllSupported;

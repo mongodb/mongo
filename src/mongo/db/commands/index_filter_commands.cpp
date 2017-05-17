@@ -117,7 +117,7 @@ IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpTex
 
 bool IndexFilterCommand::run(OperationContext* opCtx,
                              const string& dbname,
-                             BSONObj& cmdObj,
+                             const BSONObj& cmdObj,
                              string& errmsg,
                              BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
@@ -161,7 +161,7 @@ ListFilters::ListFilters()
 
 Status ListFilters::runIndexFilterCommand(OperationContext* opCtx,
                                           const string& ns,
-                                          BSONObj& cmdObj,
+                                          const BSONObj& cmdObj,
                                           BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
@@ -229,7 +229,7 @@ ClearFilters::ClearFilters()
 
 Status ClearFilters::runIndexFilterCommand(OperationContext* opCtx,
                                            const std::string& ns,
-                                           BSONObj& cmdObj,
+                                           const BSONObj& cmdObj,
                                            BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
@@ -330,7 +330,7 @@ SetFilter::SetFilter()
 
 Status SetFilter::runIndexFilterCommand(OperationContext* opCtx,
                                         const std::string& ns,
-                                        BSONObj& cmdObj,
+                                        const BSONObj& cmdObj,
                                         BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
     const NamespaceString nss(ns);

@@ -71,7 +71,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string&,
-             mongo::BSONObj&,
+             const mongo::BSONObj&,
              std::string&,
              mongo::BSONObjBuilder& result) override {
         executor::ConnectionPoolStats stats{};

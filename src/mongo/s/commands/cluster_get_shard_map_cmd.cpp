@@ -69,7 +69,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         // MongoD instances do not know that they are part of a sharded cluster until they

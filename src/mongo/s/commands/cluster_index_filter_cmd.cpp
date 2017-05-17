@@ -93,7 +93,7 @@ public:
     // Cluster plan cache command entry point.
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, cmdObj));

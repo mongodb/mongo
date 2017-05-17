@@ -88,7 +88,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& db,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         NamespaceString nss = parseNsCollectionRequired(db, cmdObj);

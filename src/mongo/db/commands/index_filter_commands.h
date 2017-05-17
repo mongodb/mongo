@@ -65,7 +65,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result);
 
@@ -93,7 +93,7 @@ public:
      */
     virtual Status runIndexFilterCommand(OperationContext* opCtx,
                                          const std::string& ns,
-                                         BSONObj& cmdObj,
+                                         const BSONObj& cmdObj,
                                          BSONObjBuilder* bob) = 0;
 
 private:
@@ -112,7 +112,7 @@ public:
 
     virtual Status runIndexFilterCommand(OperationContext* opCtx,
                                          const std::string& ns,
-                                         BSONObj& cmdObj,
+                                         const BSONObj& cmdObj,
                                          BSONObjBuilder* bob);
 
     /**
@@ -134,7 +134,7 @@ public:
 
     virtual Status runIndexFilterCommand(OperationContext* opCtx,
                                          const std::string& ns,
-                                         BSONObj& cmdObj,
+                                         const BSONObj& cmdObj,
                                          BSONObjBuilder* bob);
 
     /**
@@ -168,7 +168,7 @@ public:
 
     virtual Status runIndexFilterCommand(OperationContext* opCtx,
                                          const std::string& ns,
-                                         BSONObj& cmdObj,
+                                         const BSONObj& cmdObj,
                                          BSONObjBuilder* bob);
 
     /**

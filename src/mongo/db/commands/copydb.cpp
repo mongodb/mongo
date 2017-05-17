@@ -117,7 +117,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         boost::optional<DisableDocumentValidation> maybeDisableValidation;

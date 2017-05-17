@@ -382,7 +382,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         HandshakeArgs handshake;

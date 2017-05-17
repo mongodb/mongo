@@ -75,7 +75,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& ignored,
                      BSONObjBuilder& result);
 
@@ -102,7 +102,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& ignored,
                      BSONObjBuilder& result);
 
@@ -270,7 +270,7 @@ void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) {
 
 bool CmdSaslStart::run(OperationContext* opCtx,
                        const std::string& db,
-                       BSONObj& cmdObj,
+                       const BSONObj& cmdObj,
                        std::string& ignored,
                        BSONObjBuilder& result) {
     Client* client = Client::getCurrent();
@@ -311,7 +311,7 @@ void CmdSaslContinue::help(std::stringstream& os) const {
 
 bool CmdSaslContinue::run(OperationContext* opCtx,
                           const std::string& db,
-                          BSONObj& cmdObj,
+                          const BSONObj& cmdObj,
                           std::string& ignored,
                           BSONObjBuilder& result) {
     Client* client = Client::getCurrent();

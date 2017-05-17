@@ -82,7 +82,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& output) override {
         auto shardResponses =

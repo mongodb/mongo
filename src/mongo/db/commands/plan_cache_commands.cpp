@@ -112,7 +112,7 @@ PlanCacheCommand::PlanCacheCommand(const string& name,
 
 bool PlanCacheCommand::run(OperationContext* opCtx,
                            const string& dbname,
-                           BSONObj& cmdObj,
+                           const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
@@ -223,7 +223,7 @@ PlanCacheListQueryShapes::PlanCacheListQueryShapes()
 
 Status PlanCacheListQueryShapes::runPlanCacheCommand(OperationContext* opCtx,
                                                      const string& ns,
-                                                     BSONObj& cmdObj,
+                                                     const BSONObj& cmdObj,
                                                      BSONObjBuilder* bob) {
     // This is a read lock. The query cache is owned by the collection.
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
@@ -275,7 +275,7 @@ PlanCacheClear::PlanCacheClear()
 
 Status PlanCacheClear::runPlanCacheCommand(OperationContext* opCtx,
                                            const std::string& ns,
-                                           BSONObj& cmdObj,
+                                           const BSONObj& cmdObj,
                                            BSONObjBuilder* bob) {
     // This is a read lock. The query cache is owned by the collection.
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
@@ -352,7 +352,7 @@ PlanCacheListPlans::PlanCacheListPlans()
 
 Status PlanCacheListPlans::runPlanCacheCommand(OperationContext* opCtx,
                                                const std::string& ns,
-                                               BSONObj& cmdObj,
+                                               const BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
     AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 

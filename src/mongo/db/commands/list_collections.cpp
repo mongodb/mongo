@@ -220,7 +220,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         unique_ptr<MatchExpression> matcher;

@@ -130,7 +130,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& db,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         long long opId = parseOpId(cmdObj);

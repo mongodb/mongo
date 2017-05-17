@@ -148,7 +148,7 @@ public:
     bool runParsed(OperationContext* opCtx,
                    const NamespaceString& origNss,
                    const GetMoreRequest& request,
-                   BSONObj& cmdObj,
+                   const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) {
 
@@ -443,7 +443,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         // Counted as a getMore, not as a command.

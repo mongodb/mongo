@@ -75,7 +75,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string&,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         if (cmdObj.firstElement().type() != jstOID) {

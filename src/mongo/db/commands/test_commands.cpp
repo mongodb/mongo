@@ -77,7 +77,7 @@ public:
     }
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
@@ -151,7 +151,7 @@ public:
     CmdSleep() : Command("sleep") {}
     bool run(OperationContext* opCtx,
              const string& ns,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         log() << "test only command sleep invoked";
@@ -214,7 +214,7 @@ public:
                                        std::vector<Privilege>* out) {}
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString fullNs = parseNsCollectionRequired(dbname, cmdObj);
@@ -291,7 +291,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);

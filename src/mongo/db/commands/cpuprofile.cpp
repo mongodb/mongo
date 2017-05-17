@@ -105,7 +105,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      std::string const& db,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& errmsg,
                      BSONObjBuilder& result);
 
@@ -121,7 +121,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      std::string const& db,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& errmsg,
                      BSONObjBuilder& result);
 
@@ -133,7 +133,7 @@ char const* const CpuProfilerStopCommand::commandName = "_cpuProfilerStop";
 
 bool CpuProfilerStartCommand::run(OperationContext* opCtx,
                                   std::string const& db,
-                                  BSONObj& cmdObj,
+                                  const BSONObj& cmdObj,
                                   std::string& errmsg,
                                   BSONObjBuilder& result) {
     // The DB lock here is just so we have IX on the global lock in order to prevent shutdown
@@ -150,7 +150,7 @@ bool CpuProfilerStartCommand::run(OperationContext* opCtx,
 
 bool CpuProfilerStopCommand::run(OperationContext* opCtx,
                                  std::string const& db,
-                                 BSONObj& cmdObj,
+                                 const BSONObj& cmdObj,
                                  std::string& errmsg,
                                  BSONObjBuilder& result) {
     // The DB lock here is just so we have IX on the global lock in order to prevent shutdown

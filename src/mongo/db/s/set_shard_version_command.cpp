@@ -90,7 +90,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string&,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         uassert(ErrorCodes::IllegalOperation,

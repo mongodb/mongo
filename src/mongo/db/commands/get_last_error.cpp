@@ -72,7 +72,7 @@ public:
     CmdResetError() : Command("resetError", "reseterror") {}
     bool run(OperationContext* opCtx,
              const string& db,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError::get(opCtx->getClient()).reset();
@@ -105,7 +105,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         //
@@ -313,7 +313,7 @@ public:
     CmdGetPrevError() : Command("getPrevError", "getpreverror") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError* le = &LastError::get(opCtx->getClient());

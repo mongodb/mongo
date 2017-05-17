@@ -91,7 +91,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              std::string& errmsg,
              BSONObjBuilder& result) {
         VersionInfoInterface::instance().appendBuildInfo(&result);
@@ -120,7 +120,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& badns,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         // IMPORTANT: Don't put anything in here that might lock db - including authentication
@@ -145,7 +145,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         if (getGlobalScriptEngine()) {
@@ -187,7 +187,7 @@ public:
     }
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         ProcessInfo p;
@@ -234,7 +234,7 @@ public:
     }
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate);
@@ -265,7 +265,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         // sort the commands before building the result BSON
@@ -363,7 +363,7 @@ public:
     CmdForceError() : Command("forceerror") {}
     bool run(OperationContext* opCtx,
              const string& dbnamne,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         LastError::get(cc()).setLastError(10038, "forced error");
@@ -397,7 +397,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         BSONElement val = cmdObj.firstElement();
@@ -468,7 +468,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         std::string logName;
@@ -520,7 +520,7 @@ public:
     }
     virtual bool run(OperationContext* opCtx,
                      const string&,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         result.append("argv", serverGlobalParams.argvArray);

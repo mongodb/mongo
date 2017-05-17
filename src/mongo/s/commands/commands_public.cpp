@@ -212,7 +212,7 @@ protected:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& output) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -246,7 +246,7 @@ protected:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
@@ -352,7 +352,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& output) {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -423,7 +423,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         uassertStatusOK(createShardDatabase(opCtx, dbName));
@@ -455,7 +455,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const auto fullNsFromElt = cmdObj.firstElement();
@@ -513,7 +513,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const auto todbElt = cmdObj["todb"];
@@ -586,7 +586,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -766,7 +766,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
@@ -959,7 +959,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const std::string ns = parseNs(dbName, cmdObj);
@@ -994,7 +994,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -1240,7 +1240,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
@@ -1382,7 +1382,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -1519,7 +1519,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         RARELY {
@@ -1564,7 +1564,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) final {
         auto nss = NamespaceString::makeListCollectionsNSS(dbName);
@@ -1613,7 +1613,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbName,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) final {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));

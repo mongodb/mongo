@@ -98,7 +98,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         auto parsedRequest = uassertStatusOK(AddShardToZoneRequest::parseFromMongosCommand(cmdObj));

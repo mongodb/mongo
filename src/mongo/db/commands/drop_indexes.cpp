@@ -86,7 +86,7 @@ public:
     CmdDropIndexes() : Command("dropIndexes", "deleteIndexes") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, jsobj);
@@ -117,7 +117,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& jsobj,
+             const BSONObj& jsobj,
              string& errmsg,
              BSONObjBuilder& result) {
         DBDirectClient db(opCtx);

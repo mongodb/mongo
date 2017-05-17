@@ -60,7 +60,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     virtual bool run(OperationContext* txn,
                      const string& badns,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      string& errmsg,
                      BSONObjBuilder& result) {
         double cpuFactor = 1;

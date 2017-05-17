@@ -59,7 +59,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result);
 
@@ -87,7 +87,7 @@ public:
      */
     virtual Status runPlanCacheCommand(OperationContext* opCtx,
                                        const std::string& ns,
-                                       BSONObj& cmdObj,
+                                       const BSONObj& cmdObj,
                                        BSONObjBuilder* bob) = 0;
 
     /**
@@ -113,7 +113,7 @@ public:
     PlanCacheListQueryShapes();
     virtual Status runPlanCacheCommand(OperationContext* opCtx,
                                        const std::string& ns,
-                                       BSONObj& cmdObj,
+                                       const BSONObj& cmdObj,
                                        BSONObjBuilder* bob);
 
     /**
@@ -139,7 +139,7 @@ public:
     PlanCacheClear();
     virtual Status runPlanCacheCommand(OperationContext* opCtx,
                                        const std::string& ns,
-                                       BSONObj& cmdObj,
+                                       const BSONObj& cmdObj,
                                        BSONObjBuilder* bob);
 
     /**
@@ -168,7 +168,7 @@ public:
     PlanCacheListPlans();
     virtual Status runPlanCacheCommand(OperationContext* opCtx,
                                        const std::string& ns,
-                                       BSONObj& cmdObj,
+                                       const BSONObj& cmdObj,
                                        BSONObjBuilder* bob);
 
     /**

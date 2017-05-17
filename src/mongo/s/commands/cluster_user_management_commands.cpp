@@ -88,7 +88,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -126,7 +126,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         auth::CreateOrUpdateUserArgs args;
@@ -175,7 +175,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         UserName userName;
@@ -220,7 +220,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -260,7 +260,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         string userNameString;
@@ -307,7 +307,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         string userNameString;
@@ -358,7 +358,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
@@ -392,7 +392,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -426,7 +426,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -466,7 +466,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -506,7 +506,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -546,7 +546,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -586,7 +586,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -629,7 +629,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -673,7 +673,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         const bool ok = Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -717,7 +717,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementReadCommand(
@@ -755,7 +755,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -805,7 +805,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         return Grid::get(opCtx)->catalogClient(opCtx)->runUserManagementWriteCommand(
@@ -894,7 +894,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         // Run the authSchemaUpgrade command on the config servers

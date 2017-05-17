@@ -101,7 +101,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));

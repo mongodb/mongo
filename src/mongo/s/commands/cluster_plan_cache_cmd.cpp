@@ -88,7 +88,7 @@ public:
     // Cluster plan cache command entry point.
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result);
 
@@ -111,7 +111,7 @@ private:
 
 bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
                               const std::string& dbName,
-                              BSONObj& cmdObj,
+                              const BSONObj& cmdObj,
                               std::string& errMsg,
                               BSONObjBuilder& result) {
     const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));

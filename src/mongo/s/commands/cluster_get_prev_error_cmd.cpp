@@ -63,7 +63,7 @@ public:
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& dbname,
-                     BSONObj& cmdObj,
+                     const BSONObj& cmdObj,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         errmsg += "getpreverror not supported for sharded environments";

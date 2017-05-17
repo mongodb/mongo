@@ -49,7 +49,7 @@ public:
 private:
     bool run(OperationContext* opCtx,
              const std::string&,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result) final {
         Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);

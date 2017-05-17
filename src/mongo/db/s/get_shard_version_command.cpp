@@ -84,7 +84,7 @@ public:
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              std::string& errmsg,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));

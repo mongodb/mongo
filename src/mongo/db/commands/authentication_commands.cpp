@@ -115,7 +115,7 @@ public:
                                        std::vector<Privilege>* out) {}  // No auth required
     bool run(OperationContext* opCtx,
              const string&,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         nonce64 n = getNextNonce();
@@ -152,7 +152,7 @@ void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {
 
 bool CmdAuthenticate::run(OperationContext* opCtx,
                           const string& dbname,
-                          BSONObj& cmdObj,
+                          const BSONObj& cmdObj,
                           string& errmsg,
                           BSONObjBuilder& result) {
     if (!serverGlobalParams.quiet.load()) {
@@ -375,7 +375,7 @@ public:
     CmdLogout() : Command("logout") {}
     bool run(OperationContext* opCtx,
              const string& dbname,
-             BSONObj& cmdObj,
+             const BSONObj& cmdObj,
              string& errmsg,
              BSONObjBuilder& result) {
         AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
