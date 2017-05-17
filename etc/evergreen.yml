@@ -1369,7 +1369,7 @@ tasks:
         display_name: Source tarball
         # We only need to upload the source tarball from one of the build variants
         # because it should be the same everywhere, so just use linux-64/windows-64-2k8.
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
 
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
@@ -3077,7 +3077,7 @@ tasks:
         remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
     - *apply_compile_expansions
     - func: "fetch debugsymbols archive"
     - command: shell.exec
@@ -3160,7 +3160,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
 
     # Put the debug symbols
     - command: s3.put
@@ -3206,7 +3206,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
 
     # Put the debug symbols signature
     - command: s3.put
@@ -3226,7 +3226,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         permissions: public-read
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
+        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi
         bucket: build-push-testing
         content_type: application/x-msi
@@ -3264,7 +3264,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
 
     # Put the debug symbols sha1
     - command: s3.put
@@ -3284,7 +3284,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         permissions: public-read
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
+        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1
         bucket: build-push-testing
         content_type: text/plain
@@ -3322,7 +3322,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
 
     # Put the debug symbols sha256
     - command: s3.put
@@ -3341,7 +3341,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
+        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256
         bucket: build-push-testing
         permissions: public-read
@@ -3380,7 +3380,7 @@ tasks:
         permissions: public-read
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
-        build_variants: [ linux-64, windows-64-2k8 ]
+        build_variants: [ linux-64, windows-64-2k8-ssl ]
 
     # Put the debug symbols md5
     - command: s3.put
@@ -3399,7 +3399,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
+        build_variants: ["enterprise-windows-64-2k8", "windows-64-2k8-ssl"]
         local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5
         bucket: build-push-testing
         permissions: public-read
@@ -3422,12 +3422,12 @@ tasks:
             #Source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8' ]}
+               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
 
             #MSI (Windows only)
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl' ]}
+               'build_variants': [ 'enterprise-windows-64-2k8', 'windows-64-2k8-ssl' ]}
 
             #Binaries Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
@@ -3440,7 +3440,7 @@ tasks:
             #Source tarball signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8' ]}
+               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
 
             #SHA1 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
@@ -3453,12 +3453,12 @@ tasks:
             #SHA1 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8' ]}
+               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
 
             #SHA1 for MSI
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl']}
+               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
 
             #SHA256 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
@@ -3471,12 +3471,12 @@ tasks:
             #SHA256 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8' ]}
+               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
 
             #SHA256 for MSI files
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl']}
+               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
 
             #MD5 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
@@ -3489,12 +3489,12 @@ tasks:
             #MD5 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'linux-64', 'windows-64-2k8' ]}
+               'build_variants': [ 'linux-64', 'windows-64-2k8-ssl' ]}
 
             #MD5 for MSIs
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'], }
+               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl'], }
 
     # Debug symbols are not created for all variants and the copy is optional.
     - command: s3Copy.copy
