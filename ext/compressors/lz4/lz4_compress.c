@@ -54,8 +54,8 @@ typedef struct {
 
 /*
  * LZ4 decompression requires the exact compressed byte count returned by the
- * LZ4_compress and LZ4_compress_destSize functions. WiredTiger doesn't track
- * that value, store it in the destination buffer.
+ * LZ4_compress_default and LZ4_compress_destSize functions. WiredTiger doesn't
+ * track that value, store it in the destination buffer.
  *
  * Additionally, LZ4_compress_destSize may compress into the middle of a record,
  * and after decompression we return the length to the last record successfully
@@ -137,11 +137,10 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	(void)compressor;				/* Unused parameters */
 	(void)session;
-	(void)dst_len;
 
 	/* Compress, starting after the prefix bytes. */
-	lz4_len = LZ4_compress(
-	    (const char *)src, (char *)dst + sizeof(LZ4_PREFIX), (int)src_len);
+	lz4_len = LZ4_compress_default((const char *)src,
+	    (char *)dst + sizeof(LZ4_PREFIX), (int)src_len, (int)dst_len);
 
 	/*
 	 * If compression succeeded and the compressed length is smaller than
