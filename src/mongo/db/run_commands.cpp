@@ -341,6 +341,130 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
     return operationTime;
 }
 
+bool runCommandImpl(OperationContext* opCtx,
+                    Command* command,
+                    const rpc::RequestInterface& request,
+                    rpc::ReplyBuilderInterface* replyBuilder) {
+    auto bytesToReserve = command->reserveBytesForReply();
+
+// SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
+// additional memory pressure introduced by reply buffer pre-allocation, causes the concurrency
+// suite to run extremely slowly. As a workaround we do not pre-allocate in Windows DEBUG builds.
+#ifdef _WIN32
+    if (kDebugBuild)
+        bytesToReserve = 0;
+#endif
+
+    // run expects non-const bsonobj
+    BSONObj cmd = request.getCommandArgs();
+
+    // run expects const db std::string (can't bind to temporary)
+    const std::string db = request.getDatabase().toString();
+
+    BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
+    auto readConcernArgsStatus = _extractReadConcern(cmd, command->supportsReadConcern());
+
+    if (!readConcernArgsStatus.isOK()) {
+        auto result =
+            Command::appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
+    }
+
+    Status rcStatus = waitForReadConcern(opCtx, readConcernArgsStatus.getValue());
+    if (!rcStatus.isOK()) {
+        if (rcStatus == ErrorCodes::ExceededTimeLimit) {
+            const int debugLevel =
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
+            LOG(debugLevel) << "Command on database " << db
+                            << " timed out waiting for read concern to be satisfied. Command: "
+                            << redact(command->getRedactedCopyForLogging(request.getCommandArgs()));
+        }
+
+        auto result = Command::appendCommandStatus(inPlaceReplyBob, rcStatus);
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
+    }
+
+    std::string errmsg;
+    bool result;
+    auto startOperationTime = getClientOperationTime(opCtx);
+    if (!command->supportsWriteConcern(cmd)) {
+        if (commandSpecifiesWriteConcern(cmd)) {
+            auto result = Command::appendCommandStatus(
+                inPlaceReplyBob,
+                {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
+        // TODO: remove queryOptions parameter from command's run method.
+        result = command->run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
+    } else {
+        auto wcResult = extractWriteConcern(opCtx, cmd, db);
+        if (!wcResult.isOK()) {
+            auto result = Command::appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
+        // Change the write concern while running the command.
+        const auto oldWC = opCtx->getWriteConcern();
+        ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
+        opCtx->setWriteConcern(wcResult.getValue());
+        ON_BLOCK_EXIT([&] {
+            _waitForWriteConcernAndAddToCommandResponse(
+                opCtx, command->getName(), &inPlaceReplyBob);
+        });
+
+        result = command->run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
+
+        // Nothing in run() should change the writeConcern.
+        dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
+                                                            wcResult.getValue().toBSON()));
+    }
+
+    // When a linearizable read command is passed in, check to make sure we're reading
+    // from the primary.
+    if (command->supportsReadConcern() && (readConcernArgsStatus.getValue().getLevel() ==
+                                           repl::ReadConcernLevel::kLinearizableReadConcern) &&
+        (request.getCommandName() != "getMore")) {
+
+        auto linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
+
+        if (!linearizableReadStatus.isOK()) {
+            inPlaceReplyBob.resetToEmpty();
+            auto result = Command::appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+    }
+
+    Command::appendCommandStatus(inPlaceReplyBob, result, errmsg);
+
+    auto operationTime = computeOperationTime(
+        opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel());
+
+    // An uninitialized operation time means the cluster time is not propagated, so the operation
+    // time should not be attached to the response.
+    if (operationTime != LogicalTime::kUninitialized) {
+        Command::appendOperationTime(inPlaceReplyBob, operationTime);
+    }
+
+    inPlaceReplyBob.doneFast();
+
+    BSONObjBuilder metadataBob;
+    appendReplyMetadata(opCtx, request, &metadataBob);
+    replyBuilder->setMetadata(metadataBob.done());
+
+    return result;
+}
+
 /**
  * Executes a command after stripping metadata, performing authorization checks,
  * handling audit impersonation, and (potentially) setting maintenance mode. This method
@@ -507,7 +631,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 << rpc::TrackingMetadata::get(opCtx).toString();
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
-        retval = command->run(opCtx, request, replyBuilder);
+        retval = runCommandImpl(opCtx, command, request, replyBuilder);
 
         if (!retval) {
             command->incrementCommandsFailed();
@@ -547,133 +671,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
     }
 }
-
 }  // namespace
-
-// This really belongs in commands.cpp, but we need to move it here so we can
-// use shardingState and the repl coordinator without changing our entire library
-// structure.
-// It will be moved back as part of SERVER-18236.
-bool Command::run(OperationContext* opCtx,
-                  const rpc::RequestInterface& request,
-                  rpc::ReplyBuilderInterface* replyBuilder) {
-    auto bytesToReserve = reserveBytesForReply();
-
-// SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
-// additional memory pressure introduced by reply buffer pre-allocation, causes the concurrency
-// suite to run extremely slowly. As a workaround we do not pre-allocate in Windows DEBUG builds.
-#ifdef _WIN32
-    if (kDebugBuild)
-        bytesToReserve = 0;
-#endif
-
-    // run expects non-const bsonobj
-    BSONObj cmd = request.getCommandArgs();
-
-    // run expects const db std::string (can't bind to temporary)
-    const std::string db = request.getDatabase().toString();
-
-    BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
-    auto readConcernArgsStatus = _extractReadConcern(cmd, supportsReadConcern());
-
-    if (!readConcernArgsStatus.isOK()) {
-        auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
-        inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-        return result;
-    }
-
-    Status rcStatus = waitForReadConcern(opCtx, readConcernArgsStatus.getValue());
-    if (!rcStatus.isOK()) {
-        if (rcStatus == ErrorCodes::ExceededTimeLimit) {
-            const int debugLevel =
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
-            LOG(debugLevel) << "Command on database " << db
-                            << " timed out waiting for read concern to be satisfied. Command: "
-                            << redact(getRedactedCopyForLogging(request.getCommandArgs()));
-        }
-
-        auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
-        inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-        return result;
-    }
-
-    std::string errmsg;
-    bool result;
-    auto startOperationTime = getClientOperationTime(opCtx);
-    if (!supportsWriteConcern(cmd)) {
-        if (commandSpecifiesWriteConcern(cmd)) {
-            auto result = appendCommandStatus(
-                inPlaceReplyBob,
-                {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-
-        // TODO: remove queryOptions parameter from command's run method.
-        result = run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
-    } else {
-        auto wcResult = extractWriteConcern(opCtx, cmd, db);
-        if (!wcResult.isOK()) {
-            auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-
-        // Change the write concern while running the command.
-        const auto oldWC = opCtx->getWriteConcern();
-        ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
-        opCtx->setWriteConcern(wcResult.getValue());
-        ON_BLOCK_EXIT([&] {
-            _waitForWriteConcernAndAddToCommandResponse(opCtx, getName(), &inPlaceReplyBob);
-        });
-
-        result = run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
-
-        // Nothing in run() should change the writeConcern.
-        dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
-                                                            wcResult.getValue().toBSON()));
-    }
-
-    // When a linearizable read command is passed in, check to make sure we're reading
-    // from the primary.
-    if (supportsReadConcern() && (readConcernArgsStatus.getValue().getLevel() ==
-                                  repl::ReadConcernLevel::kLinearizableReadConcern) &&
-        (request.getCommandName() != "getMore")) {
-
-        auto linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
-
-        if (!linearizableReadStatus.isOK()) {
-            inPlaceReplyBob.resetToEmpty();
-            auto result = appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-    }
-
-    appendCommandStatus(inPlaceReplyBob, result, errmsg);
-
-    auto operationTime = computeOperationTime(
-        opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel());
-
-    // An uninitialized operation time means the cluster time is not propagated, so the operation
-    // time should not be attached to the response.
-    if (operationTime != LogicalTime::kUninitialized) {
-        appendOperationTime(inPlaceReplyBob, operationTime);
-    }
-
-    inPlaceReplyBob.doneFast();
-
-    BSONObjBuilder metadataBob;
-    appendReplyMetadata(opCtx, request, &metadataBob);
-    replyBuilder->setMetadata(metadataBob.done());
-
-    return result;
-}
 
 void generateErrorResponse(OperationContext* opCtx,
                            rpc::ReplyBuilderInterface* replyBuilder,

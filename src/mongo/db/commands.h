@@ -129,16 +129,6 @@ public:
                      BSONObjBuilder& result) = 0;
 
     /**
-     * Translation point between the new request/response types and the legacy types.
-     *
-     * Then we won't need to mutate the command object. At that point we can also make
-     * this method virtual so commands can override it directly.
-     */
-    bool run(OperationContext* opCtx,
-             const rpc::RequestInterface& request,
-             rpc::ReplyBuilderInterface* replyBuilder);
-
-    /**
      * supportsWriteConcern returns true if this command should be parsed for a writeConcern
      * field and wait for that write concern to be satisfied after the command runs.
      *
