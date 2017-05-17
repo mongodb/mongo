@@ -30,6 +30,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
@@ -206,6 +207,90 @@ TEST(NamespaceStringTest, GetTargetNSForGloballyManagedNamespace) {
         NamespaceString{"test.$cmd.listCollections"}.getTargetNSForGloballyManagedNamespace());
     ASSERT_FALSE(
         NamespaceString{"test.$cmd.otherCommand"}.getTargetNSForGloballyManagedNamespace());
+}
+
+TEST(NamespaceStringTest, IsDropPendingNamespace) {
+    ASSERT_TRUE(NamespaceString{"test.system.drop.0i0t-1.foo"}.isDropPendingNamespace());
+    ASSERT_TRUE(NamespaceString{"test.system.drop.1234567i8t9.foo"}.isDropPendingNamespace());
+    ASSERT_TRUE(NamespaceString{"test.system.drop.1234.foo"}.isDropPendingNamespace());
+    ASSERT_TRUE(NamespaceString{"test.system.drop.foo"}.isDropPendingNamespace());
+
+    ASSERT_FALSE(NamespaceString{"test.system.drop"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.drop.1234.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.drop.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"test.$cmd"}.isDropPendingNamespace());
+
+    ASSERT_FALSE(NamespaceString{"$cmd.aggregate.foo"}.isDropPendingNamespace());
+    ASSERT_FALSE(NamespaceString{"$cmd.listCollections"}.isDropPendingNamespace());
+}
+
+TEST(NamespaceStringTest, MakeDropPendingNamespace) {
+    ASSERT_EQUALS(NamespaceString{"test.system.drop.0i0t-1.foo"},
+                  NamespaceString{"test.foo"}.makeDropPendingNamespace(repl::OpTime()));
+    ASSERT_EQUALS(NamespaceString{"test.system.drop.1234567i8t9.foo"},
+                  NamespaceString{"test.foo"}.makeDropPendingNamespace(
+                      repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL)));
+    // If the collection name is too long to fit in the generated drop pending namespace, it will be
+    // truncated.
+    std::string dbName("test");
+    std::string collName(std::size_t(NamespaceString::MaxNsCollectionLen) - dbName.size() - 1, 't');
+    NamespaceString nss(dbName, collName);
+    auto dropPendingNss =
+        nss.makeDropPendingNamespace(repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL));
+    ASSERT_EQUALS(std::size_t(NamespaceString::MaxNsCollectionLen), dropPendingNss.size());
+}
+
+TEST(NamespaceStringTest, GetDropPendingNamespaceOpTime) {
+    // Null optime is acceptable.
+    ASSERT_EQUALS(
+        repl::OpTime(),
+        unittest::assertGet(
+            NamespaceString{"test.system.drop.0i0t-1.foo"}.getDropPendingNamespaceOpTime()));
+
+    // Valid optime.
+    ASSERT_EQUALS(
+        repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL),
+        unittest::assertGet(
+            NamespaceString{"test.system.drop.1234567i8t9.foo"}.getDropPendingNamespaceOpTime()));
+
+    // Original collection name is optional.
+    ASSERT_EQUALS(
+        repl::OpTime(Timestamp(Seconds(1234567), 8U), 9LL),
+        unittest::assertGet(
+            NamespaceString{"test.system.drop.1234567i8t9"}.getDropPendingNamespaceOpTime()));
+
+    // No system.drop. prefix.
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  NamespaceString{"test.1234.foo"}.getDropPendingNamespaceOpTime());
+
+    // Missing 'i' separator.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  NamespaceString{"test.system.drop.1234t8.foo"}.getDropPendingNamespaceOpTime());
+
+    // Missing 't' separator.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  NamespaceString{"test.system.drop.1234i56.foo"}.getDropPendingNamespaceOpTime());
+
+    // Timestamp seconds is not a number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.wwwi56t123.foo"}.getDropPendingNamespaceOpTime());
+
+    // Timestamp increment is not a number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.1234iaaat123.foo"}.getDropPendingNamespaceOpTime());
+
+    // Timestamp increment must be an unsigned number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.1234i-100t123.foo"}.getDropPendingNamespaceOpTime());
+
+    // Term is not a number.
+    ASSERT_EQUALS(
+        ErrorCodes::FailedToParse,
+        NamespaceString{"test.system.drop.1234i111taaa.foo"}.getDropPendingNamespaceOpTime());
 }
 
 TEST(NamespaceStringTest, CollectionComponentValidNames) {

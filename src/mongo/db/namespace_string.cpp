@@ -34,6 +34,7 @@
 
 #include "mongo/db/namespace_string.h"
 
+#include "mongo/base/parse_number.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -74,6 +75,7 @@ const char kConfigCollection[] = "admin.system.version";
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
+constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
 }  // namespace
 
@@ -146,6 +148,76 @@ boost::optional<NamespaceString> NamespaceString::getTargetNSForGloballyManagedN
         return boost::none;
     }
     return NamespaceString{db(), coll().substr(indexOfNextDot + 1)};
+}
+
+bool NamespaceString::isDropPendingNamespace() const {
+    return coll().startsWith(dropPendingNSPrefix);
+}
+
+NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {
+    mongo::StringBuilder ss;
+    ss << db() << "." << dropPendingNSPrefix;
+    ss << opTime.getSecs() << "i" << opTime.getTimestamp().getInc() << "t" << opTime.getTerm();
+    ss << "." << coll();
+    return NamespaceString(ss.stringData().substr(0, MaxNsCollectionLen));
+}
+
+StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const {
+    if (!isDropPendingNamespace()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Not a drop-pending namespace: " << _ns);
+    }
+
+    auto collectionName = coll();
+    auto opTimeBeginIndex = dropPendingNSPrefix.size();
+    auto opTimeEndIndex = collectionName.find('.', opTimeBeginIndex);
+    auto opTimeStr = std::string::npos == opTimeEndIndex
+        ? collectionName.substr(opTimeBeginIndex)
+        : collectionName.substr(opTimeBeginIndex, opTimeEndIndex - opTimeBeginIndex);
+
+    auto incrementSeparatorIndex = opTimeStr.find('i');
+    if (std::string::npos == incrementSeparatorIndex) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Missing 'i' separator in drop-pending namespace: " << _ns);
+    }
+
+    auto termSeparatorIndex = opTimeStr.find('t', incrementSeparatorIndex);
+    if (std::string::npos == termSeparatorIndex) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Missing 't' separator in drop-pending namespace: " << _ns);
+    }
+
+    long long seconds;
+    auto status = parseNumberFromString(opTimeStr.substr(0, incrementSeparatorIndex), &seconds);
+    if (!status.isOK()) {
+        return Status(
+            status.code(),
+            str::stream() << "Invalid timestamp seconds in drop-pending namespace: " << _ns << ": "
+                          << status.reason());
+    }
+
+    unsigned int increment;
+    status =
+        parseNumberFromString(opTimeStr.substr(incrementSeparatorIndex + 1,
+                                               termSeparatorIndex - (incrementSeparatorIndex + 1)),
+                              &increment);
+    if (!status.isOK()) {
+        return Status(status.code(),
+                      str::stream() << "Invalid timestamp increment in drop-pending namespace: "
+                                    << _ns
+                                    << ": "
+                                    << status.reason());
+    }
+
+    long long term;
+    status = mongo::parseNumberFromString(opTimeStr.substr(termSeparatorIndex + 1), &term);
+    if (!status.isOK()) {
+        return Status(status.code(),
+                      str::stream() << "Invalid term in drop-pending namespace: " << _ns << ": "
+                                    << status.reason());
+    }
+
+    return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
 }
 
 string NamespaceString::escapeDbName(const StringData dbname) {

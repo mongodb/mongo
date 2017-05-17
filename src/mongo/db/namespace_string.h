@@ -35,7 +35,9 @@
 #include <iosfwd>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
 
@@ -220,6 +222,28 @@ public:
      * do not target a collection.
      */
     boost::optional<NamespaceString> getTargetNSForGloballyManagedNamespace() const;
+
+    /**
+     * Returns true if this namespace refers to a drop-pending collection.
+     */
+    bool isDropPendingNamespace() const;
+
+    /**
+     * Returns the drop-pending namespace name for this namespace, provided the given optime.
+     *
+     * Example:
+     *     test.foo -> test.system.drop.<timestamp seconds>i<timestamp increment>t<term>.foo
+     *
+     * Original collection name may be truncated so that the generated namespace length does not
+     * exceed MaxNsCollectionLen.
+     */
+    NamespaceString makeDropPendingNamespace(const repl::OpTime& opTime) const;
+
+    /**
+     * Returns the optime used to generate the drop-pending namespace.
+     * Returns an error if this namespace is not drop-pending.
+     */
+    StatusWith<repl::OpTime> getDropPendingNamespaceOpTime() const;
 
     /**
      * Given a NamespaceString for which isListIndexesCursorNS() returns true, returns the
