@@ -823,7 +823,8 @@ bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
     return _snapshotThread != nullptr;
 }
 
-void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters() {
+void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
+    const OpTime& committedOpTime) {
     signalOplogWaiters();
 }
 

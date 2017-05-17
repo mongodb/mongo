@@ -281,7 +281,10 @@ public:
      */
     virtual bool snapshotsEnabled() const = 0;
 
-    virtual void notifyOplogMetadataWaiters() = 0;
+    /**
+     * Notifies listeners of a change in the commit level.
+     */
+    virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime) = 0;
 
     /**
      * Returns multiplier to apply to election timeout to obtain upper bound

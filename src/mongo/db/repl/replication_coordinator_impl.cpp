@@ -2923,7 +2923,7 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& commit
 
 void ReplicationCoordinatorImpl::_updateCommitPoint_inlock() {
     auto committedOpTime = _topCoord->getLastCommittedOpTime();
-    _externalState->notifyOplogMetadataWaiters();
+    _externalState->notifyOplogMetadataWaiters(committedOpTime);
 
     auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
 

@@ -92,7 +92,7 @@ public:
     virtual void createSnapshot(OperationContext* opCtx, SnapshotName name);
     virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;
-    virtual void notifyOplogMetadataWaiters();
+    virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
