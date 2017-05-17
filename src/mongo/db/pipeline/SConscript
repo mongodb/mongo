@@ -49,6 +49,7 @@ env.Library(
         'field_path',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/intrusive_counter',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
         ]
     )
 

@@ -35,7 +35,6 @@
 #include "mongo/shell/bench.h"
 
 #include <iostream>
-#include <pcrecpp.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespace_string.h"
@@ -47,6 +46,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.h"
+#include "mongo/util/pcrecpp_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
@@ -54,24 +54,6 @@
 // ---------------------------------
 // ---- benchmarking system --------
 // ---------------------------------
-
-// TODO:  Maybe extract as library to avoid code duplication?
-namespace {
-inline pcrecpp::RE_Options flags2options(const char* flags) {
-    pcrecpp::RE_Options options;
-    options.set_utf8(true);
-    while (flags && *flags) {
-        if (*flags == 'i')
-            options.set_caseless(true);
-        else if (*flags == 'm')
-            options.set_multiline(true);
-        else if (*flags == 'x')
-            options.set_extended(true);
-        flags++;
-    }
-    return options;
-}
-}
 
 namespace mongo {
 
@@ -459,22 +441,22 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
             const char* regex = arg.regex();
             const char* flags = arg.regexFlags();
             trapPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, mongo::flags2options(flags)));
         } else if (name == "noTrapPattern") {
             const char* regex = arg.regex();
             const char* flags = arg.regexFlags();
             noTrapPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, mongo::flags2options(flags)));
         } else if (name == "watchPattern") {
             const char* regex = arg.regex();
             const char* flags = arg.regexFlags();
             watchPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, mongo::flags2options(flags)));
         } else if (name == "noWatchPattern") {
             const char* regex = arg.regex();
             const char* flags = arg.regexFlags();
             noWatchPattern =
-                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, flags2options(flags)));
+                std::shared_ptr<pcrecpp::RE>(new pcrecpp::RE(regex, mongo::flags2options(flags)));
         } else if (name == "ops") {
             // iterate through the objects in ops
             // create an BenchRunOp per

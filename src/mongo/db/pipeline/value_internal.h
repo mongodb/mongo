@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/pcrecpp_util.h"
 
 
 namespace mongo {
@@ -73,6 +74,17 @@ class RCDecimal : public RefCountable {
 public:
     RCDecimal(const Decimal128& decVal) : decimalValue(decVal) {}
     const Decimal128 decimalValue;
+};
+
+class RCRegex : public RefCountable {
+public:
+    RCRegex(const std::string& patternStr, const std::string& flagsStr)
+        : pattern(patternStr),
+          flags(flagsStr),
+          re(patternStr.c_str(), mongo::flags2options(flagsStr.c_str())) {}
+    const std::string pattern;
+    const std::string flags;
+    const pcrecpp::RE re;
 };
 
 #pragma pack(1)
@@ -225,7 +237,11 @@ public:
     void putString(StringData s);
     void putVector(const RCVector* v);
     void putDocument(const Document& d);
-    void putRegEx(const BSONRegEx& re);
+
+    void putRegEx(const BSONRegEx& re) {
+        putRefCountable(new RCRegex(re.pattern.toString(), re.flags.toString()));
+    }
+
     void putBinData(const BSONBinData& bd) {
         putRefCountable(RCString::create(StringData(static_cast<const char*>(bd.data), bd.length)));
         binSubType = bd.type;
@@ -267,6 +283,11 @@ public:
         dassert(typeid(*genericRCPtr) == typeid(const RCVector));
         const RCVector* arrayPtr = static_cast<const RCVector*>(genericRCPtr);
         return arrayPtr->vec;
+    }
+
+    boost::intrusive_ptr<const RCRegex> getRegex() const {
+        dassert(typeid(*genericRCPtr) == typeid(const RCRegex));
+        return static_cast<const RCRegex*>(genericRCPtr);
     }
 
     boost::intrusive_ptr<const RCCodeWScope> getCodeWScope() const {

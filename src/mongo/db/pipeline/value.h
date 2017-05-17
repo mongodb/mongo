@@ -409,18 +409,6 @@ inline Timestamp Value::getTimestamp() const {
     return Timestamp(_storage.timestampValue);
 }
 
-inline const char* Value::getRegex() const {
-    verify(getType() == RegEx);
-    return _storage.getString().rawData();  // this is known to be NUL terminated
-}
-inline const char* Value::getRegexFlags() const {
-    verify(getType() == RegEx);
-    const char* pattern = _storage.getString().rawData();  // this is known to be NUL terminated
-    const char* flags = pattern + strlen(pattern) + 1;     // first byte after pattern's NUL
-    dassert(flags + strlen(flags) == pattern + _storage.getString().size());
-    return flags;
-}
-
 inline std::string Value::getSymbol() const {
     verify(getType() == Symbol);
     return _storage.getString().toString();
