@@ -165,13 +165,13 @@ structs:
         fields:
             1:
                 type: int
-                cpp_name: field1
+                cpp_name: cppField1
             2:
                 type: int
-                cpp_name: field2
+                cpp_name: cppField2
             3:
                 type: int
-                cpp_name: field3
+                cpp_name: cppField3
 
 
 ##################################################################################################

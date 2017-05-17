@@ -325,14 +325,15 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         # pylint: disable=invalid-name
         """Generate a StringData constant for field name."""
-        field_names = sorted([field.name for field in struct.fields if not field.ignore])
+        sorted_fields = sorted(
+            [field for field in struct.fields if not field.ignore], key=lambda f: f.cpp_name)
 
-        for field_name in field_names:
+        for field in sorted_fields:
             self._writer.write_line(
                 common.template_args(
                     'static constexpr auto k${constant_name}FieldName = "${field_name}"_sd;',
-                    constant_name=common.title_case(field_name),
-                    field_name=field_name))
+                    constant_name=common.title_case(field.cpp_name),
+                    field_name=field.name))
 
     def gen_enum_functions(self, idl_enum):
         # type: (ast.Enum) -> None
@@ -839,14 +840,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Generate a sorted list of string constants
 
-        field_names = sorted([field.name for field in struct.fields if not field.ignore])
+        sorted_fields = sorted(
+            [field for field in struct.fields if not field.ignore], key=lambda f: f.cpp_name)
 
-        for field_name in field_names:
+        for field in sorted_fields:
             self._writer.write_line(
                 common.template_args(
                     'constexpr StringData ${class_name}::k${constant_name}FieldName;',
                     class_name=common.title_case(struct.name),
-                    constant_name=common.title_case(field_name)))
+                    constant_name=common.title_case(field.cpp_name)))
 
     def gen_enum_definition(self, idl_enum):
         # type: (ast.Enum) -> None

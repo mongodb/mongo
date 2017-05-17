@@ -381,12 +381,13 @@ TEST(IDLStructTests, TestNonStrictStruct) {
 
     // Positive: Just 3 required fields
     {
-        auto testDoc = BSON("1" << 12 << "2" << 123 << "3" << 1234);
+        auto testDoc =
+            BSON(RequiredNonStrictField3::kCppField1FieldName << 12 << "2" << 123 << "3" << 1234);
         auto testStruct = RequiredNonStrictField3::parse(ctxt, testDoc);
 
-        assert_same_types<decltype(testStruct.getField1()), std::int32_t>();
-        assert_same_types<decltype(testStruct.getField2()), std::int32_t>();
-        assert_same_types<decltype(testStruct.getField3()), std::int32_t>();
+        assert_same_types<decltype(testStruct.getCppField1()), std::int32_t>();
+        assert_same_types<decltype(testStruct.getCppField2()), std::int32_t>();
+        assert_same_types<decltype(testStruct.getCppField3()), std::int32_t>();
     }
 
     // Negative: Missing 1 required field
