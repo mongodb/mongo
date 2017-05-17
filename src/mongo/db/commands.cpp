@@ -295,7 +295,6 @@ bool Command::isHelpRequest(const BSONElement& helpElem) {
 const char Command::kHelpFieldName[] = "help";
 
 void Command::generateHelpResponse(OperationContext* opCtx,
-                                   const rpc::RequestInterface& request,
                                    rpc::ReplyBuilderInterface* replyBuilder,
                                    const Command& command) {
     std::stringstream ss;

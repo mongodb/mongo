@@ -27,17 +27,12 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/op_msg.h"
+
 namespace mongo {
-
-class Command;
-class DBException;
-class OperationContext;
-
-namespace rpc {
-class ReplyBuilderInterface;
-class RequestInterface;
-}  // namespace rpc
-
 
 /**
  * Generates a command error response. Similar to other overloads of generateErrorResponse,
@@ -50,7 +45,7 @@ void generateErrorResponse(OperationContext* opCtx,
                            const DBException& exception);
 
 void runCommands(OperationContext* opCtx,
-                 const rpc::RequestInterface& request,
+                 const OpMsgRequest& request,
                  rpc::ReplyBuilderInterface* replyBuilder);
 
 }  // namespace mongo

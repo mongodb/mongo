@@ -33,7 +33,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/request_interface.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -77,7 +76,6 @@ private:
 };
 
 using UniqueReply = UniqueMessage<ReplyInterface>;
-using UniqueRequest = UniqueMessage<RequestInterface>;
 
 }  // namespace rpc
 }  // namespace mongo

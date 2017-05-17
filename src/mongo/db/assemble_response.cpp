@@ -160,11 +160,11 @@ DbResponse receivedCommand(OperationContext* opCtx,
 
     try {
         // This will throw if the request is on an invalid namespace.
-        rpc::LegacyRequest request{&message};
+        rpc::LegacyRequest legacyRequest{&message};
         // Auth checking for Commands happens later.
         int nToReturn = queryMessage.ntoreturn;
 
-        beginCommandOp(opCtx, nss, request.getCommandArgs());
+        beginCommandOp(opCtx, nss, legacyRequest.getCommandArgs());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -176,6 +176,9 @@ DbResponse receivedCommand(OperationContext* opCtx,
                               << ") for $cmd type ns - can only be 1 or -1",
                 nToReturn == 1 || nToReturn == -1);
 
+        auto request = OpMsgRequest::fromDBAndBody(legacyRequest.getDatabase(),
+                                                   legacyRequest.getCommandArgs(),
+                                                   legacyRequest.getMetadata());
         runCommands(opCtx, request, &builder);
 
         op->debug().iscommand = true;
@@ -193,20 +196,19 @@ DbResponse receivedCommand(OperationContext* opCtx,
 DbResponse receivedMsg(OperationContext* opCtx, Client& client, const Message& message) {
     invariant(message.operation() == dbMsg);
 
-    OpMsg requestOpMsg;
+    OpMsgRequest request;
     rpc::OpMsgReplyBuilder replyBuilder;
     auto curOp = CurOp::get(opCtx);
     try {
         // Request is validated here.
         // TODO If this fails we reply to an invalid request which isn't always safe. Unfortunately
         // tests currently rely on this. Figure out what to do.
-        requestOpMsg = OpMsg::parse(message);
-        rpc::OpMsgRequest request(requestOpMsg);
+        request = OpMsgRequest::parse(message);
 
         // We construct a legacy $cmd namespace so we can fill in curOp using
         // the existing logic that existed for OP_QUERY commands
         NamespaceString nss(request.getDatabase(), "$cmd");
-        beginCommandOp(opCtx, nss, request.getCommandArgs());
+        beginCommandOp(opCtx, nss, request.body);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->markCommand_inlock();
@@ -225,7 +227,7 @@ DbResponse receivedMsg(OperationContext* opCtx, Client& client, const Message& m
     curOp->debug().responseLength = response.header().dataLen();
 
     // TODO exhaust
-    if (requestOpMsg.isFlagSet(OpMsg::kMoreToCome)) {
+    if (request.isFlagSet(OpMsg::kMoreToCome)) {
         return {};
     }
 
@@ -241,17 +243,21 @@ DbResponse receivedRpc(OperationContext* opCtx, Client& client, const Message& m
 
     try {
         // database is validated here
-        rpc::CommandRequest request{&message};
+        rpc::CommandRequest commandRequest{&message};
 
         // We construct a legacy $cmd namespace so we can fill in curOp using
         // the existing logic that existed for OP_QUERY commands
-        NamespaceString nss(request.getDatabase(), "$cmd");
-        beginCommandOp(opCtx, nss, request.getCommandArgs());
+        NamespaceString nss(commandRequest.getDatabase(), "$cmd");
+        beginCommandOp(opCtx, nss, commandRequest.getCommandArgs());
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->markCommand_inlock();
         }
 
+
+        auto request = OpMsgRequest::fromDBAndBody(commandRequest.getDatabase(),
+                                                   commandRequest.getCommandArgs(),
+                                                   commandRequest.getMetadata());
         runCommands(opCtx, request, &replyBuilder);
 
         curOp->debug().iscommand = true;

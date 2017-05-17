@@ -64,7 +64,6 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"

@@ -88,15 +88,12 @@ private:
 
 class OpMsgRequest final : public rpc::RequestInterface {
 public:
-    explicit OpMsgRequest(OpMsg msg) : _msg(std::move(msg)) {}
+    explicit OpMsgRequest(mongo::OpMsgRequest msg) : _msg(std::move(msg)) {}
     StringData getDatabase() const override {
-        if (auto db = _msg.body["$db"]) {
-            return db.checkAndGetStringData();
-        }
-        return "admin";
+        return _msg.getDatabase();
     }
     StringData getCommandName() const override {
-        return _msg.body.firstElementFieldName();
+        return _msg.getCommandName();
     }
     const BSONObj& getMetadata() const override {
         return _msg.body;
@@ -109,7 +106,7 @@ public:
     }
 
 private:
-    const OpMsg _msg;
+    const mongo::OpMsgRequest _msg;
 };
 
 class OpMsgRequestBuilder final : public rpc::RequestBuilderInterface {

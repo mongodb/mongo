@@ -150,6 +150,7 @@ void OpMsg::shareOwnershipWith(const ConstSharedBuffer& buffer) {
 auto OpMsgBuilder::beginDocSequence(StringData name) -> DocSequenceBuilder {
     invariant(_state == kEmpty || _state == kDocSequence);
     invariant(!_openBuilder);
+    _openBuilder = true;
     _state = kDocSequence;
     _buf.appendStruct(Section::kDocSequence);
     int sizeOffset = _buf.len();

@@ -96,6 +96,48 @@ struct OpMsg {
 };
 
 /**
+ * An OpMsg that represents a request. This is a separate type from OpMsg only to provide better
+ * type-safety along with a place to hang request-specific methods.
+ */
+struct OpMsgRequest : public OpMsg {
+    // TODO in C++17 remove constructors so we can use aggregate initialization.
+    OpMsgRequest() = default;
+    explicit OpMsgRequest(OpMsg&& generic) : OpMsg(std::move(generic)) {}
+
+    static OpMsgRequest parse(const Message& message) {
+        return OpMsgRequest(OpMsg::parse(message));
+    }
+
+    static OpMsgRequest fromDBAndBody(StringData db,
+                                      const BSONObj& body,
+                                      const BSONObj& extraFields = {}) {
+        OpMsgRequest request;
+        request.body = ([&] {
+            BSONObjBuilder bodyBuilder;
+            bodyBuilder.appendElements(body);
+            bodyBuilder.appendElements(extraFields);
+            bodyBuilder.append("$db", db);
+            return bodyBuilder.obj();
+        }());
+        return request;
+    }
+
+    StringData getDatabase() const {
+        if (auto elem = body["$db"])
+            return elem.checkAndGetStringData();
+        return "admin";
+    }
+
+    StringData getCommandName() const {
+        return body.firstElementFieldName();
+    }
+
+    // DO NOT ADD MEMBERS!  Since this type is essentially a strong typedef (see the class comment),
+    // it should not hold more data than an OpMsg. It should be freely interconvertible with OpMsg
+    // without issues like slicing.
+};
+
+/**
  * Builds an OP_MSG message in-place in a Message buffer.
  *
  * While the OP_MSG format imposes no ordering of sections, in order to efficiently support our

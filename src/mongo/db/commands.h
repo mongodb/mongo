@@ -44,7 +44,6 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
@@ -447,7 +446,6 @@ public:
      * the passed ReplyBuilder will be in kOutputDocs after calling this method.
      */
     static void generateHelpResponse(OperationContext* opCtx,
-                                     const rpc::RequestInterface& request,
                                      rpc::ReplyBuilderInterface* replyBuilder,
                                      const Command& command);
 

@@ -52,7 +52,6 @@
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/rpc/request_interface.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -69,7 +68,7 @@ void registerError(OperationContext* opCtx, const DBException& exception) {
 void _generateErrorResponse(OperationContext* opCtx,
                             rpc::ReplyBuilderInterface* replyBuilder,
                             const DBException& exception,
-                            const BSONObj& metadata) {
+                            const BSONObj& replyMetadata) {
     registerError(opCtx, exception);
 
     // We could have thrown an exception after setting fields in the builder,
@@ -89,13 +88,13 @@ void _generateErrorResponse(OperationContext* opCtx,
         replyBuilder->setCommandReply(exception.toStatus());
     }
 
-    replyBuilder->setMetadata(metadata);
+    replyBuilder->setMetadata(replyMetadata);
 }
 
 void _generateErrorResponse(OperationContext* opCtx,
                             rpc::ReplyBuilderInterface* replyBuilder,
                             const DBException& exception,
-                            const BSONObj& metadata,
+                            const BSONObj& replyMetadata,
                             LogicalTime operationTime) {
     registerError(opCtx, exception);
 
@@ -119,66 +118,7 @@ void _generateErrorResponse(OperationContext* opCtx,
                                       BSON("operationTime" << operationTime.asTimestamp()));
     }
 
-    replyBuilder->setMetadata(metadata);
-}
-
-
-/**
- * Generates a command error response. This overload of generateErrorResponse is intended
- * to also add an operationTime.
- */
-void generateErrorResponse(OperationContext* opCtx,
-                           rpc::ReplyBuilderInterface* replyBuilder,
-                           const DBException& exception,
-                           const rpc::RequestInterface& request,
-                           Command* command,
-                           const BSONObj& metadata,
-                           LogicalTime operationTime) {
-    LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
-           << "on database '" << request.getDatabase() << "' "
-           << "with arguments '" << command->getRedactedCopyForLogging(request.getCommandArgs())
-           << "' metadata '" << request.getMetadata() << "' and operationTime '"
-           << operationTime.toString() << "': " << exception.toString();
-
-    _generateErrorResponse(opCtx, replyBuilder, exception, metadata, operationTime);
-}
-
-/**
- * When an assertion is hit during command execution, this method is used to fill the fields
- * of the command reply with the information from the error. In addition, information about
- * the command is logged. This function does not return anything, because there is typically
- * already an active exception when this function is called, so there
- * is little that can be done if it fails.
- */
-void generateErrorResponse(OperationContext* opCtx,
-                           rpc::ReplyBuilderInterface* replyBuilder,
-                           const DBException& exception,
-                           const rpc::RequestInterface& request,
-                           Command* command,
-                           const BSONObj& metadata) {
-    LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
-           << "on database '" << request.getDatabase() << "' "
-           << "with arguments '" << command->getRedactedCopyForLogging(request.getCommandArgs())
-           << "' "
-           << "and metadata '" << request.getMetadata() << "': " << exception.toString();
-
-    _generateErrorResponse(opCtx, replyBuilder, exception, metadata);
-}
-
-/**
- * Generates a command error response. This overload of generateErrorResponse is intended
- * to be called if the command is successfully parsed, but there is an error before we have
- * a handle to the actual Command object. This can happen, for example, when the command
- * is not found.
- */
-void generateErrorResponse(OperationContext* opCtx,
-                           rpc::ReplyBuilderInterface* replyBuilder,
-                           const DBException& exception,
-                           const rpc::RequestInterface& request) {
-    LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
-           << "on database '" << request.getDatabase() << "': " << exception.toString();
-
-    _generateErrorResponse(opCtx, replyBuilder, exception, rpc::makeEmptyMetadata());
+    replyBuilder->setMetadata(replyMetadata);
 }
 
 /**
@@ -207,7 +147,7 @@ private:
 };
 
 void appendReplyMetadata(OperationContext* opCtx,
-                         const rpc::RequestInterface& request,
+                         const OpMsgRequest& request,
                          BSONObjBuilder* metadataBob) {
     const bool isShardingAware = ShardingState::get(opCtx)->enabled();
     const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
@@ -219,8 +159,7 @@ void appendReplyMetadata(OperationContext* opCtx,
         // Attach our own last opTime.
         repl::OpTime lastOpTimeFromClient =
             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-        replCoord->prepareReplMetadata(
-            opCtx, request.getMetadata(), lastOpTimeFromClient, metadataBob);
+        replCoord->prepareReplMetadata(opCtx, request.body, lastOpTimeFromClient, metadataBob);
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18236
         if (isShardingAware || isConfig) {
@@ -346,7 +285,7 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
 
 bool runCommandImpl(OperationContext* opCtx,
                     Command* command,
-                    const rpc::RequestInterface& request,
+                    const OpMsgRequest& request,
                     rpc::ReplyBuilderInterface* replyBuilder) {
     auto bytesToReserve = command->reserveBytesForReply();
 
@@ -359,7 +298,7 @@ bool runCommandImpl(OperationContext* opCtx,
 #endif
 
     // run expects non-const bsonobj
-    BSONObj cmd = request.getCommandArgs();
+    BSONObj cmd = request.body;
 
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
@@ -382,7 +321,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
             LOG(debugLevel) << "Command on database " << db
                             << " timed out waiting for read concern to be satisfied. Command: "
-                            << redact(command->getRedactedCopyForLogging(request.getCommandArgs()));
+                            << redact(command->getRedactedCopyForLogging(request.body));
         }
 
         auto result = Command::appendCommandStatus(inPlaceReplyBob, rcStatus);
@@ -478,7 +417,7 @@ bool runCommandImpl(OperationContext* opCtx,
  */
 void execCommandDatabase(OperationContext* opCtx,
                          Command* command,
-                         const rpc::RequestInterface& request,
+                         const OpMsgRequest& request,
                          rpc::ReplyBuilderInterface* replyBuilder) {
     try {
         {
@@ -488,7 +427,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
-        rpc::readRequestMetadata(opCtx, request.getMetadata());
+        rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
         std::string dbname = request.getDatabase().toString();
@@ -505,7 +444,7 @@ void execCommandDatabase(OperationContext* opCtx,
         BSONElement queryOptionMaxTimeMSField;
 
         StringMap<int> topLevelFields;
-        for (auto&& element : request.getCommandArgs()) {
+        for (auto&& element : request.body) {
             StringData fieldName = element.fieldNameStringData();
             if (fieldName == QueryRequest::cmdOptionMaxTimeMS) {
                 cmdOptionMaxTimeMSField = element;
@@ -529,13 +468,12 @@ void execCommandDatabase(OperationContext* opCtx,
             // use help requests to determine which commands are database writes, and so must be
             // forwarded to all config servers.
             LastError::get(opCtx->getClient()).disable();
-            Command::generateHelpResponse(opCtx, request, replyBuilder, *command);
+            Command::generateHelpResponse(opCtx, replyBuilder, *command);
             return;
         }
 
         ImpersonationSessionGuard guard(opCtx);
-        uassertStatusOK(
-            Command::checkAuthorization(command, opCtx, dbname, request.getCommandArgs()));
+        uassertStatusOK(Command::checkAuthorization(command, opCtx, dbname, request.body));
 
         repl::ReplicationCoordinator* replCoord =
             repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
@@ -607,7 +545,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // version handling if this command was issued via the direct client.
         if (iAmPrimary && !opCtx->getClient()->isInDirectClient()) {
             // Handle a shard version that may have been sent along with the command.
-            auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
+            auto commandNS = NamespaceString(command->parseNs(dbname, request.body));
             auto& oss = OperationShardingState::get(opCtx);
             oss.initializeShardVersion(commandNS, shardVersionFieldIdx);
             auto shardingState = ShardingState::get(opCtx);
@@ -668,10 +606,19 @@ void execCommandDatabase(OperationContext* opCtx,
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
         if (operationTime != LogicalTime::kUninitialized) {
-            generateErrorResponse(
-                opCtx, replyBuilder, e, request, command, metadataBob.done(), operationTime);
+            LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+                   << "on database '" << request.getDatabase() << "' "
+                   << "with arguments '" << command->getRedactedCopyForLogging(request.body)
+                   << "' and operationTime '" << operationTime.toString() << "': " << e.toString();
+
+            _generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj(), operationTime);
         } else {
-            generateErrorResponse(opCtx, replyBuilder, e, request, command, metadataBob.done());
+            LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+                   << "on database '" << request.getDatabase() << "' "
+                   << "with arguments '" << command->getRedactedCopyForLogging(request.body)
+                   << "': " << e.toString();
+
+            _generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj());
         }
     }
 }
@@ -685,7 +632,7 @@ void generateErrorResponse(OperationContext* opCtx,
 }
 
 void runCommands(OperationContext* opCtx,
-                 const rpc::RequestInterface& request,
+                 const OpMsgRequest& request,
                  rpc::ReplyBuilderInterface* replyBuilder) {
     try {
         Command* c = nullptr;
@@ -699,12 +646,11 @@ void runCommands(OperationContext* opCtx,
                                             << "'";
             LOG(2) << msg;
             uasserted(ErrorCodes::CommandNotFound,
-                      str::stream() << msg << ", bad cmd: '" << redact(request.getCommandArgs())
-                                    << "'");
+                      str::stream() << msg << ", bad cmd: '" << redact(request.body) << "'");
         }
 
         LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-               << c->getRedactedCopyForLogging(request.getCommandArgs());
+               << c->getRedactedCopyForLogging(request.body);
 
         {
             // Try to set this as early as possible, as soon as we have figured out the command.
@@ -716,7 +662,10 @@ void runCommands(OperationContext* opCtx,
     }
 
     catch (const DBException& ex) {
-        generateErrorResponse(opCtx, replyBuilder, ex, request);
+        LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+               << "on database '" << request.getDatabase() << "': " << ex.toString();
+
+        _generateErrorResponse(opCtx, replyBuilder, ex, rpc::makeEmptyMetadata());
     }
 }
 
