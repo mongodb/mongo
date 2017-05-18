@@ -584,7 +584,11 @@ ExitCode _initAndListen(int listenPort) {
         Status status = authindex::verifySystemIndexes(startupOpCtx.get());
         if (!status.isOK()) {
             log() << redact(status);
-            exitCleanly(EXIT_NEED_UPGRADE);
+            if (status.code() == ErrorCodes::AuthSchemaIncompatible) {
+                exitCleanly(EXIT_NEED_UPGRADE);
+            } else {
+                quickExit(EXIT_FAILURE);
+            }
         }
 
         // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
