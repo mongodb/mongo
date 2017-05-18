@@ -212,6 +212,35 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='drop_pending_collection_reaper',
+    source=[
+        'drop_pending_collection_reaper.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+        'storage_interface',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
+
+env.CppUnitTest(
+    target='drop_pending_collection_reaper_test',
+    source=[
+        'drop_pending_collection_reaper_test.cpp',
+    ],
+    LIBDEPS=[
+        'drop_pending_collection_reaper',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.Library(
     target='scatter_gather',
     source=[
         'scatter_gather_algorithm.cpp',
