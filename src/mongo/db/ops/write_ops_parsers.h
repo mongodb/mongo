@@ -28,9 +28,9 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -43,9 +43,9 @@ namespace mongo {
  * the objects to insert, or update and query operators.
  */
 
-InsertOp parseInsertCommand(StringData dbName, const BSONObj& cmd);
-UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd);
-DeleteOp parseDeleteCommand(StringData dbName, const BSONObj& cmd);
+InsertOp parseInsertCommand(const OpMsgRequest& request);
+UpdateOp parseUpdateCommand(const OpMsgRequest& request);
+DeleteOp parseDeleteCommand(const OpMsgRequest& request);
 
 InsertOp parseLegacyInsert(const Message& msg);
 UpdateOp parseLegacyUpdate(const Message& msg);

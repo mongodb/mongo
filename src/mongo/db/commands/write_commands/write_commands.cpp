@@ -207,13 +207,12 @@ public:
         return ReadWriteType::kWrite;
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             std::string& errmsg,
-             BSONObjBuilder& result) final {
+    bool enhancedRun(OperationContext* opCtx,
+                     const OpMsgRequest& request,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) final {
         try {
-            runImpl(opCtx, dbname, cmdObj, result);
+            runImpl(opCtx, request, result);
             return true;
         } catch (const DBException& ex) {
             LastError::get(opCtx->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
@@ -222,8 +221,7 @@ public:
     }
 
     virtual void runImpl(OperationContext* opCtx,
-                         const std::string& dbname,
-                         const BSONObj& cmdObj,
+                         const OpMsgRequest& request,
                          BSONObjBuilder& result) = 0;
 };
 
@@ -251,10 +249,9 @@ public:
     }
 
     void runImpl(OperationContext* opCtx,
-                 const std::string& dbname,
-                 const BSONObj& cmdObj,
+                 const OpMsgRequest& request,
                  BSONObjBuilder& result) final {
-        const auto batch = parseInsertCommand(dbname, cmdObj);
+        const auto batch = parseInsertCommand(request);
         const auto reply = performInserts(opCtx, batch);
         serializeReply(opCtx,
                        ReplyStyle::kNotUpdate,
@@ -287,10 +284,9 @@ public:
     }
 
     void runImpl(OperationContext* opCtx,
-                 const std::string& dbname,
-                 const BSONObj& cmdObj,
+                 const OpMsgRequest& request,
                  BSONObjBuilder& result) final {
-        const auto batch = parseUpdateCommand(dbname, cmdObj);
+        const auto batch = parseUpdateCommand(request);
         const auto reply = performUpdates(opCtx, batch);
         serializeReply(opCtx,
                        ReplyStyle::kUpdate,
@@ -305,7 +301,8 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
-        const auto batch = parseUpdateCommand(dbname, cmdObj);
+        auto request = OpMsgRequest::fromDBAndBody(dbname, cmdObj);
+        const auto batch = parseUpdateCommand(request);
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",
                 batch.updates.size() == 1);
@@ -357,10 +354,9 @@ public:
     }
 
     void runImpl(OperationContext* opCtx,
-                 const std::string& dbname,
-                 const BSONObj& cmdObj,
+                 const OpMsgRequest& request,
                  BSONObjBuilder& result) final {
-        const auto batch = parseDeleteCommand(dbname, cmdObj);
+        const auto batch = parseDeleteCommand(request);
         const auto reply = performDeletes(opCtx, batch);
         serializeReply(opCtx,
                        ReplyStyle::kNotUpdate,
@@ -375,7 +371,8 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
-        const auto batch = parseDeleteCommand(dbname, cmdObj);
+        auto request = OpMsgRequest::fromDBAndBody(dbname, cmdObj);
+        const auto batch = parseDeleteCommand(request);
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",
                 batch.deletes.size() == 1);

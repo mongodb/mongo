@@ -75,22 +75,21 @@ void checkOpCountForCommand(size_t numOps) {
  * uniqueFieldName. The uniqueField is the only top-level field that is unique to the specific type
  * of write command.
  */
-void parseWriteCommand(StringData dbName,
-                       const BSONObj& cmd,
+void parseWriteCommand(const OpMsgRequest& request,
                        StringData uniqueFieldName,
-                       BSONElement* uniqueField,
+                       std::vector<BSONObj>* uniqueField,
                        ParsedWriteOp* op) {
     // Command dispatch wouldn't get here with an empty object because the first field indicates
     // which command to run.
-    invariant(!cmd.isEmpty());
+    invariant(!request.body.isEmpty());
 
     bool haveUniqueField = false;
     bool firstElement = true;
-    for (BSONElement field : cmd) {
+    for (BSONElement field : request.body) {
         if (firstElement) {
             // The key is the command name and the value is the collection name
             checkBSONType(String, field);
-            op->ns = NamespaceString(dbName, field.valueStringData());
+            op->ns = NamespaceString(request.getDatabase(), field.valueStringData());
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace: " << op->ns.ns(),
                     op->ns.isValid());
@@ -105,33 +104,48 @@ void parseWriteCommand(StringData dbName,
             checkBSONType(Bool, field);
             op->continueOnError = !field.Bool();
         } else if (fieldName == uniqueFieldName) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "Duplicate field " << uniqueFieldName,
+                    !haveUniqueField);
             haveUniqueField = true;
-            *uniqueField = field;
+            checkBSONType(Array, field);
+            for (auto subField : field.Obj()) {
+                checkTypeInArray(Object, subField, field);
+                uniqueField->push_back(subField.Obj());
+            }
         } else if (!Command::isGenericArgument(fieldName)) {
             uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "Unknown option to " << cmd.firstElementFieldName()
+                      str::stream() << "Unknown option to " << request.getCommandName()
                                     << " command: "
                                     << fieldName);
         }
     }
 
+    for (auto&& seq : request.sequences) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Unknown document sequence option to " << request.getCommandName()
+                              << " command: "
+                              << seq.name,
+                seq.name == uniqueFieldName);
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Duplicate document sequence " << uniqueFieldName,
+                !haveUniqueField);
+        haveUniqueField = true;
+        *uniqueField = seq.objs;
+    }
+
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << uniqueFieldName << " option is required to the "
-                          << cmd.firstElementFieldName()
+                          << request.getCommandName()
                           << " command.",
             haveUniqueField);
 }
 }
 
-InsertOp parseInsertCommand(StringData dbName, const BSONObj& cmd) {
-    BSONElement documents;
+InsertOp parseInsertCommand(const OpMsgRequest& request) {
+    invariant(request.getCommandName() == "insert");
     InsertOp op;
-    parseWriteCommand(dbName, cmd, "documents", &documents, &op);
-    checkBSONType(Array, documents);
-    for (auto doc : documents.Obj()) {
-        checkTypeInArray(Object, doc, documents);
-        op.documents.push_back(doc.Obj());
-    }
+    parseWriteCommand(request, "documents", &op.documents, &op);
     checkOpCountForCommand(op.documents.size());
 
     if (op.ns.isSystemDotIndexes()) {
@@ -144,18 +158,17 @@ InsertOp parseInsertCommand(StringData dbName, const BSONObj& cmd) {
     return op;
 }
 
-UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd) {
-    BSONElement updates;
+UpdateOp parseUpdateCommand(const OpMsgRequest& request) {
+    invariant(request.getCommandName() == "update");
+    std::vector<BSONObj> updates;
     UpdateOp op;
-    parseWriteCommand(dbName, cmd, "updates", &updates, &op);
-    checkBSONType(Array, updates);
-    for (auto doc : updates.Obj()) {
-        checkTypeInArray(Object, doc, updates);
+    parseWriteCommand(request, "updates", &updates, &op);
+    for (auto&& doc : updates) {
         op.updates.emplace_back();
         auto& update = op.updates.back();
         bool haveQ = false;
         bool haveU = false;
-        for (auto field : doc.Obj()) {
+        for (auto field : doc) {
             const StringData fieldName = field.fieldNameStringData();
             if (fieldName == "q") {
                 haveQ = true;
@@ -193,18 +206,17 @@ UpdateOp parseUpdateCommand(StringData dbName, const BSONObj& cmd) {
     return op;
 }
 
-DeleteOp parseDeleteCommand(StringData dbName, const BSONObj& cmd) {
-    BSONElement deletes;
+DeleteOp parseDeleteCommand(const OpMsgRequest& request) {
+    invariant(request.getCommandName() == "delete");
+    std::vector<BSONObj> deletes;
     DeleteOp op;
-    parseWriteCommand(dbName, cmd, "deletes", &deletes, &op);
-    checkBSONType(Array, deletes);
-    for (auto doc : deletes.Obj()) {
-        checkTypeInArray(Object, doc, deletes);
+    parseWriteCommand(request, "deletes", &deletes, &op);
+    for (auto&& doc : deletes) {
         op.deletes.emplace_back();
         auto& del = op.deletes.back();  // delete is a reserved word.
         bool haveQ = false;
         bool haveLimit = false;
-        for (auto field : doc.Obj()) {
+        for (auto field : doc) {
             const StringData fieldName = field.fieldNameStringData();
             if (fieldName == "q") {
                 haveQ = true;
