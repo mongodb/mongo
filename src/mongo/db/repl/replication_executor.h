@@ -366,6 +366,7 @@ private:
     CallbackFn _callbackFn;
     bool _isCanceled;
     bool _isSleeper;
+    bool _isRemoved;
     WorkQueue::iterator _iter;
     EventHandle _finishedEvent;
 };
