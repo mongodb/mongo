@@ -33,7 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -102,7 +102,7 @@ protected:
     /**
      * Gets the replication executor under test.
      */
-    ReplicationExecutor* getReplExec();
+    executor::TaskExecutor* getReplExec();
 
     /**
      * Gets the replication coordinator under test.
@@ -261,10 +261,13 @@ private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
     TopologyCoordinatorImpl* _topo = nullptr;
-    // Owned by ReplicationExecutor
+    // Owned by executor
     executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl
     ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
+    // Owned by ReplicationCoordinatorImpl
+    executor::TaskExecutor* _replExec = nullptr;
+
     ReplSettings _settings;
     bool _callShutdown = false;
     ServiceContext::UniqueClient _client = getGlobalServiceContext()->makeClient("testClient");

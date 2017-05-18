@@ -189,7 +189,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     // Store the vote in persistent storage.
     LastVote lastVote{originalTerm + 1, _selfIndex};
 
-    auto cbStatus = _replExecutor->scheduleDBWork(
+    auto cbStatus = _replExecutor->scheduleWork(
         [this, lastVote](const executor::TaskExecutor::CallbackArgs& cbData) {
             _writeLastVoteForMyElection(lastVote, cbData);
         });
@@ -206,21 +206,23 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     // so _mutex must be unlocked here.  However, we cannot return until we
     // lock it because we want to lose the election on cancel or error and
     // doing so requires _mutex.
-    Status status = Status::OK();
-    if (cbData.status.isOK()) {
-        invariant(cbData.opCtx);
-        status = _externalState->storeLocalLastVoteDocument(cbData.opCtx, lastVote);
-    }
+    auto status = [&] {
+        if (!cbData.status.isOK()) {
+            return cbData.status;
+        }
+        auto opCtx = cc().makeOperationContext();
+        return _externalState->storeLocalLastVoteDocument(opCtx.get(), lastVote);
+    }();
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_voteRequester);
     LoseElectionDryRunGuardV1 lossGuard(this);
-    if (!cbData.status.isOK()) {
+    if (status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
     if (!status.isOK()) {
-        error() << "failed to store LastVote document when voting for myself: " << status;
+        log() << "failed to store LastVote document when voting for myself: " << status;
         return;
     }
 

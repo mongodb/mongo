@@ -285,7 +285,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     ServiceContext* service,
     const ReplSettings& settings,
     std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
-    std::unique_ptr<NetworkInterface> network,
+    std::unique_ptr<executor::TaskExecutor> executor,
     std::unique_ptr<TopologyCoordinator> topCoord,
     ReplicationProcess* replicationProcess,
     StorageInterface* storage,
@@ -294,7 +294,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _settings(settings),
       _replMode(getReplicationModeFromSettings(settings)),
       _topCoord(std::move(topCoord)),
-      _replExecutor(stdx::make_unique<ReplicationExecutor>(std::move(network), prngSeed)),
+      _replExecutor(std::move(executor)),
       _externalState(std::move(externalState)),
       _inShutdown(false),
       _memberState(MemberState::RS_STARTUP),
@@ -438,16 +438,19 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
-    auto handle = _scheduleDBWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
-                                             this,
-                                             stdx::placeholders::_1,
-                                             localConfig,
-                                             lastOpTimeStatus,
-                                             lastVote));
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _finishLoadLocalConfigCbh = handle;
+    auto handle =
+        _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
+                                               this,
+                                               stdx::placeholders::_1,
+                                               localConfig,
+                                               lastOpTimeStatus,
+                                               lastVote));
+    if (handle == ErrorCodes::ShutdownInProgress) {
+        handle = CallbackHandle{};
     }
+    fassertStatusOK(40446, handle);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _finishLoadLocalConfigCbh = std::move(handle.getValue());
 
     return false;
 }
@@ -536,8 +539,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 
     if (!isArbiter) {
         _externalState->startThreads(_settings);
-        invariant(cbData.opCtx);
-        _startDataReplication(cbData.opCtx);
+        auto opCtx = cc().makeOperationContext();
+        _startDataReplication(opCtx.get());
     }
 }
 
@@ -690,8 +693,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
     // Shutdown must:
     // * prevent new threads from blocking in awaitReplication
     // * wake up all existing threads blocking in awaitReplication
-    // * tell the ReplicationExecutor to shut down
-    // * wait for the thread running the ReplicationExecutor to finish
+    // * Shut down and join the execution resources it owns.
 
     if (!_settings.usingReplSets()) {
         return;
@@ -802,7 +804,7 @@ bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
         return false;
     }
 
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
         // the old and new state were equal. So, try again after the election is over to
@@ -2161,53 +2163,51 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     auto reconfigFinished = uassertStatusOK(_replExecutor->makeEvent());
-    const auto reconfigFinishFn =
-        [ this, newConfig, myIndex = myIndex.getValue(), reconfigFinished ](
-            const executor::TaskExecutor::CallbackArgs& cbData) {
-
-        if (!cbData.status.isOK()) {
-            return;
-        }
-        _finishReplSetReconfig(newConfig, myIndex, reconfigFinished);
-    };
-
-    // If it's a force reconfig, the primary node may not be electable after the configuration
-    // change.  In case we are that primary node, finish the reconfig under the global lock,
-    // so that the step down occurs safely.
-    StatusWith<CallbackHandle> cbhStatus(ErrorCodes::InternalError,
-                                         "reconfigFinishFn hasn't been scheduled");
-    if (args.force) {
-        cbhStatus = _replExecutor->scheduleWorkWithGlobalExclusiveLock(reconfigFinishFn);
-    } else {
-        cbhStatus = _replExecutor->scheduleWork(reconfigFinishFn);
-    }
-    if (cbhStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return cbhStatus.getStatus();
-    }
-
-    fassert(18824, cbhStatus.getStatus());
-
+    uassertStatusOK(
+        _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
+                                               this,
+                                               stdx::placeholders::_1,
+                                               newConfig,
+                                               args.force,
+                                               myIndex.getValue(),
+                                               reconfigFinished)));
     configStateGuard.Dismiss();
     _replExecutor->waitForEvent(reconfigFinished);
     return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(
+    const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
+    const bool isForceReconfig,
     int myIndex,
     const executor::TaskExecutor::EventHandle& finishedEvent) {
+
+    if (cbData.status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+    auto opCtx = cc().makeOperationContext();
+    boost::optional<Lock::GlobalWrite> globalExclusiveLock;
+    if (isForceReconfig) {
+        // Since it's a force reconfig, the primary node may not be electable after the
+        // configuration change.  In case we are that primary node, finish the reconfig under the
+        // global lock, so that the step down occurs safely.
+        globalExclusiveLock.emplace(opCtx.get());
+    }
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     invariant(_rsConfigState == kConfigReconfiguring);
     invariant(_rsConfig.isInitialized());
 
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor->onEvent(electionFinishedEvent,
                                stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                                           this,
+                                          stdx::placeholders::_1,
                                           newConfig,
+                                          isForceReconfig,
                                           myIndex,
                                           finishedEvent));
         return;
@@ -2220,15 +2220,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
     _dropAllSnapshots_inlock();
 
-    auto evh = _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     lk.unlock();
-    if (evh) {
-        _replExecutor->onEvent(evh, [this, action](const CallbackArgs& cbArgs) {
-            _performPostMemberStateUpdateAction(action);
-        });
-    } else {
-        _performPostMemberStateUpdateAction(action);
-    }
+    _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
+    _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);
 }
 
@@ -3276,90 +3270,32 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     }
 }
 
-EventHandle ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
-    const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
+void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
+    OperationContext* opCtx, const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
+
     // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
     // nodes.
     if (!oldConfig.isInitialized() ||
         oldConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
-        return {};
+        return;
     }
     invariant(newConfig.getProtocolVersion() == 1);
 
-    // Write last vote
-    auto evhStatus = _replExecutor->makeEvent();
-    if (evhStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return {};
-    }
-    invariant(evhStatus.isOK());
-    auto evh = evhStatus.getValue();
-
-    auto cbStatus = _replExecutor->scheduleDBWork([this, evh](const CallbackArgs& cbData) {
-        if (cbData.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-        invariant(cbData.opCtx);
-
-        LastVote lastVote{OpTime::kInitialTerm, -1};
-        auto status = _externalState->storeLocalLastVoteDocument(cbData.opCtx, lastVote);
-        invariant(status.isOK());
-        _replExecutor->signalEvent(evh);
-    });
-    if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return {};
-    }
-    invariant(cbStatus.isOK());
-    return evh;
-}
-
-CallbackHandle ReplicationCoordinatorImpl::_scheduleWork(const CallbackFn& work) {
-    auto scheduleFn = [this](const CallbackFn& workWrapped) {
-        return _replExecutor->scheduleWork(workWrapped);
-    };
-    return _wrapAndScheduleWork(scheduleFn, work);
+    const LastVote lastVote{OpTime::kInitialTerm, -1};
+    fassert(40445, _externalState->storeLocalLastVoteDocument(opCtx, lastVote));
 }
 
 CallbackHandle ReplicationCoordinatorImpl::_scheduleWorkAt(Date_t when, const CallbackFn& work) {
-    auto scheduleFn = [this, when](const CallbackFn& workWrapped) {
-        return _replExecutor->scheduleWorkAt(when, workWrapped);
-    };
-    return _wrapAndScheduleWork(scheduleFn, work);
-}
-
-void ReplicationCoordinatorImpl::_scheduleWorkAndWaitForCompletion(const CallbackFn& work) {
-    if (auto handle = _scheduleWork(work)) {
-        _replExecutor->wait(handle);
-    }
-}
-
-void ReplicationCoordinatorImpl::_scheduleWorkAtAndWaitForCompletion(Date_t when,
-                                                                     const CallbackFn& work) {
-    if (auto handle = _scheduleWorkAt(when, work)) {
-        _replExecutor->wait(handle);
-    }
-}
-
-CallbackHandle ReplicationCoordinatorImpl::_scheduleDBWork(const CallbackFn& work) {
-    auto scheduleFn = [this](const CallbackFn& workWrapped) {
-        return _replExecutor->scheduleDBWork(workWrapped);
-    };
-    return _wrapAndScheduleWork(scheduleFn, work);
-}
-
-CallbackHandle ReplicationCoordinatorImpl::_wrapAndScheduleWork(ScheduleFn scheduleFn,
-                                                                const CallbackFn& work) {
-    auto workWrapped = [this, work](const CallbackArgs& args) {
+    auto cbh = _replExecutor->scheduleWorkAt(when, [work](const CallbackArgs& args) {
         if (args.status == ErrorCodes::CallbackCanceled) {
             return;
         }
         work(args);
-    };
-    auto cbh = scheduleFn(workWrapped);
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return CallbackHandle();
+    });
+    if (cbh == ErrorCodes::ShutdownInProgress) {
+        return {};
     }
-    fassert(28800, cbh.getStatus());
-    return cbh.getValue();
+    return fassertStatusOK(28800, cbh);
 }
 
 EventHandle ReplicationCoordinatorImpl::_makeEvent() {
@@ -3429,8 +3365,7 @@ void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
     _indexPrefetchConfig = cfg;
 }
 
-executor::TaskExecutor::EventHandle
-ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inTopoLock() {
+executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inlock() {
     if (_topCoord->getRole() != TopologyCoordinator::Role::candidate) {
         return {};
     }

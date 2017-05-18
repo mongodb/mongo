@@ -690,6 +690,7 @@ env.Library(
     ],
     LIBDEPS=[
         "concurrency/lock_manager",
+        "concurrency/write_conflict_exception",
         "curop",
         "repl/read_concern_args",
         "repl/repl_coordinator_impl",

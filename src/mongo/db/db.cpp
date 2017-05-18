@@ -855,6 +855,21 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 #endif
 }
 
+auto makeReplicationExecutor(ServiceContext* serviceContext) {
+    ThreadPool::Options tpOptions;
+    tpOptions.poolName = "replexec";
+    tpOptions.maxThreads = 50;
+    tpOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
+    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        stdx::make_unique<ThreadPool>(tpOptions),
+        executor::makeNetworkInterface(
+            "NetworkInterfaceASIO-Replication", nullptr, std::move(hookList)));
+}
+
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
                                      ("SetGlobalEnvironment", "SSLManager", "default"))
 (InitializerContext* context) {
@@ -873,16 +888,12 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
-    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
-
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,
         getGlobalReplSettings(),
         stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(serviceContext,
                                                                          storageInterface),
-        executor::makeNetworkInterface(
-            "NetworkInterfaceASIO-Replication", nullptr, std::move(hookList)),
+        makeReplicationExecutor(serviceContext),
         stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),
         replicationProcess,
         storageInterface,

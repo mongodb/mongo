@@ -212,19 +212,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='replication_executor',
-    source=[
-        'replication_executor.cpp',
-    ],
-    LIBDEPS=[
-        'database_task',
-        'task_runner',
-        '$BUILD_DIR/mongo/executor/network_interface',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
-    ],
-)
-
-env.Library(
     target='scatter_gather',
     source=[
         'scatter_gather_algorithm.cpp',
@@ -232,24 +219,6 @@ env.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-    ],
-)
-
-
-env.CppUnitTest(
-    target='replication_executor_test',
-    source=[
-        'replication_executor_test.cpp',
-        'replication_executor_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'replication_executor',
-        'replmocks',
-        'service_context_repl_mock_init',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/executor/task_executor_test_fixture',
-        '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
 
@@ -583,9 +552,11 @@ env.Library('repl_coordinator_impl',
             LIBDEPS=[
                      '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
                      '$BUILD_DIR/mongo/db/common',
+                     '$BUILD_DIR/mongo/db/concurrency/lock_manager',
                      '$BUILD_DIR/mongo/db/index/index_descriptor',
                      '$BUILD_DIR/mongo/db/server_options_core',
                      '$BUILD_DIR/mongo/db/service_context',
+                     '$BUILD_DIR/mongo/executor/task_executor_interface',
                      '$BUILD_DIR/mongo/rpc/command_status',
                      '$BUILD_DIR/mongo/rpc/metadata',
                      '$BUILD_DIR/mongo/transport/transport_layer_common',
@@ -597,7 +568,6 @@ env.Library('repl_coordinator_impl',
                      'repl_coordinator_interface',
                      'repl_settings',
                      'replica_set_messages',
-                     'replication_executor',
                      'replication_process',
                      'reporter',
                      'rslog',
@@ -617,6 +587,8 @@ env.Library(
         'topology_coordinator_impl',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/executor/network_interface_mock',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
@@ -851,7 +823,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'repl_settings',
         'replica_set_messages',
-        'replication_executor',
         'replication_process',
         'serveronly',
     ],
@@ -955,9 +926,10 @@ env.Library(
     ],
     LIBDEPS=[
         'replica_set_messages',
-        'replication_executor',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/executor/remote_command',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )
@@ -1144,27 +1116,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target='database_task',
-    source=[
-        'database_task.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/curop',
-    ],
-)
-
-env.CppUnitTest(
-    target='database_task_test',
-    source='database_task_test.cpp',
-    LIBDEPS=[
-        'database_task',
-        'task_runner_test_fixture',
-    ],
-)
-
 env.CppUnitTest(
     target='read_concern_args_test',
     source=[
@@ -1302,7 +1253,7 @@ env.Library(
         'rollback_checker.cpp',
     ],
     LIBDEPS=[
-        'replication_executor',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
 

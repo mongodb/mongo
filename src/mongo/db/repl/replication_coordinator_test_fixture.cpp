@@ -44,6 +44,8 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -57,8 +59,8 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-ReplicationExecutor* ReplCoordTest::getReplExec() {
-    return _repl->getExecutor();
+executor::TaskExecutor* ReplCoordTest::getReplExec() {
+    return _replExec;
 }
 
 ReplSetConfig ReplCoordTest::assertMakeRSConfig(const BSONObj& configBson) {
@@ -138,10 +140,16 @@ void ReplCoordTest::init() {
     _net = net.get();
     auto externalState = stdx::make_unique<ReplicationCoordinatorExternalStateMock>();
     _externalState = externalState.get();
+    executor::ThreadPoolMock::Options tpOptions;
+    tpOptions.onCreateThread = []() { Client::initThread("replexec"); };
+    auto pool = stdx::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
+    auto replExec =
+        stdx::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    _replExec = replExec.get();
     _repl = stdx::make_unique<ReplicationCoordinatorImpl>(service,
                                                           _settings,
                                                           std::move(externalState),
-                                                          std::move(net),
+                                                          std::move(replExec),
                                                           std::move(topo),
                                                           replicationProcess,
                                                           storageInterface,
@@ -349,11 +357,6 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
                     << request.cmdObj;
             net->blackHole(noi);
         }
-        net->runReadyNetworkOperations();
-        // Successful elections need to write the last vote to disk, which is done by DB worker.
-        // Wait until DB worker finishes its job to ensure the synchronization with the
-        // executor.
-        getReplExec()->waitForDBWork_forTest();
         net->runReadyNetworkOperations();
         hasReadyRequests = net->hasReadyRequests();
         getNet()->exitNetwork();

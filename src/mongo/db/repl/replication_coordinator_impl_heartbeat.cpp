@@ -337,7 +337,7 @@ executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart()
         return finishEvent;
     }
 
-    _replExecutor->scheduleWorkWithGlobalExclusiveLock(stdx::bind(
+    _replExecutor->scheduleWork(stdx::bind(
         &ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1, finishEvent));
     return finishEvent;
 }
@@ -345,24 +345,15 @@ executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart()
 void ReplicationCoordinatorImpl::_stepDownFinish(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const executor::TaskExecutor::EventHandle& finishedEvent) {
+
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
-    if (MONGO_FAIL_POINT(blockHeartbeatStepdown)) {
-        // Must reschedule rather than block so we don't take up threads in the replication
-        // executor.
-        sleepmillis(10);
-        _replExecutor->scheduleWorkWithGlobalExclusiveLock(
-            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
-                       this,
-                       stdx::placeholders::_1,
-                       finishedEvent));
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(blockHeartbeatStepdown);
 
-        return;
-    }
-
-    invariant(cbData.opCtx);
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalWrite globalExclusiveLock(opCtx.get());
     // TODO Add invariant that we've got global shared or global exclusive lock, when supported
     // by lock manager.
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -402,44 +393,27 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         LOG_FOR_HEARTBEATS(2) << "Rescheduling heartbeat reconfig to version "
                               << newConfig.getConfigVersion()
                               << " to be processed after election is cancelled.";
-        _replExecutor->onEvent(
-            electionFinishedEvent,
-            stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled,
-                       this,
-                       stdx::placeholders::_1,
-                       newConfig));
+
+        _replExecutor->onEvent(electionFinishedEvent,
+                               stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
+                                          this,
+                                          stdx::placeholders::_1,
+                                          newConfig));
         return;
     }
-    _replExecutor->scheduleDBWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
-                                             this,
-                                             stdx::placeholders::_1,
-                                             newConfig));
-}
-
-void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
-    const executor::TaskExecutor::CallbackArgs& cbData, const ReplSetConfig& newConfig) {
-    if (cbData.status == ErrorCodes::CallbackCanceled) {
-        return;
-    }
-
-    fassert(18911, cbData.status);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_inShutdown) {
-        return;
-    }
-
-    _replExecutor->scheduleDBWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
-                                             this,
-                                             stdx::placeholders::_1,
-                                             newConfig));
+    _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
+                                           this,
+                                           stdx::placeholders::_1,
+                                           newConfig));
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     const executor::TaskExecutor::CallbackArgs& cbd, const ReplSetConfig& newConfig) {
+
     if (cbd.status.code() == ErrorCodes::CallbackCanceled) {
         log() << "The callback to persist the replica set configuration was canceled - "
               << "the configuration was not persisted but was used: " << newConfig.toBSON();
@@ -470,7 +444,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     } else {
         LOG_FOR_HEARTBEATS(2) << "Config with version " << newConfig.getConfigVersion()
                               << " validated for reconfig; persisting to disk.";
-        Status status = _externalState->storeLocalConfigDocument(cbd.opCtx, newConfig.toBSON());
+
+        auto opCtx = cc().makeOperationContext();
+        auto status = _externalState->storeLocalConfigDocument(opCtx.get(), newConfig.toBSON());
         bool isFirstConfig;
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -493,33 +469,13 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
         if (!isArbiter && isFirstConfig) {
             _externalState->startThreads(_settings);
-            _startDataReplication(cbd.opCtx);
+            _startDataReplication(opCtx.get());
         }
     }
 
-    LOG_FOR_HEARTBEATS(2)
-        << "New configuration with version " << newConfig.getConfigVersion()
-        << " persisted to local storage; scheduling work to install new config in memory.";
-
-    const CallbackFn reconfigFinishFn(
-        stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
-                   this,
-                   stdx::placeholders::_1,
-                   newConfig,
-                   myIndex));
-
-    // Make sure that the reconfigFinishFn doesn't finish until we've reset
-    // _heartbeatReconfigThread.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_memberState.primary()) {
-        // If the primary is receiving a heartbeat reconfig, that strongly suggests
-        // that there has been a force reconfiguration.  In any event, it might lead
-        // to this node stepping down as primary, so we'd better do it with the global
-        // lock.
-        _replExecutor->scheduleWorkWithGlobalExclusiveLock(reconfigFinishFn);
-    } else {
-        _replExecutor->scheduleWork(reconfigFinishFn);
-    }
+    LOG_FOR_HEARTBEATS(2) << "New configuration with version " << newConfig.getConfigVersion()
+                          << " persisted to local storage; installing new config in memory";
+    _heartbeatReconfigFinish(cbd, newConfig, myIndex);
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
@@ -544,32 +500,24 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         return;
     }
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto opCtx = cc().makeOperationContext();
+    boost::optional<Lock::GlobalWrite> globalExclusiveLock;
+    stdx::unique_lock<stdx::mutex> lk{_mutex};
+    if (_memberState.primary()) {
+        // If we are primary, we need the global lock in MODE_X to step down. If we somehow
+        // transition out of primary while waiting for the global lock, there's no harm in holding
+        // it.
+        lk.unlock();
+        globalExclusiveLock.emplace(opCtx.get());
+        lk.lock();
+    }
 
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
 
-    if (_getMemberState_inlock().primary() && !cbData.opCtx) {
-        LOG_FOR_HEARTBEATS(2) << "Attempting to install new config without locks but we are "
-                                 "primary; Rescheduling work with global exclusive lock to finish "
-                                 "reconfig.";
-        // Not having an OperationContext in the CallbackData means we definitely aren't holding
-        // the global lock.  Since we're primary and this reconfig could cause us to stepdown,
-        // reschedule this work with the global exclusive lock so the stepdown is safe.
-        // TODO(spencer): When we *do* have an OperationContext, consult it to confirm that
-        // we are indeed holding the global lock.
-        _replExecutor->scheduleWorkWithGlobalExclusiveLock(
-            stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
-                       this,
-                       stdx::placeholders::_1,
-                       newConfig,
-                       myIndex));
-        return;
-    }
-
     // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inTopoLock()) {
+    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         LOG_FOR_HEARTBEATS(0)
             << "Waiting for election to complete before finishing reconfig to version "
             << newConfig.getConfigVersion();
@@ -607,16 +555,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
     const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndexValue);
-    auto evh = _resetElectionInfoOnProtocolVersionUpgrade(oldConfig, newConfig);
     lk.unlock();
-    if (evh) {
-        _replExecutor->onEvent(evh,
-                               [this, action](const executor::TaskExecutor::CallbackArgs& cbArgs) {
-                                   _performPostMemberStateUpdateAction(action);
-                               });
-    } else {
-        _performPostMemberStateUpdateAction(action);
-    }
+    _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
+    _performPostMemberStateUpdateAction(action);
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(

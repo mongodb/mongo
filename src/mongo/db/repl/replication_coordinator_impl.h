@@ -42,7 +42,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -94,7 +93,7 @@ public:
     ReplicationCoordinatorImpl(ServiceContext* serviceContext,
                                const ReplSettings& settings,
                                std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
-                               std::unique_ptr<executor::NetworkInterface> network,
+                               std::unique_ptr<executor::TaskExecutor> executor,
                                std::unique_ptr<TopologyCoordinator> topoCoord,
                                ReplicationProcess* replicationProcess,
                                StorageInterface* storage,
@@ -107,12 +106,6 @@ public:
     virtual void startup(OperationContext* opCtx) override;
 
     virtual void shutdown(OperationContext* opCtx) override;
-
-    ReplicationExecutor* getExecutor() {
-        return _replExecutor.get();
-    }
-
-    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override;
 
     virtual const ReplSettings& getSettings() const override;
 
@@ -319,6 +312,8 @@ public:
 
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
                                             const SnapshotName& untilSnapshot) override;
+
+    virtual void appendDiagnosticBSON(BSONObjBuilder*) override;
 
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
@@ -569,7 +564,7 @@ private:
     private:
         ReplicationCoordinatorImpl* _repl;  // Not owned.
         // Callback handle used to cancel a scheduled catchup timeout callback.
-        ReplicationExecutor::CallbackHandle _timeoutCbh;
+        executor::TaskExecutor::CallbackHandle _timeoutCbh;
         // Handle to a Waiter that contains the current target optime to reach after which
         // we can exit catchup mode.
         std::unique_ptr<CallbackWaiter> _waiter;
@@ -798,7 +793,9 @@ private:
      * Finishes the work of processReplSetReconfig, in the event of
      * a successful quorum check.
      */
-    void _finishReplSetReconfig(const ReplSetConfig& newConfig,
+    void _finishReplSetReconfig(const executor::TaskExecutor::CallbackArgs& cbData,
+                                const ReplSetConfig& newConfig,
+                                bool isForceReconfig,
                                 int myIndex,
                                 const executor::TaskExecutor::EventHandle& finishedEvent);
 
@@ -919,13 +916,6 @@ private:
      * Schedules a replica set config change.
      */
     void _scheduleHeartbeatReconfig_inlock(const ReplSetConfig& newConfig);
-
-    /**
-     * Callback that continues a heartbeat-initiated reconfig after a running election
-     * completes.
-     */
-    void _heartbeatReconfigAfterElectionCanceled(const executor::TaskExecutor::CallbackArgs& cbData,
-                                                 const ReplSetConfig& newConfig);
 
     /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
@@ -1059,18 +1049,10 @@ private:
 
     /**
      * Resets the term of last vote to 0 to prevent any node from voting for term 0.
-     * Returns the event handle that indicates when last vote write finishes.
      */
-    EventHandle _resetElectionInfoOnProtocolVersionUpgrade(const ReplSetConfig& oldConfig,
-                                                           const ReplSetConfig& newConfig);
-
-    /**
-     * Schedules work and returns handle to callback.
-     * If work cannot be scheduled due to shutdown, returns empty handle.
-     * All other non-shutdown scheduling failures will abort the process.
-     * Does not run 'work' if callback is canceled.
-     */
-    CallbackHandle _scheduleWork(const CallbackFn& work);
+    void _resetElectionInfoOnProtocolVersionUpgrade(OperationContext* opCtx,
+                                                    const ReplSetConfig& oldConfig,
+                                                    const ReplSetConfig& newConfig);
 
     /**
      * Schedules work to be run no sooner than 'when' and returns handle to callback.
@@ -1079,31 +1061,6 @@ private:
      * Does not run 'work' if callback is canceled.
      */
     CallbackHandle _scheduleWorkAt(Date_t when, const CallbackFn& work);
-
-    /**
-     * Schedules work and waits for completion.
-     */
-    void _scheduleWorkAndWaitForCompletion(const CallbackFn& work);
-
-    /**
-     * Schedules work to be run no sooner than 'when' and waits for completion.
-     */
-    void _scheduleWorkAtAndWaitForCompletion(Date_t when, const CallbackFn& work);
-
-    /**
-     * Schedules DB work and returns handle to callback.
-     * If work cannot be scheduled due to shutdown, returns empty handle.
-     * All other non-shutdown scheduling failures will abort the process.
-     * Does not run 'work' if callback is canceled.
-     */
-    CallbackHandle _scheduleDBWork(const CallbackFn& work);
-
-    /**
-     * Does the actual work of scheduling the work with the executor.
-     * Used by _scheduleWork() and _scheduleWorkAt() only.
-     * Do not call this function directly.
-     */
-    CallbackHandle _wrapAndScheduleWork(ScheduleFn scheduleFn, const CallbackFn& work);
 
     /**
      * Creates an event.
@@ -1133,10 +1090,8 @@ private:
      * Cancels the running election, if any, and returns an event that will be signaled when the
      * canceled election completes. If there is no running election, returns an invalid event
      * handle.
-     *
-     * Caller must already have locked the _topoMutex.
      */
-    executor::TaskExecutor::EventHandle _cancelElectionIfNeeded_inTopoLock();
+    executor::TaskExecutor::EventHandle _cancelElectionIfNeeded_inlock();
 
     /**
      * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
@@ -1196,7 +1151,7 @@ private:
     std::unique_ptr<TopologyCoordinator> _topCoord;  // (M)
 
     // Executor that drives the topology coordinator.
-    std::unique_ptr<ReplicationExecutor> _replExecutor;  // (S)
+    std::unique_ptr<executor::TaskExecutor> _replExecutor;  // (S)
 
     // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
     std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;  // (PS)

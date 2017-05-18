@@ -126,7 +126,7 @@ void ThreadPoolMock::consumeTasks(stdx::unique_lock<stdx::mutex>* lk) {
 
     invariant(_tasks.empty());
 
-    while (!_joining) {
+    while (_started && !_joining) {
         lk->unlock();
         _net->waitForWork();
         lk->lock();
