@@ -8,6 +8,10 @@
 
 load("jstests/replsets/rslib.js");
 
+// We are bypassing collection validation because this test runs "shutdown" command so the server is
+// expected to be down when MongoRunner.stopMongod is called.
+TestData.skipCollectionAndIndexValidation = true;
+
 var replTest = new ReplSetTest({
     name: 'testSet',
     nodes: {"n0": {rsConfig: {priority: 2}}, "n1": {}, "n2": {rsConfig: {votes: 1, priority: 0}}},

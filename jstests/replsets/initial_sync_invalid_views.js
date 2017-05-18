@@ -30,5 +30,9 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
     replSet.awaitSecondaryNodes(200 * 1000);
+
+    // Skip collection validation during stopMongod if invalid views exists.
+    TestData.skipValidationOnInvalidViewDefinitions = true;
+
     replSet.stopSet();
 })();

@@ -5,6 +5,11 @@
 (function() {
     "use strict";
 
+    // Decimal data with feature compatibility version 3.2 causes collection
+    // validation failure.
+    // TODO: SERVER-29350 Remove this code when feature compatibility version 3.2 is removed.
+    TestData.skipCollectionAndIndexValidation = true;
+
     var replTest = new ReplSetTest({name: 'testSet', nodes: 2});
 
     var nodes = replTest.startSet();

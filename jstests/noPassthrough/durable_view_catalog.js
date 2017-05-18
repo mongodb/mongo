@@ -59,6 +59,9 @@
     // Insert an invalid view definition directly into system.views to bypass normal validation.
     assert.writeOK(viewsDB.system.views.insert({_id: "badView", pipeline: "badType"}));
 
+    // Skip collection validation during stopMongod if invalid views exists.
+    TestData.skipValidationOnInvalidViewDefinitions = true;
+
     // Restarting the mongod should succeed despite the presence of invalid view definitions.
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod(mongodArgs);

@@ -230,7 +230,9 @@ jsTestOptions = function() {
             networkMessageCompressors: TestData.networkMessageCompressors,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             forceValidationWithFeatureCompatibilityVersion:
-                TestData.forceValidationWithFeatureCompatibilityVersion
+                TestData.forceValidationWithFeatureCompatibilityVersion,
+            skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
+            skipValidationOnNamespaceNotFound: TestData.skipValidationOnNamespaceNotFound
         });
     }
     return _jsTestOptions;

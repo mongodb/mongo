@@ -95,6 +95,16 @@ function validateCollections(db, obj) {
         var res = coll.validate(full);
 
         if (!res.ok || !res.valid) {
+            if (jsTest.options().skipValidationOnNamespaceNotFound &&
+                res.errmsg === 'ns not found') {
+                // During a 'stopStart' backup/restore on the secondary node, the actual list of
+                // collections can be out of date if ops are still being applied from the oplog. In
+                // this case we skip the collection if the ns was not found at time of validation
+                // and continue to next.
+                print('Skipping collection validation for ' + coll.getFullName() +
+                      ' since collection was not found');
+                continue;
+            }
             print('Collection validation failed with response: ' + tojson(res));
             dumpCollection(coll, 100);
             success = false;

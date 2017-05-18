@@ -293,8 +293,16 @@ var BackupRestoreTest = function(options) {
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
             rst.start(secondary.nodeId, {}, true);
         } else if (options.backup == 'stopStart') {
+            // Set an option to skip 'ns not found' error during collection validation
+            // when shutting down mongod.
+            TestData.skipValidationOnNamespaceNotFound = true;
+
             // Stop the mongod process
             rst.stop(secondary.nodeId);
+
+            // Unset to allow future collection validation on stopMongod.
+            TestData.skipValidationOnNamespaceNotFound = false;
+
             copyDbpath(dbpathSecondary, hiddenDbpath);
             removeFile(hiddenDbpath + '/mongod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));

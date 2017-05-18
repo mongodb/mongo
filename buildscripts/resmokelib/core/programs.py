@@ -179,6 +179,9 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     if "eval" in kwargs:
         eval_sb.append(str(kwargs.pop("eval")))
 
+    # Load this file to allow a callback to validate collections before shutting down mongod.
+    eval_sb.append("load('jstests/libs/override_methods/validate_collections_on_shutdown.js')");
+
     eval_str = "; ".join(eval_sb)
     args.append("--eval")
     args.append(eval_str)
