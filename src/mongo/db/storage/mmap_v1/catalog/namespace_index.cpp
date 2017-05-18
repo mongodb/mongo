@@ -44,6 +44,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -192,6 +193,7 @@ void NamespaceIndex::init(OperationContext* opCtx) {
         unsigned long long l = mmapv1GlobalOptions.lenForNewNsFiles;
         log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
 
+        Timer timer;
         {
             // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
             const unsigned long long kBlockSize = 1024 * 1024;
@@ -238,6 +240,10 @@ void NamespaceIndex::init(OperationContext* opCtx) {
 
             p = _f.getView();
         }
+
+        log() << "done allocating ns file " << pathString << ", "
+              << "size: " << (len / 1024 / 1024) << "MB, "
+              << "took " << static_cast<double>(timer.millis()) / 1000.0 << " seconds";
     }
 
     if (p == 0) {
