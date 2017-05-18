@@ -27,25 +27,12 @@
 
 #pragma once
 
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/op_msg.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
-/**
- * Generates a command error response. Similar to other overloads of generateErrorResponse,
- * but doesn't print any information about the specific command being executed. This is
- * neccessary, for example, if there is
- * an assertion hit while parsing the command.
- */
-void generateErrorResponse(OperationContext* opCtx,
-                           rpc::ReplyBuilderInterface* replyBuilder,
-                           const DBException& exception);
-
-void runCommands(OperationContext* opCtx,
-                 const OpMsgRequest& request,
-                 rpc::ReplyBuilderInterface* replyBuilder);
+DbResponse runCommands(OperationContext* opCtx, const Message& message);
 
 }  // namespace mongo

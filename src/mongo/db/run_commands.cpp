@@ -44,6 +44,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
@@ -619,51 +620,85 @@ void execCommandDatabase(OperationContext* opCtx,
         }
     }
 }
+
+/**
+ * Fills out CurOp / OpDebug with basic command info.
+ */
+void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
+    auto curop = CurOp::get(opCtx);
+    curop->debug().iscommand = true;
+
+    // We construct a legacy $cmd namespace so we can fill in curOp using
+    // the existing logic that existed for OP_QUERY commands
+    NamespaceString nss(request.getDatabase(), "$cmd");
+
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    curop->setOpDescription_inlock(request.body);
+    curop->markCommand_inlock();
+    curop->setNS_inlock(nss.ns());
+}
 }  // namespace
 
-void generateErrorResponse(OperationContext* opCtx,
-                           rpc::ReplyBuilderInterface* replyBuilder,
-                           const DBException& exception) {
-    LOG(1) << "assertion while executing command: " << exception.toString();
-    _generateErrorResponse(opCtx, replyBuilder, exception, rpc::makeEmptyMetadata());
-}
+DbResponse runCommands(OperationContext* opCtx, const Message& message) {
+    auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
 
-void runCommands(OperationContext* opCtx,
-                 const OpMsgRequest& request,
-                 rpc::ReplyBuilderInterface* replyBuilder) {
+    // TODO If this parsing the request fails we reply to an invalid request which isn't always
+    // safe. Unfortunately tests currently rely on this. Figure out what to do (probably throw a
+    // special exception type like ConnectionFatalMessageParseError).
+    bool canReply = true;
+    auto curOp = CurOp::get(opCtx);
+    boost::optional<OpMsgRequest> request;
     try {
+        request.emplace(rpc::opMsgRequestFromAnyProtocol(message));  // Request is validated here.
+        canReply = !request->isFlagSet(OpMsg::kMoreToCome);
+
+        curOpCommandSetup(opCtx, *request);
+
         Command* c = nullptr;
         // In the absence of a Command object, no redaction is possible. Therefore
         // to avoid displaying potentially sensitive information in the logs,
         // we restrict the log message to the name of the unrecognized command.
         // However, the complete command object will still be echoed to the client.
-        if (!(c = Command::findCommand(request.getCommandName()))) {
+        if (!(c = Command::findCommand(request->getCommandName()))) {
             Command::unknownCommands.increment();
-            std::string msg = str::stream() << "no such command: '" << request.getCommandName()
+            std::string msg = str::stream() << "no such command: '" << request->getCommandName()
                                             << "'";
             LOG(2) << msg;
             uasserted(ErrorCodes::CommandNotFound,
-                      str::stream() << msg << ", bad cmd: '" << redact(request.body) << "'");
+                      str::stream() << msg << ", bad cmd: '" << redact(request->body) << "'");
         }
 
-        LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-               << c->getRedactedCopyForLogging(request.body);
+        LOG(2) << "run command " << request->getDatabase() << ".$cmd" << ' '
+               << c->getRedactedCopyForLogging(request->body);
 
         {
             // Try to set this as early as possible, as soon as we have figured out the command.
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
+            curOp->setLogicalOp_inlock(c->getLogicalOp());
         }
 
-        execCommandDatabase(opCtx, c, request, replyBuilder);
+        execCommandDatabase(opCtx, c, *request, replyBuilder.get());
+    } catch (const DBException& ex) {
+        if (request) {
+            LOG(1) << "assertion while executing command '" << request->getCommandName() << "' "
+                   << "on database '" << request->getDatabase() << "': " << ex.toString();
+        } else {
+            // We failed during parsing so we can't log anything about the command.
+            LOG(1) << "assertion while executing command: " << ex.toString();
+        }
+
+        _generateErrorResponse(opCtx, replyBuilder.get(), ex, rpc::makeEmptyMetadata());
     }
 
-    catch (const DBException& ex) {
-        LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
-               << "on database '" << request.getDatabase() << "': " << ex.toString();
-
-        _generateErrorResponse(opCtx, replyBuilder, ex, rpc::makeEmptyMetadata());
+    if (!canReply) {
+        return {};
     }
+
+    auto response = replyBuilder->done();
+    curOp->debug().responseLength = response.header().dataLen();
+
+    // TODO exhaust
+    return DbResponse{std::move(response)};
 }
 
 }  // namespace mongo
