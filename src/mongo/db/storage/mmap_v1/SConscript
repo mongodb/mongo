@@ -58,7 +58,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/diag_log',
         '$BUILD_DIR/mongo/db/index_names',

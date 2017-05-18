@@ -207,10 +207,5 @@ env.Library(
         '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/db/introspect',
         '$BUILD_DIR/mongo/db/curop_metrics',
-        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-04-18): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )

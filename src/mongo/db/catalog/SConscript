@@ -145,6 +145,7 @@ env.Library(
         'index_create',
         'index_key_validate',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authmongod',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/query/query',
@@ -159,9 +160,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/clientcursor',
-        '$BUILD_DIR/mongo/db/commands/dcommands',
-        '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/s/balancer',
+        '$BUILD_DIR/mongo/db/views/views_mongod',
     ],
 )
 

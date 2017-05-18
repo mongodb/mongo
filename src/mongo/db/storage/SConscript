@@ -179,7 +179,7 @@ env.Library(
         "storage_init.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands/core",
+        '$BUILD_DIR/mongo/db/commands/server_status',
         "storage_options",
     ],
 )

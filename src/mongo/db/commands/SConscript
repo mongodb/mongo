@@ -17,12 +17,22 @@ env.Library(
     source=[
         'server_status_internal.cpp',
         'server_status_metric.cpp',
-        ],
+    ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/base'
-        ]
-    )
+    ]
+)
+
+env.Library(
+    target='server_status',
+    source=[
+        'server_status.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands',
+    ]
+)
 
 env.Library(
     target="core",
@@ -41,7 +51,6 @@ env.Library(
         "mr_common.cpp",
         "parameters.cpp",
         "rename_collection_common.cpp",
-        "server_status.cpp",
         "user_management_commands_common.cpp",
         "write_commands/write_commands_common.cpp",
     ],
@@ -84,6 +93,32 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="dcommands_fsync",
+    source=[
+        "fsync.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
+    ],
+)
+
+env.Library(
+    target="dcommands_fcv",
+    source=[
+        "feature_compatibility_version.cpp",
+    ],
+    LIBDEPS=[
+        'core',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/index_d',
+    ],
+)
+
 # Commands that should only be present in mongod
 env.Library(
     target="dcommands",
@@ -106,10 +141,8 @@ env.Library(
         "drop_indexes.cpp",
         "eval.cpp",
         "explain_cmd.cpp",
-        "feature_compatibility_version.cpp",
         "find_and_modify.cpp",
         "find_cmd.cpp",
-        "fsync.cpp",
         "geo_near_cmd.cpp",
         "get_last_error.cpp",
         "getmore_cmd.cpp",
@@ -144,6 +177,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/auth/authmongod',
         '$BUILD_DIR/mongo/db/background',
+        '$BUILD_DIR/mongo/db/catalog/catalog',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
@@ -168,12 +202,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/parallel',
         'apply_ops_cmd_common',
         'core',
+        'dcommands_fcv',
+        'dcommands_fsync',
         'killcursors_common',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE (CursorManager)
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-05-16): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

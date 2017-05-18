@@ -398,10 +398,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
             'heap_profiler.cpp',
         ],
         LIBDEPS=[
-            # TODO: This is needless, the definition of
-            # ServerStatusSection should live in its own library, as
-            # it doesn't require all of the other commands.
-            '$BUILD_DIR/mongo/db/commands/core',
+            '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/db/server_parameters',
             '$BUILD_DIR/mongo/util/net/network',
         ],

@@ -97,7 +97,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         'fill_locker_info',
         'top',

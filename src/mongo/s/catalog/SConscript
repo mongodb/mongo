@@ -150,9 +150,8 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/db/commands/dcommands',
+        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
         '$BUILD_DIR/mongo/db/s/balancer',
-
     ],
 )
 

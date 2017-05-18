@@ -586,7 +586,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        'commands/dcommands',
         'repl/serveronly',
         'views/views_mongod',
         '$BUILD_DIR/mongo/util/uuid_catalog',
@@ -721,8 +720,10 @@ env.Library(
         "ttl.cpp",
     ],
     LIBDEPS=[
-        "commands/dcommands",
+        "commands/dcommands_fsync",
         "db_raii",
+        "ops/write_ops",
+        "query/query",
         "ttl_collection_cache",
     ],
 )
@@ -753,7 +754,7 @@ env.Library(
         #'introspect', # CYCLE
         #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
+        #'$BUILD_DIR/mongo/db/commands/dcommands_fsync', # CYCLE
     ],
     LIBDEPS_TAGS=[
         # TODO(ADAM, 2017-05-16): See `CYCLE` tags above
