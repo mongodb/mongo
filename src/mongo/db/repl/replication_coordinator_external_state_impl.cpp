@@ -182,8 +182,12 @@ std::unique_ptr<ThreadPool> makeThreadPool() {
 }  // namespace
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
-    ServiceContext* service, StorageInterface* storageInterface)
-    : _service(service), _storageInterface(storageInterface) {
+    ServiceContext* service,
+    DropPendingCollectionReaper* dropPendingCollectionReaper,
+    StorageInterface* storageInterface)
+    : _service(service),
+      _dropPendingCollectionReaper(dropPendingCollectionReaper),
+      _storageInterface(storageInterface) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}

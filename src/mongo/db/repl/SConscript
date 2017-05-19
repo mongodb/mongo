@@ -854,6 +854,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        'drop_pending_collection_reaper',
         'repl_settings',
         'replica_set_messages',
         'replication_process',

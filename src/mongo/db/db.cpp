@@ -903,6 +903,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
 
     repl::DropPendingCollectionReaper::set(
         serviceContext, stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
+    auto dropPendingCollectionReaper = repl::DropPendingCollectionReaper::get(serviceContext);
 
     repl::TopologyCoordinatorImpl::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
@@ -914,8 +915,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,
         getGlobalReplSettings(),
-        stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(serviceContext,
-                                                                         storageInterface),
+        stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
+            serviceContext, dropPendingCollectionReaper, storageInterface),
         makeReplicationExecutor(serviceContext),
         stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),
         replicationProcess,

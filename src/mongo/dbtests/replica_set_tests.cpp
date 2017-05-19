@@ -30,6 +30,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -48,8 +49,12 @@ protected:
     void setUp() {
         auto opCtx = makeOpCtx();
         _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
-        _replCoordExternalState.reset(new repl::ReplicationCoordinatorExternalStateImpl(
-            opCtx->getServiceContext(), _storageInterface.get()));
+        _dropPendingCollectionReaper =
+            stdx::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get());
+        _replCoordExternalState = stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
+            opCtx->getServiceContext(),
+            _dropPendingCollectionReaper.get(),
+            _storageInterface.get());
     }
 
     void tearDown() {
@@ -58,6 +63,7 @@ protected:
         client.dropCollection("local.replset.election");
 
         _replCoordExternalState.reset();
+        _dropPendingCollectionReaper.reset();
         _storageInterface.reset();
     }
 
@@ -72,6 +78,7 @@ protected:
 private:
     std::unique_ptr<repl::ReplicationCoordinatorExternalStateImpl> _replCoordExternalState;
     std::unique_ptr<repl::StorageInterface> _storageInterface;
+    std::unique_ptr<repl::DropPendingCollectionReaper> _dropPendingCollectionReaper;
 };
 
 TEST_F(ReplicaSetTest, ReplCoordExternalStateStoresLastVoteWithNewTerm) {

@@ -121,6 +121,7 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
         "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/serveronly",

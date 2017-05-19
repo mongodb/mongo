@@ -46,6 +46,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -353,8 +354,10 @@ public:
             result.append("info2", noConfigMessage);
             log() << "initiate : " << noConfigMessage;
 
-            ReplicationCoordinatorExternalStateImpl externalState(opCtx->getServiceContext(),
-                                                                  StorageInterface::get(opCtx));
+            ReplicationCoordinatorExternalStateImpl externalState(
+                opCtx->getServiceContext(),
+                DropPendingCollectionReaper::get(opCtx),
+                StorageInterface::get(opCtx));
             std::string name;
             std::vector<HostAndPort> seeds;
             parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...
