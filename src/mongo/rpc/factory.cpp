@@ -81,18 +81,18 @@ std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
     }
 }
 
-std::unique_ptr<RequestInterface> makeRequest(const Message* unownedMessage) {
-    switch (unownedMessage->operation()) {
+OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage) {
+    switch (unownedMessage.operation()) {
         case mongo::dbMsg:
-            return stdx::make_unique<OpMsgRequest>(mongo::OpMsgRequest::parse(*unownedMessage));
+            return OpMsgRequest::parse(unownedMessage);
         case mongo::dbQuery:
-            return stdx::make_unique<LegacyRequest>(unownedMessage);
+            return opMsgRequestFromLegacyRequest(unownedMessage);
         case mongo::dbCommand:
-            return stdx::make_unique<CommandRequest>(unownedMessage);
+            return opMsgRequestFromCommandRequest(unownedMessage);
         default:
             uasserted(ErrorCodes::UnsupportedFormat,
                       str::stream() << "Received a reply message with unexpected opcode: "
-                                    << unownedMessage->operation());
+                                    << unownedMessage.operation());
     }
 }
 

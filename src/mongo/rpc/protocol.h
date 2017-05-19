@@ -34,6 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 class BSONObj;
@@ -83,6 +84,8 @@ const ProtocolSet kOpMsgOnly = static_cast<ProtocolSet>(Protocol::kOpMsg);
 const ProtocolSet kAll = kOpQueryOnly | kOpCommandOnly | kOpMsgOnly;
 
 }  // namespace supports
+
+Protocol protocolForMessage(const Message& message);
 
 /**
  * Returns the protocol used to initiate the current operation.

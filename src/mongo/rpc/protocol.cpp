@@ -69,6 +69,21 @@ constexpr ProtocolSetAndName protocolSetNames[] = {
 
 }  // namespace
 
+Protocol protocolForMessage(const Message& message) {
+    switch (message.operation()) {
+        case mongo::dbMsg:
+            return Protocol::kOpMsg;
+        case mongo::dbQuery:
+            return Protocol::kOpQuery;
+        case mongo::dbCommand:
+            return Protocol::kOpCommandV1;
+        default:
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "Received a reply message with unexpected opcode: "
+                                    << message.operation());
+    }
+}
+
 StatusWith<Protocol> negotiate(ProtocolSet fst, ProtocolSet snd) {
     using std::begin;
     using std::end;

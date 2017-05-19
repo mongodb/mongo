@@ -74,12 +74,12 @@ TEST(RequestBuilder, RoundTrip) {
                    .setMetadata(metadata)
                    .done();
 
-    rpc::CommandRequest parsed(&msg);
+    auto parsed = mongo::rpc::ParsedOpCommand::parse(msg);
 
-    ASSERT_EQUALS(parsed.getDatabase(), databaseName);
-    ASSERT_EQUALS(parsed.getCommandName(), commandName);
-    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
-    ASSERT_BSONOBJ_EQ(parsed.getCommandArgs(), commandArgs);
+    ASSERT_EQUALS(parsed.database, databaseName);
+    ASSERT_EQUALS(StringData(parsed.body.firstElementFieldName()), commandName);
+    ASSERT_BSONOBJ_EQ(parsed.metadata, metadata);
+    ASSERT_BSONOBJ_EQ(parsed.body, commandArgs);
 }
 
 }  // namespace

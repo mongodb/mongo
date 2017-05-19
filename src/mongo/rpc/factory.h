@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/rpc/protocol.h"
+#include "mongo/util/net/op_msg.h"
 
 #include <memory>
 
@@ -44,7 +45,6 @@ namespace rpc {
 class ReplyBuilderInterface;
 class ReplyInterface;
 class RequestBuilderInterface;
-class RequestInterface;
 
 /**
  * Returns the appropriate concrete RequestBuilder. Throws if one cannot be chosen.
@@ -61,10 +61,9 @@ std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto);
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage);
 
 /**
- * Returns the appropriate concrete Request according to the contents of the message.
- * Throws if one cannot be chosen.
+ * Parses the message (from any protocol) into an OpMsgRequest.
  */
-std::unique_ptr<RequestInterface> makeRequest(const Message* unownedMessage);
+OpMsgRequest opMsgRequestFromAnyProtocol(const Message& unownedMessage);
 
 /**
  * Returns the appropriate concrete ReplyBuilder.

@@ -782,7 +782,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     // Simulate user command.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_BSONOBJ_EQ(commandRequest, request.cmdObj);
+                               ASSERT_BSONOBJ_EQ(commandRequest, request.cmdObj.removeField("$db"));
 
                                RemoteCommandResponse response;
                                response.data = commandReply;
@@ -814,6 +814,13 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                                     << "blah"
                                     << "ok"
                                     << 1.0);
+    BSONObj hookUnifiedRequest = ([&] {
+        BSONObjBuilder bob;
+        bob.appendElements(hookCommandRequest);
+        bob.appendElements(hookRequestMetadata);
+        bob.append("$db", "foo");
+        return bob.obj();
+    }());
     BSONObj hookReplyMetadata = BSON("1111" << 2222);
 
     Status handleReplyError{ErrorCodes::AuthSchemaIncompatible, "daowdjkpowkdjpow"};
@@ -853,8 +860,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_BSONOBJ_EQ(request.cmdObj, hookCommandRequest);
-                               ASSERT_BSONOBJ_EQ(request.metadata, hookRequestMetadata);
+                               ASSERT_BSONOBJ_EQ(request.cmdObj, hookUnifiedRequest);
+                               ASSERT_BSONOBJ_EQ(request.metadata, BSONObj());
 
                                RemoteCommandResponse response;
                                response.data = hookCommandReply;
@@ -1027,7 +1034,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_EQ("bar", request.metadata["foo"].str());
+                               ASSERT_EQ("bar", request.cmdObj["foo"].str());
                                RemoteCommandResponse response;
                                response.data = BSON("ok" << 1);
                                response.metadata = BSON("baz"

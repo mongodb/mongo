@@ -77,12 +77,12 @@ TEST(CommandRequest, ParseAllFields) {
     Message toSend;
     toSend.setData(dbCommand, opCommandData.data(), opCommandData.size());
 
-    rpc::CommandRequest opCmd{&toSend};
+    auto opCmd = rpc::ParsedOpCommand::parse(toSend);
 
-    ASSERT_EQUALS(opCmd.getCommandName(), commandName);
-    ASSERT_EQUALS(opCmd.getDatabase(), database);
-    ASSERT_BSONOBJ_EQ(opCmd.getMetadata(), metadata);
-    ASSERT_BSONOBJ_EQ(opCmd.getCommandArgs(), commandArgs);
+    ASSERT_EQUALS(opCmd.body.firstElementFieldName(), commandName);
+    ASSERT_EQUALS(opCmd.database, database);
+    ASSERT_BSONOBJ_EQ(opCmd.metadata, metadata);
+    ASSERT_BSONOBJ_EQ(opCmd.body, commandArgs);
 }
 
 TEST(CommandRequest, EmptyCommandObjThrows) {
@@ -92,7 +92,7 @@ TEST(CommandRequest, EmptyCommandObjThrows) {
     crb.setCommandArgs(BSONObj());
     crb.setMetadata(BSONObj());
     auto msg = crb.done();
-    ASSERT_THROWS_CODE(rpc::CommandRequest{&msg}, UserException, 39950);
+    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), UserException, 39950);
 }
 
 TEST(CommandRequest, MismatchBetweenCommandNamesThrows) {
@@ -102,7 +102,7 @@ TEST(CommandRequest, MismatchBetweenCommandNamesThrows) {
     crb.setCommandArgs(BSON("launchMissiles" << 1));
     crb.setMetadata(BSONObj());
     auto msg = crb.done();
-    ASSERT_THROWS_CODE(rpc::CommandRequest{&msg}, UserException, 39950);
+    ASSERT_THROWS_CODE(rpc::ParsedOpCommand::parse(msg), UserException, 39950);
 }
 
 }  // namespace

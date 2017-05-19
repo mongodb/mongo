@@ -160,25 +160,16 @@ DbResponse receivedCommand(OperationContext* opCtx,
 
     try {
         // This will throw if the request is on an invalid namespace.
-        rpc::LegacyRequest legacyRequest{&message};
+        auto request = rpc::opMsgRequestFromLegacyRequest(message);
         // Auth checking for Commands happens later.
-        int nToReturn = queryMessage.ntoreturn;
 
-        beginCommandOp(opCtx, nss, legacyRequest.getCommandArgs());
+        beginCommandOp(opCtx, nss, request.body);
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             op->markCommand_inlock();
         }
 
-        uassert(16979,
-                str::stream() << "bad numberToReturn (" << nToReturn
-                              << ") for $cmd type ns - can only be 1 or -1",
-                nToReturn == 1 || nToReturn == -1);
-
-        auto request = OpMsgRequest::fromDBAndBody(legacyRequest.getDatabase(),
-                                                   legacyRequest.getCommandArgs(),
-                                                   legacyRequest.getMetadata());
         runCommands(opCtx, request, &builder);
 
         op->debug().iscommand = true;
@@ -243,21 +234,17 @@ DbResponse receivedRpc(OperationContext* opCtx, Client& client, const Message& m
 
     try {
         // database is validated here
-        rpc::CommandRequest commandRequest{&message};
+        auto request = rpc::opMsgRequestFromLegacyRequest(message);
 
         // We construct a legacy $cmd namespace so we can fill in curOp using
         // the existing logic that existed for OP_QUERY commands
-        NamespaceString nss(commandRequest.getDatabase(), "$cmd");
-        beginCommandOp(opCtx, nss, commandRequest.getCommandArgs());
+        NamespaceString nss(request.getDatabase(), "$cmd");
+        beginCommandOp(opCtx, nss, request.body);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->markCommand_inlock();
         }
 
-
-        auto request = OpMsgRequest::fromDBAndBody(commandRequest.getDatabase(),
-                                                   commandRequest.getCommandArgs(),
-                                                   commandRequest.getMetadata());
         runCommands(opCtx, request, &replyBuilder);
 
         curOp->debug().iscommand = true;

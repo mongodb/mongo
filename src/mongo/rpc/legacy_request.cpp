@@ -30,6 +30,7 @@
 
 #include <utility>
 
+#include "mongo/db/dbmessage.h"
 #include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
@@ -37,35 +38,24 @@
 namespace mongo {
 namespace rpc {
 
-LegacyRequest::LegacyRequest(const Message* message)
-    : _message(std::move(message)), _dbMessage(*message), _queryMessage(_dbMessage) {
-    _database = nsToDatabaseSubstring(_queryMessage.ns);
+OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
+    DbMessage dbm(message);
+    QueryMessage qm(dbm);
+    NamespaceString ns(qm.ns);
 
-    std::tie(_upconvertedCommandArgs, _upconvertedMetadata) = rpc::upconvertRequestMetadata(
-        std::move(_queryMessage.query), std::move(_queryMessage.queryOptions));
-}
+    uassert(40473,
+            str::stream() << "Trying to handle namespace " << qm.ns << " as a command",
+            ns.isCommand());
 
-LegacyRequest::~LegacyRequest() = default;
+    uassert(16979,
+            str::stream() << "bad numberToReturn (" << qm.ntoreturn
+                          << ") for $cmd type ns - can only be 1 or -1",
+            qm.ntoreturn == 1 || qm.ntoreturn == -1);
 
-StringData LegacyRequest::getDatabase() const {
-    return _database;
-}
+    auto bodyAndMetadata = rpc::upconvertRequestMetadata(qm.query, qm.queryOptions);
 
-StringData LegacyRequest::getCommandName() const {
-    return _upconvertedCommandArgs.firstElement().fieldNameStringData();
-}
-
-const BSONObj& LegacyRequest::getMetadata() const {
-    // TODO SERVER-18236
-    return _upconvertedMetadata;
-}
-
-const BSONObj& LegacyRequest::getCommandArgs() const {
-    return _upconvertedCommandArgs;
-}
-
-Protocol LegacyRequest::getProtocol() const {
-    return rpc::Protocol::kOpQuery;
+    return OpMsgRequest::fromDBAndBody(
+        ns.db(), std::get<0>(bodyAndMetadata), std::get<1>(bodyAndMetadata));
 }
 
 }  // namespace rpc

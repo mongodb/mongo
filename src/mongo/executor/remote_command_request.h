@@ -33,7 +33,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/request_interface.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -77,17 +76,6 @@ struct RemoteCommandRequest {
                          Milliseconds timeoutMillis = kNoTimeout)
         : RemoteCommandRequest(
               theTarget, theDbName, theCmdObj, rpc::makeEmptyMetadata(), opCtx, timeoutMillis) {}
-
-    RemoteCommandRequest(const HostAndPort& theTarget,
-                         const rpc::RequestInterface& request,
-                         OperationContext* opCtx,
-                         Milliseconds timeoutMillis = kNoTimeout)
-        : RemoteCommandRequest(theTarget,
-                               request.getDatabase().toString(),
-                               request.getCommandArgs(),
-                               request.getMetadata(),
-                               opCtx,
-                               timeoutMillis) {}
 
     std::string toString() const;
 

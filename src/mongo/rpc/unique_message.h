@@ -39,8 +39,7 @@ namespace mongo {
 namespace rpc {
 
 /**
- * A wrapper around an owned message that includes access to an associated
- * ReplyInterface or RequestInterface.
+ * A wrapper around an owned message that includes access to an associated ReplyInterface.
  */
 template <typename MessageViewType>
 class UniqueMessage {

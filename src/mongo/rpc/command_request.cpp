@@ -54,9 +54,11 @@ const std::size_t kMaxCommandNameLength = 128;
 
 }  // namespace
 
-CommandRequest::CommandRequest(const Message* message) : _message(message) {
-    char* begin = _message->singleData().data();
-    std::size_t length = _message->singleData().dataLen();
+ParsedOpCommand ParsedOpCommand::parse(const Message& message) {
+    ParsedOpCommand out;
+
+    char* begin = message.singleData().data();
+    std::size_t length = message.singleData().dataLen();
 
     // checked in message_port.cpp
     invariant(length <= MaxMessageSizeBytes);
@@ -67,10 +69,10 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
 
     Terminated<'\0', StringData> str;
     uassertStatusOK(cur.readAndAdvance<>(&str));
-    _database = std::move(str.value);
+    out.database = str.value.toString();
 
     uassertStatusOK(cur.readAndAdvance<>(&str));
-    _commandName = std::move(str.value);
+    const auto commandName = std::move(str.value);
 
     uassert(28637,
             str::stream() << "Command name parsed in OP_COMMAND message must be between "
@@ -78,76 +80,61 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
                           << " and "
                           << kMaxCommandNameLength
                           << " bytes. Got: "
-                          << _database,
-            (_commandName.size() >= kMinCommandNameLength) &&
-                (_commandName.size() <= kMaxCommandNameLength));
+                          << out.database,
+            (commandName.size() >= kMinCommandNameLength) &&
+                (commandName.size() <= kMaxCommandNameLength));
 
     Validated<BSONObj> obj;
     uassertStatusOK(cur.readAndAdvance<>(&obj));
-    _commandArgs = std::move(obj.val);
+    out.body = std::move(obj.val);
     uassert(39950,
-            str::stream() << "Command name parsed in OP_COMMAND message '" << _commandName
+            str::stream() << "Command name parsed in OP_COMMAND message '" << commandName
                           << "' doesn't match command name from object '"
-                          << _commandArgs.firstElementFieldName()
+                          << out.body.firstElementFieldName()
                           << '\'',
-            _commandArgs.firstElementFieldName() == _commandName);
+            out.body.firstElementFieldName() == commandName);
+
+    uassertStatusOK(cur.readAndAdvance<>(&obj));
+    out.metadata = std::move(obj.val);
+
+    uassert(40419, "OP_COMMAND request contains trailing bytes following metadata", cur.empty());
+
+    return out;
+}
+
+OpMsgRequest opMsgRequestFromCommandRequest(const Message& message) {
+    auto parsed = ParsedOpCommand::parse(message);
+
+    BSONObjBuilder bodyBuilder;
+    bodyBuilder.appendElements(parsed.body);
 
     // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
     // fields differently. We do all up-conversion here so that the rest of the code only has to
     // deal with the current format.
-    uassertStatusOK(cur.readAndAdvance<>(&obj));
-    BSONObjBuilder metadataBuilder;
-    for (auto elem : obj.val) {
+    for (auto elem : parsed.metadata) {
         if (elem.fieldNameStringData() == "configsvr") {
-            metadataBuilder.appendAs(elem, "$configServerState");
+            bodyBuilder.appendAs(elem, "$configServerState");
         } else if (elem.fieldNameStringData() == "$ssm") {
             auto ssmObj = elem.Obj();
             if (auto readPrefElem = ssmObj["$readPreference"]) {
                 // Promote the read preference to the top level.
-                metadataBuilder.append(readPrefElem);
+                bodyBuilder.append(readPrefElem);
             } else if (ssmObj["$secondaryOk"].trueValue()) {
                 // Convert secondaryOk to equivalent read preference if none was explicitly
                 // provided.
                 ReadPreferenceSetting(ReadPreference::SecondaryPreferred)
-                    .toContainingBSON(&metadataBuilder);
+                    .toContainingBSON(&bodyBuilder);
             }
         } else {
-            metadataBuilder.append(elem);
+            bodyBuilder.append(elem);
         }
     }
-    _metadata = metadataBuilder.obj();
 
-    uassert(40419, "OP_COMMAND request contains trailing bytes following metadata", cur.empty());
-}
+    bodyBuilder.append("$db", parsed.database);
 
-StringData CommandRequest::getDatabase() const {
-    return _database;
-}
-
-StringData CommandRequest::getCommandName() const {
-    return _commandName;
-}
-
-const BSONObj& CommandRequest::getMetadata() const {
-    return _metadata;
-}
-
-const BSONObj& CommandRequest::getCommandArgs() const {
-    return _commandArgs;
-}
-
-bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
-    return (lhs._database == rhs._database) && (lhs._commandName == rhs._commandName) &&
-        SimpleBSONObjComparator::kInstance.evaluate(lhs._metadata == rhs._metadata) &&
-        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs);
-}
-
-bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {
-    return !(lhs == rhs);
-}
-
-Protocol CommandRequest::getProtocol() const {
-    return rpc::Protocol::kOpCommandV1;
+    OpMsgRequest request;
+    request.body = bodyBuilder.obj();
+    return request;
 }
 
 }  // namespace rpc

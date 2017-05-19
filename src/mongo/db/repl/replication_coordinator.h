@@ -59,7 +59,6 @@ namespace rpc {
 
 class OplogQueryMetadata;
 class ReplSetMetadata;
-class RequestInterface;
 
 }  // namespace rpc
 

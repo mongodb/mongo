@@ -28,66 +28,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/rpc/request_interface.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
-class Message;
-
 namespace rpc {
 
-/**
- * An immutable view of an OP_QUERY command request. The underlying bytes are owned
- * by a mongo::Message, which must outlive any LegacyRequest instances created from it.
- *
- */
-class LegacyRequest : public RequestInterface {
-public:
-    /**
-     * Construct a Request from a Message. Underlying message MUST outlive the Request.
-     * Required fields are parsed eagerly, inputDocs are parsed lazily.
-     */
-    explicit LegacyRequest(const Message* message);
-
-    ~LegacyRequest() final;
-
-    /**
-     * The database that the command is to be executed on.
-     */
-    StringData getDatabase() const final;
-
-    /**
-     * The name of the command to execute.
-     */
-    StringData getCommandName() const final;
-
-    /**
-     * The metadata associated with the command request. This is information that is
-     * independent of any specific command, i.e. auditing information.
-     */
-    const BSONObj& getMetadata() const final;
-
-    /**
-     * The arguments to the command - this is passed to the command's run() method.
-     */
-    const BSONObj& getCommandArgs() const final;
-
-    Protocol getProtocol() const final;
-
-private:
-    const Message* _message;
-    // TODO: metadata will be handled in SERVER-18236
-    // for now getMetadata() is a no op
-    DbMessage _dbMessage;
-    QueryMessage _queryMessage;
-    StringData _database;
-
-    BSONObj _upconvertedMetadata;
-    BSONObj _upconvertedCommandArgs;
-};
+OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message);
 
 }  // namespace rpc
 }  // namespace mongo
