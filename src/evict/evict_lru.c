@@ -906,10 +906,8 @@ void
 __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
-	WT_CACHE *cache;
 
 	btree = S2BT(session);
-	cache = S2C(session)->cache;
 
 	/*
 	 * We have seen subtle bugs with multiple threads racing to turn
@@ -917,12 +915,26 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 	 */
 	WT_DIAGNOSTIC_YIELD;
 
-	/* Hold the walk lock to turn on eviction. */
-	__wt_spin_lock(session, &cache->evict_walk_lock);
-	WT_ASSERT(session,
-	    btree->evict_ref == NULL && btree->evict_disabled > 0);
-	--btree->evict_disabled;
-	__wt_spin_unlock(session, &cache->evict_walk_lock);
+	/*
+	 * Atomically decrement the evict-disabled count, without acquiring the
+	 * eviction walk-lock. We can't acquire that lock here because there's
+	 * a potential deadlock. When acquiring exclusive eviction access, we
+	 * acquire the eviction walk-lock and then the cache's pass-intr lock.
+	 * The current eviction implementation can hold the pass-intr lock and
+	 * call into this function (see WT-3303 for the details), which might
+	 * deadlock with another thread trying to get exclusive eviction access.
+	 */
+#if defined(HAVE_DIAGNOSTIC)
+	{
+	int32_t v;
+
+	WT_ASSERT(session, btree->evict_ref == NULL);
+	v = __wt_atomic_subi32(&btree->evict_disabled, 1);
+	WT_ASSERT(session, v >= 0);
+	}
+#else
+	(void)__wt_atomic_subi32(&btree->evict_disabled, 1);
+#endif
 }
 
 #define	EVICT_TUNE_BATCH	1	/* Max workers to add each period */
