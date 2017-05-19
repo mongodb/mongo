@@ -39,6 +39,7 @@ env.Library(
     source=[
         'document.cpp',
         'document_comparator.cpp',
+        'document_path_support.cpp',
         'value.cpp',
         'value_comparator.cpp',
         ],
@@ -65,6 +66,7 @@ env.CppUnitTest(
     source=[
         'document_comparator_test.cpp',
         'document_value_test.cpp',
+        'document_path_support_test.cpp',
         'document_value_test_util_self_test.cpp',
         'value_comparator_test.cpp',
     ],

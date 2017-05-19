@@ -1,7 +1,6 @@
-// SERVER-19095: Add $lookup aggregation stage.
+// Basic $lookup regression tests.
 
-// For assertErrorCode.
-load("jstests/aggregation/extras/utils.js");
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
 (function() {
     "use strict";
@@ -344,9 +343,31 @@ load("jstests/aggregation/extras/utils.js");
         expectedResults = [{_id: 0, a: [0, 1, 2], b: [{_id: 0}, {_id: 1}]}];
         testPipeline(pipeline, expectedResults, coll);
 
+        // Basic array corresponding to a single document.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 0, a: [1]}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 0}));
+        assert.writeOK(from.insert({_id: 1}));
+
+        pipeline = [
+            {
+              $lookup: {
+                  localField: "a",
+                  foreignField: "_id",
+                  from: "from",
+                  as: "b",
+              }
+            },
+        ];
+        expectedResults = [{_id: 0, a: [1], b: [{_id: 1}]}];
+        testPipeline(pipeline, expectedResults, coll);
+
         // Array containing regular expressions.
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: [/a regex/, /^x/]}));
+        assert.writeOK(coll.insert({_id: 1, a: [/^x/]}));
 
         from.drop();
         assert.writeOK(from.insert({_id: 0, b: "should not match a regex"}));
@@ -364,8 +385,34 @@ load("jstests/aggregation/extras/utils.js");
               }
             },
         ];
-        expectedResults =
-            [{_id: 0, a: [/a regex/, /^x/], b: [{_id: 2, b: /a regex/}, {_id: 3, b: /^x/}]}];
+        expectedResults = [
+            {_id: 0, a: [/a regex/, /^x/], b: [{_id: 2, b: /a regex/}, {_id: 3, b: /^x/}]},
+            {_id: 1, a: [/^x/], b: [{_id: 3, b: /^x/}]}
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // 'localField' references a field within an array of sub-objects.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 0, a: [{b: 1}, {b: 2}]}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 0}));
+        assert.writeOK(from.insert({_id: 1}));
+        assert.writeOK(from.insert({_id: 2}));
+        assert.writeOK(from.insert({_id: 3}));
+
+        pipeline = [
+            {
+              $lookup: {
+                  localField: "a.b",
+                  foreignField: "_id",
+                  from: "from",
+                  as: "c",
+              }
+            },
+        ];
+
+        expectedResults = [{"_id": 0, "a": [{"b": 1}, {"b": 2}], "c": [{"_id": 1}, {"_id": 2}]}];
         testPipeline(pipeline, expectedResults, coll);
 
         //

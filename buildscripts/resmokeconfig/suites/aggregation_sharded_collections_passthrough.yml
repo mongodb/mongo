@@ -7,7 +7,6 @@ selector:
     - jstests/aggregation/sources/*/*.js
     exclude_files:
     # The following tests start their own ShardingTest.
-    - jstests/aggregation/bugs/server19095.js
     - jstests/aggregation/bugs/server6118.js
     - jstests/aggregation/bugs/server6179.js
     - jstests/aggregation/bugs/server7781.js
@@ -16,6 +15,7 @@ selector:
     - jstests/aggregation/sources/addFields/weather.js
     - jstests/aggregation/sources/facet/use_cases.js
     - jstests/aggregation/sources/graphLookup/sharded.js
+    - jstests/aggregation/sources/lookup/lookup.js
     - jstests/aggregation/sources/replaceRoot/address.js
     - jstests/aggregation/testshard1.js
     # The following tests start their own ReplSetTest.
