@@ -316,20 +316,22 @@ void runCommand(OperationContext* opCtx, StringData db, BSONObj cmdObj, BSONObjB
             runAgainstRegistered(opCtx, db, cmdObj, builder);
             return;
         } catch (const StaleConfigException& e) {
+            if (e.getns().empty()) {
+                // This should be impossible but older versions tried incorrectly to handle it here.
+                log() << "Received a stale config error with an empty namespace while executing "
+                      << redact(cmdObj) << " : " << redact(e);
+                throw;
+            }
+
             if (loops <= 0)
                 throw e;
 
             loops--;
-
             log() << "Retrying command " << redact(cmdObj) << causedBy(e);
 
-            // For legacy reasons, ns may not actually be set in the exception
-            const std::string staleNS(e.getns().empty() ? NamespaceString(db).getCommandNS().ns()
-                                                        : e.getns());
-
-            ShardConnection::checkMyConnectionVersions(opCtx, staleNS);
+            ShardConnection::checkMyConnectionVersions(opCtx, e.getns());
             if (loops < 4) {
-                const NamespaceString staleNSS(staleNS);
+                const NamespaceString staleNSS(e.getns());
                 if (staleNSS.isValid()) {
                     Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
                 }
