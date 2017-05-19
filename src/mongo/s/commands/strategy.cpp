@@ -295,6 +295,54 @@ void runAgainstRegistered(OperationContext* opCtx,
 
     execCommandClient(opCtx, c, db, jsobj, anObjBuilder);
 }
+
+void runCommand(OperationContext* opCtx, StringData db, BSONObj cmdObj, BSONObjBuilder&& builder) {
+    // Handle command option maxTimeMS.
+    uassert(ErrorCodes::InvalidOptions,
+            "no such command option $maxTimeMs; use maxTimeMS instead",
+            cmdObj[QueryRequest::queryOptionMaxTimeMS].eoo());
+
+    const int maxTimeMS =
+        uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdObj[QueryRequest::cmdOptionMaxTimeMS]));
+    if (maxTimeMS > 0) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
+    }
+
+    int loops = 5;
+
+    while (true) {
+        builder.resetToEmpty();
+        try {
+            runAgainstRegistered(opCtx, db, cmdObj, builder);
+            return;
+        } catch (const StaleConfigException& e) {
+            if (loops <= 0)
+                throw e;
+
+            loops--;
+
+            log() << "Retrying command " << redact(cmdObj) << causedBy(e);
+
+            // For legacy reasons, ns may not actually be set in the exception
+            const std::string staleNS(e.getns().empty() ? NamespaceString(db).getCommandNS().ns()
+                                                        : e.getns());
+
+            ShardConnection::checkMyConnectionVersions(opCtx, staleNS);
+            if (loops < 4) {
+                const NamespaceString staleNSS(staleNS);
+                if (staleNSS.isValid()) {
+                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
+                }
+            }
+            continue;
+        } catch (const DBException& e) {
+            builder.resetToEmpty();
+            Command::appendCommandStatus(builder, e.toStatus());
+            return;
+        }
+        MONGO_UNREACHABLE;
+    }
+}
 }  // namespace
 
 DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
@@ -381,11 +429,6 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                          cursorId.getValue())};
 }
 
-static void runCommand(OperationContext* opCtx,
-                       StringData db,
-                       BSONObj cmdObj,
-                       BSONObjBuilder&& builder);
-
 DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
                                           NamespaceString nss,
                                           DbMessage* dbm) {
@@ -466,57 +509,6 @@ DbResponse Strategy::clientOpQueryCommand(OperationContext* opCtx,
     OpQueryReplyBuilder reply;
     runCommand(opCtx, nss.db(), cmdObj, BSONObjBuilder(reply.bufBuilderForResults()));
     return DbResponse{reply.toCommandReply()};
-}
-
-static void runCommand(OperationContext* opCtx,
-                       StringData db,
-                       BSONObj cmdObj,
-                       BSONObjBuilder&& builder) {
-    // Handle command option maxTimeMS.
-    uassert(ErrorCodes::InvalidOptions,
-            "no such command option $maxTimeMs; use maxTimeMS instead",
-            cmdObj[QueryRequest::queryOptionMaxTimeMS].eoo());
-
-    const int maxTimeMS =
-        uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdObj[QueryRequest::cmdOptionMaxTimeMS]));
-    if (maxTimeMS > 0) {
-        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
-    }
-
-    int loops = 5;
-
-    while (true) {
-        builder.resetToEmpty();
-        try {
-            runAgainstRegistered(opCtx, db, cmdObj, builder);
-            return;
-        } catch (const StaleConfigException& e) {
-            if (loops <= 0)
-                throw e;
-
-            loops--;
-
-            log() << "Retrying command " << redact(cmdObj) << causedBy(e);
-
-            // For legacy reasons, ns may not actually be set in the exception
-            const std::string staleNS(e.getns().empty() ? NamespaceString(db).getCommandNS().ns()
-                                                        : e.getns());
-
-            ShardConnection::checkMyConnectionVersions(opCtx, staleNS);
-            if (loops < 4) {
-                const NamespaceString staleNSS(staleNS);
-                if (staleNSS.isValid()) {
-                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
-                }
-            }
-            continue;
-        } catch (const DBException& e) {
-            builder.resetToEmpty();
-            Command::appendCommandStatus(builder, e.toStatus());
-            return;
-        }
-        MONGO_UNREACHABLE;
-    }
 }
 
 DbResponse Strategy::clientOpMsgCommand(OperationContext* opCtx, const Message& m) {
