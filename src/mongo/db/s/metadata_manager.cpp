@@ -196,12 +196,12 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
 
     // We already have newer version
     if (activeMetadata->getCollVersion() >= remoteMetadata->getCollVersion()) {
-        LOG(1) << "Ignoring refresh of active metadata " << activeMetadata->toStringBasic()
+        LOG(1) << "Ignoring update of active metadata " << activeMetadata->toStringBasic()
                << " with an older " << remoteMetadata->toStringBasic();
         return;
     }
 
-    log() << "Refreshing metadata for collection " << _nss.ns() << " from "
+    log() << "Updating collection metadata for " << _nss.ns() << " from "
           << activeMetadata->toStringBasic() << " to " << remoteMetadata->toStringBasic();
 
     // Resolve any receiving chunks, which might have completed by now.

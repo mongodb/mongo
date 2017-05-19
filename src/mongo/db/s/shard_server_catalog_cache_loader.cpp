@@ -157,9 +157,9 @@ ChunkVersion getPersistedMaxVersion(OperationContext* opCtx, const NamespaceStri
  * Tries to find persisted chunk metadata with chunk versions GTE to 'version'. Should always
  * return metadata if the collection exists.
  *
- * If 'version's epoch matches persisted metadata, returns GTE persisted metadata.
+ * If 'version's epoch matches persisted metadata, returns persisted metadata GTE 'version'.
  * If 'version's epoch doesn't match persisted metadata, returns all persisted metadata.
- * If nothing there is no persisted metadata, returns an empty CollectionAndChangedChunks object.
+ * If there is no persisted metadata, returns an empty CollectionAndChangedChunks object.
  */
 StatusWith<CollectionAndChangedChunks> getPersistedMetadataSinceVersion(OperationContext* opCtx,
                                                                         const NamespaceString& nss,
@@ -178,12 +178,9 @@ StatusWith<CollectionAndChangedChunks> getPersistedMetadataSinceVersion(Operatio
     auto shardCollectionEntry = std::move(swShardCollectionEntry.getValue());
 
     // If the persisted epoch doesn't match what the CatalogCache requested, read everything.
-    ChunkVersion startingVersion;
-    if (shardCollectionEntry.getEpoch() != version.epoch()) {
-        startingVersion = ChunkVersion(0, 0, shardCollectionEntry.getEpoch());
-    } else {
-        startingVersion = version;
-    }
+    ChunkVersion startingVersion = (shardCollectionEntry.getEpoch() == version.epoch())
+        ? version
+        : ChunkVersion(0, 0, shardCollectionEntry.getEpoch());
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
 
@@ -290,7 +287,7 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
             [ this, nss, version, currentTerm, callbackFn, notify ]() noexcept {
                 auto opCtx = Client::getCurrent()->makeOperationContext();
                 try {
-                    _schedulePrimayGetChunksSince(
+                    _schedulePrimaryGetChunksSince(
                         opCtx.get(), nss, version, currentTerm, callbackFn, notify);
                 } catch (const DBException& ex) {
                     callbackFn(opCtx.get(), ex.toStatus());
@@ -302,7 +299,7 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
     return notify;
 }
 
-void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
+void ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
@@ -327,44 +324,57 @@ void ShardServerCatalogCacheLoader::_schedulePrimayGetChunksSince(
         return getPersistedMaxVersion(opCtx, nss);
     }();
 
-    auto remoteRefreshCallbackFn =
-        [this, nss, catalogCacheSinceVersion, maxLoaderVersion, termScheduled, callbackFn, notify](
-            OperationContext* opCtx,
-            StatusWith<CollectionAndChangedChunks> swCollectionAndChangedChunks) {
+    auto remoteRefreshCallbackFn = [this,
+                                    nss,
+                                    catalogCacheSinceVersion,
+                                    maxLoaderVersion,
+                                    termScheduled,
+                                    callbackFn,
+                                    notify](
+        OperationContext* opCtx,
+        StatusWith<CollectionAndChangedChunks> swCollectionAndChangedChunks) {
 
-            if (!swCollectionAndChangedChunks.isOK() &&
-                swCollectionAndChangedChunks != ErrorCodes::NamespaceNotFound) {
-                // No updates to apply. Do nothing.
-            } else {
-                // Enqueue a Task to apply the update retrieved from the config server.
-                Status scheduleStatus = _scheduleTask(
-                    nss, Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
-                if (!scheduleStatus.isOK()) {
-                    callbackFn(opCtx, StatusWith<CollectionAndChangedChunks>(scheduleStatus));
-                    notify->set();
-                    return;
-                }
-
-                if (swCollectionAndChangedChunks.isOK()) {
-                    // Create a response for the CatalogCache from the loader's metadata
-                    // -- both persisted and enqueued.
-
-                    swCollectionAndChangedChunks =
-                        _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion, termScheduled);
-                    // If no results were returned, convert the response into
-                    // NamespaceNotFound.
-                    if (swCollectionAndChangedChunks.isOK() &&
-                        swCollectionAndChangedChunks.getValue().changedChunks.empty()) {
-                        swCollectionAndChangedChunks =
-                            Status(ErrorCodes::NamespaceNotFound, "collection was dropped");
-                    }
-                }
+        if (!swCollectionAndChangedChunks.isOK() &&
+            swCollectionAndChangedChunks != ErrorCodes::NamespaceNotFound) {
+            // No updates to apply. Do nothing.
+        } else {
+            // Enqueue a Task to apply the update retrieved from the config server.
+            Status scheduleStatus = _scheduleTask(
+                nss, Task{swCollectionAndChangedChunks, maxLoaderVersion, termScheduled});
+            if (!scheduleStatus.isOK()) {
+                callbackFn(opCtx, scheduleStatus);
+                notify->set();
+                return;
             }
 
-            // Complete the callbackFn work.
-            callbackFn(opCtx, std::move(swCollectionAndChangedChunks));
-            notify->set();
-        };
+            if (swCollectionAndChangedChunks.isOK()) {
+                log() << "Cache loader remotely refreshed for collection " << nss
+                      << " from collection version " << maxLoaderVersion
+                      << " and found collection version "
+                      << swCollectionAndChangedChunks.getValue().changedChunks.back().getVersion();
+
+                // Metadata was found remotely -- otherwise would have received
+                // NamespaceNotFound rather than Status::OK(). Return metadata for CatalogCache
+                // that's GTE catalogCacheSinceVersion, from the loader's persisted and enqueued
+                // metadata.
+
+                swCollectionAndChangedChunks =
+                    _getLoaderMetadata(opCtx, nss, catalogCacheSinceVersion, termScheduled);
+                if (swCollectionAndChangedChunks.isOK()) {
+                    // After finding metadata remotely, we must have found metadata locally.
+                    invariant(!swCollectionAndChangedChunks.getValue().changedChunks.empty());
+                }
+            } else {  // NamespaceNotFound
+                invariant(swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
+                log() << "Cache loader remotely refreshed for collection " << nss
+                      << " from version " << maxLoaderVersion << " and no metadata was found.";
+            }
+        }
+
+        // Complete the callbackFn work.
+        callbackFn(opCtx, std::move(swCollectionAndChangedChunks));
+        notify->set();
+    };
 
     // Refresh the loader's metadata from the config server. The caller's request will
     // then be serviced from the loader's up-to-date metadata.
@@ -381,7 +391,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     // enqueued, if an enqueued task finished after the persisted read but before the enqueued read.
 
     auto enqueuedRes = _getEnqueuedMetadata(nss, catalogCacheSinceVersion, term);
-    bool isEnqueued = std::move(enqueuedRes.first);
+    bool tasksAreEnqueued = std::move(enqueuedRes.first);
     CollectionAndChangedChunks enqueued = std::move(enqueuedRes.second);
 
     auto swPersisted = getPersistedMetadataSinceVersion(opCtx, nss, catalogCacheSinceVersion);
@@ -390,11 +400,24 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
     }
     CollectionAndChangedChunks persisted = std::move(swPersisted.getValue());
 
-    if (!isEnqueued) {
+    log() << "Cache loader found "
+          << (enqueued.changedChunks.empty()
+                  ? (tasksAreEnqueued ? "a drop enqueued" : "no enqueued metadata")
+                  : ("enqueued metadata from " +
+                     enqueued.changedChunks.front().getVersion().toString() + " to " +
+                     enqueued.changedChunks.back().getVersion().toString()))
+          << " and " << (persisted.changedChunks.empty()
+                             ? "no persisted metadata"
+                             : ("persisted metadata from " +
+                                persisted.changedChunks.front().getVersion().toString() + " to " +
+                                persisted.changedChunks.back().getVersion().toString()))
+          << ", GTE cache version " << catalogCacheSinceVersion;
+
+    if (!tasksAreEnqueued) {
         // There are no tasks in the queue. Return the persisted metadata.
         return persisted;
     } else if (enqueued.changedChunks.empty() || enqueued.epoch != persisted.epoch) {
-        // There is a task queue. Either:
+        // There is a task queue and either:
         // - nothing was returned, which means the last task enqueued is a drop task.
         // - the epoch changed in the enqueued metadata, which means there's a drop operation
         //   enqueued somewhere.
@@ -445,7 +468,7 @@ std::pair<bool, CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getE
     // task data is no longer valid.
     CollectionAndChangedChunks collAndChunks = taskListIt->second.getEnqueuedMetadataForTerm(term);
 
-    // Returns all the results if 'catalogCacheSinceVersion's epoch does not match. Otherwise, trim
+    // Return all the results if 'catalogCacheSinceVersion's epoch does not match. Otherwise, trim
     // the results to be GTE to 'catalogCacheSinceVersion'.
 
     if (collAndChunks.epoch != catalogCacheSinceVersion.epoch()) {
@@ -469,17 +492,16 @@ Status ShardServerCatalogCacheLoader::_scheduleTask(const NamespaceString& nss, 
     _taskLists[nss].addTask(std::move(task));
 
     if (wasEmpty) {
-        return _threadPool.schedule([this, nss]() {
-            Status status = _threadPool.schedule([this, nss]() { _runTasks(nss); });
-            if (!status.isOK()) {
-                log() << "CatalogCacheLoader failed to schedule more persisted metadata update"
-                      << " tasks for namespace '" << nss << "' due to '" << redact(status)
-                      << "'. Clearing task list so that scheduling"
-                      << " will be attempted by the next caller to refresh this namespace.";
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
-                _taskLists.erase(nss);
-            }
-        });
+        Status status = _threadPool.schedule([this, nss]() { _runTasks(nss); });
+        if (!status.isOK()) {
+            log() << "Cache loader failed to schedule persisted metadata update"
+                  << " task for namespace '" << nss << "' due to '" << redact(status)
+                  << "'. Clearing task list so that scheduling"
+                  << " will be attempted by the next caller to refresh this namespace.";
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            _taskLists.erase(nss);
+        }
+        return status;
     }
 
     return Status::OK();
@@ -508,8 +530,8 @@ void ShardServerCatalogCacheLoader::_runTasks(const NamespaceString& nss) {
     if (!_taskLists[nss].empty()) {
         Status status = _threadPool.schedule([this, nss]() { _runTasks(nss); });
         if (!status.isOK()) {
-            log() << "CatalogCacheLoader failed to schedule more persisted metadata update"
-                  << " tasks for namespace '" << nss << "' due to '" << redact(status)
+            log() << "Cache loader failed to schedule a persisted metadata update"
+                  << " task for namespace '" << nss << "' due to '" << redact(status)
                   << "'. Clearing task list so that scheduling will be attempted by the next"
                   << " caller to refresh this namespace.";
             stdx::lock_guard<stdx::mutex> lock(_mutex);

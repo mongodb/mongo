@@ -204,7 +204,7 @@ private:
      *
      * Only run on the shard primary.
      */
-    void _schedulePrimayGetChunksSince(
+    void _schedulePrimaryGetChunksSince(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
