@@ -73,28 +73,15 @@ public:
     /**
      * Creates a new node by merging the contents of two input nodes. The semantics of the merge
      * operation depend on the types of the input nodes. When the nodes have the same type, this
-     * function dispatches the merge to a performMerge implementation defined for that subtype.
-     * Returns a ConflictingUpdateOperators status when the types of the input nodes differ or when
-     * any of the child nodes fail to merge.
+     * function dispatches the merge to a createUpdateNodeByMerging implementation defined for that
+     * subtype. Throws UserException with a ConflictingUpdateOperators code when the types of the
+     * input nodes differ or when any of the child nodes fail to merge.
      */
-    static StatusWith<std::unique_ptr<UpdateNode>> createUpdateNodeByMerging(
-        const UpdateNode& leftNode, const UpdateNode& rightNode, FieldRef* pathTaken);
+    static std::unique_ptr<UpdateNode> createUpdateNodeByMerging(const UpdateNode& leftNode,
+                                                                 const UpdateNode& rightNode,
+                                                                 FieldRef* pathTaken);
 
     const Type type;
-
-protected:
-    /**
-     * Does the actual work of merging for UpdateNode::createUpdateByMerging. Throws a
-     * ConflictingUpdateException when a conflict occurs.
-     */
-    static std::unique_ptr<UpdateNode> performMerge(const UpdateNode& leftNode,
-                                                    const UpdateNode& rightNode,
-                                                    FieldRef* pathTaken);
-
-    class ConflictingUpdateException : public DBException {
-    public:
-        ConflictingUpdateException(const FieldRef& conflictingPath);
-    };
 };
 
 }  // namespace mongo

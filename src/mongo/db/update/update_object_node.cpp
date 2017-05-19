@@ -128,11 +128,17 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(UpdateObjectNode* root,
     return positional;
 }
 
-// static
-std::unique_ptr<UpdateNode> UpdateObjectNode::copyOrMergeAsNecessary(UpdateNode* leftNode,
-                                                                     UpdateNode* rightNode,
-                                                                     FieldRef* pathTaken,
-                                                                     const std::string& nextField) {
+namespace {
+/**
+ * Helper for when performMerge wants to create a merged child from children that exist in two
+ * merging nodes. If there is only one child (leftNode or rightNode is NULL), we clone it. If there
+ * are two different children, we merge them recursively. If there are no children (leftNode and
+ * rightNode are null), we return nullptr.
+ */
+std::unique_ptr<UpdateNode> copyOrMergeAsNecessary(UpdateNode* leftNode,
+                                                   UpdateNode* rightNode,
+                                                   FieldRef* pathTaken,
+                                                   const std::string& nextField) {
     if (!leftNode && !rightNode) {
         return nullptr;
     } else if (!leftNode) {
@@ -142,14 +148,14 @@ std::unique_ptr<UpdateNode> UpdateObjectNode::copyOrMergeAsNecessary(UpdateNode*
     } else {
         std::unique_ptr<FieldRef> updatedFieldRef(
             new FieldRef(pathTaken->dottedField() + "." + nextField));
-        return UpdateNode::performMerge(*leftNode, *rightNode, updatedFieldRef.get());
+        return UpdateNode::createUpdateNodeByMerging(*leftNode, *rightNode, updatedFieldRef.get());
     }
+}
 }
 
 // static
-std::unique_ptr<UpdateNode> UpdateObjectNode::performMerge(const UpdateObjectNode& leftNode,
-                                                           const UpdateObjectNode& rightNode,
-                                                           FieldRef* pathTaken) {
+std::unique_ptr<UpdateNode> UpdateObjectNode::createUpdateNodeByMerging(
+    const UpdateObjectNode& leftNode, const UpdateObjectNode& rightNode, FieldRef* pathTaken) {
     auto mergedNode = stdx::make_unique<UpdateObjectNode>();
 
     // Get the union of the field names we know about among the leftNode and rightNode children.

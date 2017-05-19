@@ -36,31 +36,19 @@
 namespace mongo {
 
 // static
-StatusWith<std::unique_ptr<UpdateNode>> UpdateNode::createUpdateNodeByMerging(
-    const UpdateNode& leftNode, const UpdateNode& rightNode, FieldRef* pathTaken) {
-    try {
-        return performMerge(leftNode, rightNode, pathTaken);
-    } catch (const ConflictingUpdateException& e) {
-        return e.toStatus();
-    }
-}
-
-// static
-std::unique_ptr<UpdateNode> UpdateNode::performMerge(const UpdateNode& leftNode,
-                                                     const UpdateNode& rightNode,
-                                                     FieldRef* pathTaken) {
+std::unique_ptr<UpdateNode> UpdateNode::createUpdateNodeByMerging(const UpdateNode& leftNode,
+                                                                  const UpdateNode& rightNode,
+                                                                  FieldRef* pathTaken) {
     if (leftNode.type == UpdateNode::Type::Object && rightNode.type == UpdateNode::Type::Object) {
-        return UpdateObjectNode::performMerge(static_cast<const UpdateObjectNode&>(leftNode),
-                                              static_cast<const UpdateObjectNode&>(rightNode),
-                                              pathTaken);
+        return UpdateObjectNode::createUpdateNodeByMerging(
+            static_cast<const UpdateObjectNode&>(leftNode),
+            static_cast<const UpdateObjectNode&>(rightNode),
+            pathTaken);
     } else {
-        throw ConflictingUpdateException(*pathTaken);
+        uasserted(
+            ErrorCodes::ConflictingUpdateOperators,
+            (str::stream() << "Update created a conflict at '" << pathTaken->dottedField() << "'"));
     }
 }
-
-UpdateNode::ConflictingUpdateException::ConflictingUpdateException(const FieldRef& conflictingPath)
-    : DBException(str::stream() << "Update created a conflict at '" << conflictingPath.dottedField()
-                                << "'",
-                  ErrorCodes::ConflictingUpdateOperators) {}
 
 }  // namespace mongo

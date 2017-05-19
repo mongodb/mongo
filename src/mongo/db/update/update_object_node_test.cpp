@@ -360,11 +360,11 @@ TEST(UpdateObjectNodeTest, DistinctFieldsMergeCorrectly) {
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["ab"], collator));
 
     auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(result);
 
-    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
-    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
-    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(result->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.get());
     ASSERT_TRUE(fieldsMatch(std::vector<std::string>{"a", "ab"}, *mergedRootNode));
 }
 
@@ -380,11 +380,11 @@ TEST(UpdateObjectNodeTest, NestedMergeSucceeds) {
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.d"], collator));
 
     auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(result);
 
-    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
-    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
-    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(result->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.get());
     ASSERT_TRUE(fieldsMatch({"a"}, *mergedRootNode));
 
     ASSERT_TRUE(mergedRootNode->getChild("a"));
@@ -406,11 +406,11 @@ TEST(UpdateObjectNodeTest, DoublyNestedMergeSucceeds) {
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b.d"], collator));
 
     auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(result);
 
-    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
-    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
-    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(result->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.get());
     ASSERT_TRUE(fieldsMatch({"a"}, *mergedRootNode));
 
     ASSERT_TRUE(mergedRootNode->getChild("a"));
@@ -438,11 +438,11 @@ TEST(UpdateObjectNodeTest, FieldAndPositionalMergeCorrectly) {
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$"], collator));
 
     auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(result);
 
-    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
-    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
-    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(result->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.get());
     ASSERT_TRUE(fieldsMatch(std::vector<std::string>{"a"}, *mergedRootNode));
 
     ASSERT_TRUE(mergedRootNode->getChild("a"));
@@ -465,11 +465,11 @@ TEST(UpdateObjectNodeTest, MergeThroughPositionalSucceeds) {
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$.c"], collator));
 
     auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(result);
 
-    ASSERT_TRUE(result.getValue()->type == UpdateNode::Type::Object);
-    ASSERT_TRUE(typeid(*result.getValue()) == typeid(UpdateObjectNode&));
-    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.getValue().get());
+    ASSERT_TRUE(result->type == UpdateNode::Type::Object);
+    ASSERT_TRUE(typeid(*result) == typeid(UpdateObjectNode&));
+    auto mergedRootNode = static_cast<UpdateObjectNode*>(result.get());
     ASSERT_TRUE(fieldsMatch({"a"}, *mergedRootNode));
 
     ASSERT_TRUE(mergedRootNode->getChild("a"));
@@ -496,10 +496,12 @@ TEST(UpdateObjectNodeTest, TopLevelConflictFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a'");
 }
 
 TEST(UpdateObjectNodeTest, NestedConflictFails) {
@@ -513,10 +515,12 @@ TEST(UpdateObjectNodeTest, NestedConflictFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.b'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a.b'");
 }
 
 TEST(UpdateObjectNodeTest, LeftPrefixMergeFails) {
@@ -530,10 +534,12 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b.c"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.b'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a.b'");
 }
 
 TEST(UpdateObjectNodeTest, RightPrefixMergeFails) {
@@ -547,10 +553,12 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.b"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.b'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a.b'");
 }
 
 TEST(UpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
@@ -564,10 +572,12 @@ TEST(UpdateObjectNodeTest, LeftPrefixMergeThroughPositionalFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$.c.d"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.$.c'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a.$.c'");
 }
 
 TEST(UpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
@@ -581,10 +591,12 @@ TEST(UpdateObjectNodeTest, RightPrefixMergeThroughPositionalFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$.c"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.$.c'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a.$.c'");
 }
 
 TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
@@ -598,10 +610,12 @@ TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &setRoot2, modifiertable::ModifierType::MOD_SET, setUpdate2["$set"]["a.$"], collator));
 
-    auto result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ConflictingUpdateOperators);
-    ASSERT_EQ(result.getStatus().reason(), "Update created a conflict at 'root.a.$'");
+    std::unique_ptr<UpdateNode> result;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        result = UpdateNode::createUpdateNodeByMerging(setRoot1, setRoot2, &fakeFieldRef),
+        UserException,
+        ErrorCodes::ConflictingUpdateOperators,
+        "Update created a conflict at 'root.a.$'");
 }
 
 }  // namespace

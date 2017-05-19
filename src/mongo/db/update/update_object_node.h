@@ -63,9 +63,9 @@ public:
      * This merge operation is a deep copy: the new UpdateObjectNode is a brand new tree that does
      * not contain any references to the objects in the original input trees.
      */
-    static std::unique_ptr<UpdateNode> performMerge(const UpdateObjectNode& leftNode,
-                                                    const UpdateObjectNode& rightNode,
-                                                    FieldRef* pathTaken);
+    static std::unique_ptr<UpdateNode> createUpdateNodeByMerging(const UpdateObjectNode& leftNode,
+                                                                 const UpdateObjectNode& rightNode,
+                                                                 FieldRef* pathTaken);
 
     UpdateObjectNode() : UpdateNode(Type::Object) {}
 
@@ -92,17 +92,6 @@ public:
     void setChild(std::string field, std::unique_ptr<UpdateNode> child);
 
 private:
-    /**
-    * Helper for when performMerge wants to create a merged child from children that exist in two
-    * merging nodes. If there is only one child (leftNode or rightNode is NULL), we clone it. If
-    * there are two different children, we merge them recursively. If there are no children
-    * (leftNode and rightNode are null), we return nullptr.
-    */
-    static std::unique_ptr<UpdateNode> copyOrMergeAsNecessary(UpdateNode* leftNode,
-                                                              UpdateNode* rightNode,
-                                                              FieldRef* pathTaken,
-                                                              const std::string& nextField);
-
     stdx::unordered_map<std::string, clonable_ptr<UpdateNode>> _children;
     clonable_ptr<UpdateNode> _positionalChild;
 };
