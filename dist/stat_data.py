@@ -150,6 +150,7 @@ connection_stats = [
     ConnStat('read_io', 'total read I/Os'),
     ConnStat('rwlock_read', 'pthread mutex shared lock read-lock calls'),
     ConnStat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
+    ConnStat('time_travel', 'detected system time went backwards'),
     ConnStat('write_io', 'total write I/Os'),
 
     ##########################################

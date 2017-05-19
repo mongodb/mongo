@@ -29,8 +29,10 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 
 #if defined(HAVE_CLOCK_GETTIME)
 	WT_SYSCALL_RETRY(clock_gettime(CLOCK_REALTIME, tsp), ret);
-	if (ret == 0)
+	if (ret == 0) {
+		__wt_time_check_monotonic(session, tsp);
 		return;
+	}
 	WT_PANIC_MSG(session, ret, "clock_gettime");
 #elif defined(HAVE_GETTIMEOFDAY)
 	struct timeval v;
@@ -39,6 +41,7 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	if (ret == 0) {
 		tsp->tv_sec = v.tv_sec;
 		tsp->tv_nsec = v.tv_usec * WT_THOUSAND;
+		__wt_time_check_monotonic(session, tsp);
 		return;
 	}
 	WT_PANIC_MSG(session, ret, "gettimeofday");
