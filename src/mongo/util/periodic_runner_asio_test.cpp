@@ -40,13 +40,12 @@
 namespace mongo {
 namespace {
 
-class PeriodicRunnerASIOTest : public unittest::Test {
+class PeriodicRunnerASIOTestNoSetup : public unittest::Test {
 public:
     void setUp() override {
         auto timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
         _timerFactory = timerFactory.get();
         _runner = stdx::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
-        _runner->startup();
     }
 
     void tearDown() override {
@@ -61,9 +60,20 @@ public:
         return _runner;
     }
 
-private:
+protected:
     executor::AsyncTimerFactoryMock* _timerFactory;
     std::unique_ptr<PeriodicRunnerASIO> _runner;
+};
+
+class PeriodicRunnerASIOTest : public PeriodicRunnerASIOTestNoSetup {
+public:
+    void setUp() override {
+        auto timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
+        _timerFactory = timerFactory.get();
+        _runner = stdx::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
+        auto res = _runner->startup();
+        ASSERT(res.isOK());
+    }
 };
 
 TEST_F(PeriodicRunnerASIOTest, OneJobTest) {
@@ -84,7 +94,7 @@ TEST_F(PeriodicRunnerASIOTest, OneJobTest) {
         },
         interval);
 
-    ASSERT_OK(runner()->scheduleJob(std::move(job)));
+    runner()->scheduleJob(std::move(job));
 
     // Ensure nothing happens until we fastForward
     {
@@ -102,18 +112,56 @@ TEST_F(PeriodicRunnerASIOTest, OneJobTest) {
     }
 }
 
+TEST_F(PeriodicRunnerASIOTestNoSetup, ScheduleBeforeStartupTest) {
+    int count = 0;
+    Milliseconds interval{5};
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
+    // Schedule a job before startup
+    PeriodicRunner::PeriodicJob job(
+        [&count, &mutex, &cv] {
+            {
+                stdx::unique_lock<stdx::mutex> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+        },
+        interval);
+
+    runner()->scheduleJob(std::move(job));
+
+    // Start the runner, job should still run
+    ASSERT(runner()->startup().isOK());
+
+    timerFactory().fastForward(interval);
+
+    stdx::unique_lock<stdx::mutex> lk(mutex);
+    cv.wait(lk, [&count] { return count > 0; });
+}
+
 TEST_F(PeriodicRunnerASIOTest, ScheduleAfterShutdownTest) {
     int count = 0;
     Milliseconds interval{5};
 
     // Schedule a job before shutdown
     PeriodicRunner::PeriodicJob job([&count] { count++; }, interval);
-    ASSERT_OK(runner()->scheduleJob(std::move(job)));
+
+    runner()->scheduleJob(std::move(job));
 
     // Shut down before the job runs
     runner()->shutdown();
 
     // Even once we fast forward, job should not get run
+    timerFactory().fastForward(interval);
+    sleepmillis(10);
+    ASSERT_EQ(count, 0);
+
+    // Start up the runner again, this should error and should not run
+    auto res = runner()->startup();
+    ASSERT(!res.isOK());
+
     timerFactory().fastForward(interval);
     sleepmillis(10);
     ASSERT_EQ(count, 0);
@@ -149,8 +197,8 @@ TEST_F(PeriodicRunnerASIOTest, TwoJobsTest) {
         },
         intervalB);
 
-    ASSERT_OK(runner()->scheduleJob(std::move(jobA)));
-    ASSERT_OK(runner()->scheduleJob(std::move(jobB)));
+    runner()->scheduleJob(std::move(jobA));
+    runner()->scheduleJob(std::move(jobB));
 
     // Fast forward and wait for both jobs to run the right number of times
     for (int i = 0; i <= 10; i++) {

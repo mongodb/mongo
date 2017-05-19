@@ -43,83 +43,100 @@ PeriodicRunnerASIO::PeriodicRunnerASIO(
     : _io_service(),
       _strand(_io_service),
       _timerFactory(std::move(timerFactory)),
-      _running(false) {}
+      _state(State::kReady) {}
 
 PeriodicRunnerASIO::~PeriodicRunnerASIO() {
     // We must call shutdown here to join our background thread.
     shutdown();
 }
 
-Status PeriodicRunnerASIO::scheduleJob(PeriodicJob job) {
-    {
-        stdx::unique_lock<stdx::mutex> lk(_runningMutex);
-        if (!_running) {
-            return {ErrorCodes::ShutdownInProgress, "The runner has been shut down."};
-        }
-    }
-
+void PeriodicRunnerASIO::scheduleJob(PeriodicJob job) {
     // The interval we use here will get written over by _scheduleJob_inlock.
     auto uniqueTimer = _timerFactory->make(&_strand, Milliseconds{0});
     std::shared_ptr<executor::AsyncTimerInterface> timer{std::move(uniqueTimer)};
 
-    PeriodicJobASIO asioJob(std::move(job), _timerFactory->now());
+    auto asioJob = std::make_shared<PeriodicJobASIO>(std::move(job), _timerFactory->now(), timer);
+    _jobs.insert(_jobs.end(), asioJob);
 
-    _scheduleJob(std::move(asioJob), std::move(timer));
-
-    return Status::OK();
+    {
+        stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+        if (_state == State::kRunning) {
+            _scheduleJob(asioJob);
+        }
+    }
 }
 
-void PeriodicRunnerASIO::_scheduleJob(PeriodicJobASIO job,
-                                      std::shared_ptr<executor::AsyncTimerInterface> timer) {
+void PeriodicRunnerASIO::_scheduleJob(std::weak_ptr<PeriodicJobASIO> job) {
+    auto lockedJob = job.lock();
+    if (!lockedJob) {
+        return;
+    }
+
     // Adjust the timer to expire at the correct time.
-    auto adjustedMS = job.start + job.interval - _timerFactory->now();
-    timer->expireAfter(adjustedMS);
-    timer->asyncWait([ timer, this, job = std::move(job) ](std::error_code ec) mutable {
+    auto adjustedMS = lockedJob->start + lockedJob->interval - _timerFactory->now();
+    lockedJob->timer->expireAfter(adjustedMS);
+    lockedJob->timer->asyncWait([this, job](std::error_code ec) mutable {
         if (ec) {
             severe() << "Encountered an error in PeriodicRunnerASIO: " << ec.message();
             return;
         }
 
-        stdx::unique_lock<stdx::mutex> lk(_runningMutex);
-        if (!_running) {
+        stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+        if (_state != State::kRunning) {
             return;
         }
 
-        job.start = _timerFactory->now();
-        job.job();
+        auto lockedJob = job.lock();
+        if (!lockedJob) {
+            return;
+        }
 
-        _io_service.post([ timer, this, job = std::move(job) ]() mutable {
-            _scheduleJob(std::move(job), timer);
-        });
+        lockedJob->start = _timerFactory->now();
+        lockedJob->job();
+
+        _io_service.post([this, job]() mutable { _scheduleJob(job); });
     });
 }
 
-void PeriodicRunnerASIO::startup() {
-    stdx::unique_lock<stdx::mutex> lk(_runningMutex);
-    if (!_running) {
-        _running = true;
-        _thread = stdx::thread([this]() {
-            try {
-                asio::io_service::work work(_io_service);
-                std::error_code ec;
-                _io_service.run(ec);
-                if (ec) {
-                    severe() << "Failure in PeriodicRunnerASIO: " << ec.message();
-                    fassertFailed(40438);
-                }
-            } catch (...) {
-                severe() << "Uncaught exception in PeriodicRunnerASIO: " << exceptionToStatus();
-                fassertFailed(40439);
-            }
-        });
+Status PeriodicRunnerASIO::startup() {
+    stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+    if (_state != State::kReady) {
+        return {ErrorCodes::ShutdownInProgress, "startup() already called"};
     }
+
+    _state = State::kRunning;
+    _thread = stdx::thread([this]() {
+        try {
+            asio::io_service::work workItem(_io_service);
+            std::error_code ec;
+            _io_service.run(ec);
+            if (ec) {
+                severe() << "Failure in PeriodicRunnerASIO: " << ec.message();
+                fassertFailed(40438);
+            }
+        } catch (...) {
+            severe() << "Uncaught exception in PeriodicRunnerASIO: " << exceptionToStatus();
+            fassertFailed(40439);
+        }
+    });
+
+    // schedule any jobs that we have
+    for (auto& job : _jobs) {
+        job->start = _timerFactory->now();
+        _scheduleJob(job);
+    }
+
+    return Status::OK();
 }
 
 void PeriodicRunnerASIO::shutdown() {
-    stdx::unique_lock<stdx::mutex> lk(_runningMutex);
-    if (_running) {
-        _running = false;
+    stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+    if (_state == State::kRunning) {
+        _state = State::kComplete;
+
         _io_service.stop();
+
+        _jobs.clear();
         _thread.join();
     }
 }
