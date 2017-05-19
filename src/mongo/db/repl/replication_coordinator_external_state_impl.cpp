@@ -52,6 +52,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/master_slave.h"
@@ -177,6 +178,24 @@ std::unique_ptr<ThreadPool> makeThreadPool() {
         Client::initThread(threadName.c_str());
     };
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
+}
+
+/**
+ * Schedules a task using the executor. This task is always run unless the task executor is shutting
+ * down.
+ */
+void scheduleWork(executor::TaskExecutor* executor,
+                  const executor::TaskExecutor::CallbackFn& work) {
+    auto cbh = executor->scheduleWork([work](const executor::TaskExecutor::CallbackArgs& args) {
+        if (args.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        work(args);
+    });
+    if (cbh == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassertStatusOK(40460, cbh);
 }
 
 }  // namespace
@@ -856,6 +875,20 @@ bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
 void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
     const OpTime& committedOpTime) {
     signalOplogWaiters();
+
+    // Notify the DropPendingCollectionReaper if there are any drop-pending collections with drop
+    // optimes before or at the committed optime.
+    if (auto earliestDropOpTime = _dropPendingCollectionReaper->getEarliestDropOpTime()) {
+        if (committedOpTime >= *earliestDropOpTime) {
+            auto reaper = _dropPendingCollectionReaper;
+            scheduleWork(
+                _taskExecutor.get(),
+                [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
+                    auto opCtx = cc().makeOperationContext();
+                    reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);
+                });
+        }
+    }
 }
 
 double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {
