@@ -63,7 +63,10 @@ public:
         DeleteNotification(DeleteNotification const& notifn) = default;
         DeleteNotification& operator=(DeleteNotification const& notifn) = default;
 
-        ~DeleteNotification();
+        ~DeleteNotification() {
+            // can be null only if moved from
+            dassert(!notification || *notification || notification.use_count() == 1);
+        }
 
         void notify(Status status) const {
             notification->set(status);

@@ -303,9 +303,4 @@ CollectionRangeDeleter::DeleteNotification::DeleteNotification(Status status)
     notify(status);
 }
 
-CollectionRangeDeleter::DeleteNotification::~DeleteNotification() {
-    // can be null only if moved from
-    dassert(!notification || *notification || notification.use_count() == 1);
-}
-
 }  // namespace mongo
