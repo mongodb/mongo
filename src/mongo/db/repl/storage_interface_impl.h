@@ -123,6 +123,12 @@ public:
                                                      BoundInclusion boundInclusion,
                                                      std::size_t limit) override;
 
+    StatusWith<BSONObj> findSingleton(OperationContext* opCtx, const NamespaceString& nss) override;
+
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& update) override;
+
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONElement& idKey) override;

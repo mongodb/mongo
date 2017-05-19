@@ -1619,6 +1619,109 @@ TEST_F(StorageInterfaceImplTest,
                       .getStatus());
 }
 
+TEST_F(StorageInterfaceImplTest, FindSingletonReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.findSingleton(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindSingletonReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("db.coll1");
+    ASSERT_OK(storage.createCollection(opCtx, NamespaceString("db.coll2"), CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.findSingleton(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindSingletonReturnsCollectionIsEmptyWhenCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, storage.findSingleton(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest,
+       FindSingletonReturnsTooManyMatchingDocumentsWhenNotSingletonCollection) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2}));
+    ASSERT_EQUALS(ErrorCodes::TooManyMatchingDocuments,
+                  storage.findSingleton(opCtx, nss).getStatus());
+}
+
+TEST_F(StorageInterfaceImplTest, FindSingletonReturnsDocumentWhenSingletonDocumentExists) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(storage.insertDocument(opCtx, nss, doc1));
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(storage.findSingleton(opCtx, nss)));
+}
+
+TEST_F(StorageInterfaceImplTest, PutSingletonReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    auto update = BSON("$set" << BSON("_id" << 0 << "x" << 1));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.putSingleton(opCtx, nss, update));
+}
+
+TEST_F(StorageInterfaceImplTest, PutSingletonReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("db.coll1");
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto update = BSON("$set" << BSON("_id" << 0 << "x" << 1));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage.putSingleton(opCtx, NamespaceString("db.coll2"), update));
+}
+
+TEST_F(StorageInterfaceImplTest, PutSingletonUpsertsDocumentsWhenCollectionIsEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto update = BSON("$set" << BSON("_id" << 0 << "x" << 1));
+    ASSERT_OK(storage.putSingleton(opCtx, nss, update));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << 1),
+                      unittest::assertGet(storage.findSingleton(opCtx, nss)));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 0 << "x" << 1)});
+}
+
+TEST_F(StorageInterfaceImplTest, PutSingletonUpdatesDocumentWhenCollectionIsNotEmpty) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    ASSERT_OK(storage.insertDocument(opCtx, nss, doc1));
+    auto update = BSON("$set" << BSON("x" << 1));
+    ASSERT_OK(storage.putSingleton(opCtx, nss, update));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << 1),
+                      unittest::assertGet(storage.findSingleton(opCtx, nss)));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 0 << "x" << 1)});
+}
+
+TEST_F(StorageInterfaceImplTest, PutSingletonUpdatesFirstDocumentWhenCollectionIsNotSingleton) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    ASSERT_OK(storage.insertDocuments(opCtx, nss, {doc1, doc2}));
+    auto update = BSON("$set" << BSON("x" << 2));
+    ASSERT_OK(storage.putSingleton(opCtx, nss, update));
+    _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 0 << "x" << 2), doc2});
+}
+
 TEST_F(StorageInterfaceImplTest, FindByIdReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

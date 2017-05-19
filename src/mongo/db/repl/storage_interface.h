@@ -270,6 +270,27 @@ public:
                                                              std::size_t limit) = 0;
 
     /**
+     * Finds a singleton document in a collection. Returns 'CollectionIsEmpty' if the collection
+     * is empty or 'TooManyMatchingDocuments' if it is not a singleton collection.
+     */
+    virtual StatusWith<BSONObj> findSingleton(OperationContext* opCtx,
+                                              const NamespaceString& nss) = 0;
+
+    /**
+     * Updates a singleton document in a collection. Upserts the document if it does not exist. If
+     * the document is upserted and no '_id' is provided, one will be generated.
+     * If the collection has more than 1 document, the update will only be performed on the first
+     * one found.
+     * Returns 'NamespaceNotFound' if the collection does not exist. This does not implicitly
+     * create the collection so that the caller can create the collection with any collection
+     * options they want (ex: capped, temp, collation, etc.).
+     */
+    virtual Status putSingleton(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const BSONObj& update) = 0;
+
+
+    /**
      * Finds a single document in the collection referenced by the specified _id.
      *
      * Not supported on collections with a default collation.

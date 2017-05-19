@@ -202,6 +202,17 @@ public:
             opCtx, nss, indexName, scanDirection, startKey, boundInclusion, limit);
     }
 
+    StatusWith<BSONObj> findSingleton(OperationContext* opCtx,
+                                      const NamespaceString& nss) override {
+        return Status{ErrorCodes::IllegalOperation, "findSingleton not implemented."};
+    }
+
+    Status putSingleton(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& update) override {
+        return Status{ErrorCodes::IllegalOperation, "putSingleton not implemented."};
+    }
+
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONElement& idKey) override {

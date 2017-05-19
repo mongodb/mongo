@@ -729,6 +729,31 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
                                   FindDeleteMode::kDelete);
 }
 
+StatusWith<BSONObj> StorageInterfaceImpl::findSingleton(OperationContext* opCtx,
+                                                        const NamespaceString& nss) {
+    auto result = findDocuments(opCtx,
+                                nss,
+                                boost::none,  // Collection scan.
+                                StorageInterface::ScanDirection::kForward,
+                                {},  // Start at the beginning of the collection.
+                                BoundInclusion::kIncludeStartKeyOnly,
+                                2U);  // Ask for 2 documents to ensure it's a singleton.
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    const auto& docs = result.getValue();
+    if (docs.empty()) {
+        return {ErrorCodes::CollectionIsEmpty,
+                str::stream() << "No document found in namespace: " << nss.ns()};
+    } else if (docs.size() != 1U) {
+        return {ErrorCodes::TooManyMatchingDocuments,
+                str::stream() << "More than singleton document found in namespace: " << nss.ns()};
+    }
+
+    return docs.front();
+}
+
 StatusWith<BSONObj> StorageInterfaceImpl::findById(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const BSONElement& idKey) {
@@ -758,6 +783,53 @@ StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
     }
 
     return query;
+}
+
+Status _upsertWithQuery(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& query,
+                        const BSONObj& update) {
+    UpdateRequest request(nss);
+    request.setQuery(query);
+    request.setUpdates(update);
+    request.setUpsert(true);
+    invariant(!request.isMulti());  // We only want to update one document for performance.
+    invariant(!request.shouldReturnAnyDocs());
+    invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
+
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        // ParsedUpdate needs to be inside the write conflict retry loop because it may create a
+        // CanonicalQuery whose ownership will be transferred to the plan executor in
+        // getExecutorUpdate().
+        ParsedUpdate parsedUpdate(opCtx, &request);
+        auto parsedUpdateStatus = parsedUpdate.parseRequest();
+        if (!parsedUpdateStatus.isOK()) {
+            return parsedUpdateStatus;
+        }
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        auto collectionResult = getCollection(
+            autoColl,
+            nss,
+            str::stream() << "Unable to update documents in " << nss.ns() << " using query "
+                          << query);
+        if (!collectionResult.isOK()) {
+            return collectionResult.getStatus();
+        }
+        auto collection = collectionResult.getValue();
+
+        auto planExecutorResult =
+            mongo::getExecutorUpdate(opCtx, nullptr, collection, &parsedUpdate);
+        if (!planExecutorResult.isOK()) {
+            return planExecutorResult.getStatus();
+        }
+        auto planExecutor = std::move(planExecutorResult.getValue());
+
+        return planExecutor->executePlan();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "_upsertWithQuery", nss.ns());
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace
@@ -820,6 +892,12 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "StorageInterfaceImpl::upsertById", nss.ns());
 
     MONGO_UNREACHABLE;
+}
+
+Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const BSONObj& update) {
+    return _upsertWithQuery(opCtx, nss, {}, update);
 }
 
 Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
