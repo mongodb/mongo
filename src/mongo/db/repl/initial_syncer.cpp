@@ -755,6 +755,9 @@ void InitialSyncer::_oplogFetcherCallback(const Status& oplogFetcherFinishStatus
 
 void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishStatus,
                                              std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    log() << "Finished cloning data: " << redact(databaseClonerFinishStatus)
+          << ". Beginning oplog replay.";
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto status = _checkForShutdownAndConvertStatus_inlock(databaseClonerFinishStatus,
                                                            "error cloning databases");
