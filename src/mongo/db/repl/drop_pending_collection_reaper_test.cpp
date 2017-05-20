@@ -216,4 +216,32 @@ TEST_F(DropPendingCollectionReaperTest, DropCollectionsOlderThanLogsDropCollecti
     ASSERT_EQUALS(1LL, countLogLinesContaining("Failed to remove drop-pending collection"));
 }
 
+TEST_F(DropPendingCollectionReaperTest,
+       DropCollectionsOlderThanDisablesReplicatedWritesWhenDroppingCollection) {
+    OpTime optime({Seconds{1}, 0}, 1LL);
+    NamespaceString ns("test.foo");
+    auto dpns = ns.makeDropPendingNamespace(optime);
+
+    // Override dropCollection to confirm that writes are not replicated when dropping the
+    // drop-pending collection.
+    StorageInterfaceMock storageInterfaceMock;
+    decltype(dpns) droppedNss;
+    bool writesAreReplicatedDuringDrop = true;
+    storageInterfaceMock.dropCollFn = [&droppedNss, &writesAreReplicatedDuringDrop](
+        OperationContext* opCtx, const NamespaceString& nss) {
+        droppedNss = nss;
+        writesAreReplicatedDuringDrop = opCtx->writesAreReplicated();
+        return Status::OK();
+    };
+
+    DropPendingCollectionReaper reaper(&storageInterfaceMock);
+    reaper.addDropPendingNamespace(optime, dpns);
+
+    auto opCtx = makeOpCtx();
+    reaper.dropCollectionsOlderThan(opCtx.get(), optime);
+
+    ASSERT_EQUALS(dpns, droppedNss);
+    ASSERT_FALSE(writesAreReplicatedDuringDrop);
+}
+
 }  // namespace

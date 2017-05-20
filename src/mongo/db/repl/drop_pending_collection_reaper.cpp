@@ -109,6 +109,14 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
         }
     }
 
+    if (toDrop.empty()) {
+        return;
+    }
+
+    // Every node cleans up its own drop-pending collections. We should never replicate these drops
+    // because these are internal operations.
+    UnreplicatedWritesBlock uwb(opCtx);
+
     for (const auto& opTimeAndNamespace : toDrop) {
         const auto& dropOpTime = opTimeAndNamespace.first;
         const auto& nss = opTimeAndNamespace.second;
