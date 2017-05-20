@@ -44,8 +44,10 @@ env.CppUnitTest(
             'lock_stats_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/util/progress_meter',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         'lock_manager',
+        'write_conflict_exception',
     ]
 )
