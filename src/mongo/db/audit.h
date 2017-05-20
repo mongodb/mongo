@@ -42,13 +42,19 @@ namespace mongo {
 class AuthorizationSession;
 class BSONObj;
 class Client;
-class Command;
+class CommandInterface;
 class NamespaceString;
 class OperationContext;
 class StringData;
 class UserName;
 
 namespace audit {
+
+/**
+ * Import CommandInterface as Command into the 'audit' namespace to accommodate
+ * implementations of logCommandAuthzCheck() that still refer to Command.
+ */
+using Command = CommandInterface;
 
 /**
  * Logs the result of an authentication attempt.
@@ -71,7 +77,7 @@ void logAuthentication(Client* client,
 void logCommandAuthzCheck(Client* client,
                           const std::string& dbname,
                           const BSONObj& cmdObj,
-                          Command* command,
+                          CommandInterface* command,
                           ErrorCodes::Error result);
 
 /**

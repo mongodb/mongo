@@ -46,7 +46,7 @@ void logAuthentication(Client* client,
     void logCommandAuthzCheck(Client* client,
                               const std::string& dbname,
                               const BSONObj& cmdObj,
-                              Command* command,
+                              CommandInterface* command,
                               ErrorCodes::Error result) MONGO_AUDIT_STUB
 
     void logDeleteAuthzCheck(Client* client,
