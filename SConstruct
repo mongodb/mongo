@@ -527,7 +527,7 @@ def decide_platform_tools():
     elif mongo_platform.is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
     elif mongo_platform.is_running_os('darwin'):
-        return ['gcc', 'g++', 'applelink', 'ar', 'as']
+        return ['gcc', 'g++', 'applelink', 'ar', 'as', 'xcode']
     else:
         return ["default"]
 
