@@ -418,7 +418,7 @@ add_option('variables-files',
 link_model_choices = ['auto', 'object', 'static', 'dynamic', 'dynamic-strict']
 add_option('link-model',
     choices=link_model_choices,
-    default='object',
+    default='auto',
     help='Select the linking model for the project',
     type='choice'
 )
@@ -527,7 +527,7 @@ def decide_platform_tools():
     elif mongo_platform.is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
     elif mongo_platform.is_running_os('darwin'):
-        return ['gcc', 'g++', 'applelink', 'ar', 'as', 'xcode']
+        return ['gcc', 'g++', 'applelink', 'ar', 'libtool', 'as', 'xcode']
     else:
         return ["default"]
 
@@ -1168,23 +1168,15 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
-# Normalize the link model. If it is auto, then a release build uses 'object' mode. Otherwise
-# we automatically select the 'static' model on non-windows platforms, or 'object' if on
-# Windows. If the user specified, honor the request, unless it conflicts with the requirement
-# that release builds use the 'object' mode, in which case, error out.
-#
-# We require the use of the 'object' mode for release builds because it is the only linking
-# model that works across all of our platforms. We would like to ensure that all of our
-# released artifacts are built with the same known-good-everywhere model.
+# Normalize the link model. If it is auto, then for now both developer and release builds
+# use the "static" mode. Somday later, we probably want to make the developer build default
+# dynamic, but that will require the hygienic builds project.
 link_model = get_option('link-model')
-
 if link_model == "auto":
-    link_model = "object" if (env.TargetOSIs('windows') or has_option("release")) else "static"
-elif has_option("release") and link_model != "object":
-    env.FatalError("The link model for release builds is required to be 'object'")
+    link_model = "static"
 
-# The only link model currently supported on Windows is 'object', since there is no equivalent
-# to --whole-archive.
+# Windows can't currently support anything other than 'object' or 'static', until
+# we have both hygienic builds and have annotated functions for export.
 if env.TargetOSIs('windows') and link_model not in ['object', 'static']:
     env.FatalError("Windows builds must use the 'object' or 'static' link models");
 
@@ -1377,14 +1369,14 @@ elif env.TargetOSIs('darwin'):
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
     # NOTE: The trailing space here is important. Do not remove it.
-    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-force_load '
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-force_load '
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 elif env.TargetOSIs('solaris'):
-    env['LINK_LIBGROUP_START'] = '-z rescan-start'
-    env['LINK_LIBGROUP_END'] = '-z rescan-end'
+    env['LINK_LIBGROUP_START'] = '-Wl,-z,rescan-start'
+    env['LINK_LIBGROUP_END'] = '-Wl,-z,rescan-end'
     # NOTE: The leading and trailing spaces here are important. Do not remove them.
-    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-z allextract '
-    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -z defaultextract'
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-z,allextract '
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,-z,defaultextract'
 elif env.TargetOSIs('windows'):
     env['LINK_WHOLE_ARCHIVE_LIB_START'] = '/WHOLEARCHIVE:'
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''

@@ -174,8 +174,6 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
 #endif
 
-Timer startupSrandTimer;
-
 void logStartup(OperationContext* opCtx) {
     BSONObjBuilder toLog;
     stringstream id;
@@ -591,7 +589,7 @@ ExitCode _initAndListen(int listenPort) {
     uassertStatusOK(getGlobalAuthorizationManager()->initialize(startupOpCtx.get()));
 
     /* this is for security on certain platforms (nonce generation) */
-    srand((unsigned)(curTimeMicros64() ^ startupSrandTimer.micros()));
+    srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));
 
     AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {

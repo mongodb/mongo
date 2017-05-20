@@ -165,6 +165,7 @@ else:
 env.Library(
     target='scripting_server',
     source=[
+        'scripting_server.cpp',
     ],
     LIBDEPS=[
         'scripting' if serverJs else 'scripting_none',
