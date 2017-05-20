@@ -41,7 +41,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
-    // Ensure that operations for 'Coll0' are not stalled
+    // Ensure that all operations for 'Coll0', which is not being migrated are not stalled
     assert.eq(1, coll0.find({Key: {$lte: -1}}).itcount());
     assert.eq(1, coll0.find({Key: {$gte: 1}}).itcount());
     assert.writeOK(coll0.insert({Key: -2, Value: '-2'}));
@@ -49,7 +49,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(2, coll0.find({Key: {$lte: -1}}).itcount());
     assert.eq(2, coll0.find({Key: {$gte: 1}}).itcount());
 
-    // Ensure that operations for non-sharded collections are not stalled
+    // Ensure that read operations for 'Coll1', which *is* being migration are not stalled
+    assert.eq(1, coll1.find({Key: {$lte: -1}}).itcount());
+    assert.eq(1, coll1.find({Key: {$gte: 1}}).itcount());
+
+    // Ensure that all operations for non-sharded collections are not stalled
     var collUnsharded = testDB.CollUnsharded;
     assert.eq(0, collUnsharded.find({}).itcount());
     assert.writeOK(collUnsharded.insert({TestKey: 0, Value: 'Zero'}));

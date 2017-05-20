@@ -365,7 +365,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
         return true;
     }
 
-    const auto& oss = OperationShardingState::get(opCtx);
+    auto& oss = OperationShardingState::get(opCtx);
 
     // If there is a version attached to the OperationContext, use it as the received version.
     // Otherwise, get the received version from the ShardedConnectionInfo.
@@ -391,14 +391,18 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
     auto metadata = getMetadata();
     *actualShardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
-    if (_sourceMgr && _sourceMgr->getMigrationCriticalSectionSignal()) {
-        *errmsg = str::stream() << "migration commit in progress for " << _nss.ns();
+    if (_sourceMgr) {
+        const bool isReader = !opCtx->lockState()->isWriteLocked();
 
-        // Set migration critical section on operation sharding state: operation will wait for the
-        // migration to finish before returning failure and retrying.
-        OperationShardingState::get(opCtx).setMigrationCriticalSectionSignal(
-            _sourceMgr->getMigrationCriticalSectionSignal());
-        return false;
+        auto criticalSectionSignal = _sourceMgr->getMigrationCriticalSectionSignal(isReader);
+        if (criticalSectionSignal) {
+            *errmsg = str::stream() << "migration commit in progress for " << _nss.ns();
+
+            // Set migration critical section on operation sharding state: operation will wait for
+            // the migration to finish before returning failure and retrying.
+            oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
+            return false;
+        }
     }
 
     if (expectedShardVersion->isWriteCompatibleWith(*actualShardVersion)) {

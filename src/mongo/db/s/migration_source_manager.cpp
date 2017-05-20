@@ -311,6 +311,13 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
 
+    // Read operations must begin to wait on the critical section just before we send the commit
+    // operation to the config server
+    {
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
+        _readsShouldWaitOnCritSec = true;
+    }
+
     auto commitChunkMigrationResponse =
         grid.shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -490,6 +497,19 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     }
 
     _state = kDone;
+}
+
+std::shared_ptr<Notification<void>> MigrationSourceManager::getMigrationCriticalSectionSignal(
+    bool isForReadOnlyOperation) const {
+    if (!isForReadOnlyOperation) {
+        return _critSecSignal;
+    }
+
+    if (_readsShouldWaitOnCritSec) {
+        return _critSecSignal;
+    }
+
+    return nullptr;
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport() const {

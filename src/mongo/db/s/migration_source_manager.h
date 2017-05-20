@@ -176,13 +176,13 @@ public:
 
     /**
      * Retrieves a critical section object to wait on. Will return nullptr if the migration is not
-     * yet in critical section.
+     * yet in the critical section or if the caller is a reader and the migration is still in the
+     * process of transferring the last batch of chunk modifications.
      *
      * Must be called with some form of lock on the collection namespace.
      */
-    std::shared_ptr<Notification<void>> getMigrationCriticalSectionSignal() const {
-        return _critSecSignal;
-    }
+    std::shared_ptr<Notification<void>> getMigrationCriticalSectionSignal(
+        bool isForReadOnlyOperation) const;
 
     /**
      * Returns a report on the active migration.
@@ -233,6 +233,14 @@ private:
     // callers don't have to hold collection lock in order to wait on it. Available after the
     // critical section stage has completed.
     std::shared_ptr<Notification<void>> _critSecSignal;
+
+    // Used to delay blocking reads up until the commit of the metadata on the config server needs
+    // to happen. This allows the shard to serve reads during transfer of the last batch of mods in
+    // the migration critical section.
+    //
+    // The transition from false to true is protected by the collection X-lock, which happens just
+    // before the config server metadata commit is scheduled.
+    bool _readsShouldWaitOnCritSec{false};
 };
 
 }  // namespace mongo
