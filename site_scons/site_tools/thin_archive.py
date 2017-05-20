@@ -45,32 +45,35 @@ def exists(env):
 
     return bool(isgnu)
 
+def _add_emitter(builder):
+    base_emitter = builder.emitter
+
+    def new_emitter(target, source, env):
+        for t in target:
+            setattr(t.attributes, "thin_archive", True)
+        return (target, source)
+
+    new_emitter = SCons.Builder.ListEmitter([base_emitter, new_emitter])
+    builder.emitter = new_emitter
+
+def _add_scanner(builder):
+    old_scanner = builder.target_scanner
+    path_function = old_scanner.path_function
+
+    def new_scanner(node, env, path):
+        old_results = old_scanner(node, env, path)
+        new_results = []
+        for base in old_results:
+            new_results.append(base)
+            if getattr(env.Entry(base).attributes, "thin_archive", None):
+                new_results.extend(base.children())
+        return new_results
+
+    builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner, path_function=path_function)
 
 def generate(env):
     if not exists(env):
         return
-
-    class ThinArchiveNode(SCons.Node.FS.File):
-        def __init__(self, name, directory, fs):
-            SCons.Node.FS.File.__init__(self, name, directory, fs)
-
-        def get_contents(self):
-            child_sigs = sorted([child.get_csig() for child in self.children()])
-            return ''.join(child_sigs)
-
-        def get_content_hash(self):
-            return SCons.Util.MD5signature(self.get_contents())
-
-
-    def _ThinArchiveNode(env, name, directory = None, create = 1):
-        return env.fs._lookup(env.subst(name), directory, ThinArchiveNode, create)
-
-    env.AddMethod(_ThinArchiveNode, 'ThinArchiveNode')
-
-    def archive_target_factory(arg):
-        return env.ThinArchiveNode(arg)
-
-    env['BUILDERS']['StaticLibrary'].target_factory = archive_target_factory
 
     env['ARFLAGS'] = SCons.Util.CLVar([arflag if arflag != "rc" else "rcsTD" for arflag in env['ARFLAGS']])
 
@@ -80,3 +83,10 @@ def generate(env):
     # Disable running ranlib, since we added 's' above
     env['RANLIBCOM'] = noop_action
     env['RANLIBCOMSTR'] = 'Skipping ranlib for thin archive $TARGET'
+
+    builder = env['BUILDERS']['StaticLibrary']
+    _add_emitter(builder)
+
+    _add_scanner(env['BUILDERS']['SharedLibrary'])
+    _add_scanner(env['BUILDERS']['LoadableModule'])
+    _add_scanner(env['BUILDERS']['Program'])
