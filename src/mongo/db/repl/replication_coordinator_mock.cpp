@@ -42,11 +42,26 @@
 namespace mongo {
 namespace repl {
 
-using std::vector;
+namespace {
+
+/**
+ * Helper to create default ReplSettings for tests that represents a one-node replica set.
+ */
+ReplSettings createReplSettingsForSingleNodeReplSet() {
+    ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setReplSetString("mySet/node1:12345");
+    return settings;
+}
+
+}  // namespace
 
 ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service,
                                                        const ReplSettings& settings)
     : _service(service), _settings(settings) {}
+
+ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service)
+    : ReplicationCoordinatorMock(service, createReplSettingsForSingleNodeReplSet()) {}
 
 ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
@@ -364,7 +379,7 @@ std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpT
     return std::vector<HostAndPort>();
 }
 
-vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
+std::vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
     return std::vector<HostAndPort>();
 }
 

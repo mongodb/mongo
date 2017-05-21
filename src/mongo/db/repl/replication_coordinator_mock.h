@@ -51,6 +51,12 @@ class ReplicationCoordinatorMock : public ReplicationCoordinator {
 
 public:
     ReplicationCoordinatorMock(ServiceContext* service, const ReplSettings& settings);
+
+    /**
+     * Creates a ReplicationCoordinatorMock with ReplSettings for a one-node replica set.
+     */
+    explicit ReplicationCoordinatorMock(ServiceContext* service);
+
     virtual ~ReplicationCoordinatorMock();
 
     virtual void startup(OperationContext* opCtx);
