@@ -42,21 +42,17 @@ namespace {
 
 class OpObserverTest : public ServiceContextMongoDTest {
 
-public:
-    void setUp() {
-
+private:
+    void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
-        repl::ReplSettings replSettings;
-        replSettings.setOplogSizeBytes(5 * 1024 * 1024);
-        replSettings.setReplSetString("repl");
 
         auto service = getServiceContext();
         auto opCtx = cc().makeOperationContext();
 
         // Set up ReplicationCoordinator and create oplog.
         repl::ReplicationCoordinator::set(
-            service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings));
+            service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service));
         repl::setOplogCollectionName();
         repl::createOplog(opCtx.get());
 
@@ -65,6 +61,7 @@ public:
         ASSERT_TRUE(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     }
 
+protected:
     // Assert that oplog only has a single entry and return that oplog entry.
     BSONObj getSingleOplogEntry(OperationContext* opCtx) {
         repl::OplogInterfaceLocal oplogInterface(opCtx, repl::rsOplogName);

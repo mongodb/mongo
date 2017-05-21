@@ -108,13 +108,9 @@ public:
 
 void SyncTailTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    ReplSettings replSettings;
-    replSettings.setOplogSizeBytes(5 * 1024 * 1024);
-    replSettings.setReplSetString("repl");
 
     auto service = getServiceContext();
-    ReplicationCoordinator::set(
-        service, stdx::make_unique<ReplicationCoordinatorMock>(service, replSettings));
+    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
     auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
     _storageInterface = storageInterface.get();
     storageInterface->insertDocumentsFn = [](OperationContext*,

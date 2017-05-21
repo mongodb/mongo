@@ -392,7 +392,6 @@ env.Library(
     ],
     LIBDEPS=[
         'optime',
-        'repl_settings',
         'replmocks',
         #'serveronly', # CYCLE
         '$BUILD_DIR/mongo/db/service_context',

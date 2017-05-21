@@ -50,16 +50,6 @@ using namespace mongo;
 using namespace mongo::repl;
 
 /**
- * Creates ReplSettings for ReplicationCoordinatorMock.
- */
-ReplSettings createReplSettings() {
-    ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setReplSetString("mySet/node1:12345");
-    return settings;
-}
-
-/**
  * Creates an OperationContext using the current Client.
  */
 ServiceContext::UniqueOperationContext makeOpCtx() {
@@ -86,10 +76,8 @@ protected:
 void RollbackFixUpInfoTest::setUp() {
     ServiceContextMongoDTest::setUp();
     _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
-    auto serviceContext = getServiceContext();
-    ReplicationCoordinator::set(
-        serviceContext,
-        stdx::make_unique<ReplicationCoordinatorMock>(serviceContext, createReplSettings()));
+    auto service = getServiceContext();
+    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
 
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(

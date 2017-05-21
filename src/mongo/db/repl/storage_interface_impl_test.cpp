@@ -146,16 +146,6 @@ BSONObj makeOplogEntry(OpTime opTime) {
 }
 
 /**
- * Helper to create default ReplSettings for tests.
- */
-ReplSettings createReplSettings() {
-    ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setReplSetString("mySet/node1:12345");
-    return settings;
-}
-
-/**
  * Counts the number of keys in an index using an IndexAccessMethod::validate call.
  */
 int64_t getIndexKeyCount(OperationContext* opCtx, IndexCatalog* cat, IndexDescriptor* desc) {
@@ -184,10 +174,10 @@ private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         _createOpCtx();
-        auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(getServiceContext(),
-                                                                       createReplSettings());
+        auto service = getServiceContext();
+        auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(service);
         _replicationCoordinatorMock = replCoord.get();
-        ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
+        ReplicationCoordinator::set(service, std::move(replCoord));
     }
 
     void tearDown() override {

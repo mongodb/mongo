@@ -37,7 +37,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -73,10 +72,7 @@ void OplogBufferCollectionTest::setUp() {
 
     // AutoGetCollectionForReadCommand requires a valid replication coordinator in order to check
     // the shard version.
-    ReplSettings replSettings;
-    replSettings.setOplogSizeBytes(5 * 1024 * 1024);
-    ReplicationCoordinator::set(
-        service, stdx::make_unique<ReplicationCoordinatorMock>(service, replSettings));
+    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
 
     auto storageInterface = stdx::make_unique<StorageInterfaceImpl>();
     _storageInterface = storageInterface.get();

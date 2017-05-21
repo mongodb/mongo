@@ -33,7 +33,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
@@ -57,23 +56,11 @@ protected:
     std::unique_ptr<StorageInterface> _storageInterface;
 };
 
-/**
- * Helper to create default ReplSettings for tests.
- */
-ReplSettings createReplSettings() {
-    ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setReplSetString("mySet/node1:12345");
-    return settings;
-}
-
 void ReplicationProcessTest::setUp() {
     ServiceContextMongoDTest::setUp();
     _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
-    auto serviceContext = getServiceContext();
-    ReplicationCoordinator::set(
-        serviceContext,
-        stdx::make_unique<ReplicationCoordinatorMock>(serviceContext, createReplSettings()));
+    auto service = getServiceContext();
+    ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
 }
 
 void ReplicationProcessTest::tearDown() {
