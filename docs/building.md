@@ -5,8 +5,8 @@ To build MongoDB, you will need:
 
 * A modern C++ compiler. One of the following is required.
     * GCC 5.4.0 or newer
-    * Clang 3.7 (or Apple XCode 7.0.2 Clang) or newer
-    * Visual Studio 2015 Update 2 or newer (See Windows section below for details)
+    * Clang 3.8 (or Apple XCode 8.3.2 Clang) or newer
+    * Visual Studio 2015 Update 3 or newer (See Windows section below for details)
 * Python 2.7.x and Pip modules:
   * pyyaml
   * typing
@@ -71,9 +71,9 @@ Build requirements:
 * Visual Studio 2015 Update 2 or newer
 * Python 2.7, ActiveState ActivePython 2.7.x Community Edition for Windows is recommended
 
-If using VS 2015 Update 3, a hotfix is required to build the unit tests. See 
-https://support.microsoft.com/en-us/help/3207317/visual-c-optimizer-fixes-for-visual-studio-2015-update-3
-for details.
+If using VS 2015 Update 3, two hotfixes are required to build. For details, see:
+* https://support.microsoft.com/en-us/help/3207317/visual-c-optimizer-fixes-for-visual-studio-2015-update-3
+* https://support.microsoft.com/en-za/help/4020481/fix-link-exe-crashes-with-a-fatal-lnk1000-error-when-you-use-wholearch
 
 Or download a prebuilt binary for Windows at www.mongodb.org.
 
