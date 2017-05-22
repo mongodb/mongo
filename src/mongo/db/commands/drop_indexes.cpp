@@ -190,11 +190,7 @@ public:
 
         {
             WriteUnitOfWork wunit(opCtx);
-            Status s = collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
-            if (!s.isOK()) {
-                errmsg = "dropIndexes failed";
-                return appendCommandStatus(result, s);
-            }
+            collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
             wunit.commit();
         }
 

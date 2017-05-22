@@ -854,13 +854,11 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     }
 
     // 2) drop indexes
-    Status status = _indexCatalog.dropAllIndexes(opCtx, true);
-    if (!status.isOK())
-        return status;
+    _indexCatalog.dropAllIndexes(opCtx, true);
     _cursorManager.invalidateAll(opCtx, false, "collection truncated");
 
     // 3) truncate record store
-    status = _recordStore->truncate(opCtx);
+    auto status = _recordStore->truncate(opCtx);
     if (!status.isOK())
         return status;
 

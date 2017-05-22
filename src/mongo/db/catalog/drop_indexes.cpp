@@ -62,10 +62,7 @@ Status wrappedRun(OperationContext* opCtx,
 
         if (indexToDelete == "*") {
             std::map<std::string, BSONObj> droppedIndexes;
-            Status s = indexCatalog->dropAllIndexes(opCtx, false, &droppedIndexes);
-            if (!s.isOK()) {
-                return s;
-            }
+            indexCatalog->dropAllIndexes(opCtx, false, &droppedIndexes);
 
             // We log one op for every dropped index so that we can roll them back if necessary.
             for (auto const& idx : droppedIndexes) {

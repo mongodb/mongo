@@ -424,13 +424,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     audit::logDropCollection(&cc(), fullns.toString());
 
     collection->getCursorManager()->invalidateAll(opCtx, true, "collection dropped");
-    Status s = collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
-
-    if (!s.isOK()) {
-        warning() << "could not drop collection, trying to drop indexes" << fullns << " because of "
-                  << redact(s.toString());
-        return s;
-    }
+    collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
     verify(collection->getCatalogEntry()->getTotalIndexCount(opCtx) == 0);
     LOG(1) << "\t dropIndexes done";
@@ -442,7 +436,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto uuid = collection->uuid();
     _clearCollectionCache(opCtx, fullns.toString(), "collection dropped");
 
-    s = _dbEntry->dropCollection(opCtx, fullns.toString());
+    auto s = _dbEntry->dropCollection(opCtx, fullns.toString());
 
     if (!s.isOK())
         return s;

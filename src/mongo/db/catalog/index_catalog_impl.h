@@ -229,9 +229,9 @@ public:
      * 'includingIdIndex' parameter value. If the 'droppedIndexes' parameter is not null,
      * it is filled with the names and index info of the dropped indexes.
      */
-    Status dropAllIndexes(OperationContext* opCtx,
-                          bool includingIdIndex,
-                          std::map<std::string, BSONObj>* droppedIndexes = nullptr) override;
+    void dropAllIndexes(OperationContext* opCtx,
+                        bool includingIdIndex,
+                        std::map<std::string, BSONObj>* droppedIndexes = nullptr) override;
 
     Status dropIndex(OperationContext* opCtx, IndexDescriptor* desc) override;
 

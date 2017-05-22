@@ -175,10 +175,7 @@ StatusWith<CompactStats> CollectionImpl::compact(OperationContext* opCtx,
         // which is important and wanted here
         WriteUnitOfWork wunit(opCtx);
         log() << "compact dropping indexes";
-        Status status = _indexCatalog.dropAllIndexes(opCtx, true);
-        if (!status.isOK()) {
-            return StatusWith<CompactStats>(status);
-        }
+        _indexCatalog.dropAllIndexes(opCtx, true);
         wunit.commit();
     }
 
