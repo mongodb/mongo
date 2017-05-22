@@ -190,6 +190,9 @@ public:
      * ErrorCodes::ShutdownInProgress.
      *
      * May be called by client threads or callbacks running in the executor.
+     *
+     * Contract: Implementations should guarantee that callback should be called *after* doing any
+     * processing related to the callback.
      */
     virtual StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) = 0;
 
@@ -200,6 +203,9 @@ public:
      * ErrorCodes::ShutdownInProgress.
      *
      * May be called by client threads or callbacks running in the executor.
+     *
+     * Contract: Implementations should guarantee that callback should be called *after* doing any
+     * processing related to the callback.
      */
     virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) = 0;
 
@@ -211,6 +217,9 @@ public:
      * ErrorCodes::ShutdownInProgress.
      *
      * May be called by client threads or callbacks running in the executor.
+     *
+     * Contract: Implementations should guarantee that callback should be called *after* doing any
+     * processing related to the callback.
      */
     virtual StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
                                                              const RemoteCommandCallbackFn& cb) = 0;

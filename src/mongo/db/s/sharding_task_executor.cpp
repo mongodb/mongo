@@ -41,6 +41,7 @@
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace executor {
@@ -117,7 +118,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     auto shardingCb = [timeTracker, clusterGLE, request, cb](
         const TaskExecutor::RemoteCommandCallbackArgs& args) {
-        cb(args);
+        ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
         if (!args.response.isOK()) {
             LOG(1) << "Error processing the remote request, not updating operationTime or gLE";
