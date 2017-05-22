@@ -569,7 +569,6 @@ env.Library('repl_coordinator_impl',
                 'check_quorum_for_config_change.cpp',
                 'elect_cmd_runner.cpp',
                 'freshness_checker.cpp',
-                'repl_client_info.cpp',
                 'repl_set_config_checks.cpp',
                 'replication_coordinator_impl.cpp',
                 'replication_coordinator_impl_elect.cpp',
@@ -731,14 +730,20 @@ env.CppUnitTest('replication_coordinator_impl_reconfig_test',
                 'replication_coordinator_impl_reconfig_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
-env.Library('repl_coordinator_interface',
-            ['replication_coordinator.cpp',
-             'replication_coordinator_external_state.cpp'],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/db/service_context',
-                '$BUILD_DIR/mongo/util/net/hostandport',
-                'optime',
-            ])
+env.Library(
+    target='repl_coordinator_interface',
+    source=[
+        'repl_client_info.cpp',
+        'replication_coordinator.cpp',
+        'replication_coordinator_external_state.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/decorable',
+    ],
+)
 
 env.Library('repl_coordinator_global',
             'replication_coordinator_global.cpp',
