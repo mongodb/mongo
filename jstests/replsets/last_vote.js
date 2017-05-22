@@ -134,9 +134,6 @@
               "replSetRequestVotes response had the wrong term: " + tojson(response));
     assert(!response.voteGranted,
            "node granted vote in term before last vote doc: " + tojson(response));
-    assert.eq(response.reason,
-              "candidate's term is lower than mine",
-              "replSetRequestVotes response had the wrong reason: " + tojson(response));
     assertNodeHasLastVote(node0, term, rst.nodes[0]);
     assertCurrentTerm(node0, term);
 
@@ -178,9 +175,6 @@
               "replSetRequestVotes response had the wrong term: " + tojson(response));
     assert(!response.voteGranted,
            "node granted vote in term of last vote doc: " + tojson(response));
-    assert.eq(response.reason,
-              "already voted for another candidate this term",
-              "replSetRequestVotes response had the wrong reason: " + tojson(response));
     assertNodeHasLastVote(node0, term, rst.nodes[0]);
     assertCurrentTerm(node0, term);
 

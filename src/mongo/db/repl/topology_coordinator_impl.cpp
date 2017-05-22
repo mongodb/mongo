@@ -1564,7 +1564,7 @@ bool TopologyCoordinatorImpl::_aMajoritySeemsToBeUp() const {
     return vUp * 2 > _rsConfig.getTotalVotingMembers();
 }
 
-bool TopologyCoordinatorImpl::_canSeeHealthyPrimaryOfEqualOrGreaterPriority(
+int TopologyCoordinatorImpl::_findHealthyPrimaryOfEqualOrGreaterPriority(
     const int candidateIndex) const {
     const double candidatePriority = _rsConfig.getMemberAt(candidateIndex).getPriority();
     for (auto it = _memberData.begin(); it != _memberData.end(); ++it) {
@@ -1574,11 +1574,11 @@ bool TopologyCoordinatorImpl::_canSeeHealthyPrimaryOfEqualOrGreaterPriority(
         const int itIndex = indexOfIterator(_memberData, it);
         const double priority = _rsConfig.getMemberAt(itIndex).getPriority();
         if (itIndex != candidateIndex && priority >= candidatePriority) {
-            return true;
+            return itIndex;
         }
     }
 
-    return false;
+    return -1;
 }
 
 bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime) const {
@@ -2899,29 +2899,54 @@ void TopologyCoordinatorImpl::processReplSetRequestVotes(const ReplSetRequestVot
 
     if (args.getTerm() < _term) {
         response->setVoteGranted(false);
-        response->setReason("candidate's term is lower than mine");
+        response->setReason(str::stream() << "candidate's term (" << args.getTerm()
+                                          << ") is lower than mine ("
+                                          << _term
+                                          << ")");
     } else if (args.getConfigVersion() != _rsConfig.getConfigVersion()) {
         response->setVoteGranted(false);
-        response->setReason("candidate's config version differs from mine");
+        response->setReason(str::stream() << "candidate's config version ("
+                                          << args.getConfigVersion()
+                                          << ") differs from mine ("
+                                          << _rsConfig.getConfigVersion()
+                                          << ")");
     } else if (args.getSetName() != _rsConfig.getReplSetName()) {
         response->setVoteGranted(false);
-        response->setReason("candidate's set name differs from mine");
+        response->setReason(str::stream() << "candidate's set name (" << args.getSetName()
+                                          << ") differs from mine ("
+                                          << _rsConfig.getReplSetName()
+                                          << ")");
     } else if (args.getLastDurableOpTime() < getMyLastAppliedOpTime()) {
         response->setVoteGranted(false);
-        response->setReason("candidate's data is staler than mine");
+        response
+            ->setReason(str::stream()
+                        << "candidate's data is staler than mine. candidate's last applied OpTime: "
+                        << args.getLastDurableOpTime().toString()
+                        << ", my last applied OpTime: "
+                        << getMyLastAppliedOpTime().toString());
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);
-        response->setReason("already voted for another candidate this term");
-    } else if (_selfConfig().isArbiter() &&
-               _canSeeHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex())) {
-        response->setVoteGranted(false);
-        response->setReason("can see a healthy primary of equal or greater priority");
+        response->setReason(str::stream()
+                            << "already voted for another candidate ("
+                            << _rsConfig.getMemberAt(_lastVote.getCandidateIndex()).getHostAndPort()
+                            << ") this term ("
+                            << _lastVote.getTerm()
+                            << ")");
     } else {
-        if (!args.isADryRun()) {
-            _lastVote.setTerm(args.getTerm());
-            _lastVote.setCandidateIndex(args.getCandidateIndex());
+        int betterPrimary = _findHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex());
+        if (_selfConfig().isArbiter() && betterPrimary >= 0) {
+            response->setVoteGranted(false);
+            response->setReason(str::stream()
+                                << "can see a healthy primary ("
+                                << _rsConfig.getMemberAt(betterPrimary).getHostAndPort()
+                                << ") of equal or greater priority");
+        } else {
+            if (!args.isADryRun()) {
+                _lastVote.setTerm(args.getTerm());
+                _lastVote.setCandidateIndex(args.getCandidateIndex());
+            }
+            response->setVoteGranted(true);
         }
-        response->setVoteGranted(true);
     }
 }
 

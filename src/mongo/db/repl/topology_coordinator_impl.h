@@ -316,9 +316,9 @@ private:
     // Sees if a majority number of votes are held by members who are currently "up"
     bool _aMajoritySeemsToBeUp() const;
 
-    // Returns true if the node can see a healthy primary of equal or greater priority to the
-    // candidate.
-    bool _canSeeHealthyPrimaryOfEqualOrGreaterPriority(const int candidateIndex) const;
+    // Checks if the node can see a healthy primary of equal or greater priority to the
+    // candidate. If so, returns the index of that node. Otherwise returns -1.
+    int _findHealthyPrimaryOfEqualOrGreaterPriority(const int candidateIndex) const;
 
     // Is otherOpTime close enough (within 10 seconds) to the latest known optime to qualify
     // for an election

@@ -5584,7 +5584,8 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVotesToTwoDifferentNodesInTheSameTerm) {
 
     // different candidate same term, should be a problem
     getTopoCoord().processReplSetRequestVotes(args2, &response2);
-    ASSERT_EQUALS("already voted for another candidate this term", response2.getReason());
+    ASSERT_EQUALS("already voted for another candidate (hself:27017) this term (1)",
+                  response2.getReason());
     ASSERT_FALSE(response2.getVoteGranted());
 }
 
@@ -5698,7 +5699,8 @@ TEST_F(TopoCoordTest, VoteRequestShouldNotPreventDryRunsForThatTerm) {
     ReplSetRequestVotesResponse response2;
 
     getTopoCoord().processReplSetRequestVotes(args2, &response2);
-    ASSERT_EQUALS("already voted for another candidate this term", response2.getReason());
+    ASSERT_EQUALS("already voted for another candidate (hself:27017) this term (1)",
+                  response2.getReason());
     ASSERT_FALSE(response2.getVoteGranted());
 }
 
@@ -5732,7 +5734,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenReplSetNameDoesNotMatch) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's set name differs from mine", response.getReason());
+    ASSERT_EQUALS("candidate's set name (wrongName) differs from mine (rs0)", response.getReason());
     ASSERT_FALSE(response.getVoteGranted());
 }
 
@@ -5766,7 +5768,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigVersionDoesNotMatch) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's config version differs from mine", response.getReason());
+    ASSERT_EQUALS("candidate's config version (0) differs from mine (1)", response.getReason());
     ASSERT_FALSE(response.getVoteGranted());
 }
 
@@ -5812,7 +5814,8 @@ TEST_F(TopoCoordTest, ArbiterDoesNotGrantVoteWhenItCanSeeAHealthyPrimaryOfEqualO
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("can see a healthy primary of equal or greater priority", response.getReason());
+    ASSERT_EQUALS("can see a healthy primary (h2:27017) of equal or greater priority",
+                  response.getReason());
     ASSERT_FALSE(response.getVoteGranted());
 }
 
@@ -5850,7 +5853,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's term is lower than mine", response.getReason());
+    ASSERT_EQUALS("candidate's term (1) is lower than mine (2)", response.getReason());
     ASSERT_EQUALS(2, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
 }
@@ -5887,7 +5890,12 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenOpTimeIsStale) {
 
     getTopoCoord().getMyMemberData()->setLastAppliedOpTime({Timestamp(20, 0), 0}, Date_t());
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's data is staler than mine", response.getReason());
+    ASSERT_EQUALS(
+        str::stream() << "candidate's data is staler than mine. candidate's last applied OpTime: "
+                      << OpTime().toString()
+                      << ", my last applied OpTime: "
+                      << OpTime(Timestamp(20, 0), 0).toString(),
+        response.getReason());
     ASSERT_FALSE(response.getVoteGranted());
 }
 
@@ -5945,7 +5953,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenReplSetNameDoesNotMatch) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's set name differs from mine", response.getReason());
+    ASSERT_EQUALS("candidate's set name (wrongName) differs from mine (rs0)", response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
 }
@@ -6004,7 +6012,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenConfigVersionDoesNotMatch) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's config version differs from mine", response.getReason());
+    ASSERT_EQUALS("candidate's config version (0) differs from mine (1)", response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
 }
@@ -6062,7 +6070,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantDryRunVoteWhenTermIsStale) {
     ReplSetRequestVotesResponse response;
 
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's term is lower than mine", response.getReason());
+    ASSERT_EQUALS("candidate's term (0) is lower than mine (1)", response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
 }
@@ -6181,7 +6189,12 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
 
     getTopoCoord().getMyMemberData()->setLastAppliedOpTime({Timestamp(20, 0), 0}, Date_t());
     getTopoCoord().processReplSetRequestVotes(args, &response);
-    ASSERT_EQUALS("candidate's data is staler than mine", response.getReason());
+    ASSERT_EQUALS(
+        str::stream() << "candidate's data is staler than mine. candidate's last applied OpTime: "
+                      << OpTime().toString()
+                      << ", my last applied OpTime: "
+                      << OpTime(Timestamp(20, 0), 0).toString(),
+        response.getReason());
     ASSERT_EQUALS(1, response.getTerm());
     ASSERT_FALSE(response.getVoteGranted());
 }
