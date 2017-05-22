@@ -901,7 +901,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_cond_alloc(session, "log sync", &log->log_sync_cond));
 	WT_RET(__wt_cond_alloc(session, "log write", &log->log_write_cond));
 	WT_RET(__wt_log_open(session));
-	WT_RET(__wt_log_slot_init(session));
+	WT_RET(__wt_log_slot_init(session, true));
 
 	return (0);
 }
