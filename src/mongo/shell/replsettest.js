@@ -181,7 +181,7 @@ var ReplSetTest = function(opts) {
         var currTime = new Date().getTime();
         var status;
 
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             try {
                 var conn = _callIsMaster();
                 if (!conn) {
@@ -405,7 +405,7 @@ var ReplSetTest = function(opts) {
     this.awaitSecondaryNodes = function(timeout) {
         timeout = timeout || self.kDefaultTimeoutMS;
 
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             // Reload who the current slaves are
             self.getPrimary(timeout);
 
@@ -494,7 +494,7 @@ var ReplSetTest = function(opts) {
         timeout = timeout || self.kDefaultTimeoutMS;
         var primary = null;
 
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             primary = _callIsMaster();
             return primary;
         }, "Finding primary", timeout);
@@ -506,7 +506,7 @@ var ReplSetTest = function(opts) {
         msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
         timeout = timeout || self.kDefaultTimeoutMS;
 
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             return _callIsMaster() == false;
         }, msg, timeout);
     };
@@ -722,7 +722,7 @@ var ReplSetTest = function(opts) {
         print("Waiting for op with OpTime " + tojson(opTime) +
               " to be committed on all secondaries");
 
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             for (var i = 0; i < rst.nodes.length; i++) {
                 var node = rst.nodes[i];
 
@@ -763,7 +763,7 @@ var ReplSetTest = function(opts) {
         // Blocking call, which will wait for the last optime written on the master to be available
         var awaitLastOpTimeWrittenFn = function() {
             var master = self.getPrimary();
-            assert.soon(function() {
+            assert.soonNoExcept(function() {
                 try {
                     masterLatestOpTime = _getLastOpTime(master);
                 } catch (e) {
@@ -800,7 +800,7 @@ var ReplSetTest = function(opts) {
               ", is " + tojson(masterLatestOpTime) + ", last oplog entry is " +
               tojsononeline(masterOpTime));
 
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             try {
                 print("ReplSetTest awaitReplication: checking secondaries against timestamp " +
                       tojson(masterLatestOpTime));
@@ -1235,7 +1235,7 @@ var ReplSetTest = function(opts) {
      */
     this.waitForMaster = function(timeout) {
         var master;
-        assert.soon(function() {
+        assert.soonNoExcept(function() {
             return (master = self.getPrimary());
         }, "waiting for master", timeout);
 
@@ -1369,7 +1369,7 @@ ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
 
     var tests = 0;
 
-    assert.soon(function() {
+    assert.soonNoExcept(function() {
         var rsClientHosts = conn.adminCommand('connPoolStats').replicaSets;
         if (tests++ % 10 == 0) {
             printjson(rsClientHosts);
