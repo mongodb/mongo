@@ -558,6 +558,10 @@ env_vars = Variables(
     args=ARGUMENTS
 )
 
+sconsflags = os.environ.get('SCONSFLAGS', None)
+if sconsflags:
+    print "Using SCONSFLAGS environment variable arguments: %s" % sconsflags
+
 env_vars.Add('ABIDW',
     help="Configures the path to the 'abidw' (a libabigail) utility")
 
