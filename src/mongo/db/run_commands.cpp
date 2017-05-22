@@ -341,8 +341,7 @@ bool runCommandImpl(OperationContext* opCtx,
             return result;
         }
 
-        // TODO: remove queryOptions parameter from command's run method.
-        result = command->run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
+        result = command->enhancedRun(opCtx, request, errmsg, inPlaceReplyBob);
     } else {
         auto wcResult = extractWriteConcern(opCtx, cmd, db);
         if (!wcResult.isOK()) {
@@ -361,7 +360,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 opCtx, command->getName(), &inPlaceReplyBob);
         });
 
-        result = command->run(opCtx, db, cmd, errmsg, inPlaceReplyBob);
+        result = command->enhancedRun(opCtx, request, errmsg, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==

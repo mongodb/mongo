@@ -45,6 +45,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/net/op_msg.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -104,7 +105,22 @@ public:
                      const std::string& db,
                      const BSONObj& cmdObj,
                      std::string& errmsg,
-                     BSONObjBuilder& result) = 0;
+                     BSONObjBuilder& result) {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
+     * Runs the command.
+     *
+     * The default implementation verifies that request has no document sections then forwards to
+     * run().
+     *
+     * For now commands should only implement if they need access to OP_MSG-specific functionality.
+     */
+    virtual bool enhancedRun(OperationContext* opCtx,
+                             const OpMsgRequest& request,
+                             std::string& errmsg,
+                             BSONObjBuilder& result) = 0;
 
     /**
      * supportsWriteConcern returns true if this command should be parsed for a writeConcern
@@ -308,6 +324,11 @@ public:
     std::size_t reserveBytesForReply() const override {
         return 0u;
     }
+
+    bool enhancedRun(OperationContext* opCtx,
+                     const OpMsgRequest& request,
+                     std::string& errmsg,
+                     BSONObjBuilder& result) override;
 
     bool adminOnly() const override {
         return false;
