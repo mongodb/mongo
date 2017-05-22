@@ -26,7 +26,16 @@
     s.printShardingStatus();
 
     function mytest(coll, i, loopNumber) {
-        var x = coll.find({_id: i}).explain();
+        try {
+            var x = coll.find({_id: i}).explain();
+        } catch (e) {
+            // Ignore stale shard version exceptions, since there are many migrations happening, and
+            // mongos may not be able to complete the find within the stale version retries limit.
+            if (e.message.contains("stale config")) {
+                return;
+            }
+            throw e;
+        }
         if (x)
             return;
         throw Error("can't find " + i + " in " + coll.getName() + " on loopNumber: " + loopNumber +
