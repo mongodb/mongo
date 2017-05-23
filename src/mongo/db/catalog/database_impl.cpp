@@ -38,7 +38,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -63,6 +62,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -727,7 +727,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         }
 
         if (nss.isSystem()) {
-            authindex::createSystemIndexes(opCtx, collection);
+            createSystemIndexes(opCtx, collection);
         }
     }
 

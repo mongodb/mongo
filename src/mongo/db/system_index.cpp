@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2017 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,11 +26,11 @@
 *    it in the license file.
 */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/auth_index_d.h"
+#include "mongo/db/system_index.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -47,23 +47,27 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_session_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
+using namespace std::chrono_literals;
+
 namespace mongo {
-
-using std::endl;
-
-namespace authindex {
 
 namespace {
 BSONObj v1SystemUsersKeyPattern;
 BSONObj v3SystemUsersKeyPattern;
 BSONObj v3SystemRolesKeyPattern;
+BSONObj v1SystemSessionsKeyPattern;
 std::string v3SystemUsersIndexName;
 std::string v3SystemRolesIndexName;
+std::string v1SystemSessionsIndexName;
 IndexSpec v3SystemUsersIndexSpec;
 IndexSpec v3SystemRolesIndexSpec;
+IndexSpec v1SystemSessionsIndexSpec;
+
+const NamespaceString sessionCollectionNamespace("admin.system.sessions");
 
 MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);
@@ -73,6 +77,7 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v3SystemRolesKeyPattern = BSON(
         AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME
                                                    << 1);
+    v1SystemSessionsKeyPattern = BSON("lastUse" << 1);
     v3SystemUsersIndexName =
         std::string(str::stream() << AuthorizationManager::USER_NAME_FIELD_NAME << "_1_"
                                   << AuthorizationManager::USER_DB_FIELD_NAME
@@ -81,6 +86,7 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
         std::string(str::stream() << AuthorizationManager::ROLE_NAME_FIELD_NAME << "_1_"
                                   << AuthorizationManager::ROLE_DB_FIELD_NAME
                                   << "_1");
+    v1SystemSessionsIndexName = "lastUse_1";
 
     v3SystemUsersIndexSpec.addKeys(v3SystemUsersKeyPattern);
     v3SystemUsersIndexSpec.unique();
@@ -89,6 +95,11 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v3SystemRolesIndexSpec.addKeys(v3SystemRolesKeyPattern);
     v3SystemRolesIndexSpec.unique();
     v3SystemRolesIndexSpec.name(v3SystemRolesIndexName);
+
+    v1SystemSessionsIndexSpec.addKeys(v1SystemSessionsKeyPattern);
+    v1SystemSessionsIndexSpec.expireAfterSeconds(
+        durationCount<Seconds>(Minutes(localLogicalSessionTimeoutMinutes)));
+    v1SystemSessionsIndexSpec.name(v1SystemSessionsIndexName);
 
     return Status::OK();
 }
@@ -188,6 +199,23 @@ Status verifySystemIndexes(OperationContext* opCtx) {
         }
     }
 
+    // Ensure that system indexes exist for the sessions collection, if it exists.
+    collection = autoDb.getDb()->getCollection(opCtx, sessionCollectionNamespace);
+    if (collection) {
+        IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        invariant(indexCatalog);
+
+        std::vector<IndexDescriptor*> indexes;
+        indexCatalog->findIndexesByKeyPattern(opCtx, v1SystemSessionsKeyPattern, false, &indexes);
+        if (indexes.empty()) {
+            try {
+                generateSystemIndexForExistingCollection(
+                    opCtx, collection, sessionCollectionNamespace, v1SystemSessionsIndexSpec);
+            } catch (...) {
+                return exceptionToStatus();
+            }
+        }
+    }
 
     return Status::OK();
 }
@@ -211,8 +239,15 @@ void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
 
         fassertStatusOK(
             40458, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
+    } else if (ns == sessionCollectionNamespace) {
+        auto indexSpec = fassertStatusOK(
+            40493,
+            index_key_validate::validateIndexSpec(
+                v1SystemSessionsIndexSpec.toBSON(), ns, serverGlobalParams.featureCompatibility));
+
+        fassertStatusOK(
+            40494, collection->getIndexCatalog()->createIndexOnEmptyCollection(opCtx, indexSpec));
     }
 }
 
-}  // namespace authindex
 }  // namespace mongo

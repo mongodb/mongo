@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2017 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,26 +28,22 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
-
 namespace mongo {
 
 class Collection;
 class OperationContext;
-
-namespace authindex {
+class Status;
 
 /**
- * Creates the appropriate indexes on _new_ system collections supporting authentication and
- * authorization.
+ * Creates the appropriate indexes on _new_ system collections for authentication,
+ * authorization, and sessions.
  */
 void createSystemIndexes(OperationContext* opCtx, Collection* collection);
 
 /**
- * Verifies that only the appropriate indexes to support authentication and authorization
- * are present in the admin database
+ * Verifies that only the appropriate indexes to support authentication, authorization, and
+ * sessions are present in the admin database. Will create new indexes, if they are missing.
  */
 Status verifySystemIndexes(OperationContext* opCtx);
 
-}  // namespace authindex
 }  // namespace mongo

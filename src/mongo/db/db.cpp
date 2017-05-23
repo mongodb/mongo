@@ -45,7 +45,6 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection.h"
@@ -109,6 +108,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/system_index.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -594,7 +594,7 @@ ExitCode _initAndListen(int listenPort) {
 
     AuthorizationManager* globalAuthzManager = getGlobalAuthorizationManager();
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
-        Status status = authindex::verifySystemIndexes(startupOpCtx.get());
+        Status status = verifySystemIndexes(startupOpCtx.get());
         if (!status.isOK()) {
             log() << redact(status);
             if (status.code() == ErrorCodes::AuthSchemaIncompatible) {

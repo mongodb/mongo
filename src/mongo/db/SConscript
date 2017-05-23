@@ -564,6 +564,18 @@ env.Library(
 )
 
 env.Library(
+    target='system_index',
+    source=[
+        'system_index.cpp',
+    ],
+    LIBDEPS=[
+        'db_raii',
+        'catalog/index_key_validate',
+        'logical_session_cache',
+    ],
+)
+
+env.Library(
     target="service_context_d",
     source=[
         "service_context_d.cpp",

@@ -170,12 +170,10 @@ env.Library('saslauth',
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',
              'authz_session_external_state_d.cpp',
-             'auth_index_d.cpp',
              'impersonation_session.cpp'
             ],
             LIBDEPS=[
                 'authservercommon',
-                '$BUILD_DIR/mongo/db/catalog/index_key_validate',
                 '$BUILD_DIR/mongo/db/db_raii',
                 '$BUILD_DIR/mongo/db/dbdirectclient',
                 '$BUILD_DIR/mongo/db/dbhelpers',

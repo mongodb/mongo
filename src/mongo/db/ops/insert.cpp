@@ -235,6 +235,8 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
         if (db == "admin") {
             if (coll == "system.version")
                 return Status::OK();
+            if (coll == "system.sessions")
+                return Status::OK();
             if (coll == "system.roles")
                 return Status::OK();
             if (coll == "system.new_users")
