@@ -4201,6 +4201,179 @@ class Null : public ExpectedResultBase {
 
 }  // namespace AllAnyElements
 
+namespace GetComputedPathsTest {
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesNotCountAsRenameWhenUsingRemoveBuiltin) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$REMOVE", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("a", Variables::kRootId);
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("a"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesNotCountAsRenameWhenOnlyRoot) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$ROOT", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("a", Variables::kRootId);
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("a"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesNotCountAsRenameWithNonMatchingUserVariable) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->variablesParseState.defineVariable("userVar");
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar.b", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("a", Variables::kRootId);
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("a"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesNotCountAsRenameWhenDotted) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx, "$a.b", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("c", Variables::kRootId);
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("c"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesCountAsRename) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx, "$a", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("b", Variables::kRootId);
+    ASSERT(computedPaths.paths.empty());
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["b"], "a");
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesCountAsRenameWithExplicitRoot) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$ROOT.a", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("b", Variables::kRootId);
+    ASSERT(computedPaths.paths.empty());
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["b"], "a");
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesCountAsRenameWithExplicitCurrent) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$CURRENT.a", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("b", Variables::kRootId);
+    ASSERT(computedPaths.paths.empty());
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["b"], "a");
+}
+
+TEST(GetComputedPathsTest, ExpressionFieldPathDoesCountAsRenameWithMatchingUserVariable) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto varId = expCtx->variablesParseState.defineVariable("userVar");
+    auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar.a", expCtx->variablesParseState);
+    auto computedPaths = expr->getComputedPaths("b", varId);
+    ASSERT(computedPaths.paths.empty());
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["b"], "a");
+}
+
+TEST(GetComputedPathsTest, ExpressionObjectCorrectlyReportsComputedPaths) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson("{a: '$b', c: {$add: [1, 3]}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionObject*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("d");
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("d.c"), 1u);
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["d.a"], "b");
+}
+
+TEST(GetComputedPathsTest, ExpressionObjectCorrectlyReportsComputedPathsNested) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson(
+        "{a: {b: '$c'},"
+        "d: {$map: {input: '$e', as: 'iter', in: {f: '$$iter.g'}}}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionObject*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("h");
+    ASSERT(computedPaths.paths.empty());
+    ASSERT_EQ(computedPaths.renames.size(), 2u);
+    ASSERT_EQ(computedPaths.renames["h.a.b"], "c");
+    ASSERT_EQ(computedPaths.renames["h.d.f"], "e.g");
+}
+
+TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPaths) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject =
+        fromjson("{$map: {input: '$a', as: 'iter', in: {b: '$$iter.c', d: {$add: [1, 2]}}}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("e");
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("e.d"), 1u);
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["e.b"], "a.c");
+}
+
+TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPathsWithDefaultVarName) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson("{$map: {input: '$a', in: {b: '$$this.c', d: {$add: [1, 2]}}}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("e");
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("e.d"), 1u);
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["e.b"], "a.c");
+}
+
+TEST(GetComputedPathsTest, ExpressionMapCorrectlyReportsComputedPathsWithNestedExprObject) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson("{$map: {input: '$a', in: {b: {c: '$$this.d'}}}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("e");
+    ASSERT(computedPaths.paths.empty());
+    ASSERT_EQ(computedPaths.renames.size(), 1u);
+    ASSERT_EQ(computedPaths.renames["e.b.c"], "a.d");
+}
+
+TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithWrongRootVariable) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson("{$map: {input: '$a', as: 'iter', in: {b: '$c'}}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("d");
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("d"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithWrongVariableNoExpressionObject) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson("{$map: {input: '$a', as: 'iter', in: '$b'}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("d");
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("d"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto specObject = fromjson("{$map: {input: '$a.b', as: 'iter', in: {c: '$$iter.d'}}}}");
+    auto expr = Expression::parseObject(expCtx, specObject, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionMap*>(expr.get()));
+    auto computedPaths = expr->getComputedPaths("e");
+    ASSERT_EQ(computedPaths.paths.size(), 1u);
+    ASSERT_EQ(computedPaths.paths.count("e"), 1u);
+    ASSERT(computedPaths.renames.empty());
+}
+
+}  // namespace GetComputedPathsTest
+
 class All : public Suite {
 public:
     All() : Suite("expression") {}

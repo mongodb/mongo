@@ -431,12 +431,6 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     unique_ptr<MatchExpression> expr,
     const std::set<std::string>& fields,
     const StringMap<std::string>& renames) {
-    // TODO SERVER-27115: Currently renames from dotted fields are not supported, but this
-    // restriction can be relaxed.
-    for (auto&& rename : renames) {
-        invariant(rename.second.find('.') == std::string::npos);
-    }
-
     auto splitExpr = splitMatchExpressionByWithoutRenames(std::move(expr), fields);
     if (splitExpr.first) {
         applyRenamesToExpression(splitExpr.first.get(), renames);
