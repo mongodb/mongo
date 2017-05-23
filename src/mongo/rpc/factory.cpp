@@ -48,19 +48,14 @@
 namespace mongo {
 namespace rpc {
 
-std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
-                                                            ProtocolSet serverProtos) {
-    return makeRequestBuilder(uassertStatusOK(negotiate(clientProtos, serverProtos)));
-}
-
-std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto) {
+Message messageFromOpMsgRequest(Protocol proto, const OpMsgRequest& request) {
     switch (proto) {
         case Protocol::kOpMsg:
-            return stdx::make_unique<OpMsgRequestBuilder>();
+            return request.serialize();
         case Protocol::kOpQuery:
-            return stdx::make_unique<LegacyRequestBuilder>();
+            return legacyRequestFromOpMsgRequest(request);
         case Protocol::kOpCommandV1:
-            return stdx::make_unique<CommandRequestBuilder>();
+            return opCommandRequestFromOpMsgRequest(request);
         default:
             MONGO_UNREACHABLE;
     }

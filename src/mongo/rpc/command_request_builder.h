@@ -28,58 +28,13 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 namespace rpc {
 
-/**
- * Constructs an OP_COMMAND message.
- */
-class CommandRequestBuilder : public RequestBuilderInterface {
-public:
-    /**
-     * Constructs an OP_COMMAND in a new buffer.
-     */
-    CommandRequestBuilder();
-
-    ~CommandRequestBuilder() final;
-
-    /**
-     * Construct an OP_COMMAND in an existing buffer. Ownership of the buffer will be
-     * transfered to the CommandRequestBuilder.
-     */
-    CommandRequestBuilder(Message&& message);
-
-    CommandRequestBuilder& setDatabase(StringData database) final;
-
-    CommandRequestBuilder& setCommandName(StringData commandName) final;
-
-    CommandRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
-
-    CommandRequestBuilder& setMetadata(BSONObj metadata) final;
-
-    Protocol getProtocol() const final;
-
-    /**
-     * Writes data then transfers ownership of the message to the caller.
-     * The behavior of calling any methods on the object is subsequently
-     * undefined.
-     */
-    Message done() final;
-
-private:
-    BufBuilder _builder{};
-    Message _message;
-
-    State _state{State::kDatabase};
-};
+Message opCommandRequestFromOpMsgRequest(const OpMsgRequest& request);
 
 }  // rpc
 }  // mongo

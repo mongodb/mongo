@@ -30,7 +30,6 @@
 
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/net/op_msg.h"
 
 namespace mongo {
@@ -82,38 +81,6 @@ public:
     }
 
 private:
-    OpMsgBuilder _builder;
-};
-
-class OpMsgRequestBuilder final : public rpc::RequestBuilderInterface {
-public:
-    RequestBuilderInterface& setDatabase(StringData database) override {
-        _db = database.toString();
-        return *this;
-    }
-    RequestBuilderInterface& setCommandName(StringData commandName) override {
-        // No-op because command name is first field name in command body.
-        return *this;
-    }
-    RequestBuilderInterface& setCommandArgs(BSONObj reply) override {
-        _builder.beginBody().appendElements(reply);
-        return *this;
-    }
-    RequestBuilderInterface& setMetadata(BSONObj metadata) override {
-        _builder.resumeBody().appendElements(metadata);
-        return *this;
-    }
-    rpc::Protocol getProtocol() const override {
-        return rpc::Protocol::kOpMsg;
-    }
-    Message done() override {
-        invariant(!_db.empty());
-        _builder.resumeBody().append("$db", _db);
-        return _builder.finish();
-    }
-
-private:
-    std::string _db;
     OpMsgBuilder _builder;
 };
 

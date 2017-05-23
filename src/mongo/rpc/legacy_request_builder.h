@@ -28,44 +28,13 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 namespace rpc {
 
-class LegacyRequestBuilder : public RequestBuilderInterface {
-public:
-    LegacyRequestBuilder();
-    ~LegacyRequestBuilder() final;
-
-    LegacyRequestBuilder(Message&&);
-
-    LegacyRequestBuilder& setDatabase(StringData database) final;
-    LegacyRequestBuilder& setCommandName(StringData commandName) final;
-    LegacyRequestBuilder& setMetadata(BSONObj metadata) final;
-    LegacyRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
-
-    Protocol getProtocol() const final;
-
-    Message done() final;
-
-private:
-    Message _message;
-    BufBuilder _builder{};
-
-    // we need to stash this as we need metadata to
-    // upconvert.
-    BSONObj _commandArgs;
-
-    std::string _ns{};  // copied to in setDatabase
-
-    State _state{State::kDatabase};
-};
+Message legacyRequestFromOpMsgRequest(const OpMsgRequest& request);
 
 }  // namespace rpc
 }  // namespace mongo

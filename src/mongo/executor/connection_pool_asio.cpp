@@ -189,13 +189,8 @@ std::unique_ptr<NetworkInterfaceASIO::AsyncOp> ASIOConnection::makeAsyncOp(ASIOC
 }
 
 Message ASIOConnection::makeIsMasterRequest(ASIOConnection* conn) {
-    rpc::LegacyRequestBuilder requestBuilder{};
-    requestBuilder.setDatabase("admin");
-    requestBuilder.setCommandName("isMaster");
-    requestBuilder.setCommandArgs(BSON("isMaster" << 1));
-    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
-
-    return requestBuilder.done();
+    return rpc::legacyRequestFromOpMsgRequest(
+        OpMsgRequest::fromDBAndBody("admin", BSON("isMaster" << 1)));
 }
 
 void ASIOConnection::setTimeout(Milliseconds timeout, TimeoutCallback cb) {

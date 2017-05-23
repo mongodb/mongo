@@ -57,7 +57,6 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -172,7 +171,7 @@ const rpc::ReplyMetadataReader& DBClientWithCommands::getReplyMetadataReader() {
 
 rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData database,
                                                               StringData command,
-                                                              const BSONObj& metadata,
+                                                              const BSONObj& metadataIn,
                                                               const BSONObj& commandArgs) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Database name '" << database << "' is not valid.",
@@ -185,20 +184,19 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     // call() oddly takes this by pointer, so we need to put it on the stack.
     auto host = getServerAddress();
 
-    BSONObjBuilder metadataBob(std::move(metadata));
+    auto metadata = metadataIn;
 
     if (_metadataWriter) {
+        BSONObjBuilder metadataBob(std::move(metadata));
         uassertStatusOK(
             _metadataWriter((haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
+        metadata = metadataBob.obj();
     }
 
-    auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());
-
-    requestBuilder->setDatabase(database);
-    requestBuilder->setCommandName(command);
-    requestBuilder->setCommandArgs(commandArgs);
-    requestBuilder->setMetadata(metadataBob.obj());
-    auto requestMsg = requestBuilder->done();
+    auto requestMsg = rpc::messageFromOpMsgRequest(
+        getClientRPCProtocols(),
+        getServerRPCProtocols(),
+        OpMsgRequest::fromDBAndBody(database, std::move(commandArgs), metadata));
 
     Message replyMsg;
 
@@ -224,7 +222,7 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
                           << " but reply was '"
                           << networkOpToString(replyMsg.operation())
                           << "' ",
-            requestBuilder->getProtocol() == commandReply->getProtocol());
+            rpc::protocolForMessage(requestMsg) == commandReply->getProtocol());
 
     if (_metadataReader) {
         uassertStatusOK(_metadataReader(commandReply->getMetadata(), host));

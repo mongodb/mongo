@@ -44,7 +44,6 @@
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"

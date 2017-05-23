@@ -41,7 +41,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/object_check.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/debug_util.h"
@@ -62,30 +61,23 @@ Message assembleCommandRequest(DBClientWithCommands* cli,
                                StringData database,
                                int legacyQueryOptions,
                                BSONObj legacyQuery) {
-    // Can be an OP_COMMAND or OP_QUERY message.
-    auto requestBuilder =
-        rpc::makeRequestBuilder(cli->getClientRPCProtocols(), cli->getServerRPCProtocols());
-
     BSONObj upconvertedCommand;
     BSONObj upconvertedMetadata;
 
     std::tie(upconvertedCommand, upconvertedMetadata) =
         rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions);
 
-    BSONObjBuilder metadataBob(std::move(upconvertedMetadata));
     if (cli->getRequestMetadataWriter()) {
+        BSONObjBuilder metadataBob(std::move(upconvertedMetadata));
         uassertStatusOK(cli->getRequestMetadataWriter()(
             (haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
+        upconvertedMetadata = metadataBob.obj();
     }
 
-    requestBuilder->setDatabase(database);
-    // We need to get the command name from the upconverted command as it may have originally
-    // been wrapped.
-    requestBuilder->setCommandName(upconvertedCommand.firstElementFieldName());
-    requestBuilder->setCommandArgs(std::move(upconvertedCommand));
-    requestBuilder->setMetadata(metadataBob.obj());
-
-    return requestBuilder->done();
+    return rpc::messageFromOpMsgRequest(
+        cli->getClientRPCProtocols(),
+        cli->getServerRPCProtocols(),
+        OpMsgRequest::fromDBAndBody(database, std::move(upconvertedCommand), upconvertedMetadata));
 }
 
 }  // namespace

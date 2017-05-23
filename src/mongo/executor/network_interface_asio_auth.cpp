@@ -56,12 +56,6 @@ namespace executor {
 using ResponseStatus = TaskExecutor::ResponseStatus;
 
 void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
-    // We use a legacy builder to create our ismaster request because we may
-    // have to communicate with servers that do not support OP_COMMAND
-    rpc::LegacyRequestBuilder requestBuilder{};
-    requestBuilder.setDatabase("admin");
-    requestBuilder.setCommandName("isMaster");
-
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
     bob.append("hangUpOnStepDown", false);
@@ -84,11 +78,13 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
         WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
     }
 
-    requestBuilder.setCommandArgs(bob.done());
-    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
+    // We use a legacy request to create our ismaster request because we may
+    // have to communicate with servers that do not support other protocols.
+    auto isMasterRequest =
+        rpc::legacyRequestFromOpMsgRequest(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
 
     // Set current command to ismaster request and run
-    auto beginStatus = op->beginCommand(requestBuilder.done(), op->request().target);
+    auto beginStatus = op->beginCommand(std::move(isMasterRequest), op->request().target);
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }

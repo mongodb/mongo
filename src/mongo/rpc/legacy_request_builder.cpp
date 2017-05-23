@@ -33,6 +33,8 @@
 #include <tuple>
 #include <utility>
 
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/stdx/memory.h"
@@ -42,65 +44,61 @@
 namespace mongo {
 namespace rpc {
 
-LegacyRequestBuilder::LegacyRequestBuilder() : LegacyRequestBuilder(Message()) {}
+namespace {
+/**
+ * Given a command request, attempts to construct a legacy command
+ * object and query flags bitfield augmented with the given metadata.
+ */
+BSONObj downconvertRequestBody(const OpMsgRequest& request, int* queryOptions) {
+    invariant(request.sequences.empty());  // Not supported yet.
+    *queryOptions = 0;
 
-LegacyRequestBuilder::~LegacyRequestBuilder() {}
+    if (auto readPref = request.body["$readPreference"]) {
+        auto parsed = ReadPreferenceSetting::fromInnerBSON(readPref);
+        if (parsed.isOK() && parsed.getValue().canRunOnSecondary()) {
+            *queryOptions |= QueryOption_SlaveOk;
+        }
 
-LegacyRequestBuilder::LegacyRequestBuilder(Message&& message) : _message{std::move(message)} {
-    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
+        BSONObjBuilder outer;
+        {
+            BSONObjBuilder inner(outer.subobjStart("$query"));
+            for (auto field : request.body) {
+                const auto name = field.fieldNameStringData();
+                if (name == "$readPreference" || name == "$db") {
+                    // skip field.
+                } else {
+                    inner.append(field);
+                }
+            }
+        }
+        outer.append(readPref);
+        return outer.obj();
+    } else {
+        return request.body.removeField("$db");  // No additional downconversion needed.
+    }
 }
+}  // namespace
 
-LegacyRequestBuilder& LegacyRequestBuilder::setDatabase(StringData database) {
-    invariant(_state == State::kDatabase);
-    _ns = NamespaceString(database, "$cmd").toString();
-    _state = State::kCommandName;
-    return *this;
-}
+Message legacyRequestFromOpMsgRequest(const OpMsgRequest& request) {
+    BufBuilder builder;
+    builder.skip(mongo::MsgData::MsgDataHeaderSize);
 
-LegacyRequestBuilder& LegacyRequestBuilder::setCommandName(StringData commandName) {
-    invariant(_state == State::kCommandName);
-    // no op, as commandName is the first element of commandArgs
-    _state = State::kCommandArgs;
-    return *this;
-}
+    const auto cmdNS = NamespaceString(request.getDatabase(), "").getCommandNS().toString();
 
-LegacyRequestBuilder& LegacyRequestBuilder::setCommandArgs(BSONObj commandArgs) {
-    invariant(_state == State::kCommandArgs);
-    _commandArgs = std::move(commandArgs);
-    _state = State::kMetadata;
-    return *this;
-}
-
-LegacyRequestBuilder& LegacyRequestBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
-    BSONObj legacyCommandArgs;
     int queryOptions;
+    const auto downconvertedBody = downconvertRequestBody(request, &queryOptions);
 
-    std::tie(legacyCommandArgs, queryOptions) =
-        rpc::downconvertRequestMetadata(std::move(_commandArgs), std::move(metadata));
+    builder.appendNum(queryOptions);
+    builder.appendStr(cmdNS);
+    builder.appendNum(0);  // nToSkip
+    builder.appendNum(1);  // nToReturn
 
-    _builder.appendNum(queryOptions);  // queryOptions
-    _builder.appendStr(_ns);
-    _builder.appendNum(0);  // nToSkip
-    _builder.appendNum(1);  // nToReturn
+    downconvertedBody.appendSelfToBufBuilder(builder);
 
-    legacyCommandArgs.appendSelfToBufBuilder(_builder);
-    _state = State::kInputDocs;
-    return *this;
-}
-
-Protocol LegacyRequestBuilder::getProtocol() const {
-    return rpc::Protocol::kOpQuery;
-}
-
-Message LegacyRequestBuilder::done() {
-    invariant(_state == State::kInputDocs);
-    MsgData::View msg = _builder.buf();
-    msg.setLen(_builder.len());
+    MsgData::View msg = builder.buf();
+    msg.setLen(builder.len());
     msg.setOperation(dbQuery);
-    _message.setData(_builder.release());
-    _state = State::kDone;
-    return std::move(_message);
+    return Message(builder.release());
 }
 
 }  // namespace rpc

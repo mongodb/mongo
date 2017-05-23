@@ -73,12 +73,6 @@ using LegacyCommandAndFlags = std::tuple<BSONObj, int>;
 CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags);
 
 /**
- * Given a command object and a metadata object, attempts to construct a legacy command
- * object and query flags bitfield augmented with the given metadata.
- */
-LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata);
-
-/**
  * A command reply and associated metadata object.
  */
 using CommandReplyWithMetadata = std::tuple<BSONObj, BSONObj>;

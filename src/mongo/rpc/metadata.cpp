@@ -161,33 +161,6 @@ CommandAndMetadata upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags
     return std::make_tuple(logicalTimeCommandBob.obj(), metadataBob.obj());
 }
 
-LegacyCommandAndFlags downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
-    int legacyQueryFlags = 0;
-    if (auto logicalTime = metadata[LogicalTimeMetadata::fieldName()]) {
-        BSONObjBuilder logicalTimeCommandBob(std::move(cmdObj));
-        logicalTimeCommandBob.append(logicalTime);
-        cmdObj = logicalTimeCommandBob.obj();
-    }
-
-    auto readPref = metadata["$readPreference"];
-    if (!readPref)
-        readPref = cmdObj["$readPreference"];
-
-    if (readPref) {
-        BSONObjBuilder bob;
-        bob.append("$query", cmdObj);
-        bob.append(readPref);
-        cmdObj = bob.obj();
-
-        auto parsed = ReadPreferenceSetting::fromInnerBSON(readPref);
-        if (parsed.isOK() && parsed.getValue().canRunOnSecondary()) {
-            legacyQueryFlags |= QueryOption_SlaveOk;
-        }
-    }
-
-    return std::make_tuple(cmdObj, std::move(legacyQueryFlags));
-}
-
 CommandReplyWithMetadata upconvertReplyMetadata(const BSONObj& legacyReply) {
     BSONObjBuilder commandReplyBob;
     BSONObjBuilder metadataBob;

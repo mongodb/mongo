@@ -40,7 +40,6 @@
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -61,20 +60,6 @@ namespace {
 // Used to generate unique identifiers for AsyncOps, the same AsyncOp may
 // be used to run multiple distinct requests.
 AtomicUInt64 kAsyncOpIdCounter(0);
-
-StatusWith<Message> messageFromRequest(const RemoteCommandRequest& request,
-                                       rpc::Protocol protocol) {
-    BSONObj query = request.cmdObj;
-    auto requestBuilder = rpc::makeRequestBuilder(protocol);
-
-    auto toSend = rpc::makeRequestBuilder(protocol)
-                      ->setDatabase(request.dbname)
-                      .setCommandName(request.cmdObj.firstElementFieldName())
-                      .setCommandArgs(request.cmdObj)
-                      .setMetadata(request.metadata)
-                      .done();
-    return std::move(toSend);
-}
 
 }  // namespace
 
@@ -179,11 +164,11 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
 }
 
 Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request) {
-    auto newCommand = messageFromRequest(request, operationProtocol());
-    if (!newCommand.isOK()) {
-        return newCommand.getStatus();
-    }
-    return beginCommand(std::move(newCommand.getValue()), request.target);
+    return beginCommand(
+        rpc::messageFromOpMsgRequest(
+            operationProtocol(),
+            OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj, request.metadata)),
+        request.target);
 }
 
 NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {

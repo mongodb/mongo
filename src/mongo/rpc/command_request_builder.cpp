@@ -30,80 +30,71 @@
 
 #include "mongo/rpc/command_request_builder.h"
 
-#include <utility>
-
 #include "mongo/client/read_preference.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/commands.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
 
-CommandRequestBuilder::CommandRequestBuilder() : CommandRequestBuilder(Message()) {}
+namespace {
+// OP_COMMAND put some generic arguments in the metadata and some in the body.
+bool fieldGoesInMetadata(StringData commandName, StringData field) {
+    if (!Command::isGenericArgument(field))
+        return false;  // All non-generic arguments go to the body.
 
-CommandRequestBuilder::~CommandRequestBuilder() {}
+    // For some reason this goes in the body only for a single command...
+    if (field == "$replData")
+        return commandName != "replSetUpdatePosition";
 
-CommandRequestBuilder::CommandRequestBuilder(Message&& message) : _message{std::move(message)} {
-    _builder.skip(mongo::MsgData::MsgDataHeaderSize);  // Leave room for message header.
+    // These generic arguments went in the body.
+    return !(field == "maxTimeMS" || field == "readConcern" || field == "writeConcern" ||
+             field == "shardVersion");
 }
+}  // namespace
 
-CommandRequestBuilder& CommandRequestBuilder::setDatabase(StringData database) {
-    invariant(_state == State::kDatabase);
-    _builder.appendStr(database);
-    _state = State::kCommandName;
-    return *this;
-}
+Message opCommandRequestFromOpMsgRequest(const OpMsgRequest& request) {
+    invariant(request.sequences.empty());  // Not supported yet.
 
-CommandRequestBuilder& CommandRequestBuilder::setCommandName(StringData commandName) {
-    invariant(_state == State::kCommandName);
-    _builder.appendStr(commandName);
-    _state = State::kCommandArgs;
-    return *this;
-}
+    const auto commandName = request.getCommandName();
 
-CommandRequestBuilder& CommandRequestBuilder::setCommandArgs(BSONObj commandArgs) {
-    invariant(_state == State::kCommandArgs);
-    commandArgs.appendSelfToBufBuilder(_builder);
-    _state = State::kMetadata;
-    return *this;
-}
+    BufBuilder builder;
+    builder.skip(mongo::MsgData::MsgDataHeaderSize);  // Leave room for message header.
+    builder.appendStr(request.getDatabase());
+    builder.appendStr(commandName);
 
-CommandRequestBuilder& CommandRequestBuilder::setMetadata(BSONObj metadata) {
-    invariant(_state == State::kMetadata);
     // OP_COMMAND is only used when communicating with 3.4 nodes and they serialize their metadata
-    // fields differently. We do all down-conversion here so that the rest of the code only has to
-    // deal with the current format.
-    BSONObjBuilder bob(_builder);
-    for (auto elem : metadata) {
-        if (elem.fieldNameStringData() == "$configServerState") {
-            bob.appendAs(elem, "configsvr");
-        } else if (elem.fieldNameStringData() == "$readPreference") {
-            BSONObjBuilder ssmBuilder(bob.subobjStart("$ssm"));
-            ssmBuilder.append(elem);
-            ssmBuilder.append(
-                "$secondaryOk",
-                uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(elem)).canRunOnSecondary());
-        } else {
-            bob.append(elem);
+    // fields differently. In addition to field-level differences, some generic arguments are pulled
+    // out to a metadata object, separate from the body. We do all down-conversion here so that the
+    // rest of the code only has to deal with the current format.
+    BSONObjBuilder metadataBuilder;  // Will be appended to the message after we finish the body.
+    {
+        BSONObjBuilder bodyBuilder(builder);
+        for (auto elem : request.body) {
+            const auto fieldName = elem.fieldNameStringData();
+            if (fieldName == "$configServerState") {
+                metadataBuilder.appendAs(elem, "configsvr");
+            } else if (fieldName == "$readPreference") {
+                BSONObjBuilder ssmBuilder(metadataBuilder.subobjStart("$ssm"));
+                ssmBuilder.append(elem);
+                ssmBuilder.append("$secondaryOk",
+                                  uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(elem))
+                                      .canRunOnSecondary());
+            } else if (fieldName == "$db") {
+                // skip
+            } else if (fieldGoesInMetadata(commandName, fieldName)) {
+                metadataBuilder.append(elem);
+            } else {
+                bodyBuilder.append(elem);
+            }
         }
     }
-    _state = State::kInputDocs;
-    return *this;
-}
+    metadataBuilder.obj().appendSelfToBufBuilder(builder);
 
-Protocol CommandRequestBuilder::getProtocol() const {
-    return rpc::Protocol::kOpCommandV1;
-}
-
-Message CommandRequestBuilder::done() {
-    invariant(_state == State::kInputDocs);
-    MsgData::View msg = _builder.buf();
-    msg.setLen(_builder.len());
+    MsgData::View msg = builder.buf();
+    msg.setLen(builder.len());
     msg.setOperation(dbCommand);
-    _message.setData(_builder.release());  // transfer ownership to Message.
-    _state = State::kDone;
-    return std::move(_message);
+    return Message(builder.release());
 }
 
 }  // namespace rpc
