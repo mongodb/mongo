@@ -875,6 +875,12 @@ public:
      */
     virtual Status abortCatchupIfNeeded() = 0;
 
+    /**
+     * Returns true if logOp() should not append an entry to the oplog for the namespace for this
+     * operation.
+     */
+    bool isOplogDisabledFor(OperationContext* opCtx, const NamespaceString& nss);
+
 protected:
     ReplicationCoordinator();
 };

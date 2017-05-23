@@ -67,5 +67,28 @@ void ReplicationCoordinator::set(ServiceContext* service,
     coordinator = std::move(replCoord);
 }
 
+bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    if (getReplicationMode() == ReplicationCoordinator::modeNone) {
+        return true;
+    }
+
+    if (nss.db() == "local") {
+        return true;
+    }
+
+    if (nss.isSystemDotProfile()) {
+        return true;
+    }
+
+    if (!opCtx->writesAreReplicated()) {
+        return true;
+    }
+
+    fassert(28626, opCtx->recoveryUnit());
+
+    return false;
+}
+
 }  // namespace repl
 }  // namespace mongo
