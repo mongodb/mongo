@@ -130,6 +130,24 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(UpdateObjectNode* root,
 
 namespace {
 /**
+ * Helper class for appending to a FieldRef for the duration of the current scope and then restoring
+ * the FieldRef at the end of the scope.
+ */
+class FieldRefTempAppend {
+public:
+    FieldRefTempAppend(FieldRef& fieldRef, const std::string& part) : _fieldRef(fieldRef) {
+        _fieldRef.appendPart(part);
+    }
+
+    ~FieldRefTempAppend() {
+        _fieldRef.removeLastPart();
+    }
+
+private:
+    FieldRef& _fieldRef;
+};
+
+/**
  * Helper for when performMerge wants to create a merged child from children that exist in two
  * merging nodes. If there is only one child (leftNode or rightNode is NULL), we clone it. If there
  * are two different children, we merge them recursively. If there are no children (leftNode and
@@ -146,9 +164,8 @@ std::unique_ptr<UpdateNode> copyOrMergeAsNecessary(UpdateNode* leftNode,
     } else if (!rightNode) {
         return leftNode->clone();
     } else {
-        std::unique_ptr<FieldRef> updatedFieldRef(
-            new FieldRef(pathTaken->dottedField() + "." + nextField));
-        return UpdateNode::createUpdateNodeByMerging(*leftNode, *rightNode, updatedFieldRef.get());
+        FieldRefTempAppend tempAppend(*pathTaken, nextField);
+        return UpdateNode::createUpdateNodeByMerging(*leftNode, *rightNode, pathTaken);
     }
 }
 }

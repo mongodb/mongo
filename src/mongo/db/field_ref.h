@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <iosfwd>
 #include <string>
 #include <vector>
@@ -71,6 +72,17 @@ public:
      * undefined otherwise.
      */
     void setPart(size_t i, StringData part);
+
+    /**
+     * Adds a new field to the end of the path, increasing its size by 1.
+     */
+    void appendPart(StringData part);
+
+    /**
+     * Removes the last part from the path, decreasing its size by 1. Has no effect on a
+     * FieldRef with size 0.
+     */
+    void removeLastPart();
 
     /**
      * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
@@ -144,10 +156,10 @@ private:
     }
 
     /**
-     * Returns the new number of parts after appending 'part' to this field path. It
-     * assumes that 'part' is pointing to an internally allocated area.
+     * Returns the new number of parts after appending 'part' to this field path. This is
+     * private, because it is only intended for use by the parse function.
      */
-    size_t appendPart(StringData part);
+    size_t appendParsedPart(StringData part);
 
     /**
      * Re-assemble _dotted from components, including any replacements in _replacements,
@@ -161,16 +173,30 @@ private:
     // number of field parts stored
     size_t _size;
 
-    // first kResevedAhead field components
-    mutable StringData _fixed[kReserveAhead];
+    // Number of field parts in the cached dotted name (_dotted).
+    mutable size_t _cachedSize;
 
-    // remaining field components
-    mutable std::vector<StringData> _variable;
+    /**
+     * First kResevedAhead field components.
+     *
+     * Each component is either a StringData backed by the _dotted string or boost::none
+     * to indicate that getPart() should read the string from the _replacements list.
+     */
+    mutable boost::optional<StringData> _fixed[kReserveAhead];
 
-    // cached dotted name
+    // Remaining field components. (See comment above _fixed.)
+    mutable std::vector<boost::optional<StringData>> _variable;
+
+    /**
+     * Cached copy of the complete dotted name string. The StringData objects in "_fixed"
+     * and "_variable" reference this string.
+     */
     mutable std::string _dotted;
 
-    // back memory added with the setPart call pointed to by _fized and _variable
+    /**
+     * String storage for path parts that have been replaced with setPart() or added with
+     * appendPart() since the lasted time "_dotted" was materialized.
+     */
     mutable std::vector<std::string> _replacements;
 };
 
