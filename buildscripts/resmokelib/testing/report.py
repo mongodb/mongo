@@ -249,7 +249,8 @@ class TestReport(unittest.TestResult):
         """
 
         with self._lock:
-            return [test_info for test_info in self.test_infos if test_info.status == "fail"]
+            return [test_info for test_info in self.test_infos
+                    if test_info.status in ("fail", "silentfail")]
 
     def get_errored(self):
         """
@@ -269,27 +270,31 @@ class TestReport(unittest.TestResult):
         with self._lock:
             return [test_info for test_info in self.test_infos if test_info.status == "timeout"]
 
-    def as_dict(self):
+    def as_dict(self, convert_failures=False):
         """
         Return the test result information as a dictionary.
 
         Used to create the report.json file.
+
+        If 'convert_failures' is true, then "error" and "fail" test statuses are replaced with
+        _config.REPORT_FAILURE_STATUS in the returned dictionary.
         """
 
         results = []
         with self._lock:
             for test_info in self.test_infos:
                 status = test_info.status
-                if status == "error":
-                    # Don't distinguish between failures and errors.
-                    status = _config.REPORT_FAILURE_STATUS
-                elif status == "timeout":
-                    # Until EVG-1536 is completed, we shouldn't distinguish between failures and
-                    # interrupted tests in the report.json file. In Evergreen, the behavior to sort
-                    # tests with the "timeout" test status after tests with the "pass" test status
-                    # effectively hides interrupted tests from the test results sidebar unless
-                    # sorting by the time taken.
-                    status = "fail"
+                if convert_failures:
+                    if status == "error" or status == "fail":
+                        # Don't distinguish between failures and errors.
+                        status = _config.REPORT_FAILURE_STATUS
+                    elif status == "timeout":
+                        # Until EVG-1536 is completed, we shouldn't distinguish between failures and
+                        # interrupted tests in the report.json file. In Evergreen, the behavior to
+                        # sort tests with the "timeout" test status after tests with the "pass" test
+                        # status effectively hides interrupted tests from the test results sidebar
+                        # unless sorting by the time taken.
+                        status = "fail"
 
                 result = {
                     "test_file": test_info.test_id,
@@ -330,6 +335,16 @@ class TestReport(unittest.TestResult):
             test_info.start_time = result["start"]
             test_info.end_time = result["end"]
             report.test_infos.append(test_info)
+
+            if is_dynamic:
+                report.num_dynamic += 1
+
+        # Update cached values for number of successful and failed tests.
+        report.num_failed = len(report.get_failed())
+        report.num_errored = len(report.get_errored())
+        report.num_interrupted = len(report.get_interrupted())
+        report.num_succeeded = len(report.get_successful())
+
         return report
 
     def reset(self):
