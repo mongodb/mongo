@@ -25,10 +25,14 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/platform/basic.h"
 
 #include "uuid_catalog.h"
 
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -43,17 +47,16 @@ void UUIDCatalog::onCreateCollection(OperationContext* opCtx,
     opCtx->recoveryUnit()->onRollback([this, uuid] { _removeUUIDCatalogEntry(uuid); });
 }
 
-Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) {
+Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    Collection* foundCol = _catalog[uuid];
-    return foundCol;
+    auto foundIt = _catalog.find(uuid);
+    return foundIt == _catalog.end() ? nullptr : foundIt->second;
 }
 
-NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) {
+NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    Collection* foundCol = _catalog[uuid];
-    NamespaceString nss = foundCol ? foundCol->ns() : NamespaceString();
-    return nss;
+    auto foundIt = _catalog.find(uuid);
+    return foundIt == _catalog.end() ? NamespaceString() : foundIt->second->ns();
 }
 
 void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid) {
@@ -66,7 +69,8 @@ void UUIDCatalog::_registerUUIDCatalogEntry(CollectionUUID uuid, Collection* col
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     if (coll) {
         std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
-        invariant(_catalog.insert(entry).second == true);
+        LOG(2) << "registering collection " << coll->ns() << " as having UUID " << uuid.toString();
+        invariant(_catalog.insert(entry).second);
     }
 }
 

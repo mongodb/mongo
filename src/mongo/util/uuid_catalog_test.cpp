@@ -58,11 +58,10 @@ protected:
 namespace {
 
 TEST_F(UUIDCatalogTest, onCreateCollection) {
-    ASSERT(catalog.lookupCollectionByUUID(uuid) != nullptr);
+    ASSERT(catalog.lookupCollectionByUUID(uuid) == &col);
 }
 
 TEST_F(UUIDCatalogTest, lookupCollectionByUUID) {
-    ASSERT(catalog.lookupCollectionByUUID(uuid) != nullptr);
     // Ensure the string value of the NamespaceString of the obtained Collection is equal to
     // nss.ns().
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(uuid)->ns().ns(), nss.ns());
@@ -75,6 +74,19 @@ TEST_F(UUIDCatalogTest, lookupNSSByUUID) {
     ASSERT_EQUALS(catalog.lookupNSSByUUID(uuid).ns(), nss.ns());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
     ASSERT_EQUALS(catalog.lookupNSSByUUID(CollectionUUID::gen()).ns(), NamespaceString().ns());
+}
+
+TEST_F(UUIDCatalogTest, insertAfterLookup) {
+    auto newUUID = CollectionUUID::gen();
+    NamespaceString newNss(nss.db(), "newcol");
+    Collection newCol(stdx::make_unique<CollectionMock>(newNss));
+
+    // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
+    ASSERT(catalog.lookupCollectionByUUID(newUUID) == nullptr);
+    ASSERT(catalog.lookupNSSByUUID(newUUID) == NamespaceString());
+    catalog.onCreateCollection(&opCtx, &newCol, newUUID);
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(newUUID), &newCol);
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(uuid), nss);
 }
 
 TEST_F(UUIDCatalogTest, onDropCollection) {

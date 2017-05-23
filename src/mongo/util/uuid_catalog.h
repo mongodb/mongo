@@ -61,13 +61,13 @@ public:
      * to calling this function, or else the found Collection pointer
      * might no longer be valid when the call returns.
      */
-    Collection* lookupCollectionByUUID(CollectionUUID uuid);
+    Collection* lookupCollectionByUUID(CollectionUUID uuid) const;
 
     /* This function gets the NamespaceString from the Collection* pointer that
      * corresponds to CollectionUUID uuid. If there is no such pointer, an empty
      * NamespaceString is returned.
      */
-    NamespaceString lookupNSSByUUID(CollectionUUID uuid);
+    NamespaceString lookupNSSByUUID(CollectionUUID uuid) const;
 
     /* This function removes the entry for uuid from the UUID catalog. It
      * is called by the op observer when a collection is dropped.
@@ -75,7 +75,7 @@ public:
     void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
 
 private:
-    mongo::stdx::mutex _catalogLock;
+    mutable mongo::stdx::mutex _catalogLock;
     mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
 
     void _registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
