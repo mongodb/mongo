@@ -5466,7 +5466,7 @@ buildvariants:
 - name: osx-1010-ssl
   display_name: SSL OS X 10.10
   run_on:
-  - osx-1010
+  - macos-1012
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
@@ -5575,7 +5575,7 @@ buildvariants:
 - name: osx-1010-debug
   display_name: "* OS X 10.10 DEBUG"
   run_on:
-  - osx-1010
+  - macos-1012
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
@@ -5619,7 +5619,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - osx-1010
+  - macos-1012
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
