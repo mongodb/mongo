@@ -50,7 +50,7 @@ Status SetNode::apply(mutablebson::Element element,
                       const UpdateIndexData* indexData,
                       LogBuilder* logBuilder,
                       bool* indexesAffected,
-                      bool* noop) {
+                      bool* noop) const {
     *indexesAffected = false;
     *noop = false;
 

@@ -28,12 +28,15 @@
 
 #pragma once
 
+#include <map>
+#include <string>
+
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_node.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -80,6 +83,16 @@ public:
         _positionalChild->setCollator(collator);
     }
 
+    Status apply(mutablebson::Element element,
+                 FieldRef* pathToCreate,
+                 FieldRef* pathTaken,
+                 StringData matchedField,
+                 bool fromReplication,
+                 const UpdateIndexData* indexData,
+                 LogBuilder* logBuilder,
+                 bool* indexesAffected,
+                 bool* noop) const final;
+
     /**
      * Returns the child with field name 'field' or nullptr if there is no such child.
      */
@@ -92,8 +105,12 @@ public:
     void setChild(std::string field, std::unique_ptr<UpdateNode> child);
 
 private:
-    stdx::unordered_map<std::string, clonable_ptr<UpdateNode>> _children;
+    std::map<std::string, clonable_ptr<UpdateNode>> _children;
     clonable_ptr<UpdateNode> _positionalChild;
+
+    // When calling apply() causes us to merge an element of '_children' with '_positionalChild', we
+    // store the result of the merge in case we need it in a future call to apply().
+    mutable stdx::unordered_map<std::string, clonable_ptr<UpdateNode>> _mergedChildrenCache;
 };
 
 }  // namespace mongo

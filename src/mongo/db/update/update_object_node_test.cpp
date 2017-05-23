@@ -30,12 +30,17 @@
 
 #include "mongo/db/update/update_object_node.h"
 
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
+using mongo::mutablebson::Document;
+using mongo::mutablebson::Element;
 
 TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
     auto update = fromjson("{$set: {'': 5}}");
@@ -618,4 +623,792 @@ TEST(UpdateObjectNodeTest, MergeWithConflictingPositionalFails) {
         "Update created a conflict at 'root.a.$'");
 }
 
+TEST(UpdateObjectNodeTest, ApplyCreateField) {
+    auto setUpdate = fromjson("{$set: {b: 6}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b"], collator));
+
+    Document doc(fromjson("{a: 5}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("b");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_EQUALS(fromjson("{a: 5, b: 6}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {b: 6}}"), logDoc);
+}
+
+TEST(UpdateObjectNodeTest, ApplyExistingField) {
+    auto setUpdate = fromjson("{$set: {a: 6}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a"], collator));
+
+    Document doc(fromjson("{a: 5}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_EQUALS(fromjson("{a: 6}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: 6}}"), logDoc);
+}
+
+TEST(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
+    auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["d"], collator));
+
+    Document doc(fromjson("{a: 0, c: 0}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 5, c: 7, b: 6, d: 8}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
+    auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b.d"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b.e"], collator));
+
+    Document doc(fromjson("{a: {b: 5, c: 5}, b: {d: 5, e: 5}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
+                      logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
+    auto setUpdate = fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b.d"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b.e"], collator));
+
+    Document doc(fromjson("{z: 0}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
+                      logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
+    auto setUpdate = fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.b.c.d"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.b.c.e"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.f"], collator));
+
+    Document doc(fromjson("{z: 0}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: {c: {d: 6, e: 7}}, f: 8}}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}"),
+                      logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
+    auto setUpdate = fromjson("{$set: {a: 5, d: 6, c: 7, b: 8, z: 9}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["d"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["z"], collator));
+
+    Document doc(fromjson("{z: 0, a: 0}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{z: 9, a: 5, b: 8, c: 7, d: 6}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {a: 5, b: 8, c: 7, d: 6, z: 9}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
+    auto setUpdate = fromjson("{$set: {abc: 5, cba: 6}}");
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["abc"], &collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["cba"], &collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("abc");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{abc: 5, cba: 6}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {abc: 5, cba: 6}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyNoop) {
+    auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["c"], collator));
+
+    Document doc(fromjson("{a: 5, b: 6, c: 7}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    indexData.addPath("b");
+    indexData.addPath("c");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_TRUE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
+    auto setUpdate = fromjson("{$set: {a: 5, b: 6, c: 7}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["c"], collator));
+
+    Document doc(fromjson("{a: 5, b: 0, c: 7}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    indexData.addPath("b");
+    indexData.addPath("c");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {b: 6}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyBlockingElement) {
+    auto setUpdate = fromjson("{$set: {'a.b': 5}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.b"], collator));
+
+    Document doc(fromjson("{a: 0}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(root.apply(doc.root(),
+                                           &pathToCreate,
+                                           &pathTaken,
+                                           matchedField,
+                                           fromReplication,
+                                           &indexData,
+                                           &logBuilder,
+                                           &indexesAffected,
+                                           &noop),
+                                UserException,
+                                ErrorCodes::PathNotViable,
+                                "Cannot create field 'b' in element {a: 0}");
+}
+
+TEST(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
+    auto setUpdate = fromjson("{$set: {'a.b': 5, b: 6}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["b"], collator));
+
+    Document doc(fromjson("{a: 0}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = true;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: 0, b: 6}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {b: 6}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
+    auto setUpdate = fromjson("{$set: {'a.$': 5}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(
+        root.apply(doc.root(),
+                   &pathToCreate,
+                   &pathTaken,
+                   matchedField,
+                   fromReplication,
+                   &indexData,
+                   &logBuilder,
+                   &indexesAffected,
+                   &noop),
+        UserException,
+        ErrorCodes::BadValue,
+        "The positional operator did not find the match needed from the query.");
+}
+
+TEST(UpdateObjectNodeTest, ApplyMergePositionalChild) {
+    auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$.c"], collator));
+
+    Document doc(fromjson("{a: [{b: 0, c: 0}]}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "0";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
+    auto setUpdate = fromjson("{$set: {'a.2': 5, 'a.1.b': 6, 'a.0': 7, 'a.$.c': 8}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.2"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.1.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$.c"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "1";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 7, '1': {b: 6, c: 8}, '2': 5}}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 7, 'a.1.b': 6, 'a.1.c': 8, 'a.2': 5}}"),
+                      logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
+    auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.$': 6}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "0";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_THROWS_CODE_AND_WHAT(root.apply(doc.root(),
+                                           &pathToCreate,
+                                           &pathTaken,
+                                           matchedField,
+                                           fromReplication,
+                                           &indexData,
+                                           &logBuilder,
+                                           &indexesAffected,
+                                           &noop),
+                                UserException,
+                                ErrorCodes::ConflictingUpdateOperators,
+                                "Update created a conflict at 'a.0'");
+}
+
+TEST(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
+    auto setUpdate = fromjson("{$set: {'a.0': 5, 'a.2': 6, 'a.$': 7}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.2"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "1";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 5, '1': 7, '2': 6}}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 5, 'a.1': 7, 'a.2': 6}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyPositionalChildLast) {
+    auto setUpdate = fromjson("{$set: {'a.$': 5, 'a.0': 6, 'a.1': 7}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.1"], collator));
+
+    Document doc(fromjson("{}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "2";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 6, '1': 7, '2': 5}}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 6, 'a.1': 7, 'a.2': 5}}"), logDoc.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
+    auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$.c"], collator));
+
+    Document doc(fromjson("{a: [{b: 0, c: 0}]}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "0";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), logDoc.getObject());
+
+    Document doc2(fromjson("{a: [{b: 0, c: 0}]}"));
+    Document logDoc2;
+    LogBuilder logBuilder2(logDoc2.root());
+    ASSERT_OK(root.apply(doc2.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder2,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc2.getObject());
+    ASSERT_TRUE(doc2.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), logDoc2.getObject());
+}
+
+TEST(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
+    auto setUpdate = fromjson("{$set: {'a.0.b': 5, 'a.$.c': 6, 'a.1.d': 7}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.0.b"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.$.c"], collator));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_SET, setUpdate["$set"]["a.1.d"], collator));
+
+    Document doc(fromjson("{a: [{b: 0, c: 0}, {c: 0, d: 0}]}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("");
+    StringData matchedField = "0";
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(root.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}, {c: 0, d: 7}]}"), doc.getObject());
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6, 'a.1.d': 7}}"), logDoc.getObject());
+
+    Document doc2(fromjson("{a: [{b: 0, c: 0}, {c: 0, d: 0}]}"));
+    StringData matchedField2 = "1";
+    Document logDoc2;
+    LogBuilder logBuilder2(logDoc2.root());
+    ASSERT_OK(root.apply(doc2.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField2,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder2,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_FALSE(noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 0}, {c: 6, d: 7}]}"), doc2.getObject());
+    ASSERT_TRUE(doc2.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.1.c': 6, 'a.1.d': 7}}"),
+                      logDoc2.getObject());
+}
+
 }  // namespace
+}  // namespace mongo

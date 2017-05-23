@@ -28,12 +28,7 @@
 
 #pragma once
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/mutable/element.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/update_node.h"
-#include "mongo/db/update_index_data.h"
 
 namespace mongo {
 
@@ -57,32 +52,6 @@ public:
      * multiple documents.
      */
     virtual Status init(BSONElement modExpr, const CollatorInterface* collator) = 0;
-
-    /**
-     * Applies the update node to 'element', creating the fields in 'pathToCreate' if required by
-     * the leaves (i.e. the leaves are not all $unset). 'pathTaken' is the path through the root
-     * document to 'element', ending with the field name of 'element'. 'pathToCreate' is the path
-     * taken through the UpdateNode tree beyond where the path existed in the document. For example,
-     * if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at the leaf node,
-     * pathTaken="a" and pathToCreate="b.c" If there was a positional ($) element in the update
-     * expression, 'matchedField' is the index of the array element that caused the query to match
-     * the document. 'fromReplication' is provided because some modifiers may ignore certain errors
-     * when the update is from replication. Uses the index information in 'indexData' to determine
-     * whether indexes are affected. If a LogBuilder is provided, logs the update. Outputs whether
-     * the operation was a no-op. Returns a non-OK status if the update node cannot be applied to
-     * the document.
-     *
-     * TODO SERVER-28761: Move this virtual method into UpdateNode.
-     */
-    virtual Status apply(mutablebson::Element element,
-                         FieldRef* pathToCreate,
-                         FieldRef* pathTaken,
-                         StringData matchedField,
-                         bool fromReplication,
-                         const UpdateIndexData* indexData,
-                         LogBuilder* logBuilder,
-                         bool* indexesAffected,
-                         bool* noop) = 0;
 };
 
 }  // namespace mongo

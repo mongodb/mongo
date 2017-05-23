@@ -54,7 +54,7 @@ public:
                  const UpdateIndexData* indexData,
                  LogBuilder* logBuilder,
                  bool* indexesAffected,
-                 bool* noop) final;
+                 bool* noop) const final;
 
 private:
     BSONElement _val;

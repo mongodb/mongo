@@ -43,6 +43,87 @@ bool isPositionalElement(const std::string& field) {
     return field.length() == 1 && field[0] == '$';
 }
 
+/**
+ * Applies 'child' to the child of 'element' named 'field' (which will create it, if it does not
+ * exist). If 'pathToCreate' is created, then 'pathToCreate' is moved to the end of 'pathTaken', and
+ * 'element' is advanced to the end of 'pathTaken'.
+ */
+void applyChild(const UpdateNode& child,
+                StringData field,
+                mutablebson::Element* element,
+                FieldRef* pathToCreate,
+                FieldRef* pathTaken,
+                StringData matchedField,
+                bool fromReplication,
+                const UpdateIndexData* indexData,
+                LogBuilder* logBuilder,
+                bool* indexesAffected,
+                bool* noop) {
+
+    auto childElement = *element;
+    auto pathTakenSizeBefore = pathTaken->numParts();
+
+    // If 'field' exists in 'element', append 'field' to the end of 'pathTaken' and advance
+    // 'childElement'. Otherwise, append 'field' to the end of 'pathToCreate'.
+    if (pathToCreate->empty() && (childElement = (*element)[field]).ok()) {
+        pathTaken->appendPart(field);
+    } else {
+        childElement = *element;
+        pathToCreate->appendPart(field);
+    }
+
+    bool childAffectsIndexes = false;
+    bool childNoop = false;
+
+    uassertStatusOK(child.apply(childElement,
+                                pathToCreate,
+                                pathTaken,
+                                matchedField,
+                                fromReplication,
+                                indexData,
+                                logBuilder,
+                                &childAffectsIndexes,
+                                &childNoop));
+
+    *indexesAffected = *indexesAffected || childAffectsIndexes;
+    *noop = *noop && childNoop;
+
+    // Pop 'field' off of 'pathToCreate' or 'pathTaken'.
+    if (!pathToCreate->empty()) {
+        pathToCreate->removeLastPart();
+    } else {
+        pathTaken->removeLastPart();
+    }
+
+    // If the child is an internal node, it may have created 'pathToCreate' and moved 'pathToCreate'
+    // to the end of 'pathTaken'. We should advance 'element' to the end of 'pathTaken'.
+    if (pathTaken->numParts() > pathTakenSizeBefore) {
+        for (auto i = pathTakenSizeBefore; i < pathTaken->numParts(); ++i) {
+            *element = (*element)[pathTaken->getPart(i)];
+            invariant(element->ok());
+        }
+    } else if (!pathToCreate->empty()) {
+
+        // If the child is a leaf node, it may have created 'pathToCreate' without moving
+        // 'pathToCreate' to the end of 'pathTaken'. We should move 'pathToCreate' to the end of
+        // 'pathTaken' and advance 'element' to the end of 'pathTaken'.
+        childElement = (*element)[pathToCreate->getPart(0)];
+        if (childElement.ok()) {
+            *element = childElement;
+            pathTaken->appendPart(pathToCreate->getPart(0));
+
+            // Either the path was fully created or not created at all.
+            for (size_t i = 1; i < pathToCreate->numParts(); ++i) {
+                *element = (*element)[pathToCreate->getPart(i)];
+                invariant(element->ok());
+                pathTaken->appendPart(pathToCreate->getPart(i));
+            }
+
+            pathToCreate->clear();
+        }
+    }
+}
+
 }  // namespace
 
 // static
@@ -185,7 +266,6 @@ std::unique_ptr<UpdateNode> UpdateObjectNode::createUpdateNodeByMerging(
     }
 
     // Create an entry in mergedNode->children for all the fields we found.
-    mergedNode->_children.reserve(allFields.size());
     for (const std::string& fieldName : allFields) {
         auto leftChildIt = leftNode._children.find(fieldName);
         auto rightChildIt = rightNode._children.find(fieldName);
@@ -227,6 +307,91 @@ void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> c
         invariant(_children.find(field) == _children.end());
         _children[std::move(field)] = std::move(child);
     }
+}
+
+Status UpdateObjectNode::apply(mutablebson::Element element,
+                               FieldRef* pathToCreate,
+                               FieldRef* pathTaken,
+                               StringData matchedField,
+                               bool fromReplication,
+                               const UpdateIndexData* indexData,
+                               LogBuilder* logBuilder,
+                               bool* indexesAffected,
+                               bool* noop) const {
+    *indexesAffected = false;
+    *noop = true;
+
+    bool applyPositional = _positionalChild.get();
+    if (applyPositional) {
+        uassert(ErrorCodes::BadValue,
+                "The positional operator did not find the match needed from the query.",
+                !matchedField.empty());
+    }
+
+    // Capture arguments to applyChild() to avoid code duplication.
+    auto applyChildClosure = [=, &element](const UpdateNode& child, StringData field) {
+        applyChild(child,
+                   field,
+                   &element,
+                   pathToCreate,
+                   pathTaken,
+                   matchedField,
+                   fromReplication,
+                   indexData,
+                   logBuilder,
+                   indexesAffected,
+                   noop);
+    };
+
+    for (const auto& pair : _children) {
+
+        // If this child has the same field name as the positional child, they must be merged and
+        // applied.
+        if (applyPositional && pair.first == matchedField) {
+
+            // Check if we have stored the result of merging the positional child with this child.
+            auto mergedChild = _mergedChildrenCache.find(pair.first);
+            if (mergedChild == _mergedChildrenCache.end()) {
+
+                // The full path to the merged field is required for error reporting.
+                for (size_t i = 0; i < pathToCreate->numParts(); ++i) {
+                    pathTaken->appendPart(pathToCreate->getPart(i));
+                }
+                pathTaken->appendPart(matchedField);
+                auto insertResult = _mergedChildrenCache.emplace(
+                    std::make_pair(pair.first,
+                                   UpdateNode::createUpdateNodeByMerging(
+                                       *_positionalChild, *pair.second, pathTaken)));
+                for (size_t i = 0; i < pathToCreate->numParts() + 1; ++i) {
+                    pathTaken->removeLastPart();
+                }
+                invariant(insertResult.second);
+                mergedChild = insertResult.first;
+            }
+
+            applyChildClosure(*mergedChild->second.get(), pair.first);
+
+            applyPositional = false;
+            continue;
+        }
+
+        // If 'matchedField' is alphabetically before the current child, we should apply the
+        // positional child now.
+        if (applyPositional && matchedField < pair.first) {
+            applyChildClosure(*_positionalChild.get(), matchedField);
+            applyPositional = false;
+        }
+
+        // Apply the current child.
+        applyChildClosure(*pair.second, pair.first);
+    }
+
+    // 'matchedField' is alphabetically after all children, so we apply it now.
+    if (applyPositional) {
+        applyChildClosure(*_positionalChild.get(), matchedField);
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo
