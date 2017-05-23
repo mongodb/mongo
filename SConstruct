@@ -2382,7 +2382,9 @@ def doConfigure(myenv):
         }
 
         blackfiles = set([v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list])
-        blacklist_options=["-fsanitize-blacklist=%s" % blackfile for blackfile in blackfiles]
+        blacklist_options=["-fsanitize-blacklist=%s" % blackfile
+                           for blackfile in blackfiles
+                           if os.stat(blackfile.path).st_size != 0]
 
         for blacklist_option in blacklist_options:
             if AddToCCFLAGSIfSupported(myenv, blacklist_option):
