@@ -284,20 +284,16 @@ public:
 
         const bool hasOwnMaxTime = opCtx->hasDeadline();
 
-        if (!hasOwnMaxTime) {
+        // We assume that cursors created through a DBDirectClient are always used from their
+        // original OperationContext, so we do not need to move time to and from the cursor.
+        if (!hasOwnMaxTime && !opCtx->getClient()->isInDirectClient()) {
             // There is no time limit set directly on this getMore command. If the cursor is
             // awaitData, then we supply a default time of one second. Otherwise we roll over
             // any leftover time from the maxTimeMS of the operation that spawned this cursor,
             // applying it to this getMore.
             if (isCursorAwaitData(cursor)) {
-                uassert(40117,
-                        "Illegal attempt to set operation deadline within DBDirectClient",
-                        !opCtx->getClient()->isInDirectClient());
                 opCtx->setDeadlineAfterNowBy(Seconds{1});
             } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
-                uassert(40118,
-                        "Illegal attempt to set operation deadline within DBDirectClient",
-                        !opCtx->getClient()->isInDirectClient());
                 opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
             }
         }

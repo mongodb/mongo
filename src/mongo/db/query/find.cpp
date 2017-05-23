@@ -481,9 +481,13 @@ Message getMore(OperationContext* opCtx,
 
             *exhaust = cc->queryOptions() & QueryOption_Exhaust;
 
-            // If the getmore had a time limit, remaining time is "rolled over" back to the
-            // cursor (for use by future getmore ops).
-            cc->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+            // We assume that cursors created through a DBDirectClient are always used from their
+            // original OperationContext, so we do not need to move time to and from the cursor.
+            if (!opCtx->getClient()->isInDirectClient()) {
+                // If the getmore had a time limit, remaining time is "rolled over" back to the
+                // cursor (for use by future getmore ops).
+                cc->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+            }
         }
     }
 
@@ -684,9 +688,13 @@ std::string runQuery(OperationContext* opCtx,
 
         pinnedCursor.getCursor()->setPos(numResults);
 
-        // If the query had a time limit, remaining time is "rolled over" to the cursor (for
-        // use by future getmore ops).
-        pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+        // We assume that cursors created through a DBDirectClient are always used from their
+        // original OperationContext, so we do not need to move time to and from the cursor.
+        if (!opCtx->getClient()->isInDirectClient()) {
+            // If the query had a time limit, remaining time is "rolled over" to the cursor (for
+            // use by future getmore ops).
+            pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+        }
 
         endQueryOp(opCtx, collection, *pinnedCursor.getCursor()->getExecutor(), numResults, ccId);
     } else {
