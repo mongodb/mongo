@@ -71,9 +71,9 @@ class BaseDataSet(object):
     # Create a key for a Simple or Complex data set.
     @staticmethod
     def key_by_format(i, key_format):
-        if key_format == 'i' or key_format == 'r' or key_format == 'u':
+        if key_format == 'i' or key_format == 'r':
             return i
-        elif key_format == 'S':
+        elif key_format == 'S' or key_format == 'u':
             return str('%015d' % i)
         else:
             raise AssertionError(
@@ -82,9 +82,9 @@ class BaseDataSet(object):
     # Create a value for a Simple data set.
     @staticmethod
     def value_by_format(i, value_format):
-        if value_format == 'i' or value_format == 'r' or value_format == 'u':
+        if value_format == 'i' or value_format == 'r':
             return i
-        elif value_format == 'S':
+        elif value_format == 'S' or value_format == 'u':
             return str(i) + ': abcdefghijklmnopqrstuvwxyz'
         elif value_format == '8t':
             value = (
@@ -94,8 +94,7 @@ class BaseDataSet(object):
             return value[i % len(value)]
         else:
             raise AssertionError(
-                'value: object has unexpected format: '
-                + value_format)
+                'value: object has unexpected format: ' + value_format)
 
     # Create a key for this data set.  Simple and Complex data sets have
     # the same key space.
