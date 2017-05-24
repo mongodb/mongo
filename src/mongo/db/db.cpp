@@ -81,7 +81,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repair_database.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
@@ -215,32 +214,19 @@ void logStartup(OperationContext* opCtx) {
     wunit.commit();
 }
 
-/**
- * If we are in a replset, every replicated collection must have an _id index.
- * As we scan each database, we also gather a list of drop-pending collection namespaces for
- * the DropPendingCollectionReaper to clean up eventually.
- */
-void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Database* db) {
+void checkForIdIndexes(OperationContext* opCtx, Database* db) {
     if (db->name() == "local") {
-        // Collections in the local database are not replicated, so we do not need an _id index on
-        // any collection. For the same reason, it is not possible for the local database to contain
-        // any drop-pending collections (drops are effective immediately).
+        // we do not need an _id index on anything in the local database
         return;
     }
 
     list<string> collections;
     db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
 
+    // for each collection, ensure there is a $_id_ index
     for (list<string>::iterator i = collections.begin(); i != collections.end(); ++i) {
         const string& collectionName = *i;
         NamespaceString ns(collectionName);
-
-        if (ns.isDropPendingNamespace()) {
-            auto dropOpTime = fassertStatusOK(40459, ns.getDropPendingNamespaceOpTime());
-            log() << "Found drop-pending namespace " << ns << " with drop optime " << dropOpTime;
-            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, ns);
-        }
-
         if (ns.isSystem())
             continue;
 
@@ -419,8 +405,8 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         invariant(PlanExecutor::IS_EOF == state);
 
         if (replSettings.usingReplSets()) {
-            // We only care about _id indexes and drop-pending collections if we are in a replset.
-            checkForIdIndexesAndDropPendingCollections(opCtx, db);
+            // We only care about the _id index if we are in a replset
+            checkForIdIndexes(opCtx, db);
             // Ensure oplog is capped (mmap does not guarantee order of inserts on noncapped
             // collections)
             if (db->name() == "local") {
@@ -900,9 +886,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     repl::ReplicationProcess::set(serviceContext,
                                   stdx::make_unique<repl::ReplicationProcess>(storageInterface));
     auto replicationProcess = repl::ReplicationProcess::get(serviceContext);
-
-    repl::DropPendingCollectionReaper::set(
-        serviceContext, stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
 
     repl::TopologyCoordinatorImpl::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);

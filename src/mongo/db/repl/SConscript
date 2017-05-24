@@ -1374,7 +1374,6 @@ env.Library(
     ],
     LIBDEPS=[
         'bgsync',
-        'drop_pending_collection_reaper',
         'rollback_source_impl',
         'oplog_buffer_collection',
         'oplog_interface_remote',
