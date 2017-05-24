@@ -81,12 +81,14 @@ LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
 LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
                                    std::string contextName,
                                    LogSeverity severity,
-                                   LogComponent component)
+                                   LogComponent component,
+                                   bool shouldCache)
     : _domain(domain),
       _contextName(std::move(contextName)),
       _severity(std::move(severity)),
       _component(std::move(component)),
-      _tee(nullptr) {}
+      _tee(nullptr),
+      _shouldCache(shouldCache) {}
 
 LogstreamBuilder::LogstreamBuilder(logger::MessageLogDomain* domain,
                                    const std::string& contextName,
@@ -103,7 +105,8 @@ LogstreamBuilder::LogstreamBuilder(LogstreamBuilder&& other)
       _baseMessage(std::move(other._baseMessage)),
       _os(std::move(other._os)),
       _tee(std::move(other._tee)),
-      _isTruncatable(other._isTruncatable) {}
+      _isTruncatable(other._isTruncatable),
+      _shouldCache(other._shouldCache) {}
 
 LogstreamBuilder& LogstreamBuilder::operator=(LogstreamBuilder&& other) {
     _domain = std::move(other._domain);
@@ -114,6 +117,7 @@ LogstreamBuilder& LogstreamBuilder::operator=(LogstreamBuilder&& other) {
     _os = std::move(other._os);
     _tee = std::move(other._tee);
     _isTruncatable = std::move(other._isTruncatable);
+    _shouldCache = other._shouldCache;
     return *this;
 }
 
@@ -134,7 +138,8 @@ LogstreamBuilder::~LogstreamBuilder() {
             _tee->write(_os->str());
         }
         _os->str("");
-        if (isThreadOstreamCacheInitialized && !threadOstreamCache.getMake()->get()) {
+        if (_shouldCache && isThreadOstreamCacheInitialized &&
+            !threadOstreamCache.getMake()->get()) {
             *threadOstreamCache.get() = std::move(_os);
         }
     }
@@ -148,7 +153,8 @@ void LogstreamBuilder::operator<<(Tee* tee) {
 
 void LogstreamBuilder::makeStream() {
     if (!_os) {
-        if (isThreadOstreamCacheInitialized && threadOstreamCache.getMake()->get()) {
+        if (_shouldCache && isThreadOstreamCacheInitialized &&
+            threadOstreamCache.getMake()->get()) {
             _os = std::move(*threadOstreamCache.get());
         } else {
             _os = stdx::make_unique<std::ostringstream>();

@@ -132,6 +132,22 @@ inline LogstreamBuilder log() {
                             ::MongoLogDefaultComponent_component);
 }
 
+/**
+ * Returns a LogstreamBuilder that does not cache its ostream in a threadlocal cache.
+ * Use this variant when logging from places that may not be able to access threadlocals,
+ * such as from within other threadlocal-managed objects, or thread_specific_ptr-managed
+ * objects.
+ *
+ * Once SERVER-29377 is completed, this overload can be removed.
+ */
+inline LogstreamBuilder logNoCache() {
+    return LogstreamBuilder(logger::globalLogDomain(),
+                            getThreadName(),
+                            logger::LogSeverity::Log(),
+                            ::MongoLogDefaultComponent_component,
+                            false);
+}
+
 inline LogstreamBuilder log(logger::LogComponent component) {
     return LogstreamBuilder(
         logger::globalLogDomain(), getThreadName(), logger::LogSeverity::Log(), component);

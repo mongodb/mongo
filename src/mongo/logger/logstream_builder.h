@@ -72,11 +72,17 @@ public:
      * "contextName" is a short name of the thread or other context.
      * "severity" is the logging severity of the message.
      * "component" is the primary log component of the message.
+     *
+     * By default, this class will create one ostream per thread, and it
+     * will cache that object in a threadlocal and reuse it for subsequent
+     * logs messages. Set "shouldCache" to false to create a new ostream
+     * for each instance of this class rather than cacheing.
      */
     LogstreamBuilder(MessageLogDomain* domain,
                      std::string contextName,
                      LogSeverity severity,
-                     LogComponent component);
+                     LogComponent component,
+                     bool shouldCache = true);
 
     /**
      * Deprecated.
@@ -236,6 +242,7 @@ private:
     std::unique_ptr<std::ostringstream> _os;
     Tee* _tee;
     bool _isTruncatable = true;
+    bool _shouldCache;
 };
 
 
