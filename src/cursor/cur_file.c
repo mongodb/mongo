@@ -352,11 +352,6 @@ __curfile_reserve(WT_CURSOR *cursor)
 
 	WT_ERR(__wt_btcur_reserve(cbt));
 
-	/*
-	 * Reserve maintains a position and key, which doesn't match the library
-	 * API, where reserve maintains a value. Fix the API by searching after
-	 * each successful reserve operation.
-	 */
 	WT_ASSERT(session,
 	    F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 	WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
@@ -435,7 +430,6 @@ __curfile_create(WT_SESSION_IMPL *session,
 	    __curfile_search,			/* search */
 	    __curfile_search_near,		/* search-near */
 	    __curfile_insert,			/* insert */
-	    __wt_cursor_modify_notsup,		/* modify */
 	    __curfile_update,			/* update */
 	    __curfile_remove,			/* remove */
 	    __curfile_reserve,			/* reserve */

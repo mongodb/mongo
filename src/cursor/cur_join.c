@@ -591,7 +591,6 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	    __wt_cursor_notsup,			/* search */
 	    __wt_cursor_search_near_notsup,	/* search-near */
 	    __curjoin_extract_insert,		/* insert */
-	    __wt_cursor_modify_notsup,		/* modify */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */
@@ -1294,7 +1293,6 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,			/* search */
 	    __wt_cursor_search_near_notsup,	/* search-near */
 	    __wt_cursor_notsup,			/* insert */
-	    __wt_cursor_modify_notsup,		/* modify */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */

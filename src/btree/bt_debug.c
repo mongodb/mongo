@@ -985,9 +985,9 @@ static int
 __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 {
 	for (; upd != NULL; upd = upd->next)
-		if (upd->type == WT_UPDATE_DELETED)
+		if (WT_UPDATE_DELETED_ISSET(upd))
 			WT_RET(ds->f(ds, "\tvalue {deleted}\n"));
-		else if (upd->type == WT_UPDATE_RESERVED)
+		else if (WT_UPDATE_RESERVED_ISSET(upd))
 			WT_RET(ds->f(ds, "\tvalue {reserved}\n"));
 		else if (hexbyte) {
 			WT_RET(ds->f(ds, "\t{"));

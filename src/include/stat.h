@@ -374,11 +374,9 @@ struct __wt_connection_stats {
 	int64_t write_io;
 	int64_t cursor_create;
 	int64_t cursor_insert;
-	int64_t cursor_modify;
 	int64_t cursor_next;
 	int64_t cursor_prev;
 	int64_t cursor_remove;
-	int64_t cursor_reserve;
 	int64_t cursor_reset;
 	int64_t cursor_restart;
 	int64_t cursor_search;
@@ -611,11 +609,9 @@ struct __wt_dsrc_stats {
 	int64_t cursor_remove_bytes;
 	int64_t cursor_update_bytes;
 	int64_t cursor_insert;
-	int64_t cursor_modify;
 	int64_t cursor_next;
 	int64_t cursor_prev;
 	int64_t cursor_remove;
-	int64_t cursor_reserve;
 	int64_t cursor_reset;
 	int64_t cursor_restart;
 	int64_t cursor_search;

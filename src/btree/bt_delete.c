@@ -333,7 +333,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	for (i = 0, size = 0; i < page->entries; ++i) {
 		WT_ERR(__wt_calloc_one(session, &upd));
-		upd->type = WT_UPDATE_DELETED;
+		WT_UPDATE_DELETED_SET(upd);
 
 		if (page_del == NULL)
 			upd->txnid = WT_TXN_NONE;	/* Globally visible */

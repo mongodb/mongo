@@ -240,11 +240,11 @@ struct __wt_lsm_tree {
 	 * area, copying them into place when a statistics cursor is created.
 	 */
 #define	WT_LSM_TREE_STAT_INCR(session, fld) do {			\
-	if (WT_STAT_ENABLED(session))					\
+	if (WT_STAT_ENABLED(session))	\
 		++(fld);						\
 } while (0)
 #define	WT_LSM_TREE_STAT_INCRV(session, fld, v) do {			\
-	if (WT_STAT_ENABLED(session))					\
+	if (WT_STAT_ENABLED(session))	\
 		(fld) += (int64_t)(v);					\
 } while (0)
 	int64_t bloom_false_positive;

@@ -91,7 +91,6 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
 	    __wt_cursor_notsup,			/* search */
 	    __wt_cursor_search_near_notsup,	/* search-near */
 	    __curextract_insert,		/* insert */
-	    __wt_cursor_modify_notsup,		/* modify */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */
@@ -950,7 +949,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	    __curtable_search,			/* search */
 	    __curtable_search_near,		/* search-near */
 	    __curtable_insert,			/* insert */
-	    __wt_cursor_modify_notsup,		/* modify */
 	    __curtable_update,			/* update */
 	    __curtable_remove,			/* remove */
 	    __curtable_reserve,			/* reserve */

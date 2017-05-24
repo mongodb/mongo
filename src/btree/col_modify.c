@@ -17,7 +17,8 @@ static int __col_insert_alloc(
  */
 int
 __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    uint64_t recno, const WT_ITEM *value, WT_UPDATE *upd_arg, u_int modify_type)
+    uint64_t recno, const WT_ITEM *value, WT_UPDATE *upd_arg,
+    bool is_remove, bool is_reserve)
 {
 	static const WT_ITEM col_fix_remove = { "", 1, NULL, 0, 0 };
 	WT_BTREE *btree;
@@ -37,15 +38,13 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	upd = upd_arg;
 	append = logged = false;
 
-	if (modify_type == WT_UPDATE_DELETED ||
-	    modify_type == WT_UPDATE_RESERVED) {
+	if (is_remove || is_reserve) {
 		/*
 		 * Fixed-size column-store doesn't have on-page deleted values,
 		 * it's a nul byte.
 		 */
-		if (modify_type == WT_UPDATE_DELETED &&
-		    btree->type == BTREE_COL_FIX) {
-			modify_type = WT_UPDATE_STANDARD;
+		if (is_remove && btree->type == BTREE_COL_FIX) {
+			is_remove = false;
 			value = &col_fix_remove;
 		}
 	} else {
@@ -90,7 +89,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 		/* Allocate a WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session,
-		    value, &upd, &upd_size, modify_type));
+		    value, &upd, &upd_size, is_remove, is_reserve));
 		WT_ERR(__wt_txn_modify(session, upd));
 		logged = true;
 
@@ -151,7 +150,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 		if (upd_arg == NULL) {
 			WT_ERR(__wt_update_alloc(session,
-			    value, &upd, &upd_size, modify_type));
+			    value, &upd, &upd_size, is_remove, is_reserve));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
@@ -196,7 +195,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	}
 
 	/* If the update was successful, add it to the in-memory log. */
-	if (logged && modify_type != WT_UPDATE_RESERVED)
+	if (logged && !is_reserve)
 		WT_ERR(__wt_txn_log_op(session, cbt));
 
 	if (0) {

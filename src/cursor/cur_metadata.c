@@ -550,7 +550,6 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	    __curmetadata_search,		/* search */
 	    __curmetadata_search_near,		/* search-near */
 	    __curmetadata_insert,		/* insert */
-	    __wt_cursor_modify_notsup,		/* modify */
 	    __curmetadata_update,		/* update */
 	    __curmetadata_remove,		/* remove */
 	    __wt_cursor_notsup,			/* reserve */

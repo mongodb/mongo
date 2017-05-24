@@ -48,7 +48,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
     const WT_ITEM *key, const WT_ITEM *value,
-    WT_UPDATE *upd_arg, u_int modify_type)
+    WT_UPDATE *upd_arg, bool is_remove, bool is_reserve)
 {
 	WT_DECL_RET;
 	WT_INSERT *ins;
@@ -97,7 +97,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 			/* Allocate a WT_UPDATE structure and transaction ID. */
 			WT_ERR(__wt_update_alloc(session,
-			    value, &upd, &upd_size, modify_type));
+			    value, &upd, &upd_size, is_remove, is_reserve));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
@@ -168,7 +168,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 		if (upd_arg == NULL) {
 			WT_ERR(__wt_update_alloc(session,
-			    value, &upd, &upd_size, modify_type));
+			    value, &upd, &upd_size, is_remove, is_reserve));
 			WT_ERR(__wt_txn_modify(session, upd));
 			logged = true;
 
@@ -207,7 +207,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		    &ins, ins_size, skipdepth));
 	}
 
-	if (logged && modify_type != WT_UPDATE_RESERVED)
+	if (logged && !is_reserve)
 		WT_ERR(__wt_txn_log_op(session, cbt));
 
 	if (0) {
@@ -261,7 +261,7 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value,
-    WT_UPDATE **updp, size_t *sizep, u_int modify_type)
+    WT_UPDATE **updp, size_t *sizep, bool is_remove, bool is_reserve)
 {
 	WT_UPDATE *upd;
 
@@ -271,10 +271,13 @@ __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value,
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
 	 * the value into place.
 	 */
-	if (modify_type == WT_UPDATE_DELETED ||
-	    modify_type == WT_UPDATE_RESERVED)
+	if (is_remove || is_reserve) {
 		WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE), &upd));
-	else {
+		if (is_remove)
+			WT_UPDATE_DELETED_SET(upd);
+		if (is_reserve)
+			WT_UPDATE_RESERVED_SET(upd);
+	} else {
 		WT_RET(__wt_calloc(
 		    session, 1, sizeof(WT_UPDATE) + value->size, &upd));
 		if (value->size != 0) {
@@ -282,7 +285,6 @@ __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value,
 			memcpy(WT_UPDATE_DATA(upd), value->data, value->size);
 		}
 	}
-	upd->type = (uint8_t)modify_type;
 
 	*updp = upd;
 	*sizep = WT_UPDATE_MEMSIZE(upd);

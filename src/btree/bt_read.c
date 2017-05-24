@@ -90,8 +90,7 @@ __col_instantiate(WT_SESSION_IMPL *session,
 {
 	/* Search the page and add updates. */
 	WT_RET(__wt_col_search(session, recno, ref, cbt));
-	WT_RET(__wt_col_modify(
-	    session, cbt, recno, NULL, upd, WT_UPDATE_STANDARD));
+	WT_RET(__wt_col_modify(session, cbt, recno, NULL, upd, false, false));
 	return (0);
 }
 
@@ -105,8 +104,7 @@ __row_instantiate(WT_SESSION_IMPL *session,
 {
 	/* Search the page and add updates. */
 	WT_RET(__wt_row_search(session, key, ref, cbt, true));
-	WT_RET(__wt_row_modify(
-	    session, cbt, key, NULL, upd, WT_UPDATE_STANDARD));
+	WT_RET(__wt_row_modify(session, cbt, key, NULL, upd, false, false));
 	return (0);
 }
 
@@ -129,8 +127,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, total_incr;
 	uint64_t current_recno, las_counter, las_txnid, recno, upd_txnid;
-	uint32_t las_id, session_flags;
-	uint8_t upd_type;
+	uint32_t las_id, upd_size, session_flags;
 	int exact;
 	const uint8_t *p;
 
@@ -191,10 +188,9 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 
 		/* Allocate the WT_UPDATE structure. */
 		WT_ERR(cursor->get_value(
-		    cursor, &upd_txnid, &upd_type, las_value));
-		WT_ERR(__wt_update_alloc(session, las_value, &upd, &incr,
-		    upd_type == WT_UPDATE_DELETED ?
-		    WT_UPDATE_DELETED : WT_UPDATE_STANDARD));
+		    cursor, &upd_txnid, &upd_size, las_value));
+		WT_ERR(__wt_update_alloc(session, las_value,
+		    &upd, &incr, upd_size == WT_UPDATE_DELETED_VALUE, false));
 		total_incr += incr;
 		upd->txnid = upd_txnid;
 
