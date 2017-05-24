@@ -98,22 +98,13 @@ Status renameCollection(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
     }
 
-    {
-        // Ensure that collection name does not exceed maximum length.
-        // Ensure that index names do not push the length over the max.
-        // Iterator includes unfinished indexes.
-        int longestIndexNameLength =
-            sourceColl->getIndexCatalog()->getLongestIndexNameLength(opCtx);
-
-        unsigned int longestAllowed =
-            std::min(int(NamespaceString::MaxNsCollectionLen),
-                     int(NamespaceString::MaxNsLen) - 2 /*strlen(".$")*/ - longestIndexNameLength);
-        if (target.size() > longestAllowed) {
-            StringBuilder sb;
-            sb << "collection name length of " << target.size() << " exceeds maximum length of "
-               << longestAllowed << ", allowing for index names";
-            return Status(ErrorCodes::InvalidLength, sb.str());
-        }
+    // Ensure that collection name does not exceed maximum length.
+    // Ensure that index names do not push the length over the max.
+    std::string::size_type longestIndexNameLength =
+        sourceColl->getIndexCatalog()->getLongestIndexNameLength(opCtx);
+    auto status = target.checkLengthForRename(longestIndexNameLength);
+    if (!status.isOK()) {
+        return status;
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
@@ -260,9 +251,10 @@ Status renameCollection(OperationContext* opCtx,
         }
     }
 
-    Status status = indexer.doneInserting();
-    if (!status.isOK())
+    status = indexer.doneInserting();
+    if (!status.isOK()) {
         return status;
+    }
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.

@@ -246,6 +246,12 @@ public:
     StatusWith<repl::OpTime> getDropPendingNamespaceOpTime() const;
 
     /**
+     * Checks if this namespace is valid as a target namespace for a rename operation, given
+     * the length of the longest index name in the source collection.
+     */
+    Status checkLengthForRename(const std::string::size_type longestIndexNameLength) const;
+
+    /**
      * Given a NamespaceString for which isListIndexesCursorNS() returns true, returns the
      * NamespaceString for the collection that the "listIndexes" targets.
      */

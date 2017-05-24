@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <ostream>
 
 #include "mongo/db/namespace_string.h"
@@ -221,6 +222,21 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     }
 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
+}
+
+Status NamespaceString::checkLengthForRename(
+    const std::string::size_type longestIndexNameLength) const {
+    auto longestAllowed =
+        std::min(std::string::size_type(NamespaceString::MaxNsCollectionLen),
+                 std::string::size_type(NamespaceString::MaxNsLen - 2U /*strlen(".$")*/ -
+                                        longestIndexNameLength));
+    if (size() > longestAllowed) {
+        StringBuilder sb;
+        sb << "collection name length of " << size() << " exceeds maximum length of "
+           << longestAllowed << ", allowing for index names";
+        return Status(ErrorCodes::InvalidLength, sb.str());
+    }
+    return Status::OK();
 }
 
 string NamespaceString::escapeDbName(const StringData dbname) {
