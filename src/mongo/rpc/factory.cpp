@@ -69,7 +69,7 @@ std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(Protocol proto) {
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
     switch (unownedMessage->operation()) {
         case mongo::dbMsg:
-            return stdx::make_unique<OpMsgReply>(OpMsg::parse(*unownedMessage));
+            return stdx::make_unique<OpMsgReply>(OpMsg::parseOwned(*unownedMessage));
         case mongo::opReply:
             return stdx::make_unique<LegacyReply>(unownedMessage);
         case mongo::dbCommandReply:
