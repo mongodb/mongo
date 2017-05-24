@@ -231,7 +231,7 @@ __curfile_insert(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, insert, cbt->btree);
+	CURSOR_UPDATE_API_CALL_BTREE(cursor, session, insert, cbt->btree);
 
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_ERR(__cursor_checkkey(cursor));
@@ -265,7 +265,7 @@ __wt_curfile_insert_check(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
+	CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
 	ret = __wt_btcur_insert_check(cbt);
@@ -286,7 +286,7 @@ __curfile_update(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
+	CURSOR_UPDATE_API_CALL_BTREE(cursor, session, update, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 	WT_ERR(__cursor_checkvalue(cursor));
 
@@ -345,7 +345,7 @@ __curfile_reserve(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, reserve, cbt->btree);
+	CURSOR_UPDATE_API_CALL_BTREE(cursor, session, reserve, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
 	WT_ERR(__wt_txn_context_check(session, true));

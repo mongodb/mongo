@@ -317,7 +317,7 @@ __curds_insert(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
+	CURSOR_UPDATE_API_CALL(cursor, session, insert);
 
 	__curds_txn_enter(session);
 
@@ -350,7 +350,7 @@ __curds_update(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
+	CURSOR_UPDATE_API_CALL(cursor, session, update);
 
 	WT_STAT_CONN_INCR(session, cursor_update);
 	WT_STAT_DATA_INCR(session, cursor_update);

@@ -484,7 +484,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, insert);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
@@ -563,7 +563,7 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
@@ -673,7 +673,7 @@ __curtable_reserve(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update);
 
 	/*
 	 * We don't have to open the indices here, but it makes the code similar
