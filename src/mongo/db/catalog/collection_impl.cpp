@@ -280,7 +280,7 @@ StatusWithMatchExpression CollectionImpl::parseValidator(const BSONObj& validato
     if (validator.isEmpty())
         return {nullptr};
 
-    if (ns().isSystem()) {
+    if (ns().isSystem() && !ns().isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
                 "Document validators not allowed on system collections."};
     }
