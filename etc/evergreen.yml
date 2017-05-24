@@ -4152,8 +4152,6 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_csrs_upgrade_auth_WT
-  - name: snmp
-  - name: snmp_WT
   - name: ssl
   - name: sslSpecial
   - name: unittests
