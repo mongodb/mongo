@@ -370,16 +370,16 @@ void _logOpsInner(OperationContext* opCtx,
     });
 }
 
-void logOp(OperationContext* opCtx,
-           const char* opstr,
-           const NamespaceString& nss,
-           OptionalCollectionUUID uuid,
-           const BSONObj& obj,
-           const BSONObj* o2,
-           bool fromMigrate) {
+OpTime logOp(OperationContext* opCtx,
+             const char* opstr,
+             const NamespaceString& nss,
+             OptionalCollectionUUID uuid,
+             const BSONObj& obj,
+             const BSONObj* o2,
+             bool fromMigrate) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
-        return;
+        return {};
     }
 
     Collection* oplog = getLocalOplogCollection(opCtx, _oplogCollectionName);
@@ -392,6 +392,7 @@ void logOp(OperationContext* opCtx,
         _logOpWriter(opCtx, opstr, nss, uuid, obj, o2, fromMigrate, slot.opTime, slot.hash);
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
+    return slot.opTime;
 }
 
 void logOps(OperationContext* opCtx,

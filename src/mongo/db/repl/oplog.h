@@ -90,16 +90,19 @@ void logOps(OperationContext* opCtx,
             std::vector<BSONObj>::const_iterator end,
             bool fromMigrate);
 
-/* For 'u' records, 'obj' captures the mutation made to the object but not
+/**
+ * For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
+ * Returns the optime of the oplog entry written to the oplog.
+ * Returns a null optime if oplog was not modified.
  */
-void logOp(OperationContext* opCtx,
-           const char* opstr,
-           const NamespaceString& ns,
-           OptionalCollectionUUID uuid,
-           const BSONObj& obj,
-           const BSONObj* o2,
-           bool fromMigrate);
+OpTime logOp(OperationContext* opCtx,
+             const char* opstr,
+             const NamespaceString& ns,
+             OptionalCollectionUUID uuid,
+             const BSONObj& obj,
+             const BSONObj* o2,
+             bool fromMigrate);
 
 // Flush out the cached pointers to the local database and oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.
