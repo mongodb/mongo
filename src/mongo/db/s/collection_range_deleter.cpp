@@ -85,6 +85,7 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
                                               CollectionRangeDeleter* rangeDeleterForTestOnly) {
     StatusWith<int> wrote = 0;
     auto range = boost::optional<ChunkRange>(boost::none);
+    auto notification = DeleteNotification();
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto* collection = autoColl.getCollection();
@@ -111,6 +112,7 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
 
                 const auto& frontRange = self->_orphans.front().range;
                 range.emplace(frontRange.getMin().getOwned(), frontRange.getMax().getOwned());
+                notification = self->_orphans.front().notification;
             }
 
             try {
@@ -134,11 +136,12 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
         }  // drop scopedCollectionMetadata
     }      // drop autoColl
 
-    invariant(range);
-    invariantOK(wrote.getStatus());
-    invariant(wrote.getValue() > 0);
+    dassert(range);
+    dassert(wrote.getStatus().isOK());
+    dassert(wrote.getValue() > 0);
 
-    log() << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range " << *range;
+    log() << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range "
+          << redact(range->toString());
 
     // Wait for replication outside the lock
     const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -152,9 +155,21 @@ bool CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
 
     if (!status.isOK()) {
         warning() << "Error when waiting for write concern after removing " << nss << " range "
-                  << *range << " : " << status.reason();
-    }
+                  << redact(range->toString()) << " : " << redact(status.reason());
 
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        auto* css = CollectionShardingState::get(opCtx, nss);
+        stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
+        auto* self = &css->_metadataManager->_rangesToClean;
+        // if range were already popped (e.g. by dropping nss during the waitForWriteConcern above)
+        // its notification would have been triggered, so this check suffices to ensure that it is
+        // safe to pop the range here.
+        if (!notification.ready()) {
+            dassert(!self->isEmpty() && self->_orphans.front().notification == notification);
+            self->_pop(status);
+        }
+    }
+    notification.abandon();
     return true;
 }
 
