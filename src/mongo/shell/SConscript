@@ -26,7 +26,6 @@ js_header = env.JSHeader(
         "mr.js",
         "query.js",
         "types.js",
-        "upgrade_check.js",
         "utils.js",
         "utils_sh.js",
         "utils_auth.js",

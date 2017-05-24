@@ -288,7 +288,6 @@ extern const JSFile explainable;
 extern const JSFile mongo;
 extern const JSFile mr;
 extern const JSFile query;
-extern const JSFile upgrade_check;
 extern const JSFile utils;
 extern const JSFile utils_sh;
 extern const JSFile utils_auth;
@@ -310,7 +309,6 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::crud_api);
     execSetup(JSFiles::explain_query);
     execSetup(JSFiles::explainable);
-    execSetup(JSFiles::upgrade_check);
 }
 
 namespace {

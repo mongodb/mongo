@@ -38,8 +38,8 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec ObjectInfo::methods[3] = {
-    MONGO_ATTACH_JS_FUNCTION(bsonsize), MONGO_ATTACH_JS_FUNCTION(invalidForStorage), JS_FS_END,
+const JSFunctionSpec ObjectInfo::methods[2] = {
+    MONGO_ATTACH_JS_FUNCTION(bsonsize), JS_FS_END,
 };
 
 const char* const ObjectInfo::className = "Object";
@@ -57,30 +57,6 @@ void ObjectInfo::Functions::bsonsize::call(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "argument to bsonsize has to be an object");
 
     args.rval().setInt32(ValueWriter(cx, args.get(0)).toBSON().objsize());
-}
-
-void ObjectInfo::Functions::invalidForStorage::call(JSContext* cx, JS::CallArgs args) {
-    if (args.length() != 1)
-        uasserted(ErrorCodes::BadValue, "invalidForStorage needs 1 argument");
-
-    if (args.get(0).isNull()) {
-        args.rval().setNull();
-        return;
-    }
-
-    if (!args.get(0).isObject())
-        uasserted(ErrorCodes::BadValue, "argument to invalidForStorage has to be an object");
-
-    Status validForStorage = ValueWriter(cx, args.get(0)).toBSON().storageValid(true);
-    if (validForStorage.isOK()) {
-        args.rval().setNull();
-        return;
-    }
-
-    std::string errmsg = str::stream() << validForStorage.codeString() << ": "
-                                       << validForStorage.reason();
-
-    ValueReader(cx, args.rval()).fromStringData(errmsg);
 }
 
 }  // namespace mozjs
