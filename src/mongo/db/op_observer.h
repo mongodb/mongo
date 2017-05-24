@@ -40,6 +40,10 @@ struct CollectionOptions;
 class NamespaceString;
 class OperationContext;
 
+namespace repl {
+class OpTime;
+}  // repl
+
 /**
  * Holds document update information used in logging.
  */
@@ -148,9 +152,16 @@ public:
                            const CollectionOptions& oldCollOptions,
                            boost::optional<TTLCollModInfo> ttlInfo) = 0;
     virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
-    virtual void onDropCollection(OperationContext* opCtx,
-                                  const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) = 0;
+
+    /**
+     * This function logs an oplog entry when a 'drop' command on a collection is executed.
+     * Returns the optime of the oplog entry successfully written to the oplog.
+     * Returns a null optime if an oplog entry should not be written for this operation.
+     */
+    virtual repl::OpTime onDropCollection(OperationContext* opCtx,
+                                          const NamespaceString& collectionName,
+                                          OptionalCollectionUUID uuid) = 0;
+
     /**
      * This function logs an oplog entry when an index is dropped. The namespace of the index,
      * the index name, and the index info from the index descriptor are used to create a

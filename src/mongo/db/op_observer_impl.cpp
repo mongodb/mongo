@@ -295,15 +295,16 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     getGlobalAuthorizationManager()->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
-void OpObserverImpl::onDropCollection(OperationContext* opCtx,
-                                      const NamespaceString& collectionName,
-                                      OptionalCollectionUUID uuid) {
+repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
+                                              const NamespaceString& collectionName,
+                                              OptionalCollectionUUID uuid) {
     const NamespaceString dbName = collectionName.getCommandNS();
     BSONObj cmdObj = BSON("drop" << collectionName.coll().toString());
 
+    repl::OpTime dropOpTime;
     if (!collectionName.isSystemDotProfile()) {
         // do not replicate system.profile modifications
-        repl::logOp(opCtx, "c", dbName, uuid, cmdObj, nullptr, false);
+        dropOpTime = repl::logOp(opCtx, "c", dbName, uuid, cmdObj, nullptr, false);
     }
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
@@ -328,6 +329,8 @@ void OpObserverImpl::onDropCollection(OperationContext* opCtx,
         UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
         catalog.onDropCollection(opCtx, uuid.get());
     }
+
+    return dropOpTime;
 }
 
 void OpObserverImpl::onDropIndex(OperationContext* opCtx,

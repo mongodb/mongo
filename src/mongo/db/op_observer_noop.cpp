@@ -73,9 +73,11 @@ void OpObserverNoop::onCollMod(OperationContext*,
 
 void OpObserverNoop::onDropDatabase(OperationContext*, const std::string&) {}
 
-void OpObserverNoop::onDropCollection(OperationContext*,
-                                      const NamespaceString&,
-                                      OptionalCollectionUUID) {}
+repl::OpTime OpObserverNoop::onDropCollection(OperationContext*,
+                                              const NamespaceString&,
+                                              OptionalCollectionUUID) {
+    return {};
+}
 
 void OpObserverNoop::onDropIndex(OperationContext*,
                                  const NamespaceString&,

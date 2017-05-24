@@ -72,9 +72,9 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<TTLCollModInfo> ttlInfo) override;
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
-    void onDropCollection(OperationContext* opCtx,
-                          const NamespaceString& collectionName,
-                          OptionalCollectionUUID uuid) override;
+    repl::OpTime onDropCollection(OperationContext* opCtx,
+                                  const NamespaceString& collectionName,
+                                  OptionalCollectionUUID uuid) override;
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      OptionalCollectionUUID uuid,

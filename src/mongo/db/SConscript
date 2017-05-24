@@ -1140,6 +1140,7 @@ env.Library(
         'op_observer_noop.cpp',
     ],
     LIBDEPS= [
+        '$BUILD_DIR/mongo/db/repl/optime',
     ],
 )
 
