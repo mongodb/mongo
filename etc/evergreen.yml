@@ -5573,8 +5573,6 @@ buildvariants:
   - name: mmap
   - name: replica_sets_auth
   - name: sasl
-  - name: snmp
-  - name: snmp_WT
   - name: ssl
   - name: sslSpecial
   - name: push
