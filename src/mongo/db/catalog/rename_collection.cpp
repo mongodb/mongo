@@ -102,14 +102,8 @@ Status renameCollection(OperationContext* opCtx,
         // Ensure that collection name does not exceed maximum length.
         // Ensure that index names do not push the length over the max.
         // Iterator includes unfinished indexes.
-        IndexCatalog::IndexIterator sourceIndIt =
-            sourceColl->getIndexCatalog()->getIndexIterator(opCtx, true);
-        int longestIndexNameLength = 0;
-        while (sourceIndIt.more()) {
-            int thisLength = sourceIndIt.next()->indexName().length();
-            if (thisLength > longestIndexNameLength)
-                longestIndexNameLength = thisLength;
-        }
+        int longestIndexNameLength =
+            sourceColl->getIndexCatalog()->getLongestIndexNameLength(opCtx);
 
         unsigned int longestAllowed =
             std::min(int(NamespaceString::MaxNsCollectionLen),

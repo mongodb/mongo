@@ -531,6 +531,14 @@ public:
         return this->_impl().getAccessMethodName(opCtx, keyPattern);
     }
 
+    // public helpers
+
+    /**
+     * Returns length of longest index name.
+     * This includes unfinished indexes.
+     */
+    std::string::size_type getLongestIndexNameLength(OperationContext* opCtx) const;
+
     // public static helpers
 
     static BSONObj fixIndexKey(const BSONObj& key);

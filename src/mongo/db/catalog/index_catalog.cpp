@@ -96,6 +96,17 @@ namespace {
 stdx::function<decltype(IndexCatalog::prepareInsertDeleteOptions)> prepareInsertDeleteOptionsImpl;
 }  // namespace
 
+std::string::size_type IndexCatalog::getLongestIndexNameLength(OperationContext* opCtx) const {
+    IndexCatalog::IndexIterator it = getIndexIterator(opCtx, true);
+    std::string::size_type longestIndexNameLength = 0;
+    while (it.more()) {
+        auto thisLength = it.next()->indexName().length();
+        if (thisLength > longestIndexNameLength)
+            longestIndexNameLength = thisLength;
+    }
+    return longestIndexNameLength;
+}
+
 void IndexCatalog::prepareInsertDeleteOptions(OperationContext* const opCtx,
                                               const IndexDescriptor* const desc,
                                               InsertDeleteOptions* const options) {
