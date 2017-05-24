@@ -28,9 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/op_observer_impl.h"
@@ -43,6 +45,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 namespace {
 
@@ -134,7 +137,8 @@ TEST_F(DatabaseTest, DropCollectionDropsCollectionButDoesNotLogOperationIfWrites
     ASSERT_EQUALS(repl::OpTime(), dropOpTime);
 }
 
-TEST_F(DatabaseTest, DropCollectionDropsCollectionAndLogsOperationIfWritesAreReplicated) {
+TEST_F(DatabaseTest,
+       DropCollectionRenamesCollectionToPendingDropNamespaceAndLogsOperationIfWritesAreReplicated) {
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(
         repl::ReplicationCoordinator::get(_opCtx.get())->isOplogDisabledFor(_opCtx.get(), _nss));
@@ -144,6 +148,60 @@ TEST_F(DatabaseTest, DropCollectionDropsCollectionAndLogsOperationIfWritesAreRep
     // Drop optime is non-null because an op was written to the oplog.
     auto dropOpTime = repl::ReplClientInfo::forClient(&cc()).getLastOp();
     ASSERT_GREATER_THAN(dropOpTime, repl::OpTime());
+
+    // Replicated collection is renamed with a special drop-pending names in the <db>.system.drop.*
+    // namespace.
+    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
+    ASSERT_TRUE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+}
+
+void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
+    writeConflictRetry(opCtx, "testDropCollectionWithIndexesInProgress", nss.ns(), [opCtx, nss] {
+        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        Collection* collection = nullptr;
+        {
+            WriteUnitOfWork wuow(opCtx);
+            ASSERT_TRUE(collection = db->createCollection(opCtx, nss.ns()));
+            wuow.commit();
+        }
+
+        MultiIndexBlock indexer(opCtx, collection);
+        ON_BLOCK_EXIT([&indexer, opCtx] {
+            WriteUnitOfWork wuow(opCtx);
+            indexer.commit();
+            wuow.commit();
+        });
+
+        auto indexCatalog = collection->getIndexCatalog();
+        ASSERT_EQUALS(indexCatalog->numIndexesInProgress(opCtx), 0);
+        auto indexInfoObj = BSON(
+            "v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << BSON("a" << 1) << "name"
+                << "a_1"
+                << "ns"
+                << nss.ns());
+        ASSERT_OK(indexer.init(indexInfoObj).getStatus());
+        ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);
+
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_THROWS_CODE(db->dropCollection(opCtx, nss.ns()), MsgAssertionException, 40461);
+    });
+}
+
+TEST_F(DatabaseTest,
+       DropCollectionThrowsExceptionIfThereAreIndexesInProgressAndWritesAreNotReplicated) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    ASSERT_FALSE(_opCtx->writesAreReplicated());
+    _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(_opCtx.get(), _nss);
+}
+
+TEST_F(DatabaseTest,
+       DropCollectionThrowsExceptionIfThereAreIndexesInProgressAndWritesAreReplicated) {
+    ASSERT_TRUE(_opCtx->writesAreReplicated());
+    _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(_opCtx.get(), _nss);
 }
 
 }  // namespace

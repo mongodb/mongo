@@ -101,6 +101,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'database',
+        'index_create',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/op_observer_d',
