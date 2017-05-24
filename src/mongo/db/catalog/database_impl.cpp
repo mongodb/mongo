@@ -424,40 +424,34 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     audit::logDropCollection(&cc(), fullns.toString());
 
     collection->getCursorManager()->invalidateAll(opCtx, true, "collection dropped");
-    collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
-
-    verify(collection->getCatalogEntry()->getTotalIndexCount(opCtx) == 0);
-    LOG(1) << "\t dropIndexes done";
 
     Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fullns.toString());
 
-    // We want to destroy the Collection object before telling the StorageEngine to destroy the
-    // RecordStore.
     auto uuid = collection->uuid();
-    _clearCollectionCache(opCtx, fullns.toString(), "collection dropped");
-
-    auto s = _dbEntry->dropCollection(opCtx, fullns.toString());
-
-    if (!s.isOK())
-        return s;
-
-    DEV {
-        // check all index collection entries are gone
-        string nstocheck = fullns.toString() + ".$";
-
-        for (CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i) {
-            string temp = i->first;
-
-            if (temp.find(nstocheck) != 0)
-                continue;
-            log() << "after drop, bad cache entries for: " << fullns << " have " << temp;
-            verify(0);
-        }
+    auto status = _finishDropCollection(opCtx, fullns, collection);
+    if (!status.isOK()) {
+        return status;
     }
 
     getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
 
     return Status::OK();
+}
+
+Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
+                                           const NamespaceString& fullns,
+                                           Collection* collection) {
+    LOG(1) << "dropCollection: " << fullns << " - dropAllIndexes start";
+    collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
+
+    invariant(collection->getCatalogEntry()->getTotalIndexCount(opCtx) == 0);
+    LOG(1) << "dropCollection: " << fullns << " - dropAllIndexes done";
+
+    // We want to destroy the Collection object before telling the StorageEngine to destroy the
+    // RecordStore.
+    _clearCollectionCache(opCtx, fullns.toString(), "collection dropped");
+
+    return _dbEntry->dropCollection(opCtx, fullns.toString());
 }
 
 void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
