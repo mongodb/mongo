@@ -22,6 +22,7 @@
 	search,								\
 	search_near,							\
 	insert,								\
+	modify,								\
 	update,								\
 	remove,								\
 	reserve,							\
@@ -44,6 +45,7 @@
 	search,								\
 	search_near,							\
 	insert,								\
+	modify,								\
 	update,								\
 	remove,								\
 	reserve,							\

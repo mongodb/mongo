@@ -1424,8 +1424,8 @@ __split_multi_inmem(
 			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_ERR(__wt_col_modify(
-			    session, &cbt, recno, NULL, upd, false, false));
+			WT_ERR(__wt_col_modify(session,
+			    &cbt, recno, NULL, upd, WT_UPDATE_STANDARD));
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
@@ -1447,7 +1447,7 @@ __split_multi_inmem(
 
 			/* Apply the modification. */
 			WT_ERR(__wt_row_modify(
-			    session, &cbt, key, NULL, upd, false, false));
+			    session, &cbt, key, NULL, upd, WT_UPDATE_STANDARD));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

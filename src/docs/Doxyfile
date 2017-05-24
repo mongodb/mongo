@@ -1582,6 +1582,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_file_system:=WT_FILE_SYSTEM \
                          __wt_item:=WT_ITEM \
                          __wt_lsn:=WT_LSN \
+                         __wt_modify:=WT_MODIFY \
                          __wt_session:=WT_SESSION \
                          __wt_txn_notify:=WT_TXN_NOTIFY \
                          WT_HANDLE_CLOSED(x):=x \

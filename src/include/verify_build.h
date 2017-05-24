@@ -52,6 +52,7 @@ __wt_verify_build(void)
 	/* Check specific structures weren't padded. */
 	WT_SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
 	WT_SIZE_CHECK(WT_REF, WT_REF_SIZE);
+	WT_SIZE_CHECK(WT_UPDATE, WT_UPDATE_SIZE);
 
 	/* Check specific structures were padded. */
 #define	WT_PADDING_CHECK(s)						\

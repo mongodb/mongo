@@ -323,7 +323,7 @@ struct __wt_table {
 		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST_READ);	\
 	}								\
 	if (__handle_write_locked) {					\
-		__wt_writelock(session, &__conn->dhandle_lock);	\
+		__wt_writelock(session, &__conn->dhandle_lock);		\
 		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE);	\
 	}								\
 } while (0)
