@@ -85,28 +85,6 @@ private:
     ModifierAddToSet _mod;
 };
 
-TEST(Init, FailToInitWithInvalidValue) {
-    BSONObj modObj;
-    ModifierAddToSet mod;
-
-    modObj = fromjson("{ $addToSet : { a : { 'x.$.y' : 'bad' } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-    modObj = fromjson("{ $addToSet : { a : { $each : [ { 'x.$.y' : 'bad' } ] } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-
-    // An int is not valid after $each
-    modObj = fromjson("{ $addToSet : { a : { $each : 0 } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-
-    // An object is not valid after $each
-    modObj = fromjson("{ $addToSet : { a : { $each : { a : 1 } } } }");
-    ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
-                           ModifierInterface::Options::normal()));
-}
-
 TEST(Init, ParsesSimple) {
     Mod(fromjson("{ $addToSet : { a : 1 } }"));
     Mod(fromjson("{ $addToSet : { a : 'foo' } }"));

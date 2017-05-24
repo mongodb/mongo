@@ -69,3 +69,59 @@ assert.eq(o, t.findOne(), "D3");
 t.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 3]}}});
 o.a.push(3);
 assert.eq(o, t.findOne(), "D4");
+
+// Test that dotted and '$' prefixed field names fail.
+t.drop();
+o = {
+    _id: 1,
+    a: [1, 2]
+};
+assert.writeOK(t.insert(o));
+
+assert.writeError(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+assert.writeError(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+
+assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+
+assert.writeError(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+
+assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+
+assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+
+// Test that nested _id fields are allowed.
+t.drop();
+o = {
+    _id: 1,
+    a: [1, 2]
+};
+assert.writeOK(t.insert(o));
+
+assert.writeOK(t.update({}, {$addToSet: {a: {_id: ["foo", "bar", "baz"]}}}));
+assert.writeOK(t.update({}, {$addToSet: {a: {_id: /acme.*corp/}}}));
+
+// Test that DBRefs are allowed.
+t.drop();
+o = {
+    _id: 1,
+    a: [1, 2]
+};
+assert.writeOK(t.insert(o));
+
+foo = {
+    "foo": "bar"
+};
+assert.writeOK(t.insert(foo));
+let fooDoc = t.findOne(foo);
+assert.eq(fooDoc.foo, foo.foo);
+
+let fooDocRef = {reference: new DBRef(t.getName(), fooDoc._id, t.getDB().getName())};
+
+assert.writeOK(t.update({_id: o._id}, {$addToSet: {a: fooDocRef}}));
+assert.eq(t.findOne({_id: o._id}).a[2], fooDocRef);
+
+assert.writeOK(t.update({_id: o._id}, {$addToSet: {a: {b: fooDocRef}}}));
+assert.eq(t.findOne({_id: o._id}).a[3].b, fooDocRef);

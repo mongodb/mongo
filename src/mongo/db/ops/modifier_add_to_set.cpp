@@ -169,34 +169,6 @@ Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts, b
         _val = each;
     }
 
-    // Check if no invalid data (such as fields with '$'s) are being used in the $each
-    // clause.
-    mb::ConstElement valCursor = _val.leftChild();
-    while (valCursor.ok()) {
-        const BSONType type = valCursor.getType();
-        dassert(valCursor.hasValue());
-        switch (type) {
-            case mongo::Object: {
-                Status s = valCursor.getValueObject().storageValidEmbedded();
-                if (!s.isOK())
-                    return s;
-
-                break;
-            }
-            case mongo::Array: {
-                Status s = valCursor.getValueArray().storageValidEmbedded();
-                if (!s.isOK())
-                    return s;
-
-                break;
-            }
-            default:
-                break;
-        }
-
-        valCursor = valCursor.rightSibling();
-    }
-
     setCollator(opts.collator);
     return Status::OK();
 }
