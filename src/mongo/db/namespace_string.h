@@ -96,6 +96,12 @@ public:
     NamespaceString(StringData dbName, StringData collectionName);
 
     /**
+     * Constructs the namespace '<dbName>.$cmd.aggregate', which we use as the namespace for
+     * aggregation commands with the format {aggregate: 1}.
+     */
+    static NamespaceString makeCollectionlessAggregateNSS(StringData dbName);
+
+    /**
      * Constructs a NamespaceString representing a listCollections namespace. The format for this
      * namespace is "<dbName>.$cmd.listCollections".
      */
@@ -213,6 +219,7 @@ public:
         return coll().startsWith("$cmd."_sd);
     }
 
+    bool isCollectionlessAggregateNS() const;
     bool isListCollectionsCursorNS() const;
     bool isListIndexesCursorNS() const;
 

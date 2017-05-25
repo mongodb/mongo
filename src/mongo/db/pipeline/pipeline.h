@@ -253,10 +253,11 @@ private:
     void unstitch();
 
     /**
-     * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
-     * is present but is not the last stage in the pipeline.
+     * Returns a non-OK status if the pipeline fails any of a set of semantic checks. For example,
+     * if an $out stage is present then it must come last in the pipeline, while initial stages such
+     * as $indexStats must be at the start.
      */
-    Status ensureAllStagesAreInLegalPositions() const;
+    Status validate() const;
 
     SourceContainer _sources;
 

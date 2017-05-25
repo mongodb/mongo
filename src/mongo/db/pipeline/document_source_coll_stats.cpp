@@ -122,8 +122,8 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     return {Document(builder.obj())};
 }
 
-bool DocumentSourceCollStats::isValidInitialSource() const {
-    return true;
+DocumentSource::InitialSourceType DocumentSourceCollStats::getInitialSourceType() const {
+    return InitialSourceType::kInitialSource;
 }
 
 Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {

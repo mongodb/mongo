@@ -203,6 +203,20 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
+TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
+    NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS("a");
+    AggregationRequest request(nss, {});
+
+    auto expectedSerialization =
+        Document{{AggregationRequest::kCommandName, 1},
+                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kCursorName,
+                  Value(Document({{AggregationRequest::kBatchSizeName,
+                                   AggregationRequest::kDefaultBatchSize}}))}};
+
+    ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
+}
+
 TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}}");
@@ -362,6 +376,52 @@ TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithWriteConce
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(nss, inputBson, ExplainOptions::Verbosity::kExecStats)
             .getStatus());
+}
+
+TEST(AggregationRequestTest, ParseNSShouldReturnAggregateOneNSIfAggregateFieldIsOne) {
+    const std::vector<std::string> ones{
+        "1", "1.0", "NumberInt(1)", "NumberLong(1)", "NumberDecimal('1')"};
+
+    for (auto& one : ones) {
+        const BSONObj inputBSON =
+            fromjson(str::stream() << "{aggregate: " << one << ", pipeline: []}");
+        ASSERT(AggregationRequest::parseNs("a", inputBSON).isCollectionlessAggregateNS());
+    }
+}
+
+TEST(AggregationRequestTest, ParseNSShouldRejectNumericNSIfAggregateFieldIsNotOne) {
+    const BSONObj inputBSON = fromjson("{aggregate: 2, pipeline: []}");
+    ASSERT_THROWS_CODE(
+        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::FailedToParse);
+}
+
+TEST(AggregationRequestTest, ParseNSShouldRejectNonStringNonNumericNS) {
+    const BSONObj inputBSON = fromjson("{aggregate: {}, pipeline: []}");
+    ASSERT_THROWS_CODE(
+        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::TypeMismatch);
+}
+
+TEST(AggregationRequestTest, ParseNSShouldRejectAggregateOneStringAsCollectionName) {
+    const BSONObj inputBSON = fromjson("{aggregate: '$cmd.aggregate', pipeline: []}");
+    ASSERT_THROWS_CODE(
+        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::InvalidNamespace);
+}
+
+TEST(AggregationRequestTest, ParseNSShouldRejectInvalidCollectionName) {
+    const BSONObj inputBSON = fromjson("{aggregate: '', pipeline: []}");
+    ASSERT_THROWS_CODE(
+        AggregationRequest::parseNs("a", inputBSON), UserException, ErrorCodes::InvalidNamespace);
+}
+
+TEST(AggregationRequestTest, ParseFromBSONOverloadsShouldProduceIdenticalRequests) {
+    const BSONObj inputBSON =
+        fromjson("{aggregate: 'collection', pipeline: [{$match: {}}, {$project: {}}], cursor: {}}");
+    NamespaceString nss("a.collection");
+
+    auto aggReqDBName = unittest::assertGet(AggregationRequest::parseFromBSON("a", inputBSON));
+    auto aggReqNSS = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBSON));
+
+    ASSERT_DOCUMENT_EQ(aggReqDBName.serializeToCommandObj(), aggReqNSS.serializeToCommandObj());
 }
 
 //

@@ -34,6 +34,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -66,10 +67,12 @@
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -210,6 +213,78 @@ public:
             autoColl.getCollection(), nullptr, pipeline.getValue().get());
 
         return pipeline;
+    }
+
+    std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
+                                       CurrentOpUserMode userMode) const {
+        AuthorizationSession* ctxAuth = AuthorizationSession::get(_ctx->opCtx->getClient());
+
+        std::vector<BSONObj> ops;
+
+        for (ServiceContext::LockedClientsCursor cursor(
+                 _ctx->opCtx->getClient()->getServiceContext());
+             Client* client = cursor.next();) {
+            invariant(client);
+
+            stdx::lock_guard<Client> lk(*client);
+
+            // If auth is disabled, ignore the allUsers parameter.
+            if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
+                userMode == CurrentOpUserMode::kExcludeOthers &&
+                !ctxAuth->isCoauthorizedWithClient(client)) {
+                continue;
+            }
+
+            const OperationContext* clientOpCtx = client->getOperationContext();
+
+            if (!clientOpCtx && connMode == CurrentOpConnectionsMode::kExcludeIdle) {
+                continue;
+            }
+
+            BSONObjBuilder infoBuilder;
+
+            client->reportState(infoBuilder);
+
+            const auto& clientMetadata =
+                ClientMetadataIsMasterState::get(client).getClientMetadata();
+
+            if (clientMetadata) {
+                auto appName = clientMetadata.get().getApplicationName();
+                if (!appName.empty()) {
+                    infoBuilder.append("appName", appName);
+                }
+
+                auto clientMetadataDocument = clientMetadata.get().getDocument();
+                infoBuilder.append("clientMetadata", clientMetadataDocument);
+            }
+
+            // Fill out the rest of the BSONObj with opCtx specific details.
+            infoBuilder.appendBool("active", static_cast<bool>(clientOpCtx));
+            if (clientOpCtx) {
+                infoBuilder.append("opid", clientOpCtx->getOpID());
+                if (clientOpCtx->isKillPending()) {
+                    infoBuilder.append("killPending", true);
+                }
+
+                CurOp::get(clientOpCtx)->reportState(&infoBuilder);
+
+                Locker::LockerInfo lockerInfo;
+                clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
+                fillLockerInfo(lockerInfo, infoBuilder);
+            }
+
+            ops.emplace_back(infoBuilder.obj());
+        }
+
+        return ops;
+    }
+
+    std::string getShardName(OperationContext* opCtx) const {
+        if (ShardingState::get(opCtx)->enabled()) {
+            return ShardingState::get(opCtx)->getShardName();
+        }
+
+        return std::string();
     }
 
 private:
@@ -355,7 +430,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
     }
 
     if (!sources.empty()) {
-        if (sources.front()->isValidInitialSource()) {
+        if (sources.front()->isInitialSource()) {
             return;  // don't need a cursor
         }
 

@@ -118,6 +118,16 @@ public:
     using Parser = stdx::function<std::vector<boost::intrusive_ptr<DocumentSource>>(
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&)>;
 
+    enum class InitialSourceType {
+        // Stage requires input from a preceding DocumentSource.
+        kNotInitialSource,
+        // Stage does not need an input source and should be the first stage in the pipeline.
+        kInitialSource,
+        // Similar to kInitialSource, but does not require an underlying collection to produce
+        // output.
+        kCollectionlessInitialSource
+    };
+
     /**
      * This is what is returned from the main DocumentSource API: getNext(). It is essentially a
      * (ReturnStatus, Document) pair, with the first entry being used to communicate information
@@ -249,10 +259,28 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
 
     /**
-     * Returns true if doesn't require an input source (most DocumentSources do).
+     * Subclasses should return InitialSourceType::kInitialSource if the stage does not require an
+     * input source, or InitialSourceType::kCollectionlessInitialSource if the stage will produce
+     * the input for the pipeline independent of an underlying collection. The latter are specified
+     * with {aggregate: 1}, e.g. $currentOp.
      */
-    virtual bool isValidInitialSource() const {
-        return false;
+    virtual InitialSourceType getInitialSourceType() const {
+        return InitialSourceType::kNotInitialSource;
+    }
+
+    /**
+     * Returns true if this stage does not require an input source.
+     */
+    bool isInitialSource() const {
+        return getInitialSourceType() != InitialSourceType::kNotInitialSource;
+    }
+
+    /**
+     * Returns true if this stage will produce the input for the pipeline independent of an
+     * underlying collection. These are specified with {aggregate: 1}, e.g. $currentOp.
+     */
+    bool isCollectionlessInitialSource() const {
+        return getInitialSourceType() == InitialSourceType::kCollectionlessInitialSource;
     }
 
     /**
@@ -525,6 +553,9 @@ public:
     // Wraps mongod-specific functions to allow linking into mongos.
     class MongodInterface {
     public:
+        enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
+        enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
+
         virtual ~MongodInterface(){};
 
         /**
@@ -592,6 +623,20 @@ public:
         virtual StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
             const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+
+        /**
+         * Returns a vector of owned BSONObjs, each of which contains details of an in-progress
+         * operation or, optionally, an idle connection. If userMode is kIncludeAllUsers, report
+         * operations for all authenticated users; otherwise, report only the current user's
+         * operations.
+         */
+        virtual std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
+                                                   CurrentOpUserMode userMode) const = 0;
+
+        /**
+         * Returns the name of the local shard if sharding is enabled, or an empty string.
+         */
+        virtual std::string getShardName(OperationContext* opCtx) const = 0;
 
         // Add new methods as needed.
     };

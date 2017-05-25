@@ -74,7 +74,7 @@ public:
     bool slaveOverrideOk() const {
         return true;
     }
-    bool supportsReadConcern() const final {
+    bool supportsReadConcern(const std::string& dbName, const BSONObj& cmdObj) const final {
         return true;
     }
 

@@ -92,5 +92,14 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) override {
         MONGO_UNREACHABLE;
     }
+
+    std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
+                                       CurrentOpUserMode userMode) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::string getShardName(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
 };
 }  // namespace mongo

@@ -82,6 +82,13 @@ StatusWith<std::vector<BSONObj>> AggregationRequest::parsePipelineFromBSON(
 }
 
 StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+    return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity);
+}
+
+StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     NamespaceString nss,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
@@ -232,10 +239,36 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     return request;
 }
 
+NamespaceString AggregationRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
+    auto firstElement = cmdObj.firstElement();
+
+    if (firstElement.isNumber()) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Invalid command format: the '"
+                              << firstElement.fieldNameStringData()
+                              << "' field must specify a collection name or 1",
+                firstElement.number() == 1);
+        return NamespaceString::makeCollectionlessAggregateNSS(dbname);
+    } else {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "collection name has invalid type: "
+                              << typeName(firstElement.type()),
+                firstElement.type() == BSONType::String);
+
+        const NamespaceString nss(dbname, firstElement.valueStringData());
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+                nss.isValid() && !nss.isCollectionlessAggregateNS());
+
+        return nss;
+    }
+}
+
 Document AggregationRequest::serializeToCommandObj() const {
     MutableDocument serialized;
     return Document{
-        {kCommandName, _nss.coll()},
+        {kCommandName, (_nss.isCollectionlessAggregateNS() ? Value(1) : Value(_nss.coll()))},
         {kPipelineName, _pipeline},
         // Only serialize booleans if different than their default.
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},

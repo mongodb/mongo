@@ -48,8 +48,8 @@ public:
     const char* getSourceName() const override;
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
-    bool isValidInitialSource() const override {
-        return true;
+    InitialSourceType getInitialSourceType() const override {
+        return InitialSourceType::kInitialSource;
     }
     BSONObjSet getOutputSorts() override {
         return sorts;

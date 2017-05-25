@@ -638,6 +638,30 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_currentOp_allUsers_true",
+          command: {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges: [{resource: {cluster: true}, actions: ["inprog"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                roles: roles_monitoring,
+                privileges: [{resource: {cluster: true}, actions: ["inprog"]}],
+                expectFail: true
+              }
+          ]
+        },
+        {
+          testname: "aggregate_currentOp_allUsers_false",
+          command: {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}},
+          skipSharded: true,
+          testcases: [{runOnDb: adminDbName, roles: roles_all}]
+        },
+        {
           testname: "aggregate_lookup",
           command: {
               aggregate: "foo",

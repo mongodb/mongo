@@ -278,7 +278,7 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
 
         // Disallow any stages that need to be the first stage in the pipeline.
         for (auto&& stage : pipeline->getSources()) {
-            if (stage->isValidInitialSource()) {
+            if (stage->isInitialSource()) {
                 uasserted(40173,
                           str::stream() << stage->getSourceName()
                                         << " is not allowed to be used within a $facet stage: "

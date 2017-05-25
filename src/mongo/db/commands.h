@@ -205,7 +205,9 @@ public:
     virtual bool maintenanceOk() const = 0;
 
     /**
-     * Returns true if this Command supports the readConcern argument.
+     * Returns true if this Command supports the readConcern argument. Takes the command object and
+     * the name of the database on which it was invoked as arguments, so that readConcern can be
+     * conditionally rejected based on the command's parameters and/or namespace.
      *
      * If the readConcern argument is sent to a command that returns false the command processor
      * will reject the command, returning an appropriate error message. For commands that support
@@ -216,7 +218,7 @@ public:
      * the option to the shards as needed. We rely on the shards to fail the commands in the
      * cases where it isn't supported.
      */
-    virtual bool supportsReadConcern() const = 0;
+    virtual bool supportsReadConcern(const std::string& dbName, const BSONObj& cmdObj) const = 0;
 
     /**
      * Returns LogicalOp for this command.
@@ -348,7 +350,7 @@ public:
         return true; /* assumed true prior to commit */
     }
 
-    bool supportsReadConcern() const override {
+    bool supportsReadConcern(const std::string& dbName, const BSONObj& cmdObj) const override {
         return false;
     }
 

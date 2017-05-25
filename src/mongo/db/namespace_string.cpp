@@ -77,6 +77,7 @@ const char kLogicalTimeKeysCollection[] = "admin.system.keys";
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
+constexpr auto collectionlessAggregateCursorCol = "$cmd.aggregate"_sd;
 constexpr auto dropPendingNSPrefix = "system.drop."_sd;
 
 }  // namespace
@@ -124,6 +125,10 @@ bool NamespaceString::isListIndexesCursorNS() const {
         coll().startsWith(listIndexesCursorNSPrefix);
 }
 
+bool NamespaceString::isCollectionlessAggregateNS() const {
+    return coll() == collectionlessAggregateCursorCol;
+}
+
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());
@@ -135,6 +140,13 @@ NamespaceString NamespaceString::makeListIndexesNSS(StringData dbName, StringDat
     NamespaceString nss(dbName, str::stream() << listIndexesCursorNSPrefix << collectionName);
     dassert(nss.isValid());
     dassert(nss.isListIndexesCursorNS());
+    return nss;
+}
+
+NamespaceString NamespaceString::makeCollectionlessAggregateNSS(StringData dbname) {
+    NamespaceString nss(dbname, collectionlessAggregateCursorCol);
+    dassert(nss.isValid());
+    dassert(nss.isCollectionlessAggregateNS());
     return nss;
 }
 

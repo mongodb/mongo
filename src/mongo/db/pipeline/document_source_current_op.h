@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 MongoDB Inc.
+ * Copyright (C) 2017 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -32,30 +32,15 @@
 
 namespace mongo {
 
-/**
- * Provides a document source interface to retrieve collection-level statistics for a given
- * collection.
- */
-class DocumentSourceCollStats : public DocumentSourceNeedsMongod {
+class DocumentSourceCurrentOp final : public DocumentSourceNeedsMongod {
 public:
-    class LiteParsed final : public LiteParsedDocumentSource {
-    public:
-        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
-                                                 const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>();
-        }
+    using ConnMode = MongodInterface::CurrentOpConnectionsMode;
+    using UserMode = MongodInterface::CurrentOpUserMode;
 
-        bool isCollStats() const final {
-            return true;
-        }
-
-        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-            return stdx::unordered_set<NamespaceString>();
-        }
-    };
-
-    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-        : DocumentSourceNeedsMongod(pExpCtx) {}
+    static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
+        UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers);
 
     GetNextResult getNext() final;
 
@@ -63,15 +48,26 @@ public:
 
     InitialSourceType getInitialSourceType() const final;
 
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
 private:
-    // The raw object given to $collStats containing user specified options.
-    BSONObj _collStatsSpec;
-    bool _finished = false;
+    DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                            ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
+                            UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers)
+        : DocumentSourceNeedsMongod(pExpCtx),
+          _includeIdleConnections(includeIdleConnections),
+          _includeOpsFromAllUsers(includeOpsFromAllUsers) {}
+
+    ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
+    UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
+
+    std::string _shardName;
+
+    std::vector<BSONObj> _ops;
+    std::vector<BSONObj>::iterator _opsIter;
 };
 
 }  // namespace mongo

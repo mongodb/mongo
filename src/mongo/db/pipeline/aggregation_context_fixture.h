@@ -46,10 +46,12 @@ namespace mongo {
 class AggregationContextFixture : public unittest::Test {
 public:
     AggregationContextFixture()
+        : AggregationContextFixture(NamespaceString("unittests.pipeline_test")) {}
+
+    AggregationContextFixture(NamespaceString nss)
         : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
-          _expCtx(new ExpressionContextForTest(
-              _opCtx.get(), AggregationRequest(NamespaceString("unittests.pipeline_test"), {}))) {}
+          _expCtx(new ExpressionContextForTest(_opCtx.get(), AggregationRequest(nss, {}))) {}
 
     boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
         return _expCtx.get();

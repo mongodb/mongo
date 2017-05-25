@@ -170,8 +170,8 @@ public:
     DocumentSourcePassthrough() : DocumentSourceMock({}) {}
 
     // We need this to be false so that it can be used in a $facet stage.
-    bool isValidInitialSource() const final {
-        return false;
+    InitialSourceType getInitialSourceType() const final {
+        return InitialSourceType::kNotInitialSource;
     }
 
     DocumentSource::GetNextResult getNext() final {

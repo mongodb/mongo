@@ -365,7 +365,7 @@ bool runCommandImpl(OperationContext* opCtx,
     const std::string db = request.getDatabase().toString();
 
     BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
-    auto readConcernArgsStatus = _extractReadConcern(cmd, command->supportsReadConcern());
+    auto readConcernArgsStatus = _extractReadConcern(cmd, command->supportsReadConcern(db, cmd));
 
     if (!readConcernArgsStatus.isOK()) {
         auto result =
@@ -433,8 +433,9 @@ bool runCommandImpl(OperationContext* opCtx,
 
     // When a linearizable read command is passed in, check to make sure we're reading
     // from the primary.
-    if (command->supportsReadConcern() && (readConcernArgsStatus.getValue().getLevel() ==
-                                           repl::ReadConcernLevel::kLinearizableReadConcern) &&
+    if (command->supportsReadConcern(db, cmd) &&
+        (readConcernArgsStatus.getValue().getLevel() ==
+         repl::ReadConcernLevel::kLinearizableReadConcern) &&
         (request.getCommandName() != "getMore")) {
 
         auto linearizableReadStatus = waitForLinearizableReadConcern(opCtx);

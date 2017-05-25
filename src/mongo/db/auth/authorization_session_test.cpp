@@ -627,6 +627,37 @@ TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
     ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
 }
 
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprogAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticated) {
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogAction) {
+    authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
 TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotValid) {
     BSONArray pipeline = BSON_ARRAY(BSON("$out"
                                          << ""));

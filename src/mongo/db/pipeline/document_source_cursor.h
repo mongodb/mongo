@@ -50,8 +50,8 @@ public:
         return _outputSorts;
     }
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    bool isValidInitialSource() const final {
-        return true;
+    InitialSourceType getInitialSourceType() const final {
+        return InitialSourceType::kInitialSource;
     }
 
     void detachFromOperationContext() final;

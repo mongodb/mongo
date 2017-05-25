@@ -256,9 +256,14 @@ void AuthorizationSession::_addPrivilegesForStage(const std::string& db,
 Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
                                                    const BSONObj& cmdObj) {
     std::string db(ns.db().toString());
-    auto inputResource = ResourcePattern::forExactNamespace(ns);
     uassert(
         17138, mongoutils::str::stream() << "Invalid input namespace, " << ns.ns(), ns.isValid());
+
+    // If this connection does not need to be authenticated (for instance, if auth is disabled),
+    // return Status::OK() immediately.
+    if (_externalState->shouldIgnoreAuthChecks()) {
+        return Status::OK();
+    }
 
     PrivilegeVector privileges;
 
@@ -270,8 +275,8 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
     BSONObj pipeline = pipelineElem.embeddedObject();
     if (pipeline.isEmpty()) {
         // The pipeline is empty, so we require only the find action.
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::find));
+        Privilege::addPrivilegeToPrivilegeVector(
+            &privileges, Privilege(ResourcePattern::forExactNamespace(ns), ActionType::find));
     } else {
         if (pipeline.firstElementType() != BSONType::Object) {
             // The pipeline contains something that's not an object.
@@ -284,15 +289,48 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
         BSONObj firstPipelineStage = pipeline.firstElement().embeddedObject();
         if (str::equals("$indexStats", firstPipelineStage.firstElementFieldName())) {
             Privilege::addPrivilegeToPrivilegeVector(
-                &privileges, Privilege(inputResource, ActionType::indexStats));
+                &privileges,
+                Privilege(ResourcePattern::forExactNamespace(ns), ActionType::indexStats));
         } else if (str::equals("$collStats", firstPipelineStage.firstElementFieldName())) {
             Privilege::addPrivilegeToPrivilegeVector(
-                &privileges, Privilege(inputResource, ActionType::collStats));
+                &privileges,
+                Privilege(ResourcePattern::forExactNamespace(ns), ActionType::collStats));
+        } else if (str::equals("$currentOp", firstPipelineStage.firstElementFieldName())) {
+            // Need to check the value of allUsers; if true then inprog privilege is required.
+            // {$currentOp: {idleConnections: <boolean|false>, allUsers: <boolean|false>}}
+            BSONElement spec = firstPipelineStage["$currentOp"];
+
+            if (spec.type() != BSONType::Object) {
+                return Status(
+                    ErrorCodes::TypeMismatch,
+                    str::stream()
+                        << "$currentOp options must be specified in an object, but found: "
+                        << typeName(spec.type()));
+            }
+
+            auto allUsersElt = spec["allUsers"];
+
+            if (allUsersElt && allUsersElt.type() != BSONType::Bool) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "The 'allUsers' parameter of the $currentOp stage "
+                                               "must be a boolean value, but found: "
+                                            << typeName(allUsersElt.type()));
+            }
+
+            if (allUsersElt && allUsersElt.boolean()) {
+                Privilege::addPrivilegeToPrivilegeVector(
+                    &privileges,
+                    Privilege(ResourcePattern::forClusterResource(), ActionType::inprog));
+            } else if (!getAuthenticatedUserNames().more()) {
+                // This connection is not authenticated, so we should return an error even though
+                // there are no privilege requirements when allUsers is false.
+                return Status(ErrorCodes::Unauthorized, "unauthorized");
+            }
         } else {
             // If no source requiring an alternative permission scheme is specified then default to
             // requiring find() privileges on the given namespace.
-            Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                     Privilege(inputResource, ActionType::find));
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges, Privilege(ResourcePattern::forExactNamespace(ns), ActionType::find));
         }
 
         // Add additional required privileges for each stage in the pipeline.

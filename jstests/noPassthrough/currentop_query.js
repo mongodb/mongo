@@ -6,12 +6,14 @@
     "use strict";
 
     /**
-     * @param {Object} params - Configuration options for the test.
-     * @param {string} params.readMode - The read mode to use for the parallel shell. This allows
+     * @param {string} readMode - The read mode to use for the parallel shell. This allows
      * testing currentOp() output for both OP_QUERY and OP_GET_MORE queries, as well as "find" and
      * "getMore" commands.
+     * @params {function} currentOp - Function which takes a database object and a filter, and
+     * returns an array of matching current operations. This allows us to test output for both the
+     * currentOp command and the $currentOp aggregation stage.
      */
-    function runTest(params) {
+    function runTest({readMode, currentOp}) {
         var conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
         assert.neq(null, conn, "mongod was unable to start up");
 
@@ -44,7 +46,7 @@
                 {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
 
             // Set shell read mode for the parallel shell test.
-            TestData.shellReadMode = params.readMode;
+            TestData.shellReadMode = readMode;
             TestData.currentOpTest = testObj.test;
             testObj.test = function() {
                 db.getMongo().forceReadMode(TestData.shellReadMode);
@@ -67,7 +69,7 @@
                         testObj.currentOpFilter.op = testObj.operation;
                     }
 
-                    var result = testDB.currentOp(testObj.currentOpFilter);
+                    var result = currentOp(testDB, testObj.currentOpFilter);
                     assert.commandWorked(result);
 
                     if (result.inprog.length === 1) {
@@ -83,7 +85,7 @@
                 },
                 function() {
                     return "Failed to find operation from " + tojson(testObj) +
-                        " in currentOp() output: " + tojson(testDB.currentOp());
+                        " in currentOp() output: " + tojson(currentOp(testDB, {}));
                 });
 
             // Allow the query to complete.
@@ -246,7 +248,7 @@
         //
         // Confirm currentOp contains collation for find command.
         //
-        if (params.readMode === "commands") {
+        if (readMode === "commands") {
             confirmCurrentOpContents({
                 test: function() {
                     assert.eq(db.currentop_query.find({a: 1})
@@ -324,7 +326,7 @@
         // Confirm that currentOp displays upconverted getMore and originatingCommand in the case of
         // a legacy query.
         //
-        if (params.readMode === "legacy") {
+        if (readMode === "legacy") {
             let filter = {
                 "command.getMore": {$gt: 0},
                 "command.collection": "currentop_query",
@@ -454,6 +456,23 @@
         delete TestData.queryFilter;
     }
 
-    runTest({readMode: "commands"});
-    runTest({readMode: "legacy"});
+    function currentOpCommand(inputDB, filter) {
+        return inputDB.currentOp(filter);
+    }
+
+    function currentOpAgg(inputDB, filter) {
+        let adminDB = inputDB.getSiblingDB("admin");
+        let cmdRes = adminDB.runCommand(
+            {aggregate: 1, pipeline: [{$currentOp: {}}, {$match: filter}], cursor: {}});
+
+        assert.commandWorked(cmdRes);
+
+        return {inprog: new DBCommandCursor(inputDB.getMongo(), cmdRes, 5).toArray(), ok: 1};
+    }
+
+    runTest({readMode: "commands", currentOp: currentOpCommand});
+    runTest({readMode: "legacy", currentOp: currentOpCommand});
+
+    runTest({readMode: "commands", currentOp: currentOpAgg});
+    runTest({readMode: "legacy", currentOp: currentOpAgg});
 })();

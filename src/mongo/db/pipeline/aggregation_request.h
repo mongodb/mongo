@@ -81,6 +81,22 @@ public:
         boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
     /**
+     * Convenience overload which constructs the request's NamespaceString from the given database
+     * name and command object.
+     */
+    static StatusWith<AggregationRequest> parseFromBSON(
+        const std::string& dbName,
+        const BSONObj& cmdObj,
+        boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
+
+    /*
+     * The first field in 'cmdObj' must be a string representing a valid collection name, or the
+     * number 1. In the latter case, returns a reserved namespace that does not represent a user
+     * collection. See 'NamespaceString::makeCollectionlessAggregateNSS()'.
+     */
+    static NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
+
+    /**
      * Constructs an AggregationRequest over the given namespace with the given pipeline. All
      * options aside from the pipeline assume their default values.
      */
