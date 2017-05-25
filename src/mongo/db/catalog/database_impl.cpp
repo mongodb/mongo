@@ -421,6 +421,15 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     BackgroundOperation::assertNoBgOpInProgForNs(fullns);
 
+    // Make sure no indexes builds are in progress.
+    // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
+    auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
+    massert(40461,
+            str::stream() << "cannot drop collection " << fullns.ns() << " when "
+                          << numIndexesInProgress
+                          << " index builds in progress.",
+            numIndexesInProgress == 0);
+
     audit::logDropCollection(&cc(), fullns.toString());
 
     collection->getCursorManager()->invalidateAll(opCtx, true, "collection dropped");
@@ -428,12 +437,49 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     Top::get(opCtx->getClient()->getServiceContext()).collectionDropped(fullns.toString());
 
     auto uuid = collection->uuid();
-    auto status = _finishDropCollection(opCtx, fullns, collection);
-    if (!status.isOK()) {
-        return status;
+
+    // Drop unreplicated collections immediately.
+    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, fullns)) {
+        auto status = _finishDropCollection(opCtx, fullns, collection);
+        if (!status.isOK()) {
+            return status;
+        }
+        getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
+        return Status::OK();
     }
 
-    getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
+    // Replicated collections will be renamed with a special drop-pending namespace and dropped when
+    // the replica set optime reaches the drop optime.
+    auto dropOpTime =
+        getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
+
+    // Drop collection immediately if OpObserver did not write entry to oplog.
+    // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
+    // oplog.cpp.
+    if (dropOpTime.isNull()) {
+        log() << "dropCollection: " << fullns << " - no drop optime available for pending-drop. "
+              << "Dropping collection immediately.";
+        fassertStatusOK(40462, _finishDropCollection(opCtx, fullns, collection));
+        return Status::OK();
+    }
+
+    // Check if drop-pending namespace is too long for the index names in the collection.
+    auto dpns = fullns.makeDropPendingNamespace(dropOpTime);
+    auto status =
+        dpns.checkLengthForRename(collection->getIndexCatalog()->getLongestIndexNameLength(opCtx));
+    if (!status.isOK()) {
+        log() << "dropCollection: " << fullns
+              << " - cannot proceed with collection rename for pending-drop: " << status
+              << ". Dropping collection immediately.";
+        fassertStatusOK(40463, _finishDropCollection(opCtx, fullns, collection));
+        return Status::OK();
+    }
+
+    // Rename collection using drop-pending namespace generated from drop optime.
+    const bool stayTemp = true;
+    log() << "dropCollection: " << fullns << " - renaming to drop-pending collection: " << dpns
+          << " with drop optime " << dropOpTime;
+    fassertStatusOK(40464, renameCollection(opCtx, fullns.ns(), dpns.ns(), stayTemp));
 
     return Status::OK();
 }
