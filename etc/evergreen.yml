@@ -6938,7 +6938,7 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    compile_flags: --ssl CC=/usr/bin/clang-3.7 CXX=/usr/bin/clang++-3.7 --libc++ -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
+    compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.7 CXX=/usr/bin/clang++-3.7 --libc++ -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
