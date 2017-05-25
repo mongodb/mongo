@@ -15,6 +15,11 @@
 import SCons
 import subprocess
 
+# TODO: Make a SUFF variable for the suffix to write to
+# TODO: Prevent using abilink when -gsplit-dwarf is in play, since it doesn't work
+# TODO: Make a variable for the md5sum utility (allow any hasher)
+# TODO: Add an ABILINKCOM variable to the Action, so it can be silenced.
+
 def _detect(env):
     try:
         abidw = env['ABIDW']
@@ -26,53 +31,52 @@ def _detect(env):
 
     return env.WhereIs('abidw')
 
-def generate(env):
+def _add_emitter(builder):
+    base_emitter = builder.emitter
 
-    class AbilinkNode(SCons.Node.FS.File):
-        def __init__(self, name, directory, fs):
-            SCons.Node.FS.File.__init__(self, name, directory, fs)
+    def new_emitter(target, source, env):
+        new_targets = []
+        for t in target:
+            abidw = str(t) + ".abidw"
+            abidw = (t.builder.target_factory or env.File)(abidw)
+            new_targets.append(abidw)
+            setattr(t.attributes, "abidw", abidw)
+        targets = target + new_targets
+        return (targets, source)
 
-        def get_contents(self):
-            if not self.rexists():
-                return ''
+    new_emitter = SCons.Builder.ListEmitter([base_emitter, new_emitter])
+    builder.emitter = new_emitter
 
-            fname = self.rfile().abspath
-            contents = None
+def _add_scanner(builder):
+    old_scanner = builder.target_scanner
+    path_function = old_scanner.path_function
 
-            try:
-                # TODO: If there were python bindings for libabigail, we
-                # could avoid the shell out (and probably be faster, as we
-                # could get exactly the information we want).
-                contents = subprocess.check_output([env.subst('$ABIDW'), fname])
-            except subprocess.CalledProcessError, e:
-                # ABIDW sometimes fails. In that case, log an error
-                # and fall back to the normal contents
-                print "WARNING: ABIDW failed for target %s, please file a bug report" % fname
-                try:
-                    contents = open(fname, "rb").read()
-                except EnvironmentError, e:
-                    if not e.filename:
-                        e.filename = fname
-                    raise
+    def new_scanner(node, env, path):
+        old_results = old_scanner(node, env, path)
+        new_results = []
+        for base in old_results:
+            abidw = getattr(env.Entry(base).attributes, "abidw", None)
+            new_results.append(abidw if abidw else base)
+        return new_results
 
-            return contents
+    builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner, path_function=path_function)
 
-        def get_content_hash(self):
-            return SCons.Util.MD5signature(self.get_contents())
-
-    env['ABIDW'] = _detect(env)
-
-    def ShlibNode(env, name, directory = None, create = 1):
-        return env.fs._lookup(env.subst(name), directory, AbilinkNode, create)
-
-    env.AddMethod(ShlibNode, 'ShlibNode')
-
-    def shlib_target_factory(arg):
-        return env.ShlibNode(arg)
-
-    env['BUILDERS']['SharedLibrary'].target_factory = shlib_target_factory
-    env['BUILDERS']['LoadableModule'].target_factory = shlib_target_factory
+def _add_action(builder):
+    actions = builder.action
+    builder.action = actions + SCons.Action.Action("$ABIDW $TARGET | md5sum > ${TARGET}.abidw")
 
 def exists(env):
     result = _detect(env) != None
     return result
+
+def generate(env):
+
+    if not exists(env):
+        return
+
+    builder = env['BUILDERS']['SharedLibrary']
+    _add_emitter(builder)
+    _add_action(builder)
+    _add_scanner(builder)
+    _add_scanner(env['BUILDERS']['Program'])
+    _add_scanner(env['BUILDERS']['LoadableModule'])
