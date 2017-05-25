@@ -184,6 +184,47 @@ public class PackTest {
     }
 
     @Test
+    public void pack08()
+    throws WiredTigerPackingException {
+        String format = "u";
+        PackOutputStream packer = new PackOutputStream(format);
+        PackInputStream unpacker;
+        byte[] b0 = {};
+        byte[] b1 = { 0x00 };
+        byte[] packed;
+
+        packer.addByteArray(b0);
+        packed = packer.getValue();
+        unpacker = new PackInputStream(format, packed);
+        Assert.assertTrue(java.util.Arrays.equals(
+                              unpacker.getByteArray(), b0));
+
+        packer = new PackOutputStream(format);
+        packer.addByteArray(b1);
+        packed = packer.getValue();
+        unpacker = new PackInputStream(format, packed);
+        Assert.assertTrue(java.util.Arrays.equals(
+                              unpacker.getByteArray(), b1));
+
+        format = "uu";
+        for (int i = 0; i < 2; i++) {
+            byte[] arg0 = (i == 0 ? b0 : b1);
+            for (int j = 0; j < 2; j++) {
+                byte[] arg1 = (j == 0 ? b0 : b1);
+                packer = new PackOutputStream(format);
+                packer.addByteArray(arg0);
+                packer.addByteArray(arg1);
+                packed = packer.getValue();
+                unpacker = new PackInputStream(format, packed);
+                Assert.assertTrue(java.util.Arrays.equals(
+                                      unpacker.getByteArray(), arg0));
+                Assert.assertTrue(java.util.Arrays.equals(
+                                      unpacker.getByteArray(), arg1));
+            }
+        }
+    }
+
+    @Test
     public void packUnpackNumber01()
     throws WiredTigerPackingException {
         // Verify that we can pack and unpack single signed longs.

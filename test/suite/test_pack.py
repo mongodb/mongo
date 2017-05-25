@@ -95,6 +95,11 @@ class test_pack(wttest.WiredTigerTestCase):
         self.check('3u', r"\x4")
         self.check('3uu', r"\x4", r"\x42" * 10)
         self.check('u3u', r"\x42" * 10, r"\x4")
+        self.check('u', '\x00')
+        self.check('u', '')
+        self.check('uu', '', '\x00')
+        self.check('uu', '\x00', '')
+        self.check('uu', '', '')
 
         self.check('s', "4")
         self.check("1s", "4")
