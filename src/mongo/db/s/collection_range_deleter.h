@@ -71,9 +71,11 @@ public:
         void notify(Status status) const {
             notification->set(status);
         }
-        Status waitStatus(OperationContext* opCtx) const {
-            return notification->get(opCtx);
-        }
+
+        // Sleeps waiting for notification, and returns notify's argument.
+        // On interruption, throws; calling waitStatus afterward returns failed status.
+        Status waitStatus(OperationContext* opCtx);
+
         bool ready() const {
             return bool(*notification);
         }

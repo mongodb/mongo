@@ -318,4 +318,14 @@ CollectionRangeDeleter::DeleteNotification::DeleteNotification(Status status)
     notify(status);
 }
 
+Status CollectionRangeDeleter::DeleteNotification::waitStatus(OperationContext* opCtx) {
+    try {
+        return notification->get(opCtx);
+    } catch (...) {
+        notification = std::make_shared<Notification<Status>>();
+        notify({ErrorCodes::Interrupted, "Wait for range delete request completion interrupted"});
+        throw;
+    }
+}
+
 }  // namespace mongo
