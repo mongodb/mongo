@@ -13,13 +13,13 @@ var res;
 // Bypass validation in shell so we can test the server.
 conn._skipValidation = true;
 
-// Should not allow "." in field names
+// Allow "." in field names
 res = t.save({_id: 1, "a.a": 1});
-assert(res.hasWriteError(), "a.a");
+assert(!res.hasWriteError(), "a.a");
 
-// Should not allow "." in field names, embedded
+// Allow "." in field names, embedded
 res = t.save({_id: 1, a: {"a.a": 1}});
-assert(res.hasWriteError(), "a: a.a");
+assert(!res.hasWriteError(), "a: a.a");
 
 // Should not allow "$"-prefixed field names, caught before "." check
 res = t.save({_id: 1, $a: {"a.a": 1}});
