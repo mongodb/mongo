@@ -1,0 +1,48 @@
+# This file is used to tag JS tests for retry on failure that run in the mainline.
+#
+# For JS tests that have failed, you can tag them to be retried. The following scenarios apply:
+#
+# 1. the test sometimes fails in any task on any build variant with any distro,
+# 2. the test sometimes fails in a specific task on any build variant with any distro,
+# 3. the test sometimes fails in a specific task on a specific build variant with any distro, or
+# 4. the test sometimes fails in a specific task on a specific build variant with a specific distro.
+#
+# Depending on which of the above scenarios apply, you can tag the JS file with the following tags,
+# respectively.
+#
+# 1. retry_on_failure
+# 2. retry_on_failure|${task_name}
+# 3. retry_on_failure|${task_name}|${build_variant}
+# 4. retry_on_failure|${task_name}|${build_variant}|${distro_id}
+#
+# Examples:
+#
+#   JS test failed: jstests/sharding/exact_shard_key_target.js
+#     in task_name: sharding_csrs_continuous_config_stepdown_WT
+# on build_variant: any
+#   with distro_id: any
+#         tag with: retry_on_failure|sharding_csrs_continuous_config_stepdown_WT
+#
+#   JS test failed: jstests/noPassthrough/backup_restore_stop_start.js
+#     in task_name: noPassthrough
+# on build_variant: enterprise-rhel-62-64-bit
+#   with distro_id: rhel62-small
+#         tag with: retry_on_failure|noPassthrough|enterprise-rhel-62-64-bit|rhel62-small
+#
+# Example of tagging a test affecting multiple tasks:
+#
+#   JS test failed: jstests/sharding/shard_collection_verify_initial_chunks.js
+#     in task_name: sharding and sharding_WT
+# on build_variant: linux-64
+#   with distro_id: any
+#         tag with: retry_on_failure|sharding|linux-64 and
+#                   retry_on_failure|sharding_WT|linux-64
+#
+#
+# Note: Making it possible to ignore test failures increases the risk we won't (or will take
+# longer to) discover a bug and therefore tests should be tagged judiciously.
+
+selector:
+  js_test:
+    # jstests/sharding/exact_shard_key_target.js:
+    # - retry_on_failure|sharding_csrs_continuous_config_stepdown_WT
