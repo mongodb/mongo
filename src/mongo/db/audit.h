@@ -51,12 +51,6 @@ class UserName;
 namespace audit {
 
 /**
- * Import CommandInterface as Command into the 'audit' namespace to accommodate
- * implementations of logCommandAuthzCheck() that still refer to Command.
- */
-using Command = CommandInterface;
-
-/**
  * Logs the result of an authentication attempt.
  */
 void logAuthentication(Client* client,
