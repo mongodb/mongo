@@ -849,6 +849,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                             "it is usually the object returned from MongoRunner.runMongod/s");
         }
 
+        if (!conn.port) {
+            throw new Error("first arg must have a `port` property; " +
+                            "it is usually the object returned from MongoRunner.runMongod/s");
+        }
+
         signal = parseInt(signal) || 15;
         opts = opts || {};
 

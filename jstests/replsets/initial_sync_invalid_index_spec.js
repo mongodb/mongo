@@ -22,7 +22,8 @@
         {createIndexes: "test", indexes: [{v: 2, name: "x_1", key: {x: 1}, invalidOption: 1}]}));
 
     // Add another node to the replica set to allow an initial sync to occur.
-    var init_sync_node = replTest.add();
+    var initSyncNode = replTest.add();
+    var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
     clearRawMongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(replTest);
@@ -36,7 +37,16 @@
     };
     assert.soon(assertFn, "Initial sync should have aborted on invalid index specification");
 
-    replTest.stop(init_sync_node, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    assert.soon(function() {
+        try {
+            initSyncNodeAdminDB.runCommand({ping: 1});
+        } catch (e) {
+            return true;
+        }
+        return false;
+    }, "Node did not terminate due to invalid index spec during initial sync", 60 * 1000);
+
+    replTest.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
     replTest.stopSet();
 
 })();
