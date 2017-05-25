@@ -117,6 +117,7 @@ env.Library(
         'uuid_catalog.cpp'
     ],
     LIBDEPS=[
+        'uuid',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/namespace_string',
