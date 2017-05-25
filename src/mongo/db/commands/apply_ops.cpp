@@ -121,22 +121,31 @@ public:
         txn->setWriteConcern(wcResult.getValue());
         setupSynchronousCommit(txn);
 
+        auto applyOpsRes = [&]() {
+            try {
+                // Note: this scope guard must go out of scope before the waitForWriteConcern below!
+                auto client = txn->getClient();
+                auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+                ScopeGuard lastOpSetterGuard =
+                    MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                 &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                 txn);
 
-        auto client = txn->getClient();
-        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
-        ScopeGuard lastOpSetterGuard =
-            MakeObjGuard(repl::ReplClientInfo::forClient(client),
-                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
-                         txn);
+                auto res = appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
 
-        auto applyOpsStatus = appendCommandStatus(result, applyOps(txn, dbname, cmdObj, &result));
+                if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
+                    // If this operation has already generated a new lastOp, don't bother setting it
+                    // here. No-op applyOps will not generate a new lastOp, so we still need the
+                    // guard to fire in that case.
+                    lastOpSetterGuard.Dismiss();
+                }
 
-        if (repl::ReplClientInfo::forClient(client).getLastOp() != lastOpAtOperationStart) {
-            // If this operation has already generated a new lastOp, don't bother setting it
-            // here. No-op applyOps will not generate a new lastOp, so we still need the guard to
-            // fire in that case.
-            lastOpSetterGuard.Dismiss();
-        }
+                return res;
+            } catch (const DBException& e) {
+                appendCommandStatus(result, e.toStatus());
+                return false;
+            }
+        }();
 
         WriteConcernResult res;
         auto waitForWCStatus =
@@ -146,7 +155,7 @@ public:
                                 &res);
         appendCommandWCStatus(result, waitForWCStatus);
 
-        return applyOpsStatus;
+        return applyOpsRes;
     }
 
 private:
