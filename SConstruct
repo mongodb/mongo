@@ -1189,6 +1189,13 @@ env['BUILDERS']['LibraryObject'] = env['BUILDERS']['StaticObject']
 
 if link_model.startswith("dynamic"):
 
+    # Add in the abi linking tool if the user requested and it is
+    # supported on this platform.
+    if env.get('ABIDW'):
+        abilink = Tool('abilink')
+        if abilink.exists(env):
+            abilink(env)
+
     # Redirect the 'Library' target, which we always use instead of 'StaticLibrary' for things
     # that can be built in either mode, to point to SharedLibrary.
     env['BUILDERS']['Library'] = env['BUILDERS']['SharedLibrary']
@@ -1351,20 +1358,6 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env['RANLIBCOMSTR'] = 'Skipping ranlib for $TARGET'
 
 libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
-
-# Both the abidw tool and the thin archive tool must be loaded after
-# libdeps, so that the scanners they inject can see the library
-# dependencies added by libdeps.
-if link_model.startswith("dynamic"):
-    # Add in the abi linking tool if the user requested and it is
-    # supported on this platform.
-    if env.get('ABIDW'):
-        abilink = Tool('abilink')
-        if abilink.exists(env):
-            abilink(env)
-
-if env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
-    env.Tool('thin_archive')
 
 if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
