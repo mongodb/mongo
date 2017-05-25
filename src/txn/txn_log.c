@@ -82,12 +82,12 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	 * or update, all of which require log records. We shouldn't ever log
 	 * reserve operations.
 	 */
-	WT_ASSERT(session, !WT_UPDATE_RESERVED_ISSET(upd));
+	WT_ASSERT(session, upd->type != WT_UPDATE_RESERVED);
 	if (cbt->btree->type == BTREE_ROW) {
 #ifdef HAVE_DIAGNOSTIC
 		__txn_op_log_row_key_check(session, cbt);
 #endif
-		if (WT_UPDATE_DELETED_ISSET(upd))
+		if (upd->type == WT_UPDATE_DELETED)
 			WT_RET(__wt_logop_row_remove_pack(
 			    session, logrec, op->fileid, &cursor->key));
 		else
@@ -97,7 +97,7 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		recno = WT_INSERT_RECNO(cbt->ins);
 		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
-		if (WT_UPDATE_DELETED_ISSET(upd))
+		if (upd->type == WT_UPDATE_DELETED)
 			WT_RET(__wt_logop_col_remove_pack(
 			    session, logrec, op->fileid, recno));
 		else

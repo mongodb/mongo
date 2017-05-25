@@ -600,7 +600,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			 * Switch reserved operations to abort to simplify
 			 * obsolete update list truncation.
 			 */
-			if (WT_UPDATE_RESERVED_ISSET(op->u.upd))
+			if (op->u.upd->type == WT_UPDATE_RESERVED)
 				op->u.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case WT_TXN_OP_REF:

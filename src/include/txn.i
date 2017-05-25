@@ -235,7 +235,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	/* Skip reserved place-holders, they're never visible. */
 	for (; upd != NULL; upd = upd->next)
-		if (!WT_UPDATE_RESERVED_ISSET(upd) &&
+		if (upd->type != WT_UPDATE_RESERVED &&
 		    __wt_txn_visible(session, upd->txnid))
 			break;
 
