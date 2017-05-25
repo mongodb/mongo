@@ -63,8 +63,8 @@ PoolForHost::~PoolForHost() {
 
 void PoolForHost::clear() {
     if (!_parentDestroyed) {
-        log() << "Dropping all pooled connections to " << _hostName << "(with timeout of "
-              << _socketTimeout << " seconds)";
+        logNoCache() << "Dropping all pooled connections to " << _hostName << "(with timeout of "
+                     << _socketTimeout << " seconds)";
     }
 
     while (!_pool.empty()) {
@@ -88,18 +88,18 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
     bool isBroken = c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec;
     if (isFailed || isBroken) {
         _badConns++;
-        log() << "Ending connection to host " << _hostName << "(with timeout of " << _socketTimeout
-              << " seconds)"
-              << " due to bad connection status; " << openConnections()
-              << " connections to that host remain open";
+        logNoCache() << "Ending connection to host " << _hostName << "(with timeout of "
+                     << _socketTimeout << " seconds)"
+                     << " due to bad connection status; " << openConnections()
+                     << " connections to that host remain open";
         pool->onDestroy(c);
         delete c;
     } else if (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize) {
         // We have a pool size that we need to enforce
-        log() << "Ending idle connection to host " << _hostName << "(with timeout of "
-              << _socketTimeout << " seconds)"
-              << " because the pool meets constraints; " << openConnections()
-              << " connections to that host remain open";
+        logNoCache() << "Ending idle connection to host " << _hostName << "(with timeout of "
+                     << _socketTimeout << " seconds)"
+                     << " because the pool meets constraints; " << openConnections()
+                     << " connections to that host remain open";
         pool->onDestroy(c);
         delete c;
     } else {
@@ -112,9 +112,9 @@ void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
     if (microSec != DBClientBase::INVALID_SOCK_CREATION_TIME &&
         microSec > _minValidCreationTimeMicroSec) {
         _minValidCreationTimeMicroSec = microSec;
-        log() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
-              << " microSec, clearing pool for " << _hostName << " of " << openConnections()
-              << " connections" << endl;
+        logNoCache() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
+                     << " microSec, clearing pool for " << _hostName << " of " << openConnections()
+                     << " connections" << endl;
         clear();
     }
 }
@@ -558,8 +558,8 @@ ScopedDbConnection::~ScopedDbConnection() {
             }
         } else {
             /* see done() comments above for why we log this line */
-            log() << "scoped connection to " << _conn->getServerAddress()
-                  << " not being returned to the pool" << endl;
+            logNoCache() << "scoped connection to " << _conn->getServerAddress()
+                         << " not being returned to the pool" << endl;
             kill();
         }
     }
