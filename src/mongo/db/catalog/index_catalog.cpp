@@ -857,12 +857,11 @@ Status IndexCatalog::_dropIndex(OperationContext* txn, IndexCatalogEntry* entry)
 
     invariant(_entries.release(entry->descriptor()) == entry);
     txn->recoveryUnit()->registerChange(new IndexRemoveChange(txn, _collection, &_entries, entry));
+    _collection->infoCache()->droppedIndex(txn, indexName);
     entry = NULL;
     _deleteIndexFromDisk(txn, indexName, indexNamespace);
 
     _checkMagic();
-
-    _collection->infoCache()->droppedIndex(txn, indexName);
 
     return Status::OK();
 }

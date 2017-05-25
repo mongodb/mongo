@@ -41,6 +41,8 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
@@ -115,7 +117,7 @@ Status renameCollection(OperationContext* txn,
 
     Database* const targetDB = dbHolder().openDb(txn, target.db());
 
-    {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         WriteUnitOfWork wunit(txn);
 
         // Check if the target namespace exists and if dropTarget is true.
@@ -149,6 +151,7 @@ Status renameCollection(OperationContext* txn,
 
         wunit.commit();
     }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "renameCollection", target.ns());
 
     // If we get here, we are renaming across databases, so we must copy all the data and
     // indexes, then remove the source collection.
