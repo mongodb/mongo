@@ -117,6 +117,29 @@ TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {
     ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
 }
 
+TEST_F(DocumentSourceLookUpTest, AcceptsPipelineWithLetSyntax) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    auto docSource = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from"
+                               << "coll"
+                               << "let"
+                               << BSON("var1"
+                                       << "$x")
+                               << "pipeline"
+                               << BSON_ARRAY(BSON("$project" << BSON("hasX"
+                                                                     << "$$var1"))
+                                             << BSON("$match" << BSON("$hasX" << true)))
+                               << "as"
+                               << "as"))
+            .firstElement(),
+        expCtx);
+    auto lookup = static_cast<DocumentSourceLookUp*>(docSource.get());
+    ASSERT_TRUE(lookup->wasConstructedWithPipelineSyntax());
+}
+
 TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpecified) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
@@ -142,8 +165,81 @@ TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenPipelineIsSpec
              << lookupStage->getSourceName()
              << " stage to uassert on mix of localField/foreignField and pipeline options");
     } catch (const UserException& ex) {
-        ASSERT_EQ(40450, ex.getCode());
+        ASSERT_EQ(ErrorCodes::FailedToParse, ex.getCode());
     }
+}
+
+TEST_F(DocumentSourceLookUpTest, RejectsLocalFieldForeignFieldWhenLetIsSpecified) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(BSON("$lookup" << BSON("from"
+                                                                                   << "coll"
+                                                                                   << "let"
+                                                                                   << BSON("var1"
+                                                                                           << "$a")
+                                                                                   << "localField"
+                                                                                   << "a"
+                                                                                   << "foreignField"
+                                                                                   << "b"
+                                                                                   << "as"
+                                                                                   << "as"))
+                                                                .firstElement(),
+                                                            expCtx),
+                       UserException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
+                           BSON("$lookup" << BSON("from"
+                                                  << "coll"
+                                                  << "let"
+                                                  << BSON(""  // Empty variable name.
+                                                          << "$a")
+                                                  << "pipeline"
+                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                                  << "as"
+                                                  << "as"))
+                               .firstElement(),
+                           expCtx),
+                       UserException,
+                       16866);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
+                           BSON("$lookup" << BSON("from"
+                                                  << "coll"
+                                                  << "let"
+                                                  << BSON("^invalidFirstChar"
+                                                          << "$a")
+                                                  << "pipeline"
+                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                                  << "as"
+                                                  << "as"))
+                               .firstElement(),
+                           expCtx),
+                       UserException,
+                       16867);
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
+                           BSON("$lookup" << BSON("from"
+                                                  << "coll"
+                                                  << "let"
+                                                  << BSON("contains.invalidChar"
+                                                          << "$a")
+                                                  << "pipeline"
+                                                  << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                                  << "as"
+                                                  << "as"))
+                               .firstElement(),
+                           expCtx),
+                       UserException,
+                       16868);
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
@@ -154,6 +250,9 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     auto lookupStage = DocumentSourceLookUp::createFromBson(
         BSON("$lookup" << BSON("from"
                                << "coll"
+                               << "let"
+                               << BSON("local_x"
+                                       << "$x")
                                << "pipeline"
                                << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
                                << "as"
@@ -174,9 +273,12 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
     ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
 
     auto serializedStage = serializedDoc["$lookup"].getDocument();
-    ASSERT_EQ(serializedStage.size(), 3UL);
+    ASSERT_EQ(serializedStage.size(), 4UL);
     ASSERT_VALUE_EQ(serializedStage["from"], Value(std::string("coll")));
     ASSERT_VALUE_EQ(serializedStage["as"], Value(std::string("as")));
+
+    ASSERT_DOCUMENT_EQ(serializedStage["let"].getDocument(),
+                       Document(fromjson("{local_x: \"$x\"}")));
 
     ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
     ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 1UL);

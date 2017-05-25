@@ -124,5 +124,8 @@
     clear();
 
     // Check that invalid pipelines are disallowed. The following $lookup is missing the 'as' field.
-    makeView("a", "b", [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}], 40449);
+    makeView("a",
+             "b",
+             [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}],
+             ErrorCodes.FailedToParse);
 }());

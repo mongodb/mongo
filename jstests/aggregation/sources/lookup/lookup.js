@@ -221,6 +221,31 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
             expectedResults,
             coll);
 
+        // If $lookup didn't add fields referenced by "let" variables to its dependencies, this test
+        // would fail as the value of the "a" field would be lost and treated as null.
+        expectedResults = [
+            {"_id": 0, "same": [{"_id": 0, "x": 1}, {"_id": 1, "x": 1}, {"_id": 2, "x": 1}]},
+            {
+              "_id": 1,
+              "same": [{"_id": 0, "x": null}, {"_id": 1, "x": null}, {"_id": 2, "x": null}]
+            },
+            {"_id": 2, "same": [{"_id": 0}, {"_id": 1}, {"_id": 2}]}
+        ];
+        testPipeline(
+            [
+              {
+                $lookup: {
+                    let : {var1: "$a"},
+                    pipeline: [{$project: {x: "$$var1"}}],
+                    from: "from",
+                    as: "same"
+                }
+              },
+              {$project: {"same": 1}}
+            ],
+            expectedResults,
+            coll);
+
         //
         // Dotted field paths.
         //
@@ -416,31 +441,238 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
         testPipeline(pipeline, expectedResults, coll);
 
         //
+        // Pipeline syntax using 'let' variables.
+        //
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, x: 1}));
+        assert.writeOK(coll.insert({_id: 2, x: 2}));
+        assert.writeOK(coll.insert({_id: 3, x: 3}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 1}));
+        assert.writeOK(from.insert({_id: 2}));
+        assert.writeOK(from.insert({_id: 3}));
+
+        // Basic non-equi theta join.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$_id"},
+                  pipeline: [
+                      {$project: {isMatch: {$gt: ["$$var1", "$_id"]}}},
+                      {$match: {isMatch: true}},
+                      {$project: {isMatch: 0}}
+                  ],
+                  from: "from",
+                  as: "c",
+              }
+            },
+        ];
+
+        expectedResults = [
+            {"_id": 1, x: 1, "c": []},
+            {"_id": 2, x: 2, "c": [{"_id": 1}]},
+            {
+              "_id": 3,
+              x: 3,
+              "c": [
+                  {"_id": 1},
+                  {
+                    "_id": 2,
+                  }
+              ]
+            }
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Multiple variables.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$_id", var2: "$x"},
+                  pipeline: [
+                      {
+                        $project: {
+                            isMatch: {$gt: ["$$var1", "$_id"]},
+                            var2Times2: {$multiply: [2, "$$var2"]}
+                        }
+                      },
+                      {$match: {isMatch: true}},
+                      {$project: {isMatch: 0}}
+                  ],
+                  from: "from",
+                  as: "c",
+              },
+            },
+            {$project: {x: 1, c: 1}}
+        ];
+
+        expectedResults = [
+            {"_id": 1, x: 1, "c": []},
+            {"_id": 2, x: 2, "c": [{"_id": 1, var2Times2: 4}]},
+            {"_id": 3, x: 3, "c": [{"_id": 1, var2Times2: 6}, {"_id": 2, var2Times2: 6}]}
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Let var as complex expression object.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: {$mod: ["$x", 3]}},
+                  pipeline: [
+                      {$project: {var1Mod3TimesForeignId: {$multiply: ["$$var1", "$_id"]}}},
+                  ],
+                  from: "from",
+                  as: "c",
+              }
+            },
+        ];
+
+        expectedResults = [
+            {
+              "_id": 1,
+              x: 1,
+              "c": [
+                  {_id: 1, var1Mod3TimesForeignId: 1},
+                  {_id: 2, var1Mod3TimesForeignId: 2},
+                  {_id: 3, var1Mod3TimesForeignId: 3}
+              ]
+            },
+            {
+              "_id": 2,
+              x: 2,
+              "c": [
+                  {_id: 1, var1Mod3TimesForeignId: 2},
+                  {_id: 2, var1Mod3TimesForeignId: 4},
+                  {_id: 3, var1Mod3TimesForeignId: 6}
+              ]
+            },
+            {
+              "_id": 3,
+              x: 3,
+              "c": [
+                  {_id: 1, var1Mod3TimesForeignId: 0},
+                  {_id: 2, var1Mod3TimesForeignId: 0},
+                  {_id: 3, var1Mod3TimesForeignId: 0}
+              ]
+            }
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // 'let' variable shadowed by foreign pipeline variable.
+        pipeline = [
+            {$match: {_id: 2}},
+            {
+              $lookup: {
+                  let : {var1: "$_id"},
+                  pipeline: [
+                      {$project: {shadowedVar: {$let: {vars: {var1: "$_id"}, in : "$$var1"}}}},
+                  ],
+                  from: "from",
+                  as: "c",
+              }
+            }
+        ];
+
+        expectedResults = [{
+            "_id": 2,
+            "x": 2,
+            "c": [
+                {"_id": 1, "shadowedVar": 1},
+                {"_id": 2, "shadowedVar": 2},
+                {"_id": 3, "shadowedVar": 3}
+            ]
+        }];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Use of undefined variable fails.
+        assertErrorCode(coll,
+                        [{
+                           $lookup: {
+                               from: "from",
+                               as: "as",
+                               let : {var1: "$x"},
+                               pipeline: [{$project: {myVar: "$$nonExistent"}}]
+                           }
+                        }],
+                        17276);
+
+        //
         // Error cases.
         //
 
-        // All four fields must be specified.
-        assertErrorCode(coll, [{$lookup: {foreignField: "b", from: "from", as: "same"}}], 4572);
-        assertErrorCode(coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], 4572);
-        assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], 40320);
-        assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: "b", from: "from"}}], 40449);
+        // 'from', 'as', 'localField' and 'foreignField' must all be specified when run with
+        // localField/foreignField syntax.
+        assertErrorCode(coll,
+                        [{$lookup: {foreignField: "b", from: "from", as: "same"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", from: "from", as: "same"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", foreignField: "b", as: "same"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", foreignField: "b", from: "from"}}],
+                        ErrorCodes.FailedToParse);
 
-        // All four field's values must be strings.
+        // localField/foreignField and pipeline/let syntax must not be mixed.
+        assertErrorCode(coll,
+                        [{$lookup: {pipeline: [], foreignField: "b", from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {pipeline: [], localField: "b", from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
         assertErrorCode(
-            coll, [{$lookup: {localField: 1, foreignField: "b", from: "from", as: "as"}}], 4570);
+            coll,
+            [{$lookup: {pipeline: [], localField: "b", foreignField: "b", from: "from", as: "as"}}],
+            ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {let : {a: "$b"}, foreignField: "b", from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {let : {a: "$b"}, localField: "b", from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
         assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}], 4570);
+            coll,
+            [{
+               $lookup:
+                   {let : {a: "$b"}, localField: "b", foreignField: "b", from: "from", as: "as"}
+            }],
+            ErrorCodes.FailedToParse);
+
+        // 'from', 'as', 'localField' and 'foreignField' must all be of type string.
+        assertErrorCode(coll,
+                        [{$lookup: {localField: 1, foreignField: "b", from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}],
+                        ErrorCodes.FailedToParse);
+
+        // 'pipeline' and 'let' must be of expected type.
         assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}], 40321);
+            coll, [{$lookup: {pipeline: 1, from: "from", as: "as"}}], ErrorCodes.FailedToParse);
         assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}], 4570);
+            coll, [{$lookup: {pipeline: {}, from: "from", as: "as"}}], ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {let : 1, pipeline: [], from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
+        assertErrorCode(coll,
+                        [{$lookup: {let : [], pipeline: [], from: "from", as: "as"}}],
+                        ErrorCodes.FailedToParse);
 
         // The foreign collection must be a valid namespace.
-        assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: "b", from: "", as: "as"}}], 40322);
+        assertErrorCode(coll,
+                        [{$lookup: {localField: "a", foreignField: "b", from: "", as: "as"}}],
+                        ErrorCodes.InvalidNamespace);
         // $lookup's field must be an object.
-        assertErrorCode(coll, [{$lookup: "string"}], 40319);
+        assertErrorCode(coll, [{$lookup: "string"}], ErrorCodes.FailedToParse);
     }
 
     // Run tests on single node.

@@ -123,7 +123,6 @@ public:
 
 protected:
     static const int kInterruptCheckPeriod = 128;
-
     ExpressionContext() : variablesParseState(variables.useIdGenerator()) {}
 
     /**

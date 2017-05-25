@@ -35,10 +35,10 @@
 
 namespace mongo {
 
-/// The state used as input and working space for Expressions.
+/**
+ * The state used as input and working space for Expressions.
+ */
 class Variables {
-    MONGO_DISALLOW_COPYING(Variables);
-
 public:
     // Each unique variable is assigned a unique id of this type. Negative ids are reserved for
     // system variables and non-negative ids are allocated for user variables.
@@ -93,7 +93,6 @@ public:
         return &_idGenerator;
     }
 
-
 private:
     IdGenerator _idGenerator;
     std::vector<Value> _valueList;
@@ -127,6 +126,16 @@ public:
      * Returns the current Id for a variable. uasserts if the variable isn't defined.
      */
     Variables::Id getVariable(StringData name) const;
+
+    /**
+     * Return a copy of this VariablesParseState. Will replace the copy's '_idGenerator' pointer
+     * with 'idGenerator'.
+     */
+    VariablesParseState copyWith(Variables::IdGenerator* idGenerator) const {
+        VariablesParseState vps = *this;
+        vps._idGenerator = idGenerator;
+        return vps;
+    }
 
 private:
     // Not owned here.
