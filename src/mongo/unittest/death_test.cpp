@@ -117,7 +117,7 @@ void DeathTestImpl::_doTest() {
     // We disable the creation of core dump files in the child process since the child process is
     // expected to exit uncleanly. This avoids unnecessarily creating core dump files when the child
     // process calls std::abort() or std::terminate().
-    const struct rlimit kNoCoreDump{0U, 0U};
+    const struct rlimit kNoCoreDump { 0U, 0U };
     checkSyscall(setrlimit(RLIMIT_CORE, &kNoCoreDump));
 
     try {
