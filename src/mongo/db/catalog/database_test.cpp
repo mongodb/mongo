@@ -37,11 +37,13 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -138,10 +140,35 @@ TEST_F(DatabaseTest, DropCollectionDropsCollectionButDoesNotLogOperationIfWrites
 }
 
 TEST_F(DatabaseTest,
-       DropCollectionRenamesCollectionToPendingDropNamespaceAndLogsOperationIfWritesAreReplicated) {
+       DropCollectionDropsCollectionAndLogsOperationIfWritesAreReplicatedButReaperIsNotAvailable) {
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(
         repl::ReplicationCoordinator::get(_opCtx.get())->isOplogDisabledFor(_opCtx.get(), _nss));
+
+    _testDropCollection(_opCtx.get(), _nss, true);
+
+    // Drop optime is non-null because an op was written to the oplog.
+    auto dropOpTime = repl::ReplClientInfo::forClient(&cc()).getLastOp();
+    ASSERT_GREATER_THAN(dropOpTime, repl::OpTime());
+
+    // If the drop-pending collection reaper is not available, the collection is not renamed to
+    // <db>.system.drop.*.
+    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
+    ASSERT_FALSE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+}
+
+TEST_F(
+    DatabaseTest,
+    DropCollectionRenamesCollectionToPendingDropNamespaceAndLogsOperationIfWritesAreReplicatedAndReaperIsAvailable) {
+    ASSERT_TRUE(_opCtx->writesAreReplicated());
+    ASSERT_FALSE(
+        repl::ReplicationCoordinator::get(_opCtx.get())->isOplogDisabledFor(_opCtx.get(), _nss));
+
+    auto service = getServiceContext();
+    repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
+    repl::DropPendingCollectionReaper::set(
+        service,
+        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 
     _testDropCollection(_opCtx.get(), _nss, true);
 
@@ -153,6 +180,12 @@ TEST_F(DatabaseTest,
     // namespace.
     auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
     ASSERT_TRUE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+
+    // Reaper should have the drop optime of the collection.
+    auto reaperEarliestDropOpTime =
+        repl::DropPendingCollectionReaper::get(service)->getEarliestDropOpTime();
+    ASSERT_TRUE(reaperEarliestDropOpTime);
+    ASSERT_EQUALS(dropOpTime, *reaperEarliestDropOpTime);
 }
 
 void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationContext* opCtx,

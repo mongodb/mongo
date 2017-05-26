@@ -53,6 +53,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
@@ -437,7 +438,12 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto uuid = collection->uuid();
 
     // Drop unreplicated collections immediately.
-    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, fullns)) {
+    // Replicated collections should also be dropped immediately if there is no active reaper to
+    // remove the drop-pending collections.
+    auto isOplogDisabledForNamespace =
+        repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, fullns);
+    auto reaper = repl::DropPendingCollectionReaper::get(opCtx);
+    if (isOplogDisabledForNamespace || !reaper) {
         auto status = _finishDropCollection(opCtx, fullns, collection);
         if (!status.isOK()) {
             return status;
@@ -478,6 +484,11 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     log() << "dropCollection: " << fullns << " - renaming to drop-pending collection: " << dpns
           << " with drop optime " << dropOpTime;
     fassertStatusOK(40464, renameCollection(opCtx, fullns.ns(), dpns.ns(), stayTemp));
+
+    // Register this drop-pending namespace with DropPendingCollectionReaper to remove when the
+    // committed optime reaches the drop optime.
+    invariant(reaper);
+    reaper->addDropPendingNamespace(dropOpTime, dpns);
 
     return Status::OK();
 }
