@@ -53,12 +53,20 @@ TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
     ASSERT_EQ(result.getStatus().reason(), "An empty update path is not valid.");
 }
 
-TEST(UpdateObjectNodeTest, ValidPathParsesSuccessfully) {
+TEST(UpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
     UpdateObjectNode root;
     ASSERT_OK(UpdateObjectNode::parseAndMerge(
         &root, modifiertable::ModifierType::MOD_SET, update["$set"]["a.b"], collator));
+}
+
+TEST(UpdateObjectNodeTest, ValidUnsetPathParsesSuccessfully) {
+    auto update = fromjson("{$unset: {'a.b': 5}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_UNSET, update["$unset"]["a.b"], collator));
 }
 
 TEST(UpdateObjectNodeTest, MultiplePositionalElementsFailToParse) {
