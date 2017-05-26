@@ -1,14 +1,14 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/master_slave/*.js
-    exclude_files:
-    # Skip until SERVER-25618 is resolved.
-    - jstests/master_slave/block1.js
+  roots:
+  - jstests/master_slave/*.js
+  exclude_files:
+  # Skip until SERVER-25618 is resolved.
+  - jstests/master_slave/block1.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
-        readMode: commands
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

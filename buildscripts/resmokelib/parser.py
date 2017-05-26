@@ -305,11 +305,10 @@ def create_test_membership_map(fail_on_missing_selector=False):
                     continue
             raise
 
-        for group in suite.test_groups:
-            for testfile in group.tests:
-                if isinstance(testfile, dict):
-                    continue
-                test_membership[testfile].append(suite_name)
+        for testfile in suite.test_group.tests:
+            if isinstance(testfile, dict):
+                continue
+            test_membership[testfile].append(suite_name)
     return test_membership
 
 
@@ -319,17 +318,21 @@ def get_suites(values, args):
 
     _config.INTERNAL_EXECUTOR_NAME = values.executor_file
 
-    # If there are no suites specified, but there are args, assume they are jstests.
+    # If there are no suites specified, but args, collect the specified files.
     if args:
-        # Do not change the execution order of the jstests passed as args, unless a tag option is
+        # Do not change the execution order of the tests passed as args, unless a tag option is
         # specified. If an option is specified, then sort the tests for consistent execution order.
         _config.ORDER_TESTS_BY_NAME = any(tag_filter is not None for
                                           tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS,
                                                          _config.INCLUDE_WITH_ANY_TAGS))
         # No specified config, just use the following, and default the logging and executor.
-        suite_config = _make_jstests_config(args)
+        suite_config = _make_config(args)
         _ensure_executor(suite_config, values.executor_file)
-        suite = testing.suite.Suite("<jstests>", suite_config)
+        # The test_kind comes from the executor file.
+        _ensure_test_kind(suite_config,
+                          _get_yaml_config("executor", values.executor_file),
+                          values.executor_file)
+        suite = testing.suite.Suite("<%s>" % suite_config["test_kind"], suite_config)
         return [suite]
 
     suite_files = values.suite_files.split(",")
@@ -390,41 +393,37 @@ def _get_suite_config(pathname):
     Attempts to read a YAML configuration from 'pathname' that describes
     what tests to run and how to run them.
     """
+    return _get_yaml_config("suite", pathname)
 
-    # Named suites are specified as the basename of the file, without the .yml extension.
+
+def _make_config(files):
+    return {"selector": {"roots": files}}
+
+
+def _ensure_test_kind(suite_config, yaml_config, yaml_file):
+    if "test_kind" not in yaml_config:
+        raise ValueError("YAML config file %s missing key 'test_kind'" % (yaml_file))
+    suite_config["test_kind"] = yaml_config["test_kind"]
+
+
+def _get_yaml_config(kind, pathname):
+    # Named executors or suites are specified as the basename of the file, without the .yml
+    # extension.
     if not utils.is_yaml_file(pathname) and not os.path.dirname(pathname):
         if pathname not in resmokeconfig.NAMED_SUITES:
-            raise optparse.OptionValueError("Unknown suite '%s'" % (pathname))
+            raise optparse.OptionValueError("Unknown %s '%s'" % (kind, pathname))
         pathname = resmokeconfig.NAMED_SUITES[pathname]  # Expand 'pathname' to full path.
 
     if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
-        raise optparse.OptionValueError("Expected a suite YAML config, but got '%s'" % (pathname))
-
+        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'"
+                                        % (kind, pathname))
     return utils.load_yaml_file(pathname)
 
 
-def _make_jstests_config(js_files):
-    for pathname in js_files:
-        if not utils.is_js_file(pathname) or not os.path.isfile(pathname):
-            raise optparse.OptionValueError("Expected a list of JS files, but got '%s'"
-                                            % (pathname))
-
-    return {"selector": {"js_test": {"roots": js_files}}}
-
-
-def _ensure_executor(suite_config, executor_pathname):
+def _ensure_executor(suite_config, pathname):
     if "executor" not in suite_config:
         # Named executors are specified as the basename of the file, without the .yml extension.
-        if not utils.is_yaml_file(executor_pathname) and not os.path.dirname(executor_pathname):
-            if executor_pathname not in resmokeconfig.NAMED_SUITES:
-                raise optparse.OptionValueError("Unknown executor '%s'" % (executor_pathname))
-            executor_pathname = resmokeconfig.NAMED_SUITES[executor_pathname]
-
-        if not utils.is_yaml_file(executor_pathname) or not os.path.isfile(executor_pathname):
-            raise optparse.OptionValueError("Expected an executor YAML config, but got '%s'"
-                                            % (executor_pathname))
-
-        suite_config["executor"] = utils.load_yaml_file(executor_pathname).pop("executor")
+        suite_config["executor"] = _get_yaml_config("executor", pathname).pop("executor")
 
 
 def _expand_user(pathname):

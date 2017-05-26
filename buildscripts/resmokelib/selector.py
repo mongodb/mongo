@@ -88,27 +88,38 @@ def _filter_cpp_tests(kind, root, include_files, exclude_files):
 
 
 def filter_cpp_unit_tests(root=config.DEFAULT_UNIT_TEST_LIST,
+                          roots=None,
                           include_files=None,
                           exclude_files=None):
     """
     Filters out what C++ unit tests to run.
     """
+    # 'roots' is provided only if a file list is given from the command line.
+    if roots is not None:
+        return roots
     return _filter_cpp_tests("C++ unit test", root, include_files, exclude_files)
 
 
 def filter_cpp_integration_tests(root=config.DEFAULT_INTEGRATION_TEST_LIST,
+                                 roots=None,
                                  include_files=None,
                                  exclude_files=None):
     """
     Filters out what C++ integration tests to run.
     """
+    # 'roots' is provided only if a file list is given from the command line.
+    if roots is not None:
+        return roots
     return _filter_cpp_tests("C++ integration test", root, include_files, exclude_files)
 
 
-def filter_dbtests(binary=None, include_suites=None):
+def filter_dbtests(binary=None, roots=None, include_suites=None):
     """
     Filters out what dbtests to run.
     """
+    # 'roots' is provided only if a file list is given from the command line.
+    if roots is not None:
+        return roots
 
     # TODO: SERVER-22170 Implement full tagging support
     # If --includeWithAnyTags is supplied, then no tests should be run since

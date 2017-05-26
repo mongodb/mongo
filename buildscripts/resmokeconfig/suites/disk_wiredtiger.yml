@@ -1,23 +1,23 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/disk/*.js
+  roots:
+  - jstests/disk/*.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        global_vars:
-          TestData:
-            storageEngine: wiredTiger
-        readMode: commands
-    hooks:
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 1
-    fixture:
-      class: MongoDFixture
-      mongod_options:
-        set_parameters:
-          enableTestCommands: 1
-        storageEngine: wiredTiger
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          storageEngine: wiredTiger
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 1
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+      storageEngine: wiredTiger

@@ -27,51 +27,50 @@ def _execute_suite(suite):
 
     logger = resmokelib.logging.loggers.EXECUTOR_LOGGER
 
-    for group in suite.test_groups:
-        if resmokelib.config.SHUFFLE:
-            logger.info("Shuffling order of tests for %ss in suite %s. The seed is %d.",
-                        group.test_kind, suite.get_name(), resmokelib.config.RANDOM_SEED)
-            random.seed(resmokelib.config.RANDOM_SEED)
-            random.shuffle(group.tests)
+    if resmokelib.config.SHUFFLE:
+        logger.info("Shuffling order of tests for %ss in suite %s. The seed is %d.",
+                    suite.test_group.test_kind, suite.get_name(), resmokelib.config.RANDOM_SEED)
+        random.seed(resmokelib.config.RANDOM_SEED)
+        random.shuffle(suite.test_group.tests)
 
-        if resmokelib.config.DRY_RUN == "tests":
-            sb = []
-            sb.append("Tests that would be run for %ss in suite %s:"
-                      % (group.test_kind, suite.get_name()))
-            if len(group.tests) > 0:
-                for test in group.tests:
-                    sb.append(test)
-            else:
-                sb.append("(no tests)")
-            logger.info("\n".join(sb))
+    if resmokelib.config.DRY_RUN == "tests":
+        sb = []
+        sb.append("Tests that would be run for %ss in suite %s:"
+                  % (suite.test_group.test_kind, suite.get_name()))
+        if len(suite.test_group.tests) > 0:
+            for test in suite.test_group.tests:
+                sb.append(test)
+        else:
+            sb.append("(no tests)")
+        logger.info("\n".join(sb))
 
-            # Set a successful return code on the test group because we want to output the tests
-            # that would get run by any other suites the user specified.
-            group.return_code = 0
-            continue
+        # Set a successful return code on the test group because we want to output the tests
+        # that would get run by any other suites the user specified.
+        suite.test_group.return_code = 0
+        return True
 
-        if len(group.tests) == 0:
-            logger.info("Skipping %ss, no tests to run", group.test_kind)
-            continue
+    if len(suite.test_group.tests) == 0:
+        logger.info("Skipping %ss, no tests to run", suite.test_group.test_kind)
+        return True
 
-        group_config = suite.get_executor_config().get(group.test_kind, {})
-        executor = resmokelib.testing.executor.TestGroupExecutor(logger,
-                                                                 group,
-                                                                 **group_config)
+    group_config = suite.get_executor_config()
+    executor = resmokelib.testing.executor.TestGroupExecutor(logger,
+                                                             suite.test_group,
+                                                             **group_config)
 
-        try:
-            executor.run()
-            if resmokelib.config.FAIL_FAST and group.return_code != 0:
-                suite.return_code = group.return_code
-                return False
-        except resmokelib.errors.UserInterrupt:
-            suite.return_code = 130  # Simulate SIGINT as exit code.
-            return True
-        except:
-            logger.exception("Encountered an error when running %ss of suite %s.",
-                             group.test_kind, suite.get_name())
-            suite.return_code = 2
+    try:
+        executor.run()
+        if resmokelib.config.FAIL_FAST and suite.test_group.return_code != 0:
+            suite.return_code = suite.test_group.return_code
             return False
+    except resmokelib.errors.UserInterrupt:
+        suite.return_code = 130  # Simulate SIGINT as exit code.
+        return True
+    except:
+        logger.exception("Encountered an error when running %ss of suite %s.",
+                         suite.test_group.test_kind, suite.get_name())
+        suite.return_code = 2
+        return False
 
 
 def _log_summary(logger, suites, time_taken):
@@ -103,6 +102,8 @@ def _dump_suite_config(suite, logging_config):
 
     sb = []
     sb.append("YAML configuration of suite %s" % (suite.get_name()))
+    sb.append(resmokelib.utils.dump_yaml({"test_kind": suite.get_test_kind_config()}))
+    sb.append("")
     sb.append(resmokelib.utils.dump_yaml({"selector": suite.get_selector_config()}))
     sb.append("")
     sb.append(resmokelib.utils.dump_yaml({"executor": suite.get_executor_config()}))
@@ -120,9 +121,8 @@ def find_suites_by_test(suites):
     memberships = {}
     test_membership = resmokelib.parser.create_test_membership_map()
     for suite in suites:
-        for group in suite.test_groups:
-            for test in group.tests:
-                memberships[test] = test_membership[test]
+        for test in suite.test_group.tests:
+            memberships[test] = test_membership[test]
     return memberships
 
 

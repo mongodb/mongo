@@ -1,39 +1,39 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/core/**/*.js
-    exclude_files:
-    # These tests are not expected to pass with replica-sets:
-    - jstests/core/dbadmin.js
-    - jstests/core/opcounters_write_cmd.js
-    - jstests/core/read_after_optime.js
-    - jstests/core/capped_update.js
-    # Having duplicate namespaces is not supported and will cause initial sync to fail.
-    - jstests/core/views/duplicate_ns.js
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # These tests are not expected to pass with replica-sets:
+  - jstests/core/dbadmin.js
+  - jstests/core/opcounters_write_cmd.js
+  - jstests/core/read_after_optime.js
+  - jstests/core/capped_update.js
+  # Having duplicate namespaces is not supported and will cause initial sync to fail.
+  - jstests/core/views/duplicate_ns.js
 
 run_hook_interval: &run_hook_interval 20
 executor:
-  js_test:
-    config:
-      shell_options:
-        eval: "testingReplication = true;"
-        readMode: commands
-    hooks:
-    - class: IntermediateInitialSync
-      n: *run_hook_interval
-    - class: CleanEveryN
-      n: *run_hook_interval
-    fixture:
-      class: ReplicaSetFixture
-      mongod_options:
-        bind_ip_all: ''
-        oplogSize: 511
-        set_parameters:
-          enableTestCommands: 1
-          numInitialSyncAttempts: 1
-          numInitialSyncConnectAttempts: 60
-      num_nodes: 2
-      start_initial_sync_node: True
-      replset_config_options:
-        settings:
-          chainingAllowed: False
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+      readMode: commands
+  hooks:
+  - class: IntermediateInitialSync
+    n: *run_hook_interval
+  - class: CleanEveryN
+    n: *run_hook_interval
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ''
+      oplogSize: 511
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+        numInitialSyncConnectAttempts: 60
+    num_nodes: 2
+    start_initial_sync_node: True
+    replset_config_options:
+      settings:
+        chainingAllowed: False

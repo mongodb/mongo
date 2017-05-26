@@ -1,19 +1,19 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/serial_run/*.js
+  roots:
+  - jstests/serial_run/*.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        readMode: commands
-    hooks:
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 1
-    fixture:
-      class: MongoDFixture
-      mongod_options:
-        set_parameters:
-          enableTestCommands: 1
+  config:
+    shell_options:
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 1
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

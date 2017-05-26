@@ -1,142 +1,142 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/core/**/*.js
-    exclude_files:
-    # The following tests fail because a certain command or functionality is not supported on
-    # mongos. This command or functionality is placed in a comment next to the failing test.
-    - jstests/core/apitest_db.js  # profiling.
-    - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
-    - jstests/core/capped6.js  # captrunc.
-    - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
-    - jstests/core/capped_empty.js  # emptycapped.
-    - jstests/core/capped_update.js # uses godinsert and can't run under replication.
-    - jstests/core/check_shard_index.js  # checkShardingIndex.
-    - jstests/core/collection_truncate.js  # emptycapped.
-    - jstests/core/compact_keeps_indexes.js  # compact.
-    - jstests/core/currentop.js  # uses fsync.
-    - jstests/core/dbadmin.js  # "local" database.
-    - jstests/core/dbhash.js  # dbhash.
-    - jstests/core/dbhash2.js  # dbhash.
-    - jstests/core/diagdata.js # Command not supported in mongos
-    - jstests/core/dropdb_race.js  # syncdelay.
-    - jstests/core/evalb.js  # db.eval() and profiling.
-    - jstests/core/fsync.js  # uses fsync.
-    - jstests/core/geo_haystack*.js  # geoSearch.
-    - jstests/core/geo_s2cursorlimitskip.js  # db.eval() and profiling.
-    - jstests/core/geo_update_btree2.js  # notablescan.
-    - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
-    - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
-    - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
-    - jstests/core/notablescan.js  # notablescan.
-    - jstests/core/profile*.js  # profiling.
-    - jstests/core/repair_database.js # repairDatabase
-    - jstests/core/repair_database_input_validation.js # repairDatabase
-    - jstests/core/repair_server12955.js # repairDatabase
-    - jstests/core/stages*.js  # stageDebug.
-    - jstests/core/startup_log.js  # "local" database.
-    - jstests/core/storageDetailsCommand.js  # diskStorageStats.
-    - jstests/core/top.js  # top.
-    # The following tests fail because mongos behaves differently from mongod when testing certain
-    # functionality. The differences are in a comment next to the failing test.
-    - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos.
-    - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
-    - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
-    - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-    - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
-    # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos.
-    - jstests/core/invalid_db_name.js
-    - jstests/core/validate_cmd_ns.js
-    - jstests/core/views/invalid_system_views.js # We expect listCollections to fail when there's an invalid view.
-    # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
-    - jstests/core/views/views_coll_stats.js
-    - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-    # Tests that won't work with an injected 'majority' readConcern
-    # and/or an injected 'majority' writeConcern. Where a function is
-    # listed the reason is we don't have a reliable solution to override
-    # the write concern for that function.
-    - jstests/core/batch_write_command*.js # these tests use various write concerns
-    - jstests/core/bench_test*.js # benchRun() used for writes
-    - jstests/core/crud_api.js # has specific w:0 tests
-    - jstests/core/error2.js # db.eval() used
-    - jstests/core/eval0.js # db.eval() used
-    - jstests/core/eval1.js # db.eval() used
-    - jstests/core/eval3.js # db.eval() used
-    - jstests/core/eval4.js # db.eval() used
-    - jstests/core/eval5.js # db.eval() used
-    - jstests/core/eval6.js # db.eval() used
-    - jstests/core/eval7.js # db.eval() used
-    - jstests/core/eval9.js # db.eval() used
-    - jstests/core/evala.js # db.eval() used
-    - jstests/core/evalc.js # db.eval() used
-    - jstests/core/evald.js # db.eval() used
-    - jstests/core/evale.js # db.eval() used
-    - jstests/core/evalg.js # db.eval() used
-    - jstests/core/eval_mr.js # db.eval() used
-    - jstests/core/eval_nolock.js # db.eval() used
-    - jstests/core/js3.js # db.dbEval() used
-    - jstests/core/js7.js # db.eval() used
-    - jstests/core/js9.js # db.eval() used
-    - jstests/core/mr_merge.js # mr temp tables aren't replicated
-    - jstests/core/mr_merge2.js # mr temp tables aren't replicated
-    - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
-    - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
-    - jstests/core/opcounters_active.js  # off by n problem with opcounters
-    - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
-    - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
-    - jstests/core/remove8.js # db.eval() used
-    - jstests/core/rename4.js # db.eval() used
-    - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
-    - jstests/core/shellkillop.js # db.eval() used
-    - jstests/core/shell_writeconcern.js # checks write concern shell helpers
-    - jstests/core/storefunc.js # db.eval() used
-    - jstests/core/write_result.js # Tests invalid writeConcern, we shouldn't override.
-    # Tests that need triaging & remediation | blacklist decision
-    # Comments list possible problem point under review.
-    - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
-    # Tests that fail for Causal Consistency as they have statements that do not support
-    # non-local read concern.
-    - jstests/core/geo_mapreduce.js
-    - jstests/core/geo_mapreduce2.js
-    - jstests/core/geo_big_polygon3.js
-    - jstests/core/mr*.js
-    - jstests/core/profile_mapreduce.js
-    - jstests/core/collation.js
-    - jstests/core/loadserverscripts.js
-    - jstests/core/bypass_doc_validation.js
-    - jstests/core/capped_max1.js
-    - jstests/core/commands_namespace_parsing.js
-    - jstests/core/tailable_skip_limit.js
-    - jstests/core/constructors.js
-    - jstests/core/index_stats.js
-    - jstests/core/views/views_all_commands.js
-    - jstests/core/or4.js
-    - jstests/core/recursion.js
-    - jstests/core/temp_cleanup.js
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # The following tests fail because a certain command or functionality is not supported on
+  # mongos. This command or functionality is placed in a comment next to the failing test.
+  - jstests/core/apitest_db.js  # profiling.
+  - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
+  - jstests/core/capped6.js  # captrunc.
+  - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
+  - jstests/core/capped_empty.js  # emptycapped.
+  - jstests/core/capped_update.js # uses godinsert and can't run under replication.
+  - jstests/core/check_shard_index.js  # checkShardingIndex.
+  - jstests/core/collection_truncate.js  # emptycapped.
+  - jstests/core/compact_keeps_indexes.js  # compact.
+  - jstests/core/currentop.js  # uses fsync.
+  - jstests/core/dbadmin.js  # "local" database.
+  - jstests/core/dbhash.js  # dbhash.
+  - jstests/core/dbhash2.js  # dbhash.
+  - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/dropdb_race.js  # syncdelay.
+  - jstests/core/evalb.js  # db.eval() and profiling.
+  - jstests/core/fsync.js  # uses fsync.
+  - jstests/core/geo_haystack*.js  # geoSearch.
+  - jstests/core/geo_s2cursorlimitskip.js  # db.eval() and profiling.
+  - jstests/core/geo_update_btree2.js  # notablescan.
+  - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
+  - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
+  - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
+  - jstests/core/notablescan.js  # notablescan.
+  - jstests/core/profile*.js  # profiling.
+  - jstests/core/repair_database.js # repairDatabase
+  - jstests/core/repair_database_input_validation.js # repairDatabase
+  - jstests/core/repair_server12955.js # repairDatabase
+  - jstests/core/stages*.js  # stageDebug.
+  - jstests/core/startup_log.js  # "local" database.
+  - jstests/core/storageDetailsCommand.js  # diskStorageStats.
+  - jstests/core/top.js  # top.
+  # The following tests fail because mongos behaves differently from mongod when testing certain
+  # functionality. The differences are in a comment next to the failing test.
+  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos.
+  - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
+  - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
+  - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
+  - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
+  # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos.
+  - jstests/core/invalid_db_name.js
+  - jstests/core/validate_cmd_ns.js
+  - jstests/core/views/invalid_system_views.js # We expect listCollections to fail when there's an invalid view.
+  # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
+  - jstests/core/views/views_coll_stats.js
+  - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+  # Tests that won't work with an injected 'majority' readConcern
+  # and/or an injected 'majority' writeConcern. Where a function is
+  # listed the reason is we don't have a reliable solution to override
+  # the write concern for that function.
+  - jstests/core/batch_write_command*.js # these tests use various write concerns
+  - jstests/core/bench_test*.js # benchRun() used for writes
+  - jstests/core/crud_api.js # has specific w:0 tests
+  - jstests/core/error2.js # db.eval() used
+  - jstests/core/eval0.js # db.eval() used
+  - jstests/core/eval1.js # db.eval() used
+  - jstests/core/eval3.js # db.eval() used
+  - jstests/core/eval4.js # db.eval() used
+  - jstests/core/eval5.js # db.eval() used
+  - jstests/core/eval6.js # db.eval() used
+  - jstests/core/eval7.js # db.eval() used
+  - jstests/core/eval9.js # db.eval() used
+  - jstests/core/evala.js # db.eval() used
+  - jstests/core/evalc.js # db.eval() used
+  - jstests/core/evald.js # db.eval() used
+  - jstests/core/evale.js # db.eval() used
+  - jstests/core/evalg.js # db.eval() used
+  - jstests/core/eval_mr.js # db.eval() used
+  - jstests/core/eval_nolock.js # db.eval() used
+  - jstests/core/js3.js # db.dbEval() used
+  - jstests/core/js7.js # db.eval() used
+  - jstests/core/js9.js # db.eval() used
+  - jstests/core/mr_merge.js # mr temp tables aren't replicated
+  - jstests/core/mr_merge2.js # mr temp tables aren't replicated
+  - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
+  - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
+  - jstests/core/opcounters_active.js  # off by n problem with opcounters
+  - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
+  - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
+  - jstests/core/remove8.js # db.eval() used
+  - jstests/core/rename4.js # db.eval() used
+  - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
+  - jstests/core/shellkillop.js # db.eval() used
+  - jstests/core/shell_writeconcern.js # checks write concern shell helpers
+  - jstests/core/storefunc.js # db.eval() used
+  - jstests/core/write_result.js # Tests invalid writeConcern, we shouldn't override.
+  # Tests that need triaging & remediation | blacklist decision
+  # Comments list possible problem point under review.
+  - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+  # Tests that fail for Causal Consistency as they have statements that do not support
+  # non-local read concern.
+  - jstests/core/geo_mapreduce.js
+  - jstests/core/geo_mapreduce2.js
+  - jstests/core/geo_big_polygon3.js
+  - jstests/core/mr*.js
+  - jstests/core/profile_mapreduce.js
+  - jstests/core/collation.js
+  - jstests/core/loadserverscripts.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/capped_max1.js
+  - jstests/core/commands_namespace_parsing.js
+  - jstests/core/tailable_skip_limit.js
+  - jstests/core/constructors.js
+  - jstests/core/index_stats.js
+  - jstests/core/views/views_all_commands.js
+  - jstests/core/or4.js
+  - jstests/core/recursion.js
+  - jstests/core/temp_cleanup.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
-        readMode: commands
-    hooks:
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 20
-    fixture:
-      class: ShardedClusterFixture
-      mongos_options:
-        bind_ip_all: ''
-        set_parameters:
-          enableTestCommands: 1
-      mongod_options:
-        bind_ip_all: ''
-        nopreallocj: ''
-        enableMajorityReadConcern: ''
-        set_parameters:
-          enableTestCommands: 1
-          numInitialSyncAttempts: 1
-      num_rs_nodes_per_shard: 2
-      enable_sharding:
-      - test
+  config:
+    shell_options:
+      eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      bind_ip_all: ''
+      nopreallocj: ''
+      enableMajorityReadConcern: ''
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+    num_rs_nodes_per_shard: 2
+    enable_sharding:
+    - test

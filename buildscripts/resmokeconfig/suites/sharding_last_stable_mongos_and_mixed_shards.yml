@@ -1,42 +1,42 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/sharding/*.js
-    exclude_files:
-    # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
-    - jstests/sharding/config_version_rollback.js
-    # Behavior change to addShard
-    - jstests/sharding/addshard_idempotent.js
-    # SERVER-29066: Remove when 3.4.5 becomes 'last-stable'
-    - jstests/sharding/findandmodify1.js
-    # 3.6 mongods have improved covering behavior for queries on shard key index. Un-blacklist when
-    # 3.6 becomes 'last-stable'.
-    - jstests/sharding/covered_shard_key_indexes.js
-    # Enable when 3.6 becomes last-stable.
-    - jstests/sharding/views.js
-    - jstests/sharding/view_rewrite.js
-    - jstests/sharding/explain_agg_read_pref.js
-    # New feature in v3.6 mongos
-    - jstests/sharding/logical_time_metadata.js
-    # New feature in v3.6 mongos and mongod.
-    - jstests/sharding/logical_time_api.js
-    - jstests/sharding/operation_time_api.js
-    - jstests/sharding/auth_drop_user_while_logged_in.js
-    # New feature in v3.6 mongo shell.
-    - jstests/sharding/causal_consistency_shell_support.js
-    # Changes to currentOp format in 3.6.
-    - jstests/sharding/features3.js
-    - jstests/sharding/migration_ignore_interrupts_3.js
-    - jstests/sharding/migration_ignore_interrupts_4.js
-    - jstests/sharding/mongos_query_comment.js
-    - jstests/sharding/sharded_profile.js
+  roots:
+  - jstests/sharding/*.js
+  exclude_files:
+  # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
+  - jstests/sharding/config_version_rollback.js
+  # Behavior change to addShard
+  - jstests/sharding/addshard_idempotent.js
+  # SERVER-29066: Remove when 3.4.5 becomes 'last-stable'
+  - jstests/sharding/findandmodify1.js
+  # 3.6 mongods have improved covering behavior for queries on shard key index. Un-blacklist when
+  # 3.6 becomes 'last-stable'.
+  - jstests/sharding/covered_shard_key_indexes.js
+  # Enable when 3.6 becomes last-stable.
+  - jstests/sharding/views.js
+  - jstests/sharding/view_rewrite.js
+  - jstests/sharding/explain_agg_read_pref.js
+  # New feature in v3.6 mongos
+  - jstests/sharding/logical_time_metadata.js
+  # New feature in v3.6 mongos and mongod.
+  - jstests/sharding/logical_time_api.js
+  - jstests/sharding/operation_time_api.js
+  - jstests/sharding/auth_drop_user_while_logged_in.js
+  # New feature in v3.6 mongo shell.
+  - jstests/sharding/causal_consistency_shell_support.js
+  # Changes to currentOp format in 3.6.
+  - jstests/sharding/features3.js
+  - jstests/sharding/migration_ignore_interrupts_3.js
+  - jstests/sharding/migration_ignore_interrupts_4.js
+  - jstests/sharding/mongos_query_comment.js
+  - jstests/sharding/sharded_profile.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        global_vars:
-          TestData:
-            mongosBinVersion: 'last-stable'
-            shardMixedBinVersions: true
-        nodb: ''
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          mongosBinVersion: 'last-stable'
+          shardMixedBinVersions: true
+      nodb: ''

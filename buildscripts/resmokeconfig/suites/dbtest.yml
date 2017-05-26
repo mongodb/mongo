@@ -1,8 +1,8 @@
-selector:
-  db_test: {}
+test_kind: db_test
+
+selector: {}
 
 executor:
-  db_test:
-    config:
-      dbtest_options:
-        dur: ''
+  config:
+    dbtest_options:
+      dur: ''

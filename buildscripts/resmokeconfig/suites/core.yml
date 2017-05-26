@@ -1,20 +1,20 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/core/**/*.js
+  roots:
+  - jstests/core/**/*.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        readMode: commands
-    hooks:
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 20
-    fixture:
-      class: MongoDFixture
-      mongod_options:
-        bind_ip_all: ''
-        set_parameters:
-          enableTestCommands: 1
+  config:
+    shell_options:
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1

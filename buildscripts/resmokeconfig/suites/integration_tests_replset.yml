@@ -1,19 +1,19 @@
+test_kind: cpp_integration_test
+
 selector:
-  cpp_integration_test:
-    root: build/integration_tests.txt
+  root: build/integration_tests.txt
 
 executor:
-  cpp_integration_test:
-    config: {}
-    hooks:
-    - class: ValidateCollections
-    - class: CheckReplOplogs
-    - class: CheckReplDBHash
-    fixture:
-      class: ReplicaSetFixture
-      mongod_options:
-        bind_ip_all: ''
-        set_parameters:
-          enableTestCommands: 1
-          numInitialSyncAttempts: 1
-      num_nodes: 2
+  config: {}
+  hooks:
+  - class: ValidateCollections
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+    num_nodes: 2

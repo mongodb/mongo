@@ -1,15 +1,15 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/noPassthrough/*.js
-    exclude_files:
-    # Disable inmem_full as per SERVER-27014
-    - jstests/noPassthrough/inmem_full.js
+  roots:
+  - jstests/noPassthrough/*.js
+  exclude_files:
+  # Disable inmem_full as per SERVER-27014
+  - jstests/noPassthrough/inmem_full.js
 
 # noPassthrough tests start their own mongod's.
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
-        readMode: commands
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

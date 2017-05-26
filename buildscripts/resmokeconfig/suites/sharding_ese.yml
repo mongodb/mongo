@@ -2,19 +2,19 @@
 config_variables:
 - &keyFile src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
 
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/sharding/*.js
-    exclude_files:
+  roots:
+  - jstests/sharding/*.js
+  exclude_files:
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
-        global_vars:
-          TestData:
-            enableEncryption: ''
-            encryptionKeyFile: *keyFile
-        readMode: commands
+  config:
+    shell_options:
+      nodb: ''
+      global_vars:
+        TestData:
+          enableEncryption: ''
+          encryptionKeyFile: *keyFile
+      readMode: commands

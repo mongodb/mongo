@@ -17,8 +17,6 @@ class Suite(object):
     A suite of tests.
     """
 
-    TESTS_ORDER = ("cpp_unit_test", "cpp_integration_test", "db_test", "js_test", "mongos_test")
-
     def __init__(self, suite_name, suite_config):
         """
         Initializes the suite with the specified name and configuration.
@@ -27,13 +25,9 @@ class Suite(object):
         self._suite_name = suite_name
         self._suite_config = suite_config
 
-        self.test_groups = []
-        for test_kind in Suite.TESTS_ORDER:
-            if test_kind not in suite_config["selector"]:
-                continue
-            tests = self._get_tests_for_group(test_kind)
-            test_group = testgroup.TestGroup(test_kind, tests)
-            self.test_groups.append(test_group)
+        test_kind = self.get_test_kind_config()
+        tests = self._get_tests_for_group(test_kind)
+        self.test_group = testgroup.TestGroup(test_kind, tests)
 
         self.return_code = None
 
@@ -46,7 +40,7 @@ class Suite(object):
         filtering policy.
         """
 
-        test_info = self.get_selector_config()[test_kind]
+        test_info = self.get_selector_config()
 
         # The mongos_test doesn't have to filter anything, the test_info is just the arguments to
         # the mongos program to be used as the test case.
@@ -86,6 +80,12 @@ class Suite(object):
         """
         return self._suite_config["executor"]
 
+    def get_test_kind_config(self):
+        """
+        Returns the "test_kind" section of the YAML configuration.
+        """
+        return self._suite_config["test_kind"]
+
     def record_start(self):
         """
         Records the start time of the suite.
@@ -105,28 +105,19 @@ class Suite(object):
         # Only set 'return_code' if it hasn't been set already. It may have been set if there was
         # an exception that happened during the execution of the suite.
         if self.return_code is None:
-            # The return code of the suite should be 2 if any test group has a return code of 2.
-            # The return code of the suite should be 1 if any test group has a return code of 1,
-            # and none have a return code of 2. Otherwise, the return code should be 0.
-            self.return_code = max(test_group.return_code for test_group in self.test_groups)
+            self.return_code = self.test_group.return_code
 
     def summarize(self, sb):
         """
-        Appends a summary of each individual test group onto the string
-        builder 'sb'.
+        Appends a summary of the test group onto the string builder 'sb'.
         """
 
-        combined_summary = _summary.Summary(0, 0.0, 0, 0, 0, 0)
+        summary = _summary.Summary(0, 0.0, 0, 0, 0, 0)
 
-        summarized_groups = []
-        for group in self.test_groups:
-            group_sb = []
-            summary = group.summarize(group_sb)
-            summarized_groups.append("    %ss: %s" % (group.test_kind, "\n        ".join(group_sb)))
+        summary = self.test_group.summarize(sb)
+        summarized_group = "    %ss: %s" % (self.test_group.test_kind, "\n        ".join(sb))
 
-            combined_summary = _summary.combine(combined_summary, summary)
-
-        if combined_summary.num_run == 0:
+        if summary.num_run == 0:
             sb.append("Suite did not run any tests.")
             return
 
@@ -134,10 +125,9 @@ class Suite(object):
         # information available.
         if self._start_time is not None and self._end_time is not None:
             time_taken = self._end_time - self._start_time
-            combined_summary = combined_summary._replace(time_taken=time_taken)
+            summary = summary._replace(time_taken=time_taken)
 
         sb.append("%d test(s) ran in %0.2f seconds"
-                  " (%d succeeded, %d were skipped, %d failed, %d errored)" % combined_summary)
+                  " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
 
-        for summary_text in summarized_groups:
-            sb.append(summary_text)
+        sb.append(summarized_group)

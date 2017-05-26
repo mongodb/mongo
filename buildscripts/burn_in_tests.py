@@ -242,9 +242,8 @@ def find_tests_by_executor(suites):
     memberships = {}
     test_membership = resmokelib.parser.create_test_membership_map()
     for suite in suites:
-        for group in suite.test_groups:
-            for test in group.tests:
-                memberships[test] = test_membership[test]
+        for test in suite.test_group.tests:
+            memberships[test] = test_membership[test]
     return memberships
 
 
@@ -258,10 +257,9 @@ def create_executor_list(suites, exclude_suites):
     memberships = collections.defaultdict(list)
     test_membership = resmokelib.parser.create_test_membership_map()
     for suite in suites:
-        for group in suite.test_groups:
-            for test in group.tests:
-                for executor in set(test_membership[test]) - set(exclude_suites):
-                    memberships[executor].append(test)
+        for test in suite.test_group.tests:
+            for executor in set(test_membership[test]) - set(exclude_suites):
+                memberships[executor].append(test)
     return memberships
 
 

@@ -1,11 +1,11 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/replsets/*.js
+  roots:
+  - jstests/replsets/*.js
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
-        readMode: commands
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

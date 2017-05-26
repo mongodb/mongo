@@ -1,6 +1,7 @@
+test_kind: js_test
+
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
-        readMode: commands
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands

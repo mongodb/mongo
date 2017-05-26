@@ -1,3 +1,4 @@
+test_kind: mongos_test
+
 selector:
-  mongos_test:
-    test: ''
+  test: ''

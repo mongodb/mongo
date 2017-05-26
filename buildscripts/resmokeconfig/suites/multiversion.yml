@@ -1,19 +1,19 @@
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/multiVersion/*.js
-    exclude_files:
-    # Multi storageEngine tests
-    - jstests/multiVersion/mixed_storage_version_replication.js
-    - jstests/multiVersion/transitioning_to_and_from_WT.js
-    # TODO: SERVER-21578
-    - jstests/multiVersion/balancer_multiVersion_detect.js
-    # TODO: SERVER-28104
-    - jstests/multiVersion/minor_version_tags_new_old_new.js
+  roots:
+  - jstests/multiVersion/*.js
+  exclude_files:
+  # Multi storageEngine tests
+  - jstests/multiVersion/mixed_storage_version_replication.js
+  - jstests/multiVersion/transitioning_to_and_from_WT.js
+  # TODO: SERVER-21578
+  - jstests/multiVersion/balancer_multiVersion_detect.js
+  # TODO: SERVER-28104
+  - jstests/multiVersion/minor_version_tags_new_old_new.js
 
 # Multiversion tests start their own mongod's.
 executor:
-  js_test:
-    config:
-      shell_options:
-        nodb: ''
+  config:
+    shell_options:
+      nodb: ''

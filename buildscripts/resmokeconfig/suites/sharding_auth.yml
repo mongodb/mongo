@@ -3,40 +3,40 @@ config_variables:
 - &keyFile jstests/libs/authTestsKey
 - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 
+test_kind: js_test
+
 selector:
-  js_test:
-    roots:
-    - jstests/sharding/*.js
-    exclude_files:
-    # Skip any tests that run with auth explicitly.
-    - jstests/sharding/*[aA]uth*.js
-    # Skip these additional tests when running with auth enabled.
-    - jstests/sharding/copydb_from_mongos.js  # SERVER-13080
-    - jstests/sharding/parallel.js
-    # Skip the testcases that do not have auth bypass when running ops in parallel.
-    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js         # SERVER-21713
-    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js  # SERVER-21713
-    - jstests/sharding/migration_ignore_interrupts_1.js                 # SERVER-21713
-    - jstests/sharding/migration_ignore_interrupts_2.js                 # SERVER-21713
-    - jstests/sharding/migration_ignore_interrupts_3.js                 # SERVER-21713
-    - jstests/sharding/migration_ignore_interrupts_4.js                 # SERVER-21713
-    - jstests/sharding/migration_move_chunk_after_receive.js            # SERVER-21713
-    - jstests/sharding/migration_server_status.js                       # SERVER-21713
-    - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
-    - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713
-    - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js       # SERVER-21713
-    - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
-    - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
+  roots:
+  - jstests/sharding/*.js
+  exclude_files:
+  # Skip any tests that run with auth explicitly.
+  - jstests/sharding/*[aA]uth*.js
+  # Skip these additional tests when running with auth enabled.
+  - jstests/sharding/copydb_from_mongos.js  # SERVER-13080
+  - jstests/sharding/parallel.js
+  # Skip the testcases that do not have auth bypass when running ops in parallel.
+  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js         # SERVER-21713
+  - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js  # SERVER-21713
+  - jstests/sharding/migration_ignore_interrupts_1.js                 # SERVER-21713
+  - jstests/sharding/migration_ignore_interrupts_2.js                 # SERVER-21713
+  - jstests/sharding/migration_ignore_interrupts_3.js                 # SERVER-21713
+  - jstests/sharding/migration_ignore_interrupts_4.js                 # SERVER-21713
+  - jstests/sharding/migration_move_chunk_after_receive.js            # SERVER-21713
+  - jstests/sharding/migration_server_status.js                       # SERVER-21713
+  - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
+  - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713
+  - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js       # SERVER-21713
+  - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
+  - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
 
 executor:
-  js_test:
-    config:
-      shell_options:
-        global_vars:
-          TestData:
-            auth: true
-            authMechanism: SCRAM-SHA-1
-            keyFile: *keyFile
-            keyFileData: *keyFileData
-        nodb: ''
-        readMode: commands
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-1
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+      nodb: ''
+      readMode: commands

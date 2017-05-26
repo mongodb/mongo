@@ -1,17 +1,17 @@
+test_kind: cpp_integration_test
+
 selector:
-  cpp_integration_test:
-    root: build/integration_tests.txt
+  root: build/integration_tests.txt
 
 executor:
-  cpp_integration_test:
-    config: {}
-    hooks:
-    - class: ValidateCollections
-    - class: CleanEveryN
-      n: 20
-    fixture:
-      class: MongoDFixture
-      mongod_options:
-        bind_ip_all: ''
-        set_parameters:
-          enableTestCommands: 1
+  config: {}
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
