@@ -47,6 +47,7 @@
 #include "mongo/db/ops/modifier_set.h"
 #include "mongo/db/ops/modifier_unset.h"
 #include "mongo/db/update/set_node.h"
+#include "mongo/db/update/unset_node.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/memory.h"
 
@@ -181,6 +182,8 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
     switch (modType) {
         case MOD_SET:
             return stdx::make_unique<SetNode>();
+        case MOD_UNSET:
+            return stdx::make_unique<UnsetNode>();
         default:
             return nullptr;
     }

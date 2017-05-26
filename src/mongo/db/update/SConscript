@@ -57,6 +57,7 @@ env.Library(
     source=[
         'modifier_table.cpp',
         'set_node.cpp',
+        'unset_node.cpp',
         'update_node.cpp',
         'update_object_node.cpp',
     ],
@@ -78,6 +79,15 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='set_node_test',
     source='set_node_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='unset_node_test',
+    source='unset_node_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
         'update',
