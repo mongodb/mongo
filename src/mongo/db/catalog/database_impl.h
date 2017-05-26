@@ -155,9 +155,16 @@ public:
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
      * that is required.
+     *
+     * If we are applying a 'drop' oplog entry on a secondary, 'dropOpTime' will contain the optime
+     * of the oplog entry.
      */
-    Status dropCollection(OperationContext* opCtx, StringData fullns) final;
-    Status dropCollectionEvenIfSystem(OperationContext* opCtx, const NamespaceString& fullns) final;
+    Status dropCollection(OperationContext* opCtx,
+                          StringData fullns,
+                          repl::OpTime dropOpTime) final;
+    Status dropCollectionEvenIfSystem(OperationContext* opCtx,
+                                      const NamespaceString& fullns,
+                                      repl::OpTime dropOpTime) final;
 
     Status dropView(OperationContext* opCtx, StringData fullns) final;
 

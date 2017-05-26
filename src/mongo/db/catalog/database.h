@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
@@ -76,9 +77,12 @@ public:
 
         virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
 
-        virtual Status dropCollection(OperationContext* opCtx, StringData fullns) = 0;
+        virtual Status dropCollection(OperationContext* opCtx,
+                                      StringData fullns,
+                                      repl::OpTime dropOpTime) = 0;
         virtual Status dropCollectionEvenIfSystem(OperationContext* opCtx,
-                                                  const NamespaceString& fullns) = 0;
+                                                  const NamespaceString& fullns,
+                                                  repl::OpTime dropOpTime) = 0;
 
         virtual Status dropView(OperationContext* opCtx, StringData fullns) = 0;
 
@@ -233,13 +237,19 @@ public:
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
      * that is required.
+     *
+     * If we are applying a 'drop' oplog entry on a secondary, 'dropOpTime' will contain the optime
+     * of the oplog entry.
      */
-    inline Status dropCollection(OperationContext* const opCtx, const StringData fullns) {
-        return this->_impl().dropCollection(opCtx, fullns);
+    inline Status dropCollection(OperationContext* const opCtx,
+                                 const StringData fullns,
+                                 repl::OpTime dropOpTime = {}) {
+        return this->_impl().dropCollection(opCtx, fullns, dropOpTime);
     }
     inline Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
-                                             const NamespaceString& fullns) {
-        return this->_impl().dropCollectionEvenIfSystem(opCtx, fullns);
+                                             const NamespaceString& fullns,
+                                             repl::OpTime dropOpTime = {}) {
+        return this->_impl().dropCollectionEvenIfSystem(opCtx, fullns, dropOpTime);
     }
 
     inline Status dropView(OperationContext* const opCtx, const StringData fullns) {

@@ -286,7 +286,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
             continue;
         try {
             WriteUnitOfWork wunit(opCtx);
-            Status status = dropCollection(opCtx, ns);
+            Status status = dropCollection(opCtx, ns, {});
 
             if (!status.isOK()) {
                 warning() << "could not drop temp collection '" << ns << "': " << redact(status);
@@ -381,7 +381,9 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, StringData fullns) {
     return status;
 }
 
-Status DatabaseImpl::dropCollection(OperationContext* opCtx, StringData fullns) {
+Status DatabaseImpl::dropCollection(OperationContext* opCtx,
+                                    StringData fullns,
+                                    repl::OpTime dropOpTime) {
     if (!getCollection(opCtx, fullns)) {
         // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
@@ -403,11 +405,12 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx, StringData fullns) 
         }
     }
 
-    return dropCollectionEvenIfSystem(opCtx, nss);
+    return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime);
 }
 
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
-                                                const NamespaceString& fullns) {
+                                                const NamespaceString& fullns,
+                                                repl::OpTime dropOpTimeUnused) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     LOG(1) << "dropCollection: " << fullns;
