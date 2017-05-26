@@ -225,6 +225,8 @@
         },
         getCmdLineOpts: {skip: isUnrelated},
         getDiagnosticData: {skip: isUnrelated},
+        getDiagnosticDataFiles: {skip: isUnrelated},
+        getDiagnosticDataFromFile: {skip: isUnrelated},
         getLastError: {skip: isUnrelated},
         getLog: {skip: isUnrelated},
         getMore: {
