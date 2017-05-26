@@ -42,8 +42,10 @@
 #include <unistd.h>
 #ifdef __UCLIBC__
 #include <features.h>
-#else
+#elif defined(__GLIBC__)
 #include <gnu/libc-version.h>
+#else
+#define gnu_get_libc_version(x) "unknown"
 #endif
 
 #include <boost/filesystem.hpp>
