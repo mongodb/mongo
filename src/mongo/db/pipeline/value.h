@@ -176,7 +176,7 @@ public:
     Document getDocument() const;
     OID getOid() const;
     bool getBool() const;
-    long long getDate() const;  // in milliseconds
+    Date_t getDate() const;
     Timestamp getTimestamp() const;
     const char* getRegex() const;
     const char* getRegexFlags() const;
@@ -228,9 +228,7 @@ public:
     double coerceToDouble() const;
     Decimal128 coerceToDecimal() const;
     Timestamp coerceToTimestamp() const;
-    long long coerceToDate() const;
-    time_t coerceToTimeT() const;
-    tm coerceToTm() const;  // broken-out time struct (see man gmtime)
+    Date_t coerceToDate() const;
 
     //
     // Comparison API.
@@ -399,9 +397,9 @@ inline bool Value::getBool() const {
     return _storage.boolValue;
 }
 
-inline long long Value::getDate() const {
+inline Date_t Value::getDate() const {
     verify(getType() == Date);
-    return _storage.dateValue;
+    return Date_t::fromMillisSinceEpoch(_storage.dateValue);
 }
 
 inline Timestamp Value::getTimestamp() const {

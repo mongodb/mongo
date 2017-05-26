@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/mongoutils/str.h"
@@ -266,7 +267,7 @@ Value ExpressionAdd::evaluate(const Document& root) const {
             case Date:
                 uassert(16612, "only one date allowed in an $add expression", !haveDate);
                 haveDate = true;
-                nonDecimalTotal.addLong(val.getDate());
+                nonDecimalTotal.addLong(val.getDate().toMillisSinceEpoch());
                 break;
             default:
                 uassert(16554,
@@ -987,7 +988,7 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
 
     const string format = formatElem.str();
 
-    validateFormat(format);
+    TimeZone::validateFormat(format);
 
     return new ExpressionDateToString(expCtx, format, parseOperand(expCtx, dateElem, vps));
 }
@@ -1015,141 +1016,7 @@ Value ExpressionDateToString::evaluate(const Document& root) const {
         return Value(BSONNULL);
     }
 
-    return Value(formatDate(_format, date.coerceToTm(), date.coerceToDate()));
-}
-
-// verifies that any '%' is followed by a valid format character, and that
-// the format string ends with an even number of '%' symbols
-void ExpressionDateToString::validateFormat(const std::string& format) {
-    for (string::const_iterator it = format.begin(); it != format.end(); ++it) {
-        if (*it != '%') {
-            continue;
-        }
-
-        ++it;  // next character must be format modifier
-        uassert(18535, "Unmatched '%' at end of $dateToString format string", it != format.end());
-
-
-        switch (*it) {
-            // all of these fall through intentionally
-            case '%':
-            case 'Y':
-            case 'm':
-            case 'd':
-            case 'H':
-            case 'M':
-            case 'S':
-            case 'L':
-            case 'j':
-            case 'w':
-            case 'U':
-            case 'G':
-            case 'V':
-            case 'u':
-                break;
-            default:
-                uasserted(18536,
-                          str::stream() << "Invalid format character '%" << *it
-                                        << "' in $dateToString format string");
-        }
-    }
-}
-
-string ExpressionDateToString::formatDate(const string& format,
-                                          const tm& tm,
-                                          const long long date) {
-    StringBuilder formatted;
-    for (string::const_iterator it = format.begin(); it != format.end(); ++it) {
-        if (*it != '%') {
-            formatted << *it;
-            continue;
-        }
-
-        ++it;                           // next character is format modifier
-        invariant(it != format.end());  // checked in validateFormat
-
-        switch (*it) {
-            case '%':  // Escaped literal %
-                formatted << '%';
-                break;
-            case 'Y':  // Year
-            {
-                const int year = ExpressionYear::extract(tm);
-                uassert(18537,
-                        str::stream() << "$dateToString is only defined on year 0-9999,"
-                                      << " tried to use year "
-                                      << year,
-                        (year >= 0) && (year <= 9999));
-                insertPadded(formatted, year, 4);
-                break;
-            }
-            case 'm':  // Month
-                insertPadded(formatted, ExpressionMonth::extract(tm), 2);
-                break;
-            case 'd':  // Day of month
-                insertPadded(formatted, ExpressionDayOfMonth::extract(tm), 2);
-                break;
-            case 'H':  // Hour
-                insertPadded(formatted, ExpressionHour::extract(tm), 2);
-                break;
-            case 'M':  // Minute
-                insertPadded(formatted, ExpressionMinute::extract(tm), 2);
-                break;
-            case 'S':  // Second
-                insertPadded(formatted, ExpressionSecond::extract(tm), 2);
-                break;
-            case 'L':  // Millisecond
-                insertPadded(formatted, ExpressionMillisecond::extract(date), 3);
-                break;
-            case 'j':  // Day of year
-                insertPadded(formatted, ExpressionDayOfYear::extract(tm), 3);
-                break;
-            case 'w':  // Day of week
-                insertPadded(formatted, ExpressionDayOfWeek::extract(tm), 1);
-                break;
-            case 'U':  // Week
-                insertPadded(formatted, ExpressionWeek::extract(tm), 2);
-                break;
-            case 'G':  // Iso year of week
-                insertPadded(formatted, ExpressionIsoWeekYear::extract(tm), 4);
-                break;
-            case 'V':  // Iso week
-                insertPadded(formatted, ExpressionIsoWeek::extract(tm), 2);
-                break;
-            case 'u':  // Iso day of week
-                insertPadded(formatted, ExpressionIsoDayOfWeek::extract(tm), 1);
-                break;
-            default:
-                // Should never happen as format is pre-validated
-                invariant(false);
-        }
-    }
-    return formatted.str();
-}
-
-// Only works with 1 <= spaces <= 4 and 0 <= number <= 9999.
-// If spaces is less than the digit count of number we simply insert the number
-// without padding.
-void ExpressionDateToString::insertPadded(StringBuilder& sb, int number, int width) {
-    invariant(width >= 1);
-    invariant(width <= 4);
-    invariant(number >= 0);
-    invariant(number <= 9999);
-
-    int digits = 1;
-
-    if (number >= 1000) {
-        digits = 4;
-    } else if (number >= 100) {
-        digits = 3;
-    } else if (number >= 10) {
-        digits = 2;
-    }
-
-    if (width > digits) {
-        sb.write("0000", width - digits);
-    }
-    sb << number;
+    return Value(TimeZoneDatabase::utcZone().formatDate(_format, date.coerceToDate()));
 }
 
 void ExpressionDateToString::addDependencies(DepsTracker* deps) const {
@@ -1159,8 +1026,8 @@ void ExpressionDateToString::addDependencies(DepsTracker* deps) const {
 /* ---------------------- ExpressionDayOfMonth ------------------------- */
 
 Value ExpressionDayOfMonth::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluate(root));
+    return Value(TimeZoneDatabase::utcZone().dateParts(date.coerceToDate()).dayOfMonth);
 }
 
 REGISTER_EXPRESSION(dayOfMonth, ExpressionDayOfMonth::parse);
@@ -1171,8 +1038,8 @@ const char* ExpressionDayOfMonth::getOpName() const {
 /* ------------------------- ExpressionDayOfWeek ----------------------------- */
 
 Value ExpressionDayOfWeek::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluate(root));
+    return Value(TimeZoneDatabase::utcZone().dayOfWeek(date.coerceToDate()));
 }
 
 REGISTER_EXPRESSION(dayOfWeek, ExpressionDayOfWeek::parse);
@@ -1183,8 +1050,8 @@ const char* ExpressionDayOfWeek::getOpName() const {
 /* ------------------------- ExpressionDayOfYear ----------------------------- */
 
 Value ExpressionDayOfYear::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluate(root));
+    return Value(TimeZoneDatabase::utcZone().dayOfYear(date.coerceToDate()));
 }
 
 REGISTER_EXPRESSION(dayOfYear, ExpressionDayOfYear::parse);
@@ -1897,14 +1764,8 @@ void ExpressionMeta::addDependencies(DepsTracker* deps) const {
 /* ------------------------- ExpressionMillisecond ----------------------------- */
 
 Value ExpressionMillisecond::evaluate(const Document& root) const {
-    Value date(vpOperand[0]->evaluate(root));
-    return Value(extract(date.coerceToDate()));
-}
-
-int ExpressionMillisecond::extract(const long long date) {
-    const int ms = date % 1000LL;
-    // adding 1000 since dates before 1970 would have negative ms
-    return ms >= 0 ? ms : 1000 + ms;
+    auto date = vpOperand[0]->evaluate(root).coerceToDate();
+    return Value(TimeZoneDatabase::utcZone().dateParts(date).millisecond);
 }
 
 REGISTER_EXPRESSION(millisecond, ExpressionMillisecond::parse);
@@ -1915,8 +1776,8 @@ const char* ExpressionMillisecond::getOpName() const {
 /* ------------------------- ExpressionMinute -------------------------- */
 
 Value ExpressionMinute::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluate(root));
+    return Value(TimeZoneDatabase::utcZone().dateParts(date.coerceToDate()).minute);
 }
 
 REGISTER_EXPRESSION(minute, ExpressionMinute::parse);
@@ -1984,8 +1845,8 @@ const char* ExpressionMod::getOpName() const {
 /* ------------------------ ExpressionMonth ----------------------------- */
 
 Value ExpressionMonth::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    auto date = vpOperand[0]->evaluate(root).coerceToDate();
+    return Value(TimeZoneDatabase::utcZone().dateParts(date).month);
 }
 
 REGISTER_EXPRESSION(month, ExpressionMonth::parse);
@@ -2059,8 +1920,8 @@ const char* ExpressionMultiply::getOpName() const {
 /* ------------------------- ExpressionHour ----------------------------- */
 
 Value ExpressionHour::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    auto date = vpOperand[0]->evaluate(root).coerceToDate();
+    return Value(TimeZoneDatabase::utcZone().dateParts(date).hour);
 }
 
 REGISTER_EXPRESSION(hour, ExpressionHour::parse);
@@ -2960,8 +2821,8 @@ const char* ExpressionReverseArray::getOpName() const {
 /* ------------------------- ExpressionSecond ----------------------------- */
 
 Value ExpressionSecond::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    auto date = vpOperand[0]->evaluate(root).coerceToDate();
+    return Value(TimeZoneDatabase::utcZone().dateParts(date).second);
 }
 
 REGISTER_EXPRESSION(second, ExpressionSecond::parse);
@@ -3661,11 +3522,9 @@ Value ExpressionSubtract::evaluate(const Document& root) const {
         return Value(BSONNULL);
     } else if (lhs.getType() == Date) {
         if (rhs.getType() == Date) {
-            long long timeDelta = lhs.getDate() - rhs.getDate();
-            return Value(timeDelta);
+            return Value(durationCount<Milliseconds>(lhs.getDate() - rhs.getDate()));
         } else if (rhs.numeric()) {
-            long long millisSinceEpoch = lhs.getDate() - rhs.coerceToLong();
-            return Value(Date_t::fromMillisSinceEpoch(millisSinceEpoch));
+            return Value(lhs.getDate() - Milliseconds(rhs.coerceToLong()));
         } else {
             uasserted(16613,
                       str::stream() << "cant $subtract a " << typeName(rhs.getType())
@@ -3875,28 +3734,8 @@ const char* ExpressionType::getOpName() const {
 /* ------------------------- ExpressionWeek ----------------------------- */
 
 Value ExpressionWeek::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
-}
-
-int ExpressionWeek::extract(const tm& tm) {
-    int dayOfWeek = tm.tm_wday;
-    int dayOfYear = tm.tm_yday;
-    int prevSundayDayOfYear = dayOfYear - dayOfWeek;    // may be negative
-    int nextSundayDayOfYear = prevSundayDayOfYear + 7;  // must be positive
-
-    // Return the zero based index of the week of the next sunday, equal to the one based index
-    // of the week of the previous sunday, which is to be returned.
-    int nextSundayWeek = nextSundayDayOfYear / 7;
-
-    // Verify that the week calculation is consistent with strftime "%U".
-    DEV {
-        char buf[3];
-        verify(strftime(buf, 3, "%U", &tm));
-        verify(int(str::toUnsigned(buf)) == nextSundayWeek);
-    }
-
-    return nextSundayWeek;
+    auto date = vpOperand[0]->evaluate(root).coerceToDate();
+    return Value(TimeZoneDatabase::utcZone().week(date));
 }
 
 REGISTER_EXPRESSION(week, ExpressionWeek::parse);
@@ -3908,12 +3747,7 @@ const char* ExpressionWeek::getOpName() const {
 
 Value ExpressionIsoDayOfWeek::evaluate(const Document& root) const {
     Value date(vpOperand[0]->evaluate(root));
-    return Value(extract(date.coerceToTm()));
-}
-
-int ExpressionIsoDayOfWeek::extract(const tm& tm) {
-    // translate from sunday=0 … saturday=6 to monday=1 … sunday=7
-    return (tm.tm_wday - 7) % 7 + 7;
+    return Value(TimeZoneDatabase::utcZone().isoDayOfWeek(date.coerceToDate()));
 }
 
 REGISTER_EXPRESSION(isoDayOfWeek, ExpressionIsoDayOfWeek::parse);
@@ -3925,30 +3759,7 @@ const char* ExpressionIsoDayOfWeek::getOpName() const {
 
 Value ExpressionIsoWeekYear::evaluate(const Document& root) const {
     Value date(vpOperand[0]->evaluate(root));
-    return Value(extract(date.coerceToTm()));
-}
-
-int ExpressionIsoWeekYear::extract(const tm& tm) {
-    if (tm.tm_mon > 0 && tm.tm_mon < 11) {
-        // If month is between February and November, it is just the year given.
-        return tm.tm_year + 1900;
-    } else if (tm.tm_mon == 0) {
-        // In January we need to check if the week belongs to previous year.
-        int isoWeek = ExpressionIsoWeek::extract(tm);
-        if (isoWeek > 51) {  // Weeks 52 and 53 belong to the previous year.
-            return tm.tm_year + 1900 - 1;
-        } else {  // All other weeks belong to given year.
-            return tm.tm_year + 1900;
-        }
-    } else {
-        // A week 1 in December belongs to the next year.
-        int isoWeek = ExpressionIsoWeek::extract(tm);
-        if (isoWeek == 1) {
-            return tm.tm_year + 1900 + 1;
-        } else {
-            return tm.tm_year + 1900;
-        }
-    }
+    return Value(TimeZoneDatabase::utcZone().isoYear(date.coerceToDate()));
 }
 
 REGISTER_EXPRESSION(isoWeekYear, ExpressionIsoWeekYear::parse);
@@ -3958,97 +3769,9 @@ const char* ExpressionIsoWeekYear::getOpName() const {
 
 /* ------------------------- ExpressionIsoWeek -------------------------- */
 
-namespace {
-bool isLeapYear(int year) {
-    if (year % 4 != 0) {
-        // Not a leap year because a leap year must be divisable by 4.
-        return false;
-    } else if (year % 100 != 0) {
-        // Every year that is divisable by 100 is a leap year.
-        return true;
-    } else if (year % 400 != 0) {
-        // Every 400th year is not a leap year, althoght it is divisable by 4.
-        return false;
-    } else {
-        // Every year divisable by 4 but not 400 is a leap year.
-        return true;
-    }
-}
-
-int lastWeek(int year) {
-    // Create YYYY-12-31T23:59:59 so only 1 second left to new year.
-    struct tm tm = {};
-    tm.tm_year = year - 1900;
-    tm.tm_mon = 11;
-    tm.tm_mday = 31;
-    tm.tm_hour = 23;
-    tm.tm_min = 59;
-    tm.tm_sec = 59;
-    mktime(&tm);
-
-    // From: https://en.wikipedia.org/wiki/ISO_week_date#Last_week :
-    // If 31 December is on a Monday, Tuesday or Wednesday, it is in week 01 of the next year. If
-    // it is on a Thursday, it is in week 53 of the year just ending; if on a Friday it is in week
-    // 52 (or 53 if the year just ending is a leap year); if on a Saturday or Sunday, it is in week
-    // 52 of the year just ending.
-    if (tm.tm_wday > 0 && tm.tm_wday < 4) {  // Mon(1), Tue(2), and Wed(3)
-        return 1;
-    } else if (tm.tm_wday == 4) {  // Thu (4)
-        return 53;
-    } else if (tm.tm_wday == 5) {  // Fri (5)
-        // On Fri it's week 52 for non leap years and 53 for leap years.
-        // https://en.wikipedia.org/wiki/Leap_year#Algorithm
-        if (isLeapYear(year)) {
-            return 53;
-        } else {
-            return 52;
-        }
-    } else {  // Sat (6) or Sun (0)
-        return 52;
-    }
-}
-}
-
 Value ExpressionIsoWeek::evaluate(const Document& root) const {
     Value date(vpOperand[0]->evaluate(root));
-    return Value(extract(date.coerceToTm()));
-}
-
-// Quote https://en.wikipedia.org/wiki/ISO_week_date :
-// Weeks start with Monday. The first week of a year is the week that contains the first Thursday of
-// the year (and, hence, always contains 4 January).
-int ExpressionIsoWeek::extract(const tm& tm) {
-    // Calculation taken from:
-    // https://en.wikipedia.org/wiki/ISO_week_date#Calculating_the_week_number_of_a_given_date
-    //
-    // week(date) = floor( (ordinal(data) - weekday(date) + 10) / 7 )
-    //
-    // The first week must contain the first Thursday, therefore the `+ 10` after subtracting the
-    // weekday. Example: 2016-01-07 is the first Thursday
-    // ordinal(2016-01-07) => 7
-    // weekday(2016-01-07) => 4
-    //
-    // floor((7-4+10)/7) = floor(13/7) => 1
-    //
-    // week(date)    = isoWeek
-    // ordinal(date) = isoDayOfYear
-    // weekday(date) = isoDayOfWeek
-    int isoDayOfWeek = ExpressionIsoDayOfWeek::extract(tm);
-    int isoDayOfYear = tm.tm_yday + 1;
-    int isoWeek = (isoDayOfYear - isoDayOfWeek + 10) / 7;
-
-    // There is no week 0, so it must be the last week of the previous year.
-    if (isoWeek < 1) {
-        return lastWeek(tm.tm_year + 1900 - 1);
-        // If the calculated week is 53 and bigger than the last week, than it is the first week of
-        // the
-        // next year.
-    } else if (isoWeek == 53 && isoWeek > lastWeek(tm.tm_year + 1900)) {
-        return 1;
-        // It is just the week calculated
-    } else {
-        return isoWeek;
-    }
+    return Value(TimeZoneDatabase::utcZone().isoWeek(date.coerceToDate()));
 }
 
 REGISTER_EXPRESSION(isoWeek, ExpressionIsoWeek::parse);
@@ -4059,8 +3782,8 @@ const char* ExpressionIsoWeek::getOpName() const {
 /* ------------------------- ExpressionYear ----------------------------- */
 
 Value ExpressionYear::evaluate(const Document& root) const {
-    Value pDate(vpOperand[0]->evaluate(root));
-    return Value(extract(pDate.coerceToTm()));
+    Value date(vpOperand[0]->evaluate(root));
+    return Value(TimeZoneDatabase::utcZone().dateParts(date.coerceToDate()).year);
 }
 
 REGISTER_EXPRESSION(year, ExpressionYear::parse);

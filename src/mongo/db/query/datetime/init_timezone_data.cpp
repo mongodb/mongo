@@ -44,20 +44,20 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(
 (InitializerContext* context) {
     auto serviceContext = getGlobalServiceContext();
     if (!serverGlobalParams.timeZoneInfoPath.empty()) {
-        std::unique_ptr<timelib_tzdb, DateTimeSupport::TimeZoneDBDeleter> timeZoneDatabase(
+        std::unique_ptr<timelib_tzdb, TimeZoneDatabase::TimeZoneDBDeleter> timeZoneDatabase(
             timelib_zoneinfo(const_cast<char*>(serverGlobalParams.timeZoneInfoPath.c_str())),
-            DateTimeSupport::TimeZoneDBDeleter());
+            TimeZoneDatabase::TimeZoneDBDeleter());
         if (!timeZoneDatabase) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "failed to load time zone database from path \""
                                   << serverGlobalParams.timeZoneInfoPath
                                   << "\""};
         }
-        DateTimeSupport::set(serviceContext,
-                             stdx::make_unique<DateTimeSupport>(std::move(timeZoneDatabase)));
+        TimeZoneDatabase::set(serviceContext,
+                              stdx::make_unique<TimeZoneDatabase>(std::move(timeZoneDatabase)));
     } else {
         // No 'zoneInfo' specified on the command line, fall back to the built-in rules.
-        DateTimeSupport::set(serviceContext, stdx::make_unique<DateTimeSupport>());
+        TimeZoneDatabase::set(serviceContext, stdx::make_unique<TimeZoneDatabase>());
     }
     return Status::OK();
 }

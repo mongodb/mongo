@@ -687,7 +687,7 @@ class Date {
 public:
     void run() {
         Value value = Value(Date_t::fromMillisSinceEpoch(999));
-        ASSERT_EQUALS(999, value.getDate());
+        ASSERT_EQUALS(999, value.getDate().toMillisSinceEpoch());
         ASSERT_EQUALS(mongo::Date, value.getType());
         assertRoundTrips(value);
     }
@@ -1269,7 +1269,7 @@ class ToDateBase {
 public:
     virtual ~ToDateBase() {}
     void run() {
-        ASSERT_EQUALS(expected(), value().coerceToDate());
+        ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(expected()), value().coerceToDate());
     }
 
 protected:

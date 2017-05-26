@@ -55,10 +55,21 @@ function test(date, testSynthetics) {
     }
 
     assert.commandWorked(res);
+    assert.eq(res.cursor.firstBatch[0].year, date.getUTCFullYear(), "year");
+    assert.eq(res.cursor.firstBatch[0].month, date.getUTCMonth() + 1, "month");
+    assert.eq(res.cursor.firstBatch[0].dayOfMonth, date.getUTCDate(), "dayOfMonth");
+    assert.eq(res.cursor.firstBatch[0].hour, date.getUTCHours(), "hour");
+    assert.eq(res.cursor.firstBatch[0].minute, date.getUTCMinutes(), "minute");
+    assert.eq(res.cursor.firstBatch[0].second, date.getUTCSeconds(), "second");
+    assert.eq(res.cursor.firstBatch[0].millisecond, date.getUTCMilliseconds(), "millisecond");
+    assert.eq(res.cursor.firstBatch[0].millisecondPlusTen,
+              (date.getUTCMilliseconds() + 10) % 1000,
+              "millisecondPlusTen");
+    assert.eq(res.cursor.firstBatch[0].string, date.tojson().slice(9, 28), "string");
+    assert.eq(res.cursor.firstBatch[0].format, date.tojson(), "format");
     assert.eq(res.cursor.firstBatch[0], {
         year: date.getUTCFullYear(),
-        month: date.getUTCMonth() + 1  // jan == 1
-        ,
+        month: date.getUTCMonth() + 1,  // jan == 1
         dayOfMonth: date.getUTCDate(),
         hour: date.getUTCHours(),
         minute: date.getUTCMinutes(),

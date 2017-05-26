@@ -27,3 +27,13 @@ timeZoneEnv.Library(
         '$BUILD_DIR/third_party/shim_timelib',
     ]
 )
+
+timeZoneEnv.CppUnitTest(
+    target='date_time_support_test',
+    source=[
+        'date_time_support_test.cpp',
+    ],
+    LIBDEPS=[
+        'date_time_support',
+    ]
+)

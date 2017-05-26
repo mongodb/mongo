@@ -678,13 +678,6 @@ private:
                            const std::string& format,               // the format string
                            boost::intrusive_ptr<Expression> date);  // the date to format
 
-    // Will uassert on invalid data
-    static void validateFormat(const std::string& format);
-
-    // Need raw date as tm doesn't have millisecond resolution.
-    // Format must be valid.
-    static std::string formatDate(const std::string& format, const tm& tm, const long long date);
-
     static void insertPadded(StringBuilder& sb, int number, int spaces);
 
     const std::string _format;
@@ -698,10 +691,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static inline int extract(const tm& tm) {
-        return tm.tm_mday;
-    }
 };
 
 
@@ -712,11 +701,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    // MySQL uses 1-7, tm uses 0-6
-    static inline int extract(const tm& tm) {
-        return tm.tm_wday + 1;
-    }
 };
 
 
@@ -727,11 +711,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    // MySQL uses 1-366, tm uses 0-365
-    static inline int extract(const tm& tm) {
-        return tm.tm_yday + 1;
-    }
 };
 
 
@@ -866,10 +845,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static inline int extract(const tm& tm) {
-        return tm.tm_hour;
-    }
 };
 
 
@@ -1043,8 +1018,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static int extract(const long long date);
 };
 
 
@@ -1055,10 +1028,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static int extract(const tm& tm) {
-        return tm.tm_min;
-    }
 };
 
 
@@ -1097,11 +1066,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    // MySQL uses 1-12, tm uses 0-11
-    static inline int extract(const tm& tm) {
-        return tm.tm_mon + 1;
-    }
 };
 
 
@@ -1237,10 +1201,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static inline int extract(const tm& tm) {
-        return tm.tm_sec;
-    }
 };
 
 
@@ -1506,8 +1466,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static int extract(const tm& tm);
 };
 
 
@@ -1518,8 +1476,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static int extract(const tm& tm);
 };
 
 
@@ -1530,8 +1486,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static int extract(const tm& tm);
 };
 
 
@@ -1542,8 +1496,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    static int extract(const tm& tm);
 };
 
 
@@ -1554,11 +1506,6 @@ public:
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
-
-    // tm_year is years since 1990
-    static int extract(const tm& tm) {
-        return tm.tm_year + 1900;
-    }
 };
 
 

@@ -41,6 +41,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
@@ -54,6 +55,10 @@ using std::ostream;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+namespace {
+constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S"_sd;
+}
 
 void ValueStorage::verifyRefCountingIfShould() const {
     switch (type) {
@@ -343,7 +348,7 @@ BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Value& val)
         case Bool:
             return builder << val.getBool();
         case Date:
-            return builder << Date_t::fromMillisSinceEpoch(val.getDate());
+            return builder << val.getDate();
         case bsonTimestamp:
             return builder << val.getTimestamp();
         case Object:
@@ -556,16 +561,16 @@ Decimal128 Value::coerceToDecimal() const {
     }  // switch(getType())
 }
 
-long long Value::coerceToDate() const {
+Date_t Value::coerceToDate() const {
     switch (getType()) {
         case Date:
             return getDate();
 
         case bsonTimestamp:
-            return getTimestamp().getSecs() * 1000LL;
+            return Date_t::fromMillisSinceEpoch(getTimestamp().getSecs() * 1000LL);
 
         case jstOID:
-            return getOid().asDateT().toMillisSinceEpoch();
+            return getOid().asDateT();
 
         default:
             uassert(16006,
@@ -573,57 +578,6 @@ long long Value::coerceToDate() const {
                                   << " to Date",
                     false);
     }  // switch(getType())
-}
-
-time_t Value::coerceToTimeT() const {
-    long long millis = coerceToDate();
-    if (millis < 0) {
-        // We want the division below to truncate toward -inf rather than 0
-        // eg Dec 31, 1969 23:59:58.001 should be -2 seconds rather than -1
-        // This is needed to get the correct values from coerceToTM
-        if (-1999 / 1000 != -2) {  // this is implementation defined
-            millis -= 1000 - 1;
-        }
-    }
-    const long long seconds = millis / 1000;
-
-    uassert(16421,
-            "Can't handle date values outside of time_t range",
-            seconds >= std::numeric_limits<time_t>::min() &&
-                seconds <= std::numeric_limits<time_t>::max());
-
-    return static_cast<time_t>(seconds);
-}
-tm Value::coerceToTm() const {
-    // See implementation in Date_t.
-    // Can't reuse that here because it doesn't support times before 1970
-    time_t dtime = coerceToTimeT();
-    tm out;
-
-#if defined(_WIN32)  // Both the argument order and the return values differ
-    bool itWorked = gmtime_s(&out, &dtime) == 0;
-#else
-    bool itWorked = gmtime_r(&dtime, &out) != NULL;
-#endif
-
-    if (!itWorked) {
-        if (dtime < 0) {
-            // Windows docs say it doesn't support these, but empirically it seems to work
-            uasserted(16422, "gmtime failed - your system doesn't support dates before 1970");
-        } else {
-            uasserted(16423, str::stream() << "gmtime failed to convert time_t of " << dtime);
-        }
-    }
-
-    return out;
-}
-
-static string tmToISODateString(const tm& time) {
-    char buf[128];
-    size_t len = strftime(buf, 128, "%Y-%m-%dT%H:%M:%S", &time);
-    verify(len > 0);
-    verify(len < 128);
-    return buf;
 }
 
 string Value::coerceToString() const {
@@ -649,7 +603,7 @@ string Value::coerceToString() const {
             return getTimestamp().toStringPretty();
 
         case Date:
-            return tmToISODateString(coerceToTm());
+            return TimeZoneDatabase::utcZone().formatDate(kISOFormatString, getDate());
 
         case EOO:
         case jstNULL:
@@ -1166,7 +1120,8 @@ ostream& operator<<(ostream& out, const Value& val) {
         case Undefined:
             return out << "undefined";
         case Date:
-            return out << tmToISODateString(val.coerceToTm());
+            return out << TimeZoneDatabase::utcZone().formatDate(kISOFormatString,
+                                                                 val.coerceToDate());
         case bsonTimestamp:
             return out << val.getTimestamp().toString();
         case Object:
