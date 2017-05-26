@@ -316,6 +316,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_worker_removed;
 	int64_t cache_eviction_stable_state_workers;
 	int64_t cache_eviction_force_fail;
+	int64_t cache_eviction_force_fail_time;
 	int64_t cache_eviction_walks_active;
 	int64_t cache_eviction_walks_started;
 	int64_t cache_eviction_force_retune;
@@ -340,7 +341,9 @@ struct __wt_connection_stats {
 	int64_t cache_write_lookaside;
 	int64_t cache_pages_inuse;
 	int64_t cache_eviction_force;
+	int64_t cache_eviction_force_time;
 	int64_t cache_eviction_force_delete;
+	int64_t cache_eviction_force_delete_time;
 	int64_t cache_eviction_app;
 	int64_t cache_eviction_pages_queued;
 	int64_t cache_eviction_pages_queued_urgent;

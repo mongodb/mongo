@@ -55,10 +55,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	struct timespec start, stop;
 	bool locked, too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
+	__wt_epoch(session, &start);
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -75,19 +77,34 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
 	too_big = page->memory_footprint >= btree->splitmempage;
-	if ((ret = __wt_evict(session, ref, false)) == 0) {
-		if (too_big)
+
+	/*
+	 * Track how long the call to evict took. If eviction is successful then
+	 * we have one of two pairs of stats to increment.
+	 */
+	ret = __wt_evict(session, ref, false);
+	__wt_epoch(session, &stop);
+	if (ret == 0) {
+		if (too_big) {
 			WT_STAT_CONN_INCR(session, cache_eviction_force);
-		else
+			WT_STAT_CONN_INCRV(session, cache_eviction_force_time,
+			    WT_TIMEDIFF_US(stop, start));
+		} else {
 			/*
 			 * If the page isn't too big, we are evicting it because
 			 * it had a chain of deleted entries that make traversal
 			 * expensive.
 			 */
-			WT_STAT_CONN_INCR(
-			    session, cache_eviction_force_delete);
-	} else
+			WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
+			WT_STAT_CONN_INCRV(session,
+			    cache_eviction_force_delete_time,
+			    WT_TIMEDIFF_US(stop, start));
+		}
+	} else {
 		WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
+		WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time,
+		    WT_TIMEDIFF_US(stop, start));
+	}
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
