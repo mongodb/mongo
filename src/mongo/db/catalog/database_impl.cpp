@@ -410,10 +410,17 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                 const NamespaceString& fullns,
-                                                repl::OpTime dropOpTimeUnused) {
+                                                repl::OpTime dropOpTime) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     LOG(1) << "dropCollection: " << fullns;
+
+    // A valid 'dropOpTime' is not allowed when writes are replicated.
+    if (!dropOpTime.isNull() && opCtx->writesAreReplicated()) {
+        return Status(
+            ErrorCodes::BadValue,
+            "dropCollection() cannot accept a valid drop optime when writes are replicated.");
+    }
 
     Collection* collection = getCollection(opCtx, fullns);
 
@@ -443,10 +450,12 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // Drop unreplicated collections immediately.
     // Replicated collections should also be dropped immediately if there is no active reaper to
     // remove the drop-pending collections.
+    // If 'dropOpTime' is provided and the reaper is available, we should proceed to rename the
+    // collection.
     auto isOplogDisabledForNamespace =
         repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, fullns);
     auto reaper = repl::DropPendingCollectionReaper::get(opCtx);
-    if (isOplogDisabledForNamespace || !reaper) {
+    if ((dropOpTime.isNull() && isOplogDisabledForNamespace) || !reaper) {
         auto status = _finishDropCollection(opCtx, fullns, collection);
         if (!status.isOK()) {
             return status;
@@ -457,17 +466,32 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // Replicated collections will be renamed with a special drop-pending namespace and dropped when
     // the replica set optime reaches the drop optime.
-    auto dropOpTime =
-        getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
-
-    // Drop collection immediately if OpObserver did not write entry to oplog.
-    // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
-    // oplog.cpp.
     if (dropOpTime.isNull()) {
-        log() << "dropCollection: " << fullns << " - no drop optime available for pending-drop. "
-              << "Dropping collection immediately.";
-        fassertStatusOK(40462, _finishDropCollection(opCtx, fullns, collection));
-        return Status::OK();
+        dropOpTime =
+            getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
+
+        // Drop collection immediately if OpObserver did not write entry to oplog.
+        // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
+        // oplog.cpp.
+        if (dropOpTime.isNull()) {
+            log() << "dropCollection: " << fullns
+                  << " - no drop optime available for pending-drop. "
+                  << "Dropping collection immediately.";
+            fassertStatusOK(40462, _finishDropCollection(opCtx, fullns, collection));
+            return Status::OK();
+        }
+    } else {
+        // If we are provided with a valid 'dropOpTime', it means we are dropping this collection
+        // in the context of applying an oplog entry on a secondary.
+        // OpObserver::onDropCollection() should be returning a null OpTime because we should not be
+        // writing to the oplog.
+        auto opTime =
+            getGlobalServiceContext()->getOpObserver()->onDropCollection(opCtx, fullns, uuid);
+        if (!opTime.isNull()) {
+            severe() << "dropCollection: " << fullns
+                     << " - unexpected oplog entry written to the oplog with optime " << opTime;
+            fassertFailed(40468);
+        }
     }
 
     // Check if drop-pending namespace is too long for the index names in the collection.

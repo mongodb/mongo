@@ -94,30 +94,35 @@ void DatabaseTest::setUp() {
 void DatabaseTest::tearDown() {
     _nss = {};
     _opCtx = {};
+
+    auto service = getServiceContext();
+    repl::DropPendingCollectionReaper::set(service, {});
+    repl::StorageInterface::set(service, {});
+
     ServiceContextMongoDTest::tearDown();
 }
 
 void _testDropCollection(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         bool createCollectionBeforeDrop) {
-    writeConflictRetry(
-        opCtx, "testDropCollection", nss.ns(), [opCtx, nss, createCollectionBeforeDrop] {
-            AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
-            auto db = autoDb.getDb();
-            ASSERT_TRUE(db);
+                         bool createCollectionBeforeDrop,
+                         const repl::OpTime& dropOpTime = {}) {
+    writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
+        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
 
-            WriteUnitOfWork wuow(opCtx);
-            if (createCollectionBeforeDrop) {
-                ASSERT_TRUE(db->createCollection(opCtx, nss.ns()));
-            } else {
-                ASSERT_FALSE(db->getCollection(opCtx, nss));
-            }
-
-            ASSERT_OK(db->dropCollection(opCtx, nss.ns()));
-
+        WriteUnitOfWork wuow(opCtx);
+        if (createCollectionBeforeDrop) {
+            ASSERT_TRUE(db->createCollection(opCtx, nss.ns()));
+        } else {
             ASSERT_FALSE(db->getCollection(opCtx, nss));
-            wuow.commit();
-        });
+        }
+
+        ASSERT_OK(db->dropCollection(opCtx, nss.ns(), dropOpTime));
+
+        ASSERT_FALSE(db->getCollection(opCtx, nss));
+        wuow.commit();
+    });
 }
 
 TEST_F(DatabaseTest, DropCollectionReturnsOKIfCollectionDoesNotExist) {
@@ -175,6 +180,77 @@ TEST_F(
     // Drop optime is non-null because an op was written to the oplog.
     auto dropOpTime = repl::ReplClientInfo::forClient(&cc()).getLastOp();
     ASSERT_GREATER_THAN(dropOpTime, repl::OpTime());
+
+    // Replicated collection is renamed with a special drop-pending names in the <db>.system.drop.*
+    // namespace.
+    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
+    ASSERT_TRUE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+
+    // Reaper should have the drop optime of the collection.
+    auto reaperEarliestDropOpTime =
+        repl::DropPendingCollectionReaper::get(service)->getEarliestDropOpTime();
+    ASSERT_TRUE(reaperEarliestDropOpTime);
+    ASSERT_EQUALS(dropOpTime, *reaperEarliestDropOpTime);
+}
+
+TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicated) {
+    ASSERT_TRUE(_opCtx->writesAreReplicated());
+    ASSERT_FALSE(
+        repl::ReplicationCoordinator::get(_opCtx.get())->isOplogDisabledFor(_opCtx.get(), _nss));
+
+    auto opCtx = _opCtx.get();
+    auto nss = _nss;
+    writeConflictRetry(opCtx, "testDropOpTimeWithReplicated", nss.ns(), [opCtx, nss] {
+        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_TRUE(db->createCollection(opCtx, nss.ns()));
+
+        repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+        ASSERT_EQUALS(ErrorCodes::BadValue, db->dropCollection(opCtx, nss.ns(), dropOpTime));
+    });
+}
+
+TEST_F(DatabaseTest,
+       DropCollectionIgnoresProvidedDropOpTimeAndDropsCollectionImmediatelyIfReaperIsNotAvailable) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    ASSERT_FALSE(_opCtx->writesAreReplicated());
+    ASSERT_TRUE(
+        repl::ReplicationCoordinator::get(_opCtx.get())->isOplogDisabledFor(_opCtx.get(), _nss));
+
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    _testDropCollection(_opCtx.get(), _nss, true, dropOpTime);
+
+    // Last optime in repl client is null because we did not write to the oplog.
+    ASSERT_EQUALS(repl::OpTime(), repl::ReplClientInfo::forClient(&cc()).getLastOp());
+
+    // If the drop-pending collection reaper is not available, the collection is not renamed to
+    // <db>.system.drop.*.
+    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
+    ASSERT_FALSE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+}
+
+TEST_F(
+    DatabaseTest,
+    DropCollectionRenamesCollectionToPendingDropNamespaceUsingProvidedDropOpTimeButDoesNotLogOperationIfReaperIsAvailable) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+    ASSERT_FALSE(_opCtx->writesAreReplicated());
+    ASSERT_TRUE(
+        repl::ReplicationCoordinator::get(_opCtx.get())->isOplogDisabledFor(_opCtx.get(), _nss));
+
+    auto service = getServiceContext();
+    repl::StorageInterface::set(service, stdx::make_unique<repl::StorageInterfaceMock>());
+    repl::DropPendingCollectionReaper::set(
+        service,
+        stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
+
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    _testDropCollection(_opCtx.get(), _nss, true, dropOpTime);
+
+    // Last optime in repl client is null because we did not write to the oplog.
+    ASSERT_EQUALS(repl::OpTime(), repl::ReplClientInfo::forClient(&cc()).getLastOp());
 
     // Replicated collection is renamed with a special drop-pending names in the <db>.system.drop.*
     // namespace.
