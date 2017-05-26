@@ -49,7 +49,7 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
         ('reopen', dict(reopen=True))
     ])
     # Enable logging for this test.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
             'transaction_sync="(method=dsync,enabled)"'
 

@@ -77,9 +77,16 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         wttest.WiredTigerTestCase.__init__(self, *args, **kwargs)
         self.part = 1
 
+    def conn_extensions(self, extlist):
+        extarg = None
+        if self.expect_forceerror:
+            extarg='(config=\"rotn_force_error=true\")'
+        extlist.skip_if_missing = True
+        extlist.extension('encryptors', self.name, extarg)
+
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
-        forceerror = None
+        self.expect_forceerror = False
         if self.part == 1:
             self.name = self.name1
             self.keyid = self.keyid1
@@ -93,21 +100,20 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             self.fileinclear = self.fileinclear2 if \
                                hasattr(self, 'fileinclear2') else False
             if hasattr(self, 'forceerror1') and hasattr(self, 'forceerror2'):
-                forceerror = "rotn_force_error=true"
-        self.expect_forceerror = forceerror != None
+                self.expect_forceerror = True
         self.got_forceerror = False
 
         encarg = 'encryption=(name={0},keyid={1},secretkey={2}),'.format(
             self.name, self.keyid, self.secretkey)
-        # If forceerror is set for this test, add a config arg to
-        # the extension string. That signals rotn to return a (-1000)
-        # error code, which we'll detect here.
-        extarg = self.extensionArg([('encryptors', self.name, forceerror)])
+        # If forceerror is set for this test, conn_extensions adds a
+        # config arg to the extension string. That signals rotn to
+        # return a (-1000) error code, which we'll detect here.
+        extarg = self.extensionsConfig()
         self.pr('encarg = ' + encarg + ' extarg = ' + extarg)
         completed = False
         try:
             conn = self.wiredtiger_open(dir,
-                'create,error_prefix="{0}: ",{1}{2}'.format(
+                'create,error_prefix="{0}",{1}{2}'.format(
                  self.shortid(), encarg, extarg))
         except (BaseException) as err:
             # Capture the recognizable error created by rotn
@@ -134,29 +140,6 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             cursor.set_key(key)
             self.assertEqual(cursor.search(), 0)
             self.assertEquals(cursor.get_value(), val)
-
-    # Return the wiredtiger_open extension argument for a shared library.
-    def extensionArg(self, exts):
-        extfiles = []
-        for ext in exts:
-            (dirname, name, extarg) = ext
-            if name != None and name != 'none':
-                testdir = os.path.dirname(__file__)
-                extdir = os.path.join(run.wt_builddir, 'ext', dirname)
-                extfile = os.path.join(
-                    extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
-                if not os.path.exists(extfile):
-                    self.skipTest('extension "' + extfile + '" not built')
-                extfile = '"' + extfile + '"'
-                if not extfile in extfiles:
-                    s = extfile
-                    if extarg != None:
-                        s += "=(config=\"" + extarg + "\")"
-                    extfiles.append(s)
-        if len(extfiles) == 0:
-            return ''
-        else:
-            return ',extensions=[' + ','.join(extfiles) + ']'
 
     # Evaluate expression, which either must succeed (if expect_okay)
     # or must fail (if !expect_okay).

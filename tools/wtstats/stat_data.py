@@ -128,6 +128,8 @@ no_clear_list = [
     'cache: eviction currently operating in aggressive mode',
     'cache: eviction empty score',
     'cache: eviction state',
+    'cache: eviction worker thread active',
+    'cache: eviction worker thread stable number',
     'cache: files with active eviction walks',
     'cache: maximum bytes configured',
     'cache: maximum page size at eviction',

@@ -318,13 +318,12 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * hard case is if a page splits: the update structures might be moved
 	 * to different pages, and we still have to find them all for an abort.
 	 */
-
 	if (page_del != NULL)
 		WT_RET(__wt_calloc_def(
-		    session, page->pg_row_entries + 1, &page_del->update_list));
+		    session, page->entries + 1, &page_del->update_list));
 
 	/* Allocate the per-page update array. */
-	WT_ERR(__wt_calloc_def(session, page->pg_row_entries, &upd_array));
+	WT_ERR(__wt_calloc_def(session, page->entries, &upd_array));
 	page->modify->mod_row_update = upd_array;
 
 	/*
@@ -332,7 +331,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * structures, fill in the per-page update array with references to
 	 * deleted items.
 	 */
-	for (i = 0, size = 0; i < page->pg_row_entries; ++i) {
+	for (i = 0, size = 0; i < page->entries; ++i) {
 		WT_ERR(__wt_calloc_one(session, &upd));
 		WT_UPDATE_DELETED_SET(upd);
 

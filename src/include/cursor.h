@@ -52,8 +52,8 @@
 	{ 0 },				/* recno raw buffer */		\
 	NULL,				/* json_private */		\
 	NULL,				/* lang_private */		\
-	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
-	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
+	{ NULL, 0, NULL, 0, 0 },	/* WT_ITEM key */		\
+	{ NULL, 0, NULL, 0, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
 	NULL,				/* internal_uri */		\
 	0				/* uint32_t flags */		\
@@ -73,7 +73,7 @@ struct __wt_cursor_backup {
 #define	WT_CURBACKUP_LOCKER	0x01	/* Hot-backup started */
 	uint8_t	flags;
 };
-#define	WT_CURSOR_BACKUP_ID(cursor)	(((WT_CURSOR_BACKUP *)cursor)->maxid)
+#define	WT_CURSOR_BACKUP_ID(cursor)	(((WT_CURSOR_BACKUP *)(cursor))->maxid)
 
 struct __wt_cursor_btree {
 	WT_CURSOR iface;
@@ -474,7 +474,7 @@ struct __wt_cursor_stat {
  *	Return a reference to a statistic cursor's stats structures.
  */
 #define	WT_CURSOR_STATS(cursor)						\
-	(((WT_CURSOR_STAT *)cursor)->stats)
+	(((WT_CURSOR_STAT *)(cursor))->stats)
 
 struct __wt_cursor_table {
 	WT_CURSOR iface;
@@ -493,7 +493,7 @@ struct __wt_cursor_table {
 };
 
 #define	WT_CURSOR_PRIMARY(cursor)					\
-	(((WT_CURSOR_TABLE *)cursor)->cg_cursors[0])
+	(((WT_CURSOR_TABLE *)(cursor))->cg_cursors[0])
 
 #define	WT_CURSOR_RECNO(cursor)	WT_STREQ((cursor)->key_format, "r")
 
@@ -550,4 +550,4 @@ struct __wt_cursor_table {
 } while (0)
 
 #define	WT_CURSOR_RAW_OK						\
-	WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW
+	(WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW)

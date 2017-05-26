@@ -37,10 +37,10 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	size_t len;
 	int ch, i;
 	bool hex, json, reverse;
-	char *checkpoint, *config, *name, *p, *simplename;
+	char *checkpoint, *config, *p, *simpleuri, *uri;
 
 	hex = json = reverse = false;
-	checkpoint = config = name = simplename = NULL;
+	checkpoint = config = simpleuri = uri = NULL;
 	cursor = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "c:f:jrx")) != EOF)
 		switch (ch) {
@@ -81,19 +81,19 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		return (usage());
 
 	if (json &&
-	    ((ret = dump_json_begin(session)) != 0 ||
-	    (ret = dump_prefix(session, hex, json)) != 0))
+	    (dump_json_begin(session) != 0 ||
+	    dump_prefix(session, hex, json) != 0))
 		goto err;
 
 	for (i = 0; i < argc; i++) {
 		if (json && i > 0)
-			if ((ret = dump_json_separator(session)) != 0)
+			if (dump_json_separator(session) != 0)
 				goto err;
-		free(name);
-		free(simplename);
-		name = simplename = NULL;
+		free(uri);
+		free(simpleuri);
+		uri = simpleuri = NULL;
 
-		if ((name = util_name(session, argv[i], "table")) == NULL)
+		if ((uri = util_uri(session, argv[i], "table")) == NULL)
 			goto err;
 
 		len =
@@ -113,34 +113,34 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		(void)strcat(config, json ? "dump=json" :
 		    (hex ? "dump=hex" : "dump=print"));
 		if ((ret = session->open_cursor(
-		    session, name, NULL, config, &cursor)) != 0) {
+		    session, uri, NULL, config, &cursor)) != 0) {
 			fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-			    progname, name, session->strerror(session, ret));
+			    progname, uri, session->strerror(session, ret));
 			goto err;
 		}
 
-		if ((simplename = strdup(name)) == NULL) {
-			ret = util_err(session, errno, NULL);
+		if ((simpleuri = strdup(uri)) == NULL) {
+			(void)util_err(session, errno, NULL);
 			goto err;
 		}
-		if ((p = strchr(simplename, '(')) != NULL)
+		if ((p = strchr(simpleuri, '(')) != NULL)
 			*p = '\0';
-		if (dump_config(session, simplename, cursor, hex, json) != 0)
+		if (dump_config(session, simpleuri, cursor, hex, json) != 0)
 			goto err;
 
-		if ((ret = dump_record(cursor, reverse, json)) != 0)
+		if (dump_record(cursor, reverse, json) != 0)
 			goto err;
-		if (json && (ret = dump_json_table_end(session)) != 0)
+		if (json && dump_json_table_end(session) != 0)
 			goto err;
 
 		ret = cursor->close(cursor);
 		cursor = NULL;
 		if (ret != 0) {
-			ret = util_err(session, ret, NULL);
+			(void)util_err(session, ret, NULL);
 			goto err;
 		}
 	}
-	if (json && ((ret = dump_json_end(session)) != 0))
+	if (json && dump_json_end(session) != 0)
 		goto err;
 
 	if (0) {
@@ -148,8 +148,8 @@ err:		ret = 1;
 	}
 
 	free(config);
-	free(name);
-	free(simplename);
+	free(uri);
+	free(simpleuri);
 	if (cursor != NULL && (ret = cursor->close(cursor)) != 0) {
 		(void)util_err(session, ret, NULL);
 		ret = 1;
@@ -259,14 +259,15 @@ dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp,
     const char *fmt, ...)
 	WT_GCC_FUNC_ATTRIBUTE((format (printf, 4, 5)))
 {
-	int n;
+	WT_DECL_RET;
+	size_t n;
 	va_list ap;
 
 	va_start(ap, fmt);
-	n = vsnprintf(*bufp, *leftp, fmt, ap);
+	ret = __wt_vsnprintf_len_set(*bufp, *leftp, &n, fmt, ap);
 	va_end(ap);
-	if (n < 0)
-		return (util_err(session, EINVAL, NULL));
+	if (ret != 0)
+		return (util_err(session, ret, NULL));
 	*bufp += n;
 	*leftp -= (size_t)n;
 	return (0);
@@ -435,9 +436,11 @@ dump_table_parts_config(WT_SESSION *session, WT_CURSOR *cursor,
 
 	len = strlen(entry) + strlen(name) + 1;
 	if ((uriprefix = malloc(len)) == NULL)
-		return util_err(session, errno, NULL);
-
-	snprintf(uriprefix, len, "%s%s", entry, name);
+		return (util_err(session, errno, NULL));
+	if ((ret = __wt_snprintf(uriprefix, len, "%s%s", entry, name)) != 0) {
+		free(uriprefix);
+		return (util_err(session, ret, NULL));
+	}
 
 	/*
 	 * Search the file looking for column group and index key/value pairs:
@@ -504,16 +507,17 @@ dump_prefix(WT_SESSION *session, bool hex, bool json)
 
 	(void)wiredtiger_version(&vmajor, &vminor, &vpatch);
 
+	if (json && printf(
+	    "    \"%s\" : \"%d (%d.%d.%d)\",\n",
+	    DUMP_JSON_VERSION_MARKER, DUMP_JSON_CURRENT_VERSION,
+	    vmajor, vminor, vpatch) < 0)
+		return (util_err(session, EIO, NULL));
+
 	if (!json && (printf(
 	    "WiredTiger Dump (WiredTiger Version %d.%d.%d)\n",
 	    vmajor, vminor, vpatch) < 0 ||
 	    printf("Format=%s\n", hex ? "hex" : "print") < 0 ||
 	    printf("Header\n") < 0))
-		return (util_err(session, EIO, NULL));
-	else if (json && printf(
-	    "    \"%s\" : \"%d (%d.%d.%d)\",\n",
-	    DUMP_JSON_VERSION_MARKER, DUMP_JSON_CURRENT_VERSION,
-	    vmajor, vminor, vpatch) < 0)
 		return (util_err(session, EIO, NULL));
 
 	return (0);

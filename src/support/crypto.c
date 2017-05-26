@@ -133,5 +133,4 @@ __wt_encrypt_size(WT_SESSION_IMPL *session,
 		return;
 
 	*sizep = incoming_size + kencryptor->size_const + WT_ENCRYPT_LEN_SIZE;
-	return;
 }

@@ -69,13 +69,16 @@ int
 __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
+	WT_DECL_RET;
 	va_list ap;
 	size_t len;
 
 	for (;;) {
 		va_start(ap, fmt);
-		len = (size_t)vsnprintf(buf->mem, buf->memsize, fmt, ap);
+		ret = __wt_vsnprintf_len_set(
+		    buf->mem, buf->memsize, &len, fmt, ap);
 		va_end(ap);
+		WT_RET(ret);
 
 		/* Check if there was enough space. */
 		if (len < buf->memsize) {
@@ -100,6 +103,7 @@ int
 __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
+	WT_DECL_RET;
 	va_list ap;
 	size_t len, space;
 	char *p;
@@ -117,8 +121,9 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		p = (char *)((uint8_t *)buf->mem + buf->size);
 		WT_ASSERT(session, buf->memsize >= buf->size);
 		space = buf->memsize - buf->size;
-		len = (size_t)vsnprintf(p, space, fmt, ap);
+		ret = __wt_vsnprintf_len_set(p, space, &len, fmt, ap);
 		va_end(ap);
+		WT_RET(ret);
 
 		/* Check if there was enough space. */
 		if (len < space) {

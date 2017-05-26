@@ -31,6 +31,7 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wstrict-prototypes"
 	w="$w -Wswitch-enum"
 	w="$w -Wundef"
+	w="$w -Wuninitialized"
 	w="$w -Wunreachable-code"
 	w="$w -Wunsafe-loop-optimizations"
 	w="$w -Wunused"
@@ -65,6 +66,10 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 	# For now, turn it off.
 	# w="$w -Wno-error=cast-qual"
 	w="$w -Wno-cast-qual"
+
+	# On Centos 7.3.1611, system header files aren't compatible with
+	# -Wdisabled-macro-expansion.
+	w="$w -Wno-disabled-macro-expansion"
 
 	case "$1" in
 	*Apple*clang*version*4.1*)

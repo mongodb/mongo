@@ -1,0 +1,426 @@
+/*! @page tune_page_size_and_comp Tuning page size and compression
+
+This document aims to explain the role played by different page sizes in
+WiredTiger. It also details motivation behind an application wanting to modify
+these page sizes from their default values and the procedure to do so.
+Applications commonly configure page sizes based on their workload's typical key
+and value size. Once a page size has been chosen, appropriate defaults for the
+other configuration values are derived by WiredTiger from the page sizes, and
+relatively few applications will need to modify the other page and key/value
+size configuration options. WiredTiger also offers several compression options
+that have an impact on the size of the data both in-memory and on-disk. Hence
+while selecting page sizes, an application must also look at its desired
+compression needs. Since the data and workload for a table differs from one
+table to another in the database, an application can choose to set page sizes
+and compression options on a per-table basis.
+
+@section data_life_cycle Data life cycle
+Before detailing each page size, here is a review of how data gets stored inside
+WiredTiger:
+ - WiredTiger uses the physical disks to store data durably, creating on-disk
+files for the tables in the database directory. It also caches the portion of
+the table being currently accessed by the application for reading or writing in
+main memory.
+ - WiredTiger maintains a table's data in memory using a data structure called a
+<a href="https://en.wikipedia.org/wiki/B-tree">B-Tree</a> (
+<a href="https://en.wikipedia.org/wiki/B%2B_tree">B+ Tree</a> to be specific),
+referring to the nodes of a B-Tree as pages. Internal pages carry only keys. The
+leaf pages store both keys and values.
+ - The format of the in-memory pages is not the same as the format of the
+on-disk pages.  Therefore, the in-memory pages regularly go through a process
+called reconciliation to create data structures appropriate for storage on the
+disk. These data structures are referred to as on-disk pages. An application can
+set a maximum size separately for the internal and leaf on-disk pages otherwise
+WiredTiger uses a default value. If reconciliation of an in-memory page is
+leading to an on-disk page size greater than this maximum, WiredTiger creates
+multiple smaller on-disk pages.
+ - A component of WiredTiger called the Block Manager divides the on-disk pages
+into smaller chunks called blocks, which then get written to the disk. The size
+of these blocks is defined by a parameter called allocation_size, which is the
+underlying unit of allocation for the file the data gets stored in.  An
+application might choose to have data compressed before it gets stored to disk
+by enabling block compression.
+ - A database's tables are usually much larger than the main memory available.
+Not all of the data can be kept in memory at any given time. A process called
+eviction takes care of making space for new data by freeing the memory of data
+infrequently accessed. An eviction server regularly finds in-memory pages that
+have not been accessed in a while (following an LRU algorithm). Several
+background eviction threads continuously process these pages, reconcile them to
+disk and remove them from the main memory.
+ - When an application does an insert or an update of a key/value pair, the
+associated key is used to refer to an in-memory page. In the case of this page
+not being in memory, appropriate on-disk page(s) are read and an in-memory page
+constructed (the opposite of reconciliation). A data structure is maintained on
+every in-memory page to store any insertions or modifications to the data done
+on that page. As more and more data gets written to this page, the page's memory
+footprint keeps growing.
+ - An application can choose to set the maximum size a page is allowed to grow
+in-memory. A default size is set by WiredTiger if the application doesn't
+specify one. To keep page management efficient, as a page grows larger in-memory
+and approaches this maximum size, if possible, it is split into smaller
+in-memory pages.
+ - When doing an insert or an update, if a page grows larger than the maximum,
+the application thread is used to forcefully evict this page. This is done to
+split the growing page into smaller in-memory pages and reconcile them into
+on-disk pages. Once written to the disk they are removed from the main memory,
+making space for more data to be written. When an application gets involved in
+forced eviction, it might take longer than usual to do these inserts and
+updates. It is not always possible to (force) evict a page from memory and this
+page can temporarily grow larger in size than the configured maximum. This page
+then remains marked to be evicted and reattempts are made as the application
+puts more data in it.
+
+@section configurable_page_struct Configurable page structures in WiredTiger
+There are three page sizes that the user can configure:
+ 1. The maximum page size of any type of in-memory page in the WiredTiger cache,
+memory_page_max.
+ 2. The maximum size of the on-disk page for an internal page, internal_page_max.
+ 3. The maximum size of the on-disk leaf page, leaf_page_max.
+
+There are additional configuration settings that tune more esoteric and
+specialized data. Those are included for completeness but are rarely changed.
+
+@subsection memory_page_max memory_page_max
+The maximum size a table's page is allowed to grow to in memory before being
+reconciled to disk.
+ - An integer, with acceptable values between 512B and 10TB
+ - Default size: 5 MB
+ - Additionally constrained by the condition:
+   leaf_page_max <= memory_page_max <= cache_size/10
+ - Motivation to tune the value:
+\n memory_page_max is significant for applications wanting to tune for
+consistency in write intensive workloads.
+   - This is the parameter to start with for tuning and trying different values
+to find the correct balance between overall throughput and individual operation
+latency for each table.
+   - Splitting a growing in-memory page into smaller pages and reconciliation
+both require exclusive access to the page which makes an application's write
+operations wait. Having a large memory_page_max means that the pages will need
+to be split and reconciled less often. But when that happens, the duration that
+an exclusive access to the page is required is longer, increasing the latency of
+an application's insert or update operations. Conversely, having a smaller
+memory_page_max reduces the time taken for splitting and reconciling the pages,
+but causes it to happen more frequently, forcing more frequent but shorter
+exclusive accesses to the pages.
+   - Applications should choose the memory_page_max value considering the
+trade-off between frequency of exclusive access to the pages (for reconciliation
+or splitting pages into smaller pages) versus the duration that the exclusive
+access is required.
+ - Configuration:
+\n Specified as memory_page_max configuration option to WT_SESSION::create(). An
+example of such a configuration string is as follows:
+
+<pre>
+     "key_format=S,value_format=S,memory_page_max=10MB"
+</pre>
+
+@subsection internal_page_max internal_page_max
+The maximum page size for the reconciled on-disk internal pages of the B-Tree,
+in bytes. When an internal page grows past this size, it splits into multiple
+pages.
+ - An integer, with acceptable values between 512B and 512MB
+ - Default size: 4 KB (*appropriate for applications with relatively small keys)
+ - Additionally constrained by the condition: the size must be a multiple of the
+allocation size
+ - Motivation to tune the value:
+\n internal_page_max is significant for applications wanting to avoid excessive
+L2 cache misses while searching the tree.
+   - Recall that only keys are stored on internal pages, so the type and size of
+the key values for a table help drive the setting for this parameter.
+   - Should be sized to fit into on-chip caches.
+   - Applications doing full-table scans with out-of-memory workloads might
+increase internal_page_max to transfer more data per I/O.
+   - Influences the shape of the B-Tree, i.e. depth and the number of children
+each page in B-Tree has. To iterate to the desired key/value pair in the B-Tree,
+WiredTiger has to binary search the key-range in a page to determine the child
+page to proceed to and continue down the depth until it reaches the correct leaf
+page. Having an unusually deep B-Tree, or having too many children per page can
+negatively impact time taken to iterate the B-Tree, slowing down the application.
+The number of children per page and, hence, the tree depth depends upon the
+number of keys that can be stored in an internal page, which is
+internal_page_max divided by key size. Applications should choose an appropriate
+internal_page_max size that avoids the B-Tree from getting too deep.
+ - Configuration:
+\n Specified as internal_page_max configuration option to WT_SESSION::create().
+An example of such a configuration string is as follows:
+
+<pre>
+     "key_format=S,value_format=S,internal_page_max=16KB,leaf_page_max=1MB"
+</pre>
+
+@subsection leaf_page_max leaf_page_max
+The maximum page size for the reconciled on-disk leaf pages of the B-Tree, in
+bytes. When a leaf page grows past this size, it splits into multiple pages.
+ - An integer, with acceptable values between 512B and 512MB
+ - Default size: 32 KB (*appropriate for applications with relatively small keys
+and values)
+ - Additionally constrained by the condition: must be a multiple of the
+allocation size
+ - Motivation to tune the value:
+\n leaf_page_max is significant for applications wanting to maximize sequential
+data transfer from a storage device.
+   - Should be sized to maximize I/O performance (when reading from disk, it is
+usually desirable to read a large amount of data, assuming some locality of
+reference in the application's access pattern).
+   - Applications doing full-table scans through out-of-cache workloads might
+increase leaf_page_max to transfer more data per I/O.
+   - Applications focused on read/write amplification might decrease the page
+size to better match the underlying storage block size.
+ - Configuration:
+\n Specified as leaf_page_max configuration option to WT_SESSION::create(). An
+example of such a configuration string is as follows:
+
+<pre>
+     "key_format=S,value_format=S,internal_page_max=16KB,leaf_page_max=1MB"
+</pre>
+
+The following configuration items following are rarely used.  They are described
+for completeness:
+
+@subsection allocation_size allocation_size
+This is the underlying unit of allocation for the file. As the unit of file
+allocation, it sets the minimum page size and how much space is wasted when
+storing small amounts of data and overflow items.
+ - an integer between 512B and 128 MB
+ - must a power-of-two
+ - default : 4 KB
+ - Motivation to tune the value:
+\n Most applications should not need to tune the allocation size.
+   - To be compatible with virtual memory page sizes and direct I/O requirements
+on the platform (4KB for most common server platforms)
+   - Smaller values decrease the file space required by overflow items.
+   - For example, if the allocation size is set to 4KB, an overflow item of
+18,000 bytes requires 5 allocation units and wastes about 2KB of space. If the
+allocation size is 16KB, the same overflow item would waste more than 10KB.
+ - Configuration:
+\n Specified as allocation_size configuration option to WT_SESSION::create(). An
+example of such a configuration string is as follows:
+
+<pre>
+     "key_format=S,value_format=S,allocation_size=4KB"
+</pre>
+
+@subsection key_val_max internal/leaf key/value max
+ - Overflow items
+\n Overflow items are keys and values too large to easily store on a page. Overflow
+items are stored separately in the file from the page where the item logically
+appears, and so reading or writing an overflow item is more expensive than an
+on-page item, normally requiring additional I/O.  Additionally, overflow values
+are not cached in memory. This means overflow items won't affect the caching
+behavior of the application.  It also means that each time an overflow value is
+read, it is re-read from disk.
+ - internal_key_max
+\n The largest key stored in an internal page, in bytes. If set, keys larger than
+the specified size are stored as overflow items.
+   - The default and the maximum allowed value are both one-tenth the size of a
+newly split internal page.
+ - leaf_key_max
+\n The largest key stored in a leaf page, in bytes. If set, keys larger than the
+specified size are stored as overflow items.
+   - The default value is one-tenth the size of a newly split leaf page.
+ - leaf_value_max
+\n The largest value stored in a leaf page, in bytes. If set, values larger than
+the specified size are stored as overflow items
+   - The default is one-half the size of a newly split leaf page.
+   - If the size is larger than the maximum leaf page size, the page size is
+temporarily ignored when large values are written.
+ - Motivation to tune the values:
+\n Most applications should not need to tune the maximum key and value sizes.
+Applications requiring a small page size, but also having latency concerns such
+that the additional work to retrieve an overflow item may find modifying these
+values useful.
+\n Since overflow items are separately stored in the on-disk file, aren't cached
+and require additional I/O to access (read or write), applications should avoid
+creating overflow items.
+   - Since page sizes also determine the default size of overflow items, i.e.,
+keys and values too large to easily store on a page, they can be configured to
+avoid performance penalties working with overflow items:
+     - Applications with large keys and values, and concerned with latency,
+might increase the page size to avoid creating overflow items, in order to avoid
+the additional cost of retrieving them.
+     - Applications with large keys and values, doing random searches, might
+decrease the page size to avoid wasting cache space on overflow items that
+aren't likely to be needed.
+     - Applications with large keys and values, doing table scans, might
+increase the page size to avoid creating overflow items, as the overflow items
+must be read into memory in all cases, anyway.
+   - internal_key_max, leaf_key_max and leaf_value_max configuration values
+allow applications to change the size at which a key or value will be treated
+as an overflow item.
+     - Most applications should not need to tune the maximum key and value
+sizes.
+     - The value of internal_key_max is relative to the maximum internal page
+size. Because the number of keys on an internal page determines the depth of the
+tree, the internal_key_max value can only be adjusted within a certain range,
+and the configured value will be automatically adjusted by WiredTiger, if
+necessary, to ensure a reasonable number of keys fit on an internal page.
+     - The values of leaf_key_max and leaf_value_max are not relative to the
+maximum leaf page size. If either is larger than the maximum page size, the page
+size will be ignored when the larger keys and values are being written, and a
+larger page will be created as necessary.
+ - Configuration:
+\n Specified as internal_key_max, leaf_key_max and leaf_value_max configuration
+options to WT_SESSION::create(). An example of configuration string for a large
+leaf overflow value:
+
+<pre>
+     "key_format=S,value_format=S,leaf_page_max=16KB,leaf_value_max=256KB"
+</pre>
+
+@subsection split_pct split_pct (split percentage)
+The size (specified as percentage of internal/leaf page_max) at which the
+reconciled page must be split into multiple smaller pages before being sent for
+compression and then be written to the disk. If the reconciled page can fit into
+a single on-disk page without the page growing beyond it's set max size,
+split_pct is ignored and the page isn't split.
+ - an integer between 25 and 100
+ - default : 75
+ - Motivation to tune the value:
+\n Most applications should not need to tune the split percentage size.
+   - This value should be selected to avoid creating a large number of tiny
+pages or repeatedly splitting whenever new entries are inserted.
+\n For example, if the maximum page size is 1MB, a split_pct value of 10%
+would potentially result in creating a large number of 100KB pages, which may
+not be optimal for future I/O. Or, if the maximum page size is 1MB, a split_pct
+value of 90% would potentially result in repeatedly splitting pages as the split
+pages grow to 1MB over and over. The default value for split_pct is 75%,
+intended to keep large pages relatively large, while still giving split pages
+room to grow.
+ - Configuration:
+\n Specified as split_pct configuration option to WT_SESSION::create(). An
+example of such a configuration string is as follows:
+
+<pre>
+     "key_format=S,value_format=S,split_pct=60"
+</pre>
+
+@section compression_considerations Compression considerations
+WiredTiger compresses data at several stages to preserve memory and disk space.
+Applications can configure these different compression algorithms to tailor
+their requirements between memory, disk and CPU consumption. Compression
+algorithms other than block compression work by modifying how the keys and
+values are represented, and hence reduce data size in-memory and on-disk. Block
+compression on the other hand compress the data in its binary representation
+while saving it on the disk.
+
+Configuring compression may change application throughput. For example, in
+applications using solid-state drives (where I/O is less expensive), turning
+off compression may increase application performance by reducing CPU costs; in
+applications where I/O costs are more expensive, turning on compression may
+increase application performance by reducing the overall number of I/O
+operations.
+
+WiredTiger uses some internal algorithms to compress the amount of data stored
+that are not configurable, but always on.  For example, run-length reduces the
+size requirement by storing sequential, duplicate values in the store only a
+single time (with an associated count).
+
+Different compression options available with WiredTiger:
+ - Key-prefix
+   - Reduces the size requirement by storing any identical key prefix only once
+per page. The cost is additional CPU and memory when operating on the in-memory
+tree. Specifically, reverse sequential cursor movement (but not forward) through
+a prefix-compressed page or the random lookup of a key/value pair will allocate
+sufficient memory to hold some number of uncompressed keys. So, for example, if
+key prefix compression only saves a small number of bytes per key, the
+additional memory cost of instantiating the uncompressed key may mean prefix
+compression is not worthwhile. Further, in cases where the on-disk cost is the
+primary concern, block compression may mean prefix compression is less useful.
+   - Configuration:
+\n Specified as prefix_compression configuration option to
+WT_SESSION::create(). Applications may limit the use of prefix compression by
+configuring the minimum number of bytes that must be gained before prefix
+compression is used with prefix_compression_min configuration option. An example
+of such a configuration string is as follows:
+
+<pre>
+          "key_format=S,value_format=S,prefix_compression=true,prefix_compression_min=7"
+</pre>
+
+ - Dictionary
+   - Reduces the size requirement by storing any identical value only once per
+page.
+   - Configuration:
+\n Specified as dictionary configuration configuration option to
+WT_SESSION::create(), which specifies the maximum number of unique values
+remembered in the B-Tree row-store leaf page value dictionary. An example of
+such a configuration string is as follows:
+
+<pre>
+          "key_format=S,value_format=S,dictionary=1000"
+</pre>
+
+ - Huffman
+   - Reduces the size requirement by compressing individual key/value items, and
+can be separately configured either or both keys and values. The additional CPU
+cost of Huffman encoding can be high, and should be considered. (See Huffman
+Encoding for details.)
+   - Configuration:
+\n Specified as huffman_key and/or huffman_value configuration option to
+WT_SESSION::create(). These options can take values of "english" (to use a
+built-in English language frequency table), "utf8<file>" or "utf16<file>" (to
+use a custom utf8 or utf16 symbol frequency table file). An example of such a
+configuration string is as follows:
+
+<pre>
+          "key_format=S,value_format=S,huffman_key=english,huffman_value=english"
+</pre>
+
+ - Block Compression
+   - Reduces the size requirement of on-disk objects by compressing blocks of
+the backing object's file. The additional CPU cost of block compression can be
+high, and should be considered. When block compression has been configured,
+configured page sizes will not match the actual size of the page on disk.
+   - WiredTiger provides two methods of compressing your data when using block
+compression: the raw and noraw methods. These methods change how WiredTiger
+works to fit data into the blocks that are stored on disk. Applications needing
+to write specific sized blocks may want to consider implementing a
+WT_COMPRESSOR::compress_raw function.
+   - Noraw compression:
+\n A fixed amount of data is given to the compression system, then turned into
+a compressed block of data. The amount of data chosen to compress is the data
+needed to fill the uncompressed block. Thus when compressed, the block will be
+smaller than the normal data size and the sizes written to disk will often vary
+depending on how compressible the data being stored is. Algorithms using noraw
+compression include zlib-noraw, lz4-noraw and snappy.
+Noraw compression is better suited for workloads with random access patterns
+because each block will tend to be smaller and require less work to read and
+decompress.
+   - Raw compression:
+\n WiredTiger's raw compression takes advantage of compressors that provide a
+streaming compression API. Using the streaming API WiredTiger will try to fit as
+much data as possible into one block. This means that blocks created with raw
+compression should be of similar size. Using a streaming compression method
+should also make for less overhead in compression, as the setup and initial work
+for compressing is done fewer times compared to the amount of data stored.
+Algorithms using raw compression include zlib, lz4.
+Compared to noraw, raw compression provides more compression while using more
+CPU. Raw compression may provide a performance advantage in workloads where data
+is accessed sequentially. That is because more data is generally packed into
+each block on disk.
+   - Configuration:
+\n Specified as the block_compressor configuration option to
+WT_SESSION::create(). If WiredTiger has builtin support for "lz4", "snappy",
+"zlib" or "zstd" compression, these names are available as the value to the
+option. An example of such a configuration string is as follows:
+
+<pre>
+          "key_format=S,value_format=S,block_compressor=snappy"
+</pre>
+
+See @ref compression for further information on how to configure and enable
+different compression options.
+
+@subsection table_compress Table summarizing compression in WiredTiger
+
+<table>
+@hrow{Compression Type, Supported by row-store, Supported by variable col-store,
+      Supported by fixed col-store, Default config, Reduces in-mem size,
+      Reduces on-disk size, CPU and Memory cost}
+@row{Key-prefix, yes, no, no, disabled, yes, yes, minor}
+@row{Dictionary, yes, yes, no, disabled, yes, yes, minor}
+@row{Huffman, yes, yes, no, disabled, yes, yes, can be high}
+@row{Block, yes, yes, yes, disabled, no, yes, can be high}
+</table>
+
+*/

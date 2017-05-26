@@ -211,9 +211,9 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	if (TAILQ_EMPTY(&txn_global->nsnaph)) {
 		WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE &&
 		    !__wt_txn_visible_all(session, nsnap_new->pinned_id));
-		__wt_readlock(session, txn_global->scan_rwlock);
+		__wt_readlock(session, &txn_global->scan_rwlock);
 		txn_global->nsnap_oldest_id = nsnap_new->pinned_id;
-		__wt_readunlock(session, txn_global->scan_rwlock);
+		__wt_readunlock(session, &txn_global->scan_rwlock);
 	}
 	TAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
 	WT_STAT_CONN_INCR(session, txn_snapshots_created);
@@ -297,16 +297,16 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
 
-	__wt_readlock(session, txn_global->nsnap_rwlock);
+	__wt_readlock(session, &txn_global->nsnap_rwlock);
 	TAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
 		if (WT_STRING_MATCH(nsnap->name, nameval->str, nameval->len)) {
 			/*
 			 * Acquire the scan lock so the oldest ID can't move
 			 * forward without seeing our pinned ID.
 			 */
-			__wt_readlock(session, txn_global->scan_rwlock);
+			__wt_readlock(session, &txn_global->scan_rwlock);
 			txn_state->pinned_id = nsnap->pinned_id;
-			__wt_readunlock(session, txn_global->scan_rwlock);
+			__wt_readunlock(session, &txn_global->scan_rwlock);
 
 			WT_ASSERT(session, !__wt_txn_visible_all(
 			    session, txn_state->pinned_id) &&
@@ -327,7 +327,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 			F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 			break;
 		}
-	__wt_readunlock(session, txn_global->nsnap_rwlock);
+	__wt_readunlock(session, &txn_global->nsnap_rwlock);
 
 	if (nsnap == NULL)
 		WT_RET_MSG(session, EINVAL,

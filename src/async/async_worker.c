@@ -107,7 +107,7 @@ __async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, uint64_t my_gen)
 {
 	while (async->flush_state == WT_ASYNC_FLUSHING &&
 	    async->flush_gen == my_gen)
-		__wt_cond_wait(session, async->flush_cond, 10000);
+		__wt_cond_wait(session, async->flush_cond, 10000, NULL);
 }
 
 /*

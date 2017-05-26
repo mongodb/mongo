@@ -39,51 +39,27 @@ from wtscenario import make_scenarios
 class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'file:test_encrypt02'
     encrypt_type = [
-        ('noarg', dict( encrypt='rotn', encrypt_args='name=rotn',
-                        secret_arg=None)),
-        ('keyid', dict( encrypt='rotn', encrypt_args='name=rotn,keyid=11',
-                        secret_arg=None)),
-        ('pass', dict( encrypt='rotn', encrypt_args='name=rotn',
-                        secret_arg='ABC')),
-        ('keyid-pass', dict( encrypt='rotn', encrypt_args='name=rotn,keyid=11',
-                        secret_arg='ABC')),
+        ('noarg', dict( encrypt_args='name=rotn', secret_arg=None)),
+        ('keyid', dict( encrypt_args='name=rotn,keyid=11', secret_arg=None)),
+        ('pass', dict( encrypt_args='name=rotn', secret_arg='ABC')),
+        ('keyid-pass', dict(
+            encrypt_args='name=rotn,keyid=11', secret_arg='ABC')),
     ]
     scenarios = make_scenarios(encrypt_type)
+
+    def conn_extensions(self, extlist):
+        # Load the compression extension, skip the test if missing
+        extlist.skip_if_missing = True
+        extlist.extension('encryptors', 'rotn')
 
     nrecords = 5000
     bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010
 
-    # Return the wiredtiger_open extension argument for a shared library.
-    def extensionArg(self, exts):
-        extfiles = []
-        for ext in exts:
-            (dirname, name) = ext
-            if name != None and name != 'none':
-                testdir = os.path.dirname(__file__)
-                extdir = os.path.join(run.wt_builddir, 'ext', dirname)
-                extfile = os.path.join(
-                    extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
-                if not os.path.exists(extfile):
-                    self.skipTest('extension "' + extfile + '" not built')
-                if not extfile in extfiles:
-                    extfiles.append(extfile)
-        if len(extfiles) == 0:
-            return ''
-        else:
-            return ',extensions=["' + '","'.join(extfiles) + '"]'
-
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
+    def conn_config(self):
         secretarg = ''
         if self.secret_arg != None:
             secretarg = ',secretkey=' + self.secret_arg
-        encarg = 'encryption=({0}{1})'.format(self.encrypt_args, secretarg)
-        extarg = self.extensionArg([('encryptors', self.encrypt)])
-        connarg = 'create,error_prefix="{0}: ",{1},{2}'.format(
-            self.shortid(), encarg, extarg)
-        conn = self.wiredtiger_open(dir, connarg)
-        self.pr(`conn`)
-        return conn
+        return 'encryption=({0}{1})'.format(self.encrypt_args, secretarg)
 
     # Create a table, add keys with both big and small values, then verify them.
     def test_pass(self):

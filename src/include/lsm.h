@@ -23,11 +23,14 @@ struct __wt_lsm_worker_cookie {
 struct __wt_lsm_worker_args {
 	WT_SESSION_IMPL	*session;	/* Session */
 	WT_CONDVAR	*work_cond;	/* Owned by the manager */
+
 	wt_thread_t	tid;		/* Thread id */
+	bool		tid_set;	/* Thread id set */
+
 	u_int		id;		/* My manager slot id */
 	uint32_t	type;		/* Types of operations handled */
-#define	WT_LSM_WORKER_RUN	0x01
-	uint32_t	flags;		/* Worker flags */
+
+	volatile bool	running;	/* Worker is running */
 };
 
 /*
@@ -162,6 +165,9 @@ struct __wt_lsm_manager {
 #define	WT_LSM_MAX_WORKERS	20
 #define	WT_LSM_MIN_WORKERS	3
 	WT_LSM_WORKER_ARGS lsm_worker_cookies[WT_LSM_MAX_WORKERS];
+
+#define	WT_LSM_MANAGER_SHUTDOWN	0x01	/* Manager has shut down */
+	uint32_t flags;
 };
 
 /*
@@ -189,7 +195,7 @@ struct __wt_lsm_tree {
 
 #define	LSM_TREE_MAX_QUEUE	100
 	uint32_t queue_ref;
-	WT_RWLOCK *rwlock;
+	WT_RWLOCK rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
 	uint64_t dsk_gen;

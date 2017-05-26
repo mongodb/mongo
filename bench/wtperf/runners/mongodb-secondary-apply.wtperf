@@ -1,5 +1,5 @@
 # Simulate the MongoDB oplog apply threads on a secondary.
-conn_config="cache_size=10GB,session_max=1000,eviction=(threads_min=4,threads_max=4),log=(enabled=false),transaction_sync=(enabled=false),checkpoint_sync=true,checkpoint=(wait=60),statistics=(fast),statistics_log=(json,wait=1)"
+conn_config="cache_size=10GB,session_max=1000,eviction=(threads_min=4,threads_max=8),log=(enabled=false),transaction_sync=(enabled=false),checkpoint_sync=true,checkpoint=(wait=60),statistics=(fast),statistics_log=(json,wait=1)"
 table_config="allocation_size=4k,memory_page_max=5MB,prefix_compression=false,split_pct=75,leaf_page_max=32k,internal_page_max=16k,type=file"
 # Spread the workload out over several tables.
 table_count=4

@@ -319,6 +319,15 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %rename (getValueFormat) __wt_async_op::getValue_format;
 %rename (getType) __wt_async_op::get_type;
 
+/*
+ * Special cases: override the out typemap, return checking is done in the
+ * wrapper.
+ */
+%typemap(out) int __wt_cursor::compare_wrap,
+              int __wt_cursor::equals_wrap %{
+	$result = $1;
+%}
+
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
 
@@ -529,7 +538,6 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %}
 
 %extend __wt_async_op {
-
 	%javamethodmodifiers get_key_wrap "protected";
 	WT_ITEM get_key_wrap(JNIEnv *jenv) {
 		WT_ITEM k;

@@ -15,9 +15,9 @@ util_rebalance(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
 	int ch;
-	char *name;
+	char *uri;
 
-	name = NULL;
+	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
 		switch (ch) {
 		case '?':
@@ -30,25 +30,21 @@ util_rebalance(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
-	if ((ret = session->rebalance(session, name, NULL)) != 0) {
-		fprintf(stderr, "%s: rebalance(%s): %s\n",
-		    progname, name, session->strerror(session, ret));
-		goto err;
+	if ((ret = session->rebalance(session, uri, NULL)) != 0)
+		(void)util_err(session, ret, "session.rebalance: %s", uri);
+	else {
+		/*
+		 * Verbose configures a progress counter, move to the next
+		 * line.
+		 */
+		if (verbose)
+			printf("\n");
 	}
 
-	/* Verbose configures a progress counter, move to the next line. */
-	if (verbose)
-		printf("\n");
-
-	if (0) {
-err:		ret = 1;
-	}
-
-	free(name);
-
+	free(uri);
 	return (ret);
 }
 

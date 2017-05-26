@@ -8,6 +8,49 @@
 
 #include "wt_internal.h"
 
+#ifdef	HAVE_DIAGNOSTIC
+/*
+ * __log_slot_dump --
+ *	Dump the entire slot state.
+ */
+static void
+__log_slot_dump(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	int earliest, i;
+
+	conn = S2C(session);
+	log = conn->log;
+	earliest = 0;
+	for (i = 0; i < WT_SLOT_POOL; i++) {
+		slot = &log->slot_pool[i];
+		if (__wt_log_cmp(&slot->slot_release_lsn,
+		    &log->slot_pool[earliest].slot_release_lsn) < 0)
+			earliest = i;
+		__wt_errx(session, "Slot %d:", i);
+		__wt_errx(session, "    State: %" PRIx64 " Flags: %" PRIx32,
+		    slot->slot_state, slot->flags);
+		__wt_errx(session, "    Start LSN: %" PRIu32 "/%" PRIu32,
+		    slot->slot_start_lsn.l.file, slot->slot_start_lsn.l.offset);
+		__wt_errx(session, "    End  LSN: %" PRIu32 "/%" PRIu32,
+		    slot->slot_end_lsn.l.file, slot->slot_end_lsn.l.offset);
+		__wt_errx(session, "    Release LSN: %" PRIu32 "/%" PRIu32,
+		    slot->slot_release_lsn.l.file,
+		    slot->slot_release_lsn.l.offset);
+		__wt_errx(session, "    Offset: start: %" PRIuMAX
+		    " last:%" PRIuMAX, (uintmax_t)slot->slot_start_offset,
+		    (uintmax_t)slot->slot_last_offset);
+		__wt_errx(session, "    Unbuffered: %" PRId64
+		    " error: %" PRId32, slot->slot_unbuffered,
+		    slot->slot_error);
+	}
+	__wt_errx(session, "Earliest slot: %d", earliest);
+
+}
+#endif
+
 /*
  * __wt_log_slot_activate --
  *	Initialize a slot to become active.
@@ -21,7 +64,6 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	conn = S2C(session);
 	log = conn->log;
 
-	slot->slot_state = 0;
 	/*
 	 * !!! slot_release_lsn must be set outside this function because
 	 * this function may be called after a log file switch and the
@@ -30,12 +72,19 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * set for closing the file handle on a log file switch.  The flags
 	 * are reset when the slot is freed.  See log_slot_free.
 	 */
+	slot->slot_unbuffered = 0;
 	slot->slot_start_lsn = slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.l.offset;
 	slot->slot_last_offset = log->alloc_lsn.l.offset;
 	slot->slot_fh = log->log_fh;
 	slot->slot_error = 0;
-	slot->slot_unbuffered = 0;
+	WT_DIAGNOSTIC_YIELD;
+	/*
+	 * Set the slot state last.  Other threads may have a stale pointer
+	 * to this slot and could try to alter the state and other fields once
+	 * they see the state cleared.
+	 */
+	WT_PUBLISH(slot->slot_state, 0);
 }
 
 /*
@@ -50,6 +99,10 @@ __log_slot_close(
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	int64_t end_offset, new_state, old_state;
+#ifdef	HAVE_DIAGNOSTIC
+	struct timespec begin, now;
+	int count;
+#endif
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	WT_ASSERT(session, releasep != NULL);
@@ -101,9 +154,33 @@ retry:
 	 * that value.  If the state is unbuffered, wait for the unbuffered
 	 * size to be set.
 	 */
-	while (WT_LOG_SLOT_UNBUFFERED_ISSET(old_state) &&
-	    slot->slot_unbuffered == 0)
-		__wt_yield();
+#ifdef	HAVE_DIAGNOSTIC
+	count = 0;
+	__wt_epoch(session, &begin);
+#endif
+	if (WT_LOG_SLOT_UNBUFFERED_ISSET(old_state)) {
+		while (slot->slot_unbuffered == 0) {
+			WT_RET(WT_SESSION_CHECK_PANIC(session));
+			__wt_yield();
+#ifdef	HAVE_DIAGNOSTIC
+			++count;
+			if (count > WT_MILLION) {
+				__wt_epoch(session, &now);
+				if (WT_TIMEDIFF_SEC(now, begin) > 10) {
+					__wt_errx(session, "SLOT_CLOSE: Slot %"
+					PRIu32 " Timeout unbuffered, state 0x%"
+					PRIx64 " unbuffered %" PRIu64,
+					(uint32_t)(slot - &log->slot_pool[0]),
+					slot->slot_state,
+					slot->slot_unbuffered);
+					__log_slot_dump(session);
+					__wt_abort(session);
+				}
+				count = 0;
+			}
+#endif
+		}
+	}
 
 	end_offset =
 	    WT_LOG_SLOT_JOINED_BUFFERED(old_state) + slot->slot_unbuffered;
@@ -118,107 +195,21 @@ retry:
 }
 
 /*
- * __log_slot_switch_internal --
- *	Switch out the current slot and set up a new one.
- */
-static int
-__log_slot_switch_internal(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced)
-{
-	WT_DECL_RET;
-	WT_LOG *log;
-	WT_LOGSLOT *slot;
-	bool free_slot, release;
-
-	log = S2C(session)->log;
-	release = false;
-	slot = myslot->slot;
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-
-	/*
-	 * If someone else raced us to closing this specific slot, we're
-	 * done here.
-	 */
-	if (slot != log->active_slot)
-		return (0);
-
-	/*
-	 * We may come through here multiple times if we were able to close
-	 * a slot but could not set up a new one.  If we closed it already,
-	 * don't try to do it again but still set up the new slot.
-	 */
-	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
-		ret = __log_slot_close(session, slot, &release, forced);
-		/*
-		 * If close returns WT_NOTFOUND it means that someone else
-		 * is processing the slot change.
-		 */
-		if (ret == WT_NOTFOUND)
-			return (0);
-		WT_RET(ret);
-		if (release) {
-			WT_RET(__wt_log_release(session, slot, &free_slot));
-			if (free_slot)
-				__wt_log_slot_free(session, slot);
-		}
-	}
-	/*
-	 * Set that we have closed this slot because we may call in here
-	 * multiple times if we retry creating a new slot.
-	 */
-	F_SET(myslot, WT_MYSLOT_CLOSE);
-	WT_RET(__wt_log_slot_new(session));
-	F_CLR(myslot, WT_MYSLOT_CLOSE);
-	return (0);
-}
-
-/*
- * __wt_log_slot_switch --
- *	Switch out the current slot and set up a new one.
- */
-int
-__wt_log_slot_switch(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool retry, bool forced)
-{
-	WT_DECL_RET;
-	WT_LOG *log;
-
-	log = S2C(session)->log;
-	/*
-	 * !!! Since the WT_WITH_SLOT_LOCK macro is a do-while loop, the
-	 * compiler does not like it combined directly with the while loop
-	 * here.
-	 *
-	 * The loop conditional is a bit complex.  We have to retry if we
-	 * closed the slot but were unable to set up a new slot.  In that
-	 * case the flag indicating we have closed the slot will still be set.
-	 * We have to retry in that case regardless of the retry setting
-	 * because we are responsible for setting up the new slot.
-	 */
-	do {
-		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __log_slot_switch_internal(session, myslot, forced));
-		if (ret == EBUSY) {
-			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
-			__wt_yield();
-		}
-	} while (F_ISSET(myslot, WT_MYSLOT_CLOSE) || (retry && ret == EBUSY));
-	return (ret);
-}
-
-/*
- * __wt_log_slot_new --
+ * __log_slot_new --
  *	Find a free slot and switch it as the new active slot.
  *	Must be called holding the slot lock.
  */
-int
-__wt_log_slot_new(WT_SESSION_IMPL *session)
+static int
+__log_slot_new(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int32_t i;
+	int32_t i, pool_i;
+#ifdef	HAVE_DIAGNOSTIC
+	struct timespec begin, now;
+	int count;
+#endif
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
@@ -232,16 +223,22 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 	    WT_LOG_SLOT_OPEN(slot->slot_state))
 		return (0);
 
+#ifdef	HAVE_DIAGNOSTIC
+	count = 0;
+	__wt_epoch(session, &begin);
+#endif
 	/*
 	 * Keep trying until we can find a free slot.
 	 */
 	for (;;) {
 		/*
-		 * For now just restart at 0.  We could use log->pool_index
-		 * if that is inefficient.
+		 * Rotate among the slots to lessen collisions.
 		 */
-		for (i = 0; i < WT_SLOT_POOL; i++) {
-			slot = &log->slot_pool[i];
+		for (i = 0, pool_i = log->pool_index; i < WT_SLOT_POOL;
+		    i++, pool_i++) {
+			if (pool_i >= WT_SLOT_POOL)
+				pool_i = 0;
+			slot = &log->slot_pool[pool_i];
 			if (slot->slot_state == WT_LOG_SLOT_FREE) {
 				/*
 				 * Acquire our starting position in the
@@ -256,16 +253,147 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 				WT_STAT_CONN_INCR(session,
 				    log_slot_transitions);
 				log->active_slot = slot;
+				log->pool_index = pool_i;
 				return (0);
 			}
 		}
 		/*
 		 * If we didn't find any free slots signal the worker thread.
 		 */
-		__wt_cond_auto_signal(session, conn->log_wrlsn_cond);
+		WT_STAT_CONN_INCR(session, log_slot_no_free_slots);
+		__wt_cond_signal(session, conn->log_wrlsn_cond);
 		__wt_yield();
+#ifdef	HAVE_DIAGNOSTIC
+		++count;
+		if (count > WT_MILLION) {
+			__wt_epoch(session, &now);
+			if (WT_TIMEDIFF_SEC(now, begin) > 10) {
+				__wt_errx(session,
+				    "SLOT_NEW: Timeout free slot");
+				__log_slot_dump(session);
+				__wt_abort(session);
+			}
+			count = 0;
+		}
+#endif
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __log_slot_switch_internal --
+ *	Switch out the current slot and set up a new one.
+ */
+static int
+__log_slot_switch_internal(
+    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced, bool *did_work)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	bool free_slot, release;
+	uint32_t joined;
+
+	log = S2C(session)->log;
+	release = false;
+	slot = myslot->slot;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+
+	/*
+	 * If someone else raced us to closing this specific slot, we're
+	 * done here.
+	 */
+	if (slot != log->active_slot)
+		return (0);
+	/*
+	 * If the current active slot is unused and this is a forced switch,
+	 * we're done.  If this is a non-forced switch we always switch
+	 * because the slot could be part of an unbuffered operation.
+	 */
+	joined = WT_LOG_SLOT_JOINED(slot->slot_state);
+	if (joined == 0 && forced) {
+		WT_STAT_CONN_INCR(session, log_force_write_skip);
+		if (did_work != NULL)
+			*did_work = false;
+		return (0);
+	}
+	WT_RET(WT_SESSION_CHECK_PANIC(session));
+
+	/*
+	 * We may come through here multiple times if we were not able to
+	 * set up a new one.  If we closed it already,
+	 * don't try to do it again but still set up the new slot.
+	 */
+	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
+		ret = __log_slot_close(session, slot, &release, forced);
+		/*
+		 * If close returns WT_NOTFOUND it means that someone else
+		 * is processing the slot change.
+		 */
+		if (ret == WT_NOTFOUND)
+			return (0);
+		WT_RET(ret);
+		/*
+		 * Set that we have closed this slot because we may call in here
+		 * multiple times if we retry creating a new slot.  Similarly
+		 * set retain whether this slot needs releasing so that we don't
+		 * lose that information if we retry.
+		 */
+		F_SET(myslot, WT_MYSLOT_CLOSE);
+		if (release)
+			F_SET(myslot, WT_MYSLOT_NEEDS_RELEASE);
+	}
+	/*
+	 * Now that the slot is closed, set up a new one so that joining
+	 * threads don't have to wait on writing the previous slot if we
+	 * release it.  Release after setting a new one.
+	 */
+	WT_RET(__log_slot_new(session));
+	F_CLR(myslot, WT_MYSLOT_CLOSE);
+	if (F_ISSET(myslot, WT_MYSLOT_NEEDS_RELEASE)) {
+		WT_RET(__wt_log_release(session, slot, &free_slot));
+		F_CLR(myslot, WT_MYSLOT_NEEDS_RELEASE);
+		if (free_slot)
+			__wt_log_slot_free(session, slot);
+	}
+	return (ret);
+}
+
+/*
+ * __wt_log_slot_switch --
+ *	Switch out the current slot and set up a new one.
+ */
+int
+__wt_log_slot_switch(WT_SESSION_IMPL *session,
+    WT_MYSLOT *myslot, bool retry, bool forced, bool *did_work)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+
+	log = S2C(session)->log;
+
+	/*
+	 * !!! Since the WT_WITH_SLOT_LOCK macro is a do-while loop, the
+	 * compiler does not like it combined directly with the while loop
+	 * here.
+	 *
+	 * The loop conditional is a bit complex.  We have to retry if we
+	 * closed the slot but were unable to set up a new slot.  In that
+	 * case the flag indicating we have closed the slot will still be set.
+	 * We have to retry in that case regardless of the retry setting
+	 * because we are responsible for setting up the new slot.
+	 */
+	do {
+		WT_WITH_SLOT_LOCK(session, log,
+		    ret = __log_slot_switch_internal(
+		    session, myslot, forced, did_work));
+		if (ret == EBUSY) {
+			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
+			__wt_yield();
+		}
+	} while (F_ISSET(myslot, WT_MYSLOT_CLOSE) || (retry && ret == EBUSY));
+	return (ret);
 }
 
 /*
@@ -311,10 +439,13 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	/*
 	 * We cannot initialize the release LSN in the activate function
 	 * because that function can be called after a log file switch.
+	 * The release LSN is usually the same as the slot_start_lsn except
+	 * around a log file switch.
 	 */
 	slot->slot_release_lsn = log->alloc_lsn;
 	__wt_log_slot_activate(session, slot);
 	log->active_slot = slot;
+	log->pool_index = 0;
 
 	if (0) {
 err:		while (--i >= 0)
@@ -361,7 +492,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
  * __wt_log_slot_join --
  *	Join a consolidated logging slot.
  */
-void
+int
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
     uint32_t flags, WT_MYSLOT *myslot)
 {
@@ -370,66 +501,76 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_LOGSLOT *slot;
 	int64_t flag_state, new_state, old_state, released;
 	int32_t join_offset, new_join;
-#ifdef	HAVE_DIAGNOSTIC
-	bool unbuf_force;
-#endif
+	bool unbuffered, yld;
 
 	conn = S2C(session);
 	log = conn->log;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+	WT_ASSERT(session, mysize != 0);
 
 	/*
 	 * There should almost always be a slot open.
 	 */
+	unbuffered = false;
 #ifdef	HAVE_DIAGNOSTIC
-	unbuf_force = (++log->write_calls % WT_THOUSAND) == 0;
+	yld = (++log->write_calls % 7) == 0;
+	if ((log->write_calls % WT_THOUSAND) == 0 ||
+	    mysize > WT_LOG_SLOT_BUF_MAX) {
+#else
+	yld = false;
+	if (mysize > WT_LOG_SLOT_BUF_MAX) {
 #endif
+		unbuffered = true;
+		F_SET(myslot, WT_MYSLOT_UNBUFFERED);
+	}
 	for (;;) {
 		WT_BARRIER();
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		slot = log->active_slot;
 		old_state = slot->slot_state;
-		/*
-		 * Try to join our size into the existing size and
-		 * atomically write it back into the state.
-		 */
-		flag_state = WT_LOG_SLOT_FLAGS(old_state);
-		released = WT_LOG_SLOT_RELEASED(old_state);
-		join_offset = WT_LOG_SLOT_JOINED(old_state);
-#ifdef	HAVE_DIAGNOSTIC
-		if (unbuf_force || mysize > WT_LOG_SLOT_BUF_MAX) {
-#else
-		if (mysize > WT_LOG_SLOT_BUF_MAX) {
-#endif
-			new_join = join_offset + WT_LOG_SLOT_UNBUFFERED;
-			F_SET(myslot, WT_MYSLOT_UNBUFFERED);
-			myslot->slot = slot;
-		} else
-			new_join = join_offset + (int32_t)mysize;
-		new_state = (int64_t)WT_LOG_SLOT_JOIN_REL(
-		    (int64_t)new_join, (int64_t)released, (int64_t)flag_state);
+		if (WT_LOG_SLOT_OPEN(old_state)) {
+			/*
+			 * Try to join our size into the existing size and
+			 * atomically write it back into the state.
+			 */
+			flag_state = WT_LOG_SLOT_FLAGS(old_state);
+			released = WT_LOG_SLOT_RELEASED(old_state);
+			join_offset = WT_LOG_SLOT_JOINED(old_state);
+			if (unbuffered)
+				new_join = join_offset + WT_LOG_SLOT_UNBUFFERED;
+			else
+				new_join = join_offset + (int32_t)mysize;
+			new_state = (int64_t)WT_LOG_SLOT_JOIN_REL(
+			    (int64_t)new_join, (int64_t)released,
+			    (int64_t)flag_state);
 
-		/*
-		 * Check if the slot is open for joining and we are able to
-		 * swap in our size into the state.
-		 */
-		if (WT_LOG_SLOT_OPEN(old_state) &&
-		    __wt_atomic_casiv64(
-		    &slot->slot_state, old_state, new_state))
-			break;
+			/*
+			 * Braces used due to potential empty body warning.
+			 */
+			if (yld) {
+				WT_DIAGNOSTIC_YIELD;
+			}
+			/*
+			 * Attempt to swap our size into the state.
+			 */
+			if (__wt_atomic_casiv64(
+			    &slot->slot_state, old_state, new_state))
+				break;
+			WT_STAT_CONN_INCR(session, log_slot_races);
+		} else
+			WT_STAT_CONN_INCR(session, log_slot_active_closed);
 		/*
 		 * The slot is no longer open or we lost the race to
 		 * update it.  Yield and try again.
 		 */
-		WT_STAT_CONN_INCR(session, log_slot_races);
 		__wt_yield();
 	}
 	/*
 	 * We joined this slot.  Fill in our information to return to
 	 * the caller.
 	 */
-	if (mysize != 0)
-		WT_STAT_CONN_INCR(session, log_slot_joins);
+	WT_STAT_CONN_INCR(session, log_slot_joins);
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
 		F_SET(slot, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FLUSH))
@@ -444,6 +585,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	myslot->slot = slot;
 	myslot->offset = join_offset;
 	myslot->end_offset = (wt_off_t)((uint64_t)join_offset + mysize);
+	return (0);
 }
 
 /*
@@ -459,7 +601,6 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 	wt_off_t cur_offset, my_start;
 	int64_t my_size, rel_size;
 
-	WT_UNUSED(session);
 	slot = myslot->slot;
 	my_start = slot->slot_start_offset + myslot->offset;
 	/*
@@ -468,6 +609,7 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 	 * was written rather than the beginning record of the slot.
 	 */
 	while ((cur_offset = slot->slot_last_offset) < my_start) {
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		/*
 		 * Set our offset if we are larger.
 		 */

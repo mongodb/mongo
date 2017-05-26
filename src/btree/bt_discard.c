@@ -16,13 +16,14 @@ static void __free_skip_array(
 		WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t, bool);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *, bool);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t, bool);
+static void __page_out_int(WT_SESSION_IMPL *, WT_PAGE **, bool);
 
 /*
- * __wt_ref_out --
+ * __wt_ref_out_int --
  *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_ref_out_int(WT_SESSION_IMPL *session, WT_REF *ref, bool rewrite)
 {
 	/*
 	 * A version of the page-out function that allows us to make additional
@@ -56,15 +57,25 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 	}
 #endif
 
-	__wt_page_out(session, &ref->page);
+	__page_out_int(session, &ref->page, rewrite);
 }
 
 /*
- * __wt_page_out --
+ * __wt_ref_out --
  *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
+__wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	__wt_ref_out_int(session, ref, false);
+}
+
+/*
+ * __page_out_int --
+ *	Discard an in-memory page, freeing all memory associated with it.
+ */
+static void
+__page_out_int(WT_SESSION_IMPL *session, WT_PAGE **pagep, bool rewrite)
 {
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
@@ -103,7 +114,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	}
 
 	/* Update the cache's information. */
-	__wt_cache_page_evict(session, page);
+	__wt_cache_page_evict(session, page, rewrite);
 
 	dsk = (WT_PAGE_HEADER *)page->dsk;
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
@@ -145,6 +156,16 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 		__wt_overwrite_and_free_len(session, dsk, dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
+}
+
+/*
+ * __wt_page_out --
+ *	Discard an in-memory page, freeing all memory associated with it.
+ */
+void
+__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
+{
+	__page_out_int(session, pagep, false);
 }
 
 /*
@@ -206,8 +227,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (mod->mod_col_update != NULL)
 			__free_skip_array(session, mod->mod_col_update,
 			    page->type ==
-			    WT_PAGE_COL_FIX ? 1 : page->pg_var_entries,
-			    update_ignore);
+			    WT_PAGE_COL_FIX ? 1 : page->entries, update_ignore);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -219,12 +239,12 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (mod->mod_row_insert != NULL)
 			__free_skip_array(session, mod->mod_row_insert,
-			    page->pg_row_entries + 1, update_ignore);
+			    page->entries + 1, update_ignore);
 
 		/* Free the update array. */
 		if (mod->mod_row_update != NULL)
 			__free_update(session, mod->mod_row_update,
-			    page->pg_row_entries, update_ignore);
+			    page->entries, update_ignore);
 		break;
 	}
 
@@ -332,7 +352,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the RLE lookup array. */
-	__wt_free(session, page->pg_var_repeats);
+	__wt_free(session, page->u.col_var.repeats);
 }
 
 /*

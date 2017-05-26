@@ -134,5 +134,5 @@ __wt_curstat_cache_walk(WT_SESSION_IMPL *session)
 	WT_STAT_DATA_SET(session,
 	    cache_state_root_size, btree->root.page->memory_footprint);
 
-	WT_WITH_HANDLE_LIST_LOCK(session, __evict_stat_walk(session));
+	__evict_stat_walk(session);
 }

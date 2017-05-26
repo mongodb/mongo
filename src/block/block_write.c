@@ -43,10 +43,10 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
 	 * more targeted solution at some point.
 	 */
 	if (!conn->hot_backup) {
-		__wt_readlock(session, conn->hot_backup_lock);
+		__wt_readlock(session, &conn->hot_backup_lock);
 		if (!conn->hot_backup)
 			ret = __wt_ftruncate(session, block->fh, len);
-		__wt_readunlock(session, conn->hot_backup_lock);
+		__wt_readunlock(session, &conn->hot_backup_lock);
 	}
 
 	/*

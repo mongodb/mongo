@@ -52,8 +52,6 @@ struct __wt_session_impl {
 	const char *lastop;		/* Last operation */
 	uint32_t id;			/* UID, offset in session array */
 
-	WT_CONDVAR *cond;		/* Condition variable */
-
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
@@ -69,7 +67,6 @@ struct __wt_session_impl {
 	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 	time_t last_sweep;		/* Last sweep for dead handles */
 
-	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
@@ -90,7 +87,7 @@ struct __wt_session_impl {
 	void	  *meta_track_sub;	/* Child transaction / save point */
 	size_t	   meta_track_alloc;	/* Currently allocated */
 	int	   meta_track_nest;	/* Nesting level of meta transaction */
-#define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
+#define	WT_META_TRACKING(session)	((session)->meta_track_next != NULL)
 
 	/*
 	 * Each session keeps a cache of table handles. The set of handles
@@ -153,20 +150,16 @@ struct __wt_session_impl {
 	uint32_t flags;
 
 	/*
-	 * The split stash memory and hazard information persist past session
-	 * close because they are accessed by threads of control other than the
-	 * thread owning the session.
-	 *
-	 * The random number state persists past session close because we don't
-	 * want to repeatedly allocate repeated values for skiplist depth if the
-	 * application isn't caching sessions.
-	 *
-	 * All of these fields live at the end of the structure so it's easier
-	 * to clear everything but the fields that persist.
+	 * All of the following fields live at the end of the structure so it's
+	 * easier to clear everything but the fields that persist.
 	 */
-#define	WT_SESSION_CLEAR_SIZE(s)					\
-	(WT_PTRDIFF(&(s)->rnd, s))
+#define	WT_SESSION_CLEAR_SIZE	(offsetof(WT_SESSION_IMPL, rnd))
 
+	/*
+	 * The random number state persists past session close because we don't
+	 * want to repeatedly use the same values for skiplist depth when the
+	 * application isn't caching sessions.
+	 */
 	WT_RAND_STATE rnd;		/* Random number generation state */
 
 					/* Hashed handle reference list array */
@@ -175,6 +168,9 @@ struct __wt_session_impl {
 	TAILQ_HEAD(__tables_hash, __wt_table) *tablehash;
 
 	/*
+	 * Split stash memory persists past session close because it's accessed
+	 * by threads of control other than the thread owning the session.
+	 *
 	 * Splits can "free" memory that may still be in use, and we use a
 	 * split generation number to track it, that is, the session stores a
 	 * reference to the memory and allocates a split generation; when no
@@ -193,6 +189,9 @@ struct __wt_session_impl {
 
 	/*
 	 * Hazard pointers.
+	 *
+	 * Hazard information persists past session close because it's accessed
+	 * by threads of control other than the thread owning the session.
 	 *
 	 * Use the non-NULL state of the hazard field to know if the session has
 	 * previously been initialized.

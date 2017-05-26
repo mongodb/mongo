@@ -15,9 +15,9 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
 	int ch;
-	const char *config, *uri;
+	char *config, *uri;
 
-	config = NULL;
+	config = uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "c:")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line configuration */
@@ -35,12 +35,14 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((uri = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
 	if ((ret = session->create(session, uri, config)) != 0)
-		return (util_err(session, ret, "%s: session.create", uri));
-	return (0);
+		(void)util_err(session, ret, "session.create: %s", uri);
+
+	free(uri);
+	return (ret);
 }
 
 static int
