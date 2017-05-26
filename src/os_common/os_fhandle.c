@@ -285,7 +285,7 @@ err:		if (open_called)
  *	Final close of a handle.
  */
 static int
-__handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
+__handle_close(WT_SESSION_IMPL *session, WT_FH *fh, bool locked)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -304,7 +304,8 @@ __handle_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	WT_FILE_HANDLE_REMOVE(conn, fh, bucket);
 	(void)__wt_atomic_sub32(&conn->open_file_count, 1);
 
-	__wt_spin_unlock(session, &conn->fh_lock);
+	if (locked)
+		__wt_spin_unlock(session, &conn->fh_lock);
 
 	/* Discard underlying resources. */
 	WT_TRET(fh->handle->close(fh->handle, (WT_SESSION *)session));
@@ -348,7 +349,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 		return (0);
 	}
 
-	return (__handle_close(session, fh));
+	return (__handle_close(session, fh, true));
 }
 
 /*
@@ -362,7 +363,7 @@ __wt_close_connection_close(WT_SESSION_IMPL *session)
 	WT_FH *fh, *fh_tmp;
 
 	WT_TAILQ_SAFE_REMOVE_BEGIN(fh, &S2C(session)->fhqh, q, fh_tmp) {
-		WT_TRET(__handle_close(session, fh));
+		WT_TRET(__handle_close(session, fh, false));
 	} WT_TAILQ_SAFE_REMOVE_END
 	return (ret);
 }
