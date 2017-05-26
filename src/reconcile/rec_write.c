@@ -48,8 +48,9 @@ typedef struct {
 	/* Track the page's maximum transaction ID. */
 	uint64_t max_txn;
 
-	uint64_t update_mem;		/* Total update memory */
-	uint64_t update_mem_skipped;	/* Skipped update memory */
+	uint64_t update_mem_all;	/* Total update memory size */
+	uint64_t update_mem_saved;	/* Saved update memory size */
+	uint64_t update_mem_uncommitted;/* Uncommitted update memory size */
 
 	/*
 	 * When we can't mark the page clean (for example, checkpoint found some
@@ -452,7 +453,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * that's worth trying. The lookaside table doesn't help if we skipped
 	 * updates, it can only help with older readers preventing eviction.
 	 */
-	if (lookaside_retryp != NULL && r->update_mem_skipped == 0)
+	if (lookaside_retryp != NULL && r->update_mem_uncommitted == 0)
 		*lookaside_retryp = true;
 
 	/* Update statistics. */
@@ -561,9 +562,6 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static int
 __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	WT_BOUNDARY *bnd;
-	size_t i;
-
 	/*
 	 * Tests in this function are lookaside tests and tests to decide if
 	 * rewriting a page in memory is worth doing. In-memory configurations
@@ -582,31 +580,16 @@ __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		return (EBUSY);
 
 	/*
-	 * If doing update/restore based eviction, see if rewriting the page in
-	 * memory is worth the effort.
+	 * If when doing update/restore based eviction, we didn't split and
+	 * didn't apply any updates, then give up.
+	 *
+	 * This may lead to saving the page to the lookaside table: that
+	 * decision is made by eviction.
 	 */
-	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
-		/* If discarding a disk-page size chunk, do it. */
-		for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
-			if (bnd->supd == NULL)
-				return (0);
+	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && r->bnd_next == 1 &&
+	    r->update_mem_all != 0 && r->update_mem_all == r->update_mem_saved)
+		return (EBUSY);
 
-		/*
-		 * Switch to the lookaside table if we can: it's more effective
-		 * than rewriting a page in memory because it implies eviction.
-		 */
-		if (r->update_mem_skipped == 0)
-			return (EBUSY);
-
-		/*
-		 * Don't rewrite pages where we're not going to get back enough
-		 * memory to care. There's no empirical evidence the 2KB limit
-		 * is a good configuration, but it should keep us from wasting
-		 * time on tiny pages and pages with only a few updates.
-		 */
-		if (r->update_mem - r->update_mem_skipped < 2 * WT_KILOBYTE)
-			return (EBUSY);
-	}
 	return (0);
 }
 
@@ -910,7 +893,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->max_txn = WT_TXN_NONE;
 
 	/* Track if all updates were skipped. */
-	r->update_mem = r->update_mem_skipped = 0;
+	r->update_mem_all = r->update_mem_saved = r->update_mem_uncommitted = 0;
 
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = false;
@@ -1230,6 +1213,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_ASSERT(session,
 	    *updp == NULL || (*updp)->type != WT_UPDATE_RESERVED);
 
+	r->update_mem_all += update_mem;
+
 	/*
 	 * If all of the updates were aborted, quit. This test is not strictly
 	 * necessary because the above loop exits with skipped not set and the
@@ -1331,9 +1316,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * recover. That test is comparing the memory we'd recover to the memory
 	 * we'd have to re-instantiate as part of the rewrite.
 	 */
-	r->update_mem += update_mem;
+	r->update_mem_saved += update_mem;
 	if (skipped)
-		r->update_mem_skipped += update_mem;
+		r->update_mem_uncommitted += update_mem;
 
 	append_origv = false;
 	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
