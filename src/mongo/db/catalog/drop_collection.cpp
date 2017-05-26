@@ -47,9 +47,18 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/log.h"
 
-mongo::Status mongo::dropCollection(OperationContext* opCtx,
-                                    const NamespaceString& collectionName,
-                                    BSONObjBuilder& result) {
+namespace mongo {
+
+Status dropCollection(OperationContext* opCtx,
+                      const NamespaceString& collectionName,
+                      BSONObjBuilder& result) {
+    return dropCollection(opCtx, collectionName, result, {});
+}
+
+Status dropCollection(OperationContext* opCtx,
+                      const NamespaceString& collectionName,
+                      BSONObjBuilder& result,
+                      const repl::OpTime& dropOpTime) {
     if (!serverGlobalParams.quiet.load()) {
         log() << "CMD: drop " << collectionName;
     }
@@ -88,7 +97,7 @@ mongo::Status mongo::dropCollection(OperationContext* opCtx,
 
             BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
-            Status s = db->dropCollection(opCtx, collectionName.ns());
+            Status s = db->dropCollection(opCtx, collectionName.ns(), dropOpTime);
 
             if (!s.isOK()) {
                 return s;
@@ -108,3 +117,5 @@ mongo::Status mongo::dropCollection(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+}  // namespace mongo

@@ -33,11 +33,23 @@ class BSONObjBuilder;
 class NamespaceString;
 class OperationContext;
 
+namespace repl {
+class OpTime;
+}  // namespace repl
+
 /**
  * Drops the collection "collectionName" and populates "result" with statistics about what
  * was removed.
+ *
+ * If we are applying an oplog entry for a collection drop on a secondary, 'dropOpTime' is set
+ * to the optime in the oplog entry.
  */
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result);
+Status dropCollection(OperationContext* opCtx,
+                      const NamespaceString& collectionName,
+                      BSONObjBuilder& result,
+                      const repl::OpTime& dropOpTime);
+
 }  // namespace mongo
