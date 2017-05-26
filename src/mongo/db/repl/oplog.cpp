@@ -549,7 +549,8 @@ NamespaceString parseNs(const string& ns, const BSONObj& cmdObj) {
     return NamespaceString(NamespaceString(ns).db().toString(), coll);
 }
 
-using OpApplyFn = stdx::function<Status(OperationContext*, const char*, BSONObj&)>;
+using OpApplyFn = stdx::function<Status(
+    OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime)>;
 
 struct ApplyOpMetadata {
     OpApplyFn applyFunc;
@@ -567,7 +568,7 @@ struct ApplyOpMetadata {
 
 std::map<std::string, ApplyOpMetadata> opsMap = {
     {"create",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           const NamespaceString nss(parseNs(ns, cmd));
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
@@ -587,18 +588,18 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
       },
       {ErrorCodes::NamespaceExists}}},
     {"collMod",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return collMod(opCtx, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dropDatabase",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           return dropDatabase(opCtx, NamespaceString(ns).db().toString());
       },
       {ErrorCodes::NamespaceNotFound}}},
     {"drop",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropCollection(opCtx, parseNs(ns, cmd), resultWeDontCareAbout);
       },
@@ -607,31 +608,31 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IllegalOperation}}},
     // deleteIndex(es) is deprecated but still works as of April 10, 2015
     {"deleteIndex",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           const auto sourceNsElt = cmd.firstElement();
           const auto targetNsElt = cmd["to"];
           uassert(ErrorCodes::TypeMismatch,
@@ -648,15 +649,17 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"applyOps",
-     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return applyOps(opCtx, nsToDatabase(ns), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::UnknownError}}},
-    {"convertToCapped", {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+    {"convertToCapped",
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
          return convertToCapped(opCtx, parseNs(ns, cmd), cmd["size"].number());
      }}},
-    {"emptycapped", {[](OperationContext* opCtx, const char* ns, BSONObj& cmd) -> Status {
+    {"emptycapped",
+     {[](OperationContext* opCtx, const char* ns, BSONObj& cmd, const OpTime& opTime) -> Status {
          return emptyCapped(opCtx, parseNs(ns, cmd));
      }}},
 };
@@ -1039,6 +1042,16 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // perform the current DB checks after reacquiring the lock.
     invariant(opCtx->lockState()->isW());
 
+    // Parse optime from oplog entry unless we are applying this command in standalone or on a
+    // primary (replicated writes enabled).
+    OpTime opTime;
+    if (!opCtx->writesAreReplicated()) {
+        auto opTimeResult = OpTime::parseFromOplogEntry(op);
+        if (opTimeResult.isOK()) {
+            opTime = opTimeResult.getValue();
+        }
+    }
+
     bool done = false;
 
     while (!done) {
@@ -1051,7 +1064,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         ApplyOpMetadata curOpToApply = op->second;
         Status status = Status::OK();
         try {
-            status = curOpToApply.applyFunc(opCtx, nss.ns().c_str(), o);
+            status = curOpToApply.applyFunc(opCtx, nss.ns().c_str(), o, opTime);
         } catch (...) {
             status = exceptionToStatus();
         }
