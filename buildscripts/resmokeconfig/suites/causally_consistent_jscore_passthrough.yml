@@ -130,12 +130,28 @@ executor:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+          tracking: 0
     mongod_options:
       bind_ip_all: ''
       nopreallocj: ''
       enableMajorityReadConcern: ''
       set_parameters:
         enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+          replication:
+            heartbeats: 2
+          tracking: 0
         numInitialSyncAttempts: 1
     num_rs_nodes_per_shard: 2
     enable_sharding:
