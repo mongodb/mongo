@@ -287,7 +287,12 @@ class TestReport(unittest.TestResult):
                 if convert_failures:
                     if status == "error" or status == "fail":
                         # Don't distinguish between failures and errors.
-                        status = _config.REPORT_FAILURE_STATUS
+                        if test_info.dynamic:
+                            # Dynamic tests are used for data consistency checks, so the failures
+                            # are not silenced.
+                            status = "fail"
+                        else:
+                            status = _config.REPORT_FAILURE_STATUS
                     elif status == "timeout":
                         # Until EVG-1536 is completed, we shouldn't distinguish between failures and
                         # interrupted tests in the report.json file. In Evergreen, the behavior to

@@ -171,8 +171,8 @@ def parse_command_line():
                       dest="report_failure_status", choices=("fail", "silentfail"),
                       metavar="STATUS",
                       help="Controls if the test failure status should be reported as failed"
-                           " or be silently ignored (STATUS=silentfail). Defaults to"
-                           " STATUS=%default.")
+                           " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
+                           " never be silently ignored. Defaults to STATUS=%default.")
 
     parser.add_option("--reportFile", dest="report_file", metavar="REPORT",
                       help="Write a JSON file with test status and timing information.")
