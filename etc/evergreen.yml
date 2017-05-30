@@ -5798,7 +5798,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel62-small
+  - rhel62-large
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
@@ -5807,7 +5807,7 @@ buildvariants:
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
     # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
     # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
@@ -5819,11 +5819,7 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
-    distros:
-    - rhel62-large
   - name: compile_all
-    distros:
-    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -5839,29 +5835,13 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: concurrency
-    distros:
-    - rhel62-large
   - name: concurrency_WT
-    distros:
-    - rhel62-large
   - name: concurrency_replication
-    distros:
-    - rhel62-large
   - name: concurrency_replication_WT
-    distros:
-    - rhel62-large
   - name: concurrency_sharded
-    distros:
-    - rhel62-large
   - name: concurrency_sharded_WT
-    distros:
-    - rhel62-large
   - name: concurrency_simultaneous
-    distros:
-    - rhel62-large
   - name: concurrency_simultaneous_WT
-    distros:
-    - rhel62-large
   - name: dbtest
   - name: dbtest_WT
   - name: disk
@@ -5908,60 +5888,26 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_linearizable_passthrough
-    distros:
-    - rhel62-large
   - name: read_concern_linearizable_passthrough_WT
-    distros:
-    - rhel62-large
   - name: read_concern_majority_passthrough_WT
-    distros:
-    - rhel62-large
   - name: read_only
   - name: read_only_WT
   - name: read_only_sharded
   - name: read_only_sharded_WT
   - name: replica_sets
-    distros:
-    - rhel62-large
   - name: replica_sets_WT
-    distros:
-    - rhel62-large
   - name: replica_sets_WT_ese
-    distros:
-    - rhel62-large
   - name: replica_sets_auth
-    distros:
-    - rhel62-large
   - name: replica_sets_pv0
-    distros:
-    - rhel62-large
   - name: replica_sets_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: replica_sets_jscore_passthrough_WT
-    distros:
-    - rhel62-large
   - name: replica_sets_initsync_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: replica_sets_initsync_jscore_passthrough_WT
-    distros:
-    - rhel62-large
   - name: replica_sets_initsync_static_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: replica_sets_initsync_static_jscore_passthrough_WT
-    distros:
-    - rhel62-large
   - name: replica_sets_resync_static_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: replica_sets_resync_static_jscore_passthrough_WT
-    distros:
-    - rhel62-large
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
-    distros:
-    - rhel62-large
   - name: master_slave
   - name: master_slave_WT
   - name: master_slave_auth
@@ -5971,20 +5917,10 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding
-    distros:
-    - rhel62-large
   - name: sharding_WT
-    distros:
-    - rhel62-large
   - name: sharding_WT_ese
-    distros:
-    - rhel62-large
   - name: sharding_auth
-    distros:
-    - rhel62-large
   - name: sharding_auth_audit_WT
-    distros:
-    - rhel62-large
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -5993,14 +5929,8 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_last_stable_mongos_and_mixed_shards
-    distros:
-    - rhel62-large
   - name: sharding_op_query_WT
-    distros:
-    - rhel62-large
   - name: sharding_csrs_continuous_config_stepdown_WT
-    distros:
-    - rhel62-large
   - name: slow1
   - name: slow1_WT
   - name: serial_run
