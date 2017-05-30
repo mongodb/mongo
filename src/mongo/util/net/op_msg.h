@@ -210,6 +210,13 @@ public:
         _openBuilder = false;
     }
 
+    /**
+     * Set to true in tests that need to be able to generate duplicate top-level fields to see how
+     * the server handles them. Is false by default, although the check only happens in debug
+     * builds.
+     */
+    static AtomicBool disableDupeFieldCheck_forTest;
+
 private:
     friend class DocSequenceBuilder;
 

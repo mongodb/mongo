@@ -36,6 +36,8 @@
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/op_msg.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace executor {
@@ -48,6 +50,9 @@ class UglyBSONFixture : public NetworkInterfaceASIOIntegrationFixture {
 };
 
 TEST_F(UglyBSONFixture, DuplicateFields) {
+    OpMsgBuilder::disableDupeFieldCheck_forTest.store(true);
+    ON_BLOCK_EXIT([] { OpMsgBuilder::disableDupeFieldCheck_forTest.store(false); });
+
     assertCommandFailsOnServer("admin",
                                BSON("insert"
                                     << "test"
