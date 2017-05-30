@@ -3722,24 +3722,20 @@ buildvariants:
 - name: linux-64-debug
   display_name: Linux DEBUG
   run_on:
-  - rhel62-small
+  - rhel62-large
   batchtime: 1440 # 1 day
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: x86_64
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
   - name: compile
-    distros:
-    - rhel62-large
   - name: compile_all
-    distros:
-    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3774,31 +3770,13 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: concurrency
-    # Some concurrency workloads require a lot of memory, so we use machines
-    # with more RAM for these suites.
-    distros:
-    - rhel62-large
   - name: concurrency_WT
-    distros:
-    - rhel62-large
   - name: concurrency_replication
-    distros:
-    - rhel62-large
   - name: concurrency_replication_WT
-    distros:
-    - rhel62-large
   - name: concurrency_sharded
-    distros:
-    - rhel62-large
   - name: concurrency_sharded_WT
-    distros:
-    - rhel62-large
   - name: concurrency_simultaneous
-    distros:
-    - rhel62-large
   - name: concurrency_simultaneous_WT
-    distros:
-    - rhel62-large
   - name: read_concern_linearizable_passthrough
   - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
