@@ -16,6 +16,9 @@ selector:
   - jstests/multiVersion/balancer_multiVersion_detect.js
   # TODO: SERVER-28104
   - jstests/multiVersion/minor_version_tags_new_old_new.js
+  # TODO: SERVER-30161
+  - jstests/multiVersion/dumprestore.js
+  - jstests/multiVersion/dumprestore_sharded.js
 
 # Multiversion tests start their own mongod's.
 executor:
@@ -27,8 +30,6 @@ executor:
           authMechanism: SCRAM-SHA-1
           keyFile: *keyFile
           keyFileData: *keyFileData
-          # See SERVER-30161
-          setParameters: "enableCollectionUUIDs=0"
 
       authenticationDatabase: local
       authenticationMechanism: SCRAM-SHA-1

@@ -34,6 +34,7 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/record_id.h"
@@ -410,6 +411,73 @@ void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* opCtx
     NamespaceDetailsRSV1MetaData md(ns().ns(), _details);
     md.replaceUserFlags(opCtx, newValue);
     _updateSystemNamespaces(opCtx, BSON("$set" << BSON("options.flags" << newValue)));
+}
+
+void NamespaceDetailsCollectionCatalogEntry::addUUID(OperationContext* opCtx,
+                                                     CollectionUUID uuid,
+                                                     Collection* coll) {
+    // Add a UUID to CollectionOptions if a UUID does not yet exist.
+    if (ns().coll() == "system.namespaces") {
+        return;
+    }
+    RecordData namespaceData;
+    invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
+
+    auto namespacesBson = namespaceData.releaseToBson();
+
+    if (namespacesBson["options"].isABSONObj() && !namespacesBson["options"].Obj()["uuid"].eoo()) {
+        fassert(40565, UUID::parse(namespacesBson["options"].Obj()["uuid"]).getValue() == uuid);
+    } else {
+        _updateSystemNamespaces(opCtx, BSON("$set" << BSON("options.uuid" << uuid)));
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        catalog.onCreateCollection(opCtx, coll, uuid);
+    }
+}
+
+void NamespaceDetailsCollectionCatalogEntry::removeUUID(OperationContext* opCtx) {
+    // Remove the UUID from CollectionOptions if a UUID exists.
+    if (ns().coll() == "system.namespaces") {
+        return;
+    }
+    RecordData namespaceData;
+    invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
+    auto namespacesBson = namespaceData.releaseToBson();
+    if (!namespacesBson["options"].isABSONObj()) {
+        return;
+    }
+    auto optionsObj = namespacesBson["options"].Obj();
+
+    if (!optionsObj["uuid"].eoo()) {
+        CollectionUUID uuid = UUID::parse(optionsObj["uuid"]).getValue();
+        _updateSystemNamespaces(opCtx,
+                                BSON("$unset" << BSON("options.uuid"
+                                                      << "")));
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        Collection* coll = catalog.lookupCollectionByUUID(uuid);
+        if (coll) {
+            catalog.onDropCollection(opCtx, uuid);
+        }
+    }
+}
+
+bool NamespaceDetailsCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
+                                                                   OptionalCollectionUUID uuid) {
+    if (ns().coll() != "system.namespaces") {
+        RecordData namespaceData;
+        invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
+
+        auto namespacesBson = namespaceData.releaseToBson();
+        if (uuid && namespacesBson["options"].isABSONObj()) {
+            auto optionsObj = namespacesBson["options"].Obj();
+            return !optionsObj["uuid"].eoo() &&
+                UUID::parse(optionsObj["uuid"]).getValue() == uuid.get();
+        } else {
+            return !uuid && (!namespacesBson["options"].isABSONObj() ||
+                             namespacesBson["options"].Obj()["uuid"].eoo());
+        }
+    } else {
+        return true;
+    }
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* opCtx,

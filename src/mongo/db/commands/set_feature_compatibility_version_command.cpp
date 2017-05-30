@@ -29,9 +29,19 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -82,14 +92,45 @@ public:
         return Status::OK();
     }
 
+    bool isFCVUpgrade(StringData version) {
+        const auto existingVersion = FeatureCompatibilityVersion::toString(
+            serverGlobalParams.featureCompatibility.version.load());
+        return version == FeatureCompatibilityVersionCommandParser::kVersion36 &&
+            existingVersion == FeatureCompatibilityVersionCommandParser::kVersion34;
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         const auto version = uassertStatusOK(
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
+        auto existingVersion = FeatureCompatibilityVersion::toString(
+                                   serverGlobalParams.featureCompatibility.version.load())
+                                   .toString();
+
+        // Wait for majority commit in case we're upgrading simultaneously with another session.
+        if (version == existingVersion) {
+            const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
+                                                   WriteConcernOptions::SyncMode::UNSET,
+                                                   /*timeout*/ INT_MAX);
+            repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(
+                opCtx, writeConcern);
+        }
+
+        if (version != existingVersion && isFCVUpgrade(version)) {
+            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(true);
+            updateUUIDSchemaVersion(opCtx, /*upgrade*/ true);
+            existingVersion = version;
+        }
 
         FeatureCompatibilityVersion::set(opCtx, version);
+
+        // If version and existingVersion are still not equal, we must be downgrading.
+        if (version != existingVersion) {
+            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(false);
+            updateUUIDSchemaVersion(opCtx, /*upgrade*/ false);
+        }
 
         return true;
     }

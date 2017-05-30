@@ -10,7 +10,3 @@ executor:
   config:
     shell_options:
       nodb: ''
-      global_vars:
-        TestData:
-          # See SERVER-30161
-          setParameters: "enableCollectionUUIDs=0"

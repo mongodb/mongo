@@ -337,7 +337,9 @@ TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionDoesNotExist) {
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsNonCapped) {
     createOplog(_opCtx.get());
-    auto coll = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
     _testRollbackDelete(
         _opCtx.get(), _coordinator, _replicationProcess.get(), coll->uuid().get(), BSONObj());
     ASSERT_EQUALS(
@@ -349,6 +351,7 @@ TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsNonCapped
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsCapped) {
     createOplog(_opCtx.get());
     CollectionOptions options;
+    options.uuid = UUID::gen();
     options.capped = true;
     auto coll = _createCollection(_opCtx.get(), "test.t", options);
     ASSERT_EQUALS(
@@ -359,7 +362,9 @@ TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsCapped) {
 
 TEST_F(RSRollbackTest, RollbackDeleteRestoreDocument) {
     createOplog(_opCtx.get());
-    auto coll = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
     BSONObj doc = BSON("_id" << 0 << "a" << 1);
     _testRollbackDelete(
         _opCtx.get(), _coordinator, _replicationProcess.get(), coll->uuid().get(), doc);
@@ -415,7 +420,9 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     createOplog(_opCtx.get());
-    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto collection = _createCollection(_opCtx.get(), "test.t", options);
     auto indexSpec = BSON("ns"
                           << "test.t"
                           << "key"
@@ -486,7 +493,9 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
 
 TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     createOplog(_opCtx.get());
-    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto collection = _createCollection(_opCtx.get(), "test.t", options);
     auto indexSpec = BSON("ns"
                           << "test.t"
                           << "key"
@@ -595,7 +604,9 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
 
 TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
     createOplog(_opCtx.get());
-    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto collection = _createCollection(_opCtx.get(), "test.t", options);
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
@@ -655,7 +666,9 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
 
 TEST_F(RSRollbackTest, RollbackDropIndexCommandWithMultipleIndexes) {
     createOplog(_opCtx.get());
-    auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto collection = _createCollection(_opCtx.get(), "test.t", options);
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
@@ -868,7 +881,9 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
 
     OpTime dropTime = OpTime(Timestamp(2, 0), 5);
     auto dpns = NamespaceString("test.t").makeDropPendingNamespace(dropTime);
-    auto coll = _createCollection(_opCtx.get(), dpns, CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), dpns, options);
     _dropPendingCollectionReaper->addDropPendingNamespace(dropTime, dpns);
 
     auto commonOperation =
@@ -922,7 +937,9 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
 
 TEST_F(RSRollbackTest, RollbackCollModCommandFailsIfRBIDChangesWhileSyncingCollectionMetadata) {
     createOplog(_opCtx.get());
-    auto coll = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -1025,12 +1042,14 @@ OpTime getOpTimeFromOplogEntry(const BSONObj& entry) {
 TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     createOplog(_opCtx.get());
     Collection* coll = nullptr;
+    CollectionOptions options;
+    options.uuid = UUID::gen();
     {
         AutoGetOrCreateDb autoDb(_opCtx.get(), "test", MODE_X);
         mongo::WriteUnitOfWork wuow(_opCtx.get());
         coll = autoDb.getDb()->getCollection(_opCtx.get(), "test.t");
         if (!coll) {
-            coll = autoDb.getDb()->createCollection(_opCtx.get(), "test.t");
+            coll = autoDb.getDb()->createCollection(_opCtx.get(), "test.t", options);
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
@@ -1140,7 +1159,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         mutable std::multiset<int> searchedIds;
     } rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
 
-    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    _createCollection(_opCtx.get(), "test.t", options);
     ASSERT_OK(syncRollback(_opCtx.get(),
                            OplogInterfaceMock({applyOpsOperation, commonOperation}),
                            rollbackSource,
@@ -1167,7 +1186,9 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
 
 TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
     createOplog(_opCtx.get());
-    auto coll = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -1201,7 +1222,9 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
 
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
     createOplog(_opCtx.get());
-    auto coll = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -1248,7 +1271,9 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
 
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOptions) {
     createOplog(_opCtx.get());
-    auto coll = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    auto coll = _createCollection(_opCtx.get(), "test.t", options);
 
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));

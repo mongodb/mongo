@@ -37,6 +37,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -259,13 +260,12 @@ void setCollectionOptionFlag(OperationContext* opCtx,
     invariant(newOptions.flagsSet);
 }
 
-}  // namespace
-}  // namespace mongo
-
-mongo::Status mongo::collMod(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const BSONObj& cmdObj,
-                             BSONObjBuilder* result) {
+Status _collModInternal(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const BSONObj& cmdObj,
+                        BSONObjBuilder* result,
+                        bool upgradeUUID,
+                        OptionalCollectionUUID uuid) {
     StringData dbName = nss.db();
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
@@ -389,6 +389,18 @@ mongo::Status mongo::collMod(OperationContext* opCtx,
     if (!cmr.noPadding.eoo())
         setCollectionOptionFlag(opCtx, coll, cmr.noPadding, result);
 
+    // Modify collection UUID if we are upgrading or downgrading. This is a no-op if we have
+    // already upgraded or downgraded.
+    if (upgradeUUID) {
+        if (uuid && !coll->uuid()) {
+            CollectionCatalogEntry* cce = coll->getCatalogEntry();
+            cce->addUUID(opCtx, uuid.get(), coll);
+        } else if (!uuid && coll->uuid()) {
+            CollectionCatalogEntry* cce = coll->getCatalogEntry();
+            cce->removeUUID(opCtx);
+        }
+        coll->refreshUUID(opCtx);
+    }
 
     // Only observe non-view collMods, as view operations are observed as operations on the
     // system.views collection.
@@ -399,3 +411,145 @@ mongo::Status mongo::collMod(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+void _updateDBSchemaVersion(OperationContext* opCtx,
+                            const std::string& dbname,
+                            bool needUUIDAdded) {
+    // Iterate through all collections of database dbname and make necessary UUID changes.
+    std::vector<NamespaceString> collNamespaceStrings;
+    {
+        AutoGetDb autoDb(opCtx, dbname, MODE_X);
+        Database* const db = autoDb.getDb();
+        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
+            Collection* coll = *collectionIt;
+            collNamespaceStrings.push_back(coll->ns());
+        }
+    }
+    for (auto& collNSS : collNamespaceStrings) {
+        // Skip system.namespaces until SERVER-30095 is addressed.
+        if (collNSS.coll() == "system.namespaces") {
+            continue;
+        }
+        // Skip all non-replicated collections.
+        if (collNSS.db() == "local" || collNSS.coll() == "system.profile") {
+            continue;
+        }
+        AutoGetDb autoDb(opCtx, dbname, MODE_X);
+        Database* const db = autoDb.getDb();
+        Collection* coll = db->getCollection(opCtx, collNSS);
+        BSONObjBuilder collModObjBuilder;
+        collModObjBuilder.append("collMod", coll->ns().coll());
+        BSONObj collModObj = collModObjBuilder.done();
+        OptionalCollectionUUID uuid = boost::none;
+        if (needUUIDAdded) {
+            uuid = UUID::gen();
+        }
+        if ((needUUIDAdded && !coll->uuid()) || (!needUUIDAdded && coll->uuid())) {
+            uassertStatusOK(collModForUUIDUpgrade(opCtx, coll->ns(), collModObj, uuid));
+        }
+    }
+}
+
+void _updateDBSchemaVersionNonReplicated(OperationContext* opCtx,
+                                         const std::string& dbname,
+                                         bool needUUIDAdded) {
+    // Iterate through all collections if we're in the "local" database.
+    std::vector<NamespaceString> collNamespaceStrings;
+    if (dbname == "local") {
+        AutoGetDb autoDb(opCtx, dbname, MODE_X);
+        Database* const db = autoDb.getDb();
+        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
+            Collection* coll = *collectionIt;
+            collNamespaceStrings.push_back(coll->ns());
+        }
+    } else {
+        // If we're not in the "local" database, the only non-replicated collection
+        // is system.profile, if present.
+        collNamespaceStrings.push_back(NamespaceString(dbname, "system.profile"));
+    }
+    for (auto& collNSS : collNamespaceStrings) {
+        // Skip system.namespaces until SERVER-30095 is addressed.
+        if (collNSS.coll() == "system.namespaces") {
+            continue;
+        }
+        AutoGetDb autoDb(opCtx, dbname, MODE_X);
+        Database* const db = autoDb.getDb();
+        Collection* coll = db->getCollection(opCtx, collNSS);
+        if (!coll) {
+            // This will only occur if we incorrectly assumed there was a
+            // system.profile collection present.
+            return;
+        }
+        BSONObjBuilder collModObjBuilder;
+        collModObjBuilder.append("collMod", coll->ns().coll());
+        BSONObj collModObj = collModObjBuilder.done();
+        OptionalCollectionUUID uuid = boost::none;
+        if (needUUIDAdded) {
+            uuid = UUID::gen();
+        }
+        if ((needUUIDAdded && !coll->uuid()) || (!needUUIDAdded && coll->uuid())) {
+            BSONObjBuilder resultWeDontCareAbout;
+            uassertStatusOK(_collModInternal(
+                opCtx, coll->ns(), collModObj, &resultWeDontCareAbout, /*upgradeUUID*/ true, uuid));
+        }
+    }
+}
+
+void updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade) {
+    if (!enableCollectionUUIDs) {
+        return;
+    }
+    // Update UUIDs on all collections of all non-replicated databases.
+    std::vector<std::string> dbNames;
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+        storageEngine->listDatabases(&dbNames);
+    }
+    for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
+        auto dbName = *it;
+        _updateDBSchemaVersionNonReplicated(opCtx, dbName, upgrade);
+    }
+}
+}  // namespace
+
+Status collMod(OperationContext* opCtx,
+               const NamespaceString& nss,
+               const BSONObj& cmdObj,
+               BSONObjBuilder* result) {
+    return _collModInternal(
+        opCtx, nss, cmdObj, result, /*upgradeUUID*/ false, /*UUID*/ boost::none);
+}
+
+Status collModForUUIDUpgrade(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const BSONObj& cmdObj,
+                             OptionalCollectionUUID uuid) {
+    BSONObjBuilder resultWeDontCareAbout;
+    // First update all non-replicated collection UUIDs.
+    updateUUIDSchemaVersionNonReplicated(opCtx, !!uuid);
+    return _collModInternal(opCtx, nss, cmdObj, &resultWeDontCareAbout, /*upgradeUUID*/ true, uuid);
+}
+
+void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
+    if (!enableCollectionUUIDs) {
+        return;
+    }
+    // Update UUIDs on all collections of all databases.
+    std::vector<std::string> dbNames;
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+        storageEngine->listDatabases(&dbNames);
+    }
+
+    for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
+        auto dbName = *it;
+        _updateDBSchemaVersion(opCtx, dbName, upgrade);
+    }
+    const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
+                                           WriteConcernOptions::SyncMode::UNSET,
+                                           /*timeout*/ INT_MAX);
+    repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(opCtx, writeConcern);
+}
+}  // namespace mongo

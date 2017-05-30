@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -79,6 +80,12 @@ public:
                          StringData validationAction) final;
 
     void updateCappedSize(OperationContext*, long long int) final;
+
+    void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;
+
+    void removeUUID(OperationContext* opCtx) final;
+
+    bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) final;
 
     RecordStore* getRecordStore() {
         return _recordStore.get();

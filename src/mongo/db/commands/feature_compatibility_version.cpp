@@ -220,6 +220,11 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
             // and we have just created an empty "admin" database. Therefore, it is safe to create
             // the "admin.system.version" collection.
             invariant(autoDB.justCreated());
+
+            // We update the value of the isSchemaVersion36 server parameter so the
+            // admin.system.version collection gets a UUID.
+            serverGlobalParams.featureCompatibility.isSchemaVersion36.store(true);
+
             uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
         }
 
@@ -247,6 +252,10 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(const BSONObj& doc) {
     auto newVersion = uassertStatusOK(FeatureCompatibilityVersion::parse(doc));
     log() << "setting featureCompatibilityVersion to " << toString(newVersion);
     serverGlobalParams.featureCompatibility.version.store(newVersion);
+
+    serverGlobalParams.featureCompatibility.isSchemaVersion36.store(
+        serverGlobalParams.featureCompatibility.version.load() ==
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
 }
 
 void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {

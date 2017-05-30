@@ -741,8 +741,23 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const BSONElement& ui,
          BSONObj& cmd,
          const OpTime& opTime) -> Status {
-          BSONObjBuilder resultWeDontCareAbout;
-          return collMod(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
+          // Get UUID from cmd, if it exists.
+          OptionalCollectionUUID uuid;
+          NamespaceString nss;
+          if (ui.eoo()) {
+              uuid = boost::none;
+              nss = parseNs(ns, cmd);
+          } else {
+              uuid = uassertStatusOK(UUID::parse(ui));
+              // We need to see whether a collection with UUID ui exists before attempting to do
+              // a collMod on it. This is because we add UUIDs during upgrade to
+              // featureCompatibilityVersion 3.6 with a collMod command, so the collection will
+              // not have a UUID at the time we attempt to look it up by UUID.
+              auto& catalog = UUIDCatalog::get(opCtx);
+              nss = catalog.lookupCollectionByUUID(uuid.get()) ? catalog.lookupNSSByUUID(uuid.get())
+                                                               : parseNs(ns, cmd);
+          }
+          return collModForUUIDUpgrade(opCtx, nss, cmd, uuid);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dropDatabase",

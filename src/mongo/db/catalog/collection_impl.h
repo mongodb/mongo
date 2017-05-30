@@ -80,6 +80,11 @@ public:
         return _uuid;
     }
 
+    void refreshUUID(OperationContext* opCtx) final {
+        auto options = getCatalogEntry()->getCollectionOptions(opCtx);
+        _uuid = options.uuid;
+    }
+
     const IndexCatalog* getIndexCatalog() const final {
         return &_indexCatalog;
     }

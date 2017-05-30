@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
@@ -228,6 +229,46 @@ void KVCollectionCatalogEntry::updateTTLSetting(OperationContext* opCtx,
     invariant(offset >= 0);
     md.indexes[offset].updateTTLSetting(newExpireSeconds);
     _catalog->putMetaData(opCtx, ns().toString(), md);
+}
+
+void KVCollectionCatalogEntry::addUUID(OperationContext* opCtx,
+                                       CollectionUUID uuid,
+                                       Collection* coll) {
+    // Add a UUID to CollectionOptions if a UUID does not yet exist.
+    MetaData md = _getMetaData(opCtx);
+    if (!md.options.uuid) {
+        md.options.uuid = uuid;
+        _catalog->putMetaData(opCtx, ns().toString(), md);
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        catalog.onCreateCollection(opCtx, coll, uuid);
+    } else {
+        fassert(40564, md.options.uuid.get() == uuid);
+    }
+}
+
+void KVCollectionCatalogEntry::removeUUID(OperationContext* opCtx) {
+    // Remove the UUID from CollectionOptions if a UUID exists.
+    MetaData md = _getMetaData(opCtx);
+    if (md.options.uuid) {
+        CollectionUUID uuid = md.options.uuid.get();
+        md.options.uuid = boost::none;
+        _catalog->putMetaData(opCtx, ns().toString(), md);
+        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
+        Collection* coll = catalog.lookupCollectionByUUID(uuid);
+        if (coll) {
+            catalog.onDropCollection(opCtx, uuid);
+        }
+    }
+}
+
+bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
+                                                     OptionalCollectionUUID uuid) {
+    MetaData md = _getMetaData(opCtx);
+    if (uuid) {
+        return md.options.uuid && md.options.uuid.get() == uuid.get();
+    } else {
+        return !md.options.uuid;
+    }
 }
 
 void KVCollectionCatalogEntry::updateFlags(OperationContext* opCtx, int newValue) {

@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 
 namespace mongo {
@@ -96,6 +97,12 @@ public:
                           long long newExpireSeconds) final;
 
     void updateFlags(OperationContext* opCtx, int newValue) final;
+
+    void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;
+
+    void removeUUID(OperationContext* opCtx) final;
+
+    bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) final;
 
     void updateValidator(OperationContext* opCtx,
                          const BSONObj& validator,

@@ -388,6 +388,11 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                         fassertFailedNoTrace(40283);
                     }
                     serverGlobalParams.featureCompatibility.version.store(version.getValue());
+
+                    // Update schemaVersion parameter.
+                    serverGlobalParams.featureCompatibility.isSchemaVersion36.store(
+                        serverGlobalParams.featureCompatibility.version.load() ==
+                        ServerGlobalParams::FeatureCompatibility::Version::k36);
                 }
             }
         }

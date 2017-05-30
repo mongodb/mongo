@@ -722,8 +722,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     invariant(!options.isView());
 
     CollectionOptions optionsWithUUID = options;
-    if (enableCollectionUUIDs && !optionsWithUUID.uuid)
+    if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
+        serverGlobalParams.featureCompatibility.isSchemaVersion36.load() == true) {
         optionsWithUUID.uuid.emplace(CollectionUUID::gen());
+    }
 
     NamespaceString nss(ns);
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);

@@ -165,6 +165,10 @@ struct ServerGlobalParams {
         // Read-only parameter featureCompatibilityVersion.
         AtomicWord<Version> version{Version::k34};
 
+        // Read-only global isSchemaVersion36. This determines whether to give Collections UUIDs
+        // upon creation.
+        AtomicWord<bool> isSchemaVersion36{false};
+
         // Feature validation differs depending on the role of a mongod in a replica set or
         // master/slave configuration. Masters/primaries can accept user-initiated writes and
         // validate based on the feature compatibility version. A secondary/slave (which is not also
