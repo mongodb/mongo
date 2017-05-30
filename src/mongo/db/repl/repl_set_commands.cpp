@@ -357,7 +357,8 @@ public:
             ReplicationCoordinatorExternalStateImpl externalState(
                 opCtx->getServiceContext(),
                 DropPendingCollectionReaper::get(opCtx),
-                StorageInterface::get(opCtx));
+                StorageInterface::get(opCtx),
+                ReplicationProcess::get(opCtx));
             std::string name;
             std::vector<HostAndPort> seeds;
             parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...

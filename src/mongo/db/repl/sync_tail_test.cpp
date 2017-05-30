@@ -48,8 +48,10 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -75,6 +77,7 @@ protected:
     SyncTail::ApplyCommandInLockFn _applyCmd;
     SyncTail::IncrementOpsAppliedStatsFn _incOps;
     StorageInterfaceMock* _storageInterface = nullptr;
+    ReplicationProcess* _replicationProcess = nullptr;
 
     // Implements the MultiApplier::ApplyOperationFn interface and does nothing.
     static Status noopApplyOperationFn(MultiApplier::OperationPtrs*) {
@@ -118,6 +121,12 @@ void SyncTailTest::setUp() {
                                              const std::vector<BSONObj>&) { return Status::OK(); };
     StorageInterface::set(service, std::move(storageInterface));
 
+    _replicationProcess = new ReplicationProcess(
+        _storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
+    ReplicationProcess::set(cc().getServiceContext(),
+                            std::unique_ptr<ReplicationProcess>(_replicationProcess));
+
+
     _opCtx = cc().makeOperationContext();
     _opsApplied = 0;
     _applyOp = [](OperationContext* opCtx,
@@ -133,6 +142,7 @@ void SyncTailTest::tearDown() {
     _opCtx.reset();
     ServiceContextMongoDTest::tearDown();
     _storageInterface = nullptr;
+    ReplicationProcess::set(getServiceContext(), {});
 }
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)

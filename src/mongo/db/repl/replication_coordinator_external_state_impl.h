@@ -52,6 +52,7 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 }  // namespace
 
 class DropPendingCollectionReaper;
+class ReplicationProcess;
 class SnapshotThread;
 class StorageInterface;
 class NoopWriter;
@@ -64,7 +65,8 @@ public:
     ReplicationCoordinatorExternalStateImpl(
         ServiceContext* service,
         DropPendingCollectionReaper* dropPendingCollectionReaper,
-        StorageInterface* storageInterface);
+        StorageInterface* storageInterface,
+        ReplicationProcess* replicationProcess);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startSteadyStateReplication(OperationContext* opCtx,
@@ -163,6 +165,9 @@ private:
     DropPendingCollectionReaper* _dropPendingCollectionReaper;
 
     StorageInterface* _storageInterface;
+
+    ReplicationProcess* _replicationProcess;
+
     // True when the threads have been started
     bool _startedThreads = false;
 

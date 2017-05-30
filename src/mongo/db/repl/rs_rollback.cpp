@@ -63,7 +63,6 @@
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -340,7 +339,7 @@ namespace {
 void checkRbidAndUpdateMinValid(OperationContext* opCtx,
                                 const int rbid,
                                 const RollbackSource& rollbackSource,
-                                StorageInterface* storageInterface) {
+                                ReplicationProcess* replicationProcess) {
     // It is important that the steps are performed in order to avoid racing with upstream rollbacks
     //
     // 1) Get the last doc in their oplog.
@@ -360,8 +359,8 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     // online until we get to that point in freshness.
     OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
-    storageInterface->setAppliedThrough(opCtx, {});  // Use top of oplog.
-    storageInterface->setMinValid(opCtx, minValid);
+    replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});  // Use top of oplog.
+    replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
     if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
         // This log output is used in js tests so please leave it.
@@ -380,7 +379,7 @@ void syncFixUp(OperationContext* opCtx,
                const FixUpInfo& fixUpInfo,
                const RollbackSource& rollbackSource,
                ReplicationCoordinator* replCoord,
-               StorageInterface* storageInterface) {
+               ReplicationProcess* replicationProcess) {
     // fetch all first so we needn't handle interruption in a fancy way
 
     unsigned long long totalSize = 0;
@@ -419,7 +418,7 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     log() << "rollback 3.5";
-    checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, storageInterface);
+    checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
 
     // update them
     log() << "rollback 4 n:" << goodVersions.size();
@@ -521,7 +520,7 @@ void syncFixUp(OperationContext* opCtx,
         // we did more reading from primary, so check it again for a rollback (which would mess
         // us up), and make minValid newer.
         log() << "rollback 4.2";
-        checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, storageInterface);
+        checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
     }
 
     log() << "rollback 4.6";
@@ -785,7 +784,7 @@ Status _syncRollback(OperationContext* opCtx,
                      const RollbackSource& rollbackSource,
                      int requiredRBID,
                      ReplicationCoordinator* replCoord,
-                     StorageInterface* storageInterface) {
+                     ReplicationProcess* replicationProcess) {
     invariant(!opCtx->lockState()->isLocked());
 
     FixUpInfo how;
@@ -828,10 +827,10 @@ Status _syncRollback(OperationContext* opCtx,
     log() << "rollback 3 fixup";
     try {
         ON_BLOCK_EXIT([&] {
-            auto status = ReplicationProcess::get(opCtx)->incrementRollbackID(opCtx);
+            auto status = replicationProcess->incrementRollbackID(opCtx);
             fassertStatusOK(40425, status);
         });
-        syncFixUp(opCtx, how, rollbackSource, replCoord, storageInterface);
+        syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what(), 18753);
     }
@@ -856,7 +855,7 @@ Status syncRollback(OperationContext* opCtx,
                     const RollbackSource& rollbackSource,
                     int requiredRBID,
                     ReplicationCoordinator* replCoord,
-                    StorageInterface* storageInterface) {
+                    ReplicationProcess* replicationProcess) {
     invariant(opCtx);
     invariant(replCoord);
 
@@ -864,8 +863,8 @@ Status syncRollback(OperationContext* opCtx,
 
     DisableDocumentValidation validationDisabler(opCtx);
     UnreplicatedWritesBlock replicationDisabler(opCtx);
-    Status status =
-        _syncRollback(opCtx, localOplog, rollbackSource, requiredRBID, replCoord, storageInterface);
+    Status status = _syncRollback(
+        opCtx, localOplog, rollbackSource, requiredRBID, replCoord, replicationProcess);
 
     log() << "rollback finished" << rsLog;
     return status;
@@ -876,7 +875,7 @@ void rollback(OperationContext* opCtx,
               const RollbackSource& rollbackSource,
               int requiredRBID,
               ReplicationCoordinator* replCoord,
-              StorageInterface* storageInterface,
+              ReplicationProcess* replicationProcess,
               stdx::function<void(int)> sleepSecsFn) {
     // Set state to ROLLBACK while we are in this function. This prevents serving reads, even from
     // the oplog. This can fail if we are elected PRIMARY, in which case we better not do any
@@ -901,7 +900,7 @@ void rollback(OperationContext* opCtx,
 
     try {
         auto status = syncRollback(
-            opCtx, localOplog, rollbackSource, requiredRBID, replCoord, storageInterface);
+            opCtx, localOplog, rollbackSource, requiredRBID, replCoord, replicationProcess);
 
         // Abort only when syncRollback detects we are in a unrecoverable state.
         // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK
@@ -920,8 +919,8 @@ void rollback(OperationContext* opCtx,
         invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
 
         warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
-                  << " appliedThrough=" << replCoord->getMyLastAppliedOpTime()
-                  << " minvalid=" << storageInterface->getMinValid(opCtx);
+                  << " appliedThrough=" << replCoord->getMyLastAppliedOpTime() << " minvalid="
+                  << replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
 
         // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
         // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this

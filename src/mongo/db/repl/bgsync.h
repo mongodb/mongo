@@ -55,6 +55,7 @@ namespace repl {
 class OplogInterface;
 class ReplicationCoordinator;
 class ReplicationCoordinatorExternalState;
+class ReplicationProcess;
 class StorageInterface;
 
 class BackgroundSync {
@@ -76,6 +77,7 @@ public:
     enum class ProducerState { Starting, Running, Stopped };
 
     BackgroundSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+                   ReplicationProcess* replicationProcess,
                    std::unique_ptr<OplogBuffer> oplogBuffer);
 
     // stop syncing (when this node becomes a primary, e.g.)
@@ -187,8 +189,7 @@ private:
     void _fallBackOn3dot4Rollback(OperationContext* opCtx,
                                   const HostAndPort& source,
                                   int requiredRBID,
-                                  OplogInterface* localOplog,
-                                  StorageInterface* storageInterface);
+                                  OplogInterface* localOplog);
 
     // restart syncing
     void start(OperationContext* opCtx);
@@ -203,6 +204,9 @@ private:
 
     // A pointer to the replication coordinator external state.
     ReplicationCoordinatorExternalState* _replicationCoordinatorExternalState;
+
+    // A pointer to the replication process.
+    ReplicationProcess* _replicationProcess;
 
     /**
       * All member variables are labeled with one of the following codes indicating the

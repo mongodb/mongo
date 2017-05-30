@@ -630,6 +630,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                 stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
                                                                           _externalState.get()),
                 _storage,
+                _replicationProcess,
                 onCompletion);
             _initialSyncer = initialSyncerCopy;
         }

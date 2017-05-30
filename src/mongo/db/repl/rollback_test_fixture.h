@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -86,8 +87,10 @@ protected:
     class ReplicationCoordinatorRollbackMock;
     ReplicationCoordinatorRollbackMock* _coordinator = nullptr;
 
-    // StorageInterface used to access minValid.
     StorageInterfaceMock _storageInterface;
+
+    // ReplicationProcess used to access consistency markers.
+    std::unique_ptr<ReplicationProcess> _replicationProcess;
 };
 
 /**

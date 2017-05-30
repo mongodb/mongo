@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -74,13 +75,17 @@ ReplicationProcess* ReplicationProcess::get(OperationContext* opCtx) {
 }
 
 
-void ReplicationProcess::set(ServiceContext* service, std::unique_ptr<ReplicationProcess> storage) {
-    auto& storageInterface = getReplicationProcess(service);
-    storageInterface = std::move(storage);
+void ReplicationProcess::set(ServiceContext* service, std::unique_ptr<ReplicationProcess> process) {
+    auto& replicationProcess = getReplicationProcess(service);
+    replicationProcess = std::move(process);
 }
 
-ReplicationProcess::ReplicationProcess(StorageInterface* storageInterface)
-    : _storageInterface(storageInterface), _rbid(kUninitializedRollbackId) {}
+ReplicationProcess::ReplicationProcess(
+    StorageInterface* storageInterface,
+    std::unique_ptr<ReplicationConsistencyMarkers> consistencyMarkers)
+    : _storageInterface(storageInterface),
+      _consistencyMarkers(std::move(consistencyMarkers)),
+      _rbid(kUninitializedRollbackId) {}
 
 StatusWith<int> ReplicationProcess::getRollbackID(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -171,6 +176,10 @@ Status ReplicationProcess::clearRollbackProgress(OperationContext* opCtx) {
         return status;
     }
     return Status::OK();
+}
+
+ReplicationConsistencyMarkers* ReplicationProcess::getConsistencyMarkers() {
+    return _consistencyMarkers.get();
 }
 
 }  // namespace repl

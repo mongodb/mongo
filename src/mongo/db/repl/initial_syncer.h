@@ -71,8 +71,8 @@ MONGO_FP_FORWARD_DECLARE(rsSyncApplyStop);
 
 struct InitialSyncState;
 struct MemberState;
+class ReplicationProcess;
 class StorageInterface;
-
 
 struct InitialSyncerOptions {
     /** Function to return optime of last operation applied on this node */
@@ -174,6 +174,7 @@ public:
     InitialSyncer(InitialSyncerOptions opts,
                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
                   StorageInterface* storage,
+                  ReplicationProcess* replicationProcess,
                   const OnCompletionFn& onCompletion);
 
     virtual ~InitialSyncer();
@@ -558,6 +559,7 @@ private:
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)
     StorageInterface* _storage;                                                 // (R)
+    ReplicationProcess* _replicationProcess;                                    // (S)
 
     // This is invoked with the final status of the initial sync. If startup() fails, this callback
     // is never invoked. The caller gets the last applied optime with hash when the initial sync

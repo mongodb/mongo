@@ -46,6 +46,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
@@ -127,8 +128,10 @@ void ShardingMongodTestFixture::setUp() {
 
     auto storagePtr = stdx::make_unique<repl::StorageInterfaceMock>();
 
-    repl::ReplicationProcess::set(service,
-                                  stdx::make_unique<repl::ReplicationProcess>(storagePtr.get()));
+    repl::ReplicationProcess::set(
+        service,
+        stdx::make_unique<repl::ReplicationProcess>(
+            storagePtr.get(), stdx::make_unique<repl::ReplicationConsistencyMarkersMock>()));
     repl::ReplicationProcess::get(_opCtx.get())->initializeRollbackID(_opCtx.get());
 
     repl::StorageInterface::set(service, std::move(storagePtr));

@@ -80,10 +80,6 @@
 namespace mongo {
 namespace repl {
 
-const char StorageInterfaceImpl::kDefaultMinValidNamespace[] = "local.replset.minvalid";
-const char StorageInterfaceImpl::kInitialSyncFlagFieldName[] = "doingInitialSync";
-const char StorageInterfaceImpl::kBeginFieldName[] = "begin";
-const char StorageInterfaceImpl::kOplogDeleteFromPointFieldName[] = "oplogDeleteFromPoint";
 const char StorageInterfaceImpl::kDefaultRollbackIdNamespace[] = "local.system.rollback.id";
 const char StorageInterfaceImpl::kRollbackIdFieldName[] = "rollbackId";
 const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
@@ -91,48 +87,12 @@ const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
 namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
-const BSONObj kInitialSyncFlag(BSON(StorageInterfaceImpl::kInitialSyncFlagFieldName << true));
-
 const auto kIdIndexName = "_id_"_sd;
 
 }  // namespace
 
 StorageInterfaceImpl::StorageInterfaceImpl()
-    : StorageInterfaceImpl(NamespaceString(StorageInterfaceImpl::kDefaultMinValidNamespace)) {}
-
-StorageInterfaceImpl::StorageInterfaceImpl(const NamespaceString& minValidNss)
-    : _minValidNss(minValidNss),
-      _rollbackIdNss(StorageInterfaceImpl::kDefaultRollbackIdNamespace) {}
-
-NamespaceString StorageInterfaceImpl::getMinValidNss() const {
-    return _minValidNss;
-}
-
-BSONObj StorageInterfaceImpl::getMinValidDocument(OperationContext* opCtx) const {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        Lock::DBLock dblk(opCtx, _minValidNss.db(), MODE_IS);
-        Lock::CollectionLock lk(opCtx->lockState(), _minValidNss.ns(), MODE_IS);
-        BSONObj doc;
-        bool found = Helpers::getSingleton(opCtx, _minValidNss.ns().c_str(), doc);
-        invariant(found || doc.isEmpty());
-        return doc;
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        opCtx, "StorageInterfaceImpl::getMinValidDocument", _minValidNss.ns());
-
-    MONGO_UNREACHABLE;
-}
-
-void StorageInterfaceImpl::updateMinValidDocument(OperationContext* opCtx,
-                                                  const BSONObj& updateSpec) {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        // For now this needs to be MODE_X because it sometimes creates the collection.
-        Lock::DBLock dblk(opCtx, _minValidNss.db(), MODE_X);
-        Helpers::putSingleton(opCtx, _minValidNss.ns().c_str(), updateSpec);
-    }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
-        opCtx, "StorageInterfaceImpl::updateMinValidDocument", _minValidNss.ns());
-}
+    : _rollbackIdNss(StorageInterfaceImpl::kDefaultRollbackIdNamespace) {}
 
 StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
     BSONObjBuilder bob;
@@ -199,114 +159,6 @@ Status StorageInterfaceImpl::incrementRollbackID(OperationContext* opCtx) {
         opCtx->recoveryUnit()->waitUntilDurable();
     }
     return status;
-}
-
-bool StorageInterfaceImpl::getInitialSyncFlag(OperationContext* opCtx) const {
-    const BSONObj doc = getMinValidDocument(opCtx);
-    const auto flag = doc[kInitialSyncFlagFieldName].trueValue();
-    LOG(3) << "returning initial sync flag value of " << flag;
-    return flag;
-}
-
-void StorageInterfaceImpl::setInitialSyncFlag(OperationContext* opCtx) {
-    LOG(3) << "setting initial sync flag";
-    updateMinValidDocument(opCtx, BSON("$set" << kInitialSyncFlag));
-    opCtx->recoveryUnit()->waitUntilDurable();
-}
-
-void StorageInterfaceImpl::clearInitialSyncFlag(OperationContext* opCtx) {
-    LOG(3) << "clearing initial sync flag";
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    OpTime time = replCoord->getMyLastAppliedOpTime();
-    updateMinValidDocument(
-        opCtx,
-        BSON("$unset" << kInitialSyncFlag << "$set"
-                      << BSON("ts" << time.getTimestamp() << "t" << time.getTerm()
-                                   << kBeginFieldName
-                                   << time)));
-
-    if (getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
-        opCtx->recoveryUnit()->waitUntilDurable();
-        replCoord->setMyLastDurableOpTime(time);
-    }
-}
-
-OpTime StorageInterfaceImpl::getMinValid(OperationContext* opCtx) const {
-    const BSONObj doc = getMinValidDocument(opCtx);
-    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc);
-    // If any of the keys (fields) are missing from the minvalid document, we return
-    // a null OpTime.
-    if (opTimeStatus == ErrorCodes::NoSuchKey) {
-        return {};
-    }
-
-    if (!opTimeStatus.isOK()) {
-        severe() << "Error parsing minvalid entry: " << redact(doc)
-                 << ", with status:" << opTimeStatus.getStatus();
-        fassertFailedNoTrace(40052);
-    }
-
-    OpTime minValid = opTimeStatus.getValue();
-    LOG(3) << "returning minvalid: " << minValid.toString() << "(" << minValid.toBSON() << ")";
-
-    return minValid;
-}
-
-void StorageInterfaceImpl::setMinValid(OperationContext* opCtx, const OpTime& minValid) {
-    LOG(3) << "setting minvalid to exactly: " << minValid.toString() << "(" << minValid.toBSON()
-           << ")";
-    updateMinValidDocument(
-        opCtx, BSON("$set" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
-}
-
-void StorageInterfaceImpl::setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) {
-    LOG(3) << "setting minvalid to at least: " << minValid.toString() << "(" << minValid.toBSON()
-           << ")";
-    updateMinValidDocument(
-        opCtx, BSON("$max" << BSON("ts" << minValid.getTimestamp() << "t" << minValid.getTerm())));
-}
-
-void StorageInterfaceImpl::setOplogDeleteFromPoint(OperationContext* opCtx,
-                                                   const Timestamp& timestamp) {
-    LOG(3) << "setting oplog delete from point to: " << timestamp.toStringPretty();
-    updateMinValidDocument(opCtx,
-                           BSON("$set" << BSON(kOplogDeleteFromPointFieldName << timestamp)));
-}
-
-Timestamp StorageInterfaceImpl::getOplogDeleteFromPoint(OperationContext* opCtx) {
-    const BSONObj doc = getMinValidDocument(opCtx);
-    Timestamp out = {};
-    if (auto field = doc[kOplogDeleteFromPointFieldName]) {
-        out = field.timestamp();
-    }
-
-    LOG(3) << "returning oplog delete from point: " << out;
-    return out;
-}
-
-void StorageInterfaceImpl::setAppliedThrough(OperationContext* opCtx, const OpTime& optime) {
-    LOG(3) << "setting appliedThrough to: " << optime.toString() << "(" << optime.toBSON() << ")";
-    if (optime.isNull()) {
-        updateMinValidDocument(opCtx, BSON("$unset" << BSON(kBeginFieldName << 1)));
-    } else {
-        updateMinValidDocument(opCtx, BSON("$set" << BSON(kBeginFieldName << optime)));
-    }
-}
-
-OpTime StorageInterfaceImpl::getAppliedThrough(OperationContext* opCtx) {
-    const BSONObj doc = getMinValidDocument(opCtx);
-    const auto opTimeStatus = OpTime::parseFromOplogEntry(doc.getObjectField(kBeginFieldName));
-    if (!opTimeStatus.isOK()) {
-        // Return null OpTime on any parse failure, including if "begin" is missing.
-        return {};
-    }
-
-    OpTime appliedThrough = opTimeStatus.getValue();
-    LOG(3) << "returning appliedThrough: " << appliedThrough.toString() << "("
-           << appliedThrough.toBSON() << ")";
-
-    return appliedThrough;
 }
 
 StatusWith<std::unique_ptr<CollectionBulkLoader>>

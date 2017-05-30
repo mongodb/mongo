@@ -64,6 +64,7 @@
 #include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -203,16 +204,18 @@ void scheduleWork(executor::TaskExecutor* executor,
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
     ServiceContext* service,
     DropPendingCollectionReaper* dropPendingCollectionReaper,
-    StorageInterface* storageInterface)
+    StorageInterface* storageInterface,
+    ReplicationProcess* replicationProcess)
     : _service(service),
       _dropPendingCollectionReaper(dropPendingCollectionReaper),
-      _storageInterface(storageInterface) {
+      _storageInterface(storageInterface),
+      _replicationProcess(replicationProcess) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
 bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationContext* opCtx) {
-    return _storageInterface->getInitialSyncFlag(opCtx);
+    return _replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx);
 }
 
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
@@ -222,7 +225,8 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     invariant(replCoord);
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
-    _bgSync = stdx::make_unique<BackgroundSync>(this, makeSteadyStateOplogBuffer(opCtx));
+    _bgSync = stdx::make_unique<BackgroundSync>(
+        this, _replicationProcess, makeSteadyStateOplogBuffer(opCtx));
     _bgSync->startup(opCtx);
 
     log() << "Starting replication applier thread";
@@ -332,11 +336,12 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     // Perform additional shutdown steps below that must be done outside _threadMutex.
 
-    if (_storageInterface->getOplogDeleteFromPoint(opCtx).isNull() &&
-        loadLastOpTime(opCtx) == _storageInterface->getAppliedThrough(opCtx)) {
+    if (_replicationProcess->getConsistencyMarkers()->getOplogDeleteFromPoint(opCtx).isNull() &&
+        loadLastOpTime(opCtx) ==
+            _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
         // Clear the appliedThrough marker to indicate we are consistent with the top of the
         // oplog.
-        _storageInterface->setAppliedThrough(opCtx, {});
+        _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
     }
 }
 
@@ -385,11 +390,6 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "initiate oplog entry", "local.oplog.rs");
 
-        // This initializes the minvalid document with a null "ts" because older versions (<=3.2)
-        // get angry if the minValid document is present but doesn't have a "ts" field.
-        // Consider removing this once we no longer need to support downgrading to 3.2.
-        _storageInterface->setMinValidToAtLeast(opCtx, {});
-
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -414,8 +414,9 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
-    invariant(_storageInterface->getOplogDeleteFromPoint(opCtx).isNull());
-    _storageInterface->setAppliedThrough(opCtx, {});
+    invariant(
+        _replicationProcess->getConsistencyMarkers()->getOplogDeleteFromPoint(opCtx).isNull());
+    _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
 
     if (isV1ElectionProtocol) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -564,17 +565,14 @@ void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(ServiceContext*
 }
 
 void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationContext* opCtx) {
-    if (_storageInterface->getInitialSyncFlag(opCtx)) {
+    if (_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx)) {
         return;  // Initial Sync will take over so no cleanup is needed.
     }
 
-    // This initializes the minvalid document with a null "ts" because older versions (<=3.2)
-    // get angry if the minValid document is present but doesn't have a "ts" field.
-    // Consider removing this once we no longer need to support downgrading to 3.2.
-    _storageInterface->setMinValidToAtLeast(opCtx, {});
-
-    const auto deleteFromPoint = _storageInterface->getOplogDeleteFromPoint(opCtx);
-    const auto appliedThrough = _storageInterface->getAppliedThrough(opCtx);
+    const auto deleteFromPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogDeleteFromPoint(opCtx);
+    const auto appliedThrough =
+        _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx);
 
     const bool needToDeleteEndOfOplog = !deleteFromPoint.isNull() &&
         // This version should never have a non-null deleteFromPoint with a null appliedThrough.
@@ -591,7 +589,8 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
         log() << "Removing unapplied entries starting at: " << deleteFromPoint;
         truncateOplogTo(opCtx, deleteFromPoint);
     }
-    _storageInterface->setOplogDeleteFromPoint(opCtx, {});  // clear the deleteFromPoint
+    _replicationProcess->getConsistencyMarkers()->setOplogDeleteFromPoint(
+        opCtx, {});  // clear the deleteFromPoint
 
     if (appliedThrough.isNull()) {
         // No follow-up work to do.
@@ -643,7 +642,7 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
     while (cursor->more()) {
         auto entry = cursor->nextSafe();
         fassertStatusOK(40294, SyncTail::syncApply(opCtx, entry, true));
-        _storageInterface->setAppliedThrough(
+        _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
             opCtx, fassertStatusOK(40295, OpTime::parseFromOplogEntry(entry)));
     }
 }
@@ -653,7 +652,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
     // TODO: handle WriteConflictExceptions below
     try {
         // If we are doing an initial sync do not read from the oplog.
-        if (_storageInterface->getInitialSyncFlag(opCtx)) {
+        if (_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx)) {
             return {ErrorCodes::InitialSyncFailure, "In the middle of an initial sync."};
         }
 

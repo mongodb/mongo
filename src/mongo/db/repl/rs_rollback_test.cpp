@@ -127,14 +127,16 @@ OplogInterfaceMock::Operation makeNoopOplogEntryAndRecordId(Seconds seconds) {
 }
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
-    _storageInterface.setAppliedThrough(_opCtx.get(), OpTime(Timestamp(Seconds(0), 0), 0));
-    _storageInterface.setMinValid(_opCtx.get(), OpTime(Timestamp(Seconds(1), 0), 0));
+    _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
+        _opCtx.get(), OpTime(Timestamp(Seconds(0), 0), 0));
+    _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(),
+                                                              OpTime(Timestamp(Seconds(1), 0), 0));
     auto status = syncRollback(_opCtx.get(),
                                OplogInterfaceMock(),
                                RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
                                {},
                                _coordinator,
-                               &_storageInterface);
+                               _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
 }
@@ -151,7 +153,7 @@ TEST_F(RSRollbackTest, OplogStartMissing) {
                                RollbackSourceMock(std::move(remoteOplog)),
                                {},
                                _coordinator,
-                               &_storageInterface)
+                               _replicationProcess.get())
                       .code());
 }
 
@@ -164,7 +166,7 @@ TEST_F(RSRollbackTest, NoRemoteOpLog) {
                                RollbackSourceMock(stdx::make_unique<OplogInterfaceMock>()),
                                {},
                                _coordinator,
-                               &_storageInterface);
+                               _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
 }
@@ -186,7 +188,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdThrows) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     {},
                                     _coordinator,
-                                    &_storageInterface),
+                                    _replicationProcess.get()),
                        UserException,
                        ErrorCodes::UnknownError);
 }
@@ -209,7 +211,7 @@ TEST_F(RSRollbackTest, RemoteGetRollbackIdDiffersFromRequiredRBID) {
                                     RollbackSourceLocal(stdx::make_unique<OplogInterfaceMock>()),
                                     1,
                                     _coordinator,
-                                    &_storageInterface),
+                                    _replicationProcess.get()),
                        UserException,
                        ErrorCodes::Error(40362));
 }
@@ -227,7 +229,7 @@ TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
                      }))),
                      {},
                      _coordinator,
-                     &_storageInterface));
+                     _replicationProcess.get()));
 }
 
 /**
@@ -261,7 +263,7 @@ Collection* _createCollection(OperationContext* opCtx,
  */
 int _testRollbackDelete(OperationContext* opCtx,
                         ReplicationCoordinator* coordinator,
-                        StorageInterface* storageInterface,
+                        ReplicationProcess* replicationProcess,
                         const BSONObj& documentAtSource) {
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
@@ -297,7 +299,7 @@ int _testRollbackDelete(OperationContext* opCtx,
                            rollbackSource,
                            {},
                            coordinator,
-                           storageInterface));
+                           replicationProcess));
     ASSERT_TRUE(rollbackSource.called);
 
     Lock::DBLock dbLock(opCtx, "test", MODE_S);
@@ -313,16 +315,16 @@ int _testRollbackDelete(OperationContext* opCtx,
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionDoesNotExist) {
     createOplog(_opCtx.get());
-    ASSERT_EQUALS(-1,
-                  _testRollbackDelete(_opCtx.get(), _coordinator, &_storageInterface, BSONObj()));
+    ASSERT_EQUALS(
+        -1, _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), BSONObj()));
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsNonCapped) {
     createOplog(_opCtx.get());
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
-    _testRollbackDelete(_opCtx.get(), _coordinator, &_storageInterface, BSONObj());
-    ASSERT_EQUALS(0,
-                  _testRollbackDelete(_opCtx.get(), _coordinator, &_storageInterface, BSONObj()));
+    _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), BSONObj());
+    ASSERT_EQUALS(
+        0, _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), BSONObj()));
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsCapped) {
@@ -330,16 +332,17 @@ TEST_F(RSRollbackTest, RollbackDeleteNoDocumentAtSourceCollectionExistsCapped) {
     CollectionOptions options;
     options.capped = true;
     _createCollection(_opCtx.get(), "test.t", options);
-    ASSERT_EQUALS(0,
-                  _testRollbackDelete(_opCtx.get(), _coordinator, &_storageInterface, BSONObj()));
+    ASSERT_EQUALS(
+        0, _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), BSONObj()));
 }
 
 TEST_F(RSRollbackTest, RollbackDeleteRestoreDocument) {
     createOplog(_opCtx.get());
     _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     BSONObj doc = BSON("_id" << 0 << "a" << 1);
-    _testRollbackDelete(_opCtx.get(), _coordinator, &_storageInterface, doc);
-    ASSERT_EQUALS(1, _testRollbackDelete(_opCtx.get(), _coordinator, &_storageInterface, doc));
+    _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), doc);
+    ASSERT_EQUALS(1,
+                  _testRollbackDelete(_opCtx.get(), _coordinator, _replicationProcess.get(), doc));
 }
 
 TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
@@ -376,7 +379,7 @@ TEST_F(RSRollbackTest, RollbackInsertDocumentWithNoId) {
                                rollbackSource,
                                {},
                                _coordinator,
-                               &_storageInterface);
+                               _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -441,7 +444,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
         rollbackSource,
         {},
         _coordinator,
-        &_storageInterface));
+        _replicationProcess.get()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("rollback drop index: collection: test.t. index: a_1"));
@@ -502,7 +505,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
                            rollbackSource,
                            {},
                            _coordinator,
-                           &_storageInterface));
+                           _replicationProcess.get()));
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("rollback drop index: collection: test.t. index: a_1"));
@@ -551,7 +554,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingNamespace) {
                                rollbackSource,
                                {},
                                _coordinator,
-                               &_storageInterface);
+                               _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -614,7 +617,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
                            rollbackSource,
                            {},
                            _coordinator,
-                           &_storageInterface));
+                           _replicationProcess.get()));
     ASSERT(rollbackSource.called);
 }
 
@@ -694,7 +697,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithMultipleIndexes) {
         rollbackSource,
         {},
         _coordinator,
-        &_storageInterface));
+        _replicationProcess.get()));
     ASSERT(rollbackSource.called);
 }
 
@@ -737,7 +740,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandInvalidNamespace) {
                                rollbackSource,
                                {},
                                _coordinator,
-                               &_storageInterface);
+                               _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -783,7 +786,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandMissingIndexName) {
                                rollbackSource,
                                {},
                                _coordinator,
-                               &_storageInterface);
+                               _replicationProcess.get());
     stopCapturingLogMessages();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18752, status.location());
@@ -820,7 +823,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                      }))),
                      {},
                      _coordinator,
-                     &_storageInterface);
+                     _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18751, status.location());
 }
@@ -857,7 +860,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
                            rollbackSource,
                            {},
                            _coordinator,
-                           &_storageInterface));
+                           _replicationProcess.get()));
     ASSERT_TRUE(rollbackSource.called);
 }
 
@@ -896,7 +899,7 @@ TEST_F(RSRollbackTest, RollbackDropCollectionCommandFailsIfRBIDChangesWhileSynci
                                     rollbackSource,
                                     0,
                                     _coordinator,
-                                    &_storageInterface),
+                                    _replicationProcess.get()),
                        DBException,
                        40365);
     ASSERT(rollbackSource.copyCollectionCalled);
@@ -1021,7 +1024,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
                            rollbackSource,
                            {},
                            _coordinator,
-                           &_storageInterface));
+                           _replicationProcess.get()));
     ASSERT_EQUALS(4U, rollbackSource.searchedIds.size());
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(1));
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(2));
@@ -1062,7 +1065,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
                            rollbackSource,
                            {},
                            _coordinator,
-                           &_storageInterface));
+                           _replicationProcess.get()));
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto db = dbHolder().get(_opCtx.get(), "test");
@@ -1106,7 +1109,7 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
                            rollbackSource,
                            {},
                            _coordinator,
-                           &_storageInterface));
+                           _replicationProcess.get()));
     stopCapturingLogMessages();
     ASSERT_TRUE(rollbackSource.called);
     for (const auto& message : getCapturedLogMessages()) {
@@ -1148,7 +1151,7 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
                      rollbackSource,
                      {},
                      _coordinator,
-                     &_storageInterface);
+                     _replicationProcess.get());
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18753, status.location());
 }
@@ -1196,7 +1199,7 @@ TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback
              rollbackSourceWithInvalidOplog,
              {},
              _coordinator,
-             &_storageInterface);
+             _replicationProcess.get());
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot transition from SECONDARY to ROLLBACK"));
@@ -1219,7 +1222,7 @@ DEATH_TEST_F(RSRollbackTest,
              rollbackSourceWithInvalidOplog,
              {},
              _coordinator,
-             &_storageInterface);
+             _replicationProcess.get());
 }
 
 TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollbackError) {
@@ -1238,7 +1241,7 @@ TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollb
              rollbackSourceWithValidOplog,
              {},
              _coordinator,
-             &_storageInterface,
+             _replicationProcess.get(),
              noopSleepSecsFn);
     stopCapturingLogMessages();
 
@@ -1261,7 +1264,7 @@ DEATH_TEST_F(RSRollbackTest,
     ASSERT_TRUE(ShardIdentityRollbackNotifier::get(_opCtx.get())->didRollbackHappen());
 
     createOplog(_opCtx.get());
-    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, &_storageInterface);
+    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
 }
 
 DEATH_TEST_F(
@@ -1277,7 +1280,7 @@ DEATH_TEST_F(
     _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_RECOVERING;
 
     createOplog(_opCtx.get());
-    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, &_storageInterface);
+    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, _replicationProcess.get());
 }
 
 // The testcases used here are trying to detect off-by-one errors in

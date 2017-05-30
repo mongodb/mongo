@@ -39,38 +39,8 @@
 namespace mongo {
 namespace repl {
 
-bool StorageInterfaceMock::getInitialSyncFlag(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
-    return _initialSyncFlag;
-}
-
-void StorageInterfaceMock::setInitialSyncFlag(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
-    _initialSyncFlag = true;
-}
-
-void StorageInterfaceMock::clearInitialSyncFlag(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_initialSyncFlagMutex);
-    _initialSyncFlag = false;
-}
-
-OpTime StorageInterfaceMock::getMinValid(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    return _minValid;
-}
-
-void StorageInterfaceMock::setMinValid(OperationContext* opCtx, const OpTime& minValid) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _minValid = minValid;
-}
-
-void StorageInterfaceMock::setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _minValid = std::max(_minValid, minValid);
-}
-
 StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    stdx::lock_guard<stdx::mutex> lock(_rbidMutex);
     if (!_rbidInitialized) {
         return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
     }
@@ -78,7 +48,7 @@ StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
 }
 
 Status StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    stdx::lock_guard<stdx::mutex> lock(_rbidMutex);
     if (_rbidInitialized) {
         return Status(ErrorCodes::NamespaceExists, "Rollback ID already initialized");
     }
@@ -90,35 +60,13 @@ Status StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
 }
 
 Status StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    stdx::lock_guard<stdx::mutex> lock(_rbidMutex);
     if (!_rbidInitialized) {
         return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
     }
     _rbid++;
     return Status::OK();
 }
-
-void StorageInterfaceMock::setOplogDeleteFromPoint(OperationContext* opCtx,
-                                                   const Timestamp& timestamp) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _oplogDeleteFromPoint = timestamp;
-}
-
-Timestamp StorageInterfaceMock::getOplogDeleteFromPoint(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    return _oplogDeleteFromPoint;
-}
-
-void StorageInterfaceMock::setAppliedThrough(OperationContext* opCtx, const OpTime& optime) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _appliedThrough = optime;
-}
-
-OpTime StorageInterfaceMock::getAppliedThrough(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    return _appliedThrough;
-}
-
 Status CollectionBulkLoaderMock::init(Collection* coll,
                                       const std::vector<BSONObj>& secondaryIndexSpecs) {
     LOG(1) << "CollectionBulkLoaderMock::init called";

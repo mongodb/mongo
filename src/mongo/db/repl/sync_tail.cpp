@@ -62,6 +62,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -656,7 +657,8 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx, ReplicationCoordinator* re
     }
 
     // We can't go to SECONDARY until we reach minvalid.
-    if (replCoord->getMyLastAppliedOpTime() < StorageInterface::get(opCtx)->getMinValid(opCtx)) {
+    if (replCoord->getMyLastAppliedOpTime() <
+        ReplicationProcess::get(opCtx)->getConsistencyMarkers()->getMinValid(opCtx)) {
         return;
     }
 
@@ -817,8 +819,10 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
         // Update various things that care about our last applied optime. Tests rely on 2 happening
         // before 3 even though it isn't strictly necessary. The order of 1 doesn't matter.
         setNewTimestamp(opCtx.getServiceContext(), lastOpTimeInBatch.getTimestamp());  // 1
-        StorageInterface::get(&opCtx)->setAppliedThrough(&opCtx, lastOpTimeInBatch);   // 2
-        finalizer->record(lastOpTimeInBatch);                                          // 3
+        ReplicationProcess::get(&opCtx)->getConsistencyMarkers()->setAppliedThrough(
+            &opCtx,
+            lastOpTimeInBatch);                // 2
+        finalizer->record(lastOpTimeInBatch);  // 3
     }
 }
 
@@ -1251,7 +1255,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         prefetchOps(ops, workerPool);
     }
 
-    auto storage = StorageInterface::get(opCtx);
+    auto consistencyMarkers = ReplicationProcess::get(opCtx)->getConsistencyMarkers();
 
     LOG(2) << "replication batch size is " << ops.size();
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
@@ -1272,14 +1276,14 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
-        storage->setOplogDeleteFromPoint(opCtx, ops.front().getTimestamp());
+        consistencyMarkers->setOplogDeleteFromPoint(opCtx, ops.front().getTimestamp());
         scheduleWritesToOplog(opCtx, workerPool, ops);
         fillWriterVectors(opCtx, &ops, &writerVectors);
 
         workerPool->join();
 
-        storage->setOplogDeleteFromPoint(opCtx, Timestamp());
-        storage->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
+        consistencyMarkers->setOplogDeleteFromPoint(opCtx, Timestamp());
+        consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
         applyOps(writerVectors, workerPool, applyOperation, &statusVector);
     }

@@ -122,20 +122,9 @@ public:
 
     StorageInterfaceMock() = default;
 
-    bool getInitialSyncFlag(OperationContext* opCtx) const override;
-    void setInitialSyncFlag(OperationContext* opCtx) override;
-    void clearInitialSyncFlag(OperationContext* opCtx) override;
-
-    OpTime getMinValid(OperationContext* opCtx) const override;
-    void setMinValid(OperationContext* opCtx, const OpTime& minValid) override;
-    void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
     Status initializeRollbackID(OperationContext* opCtx) override;
     Status incrementRollbackID(OperationContext* opCtx) override;
-    void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
-    Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) override;
-    void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
-    OpTime getAppliedThrough(OperationContext* opCtx) override;
 
     StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
         const NamespaceString& nss,
@@ -306,15 +295,9 @@ public:
     };
 
 private:
-    mutable stdx::mutex _initialSyncFlagMutex;
-    bool _initialSyncFlag = false;
-
-    mutable stdx::mutex _minValidBoundariesMutex;
-    OpTime _appliedThrough;
-    OpTime _minValid;
+    mutable stdx::mutex _rbidMutex;
     int _rbid;
     bool _rbidInitialized = false;
-    Timestamp _oplogDeleteFromPoint;
 };
 
 }  // namespace repl

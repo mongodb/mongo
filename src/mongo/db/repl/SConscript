@@ -185,8 +185,33 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='replication_consistency_markers_impl',
+    source=[
+        'replication_consistency_markers_impl.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+        'repl_coordinator_impl',
+    ],
+)
+
+env.CppUnitTest(
+    target='replication_consistency_markers_impl_test',
+    source=[
+        'replication_consistency_markers_impl_test.cpp',
+    ],
+    LIBDEPS=[
+        'replication_consistency_markers_impl',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.Library(
     target='replication_process',
     source=[
+        'replication_consistency_markers.cpp',
         'replication_process.cpp',
     ],
     LIBDEPS=[
@@ -204,6 +229,7 @@ env.CppUnitTest(
         'replication_process_test.cpp',
     ],
     LIBDEPS=[
+        'replication_consistency_markers_impl',
         'replication_process',
         'replmocks',
         'storage_interface_impl',
@@ -392,6 +418,7 @@ env.Library(
     ],
     LIBDEPS=[
         'optime',
+        'replication_process',
         'replmocks',
         #'serveronly', # CYCLE
         '$BUILD_DIR/mongo/db/service_context',
@@ -502,6 +529,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'oplog_interface_local',
+        'replication_process',
         'replmocks',
         'sync_tail',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
@@ -739,6 +767,7 @@ env.Library(
     ],
     LIBDEPS=[
         'optime',
+        'replication_process',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/net/hostandport',
         '$BUILD_DIR/mongo/util/decorable',
@@ -752,6 +781,7 @@ env.Library('repl_coordinator_global',
 env.Library(
     target='replmocks',
     source=[
+        'replication_consistency_markers_mock.cpp',
         'replication_coordinator_external_state_mock.cpp',
         'replication_coordinator_mock.cpp',
         'service_context_repl_mock.cpp',
@@ -1271,6 +1301,7 @@ env.CppUnitTest(
         'base_cloner_test_fixture',
         'initial_syncer',
         'data_replicator_external_state_mock',
+        'replication_process',
         'replmocks',
         'service_context_repl_mock_init',
         'sync_source_selector_mock',
@@ -1383,6 +1414,7 @@ env.Library(
         'repl_coordinator_interface',
         'repl_coordinator_impl',
         'repl_settings',
+        'replication_consistency_markers_impl',
         'replication_process',
         'sync_tail',
         '$BUILD_DIR/mongo/base',

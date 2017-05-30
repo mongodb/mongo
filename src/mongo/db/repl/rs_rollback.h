@@ -45,8 +45,8 @@ namespace repl {
 
 class OplogInterface;
 class ReplicationCoordinator;
+class ReplicationProcess;
 class RollbackSource;
-class StorageInterface;
 
 /**
  * Entry point to rollback process.
@@ -63,7 +63,7 @@ void rollback(OperationContext* opCtx,
               const RollbackSource& rollbackSource,
               int requiredRBID,
               ReplicationCoordinator* replCoord,
-              StorageInterface* storageInterface,
+              ReplicationProcess* replicationProcess,
               stdx::function<void(int)> sleepSecsFn = [](int secs) { sleepsecs(secs); });
 
 /**
@@ -87,7 +87,7 @@ void rollback(OperationContext* opCtx,
  *            supports fetching documents and copying collections.
  * @param requiredRBID Rollback ID we are required to have throughout rollback.
  * @param replCoord Used to track the rollback ID and to change the follower state
- * @param storageInterface Used to update minValid.
+ * @param replicationProcess Used to update minValid.
  *
  * If requiredRBID is supplied, we error if the upstream node has a different RBID (ie it rolled
  * back) after fetching any information from it.
@@ -101,7 +101,7 @@ Status syncRollback(OperationContext* opCtx,
                     const RollbackSource& rollbackSource,
                     int requiredRBID,
                     ReplicationCoordinator* replCoord,
-                    StorageInterface* storageInterface);
+                    ReplicationProcess* replicationProcess);
 
 /**
  * This namespace contains internal details of the rollback system. It is only exposed in a header

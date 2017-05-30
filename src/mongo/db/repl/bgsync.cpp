@@ -45,6 +45,7 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rs_sync.h"
@@ -135,10 +136,12 @@ static ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxS
 
 BackgroundSync::BackgroundSync(
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+    ReplicationProcess* replicationProcess,
     std::unique_ptr<OplogBuffer> oplogBuffer)
     : _oplogBuffer(std::move(oplogBuffer)),
       _replCoord(getGlobalReplicationCoordinator()),
-      _replicationCoordinatorExternalState(replicationCoordinatorExternalState) {
+      _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
+      _replicationProcess(replicationProcess) {
     // Update "repl.buffer.maxSizeBytes" server status metric to reflect the current oplog buffer's
     // max size.
     bufferMaxSizeGauge.increment(_oplogBuffer->getMaxSize() - bufferMaxSizeGauge.get());
@@ -274,14 +277,14 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         }
     }
 
-    auto storageInterface = StorageInterface::get(opCtx);
     // find a target to sync from the last optime fetched
     OpTime lastOpTimeFetched;
     HostAndPort source;
     HostAndPort oldSource = _syncSourceHost;
     SyncSourceResolverResponse syncSourceResp;
     {
-        const OpTime minValidSaved = storageInterface->getMinValid(opCtx);
+        const OpTime minValidSaved =
+            _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != ProducerState::Running) {
@@ -405,8 +408,9 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
     // Set the applied point if unset. This is most likely the first time we've established a sync
     // source since stepping down or otherwise clearing the applied point. We need to set this here,
     // before the OplogWriter gets a chance to append to the oplog.
-    if (storageInterface->getAppliedThrough(opCtx).isNull()) {
-        storageInterface->setAppliedThrough(opCtx, _replCoord->getMyLastAppliedOpTime());
+    if (_replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx).isNull()) {
+        _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
+            opCtx, _replCoord->getMyLastAppliedOpTime());
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
@@ -477,6 +481,7 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing) {
+        auto storageInterface = StorageInterface::get(opCtx);
         _runRollback(opCtx, fetcherReturnStatus, source, syncSourceResp.rbid, storageInterface);
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
@@ -618,7 +623,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     OplogInterfaceLocal localOplog(opCtx, rsOplogName);
     if (use3dot4Rollback) {
         log() << "Rollback falling back on 3.4 algorithm due to startup server parameter";
-        _fallBackOn3dot4Rollback(opCtx, source, requiredRBID, &localOplog, storageInterface);
+        _fallBackOn3dot4Rollback(opCtx, source, requiredRBID, &localOplog);
     } else {
         AbstractAsyncComponent* rollback;
         StatusWith<OpTime> onRollbackShutdownResult =
@@ -661,8 +666,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
                       << onRollbackShutdownResult.getValue();
             } else if (ErrorCodes::IncompatibleRollbackAlgorithm == status) {
                 log() << "Rollback falling back on 3.4 algorithm due to " << status;
-                _fallBackOn3dot4Rollback(
-                    opCtx, source, requiredRBID, &localOplog, storageInterface);
+                _fallBackOn3dot4Rollback(opCtx, source, requiredRBID, &localOplog);
             } else {
                 warning() << "Rollback failed with error: " << status;
             }
@@ -677,8 +681,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 void BackgroundSync::_fallBackOn3dot4Rollback(OperationContext* opCtx,
                                               const HostAndPort& source,
                                               int requiredRBID,
-                                              OplogInterface* localOplog,
-                                              StorageInterface* storageInterface) {
+                                              OplogInterface* localOplog) {
     const int messagingPortTags = 0;
     ConnectionPool connectionPool(messagingPortTags);
     std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
@@ -691,7 +694,7 @@ void BackgroundSync::_fallBackOn3dot4Rollback(OperationContext* opCtx,
     };
 
     RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-    rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, storageInterface);
+    rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {

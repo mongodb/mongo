@@ -38,6 +38,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
@@ -124,7 +125,10 @@ void ReplCoordTest::init() {
     StorageInterface::set(service, std::unique_ptr<StorageInterface>(storageInterface));
     ASSERT_TRUE(storageInterface == StorageInterface::get(service));
 
-    ReplicationProcess::set(service, stdx::make_unique<ReplicationProcess>(storageInterface));
+    ReplicationProcess::set(
+        service,
+        stdx::make_unique<ReplicationProcess>(
+            storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>()));
     auto replicationProcess = ReplicationProcess::get(service);
 
     // PRNG seed for tests.

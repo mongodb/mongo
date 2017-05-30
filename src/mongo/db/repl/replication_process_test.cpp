@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
@@ -75,7 +76,9 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
 TEST_F(ReplicationProcessTest, ServiceContextDecorator) {
     auto serviceContext = getServiceContext();
     ASSERT_FALSE(ReplicationProcess::get(serviceContext));
-    ReplicationProcess* replicationProcess = new ReplicationProcess(_storageInterface.get());
+    ReplicationProcess* replicationProcess = new ReplicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ReplicationProcess::set(serviceContext,
                             std::unique_ptr<ReplicationProcess>(replicationProcess));
     ASSERT_TRUE(replicationProcess == ReplicationProcess::get(serviceContext));
@@ -85,7 +88,9 @@ TEST_F(ReplicationProcessTest, ServiceContextDecorator) {
 
 TEST_F(ReplicationProcessTest,
        GetRollbackProgressReturnsNoSuchKeyIfDocumentWithIdProgressIsNotFound) {
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
 
     // Collection is not found.
     auto opCtx = makeOpCtx();
@@ -119,7 +124,9 @@ TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFi
     ASSERT_OK(_storageInterface->insertDocument(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, doc));
 
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_EQUALS(mongo::AssertionException::convertExceptionCode(40410),
                   replicationProcess.getRollbackProgress(opCtx.get()));
 }
@@ -139,7 +146,9 @@ TEST_F(ReplicationProcessTest,
     ASSERT_OK(_storageInterface->insertDocument(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, doc));
 
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, replicationProcess.getRollbackProgress(opCtx.get()));
 }
 
@@ -156,7 +165,9 @@ TEST_F(ReplicationProcessTest,
     ASSERT_OK(_storageInterface->insertDocument(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, doc));
 
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_EQUALS(applyUntil,
                   unittest::assertGet(replicationProcess.getRollbackProgress(opCtx.get())));
 
@@ -169,7 +180,9 @@ TEST_F(ReplicationProcessTest,
        SetRollbackProgressCreatesCollectionBeforeInsertingDocumentIfCollectionDoesNotExist) {
     OpTime applyUntil({Seconds(123), 0}, 1LL);
     auto opCtx = makeOpCtx();
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_OK(replicationProcess.setRollbackProgress(opCtx.get(), applyUntil));
     ASSERT_EQUALS(1U,
                   unittest::assertGet(_storageInterface->getCollectionCount(
@@ -185,14 +198,18 @@ TEST_F(ReplicationProcessTest,
 
     OpTime applyUntil({Seconds(123), 0}, 1LL);
     auto opCtx = makeOpCtx();
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                   replicationProcess.setRollbackProgress(opCtx.get(), applyUntil));
 }
 
 TEST_F(ReplicationProcessTest, ClearRollbackProgressReturnsSuccessIfCollectionDoesNotExist) {
     auto opCtx = makeOpCtx();
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_OK(replicationProcess.clearRollbackProgress(opCtx.get()));
 }
 
@@ -202,7 +219,9 @@ TEST_F(ReplicationProcessTest,
     _storageInterface = stdx::make_unique<StorageInterfaceMock>();
 
     auto opCtx = makeOpCtx();
-    ReplicationProcess replicationProcess(_storageInterface.get());
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()));
     ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                   replicationProcess.clearRollbackProgress(opCtx.get()));
 }

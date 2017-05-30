@@ -61,28 +61,6 @@ namespace repl {
  *      * Drop database and all user databases
  *      * Drop a collection
  *      * Insert documents into a collection
- *      * Manage minvalid boundaries and initial sync state
- *
- * ***** MINVALID *****
- * This interface provides helper functions for maintaining a single document in the
- * local.replset.minvalid collection.
- *
- * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
- * set as the last step in initial sync.  At the beginning of initial sync, doingInitialSync
- * is appended onto minValid to indicate that initial sync was started but has not yet
- * completed.
- *
- * The document is also updated during "normal" sync. The optime of the last op in each batch is
- * used to set minValid, along with a "begin" field to demark the start and the fact that a batch
- * is active. When the batch is done the "begin" field is removed to indicate that we are in a
- * consistent state when the batch has been fully applied.
- *
- * Example of all fields:
- * { _id:...,
- *      doingInitialSync: true // initial sync is active
- *      ts:..., t:...   // end-OpTime
- *      begin: {ts:..., t:...} // a batch is currently being applied, and not consistent
- * }
  */
 class StorageInterface {
     MONGO_DISALLOW_COPYING(StorageInterface);
@@ -98,69 +76,12 @@ public:
     StorageInterface() = default;
     virtual ~StorageInterface() = default;
 
-    // MinValid and Initial Sync Flag.
-    /**
-     * Returns true if initial sync was started but has not not completed.
-     */
-    virtual bool getInitialSyncFlag(OperationContext* opCtx) const = 0;
-
-    /**
-     * Sets the the initial sync flag to record that initial sync has not completed.
-     *
-     * This operation is durable and waits for durable writes (which will block on
-     *journaling/checkpointing).
-     */
-    virtual void setInitialSyncFlag(OperationContext* opCtx) = 0;
-
-    /**
-     * Clears the the initial sync flag to record that initial sync has completed.
-     *
-     * This operation is durable and waits for durable writes (which will block on
-     *journaling/checkpointing).
-     */
-    virtual void clearInitialSyncFlag(OperationContext* opCtx) = 0;
-
-    /**
-     * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
-     * consider the dataset consistent.
-     */
-    virtual void setMinValid(OperationContext* opCtx, const OpTime& minValid) = 0;
-    virtual OpTime getMinValid(OperationContext* opCtx) const = 0;
-
-    /**
-     * Sets minValid only if it is not already higher than endOpTime.
-     * Warning, this compares the term and timestamp independently. Do not use if the current
-     * minValid could be from the other fork of a rollback.
-     */
-    virtual void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& endOpTime) = 0;
-
     /**
      * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.
      */
     virtual StatusWith<int> getRollbackID(OperationContext* opCtx) = 0;
     virtual Status initializeRollbackID(OperationContext* opCtx) = 0;
     virtual Status incrementRollbackID(OperationContext* opCtx) = 0;
-
-    /**
-     * On startup all oplog entries with a value >= the oplog delete from point should be deleted.
-     * If null, no documents should be deleted.
-     */
-    virtual void setOplogDeleteFromPoint(OperationContext* opCtx, const Timestamp& timestamp) = 0;
-    virtual Timestamp getOplogDeleteFromPoint(OperationContext* opCtx) = 0;
-
-    /**
-     * The applied through point is a persistent record of where we've applied through. If null, the
-     * applied through point is the top of the oplog.
-     */
-    virtual void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) = 0;
-
-    /**
-     * You should probably be calling ReplicationCoordinator::getLastAppliedOpTime() instead.
-     *
-     * This reads the value from storage which isn't always updated when the ReplicationCoordinator
-     * is.
-     */
-    virtual OpTime getAppliedThrough(OperationContext* opCtx) = 0;
 
 
     // Collection creation and population for initial sync.
