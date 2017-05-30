@@ -28,11 +28,10 @@
 
 #pragma once
 
-#include "mongo/db/signed_logical_time.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
-class TimeProofService;
 class ServiceContext;
 class OperationContext;
 
