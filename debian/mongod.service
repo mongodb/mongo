@@ -6,7 +6,7 @@ Documentation=https://docs.mongodb.org/manual
 [Service]
 User=mongodb
 Group=mongodb
-ExecStart=/usr/bin/mongod --quiet --config /etc/mongod.conf
+ExecStart=/usr/bin/mongod --config /etc/mongod.conf
 # file size
 LimitFSIZE=infinity
 # cpu time
