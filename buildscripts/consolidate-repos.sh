@@ -26,19 +26,34 @@ mkdir -p "$repodir/yum/redhat"
 
 # to support different $releasever values in yum repo configurations
 #
-if [ ! -e "$repodir/yum/redhat/6Server" ]
-then
-  ln -s 6 "$repodir/yum/redhat/6Server"
-fi
-
 if [ ! -e "$repodir/yum/redhat/7Server" ]
 then
   ln -s 7 "$repodir/yum/redhat/7Server"
 fi
 
+if [ ! -e "$repodir/yum/redhat/6Server" ]
+then
+  ln -s 6 "$repodir/yum/redhat/6Server"
+fi
+
 if [ ! -e "$repodir/yum/redhat/5Server" ]
 then
   ln -s 5 "$repodir/yum/redhat/5Server"
+fi
+
+if [ ! -e "$repodir/yum/redhat/7Workstation" ]
+then
+  ln -s 7 "$repodir/yum/redhat/7Workstation"
+fi
+
+if [ ! -e "$repodir/yum/redhat/6Workstation" ]
+then
+  ln -s 6 "$repodir/yum/redhat/6Workstation"
+fi
+
+if [ ! -e "$repodir/yum/redhat/5Workstation" ]
+then
+  ln -s 5 "$repodir/yum/redhat/5Workstation"
 fi
 
 echo "Scanning and copying package files from $source_dir"
