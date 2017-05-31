@@ -99,7 +99,7 @@ assert.eq(10000, getTTLTime(slave1db.c, {x: 1}));
 
 // Verify the format of TTL collMod oplog entry. The old expiration time should be saved,
 // and index key patterns should be normalized to index names.
-var masterOplog = master.getDB('local').oplog.rs.find().sort({ts: 1}).toArray();
+var masterOplog = master.getDB('local').oplog.rs.find().sort({$natural: 1}).toArray();
 var collModEntry = masterOplog.find(op => op.o.collMod);
 
 assert(collModEntry, "collMod entry was not present in the oplog.");

@@ -34,7 +34,7 @@
     load('jstests/replsets/rslib.js');
 
     function getFirstOplogEntry(conn) {
-        return conn.getDB('local').oplog.rs.find().sort({ts: 1}).limit(1)[0];
+        return conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
     }
 
     /**
