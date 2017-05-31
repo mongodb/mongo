@@ -2,3 +2,5 @@ test_kind: mongos_test
 
 selector:
   test: ''
+
+executor: {}
