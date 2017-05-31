@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -120,6 +121,8 @@ void SyncTailTest::setUp() {
                                              const NamespaceString&,
                                              const std::vector<BSONObj>&) { return Status::OK(); };
     StorageInterface::set(service, std::move(storageInterface));
+    DropPendingCollectionReaper::set(
+        service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
 
     _replicationProcess = new ReplicationProcess(
         _storageInterface, stdx::make_unique<ReplicationConsistencyMarkersMock>());
@@ -139,10 +142,12 @@ void SyncTailTest::setUp() {
 }
 
 void SyncTailTest::tearDown() {
+    auto service = getServiceContext();
     _opCtx.reset();
+    ReplicationProcess::set(service, {});
+    DropPendingCollectionReaper::set(service, {});
+    StorageInterface::set(service, {});
     ServiceContextMongoDTest::tearDown();
-    _storageInterface = nullptr;
-    ReplicationProcess::set(getServiceContext(), {});
 }
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
@@ -1315,57 +1320,70 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
-    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
-    auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
-    auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
-    auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
-    auto options2 = fromjson("{'validator' : {'phone' : {'$type' : 'number' } } }");
-    auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options2);
+    ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING);
 
-    auto ops = {createColl1, dropColl, createColl2};
+    auto runOpsAndValidate = [this]() {
+        auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
+        auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
+        auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
+        auto options2 = fromjson("{'validator' : {'phone' : {'$type' : 'number' } } }");
+        auto createColl2 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options2);
 
-    ASSERT_OK(runOps(ops));
-    auto hash = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+        auto ops = {createColl1, dropColl, createColl2};
+
+        ASSERT_OK(runOps(ops));
+        auto hash = validate();
+
+        return hash;
+    };
+
+    auto hash1 = runOpsAndValidate();
+    auto hash2 = runOpsAndValidate();
+    ASSERT_EQUALS(hash1, hash2);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
     ASSERT_OK(runOp(createCollection()));
 
-    auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
-    auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
-    auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
-    auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
-    auto options = BSON("collation" << BSON("locale"
-                                            << "en"
-                                            << "caseLevel"
-                                            << false
-                                            << "caseFirst"
-                                            << "off"
-                                            << "strength"
-                                            << 1
-                                            << "numericOrdering"
-                                            << false
-                                            << "alternate"
-                                            << "non-ignorable"
-                                            << "maxVariable"
-                                            << "punct"
-                                            << "normalization"
-                                            << false
-                                            << "backwards"
-                                            << false
-                                            << "version"
-                                            << "57.1"));
-    auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
+    auto runOpsAndValidate = [this]() {
+        auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
+        auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
+        auto updateOp = update("foo", BSON("$set" << BSON("x" << 2)));
+        auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
+        auto options = BSON("collation" << BSON("locale"
+                                                << "en"
+                                                << "caseLevel"
+                                                << false
+                                                << "caseFirst"
+                                                << "off"
+                                                << "strength"
+                                                << 1
+                                                << "numericOrdering"
+                                                << false
+                                                << "alternate"
+                                                << "non-ignorable"
+                                                << "maxVariable"
+                                                << "punct"
+                                                << "normalization"
+                                                << false
+                                                << "backwards"
+                                                << false
+                                                << "version"
+                                                << "57.1"));
+        auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), nss, options);
 
-    auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
+        auto ops = {insertOp1, insertOp2, updateOp, dropColl, createColl};
 
-    ASSERT_OK(runOps(ops));
-    auto hash = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+        ASSERT_OK(runOps(ops));
+        auto hash = validate();
+
+        return hash;
+    };
+
+    auto hash1 = runOpsAndValidate();
+    auto hash2 = runOpsAndValidate();
+    ASSERT_EQUALS(hash1, hash2);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
@@ -1380,16 +1398,22 @@ TEST_F(IdempotencyTest, CreateCollectionWithIdIndex) {
     auto createColl1 = makeCreateCollectionOplogEntry(nextOpTime(), nss, options1);
     ASSERT_OK(runOp(createColl1));
 
-    auto insertOp = insert(BSON("_id" << Decimal128(1)));
-    auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
-    auto createColl2 = createCollection();
+    auto runOpsAndValidate = [this]() {
+        auto insertOp = insert(BSON("_id" << Decimal128(1)));
+        auto dropColl = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
+        auto createColl2 = createCollection();
 
-    auto ops = {insertOp, dropColl, createColl2};
+        auto ops = {insertOp, dropColl, createColl2};
 
-    ASSERT_OK(runOps(ops));
-    auto hash = validate();
-    ASSERT_OK(runOps(ops));
-    ASSERT_EQUALS(hash, validate());
+        ASSERT_OK(runOps(ops));
+        auto hash = validate();
+
+        return hash;
+    };
+
+    auto hash1 = runOpsAndValidate();
+    auto hash2 = runOpsAndValidate();
+    ASSERT_EQUALS(hash1, hash2);
 }
 
 TEST_F(IdempotencyTest, CreateCollectionWithView) {
