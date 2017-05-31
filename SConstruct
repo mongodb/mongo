@@ -638,7 +638,7 @@ env_vars.Add('MAXLINELENGTH',
     # across our platforms.
     #
     # See https://support.microsoft.com/en-us/help/830473/command-prompt-cmd.-exe-command-line-string-limitation
-    default=8191)
+    default=4095)
 
 # Note: This is only really meaningful when configured via a variables file. See the
 # default_buildinfo_environment_data() function for examples of how to use this.
