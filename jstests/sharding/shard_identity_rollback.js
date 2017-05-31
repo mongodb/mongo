@@ -89,8 +89,9 @@
             }
         },
         function() {
-            var oldPriOplog = priConn.getDB('local').oplog.rs.find().sort({ts: -1}).toArray();
-            var newPriOplog = newPriConn.getDB('local').oplog.rs.find().sort({ts: -1}).toArray();
+            var oldPriOplog = priConn.getDB('local').oplog.rs.find().sort({$natural: -1}).toArray();
+            var newPriOplog =
+                newPriConn.getDB('local').oplog.rs.find().sort({$natural: -1}).toArray();
             return "timed out waiting for original primary to shut down after rollback. " +
                 "Old primary oplog: " + tojson(oldPriOplog) + "; new primary oplog: " +
                 tojson(newPriOplog);
