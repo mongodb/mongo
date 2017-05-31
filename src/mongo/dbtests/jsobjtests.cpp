@@ -2038,7 +2038,7 @@ public:
     }
 
     void good(BSONObj o) {
-        if (o.okForStorageAsRoot())
+        if (o.storageValidEmbedded().isOK())
             return;
         throw UserException(12528, (string) "should be ok for storage:" + o.toString());
     }
@@ -2048,7 +2048,7 @@ public:
     }
 
     void bad(BSONObj o) {
-        if (!o.okForStorageAsRoot())
+        if (!o.storageValidEmbedded().isOK())
             return;
         throw UserException(12529, (string) "should NOT be ok for storage:" + o.toString());
     }
@@ -2059,10 +2059,6 @@ public:
         good("{x:1}");
         good("{x:{a:2}}");
 
-        // no dots allowed
-        bad("{'x.y':1}");
-        bad("{'x\\.y':1}");
-
         // Check for $
         bad("{x:{'$a':2}}");
         good("{'a$b':2}");
@@ -2072,7 +2068,6 @@ public:
 
         // Queries are not ok
         bad("{num: {$gt: 1}}");
-        bad("{_id: {$regex:'test'}}");
         bad("{$gt: 2}");
         bad("{a : { oo: [ {$bad:1}, {good:1}] }}");
         good("{a : { oo: [ {'\\\\$good':1}, {good:1}] }}");
@@ -2127,28 +2122,6 @@ public:
                              << 1
                              << "$hater"
                              << 1)));
-        bad(BSON("a" << BSON("$ref"
-                             << "coll"
-                             << "$id"
-                             << 1
-                             << "dot.dot"
-                             << 1)));
-
-        // _id isn't a RegEx, or Array
-        good("{_id: 0}");
-        good("{_id: {a:1, b:1}}");
-        good("{_id: {rx: /a/}}");
-        good("{_id: {rx: {$regex: 'a'}}}");
-        bad("{_id: /a/ }");
-        bad("{_id: /a/, other:1}");
-        bad("{hi:1, _id: /a/ }");
-        bad("{_id: /a/i }");
-        bad("{first:/f/i, _id: /a/i }");
-        // Not really a regex type
-        bad("{_id: {$regex: 'a'} }");
-        bad("{_id: {$regex: 'a', $options:'i'} }");
-        bad("{_id:  [1,2]}");
-        bad("{_id:  [1]}");
     }
 };
 

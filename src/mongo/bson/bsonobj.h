@@ -351,49 +351,11 @@ public:
         return x > 0 && x <= BSONObjMaxInternalSize;
     }
 
-    /** @return ok if it can be stored as a valid embedded doc.
-     *  Not valid if any field name:
-     *      - contains a "."
-     *      - starts with "$"
-     *          -- unless it is a dbref ($ref/$id/[$db]/...)
-     */
-    inline bool okForStorage() const {
-        return _okForStorage(false, true).isOK();
-    }
-
-    /** Same as above with the following extra restrictions
-     *  Not valid if:
-     *      - "_id" field is a
-     *          -- Regex
-     *          -- Array
-     */
-    inline bool okForStorageAsRoot() const {
-        return _okForStorage(true, true).isOK();
-    }
-
     /**
-     * Validates that this can be stored as an embedded document
-     * See details above in okForStorage
-     *
-     * If 'deep' is true then validation is done to children
-     *
-     * If not valid a user readable status message is returned.
+     * Validates that the element is okay to be stored in a collection.
+     * Recursively validates children.
      */
-    inline Status storageValidEmbedded(const bool deep = true) const {
-        return _okForStorage(false, deep);
-    }
-
-    /**
-     * Validates that this can be stored as a document (in a collection)
-     * See details above in okForStorageAsRoot
-     *
-     * If 'deep' is true then validation is done to children
-     *
-     * If not valid a user readable status message is returned.
-     */
-    inline Status storageValid(const bool deep = true) const {
-        return _okForStorage(true, deep);
-    }
+    Status storageValidEmbedded() const;
 
     /** @return true if object is empty -- i.e.,  {} */
     bool isEmpty() const {
@@ -604,14 +566,6 @@ private:
         if (!isValid())
             _assertInvalid();
     }
-
-    /**
-     * Validate if the element is okay to be stored in a collection, maybe as the root element
-     *
-     * If 'root' is true then checks against _id are made.
-     * If 'deep' is false then do not traverse through children
-     */
-    Status _okForStorage(bool root, bool deep) const;
 
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;

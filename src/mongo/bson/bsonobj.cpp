@@ -376,7 +376,7 @@ BSONObj BSONObj::replaceFieldNames(const BSONObj& names) const {
     return b.obj();
 }
 
-Status BSONObj::_okForStorage(bool root, bool deep) const {
+Status BSONObj::storageValidEmbedded() const {
     BSONObjIterator i(*this);
 
     // The first field is special in the case of a DBRef where the first field must be $ref
@@ -413,39 +413,23 @@ Status BSONObj::_okForStorage(bool root, bool deep) const {
             }
         }
 
-        // Do not allow "." in the field name
-        if (strchr(name, '.')) {
-            return Status(ErrorCodes::DottedFieldName,
-                          str::stream() << name << " is not valid for storage.");
-        }
-
-        // (SERVER-9502) Do not allow storing an _id field with a RegEx type or
-        // Array type in a root document
-        if (root && (e.type() == RegEx || e.type() == Array || e.type() == Undefined) &&
-            str::equals(name, "_id")) {
-            return Status(ErrorCodes::InvalidIdField,
-                          str::stream() << name
-                                        << " is not valid for storage because it is of type "
-                                        << typeName(e.type()));
-        }
-
-        if (deep && e.mayEncapsulate()) {
+        if (e.mayEncapsulate()) {
             switch (e.type()) {
                 case Object:
                 case Array: {
-                    Status s = e.embeddedObject()._okForStorage(false, true);
+                    Status s = e.embeddedObject().storageValidEmbedded();
                     // TODO: combine field names for better error messages
                     if (!s.isOK())
                         return s;
                 } break;
                 case CodeWScope: {
-                    Status s = e.codeWScopeObject()._okForStorage(false, true);
+                    Status s = e.codeWScopeObject().storageValidEmbedded();
                     // TODO: combine field names for better error messages
                     if (!s.isOK())
                         return s;
                 } break;
                 default:
-                    uassert(12579, "unhandled cases in BSONObj okForStorage", 0);
+                    uassert(12579, "unhandled cases in BSONObj storageValidEmbedded", 0);
             }
         }
 
