@@ -142,7 +142,7 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
                         ss << c;  // character should match itself
                     }
                 }
-            } else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '0') ||
+            } else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
                        (c == '\0')) {
                 // don't know what to do with these
                 r = ss;
