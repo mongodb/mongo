@@ -1,6 +1,4 @@
-// clonable_ptr.h
-
-/*-
+/**
  *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify

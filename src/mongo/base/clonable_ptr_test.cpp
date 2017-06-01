@@ -1,6 +1,4 @@
-// clonable_ptr_test.cpp
-
-/*-
+/**
  *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -38,6 +36,12 @@
 
 namespace {
 namespace stdx = mongo::stdx;
+
+template <typename Test>
+void runSyntaxTest(Test&& t) {
+    if (false)
+        t();
+}
 
 // These testing helper classes model various kinds of class which should be compatible with
 // `mongo::clonable_ptr`.  The basic use cases satisfied by each class are described in each class's
@@ -421,10 +425,8 @@ void pointerOperations() {
     }
 
     // Test `*` functionality
-    {
-        Clonable& r = *a;
-        (void)r;
-    }
+	Clonable& r = *a;
+	(void)r;
 
     // Test reset functionality
     {
@@ -470,33 +472,35 @@ void equalityOperations() {
 }  // namespace SyntaxTests
 
 TEST(ClonablePtrSyntaxTests, construction) {
-    SyntaxTests::construction<ClonableTest>();
-    SyntaxTests::construction<AltClonableTest>();
-    SyntaxTests::construction<Alt2ClonableTest>();
-    SyntaxTests::construction<RawPointerClonable>();
-    SyntaxTests::construction<UniquePtrClonable>();
+    runSyntaxTest(SyntaxTests::construction<ClonableTest>);
+    runSyntaxTest(SyntaxTests::construction<AltClonableTest>);
+    runSyntaxTest(SyntaxTests::construction<Alt2ClonableTest>);
+    runSyntaxTest(SyntaxTests::construction<RawPointerClonable>);
+    runSyntaxTest(SyntaxTests::construction<UniquePtrClonable>);
 }
 
 TEST(ClonablePtrSyntaxTests, augmentedConstruction) {
-    SyntaxTests::augmentedConstruction<FunctorClonable, FunctorClonable::CloningFunctionType>();
-    SyntaxTests::augmentedConstruction<FunctorWithDynamicStateClonable,
-                                       FunctorWithDynamicStateClonable::CloningFunctionType>();
+    runSyntaxTest(
+        SyntaxTests::augmentedConstruction<FunctorClonable, FunctorClonable::CloningFunctionType>);
+    runSyntaxTest(
+        SyntaxTests::augmentedConstruction<FunctorWithDynamicStateClonable,
+                                           FunctorWithDynamicStateClonable::CloningFunctionType>);
 }
 
 TEST(ClonablePtrSyntaxTests, pointerOperations) {
-    SyntaxTests::pointerOperations<ClonableTest>();
-    SyntaxTests::pointerOperations<AltClonableTest>();
-    SyntaxTests::pointerOperations<Alt2ClonableTest>();
-    SyntaxTests::pointerOperations<RawPointerClonable>();
-    SyntaxTests::pointerOperations<UniquePtrClonable>();
+    runSyntaxTest(SyntaxTests::pointerOperations<ClonableTest>);
+    runSyntaxTest(SyntaxTests::pointerOperations<AltClonableTest>);
+    runSyntaxTest(SyntaxTests::pointerOperations<Alt2ClonableTest>);
+    runSyntaxTest(SyntaxTests::pointerOperations<RawPointerClonable>);
+    runSyntaxTest(SyntaxTests::pointerOperations<UniquePtrClonable>);
 }
 
 TEST(ClonablePtrSyntaxTests, equalityOperations) {
-    SyntaxTests::equalityOperations<ClonableTest>();
-    SyntaxTests::equalityOperations<AltClonableTest>();
-    SyntaxTests::equalityOperations<Alt2ClonableTest>();
-    SyntaxTests::equalityOperations<RawPointerClonable>();
-    SyntaxTests::equalityOperations<UniquePtrClonable>();
+    runSyntaxTest(SyntaxTests::equalityOperations<ClonableTest>);
+    runSyntaxTest(SyntaxTests::equalityOperations<AltClonableTest>);
+    runSyntaxTest(SyntaxTests::equalityOperations<Alt2ClonableTest>);
+    runSyntaxTest(SyntaxTests::equalityOperations<RawPointerClonable>);
+    runSyntaxTest(SyntaxTests::equalityOperations<UniquePtrClonable>);
 }
 
 namespace BehaviorTests {
