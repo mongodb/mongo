@@ -1764,17 +1764,6 @@ public:
         state.prepTempCollection();
         ON_BLOCK_EXIT_OBJ(state, &State::dropTempCollections);
 
-        if (!config.outputOptions.outDB.empty()) {
-            BSONObjBuilder loc;
-            if (!config.outputOptions.outDB.empty())
-                loc.append("db", config.outputOptions.outDB);
-            if (!config.outputOptions.collectionName.empty())
-                loc.append("collection", config.outputOptions.collectionName);
-            result.append("result", loc.obj());
-        } else if (!config.outputOptions.collectionName.empty()) {
-            result.append("result", config.outputOptions.collectionName);
-        }
-
         std::vector<std::shared_ptr<Chunk>> chunks;
 
         if (config.outputOptions.outType != Config::OutputType::INMEMORY) {
