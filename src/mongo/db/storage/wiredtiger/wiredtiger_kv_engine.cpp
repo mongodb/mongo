@@ -130,6 +130,53 @@ private:
     AtomicBool _shuttingDown{false};
 };
 
+class WiredTigerKVEngine::WiredTigerCheckpointThread : public BackgroundJob {
+public:
+    explicit WiredTigerCheckpointThread(WiredTigerSessionCache* sessionCache)
+        : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
+
+    virtual string name() const {
+        return "WTCheckpointThread";
+    }
+
+    virtual void run() {
+        Client::initThread(name().c_str());
+
+        LOG(1) << "starting " << name() << " thread";
+
+        while (!_shuttingDown.load()) {
+            {
+                stdx::unique_lock<stdx::mutex> lock(_mutex);
+                _condvar.wait_for(lock,
+                                  stdx::chrono::seconds(static_cast<std::int64_t>(
+                                      wiredTigerGlobalOptions.checkpointDelaySecs)));
+            }
+
+            try {
+                const bool forceCheckpoint = true;
+                _sessionCache->waitUntilDurable(forceCheckpoint);
+            } catch (const UserException& exc) {
+                invariant(exc.getCode() == ErrorCodes::ShutdownInProgress);
+            }
+        }
+        LOG(1) << "stopping " << name() << " thread";
+    }
+
+    void shutdown() {
+        _shuttingDown.store(true);
+        _condvar.notify_one();
+        wait();
+    }
+
+private:
+    WiredTigerSessionCache* _sessionCache;
+
+    // _mutex/_condvar used to notify when _shuttingDown is flipped.
+    stdx::mutex _mutex;
+    stdx::condition_variable _condvar;
+    AtomicBool _shuttingDown{false};
+};
+
 namespace {
 
 class TicketServerParameter : public ServerParameter {
@@ -228,8 +275,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "log=(enabled=true,archive=true,path=journal,compressor=";
         ss << wiredTigerGlobalOptions.journalCompressor << "),";
         ss << "file_manager=(close_idle_time=100000),";  //~28 hours, will put better fix in 3.1.x
-        ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
-        ss << ",log_size=2GB),";
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
         ss << "verbose=(recovery_progress),";
     }
@@ -287,6 +332,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         _journalFlusher->go();
     }
 
+    if (!_readOnly && !_ephemeral) {
+        _checkpointThread = stdx::make_unique<WiredTigerCheckpointThread>(_sessionCache.get());
+        _checkpointThread->go();
+    }
+
     _sizeStorerUri = "table:sizeStorer";
     WiredTigerSession session(_conn);
     if (!_readOnly && repair && _hasUri(session.getSession(), _sizeStorerUri)) {
@@ -335,6 +385,8 @@ void WiredTigerKVEngine::cleanShutdown() {
         // these must be the last things we do before _conn->close();
         if (_journalFlusher)
             _journalFlusher->shutdown();
+        if (_checkpointThread)
+            _checkpointThread->shutdown();
         _sizeStorer.reset();
         _sessionCache->shuttingDown();
 

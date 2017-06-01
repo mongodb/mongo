@@ -192,6 +192,7 @@ public:
 
 private:
     class WiredTigerJournalFlusher;
+    class WiredTigerCheckpointThread;
 
     Status _salvageIfNeeded(const char* uri);
     void _checkIdentPath(StringData ident);
@@ -215,6 +216,7 @@ private:
     bool _ephemeral;
     bool _readOnly;
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
+    std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
 
     std::string _rsOptions;
     std::string _indexOptions;
