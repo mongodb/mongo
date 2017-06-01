@@ -125,7 +125,7 @@ public:
             return false;
         }
 
-        result.appendElements(ret);
+        filterCommandReplyForPassthrough(ret, &result);
         return true;
     }
 
@@ -220,7 +220,7 @@ public:
             return appendCommandStatus(result, getStatusFromCommandResult(ret));
         }
 
-        result.appendElements(ret);
+        filterCommandReplyForPassthrough(ret, &result);
         return true;
     }
 

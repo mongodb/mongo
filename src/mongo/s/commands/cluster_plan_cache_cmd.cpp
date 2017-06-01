@@ -134,7 +134,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
         // XXX: In absence of sensible aggregation strategy,
         //      promote first shard's result to top level.
         if (i == results.begin()) {
-            result.appendElements(cmdResult.result);
+            filterCommandReplyForPassthrough(cmdResult.result, &result);
             clusterCmdResult = cmdResult.result["ok"].trueValue();
         }
 

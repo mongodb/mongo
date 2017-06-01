@@ -1391,7 +1391,7 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         return Command::appendCommandStatus(*result, response.getValue().writeConcernStatus);
     }
 
-    result->appendElements(response.getValue().response);
+    Command::filterCommandReplyForPassthrough(response.getValue().response, result);
     return true;
 }
 
@@ -1427,7 +1427,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
             Shard::kDefaultConfigCommandTimeout,
             Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
-        result->appendElements(resultStatus.getValue().response);
+        Command::filterCommandReplyForPassthrough(resultStatus.getValue().response, result);
         return resultStatus.getValue().commandStatus.isOK();
     }
 

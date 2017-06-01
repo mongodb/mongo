@@ -92,7 +92,7 @@ public:
         uassertStatusOK(cmdResponse.commandStatus);
 
         // Append any return value from the response, which the config server returned
-        result.appendElements(cmdResponse.response);
+        filterCommandReplyForPassthrough(cmdResponse.response, &result);
 
         return true;
     }

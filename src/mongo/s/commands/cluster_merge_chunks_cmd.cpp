@@ -181,7 +181,7 @@ public:
 
         Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
 
-        result.appendElements(remoteResult);
+        filterCommandReplyForPassthrough(remoteResult, &result);
         return ok;
     }
 

@@ -501,7 +501,6 @@ public:
             arg == "$client" ||             //
             arg == "$configServerState" ||  //
             arg == "$db" ||                 //
-            arg == "$gleStats" ||           //
             arg == "$oplogQueryData" ||     //
             arg == "$queryOptions" ||       //
             arg == "$readPreference" ||     //
@@ -514,6 +513,15 @@ public:
             arg == "writeConcern" ||        //
             false;  // These comments tell clang-format to keep this line-oriented.
     }
+
+    /**
+     * Rewrites reply into a format safe to blindly forward from shards to clients.
+     *
+     * Ideally this function can be deleted once mongos run() implementations are more careful about
+     * what they return from the shards.
+     */
+    static void filterCommandReplyForPassthrough(const BSONObj& reply, BSONObjBuilder* output);
+    static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
 
 private:
     Status checkAuthForCommand(Client* client,

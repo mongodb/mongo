@@ -203,7 +203,7 @@ public:
             }
 
             if (!ret["done"].Bool()) {
-                result.appendElements(ret);
+                filterCommandReplyForPassthrough(ret, &result);
                 return true;
             }
 

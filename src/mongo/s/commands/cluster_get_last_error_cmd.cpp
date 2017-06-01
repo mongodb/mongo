@@ -303,7 +303,7 @@ public:
         if (numWCErrors == 1) {
             // Return the single write concern error we found, err should be set or not
             // from gle response
-            result.appendElements(lastErrResponse->gleResponse);
+            filterCommandReplyForPassthrough(lastErrResponse->gleResponse, &result);
             return lastErrResponse->gleResponse["ok"].trueValue();
         } else {
             // Return a generic combined WC error message

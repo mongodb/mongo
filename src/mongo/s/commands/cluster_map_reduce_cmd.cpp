@@ -290,7 +290,7 @@ public:
                     inputRoutingInfo.primary()->getId(), wcErrorElem, result);
             }
 
-            result.appendElementsUnique(res);
+            result.appendElementsUnique(filterCommandReplyForPassthrough(res));
             return ok;
         }
 

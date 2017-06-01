@@ -121,7 +121,7 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
     if (!transformedResponse.isOK()) {
         return Command::appendCommandStatus(*out, transformedResponse.getStatus());
     }
-    out->appendElements(transformedResponse.getValue());
+    Command::filterCommandReplyForPassthrough(transformedResponse.getValue(), out);
 
     return true;
 }
@@ -184,7 +184,7 @@ protected:
         if (auto wcErrorElem = res["writeConcernError"]) {
             appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, result);
         }
-        result.appendElementsUnique(res);
+        result.appendElementsUnique(filterCommandReplyForPassthrough(res));
         return ok;
     }
 };
@@ -817,7 +817,7 @@ public:
             conn.done();
 
             if (!ok) {
-                result.appendElements(res);
+                filterCommandReplyForPassthrough(res, &result);
                 return false;
             }
 
@@ -1088,7 +1088,7 @@ public:
             conn.done();
 
             if (!ok) {
-                result.appendElements(res);
+                filterCommandReplyForPassthrough(res, &result);
                 return false;
             }
 
@@ -1263,7 +1263,7 @@ public:
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
-            result.appendElements(res);
+            filterCommandReplyForPassthrough(res, &result);
             return res["ok"].trueValue();
         } else if (SimpleBSONObjComparator::kInstance.evaluate(cm->getShardKeyPattern().toBSON() ==
                                                                BSON("files_id" << 1 << "n" << 1))) {
@@ -1340,7 +1340,7 @@ public:
 
                 if (n == nNext) {
                     // no new data means we've reached the end of the file
-                    result.appendElements(res);
+                    filterCommandReplyForPassthrough(res, &result);
                     return true;
                 }
 
