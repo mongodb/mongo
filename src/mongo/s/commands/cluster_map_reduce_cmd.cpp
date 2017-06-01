@@ -282,7 +282,7 @@ public:
             ShardConnection conn(inputRoutingInfo.primary()->getConnString(), "");
 
             BSONObj res;
-            bool ok = conn->runCommand(dbname, cmdObj, res);
+            bool ok = conn->runCommand(dbname, filterCommandRequestForPassthrough(cmdObj), res);
             conn.done();
 
             if (auto wcErrorElem = res["writeConcernError"]) {

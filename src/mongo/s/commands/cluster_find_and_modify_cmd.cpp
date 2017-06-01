@@ -232,7 +232,8 @@ private:
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
         ShardConnection conn(shard->getConnString(), nss.ns(), chunkManager);
-        bool ok = conn->runCommand(nss.db().toString(), cmdObj, res);
+        bool ok =
+            conn->runCommand(nss.db().toString(), filterCommandRequestForPassthrough(cmdObj), res);
         conn.done();
 
         // ErrorCodes::RecvStaleConfig is the code for RecvStaleConfigException.

@@ -463,20 +463,4 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 
-StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BSONObj& cmdObj) {
-    BSONElement queryOptionsElt;
-    auto status = bsonExtractTypedField(
-        cmdObj, QueryRequest::kUnwrappedReadPrefField, BSONType::Object, &queryOptionsElt);
-    if (status.isOK()) {
-        // There must be a nested object containing the read preference if there is a queryOptions
-        // field.
-        return ReadPreferenceSetting::fromContainingBSON(queryOptionsElt.Obj());
-    } else if (status != ErrorCodes::NoSuchKey) {
-        return status;
-    }
-
-    // If there is no explicit read preference, that means primary only.
-    return ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly);
-}
-
 }  // namespace mongo

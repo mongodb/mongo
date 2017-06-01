@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -107,7 +108,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
                 "admin",
-                cmdObj,
+                filterCommandRequestForPassthrough(cmdObj),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             BSONObj x = std::move(response.response);
@@ -166,13 +167,13 @@ public:
 
         // Get information for config and admin dbs from the config servers.
         auto catalogClient = grid.catalogClient(opCtx);
-        auto appendStatus =
-            catalogClient->appendInfoForConfigServerDatabases(opCtx, cmdObj, &dbListBuilder);
+        auto appendStatus = catalogClient->appendInfoForConfigServerDatabases(
+            opCtx, filterCommandRequestForPassthrough(cmdObj), &dbListBuilder);
+        dbListBuilder.doneFast();
         if (!appendStatus.isOK()) {
+            result.resetToEmpty();
             return Command::appendCommandStatus(result, appendStatus);
         }
-
-        dbListBuilder.done();
 
         if (nameOnly)
             return true;

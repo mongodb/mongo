@@ -95,7 +95,9 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
     }
     const auto shard = shardStatus.getValue();
     ScopedDbConnection conn(shard->getConnString());
-    auto cursor = conn->query(str::stream() << dbName << ".$cmd", cmdObj, /* nToReturn=*/-1);
+    auto cursor = conn->query(str::stream() << dbName << ".$cmd",
+                              Command::filterCommandRequestForPassthrough(cmdObj),
+                              /* nToReturn=*/-1);
     if (!cursor || !cursor->more()) {
         return Command::appendCommandStatus(
             *out, {ErrorCodes::OperationFailed, "failed to read command response from shard"});
@@ -176,7 +178,7 @@ protected:
         ShardConnection conn(shard->getConnString(), "");
 
         BSONObj res;
-        bool ok = conn->runCommand(db, cmdObj, res);
+        bool ok = conn->runCommand(db, filterCommandRequestForPassthrough(cmdObj), res);
         conn.done();
 
         // First append the properly constructed writeConcernError. It will then be skipped
@@ -225,7 +227,7 @@ protected:
         auto shardResponses =
             uassertStatusOK(scatterGatherForNamespace(opCtx,
                                                       nss,
-                                                      cmdObj,
+                                                      filterCommandRequestForPassthrough(cmdObj),
                                                       ReadPreferenceSetting::get(opCtx),
                                                       boost::none,  // filter
                                                       boost::none,  // collation
@@ -368,8 +370,13 @@ public:
 
         vector<Strategy::CommandResult> results;
         const BSONObj query;
-        Strategy::commandOp(
-            opCtx, dbName, cmdObj, cm->getns(), query, CollationSpec::kSimpleSpec, &results);
+        Strategy::commandOp(opCtx,
+                            dbName,
+                            filterCommandRequestForPassthrough(cmdObj),
+                            cm->getns(),
+                            query,
+                            CollationSpec::kSimpleSpec,
+                            &results);
 
         BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
         bool isValid = true;
@@ -552,7 +559,7 @@ public:
                 !fromDbInfo.shardingEnabled());
 
         BSONObjBuilder b;
-        BSONForEach(e, cmdObj) {
+        BSONForEach(e, filterCommandRequestForPassthrough(cmdObj)) {
             if (strcmp(e.fieldName(), "fromhost") != 0) {
                 b.append(e);
             }
@@ -626,7 +633,7 @@ public:
             BSONObj res;
             {
                 ScopedDbConnection conn(shard->getConnString());
-                if (!conn->runCommand(dbName, cmdObj, res)) {
+                if (!conn->runCommand(dbName, filterCommandRequestForPassthrough(cmdObj), res)) {
                     if (!res["code"].eoo()) {
                         result.append(res["code"]);
                     }
@@ -814,7 +821,7 @@ public:
 
             ScopedDbConnection conn(shardStatus.getValue()->getConnString());
             BSONObj res;
-            bool ok = conn->runCommand(dbName, cmdObj, res);
+            bool ok = conn->runCommand(dbName, filterCommandRequestForPassthrough(cmdObj), res);
             conn.done();
 
             if (!ok) {
@@ -1085,7 +1092,8 @@ public:
 
             ShardConnection conn(shardStatus.getValue()->getConnString(), nss.ns());
             BSONObj res;
-            bool ok = conn->runCommand(nss.db().toString(), cmdObj, res);
+            bool ok = conn->runCommand(
+                nss.db().toString(), filterCommandRequestForPassthrough(cmdObj), res);
             conn.done();
 
             if (!ok) {
@@ -1259,8 +1267,13 @@ public:
             BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
             vector<Strategy::CommandResult> results;
-            Strategy::commandOp(
-                opCtx, dbName, cmdObj, nss.ns(), finder, CollationSpec::kSimpleSpec, &results);
+            Strategy::commandOp(opCtx,
+                                dbName,
+                                filterCommandRequestForPassthrough(cmdObj),
+                                nss.ns(),
+                                finder,
+                                CollationSpec::kSimpleSpec,
+                                &results);
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
@@ -1281,7 +1294,7 @@ public:
                 // look for chunk n and it doesn't exist. This means that the file's last
                 // chunk is n-1, so we return the computed md5 results.
                 BSONObjBuilder bb;
-                bb.appendElements(cmdObj);
+                bb.appendElements(filterCommandRequestForPassthrough(cmdObj));
                 bb.appendBool("partialOk", true);
                 bb.append("startAt", n);
                 if (!lastResult.isEmpty()) {
@@ -1415,7 +1428,7 @@ public:
         vector<AsyncRequestsSender::Request> requests;
         BSONArrayBuilder shardArray;
         for (const ShardId& shardId : shardIds) {
-            requests.emplace_back(shardId, cmdObj);
+            requests.emplace_back(shardId, filterCommandRequestForPassthrough(cmdObj));
             shardArray.append(shardId.toString());
         }
 

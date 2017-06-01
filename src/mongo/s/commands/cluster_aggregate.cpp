@@ -450,6 +450,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         cmdObj = explainCmdObj.toBson();
     }
 
+    cmdObj = Command::filterCommandRequestForPassthrough(cmdObj);
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting::get(opCtx),

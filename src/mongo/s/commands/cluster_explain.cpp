@@ -130,13 +130,14 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
 
 // static
 BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity) {
+    auto filtered = Command::filterCommandRequestForPassthrough(cmdObj);
     BSONObjBuilder out;
-    out.append("explain", cmdObj);
+    out.append("explain", filtered);
     out.append("verbosity", ExplainOptions::verbosityString(verbosity));
 
     // Propagate all generic arguments out of the inner command since the shards will only process
     // them at the top level.
-    for (auto elem : cmdObj) {
+    for (auto elem : filtered) {
         if (Command::isGenericArgument(elem.fieldNameStringData())) {
             out.append(elem);
         }

@@ -171,19 +171,12 @@ public:
             return appendCommandStatus(result, cq.getStatus());
         }
 
-        // Extract read preference. If no read preference is specified in the query, will we pass
-        // down a "primaryOnly" or "secondary" read pref, depending on the slaveOk setting.
-        auto readPref = ClusterFind::extractUnwrappedReadPref(cmdObj);
-        if (!readPref.isOK()) {
-            return appendCommandStatus(result, readPref.getStatus());
-        }
-
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
         BSONObj viewDefinition;
         auto cursorId = ClusterFind::runQuery(
-            opCtx, *cq.getValue(), readPref.getValue(), &batch, &viewDefinition);
+            opCtx, *cq.getValue(), ReadPreferenceSetting::get(opCtx), &batch, &viewDefinition);
         if (!cursorId.isOK()) {
             if (cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
                 auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();

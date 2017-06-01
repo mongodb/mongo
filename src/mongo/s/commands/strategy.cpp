@@ -143,38 +143,6 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
     }
 }
 
-/**
- * Rewrites cmdObj into the format expected by mongos Command::run() implementations.
- *
- * This performs 2 transformations:
- * 1) $readPreference fields are moved into a subobject called $queryOptions. This matches the
- *    "wrapped" format historically used internally by mongos. Moving off of that format will be
- *    done as SERVER-29091.
- *
- * 2) Filter out generic arguments that shouldn't be blindly passed to the shards.  This is
- *    necessary because many mongos implementations of Command::run() just pass cmdObj through
- *    directly to the shards. However, some of the generic arguments fields are automatically
- *    appended in the egress layer. Removing them here ensures that they don't get duplicated.
- *
- * Ideally this function can be deleted once mongos run() implementations are more careful about
- * what they send to the shards.
- */
-BSONObj filterCommandRequestForPassthrough(const BSONObj& cmdObj) {
-    BSONObjBuilder bob;
-    for (auto elem : cmdObj) {
-        const auto name = elem.fieldNameStringData();
-        if (name == "$readPreference") {
-            BSONObjBuilder(bob.subobjStart("$queryOptions")).append(elem);
-        } else if (!Command::isGenericArgument(name) || name == "maxTimeMS" ||
-                   name == "readConcern" || name == "writeConcern") {
-            // This is the whitelist of generic arguments that commands can be trusted to blindly
-            // forward to the shards.
-            bob.append(elem);
-        }
-    }
-    return bob.obj();
-}
-
 void execCommandClient(OperationContext* opCtx,
                        Command* c,
                        StringData dbname,
@@ -249,19 +217,18 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
-    auto filteredCmdObj = filterCommandRequestForPassthrough(cmdObj);
     std::string errmsg;
     bool ok = false;
     try {
         if (!supportsWriteConcern) {
-            ok = c->run(opCtx, dbname.toString(), filteredCmdObj, errmsg, result);
+            ok = c->run(opCtx, dbname.toString(), cmdObj, errmsg, result);
         } else {
             // Change the write concern while running the command.
             const auto oldWC = opCtx->getWriteConcern();
             ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
             opCtx->setWriteConcern(wcResult.getValue());
 
-            ok = c->run(opCtx, dbname.toString(), filteredCmdObj, errmsg, result);
+            ok = c->run(opCtx, dbname.toString(), cmdObj, errmsg, result);
         }
     } catch (const DBException& e) {
         result.resetToEmpty();

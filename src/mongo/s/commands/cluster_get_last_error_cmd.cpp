@@ -243,7 +243,8 @@ public:
         const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc())->getPrevHostOpTimes());
 
         std::vector<LegacyWCResponse> wcResponses;
-        auto status = enforceLegacyWriteConcern(opCtx, dbname, cmdObj, hostOpTimes, &wcResponses);
+        auto status = enforceLegacyWriteConcern(
+            opCtx, dbname, filterCommandRequestForPassthrough(cmdObj), hostOpTimes, &wcResponses);
 
         // Don't forget about our last hosts, reset the client info
         ClusterLastErrorInfo::get(cc())->disableForCommand();
