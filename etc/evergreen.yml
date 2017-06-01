@@ -4954,7 +4954,7 @@ buildvariants:
   - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
-    # SERVER-29094 add causally_consistent_jscore_passthrough_WT once resolved.
+  - name: causally_consistent_jscore_passthrough_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
