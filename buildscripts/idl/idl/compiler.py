@@ -136,7 +136,7 @@ def _update_import_includes(args, spec, header_file_name):
 
     for resolved_file_name in spec.imports.resolved_imports:
         # Guess: the file naming rules are consistent across IDL invocations
-        include_h_file_name = resolved_file_name.split('.')[0] + args.output_suffix + ".h"
+        include_h_file_name = os.path.splitext(resolved_file_name)[0] + args.output_suffix + ".h"
 
         if args.output_base_dir:
             include_h_file_name = os.path.relpath(
@@ -167,7 +167,7 @@ def compile_idl(args):
                           args.input_file, args.input_file)
             return False
 
-        file_name_prefix = args.input_file.split('.')[0]
+        file_name_prefix = os.path.splitext(args.input_file)[0]
         file_name_prefix += args.output_suffix
 
         source_file_name = file_name_prefix + ".cpp"
