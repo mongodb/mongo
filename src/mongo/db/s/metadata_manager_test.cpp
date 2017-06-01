@@ -222,36 +222,17 @@ TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
         ASSERT_EQ(manager->numberOfMetadataSnapshots(), 0UL);
         ASSERT_EQ(manager->numberOfRangesToClean(), 0UL);
 
-        auto scm1 = manager->getActiveMetadata(manager);  // and increment refcount
-        ASSERT_TRUE(bool(scm1));
-        ASSERT_EQ(0ULL, scm1->getChunks().size());
+        auto scm = manager->getActiveMetadata(manager);  // and increment scm's refcount
+        ASSERT(bool(scm));
+        addChunk(manager);  // push new metadata
 
-        addChunk(manager);                                // push new metadata
-        auto scm2 = manager->getActiveMetadata(manager);  // and increment refcount
-        ASSERT_EQ(1ULL, scm2->getChunks().size());
-
-        // this is here solely to pacify an invariant in addChunk
-        manager->refreshActiveMetadata(makeEmptyMetadata());
-
-        addChunk(manager);                                // push new metadata
-        auto scm3 = manager->getActiveMetadata(manager);  // and increment refcount
-        ASSERT_EQ(1ULL, scm3->getChunks().size());
-
-        auto overlaps =
-            manager->overlappingMetadata(manager, ChunkRange(BSON("key" << 0), BSON("key" << 10)));
-        ASSERT_EQ(2ULL, overlaps.size());
-        std::vector<ScopedCollectionMetadata> ref;
-        ref.push_back(std::move(scm3));
-        ref.push_back(std::move(scm2));
-        ASSERT(ref == overlaps);
-
-        ASSERT_EQ(manager->numberOfMetadataSnapshots(), 3UL);
+        ASSERT_EQ(manager->numberOfMetadataSnapshots(), 1UL);
         ASSERT_EQ(manager->numberOfRangesToClean(), 0UL);  // not yet...
 
         optNotif = manager->cleanUpRange(cr1);
-        ASSERT_EQ(manager->numberOfMetadataSnapshots(), 3UL);
+        ASSERT_EQ(manager->numberOfMetadataSnapshots(), 1UL);
         ASSERT_EQ(manager->numberOfRangesToClean(), 1UL);
-    }  // scm1,2,3 destroyed, refcount of each metadata goes to zero
+    }  // scm destroyed, refcount of metadata goes to zero
     ASSERT_EQ(manager->numberOfMetadataSnapshots(), 0UL);
     ASSERT_EQ(manager->numberOfRangesToClean(), 1UL);
     ASSERT_FALSE(optNotif->ready());

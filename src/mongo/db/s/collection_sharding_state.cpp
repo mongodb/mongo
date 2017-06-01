@@ -134,12 +134,6 @@ auto CollectionShardingState::cleanUpRange(ChunkRange const& range) -> CleanupNo
     return _metadataManager->cleanUpRange(range);
 }
 
-auto CollectionShardingState::overlappingMetadata(ChunkRange const& range) const
-    -> std::vector<ScopedCollectionMetadata> {
-    return _metadataManager->overlappingMetadata(_metadataManager, range);
-}
-
-
 MigrationSourceManager* CollectionShardingState::getMigrationSourceManager() {
     return _sourceMgr;
 }

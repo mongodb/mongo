@@ -46,8 +46,7 @@ public:
     /**
       * This is an object n that asynchronously changes state when a scheduled range deletion
       * completes or fails. Call n.ready() to discover if the event has already occurred.  Call
-      * n.waitStatus(opCtx) to sleep waiting for the event, and get its result.  If the wait is
-      * interrupted, waitStatus throws.
+      * n.waitStatus(opCtx) to sleep waiting for the event, and get its result.
       *
       * It is an error to destroy a returned CleanupNotification object n unless either n.ready()
       * is true or n.abandon() has been called.  After n.abandon(), n is in a moved-from state.
@@ -86,9 +85,6 @@ public:
         bool operator==(DeleteNotification const& other) const {
             return notification == other.notification;
         }
-        bool operator!=(DeleteNotification const& other) const {
-            return notification != other.notification;
-        }
 
     private:
         std::shared_ptr<Notification<Status>> notification;
@@ -99,8 +95,6 @@ public:
         ChunkRange range;
         DeleteNotification notification{};
     };
-
-    enum class Action { kFinished, kMore, kWriteOpLog };
 
     CollectionRangeDeleter() = default;
     ~CollectionRangeDeleter();
@@ -134,8 +128,8 @@ public:
     bool isEmpty() const;
 
     /*
-     * Notifies with the specified status anything waiting on ranges scheduled, and then discards
-     * the ranges and notifications.  Is called in the destructor.
+     * Notify with the specified status anything waiting on ranges scheduled, before discarding the
+     * ranges and notifications.
      */
     void clear(Status);
 
@@ -145,22 +139,21 @@ public:
     void append(BSONObjBuilder* builder) const;
 
     /**
-     * If any range deletions are scheduled, deletes up to maxToDelete documents, notifying
-     * watchers of ranges as they are done being deleted. It performs its own collection locking, so
-     * it must be called without locks.
+     * If any ranges are scheduled to clean, deletes up to maxToDelete documents, notifying watchers
+     * of ranges as they are done being deleted. It performs its own collection locking so it must
+     * be called without locks.
      *
-     * Returns kMore or kWriteOpLog if it should be scheduled to run again because there might be
-     * more documents to delete, or kFinished otherwise.  When calling again, pass the value
-     * returned.
+     * The 'rangeDeleterForTestOnly' is used as a utility for unit-tests that directly test the
+     * CollectionRangeDeleter class so they do not need to set up CollectionShardingState and
+     * MetadataManager objects.
      *
-     * Argument 'forTestOnly' is used in unit tests that exercise the CollectionRangeDeleter class,
-     * so that they do not need to set up CollectionShardingState and MetadataManager objects.
+     * Returns true if it should be scheduled to run again because there might be more documents to
+     * delete, or false otherwise.
      */
-    static Action cleanUpNextRange(OperationContext*,
-                                   NamespaceString const& nss,
-                                   Action,
-                                   int maxToDelete,
-                                   CollectionRangeDeleter* forTestOnly = nullptr);
+    static bool cleanUpNextRange(OperationContext*,
+                                 NamespaceString const& nss,
+                                 int maxToDelete,
+                                 CollectionRangeDeleter* rangeDeleterForTestOnly = nullptr);
 
 private:
     /**

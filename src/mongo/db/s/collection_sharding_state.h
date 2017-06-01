@@ -141,14 +141,6 @@ public:
     auto cleanUpRange(ChunkRange const& range) -> CleanupNotification;
 
     /**
-     * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use
-     * by running queries that overlap the argument range, suitable for identifying and invalidating
-     * those queries.
-     */
-    auto overlappingMetadata(ChunkRange const& range) const
-        -> std::vector<ScopedCollectionMetadata>;
-
-    /**
      * Returns the active migration source manager, if one is available.
      */
     MigrationSourceManager* getMigrationSourceManager();
@@ -251,12 +243,10 @@ private:
     MigrationSourceManager* _sourceMgr{nullptr};
 
     // for access to _metadataManager
-    friend auto CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
+    friend bool CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
                                                          NamespaceString const&,
-                                                         CollectionRangeDeleter::Action,
                                                          int maxToDelete,
-                                                         CollectionRangeDeleter*)
-        -> CollectionRangeDeleter::Action;
+                                                         CollectionRangeDeleter*);
 };
 
 }  // namespace mongo

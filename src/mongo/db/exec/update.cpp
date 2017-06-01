@@ -254,6 +254,12 @@ StatusWith<std::uint32_t> storageValid(const mb::ConstElement& elem,
             Status status = validateDollarPrefixElement(elem, deep);
             if (!status.isOK())
                 return status;
+        } else if (fieldName.find(".") != string::npos) {
+            // Field name cannot have a "." in it.
+            return Status(ErrorCodes::DottedFieldName,
+                          str::stream() << "The dotted field '" << elem.getFieldName() << "' in '"
+                                        << mb::getFullName(elem)
+                                        << "' is not valid for storage.");
         }
     }
 

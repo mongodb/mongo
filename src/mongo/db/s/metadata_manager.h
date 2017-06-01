@@ -114,14 +114,6 @@ public:
     CleanupNotification cleanUpRange(ChunkRange const& range);
 
     /**
-     * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use
-     * by running queries that overlap the argument range, suitable for identifying and invalidating
-     * those queries.
-     */
-    auto overlappingMetadata(std::shared_ptr<MetadataManager> const& itself,
-                             ChunkRange const& range) -> std::vector<ScopedCollectionMetadata>;
-
-    /**
      * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might
      * still be in use by running queries.  Outside of test drivers, the actual number may vary
      * after it returns, so this is really only useful for unit tests.
@@ -154,19 +146,12 @@ private:
      * Each time it completes cleaning up a range, it wakes up clients waiting on completion of
      * that range, which may then verify their range has no more deletions scheduled, and proceed.
      */
-    static void _scheduleCleanup(executor::TaskExecutor*,
-                                 NamespaceString nss,
-                                 CollectionRangeDeleter::Action);
+    static void _scheduleCleanup(executor::TaskExecutor*, NamespaceString nss);
 
     // All of the following functions must be called while holding _managerLock.
 
     /**
-     * Cancels all scheduled deletions of orphan ranges, notifying listeners with specified status.
-     */
-    void _clearAllCleanups(Status);
-
-    /**
-     * Cancels all scheduled deletions of orphan ranges, notifying listeners with status
+     * Cancel all scheduled deletions of orphan ranges, notifying listeners with status
      * InterruptedDueToReplStateChange.
      */
     void _clearAllCleanups();
@@ -244,12 +229,10 @@ private:
     // friends
 
     // for access to _rangesToClean and _managerLock under task callback
-    friend auto CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
+    friend bool CollectionRangeDeleter::cleanUpNextRange(OperationContext*,
                                                          NamespaceString const&,
-                                                         CollectionRangeDeleter::Action,
                                                          int maxToDelete,
-                                                         CollectionRangeDeleter*)
-        -> CollectionRangeDeleter::Action;
+                                                         CollectionRangeDeleter*);
     friend class ScopedCollectionMetadata;
 };
 
@@ -282,17 +265,6 @@ public:
      */
     operator bool() const;
 
-    /**
-     * Checks whether both objects refer to the identically the same metadata.
-     */
-    bool operator==(ScopedCollectionMetadata const& other) const {
-        return _metadata == other._metadata;
-    }
-    bool operator!=(ScopedCollectionMetadata const& other) const {
-        return _metadata != other._metadata;
-    }
-
-
 private:
     /**
      * Increments the usageCounter in the specified CollectionMetadata.
@@ -313,12 +285,8 @@ private:
 
     std::shared_ptr<MetadataManager> _manager{nullptr};
 
-    // These use our private ctor
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
-        std::shared_ptr<MetadataManager>);
-    friend auto MetadataManager::overlappingMetadata(std::shared_ptr<MetadataManager> const& itself,
-                                                     ChunkRange const& range)
-        -> std::vector<ScopedCollectionMetadata>;
+        std::shared_ptr<MetadataManager>);  // uses our private ctor
 };
 
 }  // namespace mongo

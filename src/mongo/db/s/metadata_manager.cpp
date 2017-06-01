@@ -44,67 +44,60 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
-// MetadataManager maintains pointers to CollectionMetadata objects in a member list named
-// _metadata.  Each CollectionMetadata contains an immutable _chunksMap of chunks assigned to this
-// shard, along with details related to its own lifecycle in a member _tracker.
+// MetadataManager maintains std::shared_ptr<CollectionMetadataManager> pointers in a list
+// _metadata. It also contains a CollectionRangeDeleter that queues orphan ranges to delete in
+// a background thread, and a record of the ranges being migrated in, to avoid deleting them.
 //
-// The current chunk mapping, used by queries starting up, is at _metadata.back().  Each query,
-// when it starts up, requests and holds a ScopedCollectionMetadata object, and destroys it on
-// termination. Each ScopedCollectionMetadata keeps a shared_ptr to its CollectionMetadata chunk
-// mapping, and to the MetadataManager itself.  CollectionMetadata mappings also keep a record of
-// chunk ranges that may be deleted when it is determined that the range can no longer be in use.
+// Free-floating CollectionMetadata objects are maintained by these pointers, and also by clients
+// via shared pointers in ScopedCollectionMetadata objects.
 //
-// ScopedCollectionMetadata's destructor decrements the CollectionMetadata's usageCounter.
-// Whenever a usageCounter drops to zero, we check whether any now-unused CollectionMetadata
-// elements can be popped off the front of _metadata.  We need to keep the unused elements in the
-// middle (as seen below) because they may schedule deletions of chunks depended on by older
-// mappings.
-//
-// New chunk mappings are pushed onto the back of _metadata. Subsequently started queries use the
-// new mapping while still-running queries continue using the older "snapshot" mappings.  We treat
-// _metadata.back()'s usage count differently from the snapshots because it can't reliably be
-// compared to zero; a new query may increment it at any time.
-//
-// (Note that the collection may be dropped or become unsharded, and even get made and sharded
-// again, between construction and destruction of a ScopedCollectionMetadata).
-//
-// MetadataManager also contains a CollectionRangeDeleter _rangesToClean that queues orphan ranges
-// being deleted in a background thread, and a mapping _receivingChunks of the ranges being migrated
-// in, to avoid deleting them.  Each range deletion is paired with a notification object triggered
-// when the deletion is completed or abandoned.
-//
+// The _tracker member of CollectionMetadata keeps:
+//   a count of the ScopedCollectionMetadata objects that have pointers to the CollectionMetadata
+//   a list of key ranges [min,max) of orphaned documents that may be deleted when the count goes
+//     to zero
 //                                        ____________________________
 //  (s): std::shared_ptr<>       Clients:| ScopedCollectionMetadata   |
-//   _________________________        +----(s) manager   metadata (s)------------------+
-//  | CollectionShardingState |       |  |____________________________|  |             |
-//  |  _metadataManager (s)   |       +-------(s) manager  metadata (s)--------------+ |
-//  |____________________|____|       |     |____________________________|   |       | |
-//   ____________________v________    +------------(s) manager  metadata (s)-----+   | |
-//  | MetadataManager             |   |         |____________________________|   |   | |
-//  |                             |<--+                                          |   | |
-//  |                             |        ___________________________  (1 use)  |   | |
-//  | getActiveMetadata():    /---------->| CollectionMetadata        |<---------+   | |
-//  |     back(): [(s),------/    |       |  _________________________|_             | |
-//  |              (s),-------------------->| CollectionMetadata        | (0 uses)   | |
-//  |  _metadata:  (s)]------\    |       | |  _________________________|_           | |
-//  |                         \-------------->| CollectionMetadata        |          | |
-//  |  _receivingChunks           |       | | |                           | (2 uses) | |
-//  |  _rangesToClean:            |       | | |  _tracker:                |<---------+ |
-//  |  _________________________  |       | | |  _______________________  |<-----------+
-//  | | CollectionRangeDeleter  | |       | | | | Tracker               | |
-//  | |                         | |       | | | |                       | |
-//  | |  _orphans [range,notif, | |       | | | | usageCounter          | |
-//  | |            range,notif, | |       | | | | orphans [range,notif, | |
-//  | |                 ...   ] | |       | | | |          range,notif, | |
-//  | |                         | |       | | | |              ...    ] | |
-//  | |_________________________| |       |_| | |_______________________| |
-//  |_____________________________|         | |  _chunksMap               |
-//                                          |_|  _chunkVersion            |
-//                                            |  ...                      |
-//                                            |___________________________|
+//   _________________________        +----(s) manager   metadata (s)-----------------+
+//  | CollectionShardingState |       |  |____________________________|  |            |
+//  |  _metadataManager (s)   |       +-------(s) manager  metadata (s)-------------+ |
+//  |____________________|____|       |     |____________________________|  |       | |
+//   ____________________v_______     +----------(s) manager  metadata (s)  |       | |
+//  | MetadataManager            |    |        |________________________|___|       | |
+//  |                            |<---+                                 |           | |
+//  |                            |        ________________________      |           | |
+//  |                       /----------->| CollectionMetadata     |<----+ (1 use)   | |
+//  |             [(s),----/     |       |  ______________________|_                | |
+//  |              (s),------------------->| CollectionMetadata     |     (0 uses)  | |
+//  |  _metadata:  (s)]----\     |       | |  ______________________|_              | |
+//  |                       \--------------->| CollectionMetadata     |             | |
+//  |                            |       | | |                        |             | |
+//  |  _rangesToClean:           |       | | |  _tracker:             |<------------+ |
+//  |  ________________________  |       | | |  ____________________  |<--------------+
+//  | | CollectionRangeDeleter | |       | | | | Tracker            | |   (2 uses)
+//  | |                        | |       | | | |                    | |
+//  | |  _orphans [[min,max),  | |       | | | |       usageCounter | |
+//  | |            [min,max),  | |       | | | | orphans [min,max), | |
+//  | |                 ... ]  | |       | | | |           ...    ] | |
+//  | |________________________| |       |_| | |____________________| |
+//  |____________________________|         | |  _chunksMap            |
+//                                         |_|  _chunkVersion         |
+//                                           |  ...                   |
+//                                           |________________________|
+//
+//  A ScopedCollectionMetadata object is created and held during a query, and destroyed when the
+//  query no longer needs access to the collection. Its destructor decrements the CollectionMetadata
+//  _tracker member's usageCounter.  Note that the collection may become unsharded, and even get
+//  sharded again, between construction and destruction of a ScopedCollectionMetadata.
+//
+//  When a new chunk mapping replaces the active mapping, it is pushed onto the back of _metadata.
+//
+//  A CollectionMetadata object pointed to from _metadata is maintained at least as long as any
+//  query holds a ScopedCollectionMetadata object referring to it, or to any older one. In the
+//  diagram above, the middle CollectionMetadata is kept until the one below it is disposed of.
 //
 //  Note that _metadata as shown here has its front() at the bottom, back() at the top. As usual,
-//  new entries are pushed onto the back, popped off the front.
+//  new entries are pushed onto the back, popped off the front.  The "active" metadata used by new
+//  queries (when there is one), is _metadata.back().
 
 namespace mongo {
 
@@ -125,17 +118,13 @@ MetadataManager::~MetadataManager() {
 }
 
 void MetadataManager::_clearAllCleanups() {
-    _clearAllCleanups(
-        {ErrorCodes::InterruptedDueToReplStateChange,
-         str::stream() << "Range deletions in " << _nss.ns()
-                       << " abandoned because collection was dropped or became unsharded"});
-}
-
-void MetadataManager::_clearAllCleanups(Status status) {
     for (auto& metadata : _metadata) {
         _pushListToClean(std::move(metadata->_tracker.orphans));
     }
-    _rangesToClean.clear(status);
+    _rangesToClean.clear({ErrorCodes::InterruptedDueToReplStateChange,
+                          str::stream() << "Range deletions in " << _nss.ns()
+                                        << " abandoned because collection was"
+                                           "  dropped or became unsharded"});
 }
 
 ScopedCollectionMetadata MetadataManager::getActiveMetadata(std::shared_ptr<MetadataManager> self) {
@@ -252,12 +241,10 @@ void MetadataManager::_retireExpiredMetadata() {
         if (!_metadata.front()->_tracker.orphans.empty()) {
             log() << "Queries possibly dependent on " << _nss.ns()
                   << " range(s) finished; scheduling for deletion";
-            // It is safe to push orphan ranges from _metadata.back(), even though new queries might
-            // start any time, because any request to delete a range it maps is rejected.
             _pushListToClean(std::move(_metadata.front()->_tracker.orphans));
         }
         if (&_metadata.front() == &_metadata.back())
-            break;  // do not pop the active chunk mapping!
+            break;  // do not retire current chunk metadata.
     }
 }
 
@@ -267,8 +254,6 @@ void MetadataManager::_retireExpiredMetadata() {
 ScopedCollectionMetadata::ScopedCollectionMetadata(std::shared_ptr<MetadataManager> manager,
                                                    std::shared_ptr<CollectionMetadata> metadata)
     : _metadata(std::move(metadata)), _manager(std::move(manager)) {
-    invariant(_metadata);
-    invariant(_manager);
     ++_metadata->_tracker.usageCounter;
 }
 
@@ -357,17 +342,15 @@ void MetadataManager::append(BSONObjBuilder* builder) {
     amrArr.done();
 }
 
-void MetadataManager::_scheduleCleanup(executor::TaskExecutor* executor,
-                                       NamespaceString nss,
-                                       CollectionRangeDeleter::Action action) {
-    executor->scheduleWork([executor, nss, action](auto&) {
+void MetadataManager::_scheduleCleanup(executor::TaskExecutor* executor, NamespaceString nss) {
+    executor->scheduleWork([executor, nss](auto&) {
         const int maxToDelete = std::max(int(internalQueryExecYieldIterations.load()), 1);
         Client::initThreadIfNotAlready("Collection Range Deleter");
         auto UniqueOpCtx = Client::getCurrent()->makeOperationContext();
         auto opCtx = UniqueOpCtx.get();
-        auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, action, maxToDelete);
-        if (next != CollectionRangeDeleter::Action::kFinished) {
-            _scheduleCleanup(executor, nss, next);
+        bool again = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, maxToDelete);
+        if (again) {
+            _scheduleCleanup(executor, nss);
         }
     });
 }
@@ -382,9 +365,9 @@ auto MetadataManager::_pushRangeToClean(ChunkRange const& range) -> CleanupNotif
 
 void MetadataManager::_pushListToClean(std::list<Deletion> ranges) {
     if (_rangesToClean.add(std::move(ranges))) {
-        _scheduleCleanup(_executor, _nss, CollectionRangeDeleter::Action::kWriteOpLog);
+        _scheduleCleanup(_executor, _nss);
     }
-    invariant(ranges.empty());
+    dassert(ranges.empty());
 }
 
 void MetadataManager::_addToReceiving(ChunkRange const& range) {
@@ -457,28 +440,6 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range) -> CleanupNotificati
           << " for deletion after all possibly-dependent queries finish";
 
     return activeMetadata->_tracker.orphans.back().notification;
-}
-
-auto MetadataManager::overlappingMetadata(std::shared_ptr<MetadataManager> const& self,
-                                          ChunkRange const& range)
-    -> std::vector<ScopedCollectionMetadata> {
-    invariant(!_metadata.empty());
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    std::vector<ScopedCollectionMetadata> result;
-    result.reserve(_metadata.size());
-    auto it = _metadata.crbegin();  // start with the current active chunk mapping
-    if ((*it)->rangeOverlapsChunk(range)) {
-        // We ignore the refcount of the active mapping; effectively, we assume it is in use.
-        result.push_back(ScopedCollectionMetadata(self, *it));
-    }
-    ++it;  // step to snapshots
-    for (auto end = _metadata.crend(); it != end; ++it) {
-        // We want all the overlapping snapshot mappings still possibly in use by a query.
-        if ((*it)->_tracker.usageCounter > 0 && (*it)->rangeOverlapsChunk(range)) {
-            result.push_back(ScopedCollectionMetadata(self, *it));
-        }
-    }
-    return result;
 }
 
 size_t MetadataManager::numberOfRangesToCleanStillInUse() {
