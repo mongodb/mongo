@@ -271,12 +271,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     BSONObj shardQuery = pipelineForTargetedShards->getInitialQuery();
 
     if (mergeCtx->explain) {
-        auto shardResults = uassertStatusOK(scatterGatherForNamespace(opCtx,
-                                                                      namespaces.executionNss,
-                                                                      targetedCommand,
-                                                                      getReadPref(targetedCommand),
-                                                                      shardQuery,
-                                                                      request.getCollation()));
+        auto shardResults =
+            uassertStatusOK(scatterGatherForNamespace(opCtx,
+                                                      namespaces.executionNss,
+                                                      targetedCommand,
+                                                      ReadPreferenceSetting::get(opCtx),
+                                                      shardQuery,
+                                                      request.getCollation()));
 
         // This must be checked before we start modifying result.
         uassertAllShardsSupportExplain(shardResults);
@@ -302,12 +303,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return Status::OK();
     }
 
-    auto cursors = uassertStatusOK(establishCursorsRetryOnStaleVersion(opCtx,
-                                                                       namespaces.executionNss,
-                                                                       targetedCommand,
-                                                                       getReadPref(targetedCommand),
-                                                                       shardQuery,
-                                                                       request.getCollation()));
+    auto cursors =
+        uassertStatusOK(establishCursorsRetryOnStaleVersion(opCtx,
+                                                            namespaces.executionNss,
+                                                            targetedCommand,
+                                                            ReadPreferenceSetting::get(opCtx),
+                                                            shardQuery,
+                                                            request.getCollation()));
 
     if (!needSplit) {
         invariant(cursors.size() == 1);
@@ -368,7 +370,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     auto response = uassertStatusOK(
         mergingShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                       getReadPref(mergeCmdObj),
+                                                       ReadPreferenceSetting::get(opCtx),
                                                        namespaces.executionNss.db().toString(),
                                                        mergeCmdObj,
                                                        Shard::RetryPolicy::kNoRetry));
@@ -450,7 +452,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
 
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,
-        getReadPref(cmdObj),
+        ReadPreferenceSetting::get(opCtx),
         namespaces.executionNss.db().toString(),
         !shard->isConfig() ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED()) : cmdObj,
         Shard::RetryPolicy::kNoRetry));

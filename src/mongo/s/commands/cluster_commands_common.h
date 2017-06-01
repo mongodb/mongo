@@ -51,12 +51,6 @@ class OperationContext;
 BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version);
 
 /**
- * Returns the read preference from the $queryOptions.$readPreference field in the cmdObj if set or
- * defaults to PrimaryOnly and an empty TagSet.
- */
-ReadPreferenceSetting getReadPref(const BSONObj& cmdObj);
-
-/**
  * Broadcasts 'cmdObj' to all shards and returns the responses as a vector.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution.

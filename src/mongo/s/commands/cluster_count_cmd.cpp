@@ -144,7 +144,7 @@ public:
         auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                           nss,
                                                           countCmdObj,
-                                                          getReadPref(countCmdObj),
+                                                          ReadPreferenceSetting::get(opCtx),
                                                           filter,
                                                           collation,
                                                           true,  // do shard versioning
@@ -272,7 +272,7 @@ public:
         auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                           nss,
                                                           explainCmd,
-                                                          getReadPref(explainCmd),
+                                                          ReadPreferenceSetting::get(opCtx),
                                                           targetingQuery,
                                                           targetingCollation,
                                                           true,  // do shard versioning

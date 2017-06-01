@@ -222,13 +222,14 @@ protected:
             uassertStatusOK(createShardDatabase(opCtx, dbName));
         }
 
-        auto shardResponses = uassertStatusOK(scatterGatherForNamespace(opCtx,
-                                                                        nss,
-                                                                        cmdObj,
-                                                                        getReadPref(cmdObj),
-                                                                        boost::none,  // filter
-                                                                        boost::none,  // collation
-                                                                        _appendShardVersion));
+        auto shardResponses =
+            uassertStatusOK(scatterGatherForNamespace(opCtx,
+                                                      nss,
+                                                      cmdObj,
+                                                      ReadPreferenceSetting::get(opCtx),
+                                                      boost::none,  // filter
+                                                      boost::none,  // collation
+                                                      _appendShardVersion));
         return appendRawResponses(opCtx, &errmsg, &output, std::move(shardResponses));
     }
 
@@ -1146,7 +1147,7 @@ public:
         auto swShardResponses = scatterGatherForNamespace(opCtx,
                                                           nss,
                                                           explainCmd,
-                                                          getReadPref(explainCmd),
+                                                          ReadPreferenceSetting::get(opCtx),
                                                           targetingQuery,
                                                           targetingCollation,
                                                           true,  // do shard versioning
@@ -1423,7 +1424,7 @@ public:
                                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                 dbName,
                                 requests,
-                                getReadPref(cmdObj));
+                                ReadPreferenceSetting::get(opCtx));
 
         // Receive the responses.
         multimap<double, BSONObj> results;  // TODO: maybe use merge-sort instead

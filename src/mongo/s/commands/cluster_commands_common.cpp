@@ -205,11 +205,6 @@ BSONObj appendShardVersion(const BSONObj& cmdObj, ChunkVersion version) {
     return cmdWithVersionBob.obj();
 }
 
-ReadPreferenceSetting getReadPref(const BSONObj& cmdObj) {
-    const auto queryOptionsObj = cmdObj.getObjectField(QueryRequest::kUnwrappedReadPrefField);
-    return uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(queryOptionsObj));
-}
-
 StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGather(
     OperationContext* opCtx,
     const std::string& dbName,

@@ -379,7 +379,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     const auto defaultReadPref = q.queryOptions & QueryOption_SlaveOk
         ? ReadPreference::SecondaryPreferred
         : ReadPreference::PrimaryOnly;
-    const auto readPreference =
+    ReadPreferenceSetting::get(opCtx) =
         uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(q.query, defaultReadPref));
 
     auto canonicalQuery =
@@ -395,8 +395,12 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
         const auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
 
         BSONObjBuilder explainBuilder;
-        uassertStatusOK(Strategy::explainFind(
-            opCtx, findCommand, queryRequest, verbosity, readPreference, &explainBuilder));
+        uassertStatusOK(Strategy::explainFind(opCtx,
+                                              findCommand,
+                                              queryRequest,
+                                              verbosity,
+                                              ReadPreferenceSetting::get(opCtx),
+                                              &explainBuilder));
 
         BSONObj explainObj = explainBuilder.done();
         return replyToQuery(explainObj);
@@ -411,7 +415,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     auto cursorId =
         ClusterFind::runQuery(opCtx,
                               *canonicalQuery,
-                              readPreference,
+                              ReadPreferenceSetting::get(opCtx),
                               &batch,
                               nullptr /*Argument is for views which OP_QUERY doesn't support*/);
 
