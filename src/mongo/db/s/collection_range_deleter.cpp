@@ -126,11 +126,11 @@ auto CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
                 // documents in the range -- excepting any queries with a read-concern option
                 // 'ignoreChunkMigration'
                 try {
-                    auto& adminSystemVersion = NamespaceString::kConfigCollectionNamespace;
+                    auto& serverConfigurationNss = NamespaceString::kServerConfigurationNamespace;
                     auto epoch = scopedCollectionMetadata->getCollVersion().epoch();
-                    AutoGetCollection autoAdmin(opCtx, adminSystemVersion, MODE_IX);
+                    AutoGetCollection autoAdmin(opCtx, serverConfigurationNss, MODE_IX);
 
-                    Helpers::upsert(opCtx, adminSystemVersion.ns(),
+                    Helpers::upsert(opCtx, serverConfigurationNss.ns(),
                         BSON("_id" << "startRangeDeletion" << "ns" << nss.ns() << "epoch" << epoch
                           << "min" << range->getMin() << "max" << range->getMax()));
 

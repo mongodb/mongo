@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/collection_sharding_state.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db_raii.h"
@@ -50,6 +51,8 @@
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_shard_collection.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -81,6 +84,18 @@ private:
     OperationContext* _opCtx;
     const ShardIdentityType _shardIdentity;
 };
+
+/**
+ * Checks via the ReplicationCoordinator whether this server is a primary/standalone that can do
+ * writes. This function may return false if the server is primary but in drain mode.
+ *
+ * Note: expects the global lock to be held so that a meaningful answer is returned -- replica set
+ * state cannot change under a lock.
+ */
+bool isPrimary(OperationContext* opCtx, const NamespaceString& nss) {
+    // If the server can execute writes, then it is either a primary or standalone.
+    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
+}
 
 }  // unnamed namespace
 
@@ -251,7 +266,7 @@ void CollectionShardingState::onInsertOp(OperationContext* opCtx, const BSONObj&
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        _nss == NamespaceString::kConfigCollectionNamespace) {
+        _nss == NamespaceString::kServerConfigurationNamespace) {
         if (auto idElem = insertedDoc["_id"]) {
             if (idElem.str() == ShardIdentityType::IdName) {
                 auto shardIdentityDoc = uassertStatusOK(ShardIdentityType::fromBSON(insertedDoc));
@@ -269,10 +284,19 @@ void CollectionShardingState::onInsertOp(OperationContext* opCtx, const BSONObj&
     }
 }
 
-void CollectionShardingState::onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc) {
+void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
+                                         const BSONObj& query,
+                                         const BSONObj& update,
+                                         const BSONObj& updatedDoc) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
+    // TODO: should this be before or after my new code????
     checkShardVersionOrThrow(opCtx);
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        _nss == NamespaceString::kShardConfigCollectionsCollectionName) {
+        _onConfigRefreshCompleteInvalidateCachedMetadata(opCtx, query, update);
+    }
 
     if (_sourceMgr) {
         _sourceMgr->getCloner()->onUpdateOp(opCtx, updatedDoc);
@@ -283,19 +307,23 @@ void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
                                          const CollectionShardingState::DeleteState& deleteState) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        _nss == NamespaceString::kConfigCollectionNamespace) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (_nss == NamespaceString::kShardConfigCollectionsCollectionName) {
+            _onConfigDeleteInvalidateCachedMetadata(opCtx, deleteState.idDoc);
+        }
 
-        if (auto idElem = deleteState.idDoc["_id"]) {
-            auto idStr = idElem.str();
-            if (idStr == ShardIdentityType::IdName) {
-                if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
-                    uasserted(40070,
-                              "cannot delete shardIdentity document while in --shardsvr mode");
-                } else {
-                    warning() << "Shard identity document rolled back.  Will shut down after "
-                                 "finishing rollback.";
-                    ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
+        if (_nss == NamespaceString::kServerConfigurationNamespace) {
+            if (auto idElem = deleteState.idDoc["_id"]) {
+                auto idStr = idElem.str();
+                if (idStr == ShardIdentityType::IdName) {
+                    if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
+                        uasserted(40070,
+                                  "cannot delete shardIdentity document while in --shardsvr mode");
+                    } else {
+                        warning() << "Shard identity document rolled back.  Will shut down after "
+                                     "finishing rollback.";
+                        ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
+                    }
                 }
             }
         }
@@ -327,7 +355,7 @@ void CollectionShardingState::onDropCollection(OperationContext* opCtx,
     dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-        _nss == NamespaceString::kConfigCollectionNamespace) {
+        _nss == NamespaceString::kServerConfigurationNamespace) {
         // Dropping system collections is not allowed for end users.
         invariant(!opCtx->writesAreReplicated());
         invariant(repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback());
@@ -351,6 +379,52 @@ void CollectionShardingState::onDropCollection(OperationContext* opCtx,
                 ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
             }
         }
+    }
+}
+
+void CollectionShardingState::_onConfigRefreshCompleteInvalidateCachedMetadata(
+    OperationContext* opCtx, const BSONObj& query, const BSONObj& update) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+    // If not primary, check whether a chunk metadata refresh just finished and invalidate the
+    // catalog cache's in-memory chunk metadata cache if true.
+    if (!isPrimary(opCtx, _nss)) {
+        // Extract which collection entry is being updated
+        std::string refreshCollection;
+        fassertStatusOK(
+            40477,
+            bsonExtractStringField(query, ShardCollectionType::uuid.name(), &refreshCollection));
+
+        // Parse the '$set' update, which will contain the 'refreshSequenceNumber' if it is present.
+        BSONElement updateElement;
+        fassertStatusOK(40478,
+                        bsonExtractTypedField(update, StringData("$set"), Object, &updateElement));
+        BSONObj setField = updateElement.Obj();
+
+        // The refreshSequenceNumber is only updated when a chunk metadata refresh completes.
+        if (setField.hasField(ShardCollectionType::refreshSequenceNumber.name())) {
+            Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(refreshCollection);
+        }
+    }
+}
+
+void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadata(OperationContext* opCtx,
+                                                                      const BSONObj& query) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+    // If not primary, invalidate the catalog cache's in-memory chunk metadata cache for the
+    // collection specified in 'query'. The collection metadata has been dropped, so the cached
+    // metadata must be invalidated.
+    if (!isPrimary(opCtx, _nss)) {
+        // Extract which collection entry is being deleted from the _id field.
+        std::string deletedCollection;
+        fassertStatusOK(
+            40479,
+            bsonExtractStringField(query, ShardCollectionType::uuid.name(), &deletedCollection));
+
+        Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(deletedCollection);
     }
 }
 

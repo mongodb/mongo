@@ -205,20 +205,52 @@ public:
      */
     boost::optional<KeyRange> getNextOrphanRange(BSONObj const& startingFrom);
 
-    // Replication subsystem hooks. If this collection is serving as a source for migration, these
-    // methods inform it of any changes to its contents.
-
+    /**
+     * Replication oplog OpObserver hooks. Informs the sharding system of changes that may be
+     * relevant to ongoing operations.
+     *
+     * The global exclusive lock is expected to be held by the caller of any of these functions.
+     */
     bool isDocumentInMigratingChunk(OperationContext* opCtx, const BSONObj& doc);
-
     void onInsertOp(OperationContext* opCtx, const BSONObj& insertedDoc);
-
-    void onUpdateOp(OperationContext* opCtx, const BSONObj& updatedDoc);
-
+    void onUpdateOp(OperationContext* opCtx,
+                    const BSONObj& query,
+                    const BSONObj& update,
+                    const BSONObj& updatedDoc);
     void onDeleteOp(OperationContext* opCtx, const DeleteState& deleteState);
-
     void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
 private:
+    /**
+     * On shard secondaries, invalidates the catalog cache's in-memory routing table for the
+     * collection specified in the _id field of 'query' if 'update' bumps the refreshSequenceNumber
+     * -- meaning a chunk metadata refresh finished being applied to the collection's locally
+     * persisted metadata store. Invalidating the catalog cache's routing table will provoke a
+     * routing table refresh next time the routing table is requested and the new metadata updates
+     * will be found.
+     *
+     * query - BSON with an _id that identifies which collections entry is being updated.
+     * update - the $set update being applied to the collections entry.
+     *
+     * The global exclusive lock is expected to be held by the caller.
+     */
+    void _onConfigRefreshCompleteInvalidateCachedMetadata(OperationContext* opCtx,
+                                                          const BSONObj& query,
+                                                          const BSONObj& update);
+
+    /**
+     * On secondaries, invalidates the catalog cache's in-memory routing table for the collection
+     * specified in the _id field of 'query' because the collection entry has been deleted as part
+     * of dropping the data collection. Invalidating the catalog cache's routing table will provoke
+     * a routing table refresh next time the routing table is requested and the metadata update will
+     * be discovered.
+     *
+     * query - BSON with an _id field that identifies which collections entry is being updated.
+     *
+     * The global exclusive lock is expected to be held by the caller.
+     */
+    void _onConfigDeleteInvalidateCachedMetadata(OperationContext* opCtx, const BSONObj& query);
+
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *

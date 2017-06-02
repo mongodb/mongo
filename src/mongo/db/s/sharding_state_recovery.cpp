@@ -188,7 +188,8 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
     try {
         // Use boost::optional so we can release the locks early
         boost::optional<AutoGetOrCreateDb> autoGetOrCreateDb;
-        autoGetOrCreateDb.emplace(opCtx, NamespaceString::kConfigCollectionNamespace.db(), MODE_X);
+        autoGetOrCreateDb.emplace(
+            opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
         BSONObj updateObj = RecoveryDocument::createChangeObj(
             grid.shardRegistry()->getConfigServerConnectionString(),
@@ -198,11 +199,11 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
 
         LOG(1) << "Changing sharding recovery document " << redact(updateObj);
 
-        UpdateRequest updateReq(NamespaceString::kConfigCollectionNamespace);
+        UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
         updateReq.setQuery(RecoveryDocument::getQuery());
         updateReq.setUpdates(updateObj);
         updateReq.setUpsert();
-        UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
+        UpdateLifecycleImpl updateLifecycle(NamespaceString::kServerConfigurationNamespace);
         updateReq.setLifecycle(&updateLifecycle);
 
         UpdateResult result = update(opCtx, autoGetOrCreateDb->getDb(), updateReq);
@@ -254,7 +255,7 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
     BSONObj recoveryDocBSON;
 
     try {
-        AutoGetCollection autoColl(opCtx, NamespaceString::kConfigCollectionNamespace, MODE_IS);
+        AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IS);
         if (!Helpers::findOne(
                 opCtx, autoColl.getCollection(), RecoveryDocument::getQuery(), recoveryDocBSON)) {
             return Status::OK();
@@ -289,7 +290,7 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
     Status status =
         grid.catalogClient(opCtx)->logChange(opCtx,
                                              "Sharding minOpTime recovery",
-                                             NamespaceString::kConfigCollectionNamespace.ns(),
+                                             NamespaceString::kServerConfigurationNamespace.ns(),
                                              recoveryDocBSON,
                                              ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK())

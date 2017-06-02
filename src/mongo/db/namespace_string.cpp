@@ -72,7 +72,7 @@ const string escapeTable[256] = {
     ".240", ".241", ".242", ".243", ".244", ".245", ".246", ".247", ".248", ".249", ".250", ".251",
     ".252", ".253", ".254", ".255"};
 
-const char kConfigCollection[] = "admin.system.version";
+const char kServerConfiguration[] = "admin.system.version";
 const char kLogicalTimeKeysCollection[] = "admin.system.keys";
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
@@ -91,7 +91,7 @@ bool legalClientSystemNS(StringData ns) {
 
     if (ns == "admin.system.roles")
         return true;
-    if (ns == kConfigCollection)
+    if (ns == kServerConfiguration)
         return true;
     if (ns == kLogicalTimeKeysCollection)
         return true;
@@ -113,8 +113,9 @@ constexpr StringData NamespaceString::kAdminDb;
 constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kConfigDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
+constexpr StringData NamespaceString::kShardConfigCollectionsCollectionName;
 
-const NamespaceString NamespaceString::kConfigCollectionNamespace(kConfigCollection);
+const NamespaceString NamespaceString::kServerConfigurationNamespace(kServerConfiguration);
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;

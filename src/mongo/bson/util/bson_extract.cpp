@@ -38,7 +38,9 @@ Status bsonExtractField(const BSONObj& object, StringData fieldName, BSONElement
         return Status(ErrorCodes::NoSuchKey,
                       mongoutils::str::stream() << "Missing expected field \""
                                                 << fieldName.toString()
-                                                << "\"");
+                                                << "\" in object '"
+                                                << object
+                                                << "'.");
     *outElement = element;
     return Status::OK();
 }

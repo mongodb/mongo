@@ -412,7 +412,7 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
                                  "queryableBackupMode. If not in queryableBackupMode, you can edit "
                                  "the shardIdentity document by starting the server *without* "
                                  "--shardsvr, manually updating the shardIdentity document in the "
-                              << NamespaceString::kConfigCollectionNamespace.toString()
+                              << NamespaceString::kServerConfigurationNamespace.toString()
                               << " collection, and restarting the server with --shardsvr."};
         }
 
@@ -420,7 +420,8 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
         BSONObj shardIdentityBSON;
         bool foundShardIdentity = false;
         try {
-            AutoGetCollection autoColl(opCtx, NamespaceString::kConfigCollectionNamespace, MODE_IS);
+            AutoGetCollection autoColl(
+                opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IS);
             foundShardIdentity = Helpers::findOne(opCtx,
                                                   autoColl.getCollection(),
                                                   BSON("_id" << ShardIdentityType::IdName),
@@ -433,7 +434,7 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
             if (!foundShardIdentity) {
                 warning() << "Started with --shardsvr, but no shardIdentity document was found on "
                              "disk in "
-                          << NamespaceString::kConfigCollectionNamespace
+                          << NamespaceString::kServerConfigurationNamespace
                           << ". This most likely means this server has not yet been added to a "
                              "sharded cluster.";
                 return false;
@@ -459,7 +460,7 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
             if (!shardIdentityBSON.isEmpty()) {
                 warning() << "Not started with --shardsvr, but a shardIdentity document was found "
                              "on disk in "
-                          << NamespaceString::kConfigCollectionNamespace << ": "
+                          << NamespaceString::kServerConfigurationNamespace << ": "
                           << shardIdentityBSON;
             }
             return false;
@@ -583,14 +584,15 @@ Status ShardingState::updateShardIdentityConfigString(OperationContext* opCtx,
                                                       const std::string& newConnectionString) {
     BSONObj updateObj(ShardIdentityType::createConfigServerUpdateObject(newConnectionString));
 
-    UpdateRequest updateReq(NamespaceString::kConfigCollectionNamespace);
+    UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
     updateReq.setQuery(BSON("_id" << ShardIdentityType::IdName));
     updateReq.setUpdates(updateObj);
-    UpdateLifecycleImpl updateLifecycle(NamespaceString::kConfigCollectionNamespace);
+    UpdateLifecycleImpl updateLifecycle(NamespaceString::kServerConfigurationNamespace);
     updateReq.setLifecycle(&updateLifecycle);
 
     try {
-        AutoGetOrCreateDb autoDb(opCtx, NamespaceString::kConfigCollectionNamespace.db(), MODE_X);
+        AutoGetOrCreateDb autoDb(
+            opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
         auto result = update(opCtx, autoDb.getDb(), updateReq);
         if (result.numMatched == 0) {

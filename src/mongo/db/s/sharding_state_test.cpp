@@ -419,7 +419,7 @@ TEST_F(ShardingStateTest,
                                         << "shardIdentity"
                                         << "configsvrConnectionString"
                                         << "invalid");
-    _dbDirectClient->insert(NamespaceString::kConfigCollectionNamespace.toString(),
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
                             invalidShardIdentity);
 
     storageGlobalParams.readOnly = false;
@@ -450,7 +450,7 @@ TEST_F(ShardingStateTest,
     ASSERT_OK(shardIdentity.validate());
     BSONObj validShardIdentity = shardIdentity.toBSON();
 
-    _dbDirectClient->insert(NamespaceString::kConfigCollectionNamespace.toString(),
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
                             validShardIdentity);
 
     storageGlobalParams.readOnly = false;
@@ -478,7 +478,7 @@ TEST_F(ShardingStateTest,
 
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndNotShardServerAndInvalidShardIdentity) {
-    _dbDirectClient->insert(NamespaceString::kConfigCollectionNamespace.toString(),
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
                             BSON("_id"
                                  << "shardIdentity"
                                  << "configsvrConnectionString"
@@ -510,7 +510,7 @@ TEST_F(ShardingStateTest,
     ASSERT_OK(shardIdentity.validate());
     BSONObj validShardIdentity = shardIdentity.toBSON();
 
-    _dbDirectClient->insert(NamespaceString::kConfigCollectionNamespace.toString(),
+    _dbDirectClient->insert(NamespaceString::kServerConfigurationNamespace.toString(),
                             validShardIdentity);
 
     // The shardIdentity doc on disk is ignored if ClusterRole is None.

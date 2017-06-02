@@ -727,7 +727,7 @@ BSONObj ShardingCatalogManagerImpl::createShardIdentityUpsertForAddShard(
     updateRequest->addToUpdates(updateDoc.release());
 
     BatchedCommandRequest commandRequest(updateRequest.release());
-    commandRequest.setNS(NamespaceString::kConfigCollectionNamespace);
+    commandRequest.setNS(NamespaceString::kServerConfigurationNamespace);
     commandRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
     return commandRequest.toBSON();

@@ -117,7 +117,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
     auto css = CollectionShardingState::get(opCtx, args.nss);
     if (!args.fromMigrate) {
-        css->onUpdateOp(opCtx, args.updatedDoc);
+        css->onUpdateOp(opCtx, args.criteria, args.update, args.updatedDoc);
     }
 
     if (strstr(args.nss.ns().c_str(), ".system.js")) {

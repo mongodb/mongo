@@ -73,7 +73,7 @@ TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
     Lock::GlobalWrite lock(operationContext());
 
     CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+                                              NamespaceString::kServerConfigurationNamespace);
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
@@ -97,7 +97,7 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
     Lock::GlobalWrite lock(operationContext());
 
     CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+                                              NamespaceString::kServerConfigurationNamespace);
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
@@ -143,7 +143,7 @@ TEST_F(CollShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument
     Lock::GlobalWrite lock(operationContext());
 
     CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+                                              NamespaceString::kServerConfigurationNamespace);
 
     ShardIdentityType shardIdentity;
     shardIdentity.setShardName("a");
@@ -157,7 +157,7 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfShardIdentityDocWasNot
     Lock::GlobalWrite lock(operationContext());
 
     CollectionShardingState collShardingState(getServiceContext(),
-                                              NamespaceString::kConfigCollectionNamespace);
+                                              NamespaceString::kServerConfigurationNamespace);
 
     WriteUnitOfWork wuow(operationContext());
     collShardingState.onInsertOp(operationContext(), BSON("_id" << 1));

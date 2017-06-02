@@ -39,7 +39,8 @@
 
 namespace mongo {
 
-const std::string ShardCollectionType::ConfigNS = "config.collections";
+const std::string ShardCollectionType::ConfigNS =
+    NamespaceString::kShardConfigCollectionsCollectionName.toString();
 
 const BSONField<std::string> ShardCollectionType::uuid("_id");
 const BSONField<std::string> ShardCollectionType::ns("ns");

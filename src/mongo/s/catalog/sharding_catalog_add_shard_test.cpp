@@ -161,7 +161,7 @@ protected:
         invariant(request.parseBSON("admin", upsertCmdObj, &errMsg) || !request.isValid(&errMsg));
 
         expectUpdatesReturnSuccess(expectedHost,
-                                   NamespaceString(NamespaceString::kConfigCollectionNamespace),
+                                   NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    request.getUpdateRequest());
     }
 
@@ -178,7 +178,7 @@ protected:
         invariant(request.parseBSON("admin", upsertCmdObj, &errMsg) || !request.isValid(&errMsg));
 
         expectUpdatesReturnFailure(expectedHost,
-                                   NamespaceString(NamespaceString::kConfigCollectionNamespace),
+                                   NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    request.getUpdateRequest(),
                                    statusToReturn);
     }
