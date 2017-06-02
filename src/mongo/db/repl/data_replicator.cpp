@@ -386,10 +386,12 @@ Status DatabasesCloner::start() {
     _status = Status::OK();
 
     log() << "starting cloning of all databases";
-    // Schedule listDatabase command which will kick off the database cloner per result db.
+    // Schedule listDatabase command which will kick off the database cloner per result db. We only
+    // retrieve database names since computing & fetching all database stats can be costly on the
+    // remote node when there are a large number of collections.
     Request listDBsReq(_source,
                        "admin",
-                       BSON("listDatabases" << true),
+                       BSON("listDatabases" << true << "nameOnly" << true),
                        rpc::ServerSelectionMetadata(true, boost::none).toBSON());
     CBHStatus s = _exec->scheduleRemoteCommand(
         listDBsReq,
