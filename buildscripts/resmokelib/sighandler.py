@@ -9,6 +9,7 @@ import os
 import signal
 import sys
 import threading
+import time
 import traceback
 
 _is_windows = (sys.platform == "win32")
@@ -17,9 +18,10 @@ if _is_windows:
     import win32event
 
 from . import reportfile
+from . import testing
 
 
-def register(logger, suites):
+def register(logger, suites, start_time):
     """
     On Windows, set up an event object to wait for signal, otherwise, register a signal handler
     for the SIGUSR1 signal.
@@ -28,18 +30,17 @@ def register(logger, suites):
     def _handle_sigusr1(signum, frame):
         """
         Signal handler that will dump the stacks of all threads and
-        then write out the report file.
+        then write out the report file and log suite summaries.
         """
 
         header_msg = "Dumping stacks due to SIGUSR1 signal"
 
-        _dump_stacks(logger, header_msg)
-        reportfile.write(suites)
+        _dump_and_log(header_msg)
 
     def _handle_set_event(event_handle):
         """
         Windows event object handler that will dump the stacks of all threads and then write out
-        the report file.
+        the report file and log suite summaries.
         """
 
         while True:
@@ -54,8 +55,18 @@ def register(logger, suites):
             else:
                 header_msg = "Dumping stacks due to signal from win32event.SetEvent"
 
-                _dump_stacks(logger, header_msg)
-                reportfile.write(suites)
+                _dump_and_log(header_msg)
+
+    def _dump_and_log(header_msg):
+        """
+        Dumps the stacks of all threads, writes the report file, and logs the suite summaries.
+        """
+        _dump_stacks(logger, header_msg)
+        reportfile.write(suites)
+
+        for suite in suites:
+            suite.interrupt()
+        testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
 
     # On Windows spawn a thread to wait on an event object for signal to dump stacks. For Cygwin

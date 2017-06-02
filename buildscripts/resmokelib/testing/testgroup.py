@@ -36,6 +36,14 @@ class TestGroup(object):
         # report intermediate results.
         self._partial_reports = None
 
+    def get_active_report(self):
+        """
+        Returns the partial report of the currently running execution, if there is one.
+        """
+        if not self._partial_reports:
+            return None
+        return _report.TestReport.combine(*self._partial_reports)
+
     def get_reports(self):
         """
         Returns the list of reports. If there's an execution currently
@@ -44,8 +52,7 @@ class TestGroup(object):
         """
 
         if self._partial_reports is not None:
-            active_report = _report.TestReport.combine(*self._partial_reports)
-            return self._reports + [active_report]
+            return self._reports + [self.get_active_report()]
 
         return self._reports
 
@@ -64,6 +71,17 @@ class TestGroup(object):
         self._end_times.append(time.time())
         self._reports.append(report)
         self._partial_reports = None
+
+    def interrupt(self):
+        """
+        Converts any partial reports to completed reports and ensures that report is ended.
+
+        Called from Suite.interrupt() when handling a SIGUSR1 interrupt.
+        """
+
+        active_report = self.get_active_report()
+        if active_report:
+            self.record_end(active_report)
 
     def summarize_latest(self, sb):
         """

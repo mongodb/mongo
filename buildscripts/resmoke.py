@@ -75,16 +75,7 @@ def _execute_suite(suite):
 
 def _log_summary(logger, suites, time_taken):
     if len(suites) > 1:
-        sb = []
-        sb.append("Summary of all suites: %d suites ran in %0.2f seconds"
-                  % (len(suites), time_taken))
-        for suite in suites:
-            suite_sb = []
-            suite.summarize(suite_sb)
-            sb.append("    %s: %s" % (suite.get_name(), "\n    ".join(suite_sb)))
-
-        logger.info("=" * 80)
-        logger.info("\n".join(sb))
+        resmokelib.testing.suite.Suite.log_summaries(logger, suites, time_taken)
 
 
 def _summarize_suite(suite):
@@ -154,7 +145,7 @@ def main():
 
     # Register a signal handler or Windows event object so we can write the report file if the task
     # times out.
-    resmokelib.sighandler.register(resmoke_logger, suites)
+    resmokelib.sighandler.register(resmoke_logger, suites, start_time)
 
     # Run the suite finder after the test suite parsing is complete.
     if values.find_suites:

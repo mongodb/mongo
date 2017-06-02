@@ -107,6 +107,19 @@ class Suite(object):
         if self.return_code is None:
             self.return_code = self.test_group.return_code
 
+    def interrupt(self):
+        """
+        Records the end of the suite and forces the end of the execution's report.
+
+        Used when handling SIGUSR1 interrupts.
+        """
+
+        if self._end_time:
+            return
+
+        self.record_end()
+        self.test_group.interrupt()
+
     def summarize(self, sb):
         """
         Appends a summary of the test group onto the string builder 'sb'.
@@ -131,3 +144,16 @@ class Suite(object):
                   " (%d succeeded, %d were skipped, %d failed, %d errored)" % summary)
 
         sb.append(summarized_group)
+
+    @staticmethod
+    def log_summaries(logger, suites, time_taken):
+        sb = []
+        sb.append("Summary of all suites: %d suites ran in %0.2f seconds"
+                  % (len(suites), time_taken))
+        for suite in suites:
+            suite_sb = []
+            suite.summarize(suite_sb)
+            sb.append("    %s: %s" % (suite.get_name(), "\n    ".join(suite_sb)))
+
+        logger.info("=" * 80)
+        logger.info("\n".join(sb))
