@@ -648,7 +648,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
 		conn->stat_tid_set = false;
 	}
-	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
+	__wt_cond_destroy(session, &conn->stat_cond);
 
 	/* Log a set of statistics on shutdown if configured. */
 	if (is_close)
