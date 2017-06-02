@@ -361,12 +361,12 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 }
 }  // namespace
 
-// We set the featureCompatibilityVersion to 3.4 in the mongos so that BSON validation always uses
-// BSONVersion::kLatest.
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion34, ("EndStartupOptionStorage"))
+// We set the featureCompatibilityVersion to 3.6 in the mongos and rely on the shards to reject
+// usages of new features if their featureCompatibilityVersion is lower.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStartupOptionStorage"))
 (InitializerContext* context) {
     mongo::serverGlobalParams.featureCompatibility.version.store(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
+        ServerGlobalParams::FeatureCompatibility::Version::k36);
     return Status::OK();
 }
 

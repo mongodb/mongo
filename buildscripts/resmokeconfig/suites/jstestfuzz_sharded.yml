@@ -14,7 +14,6 @@ executor:
       global_vars:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
-          forceValidationWithFeatureCompatibilityVersion: "3.4"
   fixture:
     class: ShardedClusterFixture
     mongos_options:

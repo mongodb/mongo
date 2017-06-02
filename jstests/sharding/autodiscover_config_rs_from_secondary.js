@@ -14,6 +14,10 @@
     conf.writeConcernMajorityJournalDefault = true;
     rst.initiate(conf);
 
+    // Ensure the featureCompatibilityVersion is 3.4 so that the mongos can connect if it is version
+    // 3.4.
+    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+
     var seedList = rst.name + "/" + rst.nodes[1].host;  // node 1 is guaranteed to not be primary
     {
         // Ensure that mongos can start up when given the CSRS secondary, discover the primary, and

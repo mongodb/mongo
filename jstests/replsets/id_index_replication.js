@@ -50,18 +50,6 @@
     assert.eq(1, spec.v, "Expected primary to build a v=1 _id index: " + tojson(spec));
     testOplogEntryIdIndexSpec("version_v1", null);
 
-    assert.commandWorked(primaryDB.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
-    var res = primaryDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq("3.2", res.featureCompatibilityVersion, tojson(res));
-
-    assert.commandWorked(primaryDB.createCollection("without_version_FCV32"));
-    allIndexes = primaryDB.without_version_FCV32.getIndexes();
-    spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
-    assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
-    assert.eq(1, spec.v, "Expected primary to build a v=1 _id index: " + tojson(spec));
-    testOplogEntryIdIndexSpec("without_version_FCV32", null);
-
     rst.awaitReplication();
 
     // Verify that the secondary built _id indexes with the same version as on the primary.
@@ -83,11 +71,6 @@
         "Expected secondary to build a v=2 _id index when explicitly requested: " + tojson(spec));
 
     allIndexes = secondaryDB.version_v1.getIndexes();
-    spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
-    assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
-    assert.eq(1, spec.v, "Expected secondary to implicitly build a v=1 _id index: " + tojson(spec));
-
-    allIndexes = secondaryDB.without_version_FCV32.getIndexes();
     spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
     assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
     assert.eq(1, spec.v, "Expected secondary to implicitly build a v=1 _id index: " + tojson(spec));

@@ -20,6 +20,9 @@ var multitest = function(replSetVersion, newNodeVersion, configSettings) {
     // Wait for a primary node.
     var primary = rst.getPrimary();
 
+    // The featureCompatibilityVersion must be 3.4 to have a mixed-version replica set.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+
     // Insert some data and wait for replication.
     for (var i = 0; i < 25; i++) {
         primary.getDB("foo").foo.insert({_id: i});

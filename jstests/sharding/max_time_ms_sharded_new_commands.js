@@ -25,14 +25,14 @@
     // Positive test for "setFeatureCompatibilityVersion"
     configureMaxTimeAlwaysTimeOut("alwaysOn");
     assert.commandFailedWithCode(
-        admin.runCommand({setFeatureCompatibilityVersion: '3.2', maxTimeMS: 1000 * 60 * 60 * 24}),
+        admin.runCommand({setFeatureCompatibilityVersion: '3.4', maxTimeMS: 1000 * 60 * 60 * 24}),
         ErrorCodes.ExceededTimeLimit,
         "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point");
 
     // Negative test for "setFeatureCompatibilityVersion"
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(
-        admin.runCommand({setFeatureCompatibilityVersion: '3.2', maxTimeMS: 1000 * 60 * 60 * 24}),
+        admin.runCommand({setFeatureCompatibilityVersion: '3.4', maxTimeMS: 1000 * 60 * 60 * 24}),
         "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
 
     st.stop();

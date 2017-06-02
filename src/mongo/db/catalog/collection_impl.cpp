@@ -1005,16 +1005,8 @@ public:
     virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
         BSONObj recordBson = record.toBson();
 
-        // Secondaries are configured to always validate using the latest enabled BSON version. But
-        // users should be able to run collection validation on a secondary in "3.2"
-        // featureCompatibilityVersion in order to be alerted to the presence of NumberDecimal.
-        auto bsonValidationVersion = (serverGlobalParams.featureCompatibility.version.load() ==
-                                      ServerGlobalParams::FeatureCompatibility::Version::k32)
-            ? BSONVersion::kV1_0
-            : Validator<BSONObj>::enabledBSONVersion();
-
-        const Status status =
-            validateBSON(recordBson.objdata(), recordBson.objsize(), bsonValidationVersion);
+        const Status status = validateBSON(
+            recordBson.objdata(), recordBson.objsize(), Validator<BSONObj>::enabledBSONVersion());
         if (status.isOK()) {
             *dataSize = recordBson.objsize();
         } else {

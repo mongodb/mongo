@@ -253,18 +253,9 @@ Status validateElementInfo(Buffer* buffer,
             return Status::OK();
 
         case NumberDecimal:
-            if (buffer->version() != BSONVersion::kV1_0) {
-                if (!buffer->skip(sizeof(Decimal128::Value)))
-                    return makeError("Invalid bson", idElem, *elemName);
-                return Status::OK();
-            } else {
-                return makeError(
-                    "Cannot use decimal BSON type when the featureCompatibilityVersion "
-                    "is 3.2. See "
-                    "http://dochub.mongodb.org/core/3.4-feature-compatibility. Found decimal",
-                    idElem,
-                    *elemName);
-            }
+            if (!buffer->skip(sizeof(Decimal128::Value)))
+                return makeError("Invalid bson", idElem, *elemName);
+            return Status::OK();
 
         case DBRef:
             status = buffer->readUTF8String(*elemName, nullptr);

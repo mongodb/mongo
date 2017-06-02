@@ -282,16 +282,73 @@ public:
                 opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
         }
 
+        // Parse the optional 'internalClient' field. This is provided by incoming connections from
+        // mongod and mongos.
+        auto internalClientElement = cmdObj["internalClient"];
+        if (internalClientElement) {
+            auto session = opCtx->getClient()->session();
+            if (session) {
+                session->replaceTags(session->getTags() | transport::Session::kInternalClient);
+            }
+
+            uassert(ErrorCodes::TypeMismatch,
+                    str::stream() << "'internalClient' must be of type Object, but was of type "
+                                  << typeName(internalClientElement.type()),
+                    internalClientElement.type() == BSONType::Object);
+
+            bool foundMaxWireVersion = false;
+            for (auto&& elem : internalClientElement.Obj()) {
+                auto fieldName = elem.fieldNameStringData();
+                if (fieldName == "minWireVersion") {
+                    // We do not currently use 'internalClient.minWireVersion'.
+                    continue;
+                } else if (fieldName == "maxWireVersion") {
+                    foundMaxWireVersion = true;
+
+                    uassert(ErrorCodes::TypeMismatch,
+                            str::stream() << "'maxWireVersion' field of 'internalClient' must be "
+                                             "of type int, but was of type "
+                                          << typeName(elem.type()),
+                            elem.type() == BSONType::NumberInt);
+
+                    // All incoming connections from mongod/mongos of earlier versions should be
+                    // closed if the featureCompatibilityVersion is bumped to 3.6.
+                    if (elem.numberInt() >= WireSpec::instance().incoming.maxWireVersion) {
+                        if (session) {
+                            session->replaceTags(
+                                session->getTags() |
+                                transport::Session::kLatestVersionInternalClientKeepOpen);
+                        }
+                    } else {
+                        if (session) {
+                            session->replaceTags(
+                                session->getTags() &
+                                ~transport::Session::kLatestVersionInternalClientKeepOpen);
+                        }
+                    }
+                } else {
+                    uasserted(ErrorCodes::BadValue,
+                              str::stream() << "Unrecognized field of 'internalClient': '"
+                                            << fieldName
+                                            << "'");
+                }
+            }
+
+            uassert(ErrorCodes::BadValue,
+                    "Missing required field 'maxWireVersion' of 'internalClient'",
+                    foundMaxWireVersion);
+        } else {
+            auto session = opCtx->getClient()->session();
+            if (session && !(session->getTags() & transport::Session::kInternalClient)) {
+                session->replaceTags(session->getTags() |
+                                     transport::Session::kExternalClientKeepOpen);
+            }
+        }
+
         appendReplicationInfo(opCtx, result, 0);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // If we have feature compatibility version 3.4, use a config server mode that 3.2
-            // mongos won't understand. This should prevent a 3.2 mongos from joining the cluster or
-            // making a connection to the config servers.
-            int configServerModeNumber = (serverGlobalParams.featureCompatibility.version.load() ==
-                                          ServerGlobalParams::FeatureCompatibility::Version::k34)
-                ? 2
-                : 1;
+            const int configServerModeNumber = 2;
             result.append("configsvr", configServerModeNumber);
         }
 
@@ -300,7 +357,18 @@ public:
         result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
         result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
-        result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+
+        // If the featureCompatibilityVersion is 3.6, respond with minWireVersion=maxWireVersion.
+        // Then if the connection is from a mongod/mongos of an earlier version, it will fail to
+        // connect.
+        if (internalClientElement &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k36) {
+            result.append("minWireVersion", WireSpec::instance().incoming.maxWireVersion);
+        } else {
+            result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+        }
+
         result.append("readOnly", storageGlobalParams.readOnly);
 
         const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),

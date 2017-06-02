@@ -56,16 +56,6 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
         assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
         st.ensurePrimaryShard('sharded', st.shard0.shardName);
 
-        // We explicitly create an index on the shard key to avoid having mongos attempt to
-        // implicitly create one. This is necessary because mongos would otherwise explicitly
-        // include the "collation" option in the requested index to prevent potentially inheriting
-        // the collation-default collation. However, specifying the "collation" option requires a
-        // v=2 index and that may not be possible if the server has featureCompatibilityVersion=3.2.
-        //
-        // TODO SERVER-25955: Allow mongos to implicitly create the shard key index when sharding a
-        // collection with a "simple" default collation and update this test case to not explicitly
-        // create it.
-        assert.commandWorked(st.s.getDB('sharded').foo.createIndex({x: 1}));
         assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.foo', key: {x: 1}}));
         assert.commandWorked(st.s.adminCommand({split: 'sharded.foo', middle: {x: 0}}));
         assert.commandWorked(

@@ -8,21 +8,16 @@
     const master = rt.start(true);
     const masterDB = master.getDB("test");
 
-    // Initially, featureCompatibilityVersion is 3.4, so we will create v=2 indexes.
-    let res = master.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-    assert.commandWorked(masterDB.createCollection("collV2"));
+    // Create a collection with a v=2 _id index.
+    assert.commandWorked(
+        masterDB.createCollection("collV2", {idIndex: {key: {_id: 1}, name: "_id_", v: 2}}));
     let spec = GetIndexHelpers.findByName(masterDB.collV2.getIndexes(), "_id_");
     assert.neq(spec, null);
     assert.eq(spec.v, 2);
 
-    // Set featureCompatibilityVersion to 3.2, so we create v=1 indexes.
-    assert.commandWorked(master.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
-    res = master.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.2");
-    assert.commandWorked(masterDB.createCollection("collV1"));
+    // Create a collection with a v=1 _id index.
+    assert.commandWorked(
+        masterDB.createCollection("collV1", {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
     spec = GetIndexHelpers.findByName(masterDB.collV1.getIndexes(), "_id_");
     assert.neq(spec, null);
     assert.eq(spec.v, 1);

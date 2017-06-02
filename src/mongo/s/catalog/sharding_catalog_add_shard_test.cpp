@@ -132,6 +132,19 @@ protected:
         });
     }
 
+    void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
+                                              StatusWith<BSONObj> response) {
+        onCommandForAddShard([&, target, response](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_EQ(request.dbname, "admin");
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("setFeatureCompatibilityVersion"
+                                   << "3.4"));
+
+            return response;
+        });
+    }
+
     /**
      * Waits for a request for the shardIdentity document to be upserted into a shard from the
      * config server on addShard.
@@ -404,6 +417,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
 
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
@@ -482,6 +498,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
                                   << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
@@ -896,6 +915,9 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
@@ -957,6 +979,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
@@ -1033,6 +1058,9 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
                                   << 1000),
                              BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
                              BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
+
+    // The shard receives the setFeatureCompatibilityVersion command.
+    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
 
     // The shardIdentity doc inserted into the admin.system.version collection on the shard.
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);

@@ -46,7 +46,6 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/resolved_view.h"
@@ -262,14 +261,6 @@ Status ViewCatalog::createView(OperationContext* opCtx,
                                const BSONObj& collation) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k32 &&
-        serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load()) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "Cannot create view when the featureCompatibilityVersion is 3.2. See "
-                      "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-    }
-
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
@@ -299,14 +290,6 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k32 &&
-        serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load()) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "Cannot modify view when the featureCompatibilityVersion is 3.2. See "
-                      "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-    }
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,

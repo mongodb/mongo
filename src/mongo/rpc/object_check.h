@@ -45,19 +45,10 @@ class Status;
 template <>
 struct Validator<BSONObj> {
     inline static BSONVersion enabledBSONVersion() {
-        // If we're in the primary/master role accepting writes, but our feature compatibility
-        // version is 3.2, then we want to reject insertion of the decimal data type. Therefore, we
-        // perform BSON 1.0 validation.
-        if (serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load() &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k32) {
-            return BSONVersion::kV1_0;
-        }
-
-        // Except for the special case above, we want to accept any BSON version which we know
-        // about. For instance, if we are a slave/secondary syncing from a primary/master and we are
-        // in 3.2 feature compatibility mode, we still want to be able to sync NumberDecimal data.
-        return BSONVersion::kV1_1;
+        // The enabled BSON version is always the latest BSON version if no new BSON types have been
+        // added during the release. Otherwise, the BSON version returned should be controlled
+        // through the featureCompatibilityVersion.
+        return BSONVersion::kLatest;
     }
 
     inline static Status validateLoad(const char* ptr, size_t length) {

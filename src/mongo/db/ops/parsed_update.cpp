@@ -35,7 +35,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -52,13 +51,6 @@ Status ParsedUpdate::parseRequest() {
     invariant(_request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
 
     if (!_request->getCollation().isEmpty()) {
-        if (serverGlobalParams.featureCompatibility.version.load() ==
-            ServerGlobalParams::FeatureCompatibility::Version::k32) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "The featureCompatibilityVersion must be 3.4 to use collation. See "
-                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-        }
-
         auto collator = CollatorFactoryInterface::get(_opCtx->getServiceContext())
                             ->makeFromBSON(_request->getCollation());
         if (!collator.isOK()) {

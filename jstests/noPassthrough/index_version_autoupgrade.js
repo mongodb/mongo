@@ -7,15 +7,8 @@
 
     load("jstests/libs/get_index_helpers.js");
 
-    function getFeatureCompatibilityVersion(conn) {
-        const res = assert.commandWorked(
-            conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
-        return res.featureCompatibilityVersion;
-    }
-
     var conn = MongoRunner.runMongod({});
     assert.neq(null, conn, "mongod was unable to start up");
-    assert.eq("3.4", getFeatureCompatibilityVersion(conn));
 
     var testDB = conn.getDB("test");
     assert.commandWorked(testDB.runCommand({create: "index_version_autoupgrade"}));
@@ -42,10 +35,9 @@
         testDB.dropDatabase();
         var coll = testDB.index_version_autoupgrade;
 
-        // Create a v=1 _id index. This requires setting featureCompatibilityVersion to 3.2.
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
-        assert.commandWorked(testDB.createCollection("index_version_autoupgrade"));
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+        // Create a v=1 _id index.
+        assert.commandWorked(testDB.createCollection(
+            "index_version_autoupgrade", {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
         var allIndexes = coll.getIndexes();
         var spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
         assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
@@ -151,7 +143,6 @@
     // version.
     var cloneConn = MongoRunner.runMongod({});
     assert.neq(null, cloneConn, "mongod was unable to start up");
-    assert.eq("3.4", getFeatureCompatibilityVersion(cloneConn));
     testIndexVersionAutoUpgrades(function(coll) {
         var cloneDB = cloneConn.getDB(coll.getDB().getName());
         assert.commandWorked(cloneDB.runCommand({
@@ -165,7 +156,6 @@
     // Test that the "clone" command doesn't upgrade existing indexes to the latest version.
     cloneConn = MongoRunner.runMongod({});
     assert.neq(null, cloneConn, "mongod was unable to start up");
-    assert.eq("3.4", getFeatureCompatibilityVersion(cloneConn));
     testIndexVersionAutoUpgrades(function(coll) {
         var cloneDB = cloneConn.getDB(coll.getDB().getName());
         assert.commandWorked(cloneDB.runCommand({

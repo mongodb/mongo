@@ -69,6 +69,9 @@ public:
 
     static constexpr TagMask kEmptyTagMask = 0;
     static constexpr TagMask kKeepOpen = 1;
+    static constexpr TagMask kInternalClient = 2;
+    static constexpr TagMask kLatestVersionInternalClientKeepOpen = 4;
+    static constexpr TagMask kExternalClientKeepOpen = 8;
 
     /**
      * Destroys a session, calling end() for this session in its TransportLayer.

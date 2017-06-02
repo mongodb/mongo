@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -432,15 +433,12 @@ void State::prepTempCollection() {
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
             invariant(incColl);
 
-            // We explicitly create a v=2 index on the "0" field so that it is always possible for a
-            // user to emit() decimal keys. Since the incremental collection is not replicated to
-            // any secondaries, there is no risk of inadvertently crashing an older version of
-            // MongoDB when the featureCompatibilityVersion of this server is 3.2.
-            BSONObj indexSpec =
+            auto rawIndexSpec =
                 BSON("key" << BSON("0" << 1) << "ns" << _config.incLong.ns() << "name"
-                           << "_temp_0"
-                           << "v"
-                           << static_cast<int>(IndexVersion::kV2));
+                           << "_temp_0");
+            auto indexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
+                rawIndexSpec, _config.incLong, serverGlobalParams.featureCompatibility));
+
             Status status = incColl->getIndexCatalog()
                                 ->createIndexOnEmptyCollection(_opCtx, indexSpec)
                                 .getStatus();
@@ -1396,16 +1394,6 @@ public:
         auto curOp = CurOp::get(opCtx);
 
         const Config config(dbname, cmd);
-
-        if (!config.collation.isEmpty() &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k32) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::InvalidOptions,
-                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
-                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
-        }
 
         LOG(1) << "mr ns: " << config.nss;
 

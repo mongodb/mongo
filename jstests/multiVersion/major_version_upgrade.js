@@ -73,8 +73,14 @@
             // repairDatabase should similarly succeed.
             assert.commandWorked(testDB.runCommand({repairDatabase: 1}));
 
-            // reIndex should succeed.
-            assert.commandWorked(testDB[collName].reIndex());
+            // reIndex will fail because when featureCompatibilityVersion>=3.4, reIndex
+            // automatically upgrades v=1 indexes to v=2.
+            assert.commandFailed(testDB[collName].reIndex());
+
+            // reIndex should not drop the index.
+            indexSpec = GetIndexHelpers.findByName(testDB[collName].getIndexes(), 'badkp');
+            assert.neq(null, indexSpec, 'could not find index "badkp" after reIndex');
+            assert.eq(1, indexSpec.v, tojson(indexSpec));
 
             // A query that hints the index should succeed.
             assert.commandWorked(testDB.runCommand({find: collName, hint: "badkp"}));

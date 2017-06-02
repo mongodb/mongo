@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/view.h"
@@ -67,13 +66,6 @@ constexpr auto kLargeString =
     "0000000000000000000000000000000000000000000000000000000";
 const auto kOneKiBMatchStage = BSON("$match" << BSON("data" << kLargeString));
 const auto kTinyMatchStage = BSON("$match" << BSONObj());
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion34, ("EndStartupOptionStorage"))
-(InitializerContext* context) {
-    mongo::serverGlobalParams.featureCompatibility.version.store(
-        ServerGlobalParams::FeatureCompatibility::Version::k34);
-    return Status::OK();
-}
 
 class DurableViewCatalogDummy final : public DurableViewCatalog {
 public:

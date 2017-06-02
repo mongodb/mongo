@@ -233,41 +233,19 @@
     assert.commandFailed(mongos.adminCommand(
         {shardCollection: kDbName + '.foo', key: {a: 1}, collation: {locale: 'simple'}}));
 
-    //
-    // Feature compatibility version collation tests.
-    //
-
-    // shardCollection should succeed on an empty collection with a non-simple default collation
-    // if feature compatibility version is 3.4.
+    // shardCollection should succeed on an empty collection with a non-simple default collation.
     mongos.getDB(kDbName).foo.drop();
     assert.commandWorked(
         mongos.getDB(kDbName).createCollection('foo', {collation: {locale: 'en_US'}}));
     assert.commandWorked(mongos.adminCommand(
         {shardCollection: kDbName + '.foo', key: {a: 1}, collation: {locale: 'simple'}}));
 
-    // shardCollection should succeed on an empty collection with no default collation if feature
-    // compatibility version is 3.4.
-    mongos.getDB(kDbName).foo.drop();
-    assert.commandWorked(mongos.getDB(kDbName).createCollection('foo'));
-    assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {a: 1}}));
-
-    // shardCollection should fail on a collection with a non-simple default collation if feature
-    // compatibility version is 3.2.
-    mongos.getDB(kDbName).foo.drop();
-    assert.commandWorked(
-        mongos.getDB(kDbName).createCollection('foo', {collation: {locale: 'en_US'}}));
-    assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
-    assert.commandFailed(mongos.adminCommand(
-        {shardCollection: kDbName + '.foo', key: {a: 1}, collation: {locale: 'simple'}}));
-
-    // shardCollection should succeed on an empty collection with no default collation if feature
-    // compatibility version is 3.2.
+    // shardCollection should succeed on an empty collection with no default collation.
     mongos.getDB(kDbName).foo.drop();
     assert.commandWorked(mongos.getDB(kDbName).createCollection('foo'));
     assert.commandWorked(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {a: 1}}));
 
     mongos.getDB(kDbName).dropDatabase();
-    assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
     //
     // Tests for the shell helper sh.shardCollection().

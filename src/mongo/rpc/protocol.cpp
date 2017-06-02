@@ -174,12 +174,6 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     return {{protos, version}};
 }
 
-bool supportsWireVersionForOpCommandInMongod(const WireVersionInfo version) {
-    // FIND_COMMAND versions support OP_COMMAND (in mongod but not mongos).
-    return (version.minWireVersion <= WireVersion::FIND_COMMAND) &&
-        (version.maxWireVersion >= WireVersion::FIND_COMMAND);
-}
-
 ProtocolSet computeProtocolSet(const WireVersionInfo version) {
     ProtocolSet result = supports::kNone;
     if (version.minWireVersion <= version.maxWireVersion) {

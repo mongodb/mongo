@@ -262,64 +262,64 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
     ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
 
     auto expectedChunksIndexes = std::vector<BSONObj>{
-        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                  << "_id_"
                  << "ns"
                  << "config.chunks"),
-        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
+        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
                  << "ns_1_min_1"
                  << "ns"
                  << "config.chunks"),
-        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "shard" << 1 << "min" << 1)
+        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "shard" << 1 << "min" << 1)
                  << "name"
                  << "ns_1_shard_1_min_1"
                  << "ns"
                  << "config.chunks"),
-        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "lastmod" << 1) << "name"
+        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "lastmod" << 1) << "name"
                  << "ns_1_lastmod_1"
                  << "ns"
                  << "config.chunks")};
     auto expectedLockpingsIndexes =
-        std::vector<BSONObj>{BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+        std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                       << "_id_"
                                       << "ns"
                                       << "config.lockpings"),
-                             BSON("v" << 1 << "key" << BSON("ping" << 1) << "name"
+                             BSON("v" << 2 << "key" << BSON("ping" << 1) << "name"
                                       << "ping_1"
                                       << "ns"
                                       << "config.lockpings")};
     auto expectedLocksIndexes = std::vector<BSONObj>{
-        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                  << "_id_"
                  << "ns"
                  << "config.locks"),
-        BSON("v" << 1 << "key" << BSON("ts" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("ts" << 1) << "name"
                  << "ts_1"
                  << "ns"
                  << "config.locks"),
-        BSON("v" << 1 << "key" << BSON("state" << 1 << "process" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("state" << 1 << "process" << 1) << "name"
                  << "state_1_process_1"
                  << "ns"
                  << "config.locks")};
     auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                  << "_id_"
                  << "ns"
                  << "config.shards"),
-        BSON("v" << 1 << "unique" << true << "key" << BSON("host" << 1) << "name"
+        BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
                  << "host_1"
                  << "ns"
                  << "config.shards")};
     auto expectedTagsIndexes = std::vector<BSONObj>{
-        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                  << "_id_"
                  << "ns"
                  << "config.tags"),
-        BSON("v" << 1 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
+        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
                  << "ns_1_min_1"
                  << "ns"
                  << "config.tags"),
-        BSON("v" << 1 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
                  << "ns_1_tag_1"
                  << "ns"
                  << "config.tags")};
@@ -352,11 +352,11 @@ TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
     ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                  << "_id_"
                  << "ns"
                  << "config.shards"),
-        BSON("v" << 1 << "unique" << true << "key" << BSON("host" << 1) << "name"
+        BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
                  << "host_1"
                  << "ns"
                  << "config.shards")};

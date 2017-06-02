@@ -141,21 +141,20 @@ struct ServerGlobalParams {
     struct FeatureCompatibility {
         enum class Version {
             /**
-             * In this mode, the cluster will expose a 3.2-like API. Attempts by a client to use new
-             * features in 3.4, such as read-only views, collation, or the decimal128 BSON type,
-             * will be rejected.
-             */
-            k32,
-
-            /**
-             * In this mode, new features in 3.4 are allowed. The system should guarantee that no
-             * 3.2 node can participate in a cluster whose feature compatibility version is 3.4.
+             * In this mode, the cluster will expose a 3.4-like API. Attempts by a client to use new
+             * features in 3.6 will be rejected.
              */
             k34,
+
+            /**
+             * In this mode, new features in 3.6 are allowed. The system should guarantee that no
+             * 3.4 node can participate in a cluster whose feature compatibility version is 3.6.
+             */
+            k36,
         };
 
         // Read-only parameter featureCompatibilityVersion.
-        AtomicWord<Version> version{Version::k32};
+        AtomicWord<Version> version{Version::k34};
 
         // Feature validation differs depending on the role of a mongod in a replica set or
         // master/slave configuration. Masters/primaries can accept user-initiated writes and

@@ -38,7 +38,7 @@ namespace mongo {
 namespace {
 
 /**
- * Sets the minimum allowed version for the cluster. If it is 3.2, then the node should not use 3.4
+ * Sets the minimum allowed version for the cluster. If it is 3.4, then the node should not use 3.6
  * features.
  *
  * Format:
@@ -63,10 +63,10 @@ public:
     }
 
     virtual void help(std::stringstream& help) const {
-        help << "Set the API version exposed by this node. If set to \"3.2\", then 3.4 "
-                "features are disabled. If \"3.4\", then 3.4 features are enabled, and all nodes "
-                "in the cluster must be version 3.4. See "
-                "http://dochub.mongodb.org/core/3.4-feature-compatibility.";
+        help << "Set the API version exposed by this node. If set to \"3.4\", then 3.6 "
+                "features are disabled. If \"3.6\", then 3.6 features are enabled, and all nodes "
+                "in the cluster must be version 3.6. See "
+                "http://dochub.mongodb.org/core/3.6-feature-compatibility.";
     }
 
     Status checkAuthForCommand(Client* client,

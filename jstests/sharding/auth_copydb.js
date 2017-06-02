@@ -10,6 +10,10 @@
     var sourceMongodConn = MongoRunner.runMongod({});
     var sourceTestDB = sourceMongodConn.getDB('test');
 
+    // Ensure sourceMongodConn has featureCompatibilityVersion=3.4, so that the sharded cluster can
+    // communicate with it if it has featureCompatibilityVersion=3.4.
+    assert.commandWorked(sourceMongodConn.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+
     sourceTestDB.foo.insert({a: 1});
 
     destAdminDB.createUser({

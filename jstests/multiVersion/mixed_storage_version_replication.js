@@ -676,6 +676,13 @@ function doMultiThreadedWork(primary, numThreads) {
     config.settings = {catchUpTimeoutMillis: 2000};
     replTest.initiate(config);
 
+    // We set the featureCompatibilityVersion to 3.4 so that 3.4 secondaries can successfully
+    // initial sync from a 3.6 primary. We do this prior to adding any other members to the replica
+    // set. This effectively allows us to emulate upgrading some of our nodes to the latest version
+    // while different 3.6 and 3.4 mongod processes are being elected primary.
+    assert.commandWorked(
+        replTest.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+
     for (let i = 1; i < setups.length; ++i) {
         replTest.add(setups[i]);
     }

@@ -617,29 +617,19 @@ StatusWith<std::string> ShardingCatalogManagerImpl::addShard(
         shardType.setMaxSizeMB(maxSize);
     }
 
-    // If the minimum allowed version for the cluster is 3.4, set the featureCompatibilityVersion to
-    // 3.4 on the shard.
-    if (serverGlobalParams.featureCompatibility.version.load() ==
-        ServerGlobalParams::FeatureCompatibility::Version::k34) {
-        auto versionResponse =
-            _runCommandForAddShard(opCtx,
-                                   targeter.get(),
-                                   "admin",
-                                   BSON(FeatureCompatibilityVersion::kCommandName
-                                        << FeatureCompatibilityVersionCommandParser::kVersion34));
-        if (!versionResponse.isOK()) {
-            return versionResponse.getStatus();
-        }
+    // The featureCompatibilityVersion should be the same throughout the cluster.
+    auto versionResponse = _runCommandForAddShard(
+        opCtx,
+        targeter.get(),
+        "admin",
+        BSON(FeatureCompatibilityVersion::kCommandName << FeatureCompatibilityVersion::toString(
+                 serverGlobalParams.featureCompatibility.version.load())));
+    if (!versionResponse.isOK()) {
+        return versionResponse.getStatus();
+    }
 
-        if (!versionResponse.getValue().commandStatus.isOK()) {
-            if (versionResponse.getStatus().code() == ErrorCodes::CommandNotFound) {
-                return {ErrorCodes::OperationFailed,
-                        "featureCompatibilityVersion for cluster is 3.4, cannot add a shard with "
-                        "version below 3.4. See "
-                        "http://dochub.mongodb.org/core/3.4-feature-compatibility."};
-            }
-            return versionResponse.getValue().commandStatus;
-        }
+    if (!versionResponse.getValue().commandStatus.isOK()) {
+        return versionResponse.getValue().commandStatus;
     }
 
     if (!MONGO_FAIL_POINT(dontUpsertShardIdentityOnNewShards)) {

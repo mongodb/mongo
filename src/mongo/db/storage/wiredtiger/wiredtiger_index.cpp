@@ -207,8 +207,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     }
     ss << ",value_format=u";
 
-    // We build v=2 indexes when the featureCompatibilityVersion is 3.4. This means that the server
-    // supports new index features and we can therefore use KeyString::Version::V1.
+    // Index versions greater than 2 use KeyString version 1.
     const int keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
         ? kKeyStringV1Version
         : kKeyStringV0Version;

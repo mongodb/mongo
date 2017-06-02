@@ -138,11 +138,6 @@ StatusWith<ProtocolSetAndWireVersionInfo> parseProtocolSetFromIsMasterReply(
     const BSONObj& isMasterReply);
 
 /**
- * Returns true if wire version supports OP_COMMAND in mongod (not mongos).
- */
-bool supportsWireVersionForOpCommandInMongod(const WireVersionInfo version);
-
-/**
   * Computes supported protocols from wire versions.
   */
 ProtocolSet computeProtocolSet(const WireVersionInfo version);

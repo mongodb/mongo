@@ -115,7 +115,6 @@ env.Library(
         'core',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/index_d',
     ],
 )
 

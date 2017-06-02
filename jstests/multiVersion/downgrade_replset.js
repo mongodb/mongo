@@ -26,6 +26,13 @@ function runDowngradeTest(protocolVersion) {
     var primary = rst.getPrimary();
     var coll = "test.foo";
 
+    // We wait for the feature compatibility version to be set to "3.4" on all nodes of the replica
+    // set in order to ensure that all nodes can be successfully downgraded. This effectively allows
+    // us to emulate upgrading to the latest version with existing data files and then trying to
+    // downgrade back to 3.4.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+    rst.awaitReplication();
+
     jsTest.log("Inserting documents into collection.");
     for (var i = 0; i < 10; i++) {
         primary.getCollection(coll).insert({_id: i, str: "hello world"});

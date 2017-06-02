@@ -545,19 +545,6 @@ public:
             result.append("note", deprecationWarning);
         }
 
-        auto featureCompatibilityVersion = serverGlobalParams.featureCompatibility.version.load();
-        auto validateFeaturesAsMaster =
-            serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load();
-        if (ServerGlobalParams::FeatureCompatibility::Version::k32 == featureCompatibilityVersion &&
-            validateFeaturesAsMaster && cmdObj.hasField("collation")) {
-            return appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 "The featureCompatibilityVersion must be 3.4 to create a collection or "
-                 "view with a default collation. See "
-                 "http://dochub.mongodb.org/core/3.4-feature-compatibility."});
-        }
-
         // Validate _id index spec and fill in missing fields.
         if (auto idIndexElem = cmdObj["idIndex"]) {
             if (cmdObj["viewOn"]) {

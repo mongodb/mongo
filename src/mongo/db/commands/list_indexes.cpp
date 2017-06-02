@@ -164,27 +164,6 @@ public:
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "listIndexes", ns.ns());
 
-            if (ns.ns() == FeatureCompatibilityVersion::kCollection &&
-                indexNames[i] == FeatureCompatibilityVersion::k32IncompatibleIndexName) {
-                BSONObjBuilder bob;
-
-                for (auto&& indexSpecElem : indexSpec) {
-                    auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
-                    if (indexSpecElemFieldName == IndexDescriptor::kIndexVersionFieldName) {
-                        // Include the index version in the command response as a decimal type
-                        // instead of as a 32-bit integer. This is a new BSON type that isn't
-                        // supported by versions of MongoDB earlier than 3.4 that will cause 3.2
-                        // secondaries to crash when performing initial sync.
-                        bob.append(IndexDescriptor::kIndexVersionFieldName,
-                                   indexSpecElem.numberDecimal());
-                    } else {
-                        bob.append(indexSpecElem);
-                    }
-                }
-
-                indexSpec = bob.obj();
-            }
-
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
             member->keyData.clear();

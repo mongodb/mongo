@@ -50,7 +50,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -148,14 +147,6 @@ public:
             return qrStatus.getStatus();
         }
 
-        if (!qrStatus.getValue()->getCollation().isEmpty() &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k32) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "The featureCompatibilityVersion must be 3.4 to use collation. See "
-                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-        }
-
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
 
         ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -250,16 +241,6 @@ public:
         }
 
         auto& qr = qrStatus.getValue();
-
-        if (!qr->getCollation().isEmpty() &&
-            serverGlobalParams.featureCompatibility.version.load() ==
-                ServerGlobalParams::FeatureCompatibility::Version::k32) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::InvalidOptions,
-                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
-                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
-        }
 
         // Validate term before acquiring locks, if provided.
         if (auto term = qr->getReplicationTerm()) {
