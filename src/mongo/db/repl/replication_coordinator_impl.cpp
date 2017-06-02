@@ -265,6 +265,7 @@ InitialSyncerOptions createInitialSyncerOptions(
         replCoord->setMyLastAppliedOpTime(opTime);
         externalState->setGlobalTimestamp(replCoord->getServiceContext(), opTime.getTimestamp());
     };
+    options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
     options.getSlaveDelay = [replCoord]() { return replCoord->getSlaveDelaySecs(); };
     options.syncSourceSelector = replCoord;
     options.replBatchLimitBytes = dur::UncommittedBytesLimit;

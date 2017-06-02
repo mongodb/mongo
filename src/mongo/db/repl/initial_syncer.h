@@ -81,6 +81,9 @@ struct InitialSyncerOptions {
     /** Function to update optime of last operation applied on this node */
     using SetMyLastOptimeFn = stdx::function<void(const OpTime&)>;
 
+    /** Function to reset all optimes on this node (e.g. applied & durable). */
+    using ResetOptimesFn = stdx::function<void()>;
+
     /** Function to sets this node into a specific follower mode. */
     using SetFollowerModeFn = stdx::function<bool(const MemberState&)>;
 
@@ -109,6 +112,7 @@ struct InitialSyncerOptions {
 
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
+    ResetOptimesFn resetOptimes;
     GetSlaveDelayFn getSlaveDelay;
 
     SyncSourceSelector* syncSourceSelector = nullptr;

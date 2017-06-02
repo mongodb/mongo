@@ -218,6 +218,7 @@ InitialSyncer::InitialSyncer(
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
     uassert(ErrorCodes::BadValue, "invalid getMyLastOptime function", _opts.getMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid setMyLastOptime function", _opts.setMyLastOptime);
+    uassert(ErrorCodes::BadValue, "invalid resetOptimes function", _opts.resetOptimes);
     uassert(ErrorCodes::BadValue, "invalid getSlaveDelay function", _opts.getSlaveDelay);
     uassert(ErrorCodes::BadValue, "invalid sync source selector", _opts.syncSourceSelector);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", _onCompletion);
@@ -447,8 +448,12 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     LOG(2) << "Resetting sync source so a new one can be chosen for this initial sync attempt.";
     _syncSource = HostAndPort();
 
+    // Reset all optimes before a new initial sync attempt.
+    _opts.resetOptimes();
     _lastApplied = {};
     _lastFetched = {};
+
+    // Clear the oplog buffer.
     _oplogBuffer->clear(makeOpCtx().get());
 
     // Get sync source.
