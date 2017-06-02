@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "mongo/util/periodic_runner_asio.h"
@@ -56,10 +57,10 @@ void PeriodicRunnerASIO::scheduleJob(PeriodicJob job) {
     std::shared_ptr<executor::AsyncTimerInterface> timer{std::move(uniqueTimer)};
 
     auto asioJob = std::make_shared<PeriodicJobASIO>(std::move(job), _timerFactory->now(), timer);
-    _jobs.insert(_jobs.end(), asioJob);
 
     {
         stdx::unique_lock<stdx::mutex> lk(_stateMutex);
+        _jobs.insert(_jobs.end(), asioJob);
         if (_state == State::kRunning) {
             _scheduleJob(asioJob);
         }
@@ -73,7 +74,8 @@ void PeriodicRunnerASIO::_scheduleJob(std::weak_ptr<PeriodicJobASIO> job) {
     }
 
     // Adjust the timer to expire at the correct time.
-    auto adjustedMS = lockedJob->start + lockedJob->interval - _timerFactory->now();
+    auto adjustedMS =
+        std::max(Milliseconds(0), lockedJob->start + lockedJob->interval - _timerFactory->now());
     lockedJob->timer->expireAfter(adjustedMS);
     lockedJob->timer->asyncWait([this, job](std::error_code ec) mutable {
         if (ec) {
@@ -135,8 +137,10 @@ void PeriodicRunnerASIO::shutdown() {
         _state = State::kComplete;
 
         _io_service.stop();
-
         _jobs.clear();
+
+        lk.unlock();
+
         _thread.join();
     }
 }

@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
