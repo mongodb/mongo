@@ -172,6 +172,11 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                                     << kMajorityReadConcernStr);
     }
 
+    if (_clusterTime && _clusterTime == LogicalTime::kUninitialized) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << kAfterClusterTimeFieldName << " cannot be a null timestamp");
+    }
+
     return Status::OK();
 }
 
