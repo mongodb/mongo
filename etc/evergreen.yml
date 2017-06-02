@@ -511,56 +511,87 @@ functions:
         # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
         # invocation. It must be placed between $preamble and $resmoke.
         wrapper="${resmoke_wrapper}"
-        resmoke_report_file="--reportFile=report.json"
         resmoke="${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py \
                  ${resmoke_args}                   \
                  $extra_args                       \
                  ${test_flags}                     \
                  --log=buildlogger                 \
                  --staggerJobs=on                  \
-                 --tagFile=etc/test_lifecycle.yml  \
                  --taskId=${task_id}"
+
+        # Set variables for mainline builds. Patch builds will override these values below.
+        tag_file=etc/test_retrial.yml
+        retry_on_failure_options="--continueOnFailure --repeat=2"
+        resmoke_tags="retry_on_failure,                                \
+                      retry_on_failure|${task_name},                   \
+                      retry_on_failure|${task_name}|${build_variant},  \
+                      retry_on_failure|${task_name}|${build_variant}|${distro_id}"
+
+        # promote_silent_failures.py is only run on Evergreen mainline. Override in patch builds.
+        run_promote_silent_failures="${python|/opt/mongodbtoolchain/v2/bin/python2}  \
+                                     buildscripts/promote_silent_failures.py -o      \
+                                     report_unreliable.json report_unreliable.json"
 
         # For patch builds, we run reliable and then unreliable tests and combine the reports.
         if [ "${is_patch|}" = "true" ]; then
-          # Disable errexit, until we run combine_reports, so we can execute the reliable and
-          # unreliable tests.
-          set +o errexit
-          # If the "resmoke_wrapper" expansion is used for 'burn_in_tests' then add the reportFile.
-          echo "$wrapper" | grep -q burn_in_tests
-          add_report_file=$?
+          tag_file=etc/test_lifecycle.yml
+          retry_on_failure_options=""
+          run_promote_silent_failures=""
           resmoke_tags="unreliable,                                \
                         unreliable|${task_name},                   \
                         unreliable|${task_name}|${build_variant},  \
                         unreliable|${task_name}|${build_variant}|${distro_id}"
-          # Remove spaces from the tags argument.
-          resmoke_tags=$(echo $resmoke_tags| tr -d " ")
-          report_file=report_reliable.json
-          resmoke_base="$resmoke                         \
-                   --excludeWithAnyTags='$resmoke_tags'  \
-                   --reportFailureStatus=fail            \
-                   --reportFile=$report_file"
-          wrapper_report_file=""
-          if [ $add_report_file -eq 0 ]; then
-            wrapper_report_file="--reportFile=$report_file"
-          fi
-          eval $preamble $wrapper $wrapper_report_file $resmoke_base
-          report_file=report_unreliable.json
-          resmoke_base="$resmoke                         \
-                   --includeWithAnyTags='$resmoke_tags'  \
-                   --reportFailureStatus=silentfail      \
-                   --reportFile=$report_file"
-          if [ $add_report_file -eq 0 ]; then
-            wrapper_report_file="--reportFile=$report_file"
-          fi
-          eval $preamble $wrapper $wrapper_report_file  $resmoke_base
-          #  Reenable errexit, as the return from combine_reports will return the cumulative error.
-          set -o errexit
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
-        else
-          eval $preamble $wrapper $resmoke $resmoke_report_file
         fi
 
+        # Disable errexit, until we run combine_reports, so we can execute the reliable and
+        # unreliable tests.
+        set +o errexit
+
+        # Remove spaces from the tags argument.
+        resmoke_tags=$(echo $resmoke_tags| tr -d " ")
+
+        report_file=report_reliable.json
+        # If the "resmoke_wrapper" expansion is used for 'burn_in_tests' then add the reportFile.
+        echo "$wrapper" | grep -q burn_in_tests
+        add_report_file=$?
+        wrapper_report_file=""
+        if [ $add_report_file -eq 0 ]; then
+          wrapper_report_file="--reportFile=$report_file"
+        fi
+
+        resmoke_base="$resmoke                         \
+                 --excludeWithAnyTags='$resmoke_tags'  \
+                 --reportFailureStatus=fail            \
+                 --reportFile=$report_file             \
+                 --tagFile=$tag_file"
+
+        # Run reliable set of tests once.
+        eval $preamble $wrapper $wrapper_report_file $resmoke_base
+
+        report_file=report_unreliable.json
+        resmoke_base="$resmoke                         \
+                 --includeWithAnyTags='$resmoke_tags'  \
+                 --reportFailureStatus=silentfail      \
+                 --reportFile=$report_file             \
+                 --tagFile=$tag_file                   \
+                 $retry_on_failure_options"
+
+        if [ $add_report_file -eq 0 ]; then
+          wrapper_report_file="--reportFile=$report_file"
+        fi
+
+        # Run unreliable set of tests.
+        eval $preamble $wrapper $wrapper_report_file $resmoke_base
+
+        #  Reenable errexit, as the return from combine_reports will return the cumulative error.
+        set -o errexit
+
+        # If both executions of the test with an "retry_on_failure*" tag fail, promote the task as
+        # a failure. Only promote silent failures on mainline.
+        eval $run_promote_silent_failures
+
+        # Combine reliable and unreliable reports.
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/combine_reports.py -o report.json report_reliable.json report_unreliable.json
 
   "do jepsen setup" :
     - command: shell.exec
@@ -1377,6 +1408,7 @@ tasks:
           - "./etc/*san.suppressions"
           - "./etc/repo_config.yaml"
           - "./etc/test_lifecycle.yml"
+          - "./etc/test_retrial.yml"
           - "./build/integration_tests/**"
           - "./build/integration_tests.txt"
           - "./build/**.gcno"
