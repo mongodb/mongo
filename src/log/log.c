@@ -476,7 +476,7 @@ __wt_log_reset(WT_SESSION_IMPL *session, uint32_t lognum)
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(
 		    session, logfiles[i], &old_lognum));
-		WT_ASSERT(session, old_lognum < lognum);
+		WT_ASSERT(session, old_lognum < lognum || lognum == 1);
 		WT_ERR(__wt_log_remove(session, WT_LOG_FILENAME, old_lognum));
 	}
 	log->fileid = lognum;
