@@ -42,9 +42,9 @@ struct timespec {
  * These are POSIX types which Windows lacks
  * Eventually WiredTiger will migrate away from these types
  */
-typedef uint32_t	u_int;
+typedef unsigned int	u_int;
 typedef unsigned char	u_char;
-typedef uint64_t	u_long;
+typedef unsigned long	u_long;
 
 /*
  * Windows does have ssize_t

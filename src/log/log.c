@@ -472,14 +472,12 @@ __wt_log_reset(WT_SESSION_IMPL *session, uint32_t lognum)
 	 * system.
 	 */
 	WT_RET(__wt_close(session, &log->log_fh));
-	WT_RET(__log_get_files(session,
-	    WT_LOG_FILENAME, &logfiles, &logcount));
+	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(
 		    session, logfiles[i], &old_lognum));
 		WT_ASSERT(session, old_lognum < lognum);
-		WT_ERR(__wt_log_remove(
-		    session, WT_LOG_FILENAME, old_lognum));
+		WT_ERR(__wt_log_remove(session, WT_LOG_FILENAME, old_lognum));
 	}
 	log->fileid = lognum;
 
@@ -487,8 +485,7 @@ __wt_log_reset(WT_SESSION_IMPL *session, uint32_t lognum)
 	WT_WITH_SLOT_LOCK(session, log,
 	    ret = __log_newfile(session, true, NULL));
 	WT_ERR(__wt_log_slot_init(session, false));
-err:	WT_TRET(
-	    __wt_fs_directory_list_free(session, &logfiles, logcount));
+err:	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
 
@@ -1150,8 +1147,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 	WT_ERR(__log_get_files(session, WT_LOG_FILENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		if (lognum > lsn->l.file &&
-		    lognum < log->trunc_lsn.l.file) {
+		if (lognum > lsn->l.file && lognum < log->trunc_lsn.l.file) {
 			WT_ERR(__log_openfile(session,
 			    &log_fh, file_prefix, lognum, 0));
 			/*
@@ -1951,8 +1947,7 @@ advance:
 	/* Truncate if we're in recovery. */
 	if (LF_ISSET(WT_LOGSCAN_RECOVER) &&
 	    __wt_log_cmp(&rd_lsn, &log->trunc_lsn) < 0)
-		WT_ERR(__log_truncate(session,
-		    &rd_lsn, WT_LOG_FILENAME, 0));
+		WT_ERR(__log_truncate(session, &rd_lsn, WT_LOG_FILENAME, 0));
 
 err:	WT_STAT_CONN_INCR(session, log_scans);
 	/*
@@ -2086,8 +2081,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		if (compression_failed ||
 		    result_len / log->allocsize >=
 		    record->size / log->allocsize)
-			WT_STAT_CONN_INCR(session,
-			    log_compress_write_fails);
+			WT_STAT_CONN_INCR(session, log_compress_write_fails);
 		else {
 			WT_STAT_CONN_INCR(session, log_compress_writes);
 			WT_STAT_CONN_INCRV(session, log_compress_mem,

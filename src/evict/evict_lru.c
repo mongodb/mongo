@@ -1706,7 +1706,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 * whether to give up.  When we are only looking for dirty pages,
 	 * search the tree for longer.
 	 */
-	min_pages = 10 * target_pages;
+	min_pages = 10 * (uint64_t)target_pages;
 	if (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) &&
 	    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
 		min_pages *= 10;

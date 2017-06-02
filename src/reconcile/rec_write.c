@@ -2149,8 +2149,8 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	r->page_size = r->page_size_orig = max;
 	if (r->raw_compression)
 		r->max_raw_page_size = r->page_size =
-		    (uint32_t)WT_MIN(r->page_size * 10,
-		    WT_MAX(r->page_size, btree->maxmempage / 2));
+		    (uint32_t)WT_MIN((uint64_t)r->page_size * 10,
+		    WT_MAX((uint64_t)r->page_size, btree->maxmempage / 2));
 	/*
 	 * If we have to split, we want to choose a smaller page size for the
 	 * split pages, because otherwise we could end up splitting one large
