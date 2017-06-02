@@ -920,6 +920,23 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='service_liason',
+    source=[
+        'service_liason.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='sessions_collection',
+    source=[
+        'sessions_collection.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+env.Library(
     target='logical_time',
     source=[
         'logical_time.cpp',
