@@ -55,8 +55,9 @@ StatusWith<LogicalSessionRecord> LogicalSessionRecord::parse(const BSONObj& bson
 
 LogicalSessionRecord LogicalSessionRecord::makeAuthoritativeRecord(LogicalSessionId id,
                                                                    UserName user,
-                                                                   boost::optional<OID> userId) {
-    return LogicalSessionRecord(std::move(id), std::move(user), std::move(userId));
+                                                                   boost::optional<OID> userId,
+                                                                   Date_t now) {
+    return LogicalSessionRecord(std::move(id), std::move(user), std::move(userId), std::move(now));
 }
 
 BSONObj LogicalSessionRecord::toBSON() const {
@@ -65,12 +66,20 @@ BSONObj LogicalSessionRecord::toBSON() const {
     return builder.obj();
 }
 
+std::string LogicalSessionRecord::toString() const {
+    return str::stream() << "LogicalSessionRecord"
+                         << " Id: '" << getLsid() << "'"
+                         << " Owner name: '" << getOwner().getUserName() << "'"
+                         << " Last-use: " << getLastUse().toString();
+}
+
 LogicalSessionRecord::LogicalSessionRecord(LogicalSessionId id,
                                            UserName user,
-                                           boost::optional<OID> userId)
+                                           boost::optional<OID> userId,
+                                           Date_t now)
     : _owner(std::make_pair(std::move(user), std::move(userId))) {
     setLsid(std::move(id));
-    setLastUse(Date_t::now());
+    setLastUse(now);
 
     Session_owner owner;
     owner.setUserName(_owner.first.getUser());

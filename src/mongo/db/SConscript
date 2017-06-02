@@ -936,6 +936,19 @@ env.Library(
     LIBDEPS=[
     ],
 )
+
+env.Library(
+    target='logical_session_cache',
+    source=[
+        'logical_session_cache.cpp',
+    ],
+    LIBDEPS=[
+        'logical_session_record',
+        'sessions_collection',
+        'service_liason',
+    ],
+)
+
 env.Library(
     target='logical_time',
     source=[

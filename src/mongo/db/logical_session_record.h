@@ -71,12 +71,26 @@ public:
      */
     static LogicalSessionRecord makeAuthoritativeRecord(LogicalSessionId id,
                                                         UserName user,
-                                                        boost::optional<OID> userId);
+                                                        boost::optional<OID> userId,
+                                                        Date_t now);
 
     /**
      * Return a BSON representation of this session record.
      */
     BSONObj toBSON() const;
+
+    /**
+     * Return a string represenation of this session record.
+     */
+    std::string toString() const;
+
+    inline bool operator==(const LogicalSessionRecord& rhs) const {
+        return getLsid() == rhs.getLsid() && getSessionOwner() == rhs.getSessionOwner();
+    }
+
+    inline bool operator!=(const LogicalSessionRecord& rhs) const {
+        return !(*this == rhs);
+    }
 
     /**
      * Return the username and id of the User who owns this session. Only a User
@@ -93,9 +107,20 @@ public:
 private:
     LogicalSessionRecord() = default;
 
-    LogicalSessionRecord(LogicalSessionId id, UserName user, boost::optional<OID> userId);
+    LogicalSessionRecord(LogicalSessionId id,
+                         UserName user,
+                         boost::optional<OID> userId,
+                         Date_t now);
 
     Owner _owner;
 };
+
+inline std::ostream& operator<<(std::ostream& s, const LogicalSessionRecord& record) {
+    return (s << record.toString());
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const LogicalSessionRecord& record) {
+    return (s << record.toString());
+}
 
 }  // namespace mongo

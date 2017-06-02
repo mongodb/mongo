@@ -100,13 +100,12 @@ public:
         UUID::Hash _hasher;
     };
 
-
-private:
     /**
      * This constructor exists for IDL only.
      */
     LogicalSessionId();
 
+private:
     /**
      * Construct a LogicalSessionId from a UUID.
      */

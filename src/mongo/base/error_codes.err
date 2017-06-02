@@ -210,6 +210,7 @@ error_code("StaleClusterTime", 209)
 error_code("CannotVerifyAndSignLogicalTime", 210)
 error_code("KeyNotFound", 211)
 error_code("IncompatibleRollbackAlgorithm", 212)
+error_code("DuplicateSession", 213)
 
 # Error codes 4000-8999 are reserved.
 
