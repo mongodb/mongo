@@ -37,17 +37,21 @@ struct __wt_condvar {
  * Don't modify this structure without understanding the read/write locking
  * functions.
  */
-union __wt_rwlock {			/* Read/write lock */
-	uint64_t u;
-	struct {
-		uint32_t wr;		/* Writers and readers */
-	} i;
-	struct {
-		uint16_t writers;	/* Now serving for writers */
-		uint16_t readers;	/* Now serving for readers */
-		uint16_t next;		/* Next available ticket number */
-		uint16_t writers_active;/* Count of active writers */
-	} s;
+struct __wt_rwlock {			/* Read/write lock */
+	volatile union {
+		uint64_t v;			/* Full 64-bit value */
+		struct {
+			uint8_t current;	/* Current ticket */
+			uint8_t next;		/* Next available ticket */
+			uint8_t reader;		/* Read queue ticket */
+			uint8_t __notused;	/* Padding */
+			uint16_t readers_active;/* Count of active readers */
+			uint16_t readers_queued;/* Count of queued readers */
+		} s;
+	} u;
+
+	WT_CONDVAR *cond_readers;	/* Blocking readers */
+	WT_CONDVAR *cond_writers;	/* Blocking writers */
 };
 
 /*
@@ -63,8 +67,8 @@ union __wt_rwlock {			/* Read/write lock */
 #define	SPINLOCK_PTHREAD_MUTEX_ADAPTIVE	3
 
 struct __wt_spinlock {
-	WT_CACHE_LINE_PAD_BEGIN
 #if SPINLOCK_TYPE == SPINLOCK_GCC
+	WT_CACHE_LINE_PAD_BEGIN
 	volatile int lock;
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
@@ -87,5 +91,8 @@ struct __wt_spinlock {
 	int16_t stat_int_usecs_off;	/* waiting server threads offset */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
+
+#if SPINLOCK_TYPE == SPINLOCK_GCC
 	WT_CACHE_LINE_PAD_END
+#endif
 };

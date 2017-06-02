@@ -414,17 +414,19 @@ struct __wt_page_modify {
 		size_t	  discard_allocated;
 	} *ovfl_track;
 
+#define	WT_PAGE_LOCK(s, p) 						\
+	__wt_spin_lock((s), &(p)->modify->page_lock)
+#define	WT_PAGE_TRYLOCK(s, p)						\
+	__wt_spin_trylock((s), &(p)->modify->page_lock)
+#define	WT_PAGE_UNLOCK(s, p) 						\
+	__wt_spin_unlock((s), &(p)->modify->page_lock)
+	WT_SPINLOCK page_lock;		/* Page's spinlock */
+
 	/*
 	 * The write generation is incremented when a page is modified, a page
 	 * is clean if the write generation is 0.
 	 */
 	uint32_t write_gen;
-
-#define	WT_PAGE_LOCK(s, p)						\
-	__wt_spin_lock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
-#define	WT_PAGE_UNLOCK(s, p)						\
-	__wt_spin_unlock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
-	uint8_t page_lock;		/* Page's spinlock */
 
 #define	WT_PM_REC_EMPTY		1	/* Reconciliation: no replacement */
 #define	WT_PM_REC_MULTIBLOCK	2	/* Reconciliation: multiple blocks */
@@ -603,13 +605,6 @@ struct __wt_page {
 	uint8_t unused[2];		/* Unused padding */
 
 	/*
-	 * Used to protect and co-ordinate splits for internal pages and
-	 * reconciliation for all pages. Only used to co-ordinate among the
-	 * uncommon cases that require exclusive access to a page.
-	 */
-	WT_RWLOCK page_lock;
-
-	/*
 	 * The page's read generation acts as an LRU value for each page in the
 	 * tree; it is used by the eviction server thread to select pages to be
 	 * discarded from the in-memory tree.
@@ -635,8 +630,6 @@ struct __wt_page {
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
-	uint64_t evict_pass_gen;	/* Eviction pass generation */
-
 	size_t memory_footprint;	/* Memory attached to the page */
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
@@ -644,6 +637,10 @@ struct __wt_page {
 
 	/* If/when the page is modified, we need lots more information. */
 	WT_PAGE_MODIFY *modify;
+
+	/* This is the 64 byte boundary, try to keep hot fields above here. */
+
+	uint64_t evict_pass_gen;	/* Eviction pass generation */
 };
 
 /*

@@ -15,7 +15,7 @@ extern int __wt_posix_unmap(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *ma
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, WT_CONDVAR **condp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool (*run_func)(WT_SESSION_IMPL *), bool *signalled);
 extern void __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
-extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern int __wt_once(void (*init_routine)(void)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_get_vm_pagesize(void) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __wt_absolute_path(const char *path);

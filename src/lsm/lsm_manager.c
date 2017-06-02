@@ -334,7 +334,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &manager->switch_lock);
 	__wt_spin_destroy(session, &manager->app_lock);
 	__wt_spin_destroy(session, &manager->manager_lock);
-	WT_TRET(__wt_cond_destroy(session, &manager->work_cond));
+	__wt_cond_destroy(session, &manager->work_cond);
 
 	return (ret);
 }

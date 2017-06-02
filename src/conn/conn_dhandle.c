@@ -52,7 +52,7 @@ __wt_conn_dhandle_alloc(
 
 	WT_RET(__wt_calloc_one(session, &dhandle));
 
-	__wt_rwlock_init(session, &dhandle->rwlock);
+	WT_ERR(__wt_rwlock_init(session, &dhandle->rwlock));
 	dhandle->name_hash = __wt_hash_city64(uri, strlen(uri));
 	WT_ERR(__wt_strdup(session, uri, &dhandle->name));
 	WT_ERR(__wt_strdup(session, checkpoint, &dhandle->checkpoint));

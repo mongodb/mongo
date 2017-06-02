@@ -62,14 +62,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
 	/* Read-write locks */
-	__wt_rwlock_init(session, &conn->dhandle_lock);
-	__wt_rwlock_init(session, &conn->hot_backup_lock);
-	__wt_rwlock_init(session, &conn->table_lock);
-
-	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
-	for (i = 0; i < WT_PAGE_LOCKS; ++i)
-		WT_RET(
-		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
+	WT_RET(__wt_rwlock_init(session, &conn->dhandle_lock));
+	WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
+	WT_RET(__wt_rwlock_init(session, &conn->table_lock));
 
 	/* Setup the spin locks for the LSM manager queues. */
 	WT_RET(__wt_spin_init(session,
@@ -113,7 +108,6 @@ void
 __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
-	u_int i;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
@@ -144,9 +138,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_rwlock_destroy(session, &conn->table_lock);
 	__wt_spin_destroy(session, &conn->turtle_lock);
-	for (i = 0; i < WT_PAGE_LOCKS; ++i)
-		__wt_spin_destroy(session, &conn->page_lock[i]);
-	__wt_free(session, conn->page_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->cfg);

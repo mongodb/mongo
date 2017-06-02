@@ -1300,13 +1300,19 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	for (;;) {
 		parent = ref->home;
 
+		/*
+		 * The page will be marked dirty, and we can only lock a page
+		 * with a modify structure.
+		 */
+		WT_RET(__wt_page_modify_init(session, parent));
+
 		if (trylock)
-			WT_RET(__wt_try_writelock(session, &parent->page_lock));
+			WT_RET(WT_PAGE_TRYLOCK(session, parent));
 		else
-			__wt_writelock(session, &parent->page_lock);
+			WT_PAGE_LOCK(session, parent);
 		if (parent == ref->home)
 			break;
-		__wt_writeunlock(session, &parent->page_lock);
+		WT_PAGE_UNLOCK(session, parent);
 	}
 
 	/*
@@ -1329,7 +1335,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	*parentp = parent;
 	return (0);
 
-err:	__wt_writeunlock(session, &parent->page_lock);
+err:	WT_PAGE_UNLOCK(session, parent);
 	return (ret);
 }
 
@@ -1345,7 +1351,7 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 	if (hazard)
 		ret = __wt_hazard_clear(session, parent->pg_intl_parent_ref);
 
-	__wt_writeunlock(session, &parent->page_lock);
+	WT_PAGE_UNLOCK(session, parent);
 	return (ret);
 }
 
@@ -1559,7 +1565,7 @@ __split_multi_inmem(
 
 			/* Apply the modification. */
 			WT_ERR(__wt_col_modify(
-			    session, &cbt, recno, NULL, upd, false));
+			    session, &cbt, recno, NULL, upd, false, true));
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
@@ -1581,7 +1587,7 @@ __split_multi_inmem(
 
 			/* Apply the modification. */
 			WT_ERR(__wt_row_modify(
-			    session, &cbt, key, NULL, upd, false));
+			    session, &cbt, key, NULL, upd, false, true));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

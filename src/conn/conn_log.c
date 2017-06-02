@@ -880,7 +880,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock,
 	    "log write LSN"));
-	__wt_rwlock_init(session, &log->log_archive_lock);
+	WT_RET(__wt_rwlock_init(session, &log->log_archive_lock));
 	if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
 		log->allocsize = (uint32_t)
 		    WT_MAX(conn->buffer_alignment, WT_LOG_ALIGN);
@@ -1043,12 +1043,12 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	}
 
 	/* Destroy the condition variables now that all threads are stopped */
-	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log_file_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log_wrlsn_cond));
+	__wt_cond_destroy(session, &conn->log_cond);
+	__wt_cond_destroy(session, &conn->log_file_cond);
+	__wt_cond_destroy(session, &conn->log_wrlsn_cond);
 
-	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
-	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
+	__wt_cond_destroy(session, &conn->log->log_sync_cond);
+	__wt_cond_destroy(session, &conn->log->log_write_cond);
 	__wt_rwlock_destroy(session, &conn->log->log_archive_lock);
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
