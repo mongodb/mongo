@@ -1155,6 +1155,60 @@ post:
       display_name: Core Dumps - Execution ${execution}
       optional: true
 
+  # Gather and archive failed unit test binaries.
+  - command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        mkdir unittest_binaries
+        # Find all core files
+        core_files=$(/usr/bin/find -H . -name "dump_*.core" -o -name "*.mdmp" 2> /dev/null)
+        for core_file in $core_files
+        do
+          # A core file name does not always have the executable name that generated it.
+          # See http://stackoverflow.com/questions/34801353/core-dump-filename-gets-thread-name-instead-of-executable-name-with-core-pattern
+          # On platforms with GDB, we get the binary name from core file
+          gdb=/opt/mongodbtoolchain/gdb/bin/gdb
+          if [ -f $gdb ]; then
+            binary_file=$($gdb -batch --quiet -ex "core $core_file" 2> /dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'")
+            binary_file_locations=$binary_file
+          else
+            # Find the base file name from the core file name, note it may be truncated.
+            # Remove leading 'dump_' and trailing '.<pid>.core' or '.<pid or time>.mdmp'
+            binary_file=$(echo $core_file | sed "s/.*\///;s/dump_//;s/\..*\.core//;s/\..*\.mdmp//")
+            # Locate the binary file. Since the base file name might be truncated, the find
+            # may return more than 1 file.
+            binary_file_locations=$(/usr/bin/find -H . -name "$binary_file*${exe}" 2> /dev/null)
+          fi
+          if [ -z "$binary_file_locations" ]; then
+            echo "Cannot locate the unittest binary file ($binary_file) that generated the core file $core_file"
+          fi
+          for binary_file_location in $binary_file_locations
+          do
+            new_binary_file=unittest_binaries/$(echo $binary_file_location | sed "s/.*\///")
+            if [ ! -f $new_binary_file ]; then
+              mv $binary_file_location $new_binary_file
+            fi
+          done
+        done
+  - command: archive.targz_pack
+    params:
+      target: "mongo-unittests.tgz"
+      source_dir: "src/unittest_binaries"
+      include:
+        - "./*_test${exe}"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: mongo-unittests.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Unit tests - Execution ${execution}
+      optional: true
+
   # Gather and archive hang_analyzer debugger files.
   - command: archive.targz_pack
     params:

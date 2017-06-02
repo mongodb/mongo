@@ -134,8 +134,8 @@ class WindowsDumper(object):
 
         dump_command = ""
         if take_dump:
-            # Dump to file, dump_<process name>_<pid>.mdmp
-            dump_file = "dump_%s_%d.%s" % (os.path.splitext(process_name)[0],
+            # Dump to file, dump_<process name>.<pid>.mdmp
+            dump_file = "dump_%s.%d.%s" % (os.path.splitext(process_name)[0],
                                            pid,
                                            self.get_dump_ext())
             dump_command = ".dump /ma %s" % dump_file
@@ -223,8 +223,8 @@ class LLDBDumper(object):
 
         dump_command = ""
         if take_dump:
-            # Dump to file, dump_<process name>_<pid>.core
-            dump_file = "dump_%s_%d.%s" % (process_name, pid, self.get_dump_ext())
+            # Dump to file, dump_<process name>.<pid>.core
+            dump_file = "dump_%s.%d.%s" % (process_name, pid, self.get_dump_ext())
             dump_command = "process save-core %s" % dump_file
             root_logger.info("Dumping core to %s" % dump_file)
 
@@ -298,8 +298,8 @@ class GDBDumper(object):
 
         dump_command = ""
         if take_dump:
-            # Dump to file, dump_<process name>_<pid>.core
-            dump_file = "dump_%s_%d.%s" % (process_name, pid, self.get_dump_ext())
+            # Dump to file, dump_<process name>.<pid>.core
+            dump_file = "dump_%s.%d.%s" % (process_name, pid, self.get_dump_ext())
             dump_command = "gcore %s" % dump_file
             root_logger.info("Dumping core to %s" % dump_file)
 
