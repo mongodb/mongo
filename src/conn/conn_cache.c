@@ -312,7 +312,7 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 		    cache->bytes_dirty_intl + cache->bytes_dirty_leaf,
 		    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
-	WT_TRET(__wt_cond_destroy(session, &cache->evict_cond));
+	__wt_cond_destroy(session, &cache->evict_cond);
 	__wt_spin_destroy(session, &cache->evict_pass_lock);
 	__wt_spin_destroy(session, &cache->evict_queue_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);

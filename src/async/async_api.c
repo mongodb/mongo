@@ -435,7 +435,7 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 	F_CLR(conn, WT_CONN_SERVER_ASYNC);
 	for (i = 0; i < conn->async_workers; i++)
 		WT_TRET(__wt_thread_join(session, async->worker_tids[i]));
-	WT_TRET(__wt_cond_destroy(session, &async->flush_cond));
+	__wt_cond_destroy(session, &async->flush_cond);
 
 	/* Close the server threads' sessions. */
 	for (i = 0; i < conn->async_workers; i++)

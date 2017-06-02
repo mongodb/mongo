@@ -104,7 +104,7 @@ __thread_group_shrink(
 		if (thread == NULL)
 			continue;
 		WT_TRET(__wt_thread_join(session, thread->tid));
-		WT_TRET(__wt_cond_destroy(session, &thread->pause_cond));
+		__wt_cond_destroy(session, &thread->pause_cond);
 	}
 	__wt_writelock(session, &group->lock);
 	for (current_slot = group->alloc; current_slot > new_count; ) {
@@ -234,7 +234,7 @@ err:	/*
 			wt_session = (WT_SESSION *)thread->session;
 			WT_TRET(wt_session->close(wt_session, NULL));
 		}
-		WT_TRET(__wt_cond_destroy(session, &thread->pause_cond));
+		__wt_cond_destroy(session, &thread->pause_cond);
 		__wt_free(session, thread);
 	}
 
@@ -290,7 +290,7 @@ __wt_thread_group_create(
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
 	    "Creating thread group: %p", (void *)group);
 
-	__wt_rwlock_init(session, &group->lock);
+	WT_RET(__wt_rwlock_init(session, &group->lock));
 	WT_ERR(__wt_cond_alloc(
 	    session, "thread group cond", &group->wait_cond));
 	cond_alloced = true;
@@ -307,7 +307,7 @@ __wt_thread_group_create(
 	/* Cleanup on error to avoid leaking resources */
 err:	if (ret != 0) {
 		if (cond_alloced)
-			WT_TRET(__wt_cond_destroy(session, &group->wait_cond));
+			__wt_cond_destroy(session, &group->wait_cond);
 		__wt_rwlock_destroy(session, &group->lock);
 	}
 	return (ret);
@@ -332,7 +332,7 @@ __wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 
 	__wt_free(session, group->threads);
 
-	WT_TRET(__wt_cond_destroy(session, &group->wait_cond));
+	__wt_cond_destroy(session, &group->wait_cond);
 	__wt_rwlock_destroy(session, &group->lock);
 
 	/*

@@ -442,7 +442,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	}
 
 	/* Initialize locks. */
-	__wt_rwlock_init(session, &btree->ovfl_lock);
+	WT_RET(__wt_rwlock_init(session, &btree->ovfl_lock));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
 	btree->modified = false;			/* Clean */

@@ -154,7 +154,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 static inline int
 __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **new_insp,
-    size_t new_ins_size, uint64_t *recnop, u_int skipdepth)
+    size_t new_ins_size, uint64_t *recnop, u_int skipdepth, bool exclusive)
 {
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
@@ -165,11 +165,16 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/* Clear references to memory we now own and must free on error. */
 	*new_insp = NULL;
 
-	/* Acquire the page's spinlock, call the worker function. */
-	WT_PAGE_LOCK(session, page);
+	/*
+	 * Acquire the page's spinlock unless we already have exclusive access.
+	 * Then call the worker function.
+	 */
+	if (!exclusive)
+		WT_PAGE_LOCK(session, page);
 	ret = __col_append_serial_func(
 	    session, ins_head, ins_stack, new_ins, recnop, skipdepth);
-	WT_PAGE_UNLOCK(session, page);
+	if (!exclusive)
+		WT_PAGE_UNLOCK(session, page);
 
 	if (ret != 0) {
 		/* Free unused memory on error. */
@@ -198,7 +203,7 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 static inline int
 __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **new_insp,
-    size_t new_ins_size, u_int skipdepth)
+    size_t new_ins_size, u_int skipdepth, bool exclusive)
 {
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
@@ -220,10 +225,12 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 		ret = __insert_simple_func(
 		    session, ins_stack, new_ins, skipdepth);
 	else {
-		WT_PAGE_LOCK(session, page);
+		if (!exclusive)
+			WT_PAGE_LOCK(session, page);
 		ret = __insert_serial_func(
 		    session, ins_head, ins_stack, new_ins, skipdepth);
-		WT_PAGE_UNLOCK(session, page);
+		if (!exclusive)
+			WT_PAGE_UNLOCK(session, page);
 	}
 
 	if (ret != 0) {
@@ -252,7 +259,8 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 static inline int
 __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
-    WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size)
+    WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size,
+    bool exclusive)
 {
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd = *updp;
@@ -295,7 +303,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/*
 	 * If there are no subsequent WT_UPDATE structures we are done here.
 	 */
-	if (upd->next == NULL)
+	if (upd->next == NULL || exclusive)
 		return (0);
 
 	/*
@@ -316,11 +324,11 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	}
 
 	/* If we can't lock it, don't scan, that's okay. */
-	if (__wt_try_writelock(session, &page->page_lock) != 0)
+	if (WT_PAGE_TRYLOCK(session, page) != 0)
 		return (0);
 
 	obsolete = __wt_update_obsolete_check(session, page, upd->next);
-	__wt_writeunlock(session, &page->page_lock);
+	WT_PAGE_UNLOCK(session, page);
 	if (obsolete != NULL)
 		__wt_update_obsolete_free(session, page, obsolete);
 

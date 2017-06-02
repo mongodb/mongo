@@ -346,7 +346,7 @@ __cursor_col_modify(
     WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, u_int modify_type)
 {
 	return (__wt_col_modify(session, cbt,
-	    cbt->iface.recno, &cbt->iface.value, NULL, modify_type));
+	    cbt->iface.recno, &cbt->iface.value, NULL, modify_type, false));
 }
 
 /*
@@ -358,7 +358,7 @@ __cursor_row_modify(
     WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, u_int modify_type)
 {
 	return (__wt_row_modify(session, cbt,
-	    &cbt->iface.key, &cbt->iface.value, NULL, modify_type));
+	    &cbt->iface.key, &cbt->iface.value, NULL, modify_type, false));
 }
 
 /*
