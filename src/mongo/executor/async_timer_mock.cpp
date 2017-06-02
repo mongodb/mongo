@@ -99,6 +99,11 @@ void AsyncTimerMockImpl::expireAfter(Milliseconds expiration) {
     }
 }
 
+int AsyncTimerMockImpl::jobs() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _handlers.size();
+}
+
 void AsyncTimerMockImpl::_callAllHandlers(std::error_code ec) {
     std::vector<AsyncTimerInterface::Handler> tmp;
     {
@@ -151,6 +156,17 @@ void AsyncTimerFactoryMock::fastForward(Milliseconds time) {
 Date_t AsyncTimerFactoryMock::now() {
     stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
     return Date_t::fromDurationSinceEpoch(_curTime);
+}
+
+int AsyncTimerFactoryMock::jobs() {
+    int jobs = 1;
+
+    stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
+    for (auto elem = _timers.begin(); elem != _timers.end(); elem++) {
+        jobs += (*elem)->jobs();
+    }
+
+    return jobs;
 }
 
 }  // namespace executor

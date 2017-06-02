@@ -75,6 +75,11 @@ public:
      */
     void expireAfter(Milliseconds expiration);
 
+    /**
+     * Returns the number of handlers on this timer.
+     */
+    int jobs();
+
 private:
     void _callAllHandlers(std::error_code ec);
 
@@ -136,6 +141,11 @@ public:
      * This will start at 0ms since the epoch and increment when fastForward is called.
      */
     Date_t now() override;
+
+    /**
+     * Returns the number of pending jobs across all timers.
+     */
+    int jobs();
 
 private:
     stdx::recursive_mutex _timersMutex;
