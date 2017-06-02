@@ -15,12 +15,13 @@
 int
 __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_DECL_RET;
 	WT_PAGE_MODIFY *modify;
 
 	WT_RET(__wt_calloc_one(session, &modify));
 
 	/* Initialize the spinlock for the page. */
-	WT_RET(__wt_spin_init(session, &modify->page_lock, "btree page"));
+	WT_ERR(__wt_spin_init(session, &modify->page_lock, "btree page"));
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
@@ -31,8 +32,8 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (__wt_atomic_cas_ptr(&page->modify, NULL, modify))
 		__wt_cache_page_inmem_incr(session, page, sizeof(*modify));
 	else
-		__wt_free(session, modify);
-	return (0);
+err:		__wt_free(session, modify);
+	return (ret);
 }
 
 /*
