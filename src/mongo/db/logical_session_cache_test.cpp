@@ -72,6 +72,12 @@ public:
         _service->join();
     }
 
+    void waitUntilRefreshScheduled() {
+        while (service()->jobs() < 2) {
+            sleepmillis(10);
+        }
+    }
+
     LogicalSessionRecord newRecord() {
         return LogicalSessionRecord::makeAuthoritativeRecord(
             LogicalSessionId::gen(), _user, _userId, _service->now());
@@ -236,7 +242,7 @@ TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
 
     // Advance time to first refresh point, check that refresh happens, and
     // that it includes both our records
-    sessions()->setRefreshHook([&hitRefresh](SessionList sessions) -> SessionList {
+    sessions()->setRefreshHook([&hitRefresh](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
         hitRefresh.set_value(sessions.size());
         return {};
     });
@@ -258,34 +264,300 @@ TEST_F(LogicalSessionCacheTest, CacheRefreshesOwnRecords) {
 
     // Advance time so that one record expires
     // Ensure that first record was refreshed, and second was thrown away
-    sessions()->setRefreshHook([&refresh2](SessionList sessions) -> SessionList {
+    sessions()->setRefreshHook([&refresh2](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
         // We should only have one record here, the other should have expired
         ASSERT_EQ(sessions.size(), size_t(1));
-        refresh2.set_value(sessions.front());
+        refresh2.set_value(*(sessions.begin()));
         return {};
     });
 
     // Wait until the second job has been scheduled
-    while (service()->jobs() < 2) {
-        sleepmillis(10);
-    }
+    waitUntilRefreshScheduled();
 
     service()->fastForward(kSessionTimeout - kForceRefresh + Milliseconds(1));
     refresh2Future.wait();
     ASSERT_EQ(refresh2Future.get(), lsid);
 }
 
-// Additional tests:
-// SERVER-28346
-// - Test that cache deletes records that fail to refresh
-// - Test that session cache properly expires records after 30 minutes of no use
-// - Test that we keep refreshing sessions that are active on the service
-// - Test that if we try to refresh a record and it is not in the sessions collection,
-//   we remove it from the cache (unless it is active on the service)
-// - Test small mixed set of cache/service active sessions
-// - Test larger sets of cache-only session records
-// - Test larger sets of service-only session records
-// - Test larger mixed sets of cache/service active sessions
+// Test that cache deletes records that fail to refresh
+TEST_F(LogicalSessionCacheTest, CacheDeletesRecordsThatFailToRefresh) {
+    // Put two sessions into the cache
+    auto record1 = newRecord();
+    auto record2 = newRecord();
+    cache()->startSession(record1);
+    cache()->startSession(record2);
+
+    stdx::promise<void> hitRefresh;
+    auto refreshFuture = hitRefresh.get_future();
+
+    // Record 1 fails to refresh
+    sessions()->setRefreshHook(
+        [&hitRefresh, &record1](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+            ASSERT_EQ(sessions.size(), size_t(2));
+            hitRefresh.set_value();
+            return {record1.getLsid()};
+        });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    refreshFuture.wait();
+
+    // Ensure that one record is still there and the other is gone
+    auto res = cache()->getOwnerFromCache(record1.getLsid());
+    ASSERT(!res.isOK());
+    res = cache()->getOwnerFromCache(record2.getLsid());
+    ASSERT(res.isOK());
+}
+
+// Test that we don't remove records that fail to refresh if they are active on the service
+TEST_F(LogicalSessionCacheTest, KeepActiveSessionAliveEvenIfRefreshFails) {
+    // Put two sessions into the cache, one into the service
+    auto record1 = newRecord();
+    auto record2 = newRecord();
+    cache()->startSession(record1);
+    service()->add(record1.getLsid());
+    cache()->startSession(record2);
+
+    stdx::promise<void> hitRefresh;
+    auto refreshFuture = hitRefresh.get_future();
+
+    // Record 1 fails to refresh
+    sessions()->setRefreshHook(
+        [&hitRefresh, &record1](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+            ASSERT_EQ(sessions.size(), size_t(2));
+            hitRefresh.set_value();
+            return {record1.getLsid()};
+        });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    refreshFuture.wait();
+
+    // Ensure that both records are still there
+    auto res = cache()->getOwnerFromCache(record1.getLsid());
+    ASSERT(res.isOK());
+    res = cache()->getOwnerFromCache(record2.getLsid());
+    ASSERT(res.isOK());
+}
+
+// Test that session cache properly expires records after 30 minutes of no use
+TEST_F(LogicalSessionCacheTest, BasicSessionExpiration) {
+    // Insert a record
+    auto record = newRecord();
+    cache()->startSession(record);
+    auto res = cache()->getOwnerFromCache(record.getLsid());
+    ASSERT(res.isOK());
+
+    // Force it to expire
+    service()->fastForward(Milliseconds(kSessionTimeout.count() + 5));
+
+    // Check that it is no longer in the cache
+    res = cache()->getOwnerFromCache(record.getLsid());
+    ASSERT(!res.isOK());
+}
+
+// Test that we keep refreshing sessions that are active on the service
+TEST_F(LogicalSessionCacheTest, LongRunningQueriesAreRefreshed) {
+    auto record = newRecord();
+    auto lsid = record.getLsid();
+
+    // Insert one active record on the service, none in the cache
+    service()->add(lsid);
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+    int count = 0;
+
+    sessions()->setRefreshHook(
+        [&cv, &mutex, &count, &lsid](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+            ASSERT_EQ(*(sessions.begin()), lsid);
+            {
+                stdx::unique_lock<stdx::mutex> lk(mutex);
+                count++;
+            }
+            cv.notify_all();
+
+            return {};
+        });
+
+    // Force a refresh, it should refresh our active session
+    service()->fastForward(kForceRefresh);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&count] { return count == 1; });
+    }
+
+    // Wait until the next job has been scheduled
+    waitUntilRefreshScheduled();
+
+    // Force a session timeout, session is still on the service
+    service()->fastForward(kSessionTimeout);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&count] { return count == 2; });
+    }
+
+    // Wait until the next job has been scheduled
+    waitUntilRefreshScheduled();
+
+    // Force another refresh, check that it refreshes that active record again
+    service()->fastForward(kForceRefresh);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&count] { return count == 3; });
+    }
+}
+
+// Test that the set of records we refresh is a sum of cached + active records
+TEST_F(LogicalSessionCacheTest, RefreshCachedAndServiceRecordsTogether) {
+    // Put one session into the cache, one into the service
+    auto record1 = newRecord();
+    service()->add(record1.getLsid());
+    auto record2 = newRecord();
+    cache()->startSession(record2);
+
+    stdx::promise<void> hitRefresh;
+    auto refreshFuture = hitRefresh.get_future();
+
+    // Both records refresh
+    sessions()->setRefreshHook([&hitRefresh](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+        ASSERT_EQ(sessions.size(), size_t(2));
+        hitRefresh.set_value();
+        return {};
+    });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    refreshFuture.wait();
+}
+
+// Test large sets of cache-only session records
+TEST_F(LogicalSessionCacheTest, ManyRecordsInCacheRefresh) {
+    int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
+    for (int i = 0; i < count; i++) {
+        auto record = newRecord();
+        cache()->startSession(record);
+    }
+
+    stdx::promise<void> hitRefresh;
+    auto refreshFuture = hitRefresh.get_future();
+
+    // Check that all records refresh
+    sessions()->setRefreshHook(
+        [&hitRefresh, &count](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+            ASSERT_EQ(sessions.size(), size_t(count));
+            hitRefresh.set_value();
+            return {};
+        });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    refreshFuture.wait();
+}
+
+// Test larger sets of service-only session records
+TEST_F(LogicalSessionCacheTest, ManyLongRunningSessionsRefresh) {
+    int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
+    for (int i = 0; i < count; i++) {
+        auto record = newRecord();
+        service()->add(record.getLsid());
+    }
+
+    stdx::promise<void> hitRefresh;
+    auto refreshFuture = hitRefresh.get_future();
+
+    // Check that all records refresh
+    sessions()->setRefreshHook(
+        [&hitRefresh, &count](LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+            ASSERT_EQ(sessions.size(), size_t(count));
+            hitRefresh.set_value();
+            return {};
+        });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    refreshFuture.wait();
+}
+
+// Test larger mixed sets of cache/service active sessions
+TEST_F(LogicalSessionCacheTest, ManySessionsRefreshComboDeluxe) {
+    int count = LogicalSessionCache::kLogicalSessionCacheDefaultCapacity;
+    for (int i = 0; i < count; i++) {
+        auto record = newRecord();
+        service()->add(record.getLsid());
+
+        auto record2 = newRecord();
+        cache()->startSession(record2);
+    }
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+    int refreshes = 0;
+    int nRefreshed = 0;
+
+    // Check that all records refresh successfully
+    sessions()->setRefreshHook([&refreshes, &mutex, &cv, &nRefreshed](
+                                   LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            refreshes++;
+            nRefreshed = sessions.size();
+        }
+        cv.notify_all();
+
+        return {};
+    });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&refreshes] { return refreshes == 1; });
+    }
+    ASSERT_EQ(nRefreshed, count * 2);
+
+    // Remove all of the service sessions, should just refresh the cache entries
+    // (and make all but one fail to refresh)
+    service()->clear();
+    sessions()->setRefreshHook([&refreshes, &mutex, &cv, &nRefreshed](
+                                   LogicalSessionIdSet sessions) -> LogicalSessionIdSet {
+        {
+            stdx::unique_lock<stdx::mutex> lk(mutex);
+            refreshes++;
+            nRefreshed = sessions.size();
+        }
+        cv.notify_all();
+
+        sessions.erase(sessions.begin());
+        return sessions;
+    });
+
+    // Wait for job to be scheduled
+    waitUntilRefreshScheduled();
+
+    // Force another refresh
+    service()->fastForward(kForceRefresh);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&refreshes] { return refreshes == 2; });
+    }
+
+    // We should not have refreshed any sessions from the service, only the cache
+    ASSERT_EQ(nRefreshed, count);
+
+    // Wait for job to be scheduled
+    waitUntilRefreshScheduled();
+
+    // Force a third refresh
+    service()->fastForward(kForceRefresh);
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&refreshes] { return refreshes == 3; });
+    }
+
+    // Since all but one record failed to refresh, third set should just have one record
+    ASSERT_EQ(nRefreshed, 1);
+}
 
 }  // namespace
 }  // namespace mongo
