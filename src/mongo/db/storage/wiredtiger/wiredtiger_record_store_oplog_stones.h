@@ -57,8 +57,12 @@ public:
 
     void kill();
 
-    bool hasExcessStones() const {
-        return _stones.size() > _numStonesToKeep;
+    bool hasExcessStones_inlock() const {
+    int64_t total_bytes = 0;
+    for (std::deque<OplogStones::Stone>::const_iterator it = _stones.begin(); it != _stones.end(); ++it) {
+        total_bytes += it->bytes;
+    }
+    return total_bytes > _rs->cappedMaxSize();
     }
 
     void awaitHasExcessStonesOrDead();
@@ -80,6 +84,9 @@ public:
     void updateStonesAfterCappedTruncateAfter(int64_t recordsRemoved,
                                               int64_t bytesRemoved,
                                               RecordId firstRemovedId);
+
+    // Resize oplog size
+    void adjust(int64_t maxSize);
 
     // The start point of where to truncate next. Used by the background reclaim thread to
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
@@ -104,13 +111,11 @@ public:
 
     void setMinBytesPerStone(int64_t size);
 
-    void setNumStonesToKeep(size_t numStones);
-
 private:
     class InsertChange;
     class TruncateChange;
 
-    void _calculateStones(OperationContext* opCtx);
+    void _calculateStones(OperationContext* opCtx, size_t size);
     void _calculateStonesByScanning(OperationContext* opCtx);
     void _calculateStonesBySampling(OperationContext* opCtx,
                                     int64_t estRecordsPerStone,
@@ -129,12 +134,8 @@ private:
     // database, and false otherwise.
     bool _isDead = false;
 
-    // Maximum number of stones to keep in the deque before the background reclaim thread should
-    // truncate the oldest ones. Does not include the stone currently being filled. This value
-    // should not be changed after initialization.
-    size_t _numStonesToKeep;
     // Minimum number of bytes the stone being filled should contain before it gets added to the
-    // deque of oplog stones. This value should not be changed after initialization.
+    // deque of oplog stones.
     int64_t _minBytesPerStone;
 
     AtomicInt64 _currentRecords;  // Number of records in the stone being filled.
