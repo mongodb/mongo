@@ -55,7 +55,9 @@ env.CppUnitTest(
 env.Library(
     target='update',
     source=[
+        'arithmetic_node.cpp',
         'modifier_table.cpp',
+        'path_creating_node.cpp',
         'set_node.cpp',
         'unset_node.cpp',
         'update_node.cpp',
@@ -68,6 +70,14 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='arithmetic_node_test',
+    source='arithmetic_node_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
+        'update',
+    ],
+)
 env.CppUnitTest(
     target='modifier_table_test',
     source='modifier_table_test.cpp',

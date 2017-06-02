@@ -46,6 +46,7 @@
 #include "mongo/db/ops/modifier_rename.h"
 #include "mongo/db/ops/modifier_set.h"
 #include "mongo/db/ops/modifier_unset.h"
+#include "mongo/db/update/arithmetic_node.h"
 #include "mongo/db/update/set_node.h"
 #include "mongo/db/update/unset_node.h"
 #include "mongo/platform/unordered_map.h"
@@ -180,6 +181,10 @@ ModifierInterface* makeUpdateMod(ModifierType modType) {
 
 std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
     switch (modType) {
+        case MOD_INC:
+            return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kAdd);
+        case MOD_MUL:
+            return stdx::make_unique<ArithmeticNode>(ArithmeticNode::ArithmeticOp::kMultiply);
         case MOD_SET:
             return stdx::make_unique<SetNode>();
         case MOD_UNSET:

@@ -53,6 +53,22 @@ TEST(UpdateObjectNodeTest, InvalidPathFailsToParse) {
     ASSERT_EQ(result.getStatus().reason(), "An empty update path is not valid.");
 }
 
+TEST(UpdateObjectNodeTest, ValidIncPathParsesSuccessfully) {
+    auto update = fromjson("{$inc: {'a.b': 5}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_INC, update["$inc"]["a.b"], collator));
+}
+
+TEST(UpdateObjectNodeTest, ValidMulPathParsesSuccessfully) {
+    auto update = fromjson("{$mul: {'a.b': 5}}");
+    const CollatorInterface* collator = nullptr;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(
+        &root, modifiertable::ModifierType::MOD_MUL, update["$mul"]["a.b"], collator));
+}
+
 TEST(UpdateObjectNodeTest, ValidSetPathParsesSuccessfully) {
     auto update = fromjson("{$set: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
@@ -114,15 +130,15 @@ TEST(UpdateObjectNodeTest, PositionalElementFirstPositionFailsToParse) {
 }
 
 // TODO SERVER-28777: All modifier types should succeed.
-TEST(UpdateObjectNodeTest, IncFailsToParse) {
-    auto update = fromjson("{$inc: {a: 5}}");
+TEST(UpdateObjectNodeTest, PushFailsToParse) {
+    auto update = fromjson("{$push: {a: 5}}");
     const CollatorInterface* collator = nullptr;
     UpdateObjectNode root;
     auto result = UpdateObjectNode::parseAndMerge(
-        &root, modifiertable::ModifierType::MOD_INC, update["$inc"]["a"], collator);
+        &root, modifiertable::ModifierType::MOD_PUSH, update["$push"]["a"], collator);
     ASSERT_NOT_OK(result);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
-    ASSERT_EQ(result.getStatus().reason(), "Cannot construct modifier of type 3");
+    ASSERT_EQ(result.getStatus().reason(), "Cannot construct modifier of type 10");
 }
 
 TEST(UpdateObjectNodeTest, TwoModifiersOnSameFieldFailToParse) {

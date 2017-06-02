@@ -34,14 +34,18 @@
 namespace mongo {
 
 /**
- * Represents the application of a $set to the value at the end of a path.
+ * Represents the application of $inc or $mul to the value at the end of a path.
  */
-class SetNode : public PathCreatingNode {
+class ArithmeticNode : public PathCreatingNode {
 public:
+    enum class ArithmeticOp { kAdd, kMultiply };
+
+    ArithmeticNode(ArithmeticOp op) : _op(op) {}
+
     Status init(BSONElement modExpr, const CollatorInterface* collator) final;
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<SetNode>(*this);
+        return stdx::make_unique<ArithmeticNode>(*this);
     }
 
     void setCollator(const CollatorInterface* collator) final {}
@@ -51,6 +55,7 @@ protected:
     Status setValueForNewElement(mutablebson::Element* element) const final;
 
 private:
+    ArithmeticOp _op;
     BSONElement _val;
 };
 

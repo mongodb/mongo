@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/update/set_node.h"
+#include "mongo/db/update/arithmetic_node.h"
 
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
@@ -36,32 +36,83 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::countChildren;
 
-DEATH_TEST(SetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
-    auto update = fromjson("{$set: {}}");
+DEATH_TEST(ArithmeticNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.ok()") {
+    auto update = fromjson("{$inc: {}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    node.init(update["$set"].embeddedObject().firstElement(), collator);
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    node.init(update["$inc"].embeddedObject().firstElement(), collator);
 }
 
-TEST(SetNodeTest, InitSucceedsForNonemptyElement) {
-    auto update = fromjson("{$set: {a: 5}}");
+TEST(ArithmeticNodeTest, InitSucceedsForNumberIntElement) {
+    auto update = fromjson("{$inc: {a: NumberInt(5)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 }
 
-TEST(SetNodeTest, ApplyNoOp) {
-    auto update = fromjson("{$set: {a: 5}}");
+TEST(ArithmeticNodeTest, InitSucceedsForNumberLongElement) {
+    auto update = fromjson("{$inc: {a: NumberLong(5)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+}
+
+TEST(ArithmeticNodeTest, InitSucceedsForDoubleElement) {
+    auto update = fromjson("{$inc: {a: 5.1}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+}
+
+TEST(ArithmeticNodeTest, InitSucceedsForDecimalElement) {
+    auto update = fromjson("{$inc: {a: NumberDecimal(\"5.1\")}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+}
+
+TEST(ArithmeticNodeTest, InitFailsForNonNumericElement) {
+    auto update = fromjson("{$inc: {a: 'foo'}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    Status result = node.init(update["$inc"]["a"], collator);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.reason(), "Cannot increment with non-numeric argument: {a: \"foo\"}");
+}
+
+TEST(ArithmeticNodeTest, InitFailsForObjectElement) {
+    auto update = fromjson("{$mul: {a: {b: 6}}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
+    Status result = node.init(update["$mul"]["a"], collator);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.reason(), "Cannot multiply with non-numeric argument: {a: { b: 6 }}");
+}
+
+TEST(ArithmeticNodeTest, InitFailsForArrayElement) {
+    auto update = fromjson("{$mul: {a: []}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
+    Status result = node.init(update["$mul"]["a"], collator);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.reason(), "Cannot multiply with non-numeric argument: {a: []}");
+}
+
+TEST(ArithmeticNodeTest, ApplyIncNoOp) {
+    auto update = fromjson("{$inc: {a: 0}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
     FieldRef pathToCreate("");
@@ -90,11 +141,77 @@ TEST(SetNodeTest, ApplyNoOp) {
     ASSERT_EQUALS(fromjson("{}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyEmptyPathToCreate) {
-    auto update = fromjson("{$set: {a: 6}}");
+TEST(ArithmeticNodeTest, ApplyMulNoOp) {
+    auto update = fromjson("{$mul: {a: 1}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
+    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+
+    Document doc(fromjson("{a: 5}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 5}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(ArithmeticNodeTest, ApplyRoundingNoOp) {
+    auto update = fromjson("{$inc: {a: 1.0}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{a: 6.022e23}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_TRUE(noop);
+    ASSERT_FALSE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 6.022e23}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{}"), logDoc);
+}
+
+TEST(ArithmeticNodeTest, ApplyEmptyPathToCreate) {
+    auto update = fromjson("{$inc: {a: 6}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
     FieldRef pathToCreate("");
@@ -118,16 +235,16 @@ TEST(SetNodeTest, ApplyEmptyPathToCreate) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 6}"), doc);
+    ASSERT_EQUALS(fromjson("{a: 11}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 6}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 11}}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyCreatePath) {
-    auto update = fromjson("{$set: {'a.b.c': 6}}");
+TEST(ArithmeticNodeTest, ApplyCreatePath) {
+    auto update = fromjson("{$inc: {'a.b.c': 6}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b.c"], collator));
 
     Document doc(fromjson("{a: {d: 5}}"));
     FieldRef pathToCreate("b.c");
@@ -156,11 +273,11 @@ TEST(SetNodeTest, ApplyCreatePath) {
     ASSERT_EQUALS(fromjson("{$set: {'a.b.c': 6}}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyCreatePathFromRoot) {
-    auto update = fromjson("{$set: {'a.b': 6}}");
+TEST(ArithmeticNodeTest, ApplyCreatePathFromRoot) {
+    auto update = fromjson("{$inc: {'a.b': 6}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{c: 5}"));
     FieldRef pathToCreate("a.b");
@@ -189,11 +306,11 @@ TEST(SetNodeTest, ApplyCreatePathFromRoot) {
     ASSERT_EQUALS(fromjson("{$set: {'a.b': 6}}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyPositional) {
-    auto update = fromjson("{$set: {'a.$': 6}}");
+TEST(ArithmeticNodeTest, ApplyPositional) {
+    auto update = fromjson("{$inc: {'a.$': 6}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.$"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.$"], collator));
 
     Document doc(fromjson("{a: [0, 1, 2]}"));
     FieldRef pathToCreate("");
@@ -217,16 +334,16 @@ TEST(SetNodeTest, ApplyPositional) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: [0, 6, 2]}"), doc);
+    ASSERT_EQUALS(fromjson("{a: [0, 7, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {'a.1': 6}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {'a.1': 7}}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyNonViablePathToCreate) {
-    auto update = fromjson("{$set: {'a.b': 5}}");
+TEST(ArithmeticNodeTest, ApplyNonViablePathToInc) {
+    auto update = fromjson("{$inc: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{a: 5}"));
     FieldRef pathToCreate("b");
@@ -253,11 +370,11 @@ TEST(SetNodeTest, ApplyNonViablePathToCreate) {
     ASSERT_EQ(result.reason(), "Cannot create field 'b' in element {a: 5}");
 }
 
-TEST(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
-    auto update = fromjson("{$set: {'a.b': 5}}");
+TEST(ArithmeticNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
+    auto update = fromjson("{$inc: {'a.b': 5}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{a: 5}"));
     FieldRef pathToCreate("b");
@@ -286,11 +403,11 @@ TEST(SetNodeTest, ApplyNonViablePathToCreateFromReplicationIsNoOp) {
     ASSERT_EQUALS(fromjson("{}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
-    auto update = fromjson("{$set: {a: 6}}");
+TEST(ArithmeticNodeTest, ApplyNoIndexDataNoLogBuilder) {
+    auto update = fromjson("{$inc: {a: 6}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
     FieldRef pathToCreate("");
@@ -312,15 +429,15 @@ TEST(SetNodeTest, ApplyNoIndexDataNoLogBuilder) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 6}"), doc);
+    ASSERT_EQUALS(fromjson("{a: 11}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyDoesNotAffectIndexes) {
-    auto update = fromjson("{$set: {a: 6}}");
+TEST(ArithmeticNodeTest, ApplyDoesNotAffectIndexes) {
+    auto update = fromjson("{$inc: {a: 6}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{a: 5}"));
     FieldRef pathToCreate("");
@@ -343,15 +460,15 @@ TEST(SetNodeTest, ApplyDoesNotAffectIndexes) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 6}"), doc);
+    ASSERT_EQUALS(fromjson("{a: 11}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, TypeChangeIsNotANoop) {
-    auto update = fromjson("{$set: {a: NumberLong(2)}}");
+TEST(ArithmeticNodeTest, IncTypePromotionIsNotANoOp) {
+    auto update = fromjson("{$inc: {a: NumberLong(0)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{a: NumberInt(2)}"));
     FieldRef pathToCreate("");
@@ -378,17 +495,13 @@ TEST(SetNodeTest, TypeChangeIsNotANoop) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
-    // Apply an op that would be a no-op.
-    auto update = fromjson("{$set: {a: {b : NumberInt(2)}}}");
+TEST(ArithmeticNodeTest, MulTypePromotionIsNotANoOp) {
+    auto update = fromjson("{$mul: {a: NumberLong(1)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
+    ASSERT_OK(node.init(update["$mul"]["a"], collator));
 
-    Document doc(fromjson("{a: { b: NumberInt(0)}}"));
-    // Apply a mutation to the document that will make it non-serialized.
-    doc.root()["a"]["b"].setValueInt(2);
-
+    Document doc(fromjson("{a: NumberInt(2)}"));
     FieldRef pathToCreate("");
     FieldRef pathTaken("a");
     StringData matchedField;
@@ -409,15 +522,328 @@ TEST(SetNodeTest, IdentityOpOnDeserializedIsNotANoOp) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: {b : NumberInt(2)}}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{a: NumberLong(2)}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyEmptyDocument) {
-    auto update = fromjson("{$set: {a: 2}}");
+TEST(ArithmeticNodeTest, TypePromotionFromIntToDecimalIsNotANoOp) {
+    auto update = fromjson("{$inc: {a: NumberDecimal(\"0.0\")}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{a: NumberInt(5)}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: NumberDecimal(\"5.0\")}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: NumberDecimal(\"5.0\")}}"), logDoc);
+}
+
+TEST(ArithmeticNodeTest, TypePromotionFromLongToDecimalIsNotANoOp) {
+    auto update = fromjson("{$inc: {a: NumberDecimal(\"0.0\")}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{a: NumberLong(5)}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: NumberDecimal(\"5.0\")}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: NumberDecimal(\"5.0\")}}"), logDoc);
+}
+
+TEST(ArithmeticNodeTest, TypePromotionFromDoubleToDecimalIsNotANoOp) {
+    auto update = fromjson("{$inc: {a: NumberDecimal(\"0.0\")}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{a: 5.25}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: NumberDecimal(\"5.25\")}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: NumberDecimal(\"5.25\")}}"), logDoc);
+}
+
+TEST(ArithmeticNodeTest, IncrementedDecimalStaysDecimal) {
+    auto update = fromjson("{$inc: {a: 5.25}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{a: NumberDecimal(\"6.25\")}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder logBuilder(logDoc.root());
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         &logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: NumberDecimal(\"11.5\")}"), doc);
+    ASSERT_TRUE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(fromjson("{$set: {a: NumberDecimal(\"11.5\")}}"), logDoc);
+}
+
+TEST(ArithmeticNodeTest, OverflowIntToLong) {
+    auto update = fromjson("{$inc: {a: 1}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    const int initialValue = std::numeric_limits<int>::max();
+    Document doc(BSON("a" << initialValue));
+    ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    ASSERT_EQUALS(BSON("a" << static_cast<long long>(initialValue) + 1), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST(ArithmeticNodeTest, UnderflowIntToLong) {
+    auto update = fromjson("{$inc: {a: -1}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    const int initialValue = std::numeric_limits<int>::min();
+    Document doc(BSON("a" << initialValue));
+    ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    ASSERT_EQUALS(BSON("a" << static_cast<long long>(initialValue) - 1), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST(ArithmeticNodeTest, IncModeCanBeReused) {
+    auto update = fromjson("{$inc: {a: 1}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc1(fromjson("{a: 1}"));
+    Document doc2(fromjson("{a: 2}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    Document logDoc;
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc1.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 2}"), doc1);
+    ASSERT_TRUE(doc1.isInPlaceModeEnabled());
+
+    indexesAffected = false;
+    noop = false;
+    ASSERT_OK(node.apply(doc2.root()["a"],
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: 3}"), doc2);
+    ASSERT_TRUE(doc1.isInPlaceModeEnabled());
+}
+
+TEST(ArithmeticNodeTest, CreatedNumberHasSameTypeAsInc) {
+    auto update = fromjson("{$inc: {a: NumberLong(5)}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{b: 6}"));
+    FieldRef pathToCreate("a");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{b: 6, a: NumberLong(5)}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST(ArithmeticNodeTest, CreatedNumberHasSameTypeAsMul) {
+    auto update = fromjson("{$mul: {a: NumberLong(5)}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kMultiply);
+    ASSERT_OK(node.init(update["$mul"]["a"], collator));
+
+    Document doc(fromjson("{b: 6}"));
+    FieldRef pathToCreate("a");
+    FieldRef pathTaken("");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    ASSERT_OK(node.apply(doc.root(),
+                         &pathToCreate,
+                         &pathTaken,
+                         matchedField,
+                         fromReplication,
+                         &indexData,
+                         logBuilder,
+                         &indexesAffected,
+                         &noop));
+    ASSERT_FALSE(noop);
+    ASSERT_TRUE(indexesAffected);
+    ASSERT_EQUALS(fromjson("{b: 6, a: NumberLong(0)}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+}
+
+TEST(ArithmeticNodeTest, ApplyEmptyDocument) {
+    auto update = fromjson("{$inc: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{}"));
     FieldRef pathToCreate("a");
@@ -444,13 +870,109 @@ TEST(SetNodeTest, ApplyEmptyDocument) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyInPlace) {
-    auto update = fromjson("{$set: {a: 2}}");
+TEST(ArithmeticNodeTest, ApplyIncToObjectFails) {
+    auto update = fromjson("{$inc: {a: 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
-    Document doc(fromjson("{a: 1}"));
+    Document doc(fromjson("{_id: 'test_object', a: {b: 1}}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    Status result = node.apply(doc.root()["a"],
+                               &pathToCreate,
+                               &pathTaken,
+                               matchedField,
+                               fromReplication,
+                               &indexData,
+                               logBuilder,
+                               &indexesAffected,
+                               &noop);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.reason(),
+              "Cannot apply $inc to a value of non-numeric type. {_id: \"test_object\"} has the "
+              "field 'a' of non-numeric type object");
+}
+
+TEST(ArithmeticNodeTest, ApplyIncToArrayFails) {
+    auto update = fromjson("{$inc: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{_id: 'test_object', a: []}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    Status result = node.apply(doc.root()["a"],
+                               &pathToCreate,
+                               &pathTaken,
+                               matchedField,
+                               fromReplication,
+                               &indexData,
+                               logBuilder,
+                               &indexesAffected,
+                               &noop);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.reason(),
+              "Cannot apply $inc to a value of non-numeric type. {_id: \"test_object\"} has the "
+              "field 'a' of non-numeric type array");
+}
+
+TEST(ArithmeticNodeTest, ApplyIncToStringFails) {
+    auto update = fromjson("{$inc: {a: 2}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{_id: 'test_object', a: \"foo\"}"));
+    FieldRef pathToCreate("");
+    FieldRef pathTaken("a");
+    StringData matchedField;
+    auto fromReplication = false;
+    UpdateIndexData indexData;
+    indexData.addPath("a");
+    LogBuilder* logBuilder = nullptr;
+    auto indexesAffected = false;
+    auto noop = false;
+    Status result = node.apply(doc.root()["a"],
+                               &pathToCreate,
+                               &pathTaken,
+                               matchedField,
+                               fromReplication,
+                               &indexData,
+                               logBuilder,
+                               &indexesAffected,
+                               &noop);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::TypeMismatch);
+    ASSERT_EQ(result.reason(),
+              "Cannot apply $inc to a value of non-numeric type. {_id: \"test_object\"} has the "
+              "field 'a' of non-numeric type string");
+}
+
+TEST(ArithmeticNodeTest, ApplyPromoteToFP) {
+    auto update = fromjson("{$inc: {a: 0.2}}");
+    const CollatorInterface* collator = nullptr;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
+
+    Document doc(fromjson("{a: NumberLong(1)}"));
     FieldRef pathToCreate("");
     FieldRef pathTaken("a");
     StringData matchedField;
@@ -471,77 +993,15 @@ TEST(SetNodeTest, ApplyInPlace) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    ASSERT_EQUALS(fromjson("{a: 1.2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyOverridePath) {
-    auto update = fromjson("{$set: {a: 2}}");
+TEST(ArithmeticNodeTest, ApplyNewPath) {
+    auto update = fromjson("{$inc: {a: 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
-
-    Document doc(fromjson("{a: {b: 1}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, ApplyChangeType) {
-    auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
-
-    Document doc(fromjson("{a: 'str'}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("a");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, ApplyNewPath) {
-    auto update = fromjson("{$set: {a: 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{b: 1}"));
     FieldRef pathToCreate("a");
@@ -568,11 +1028,11 @@ TEST(SetNodeTest, ApplyNewPath) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyLog) {
-    auto update = fromjson("{$set: {a: 2}}");
+TEST(ArithmeticNodeTest, ApplyEmptyIndexData) {
+    auto update = fromjson("{$inc: {a: 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a"], collator));
 
     Document doc(fromjson("{a: 1}"));
     FieldRef pathToCreate("");
@@ -593,17 +1053,17 @@ TEST(SetNodeTest, ApplyLog) {
                          &logBuilder,
                          &indexesAffected,
                          &noop));
-    ASSERT_EQUALS(fromjson("{a: 2}"), doc);
+    ASSERT_EQUALS(fromjson("{a: 3}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), logDoc);
+    ASSERT_EQUALS(fromjson("{$set: {a: 3}}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyNoOpDottedPath) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyNoOpDottedPath) {
+    auto update = fromjson("{$inc: {'a.b': 0}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{a: {b: 2}}"));
     FieldRef pathToCreate("");
@@ -630,13 +1090,13 @@ TEST(SetNodeTest, ApplyNoOpDottedPath) {
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
-    auto update = fromjson("{$set: {'a.b': NumberInt(2)}}");
+TEST(ArithmeticNodeTest, TypePromotionOnDottedPathIsNotANoOp) {
+    auto update = fromjson("{$inc: {'a.b': NumberLong(0)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: NumberLong(2)}}"));
+    Document doc(fromjson("{a: {b: NumberInt(2)}}"));
     FieldRef pathToCreate("");
     FieldRef pathTaken("a.b");
     StringData matchedField;
@@ -661,37 +1121,11 @@ TEST(SetNodeTest, TypeChangeOnDottedPathIsNotANoOp) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyPathNotViable) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyPathNotViableArray) {
+    auto update = fromjson("{$inc: {'a.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
-
-    Document doc(fromjson("{a:1}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_NOT_OK(node.apply(doc.root()["a"],
-                             &pathToCreate,
-                             &pathTaken,
-                             matchedField,
-                             fromReplication,
-                             indexData,
-                             logBuilder,
-                             &indexesAffected,
-                             &noop));
-}
-
-TEST(SetNodeTest, ApplyPathNotViableArrray) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{a:[{b:1}]}"));
     FieldRef pathToCreate("b");
@@ -702,22 +1136,25 @@ TEST(SetNodeTest, ApplyPathNotViableArrray) {
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_NOT_OK(node.apply(doc.root()["a"],
-                             &pathToCreate,
-                             &pathTaken,
-                             matchedField,
-                             fromReplication,
-                             indexData,
-                             logBuilder,
-                             &indexesAffected,
-                             &noop));
+    Status result = node.apply(doc.root()["a"],
+                               &pathToCreate,
+                               &pathTaken,
+                               matchedField,
+                               fromReplication,
+                               indexData,
+                               logBuilder,
+                               &indexesAffected,
+                               &noop);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::PathNotViable);
+    ASSERT_EQ(result.reason(), "Cannot create field 'b' in element {a: [ { b: 1 } ]}");
 }
 
-TEST(SetNodeTest, ApplyInPlaceDottedPath) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyInPlaceDottedPath) {
+    auto update = fromjson("{$inc: {'a.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{a: {b: 1}}"));
     FieldRef pathToCreate("");
@@ -740,17 +1177,17 @@ TEST(SetNodeTest, ApplyInPlaceDottedPath) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+    ASSERT_EQUALS(fromjson("{a: {b: 3}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyChangeTypeDottedPath) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyPromotionDottedPath) {
+    auto update = fromjson("{$inc: {'a.b': NumberLong(2)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
-    Document doc(fromjson("{a: {b: 'str'}}"));
+    Document doc(fromjson("{a: {b: NumberInt(3)}}"));
     FieldRef pathToCreate("");
     FieldRef pathTaken("a.b");
     StringData matchedField;
@@ -771,46 +1208,15 @@ TEST(SetNodeTest, ApplyChangeTypeDottedPath) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
+    ASSERT_EQUALS(fromjson("{a: {b: NumberLong(5)}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyChangePath) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyExtendPath) {
+    auto update = fromjson("{$inc: {'a.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
-
-    Document doc(fromjson("{a: {b: {c: 1}}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, ApplyExtendPath) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{a: {c: 1}}"));
     FieldRef pathToCreate("b");
@@ -837,42 +1243,11 @@ TEST(SetNodeTest, ApplyExtendPath) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyNewDottedPath) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyDottedPathEmptyDoc) {
+    auto update = fromjson("{$inc: {'a.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
-
-    Document doc(fromjson("{c: 1}"));
-    FieldRef pathToCreate("a.b");
-    FieldRef pathTaken("");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root(),
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{c: 1, a: {b: 2}}"), doc);
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, ApplyEmptyDoc) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{}"));
     FieldRef pathToCreate("a.b");
@@ -899,11 +1274,11 @@ TEST(SetNodeTest, ApplyEmptyDoc) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyFieldWithDot) {
-    auto update = fromjson("{$set: {'a.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyFieldWithDot) {
+    auto update = fromjson("{$inc: {'a.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.b"], collator));
 
     Document doc(fromjson("{'a.b':4}"));
     FieldRef pathToCreate("a.b");
@@ -930,11 +1305,11 @@ TEST(SetNodeTest, ApplyFieldWithDot) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyNoOpArrayIndex) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
+    auto update = fromjson("{$inc: {'a.2.b': 0}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     FieldRef pathToCreate("");
@@ -942,7 +1317,7 @@ TEST(SetNodeTest, ApplyNoOpArrayIndex) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -961,19 +1336,19 @@ TEST(SetNodeTest, ApplyNoOpArrayIndex) {
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
-    auto update = fromjson("{$set: {'a.2.b': NumberInt(2)}}");
+TEST(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
+    auto update = fromjson("{$set: {'a.2.b': NumberLong(0)}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
-    Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
+    Document doc(fromjson("{a: [{b: NumberInt(0)},{b: NumberInt(1)},{b: NumberInt(2)}]}"));
     FieldRef pathToCreate("");
     FieldRef pathTaken("a.2.b");
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -988,15 +1363,15 @@ TEST(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: NumberInt(2)}]}"), doc);
+    ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: NumberLong(2)}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyNonViablePath) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyNonViablePathThroughArray) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: 0}"));
     FieldRef pathToCreate("2.b");
@@ -1007,22 +1382,25 @@ TEST(SetNodeTest, ApplyNonViablePath) {
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_NOT_OK(node.apply(doc.root()["a"],
-                             &pathToCreate,
-                             &pathTaken,
-                             matchedField,
-                             fromReplication,
-                             indexData,
-                             logBuilder,
-                             &indexesAffected,
-                             &noop));
+    Status result = node.apply(doc.root()["a"],
+                               &pathToCreate,
+                               &pathTaken,
+                               matchedField,
+                               fromReplication,
+                               indexData,
+                               logBuilder,
+                               &indexesAffected,
+                               &noop);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.code(), ErrorCodes::PathNotViable);
+    ASSERT_EQ(result.reason(), "Cannot create field '2' in element {a: 0}");
 }
 
-TEST(SetNodeTest, ApplyInPlaceArrayIndex) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     FieldRef pathToCreate("");
@@ -1030,7 +1408,7 @@ TEST(SetNodeTest, ApplyInPlaceArrayIndex) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1045,15 +1423,15 @@ TEST(SetNodeTest, ApplyInPlaceArrayIndex) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
+    ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 3}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyNormalArray) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyAppendArray) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: [{b: 0},{b: 1}]}"));
     FieldRef pathToCreate("2.b");
@@ -1061,7 +1439,7 @@ TEST(SetNodeTest, ApplyNormalArray) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1080,11 +1458,11 @@ TEST(SetNodeTest, ApplyNormalArray) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyPaddingArray) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyPaddingArray) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: [{b: 0}]}"));
     FieldRef pathToCreate("2.b");
@@ -1092,7 +1470,7 @@ TEST(SetNodeTest, ApplyPaddingArray) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1111,11 +1489,11 @@ TEST(SetNodeTest, ApplyPaddingArray) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyNumericObject) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyNumericObject) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: {b: 0}}"));
     FieldRef pathToCreate("2.b");
@@ -1123,7 +1501,7 @@ TEST(SetNodeTest, ApplyNumericObject) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1142,11 +1520,11 @@ TEST(SetNodeTest, ApplyNumericObject) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyNumericField) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyNumericField) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: {'2': {b: 1}}}"));
     FieldRef pathToCreate("");
@@ -1154,7 +1532,7 @@ TEST(SetNodeTest, ApplyNumericField) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1169,15 +1547,15 @@ TEST(SetNodeTest, ApplyNumericField) {
                          &noop));
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: {'2': {b: 2}}}"), doc);
+    ASSERT_EQUALS(fromjson("{a: {'2': {b: 3}}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyExtendNumericField) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyExtendNumericField) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: {'2': {c: 1}}}"));
     FieldRef pathToCreate("b");
@@ -1185,7 +1563,7 @@ TEST(SetNodeTest, ApplyExtendNumericField) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1204,10 +1582,10 @@ TEST(SetNodeTest, ApplyExtendNumericField) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyEmptyObject) {
+TEST(ArithmeticNodeTest, ApplyNumericFieldToEmptyObject) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: {}}"));
@@ -1216,7 +1594,7 @@ TEST(SetNodeTest, ApplyEmptyObject) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1235,10 +1613,10 @@ TEST(SetNodeTest, ApplyEmptyObject) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyEmptyArray) {
+TEST(ArithmeticNodeTest, ApplyEmptyArray) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: []}"));
@@ -1247,7 +1625,7 @@ TEST(SetNodeTest, ApplyEmptyArray) {
     StringData matchedField;
     auto fromReplication = false;
     UpdateIndexData indexData;
-    indexData.addPath("a.2.b");
+    indexData.addPath("a");
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
@@ -1266,11 +1644,11 @@ TEST(SetNodeTest, ApplyEmptyArray) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
-TEST(SetNodeTest, ApplyLogDottedPath) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, ApplyLogDottedPath) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: [{b:0}, {b:1}]}"));
     FieldRef pathToCreate("2.b");
@@ -1297,11 +1675,11 @@ TEST(SetNodeTest, ApplyLogDottedPath) {
     ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
 }
 
-TEST(SetNodeTest, LogEmptyArray) {
-    auto update = fromjson("{$set: {'a.2.b': 2}}");
+TEST(ArithmeticNodeTest, LogEmptyArray) {
+    auto update = fromjson("{$inc: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
+    ASSERT_OK(node.init(update["$inc"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: []}"));
     FieldRef pathToCreate("2.b");
@@ -1328,10 +1706,10 @@ TEST(SetNodeTest, LogEmptyArray) {
     ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
 }
 
-TEST(SetNodeTest, LogEmptyObject) {
+TEST(ArithmeticNodeTest, LogEmptyObject) {
     auto update = fromjson("{$set: {'a.2.b': 2}}");
     const CollatorInterface* collator = nullptr;
-    SetNode node;
+    ArithmeticNode node(ArithmeticNode::ArithmeticOp::kAdd);
     ASSERT_OK(node.init(update["$set"]["a.2.b"], collator));
 
     Document doc(fromjson("{a: {}}"));
@@ -1359,385 +1737,5 @@ TEST(SetNodeTest, LogEmptyObject) {
     ASSERT_EQUALS(fromjson("{$set: {'a.2.b': 2}}"), logDoc);
 }
 
-TEST(SetNodeTest, ApplyNoOpComplex) {
-    auto update = fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
-
-    Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.1.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("a.1.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["1"]["b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, ApplySameStructure) {
-    auto update = fromjson("{$set: {'a.1.b': {c: 1, d: 1}}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
-
-    Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("a.1.b");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("a.1.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["1"]["b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"), doc);
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, NonViablePathWithoutRepl) {
-    auto update = fromjson("{$set: {'a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
-
-    Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("1.b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = false;
-    const UpdateIndexData* indexData = nullptr;
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_NOT_OK(node.apply(doc.root()["a"],
-                             &pathToCreate,
-                             &pathTaken,
-                             matchedField,
-                             fromReplication,
-                             indexData,
-                             logBuilder,
-                             &indexesAffected,
-                             &noop));
-}
-
-TEST(SetNodeTest, SingleFieldFromReplication) {
-    auto update = fromjson("{$set: {'a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
-
-    Document doc(fromjson("{_id:1, a: 1}"));
-    FieldRef pathToCreate("1.b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("a.1.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id:1, a: 1}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, SingleFieldNoIdFromReplication) {
-    auto update = fromjson("{$set: {'a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.1.b"], collator));
-
-    Document doc(fromjson("{a: 1}"));
-    FieldRef pathToCreate("1.b");
-    FieldRef pathTaken("a");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("a.1.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: 1}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, NestedFieldFromReplication) {
-    auto update = fromjson("{$set: {'a.a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.a.1.b"], collator));
-
-    Document doc(fromjson("{_id:1, a: {a: 1}}"));
-    FieldRef pathToCreate("1.b");
-    FieldRef pathTaken("a.a");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("a.a.1.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id:1, a: {a: 1}}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, DoubleNestedFieldFromReplication) {
-    auto update = fromjson("{$set: {'a.b.c.d': 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.b.c.d"], collator));
-
-    Document doc(fromjson("{_id:1, a: {b: {c: 1}}}"));
-    FieldRef pathToCreate("d");
-    FieldRef pathTaken("a.b.c");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("a.b.c.d");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["b"]["c"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id:1, a: {b: {c: 1}}}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, NestedFieldNoIdFromReplication) {
-    auto update = fromjson("{$set: {'a.a.1.b': 1}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.a.1.b"], collator));
-
-    Document doc(fromjson("{a: {a: 1}}"));
-    FieldRef pathToCreate("1.b");
-    FieldRef pathTaken("a.a");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("a.a.1.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{a: {a: 1}}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
-    auto update = fromjson("{$set: {'a.0.b': [0,2]}}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["a.0.b"], collator));
-
-    Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
-    FieldRef pathToCreate("b");
-    FieldRef pathTaken("a.0");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("a.0.b");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["0"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_TRUE(noop);
-    ASSERT_FALSE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id: 0, a: [1, {b: [1]}]}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-}
-
-TEST(SetNodeTest, Set6) {
-    auto update = fromjson("{$set: {'r.a': 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["r.a"], collator));
-
-    Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("r.a");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("r.a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["r"]["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id: 1, r: {a:2, b:2}}"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
-}
-
-TEST(SetNodeTest, Set6FromRepl) {
-    auto update = fromjson("{$set: { 'r.a': 2}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["r.a"], collator));
-
-    Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("r.a");
-    StringData matchedField;
-    auto fromReplication = true;
-    UpdateIndexData indexData;
-    indexData.addPath("r.a");
-    Document logDoc;
-    LogBuilder logBuilder(logDoc.root());
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["r"]["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{_id: 1, r: {a:2, b:2} }"), doc);
-    ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
-    ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
-}
-
-TEST(SetNodeTest, ApplySetModToEphemeralDocument) {
-    // The following mod when applied to a document constructed node by node exposed a
-    // latent debug only defect in mutable BSON, so this is more a test of mutable than
-    // $set.
-    auto update = fromjson("{ $set: { x: { a: 100, b: 2 }}}");
-    const CollatorInterface* collator = nullptr;
-    SetNode node;
-    ASSERT_OK(node.init(update["$set"]["x"], collator));
-
-    Document doc;
-    Element x = doc.makeElementObject("x");
-    doc.root().pushBack(x);
-    Element a = doc.makeElementInt("a", 100);
-    x.pushBack(a);
-
-    FieldRef pathToCreate("");
-    FieldRef pathTaken("x");
-    StringData matchedField;
-    auto fromReplication = false;
-    UpdateIndexData indexData;
-    indexData.addPath("x");
-    LogBuilder* logBuilder = nullptr;
-    auto indexesAffected = false;
-    auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["x"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
-    ASSERT_FALSE(noop);
-    ASSERT_TRUE(indexesAffected);
-    ASSERT_EQUALS(fromjson("{ x : { a : 100, b : 2 } }"), doc);
-    ASSERT_FALSE(doc.isInPlaceModeEnabled());
-}
-
 }  // namespace
+}  // namespace mongo
