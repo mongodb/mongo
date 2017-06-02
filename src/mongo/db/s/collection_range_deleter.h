@@ -100,7 +100,7 @@ public:
         DeleteNotification notification{};
     };
 
-    enum class Action { kFinished, kMore, kWriteOpLog };
+    enum Action { kFinished, kMore, kWriteOpLog };
 
     CollectionRangeDeleter() = default;
     ~CollectionRangeDeleter();

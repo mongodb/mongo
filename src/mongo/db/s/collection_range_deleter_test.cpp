@@ -102,9 +102,6 @@ private:
     OID _epoch;
 };
 
-bool operator==(CollectionRangeDeleter::Action a, CollectionRangeDeleter::Action b) {
-    return (int)a == (int)b;
-}
 std::ostream& operator<<(std::ostream& os, CollectionRangeDeleter::Action a) {
     return os << (int)a;
 }
