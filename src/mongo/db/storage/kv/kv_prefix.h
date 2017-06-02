@@ -54,6 +54,10 @@ public:
         return _value;
     }
 
+    int64_t repr() const {
+        return _value;
+    }
+
     std::string toString() const;
 
     inline bool operator<(const KVPrefix& rhs) const {
@@ -72,7 +76,17 @@ public:
 
     static void setLargestPrefix(KVPrefix largestPrefix);
 
+    /**
+     * Returns 'KVPrefix::kNotPrefixed' if 'storageGlobalParams.groupCollections' is false or the
+     * input 'ns' is a namespace disallowed for grouping. Otherwise returns the next 'KVPrefix'
+     * ensuring it is unique with respect to active collections and indexes.
+     */
     static KVPrefix getNextPrefix(const NamespaceString& ns);
+
+    /**
+     * Unconditionally returns a new prefix. Only useful for testing.
+     */
+    static KVPrefix generateNextPrefix();
 
 private:
     explicit KVPrefix(int64_t value) : _value(value) {}

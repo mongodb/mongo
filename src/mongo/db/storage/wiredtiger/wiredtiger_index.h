@@ -67,7 +67,8 @@ public:
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         const std::string& sysIndexConfig,
                                                         const std::string& collIndexConfig,
-                                                        const IndexDescriptor& desc);
+                                                        const IndexDescriptor& desc,
+                                                        bool isPrefixed);
 
     /**
      * Creates a WiredTiger table suitable for implementing a MongoDB index.
@@ -145,6 +146,8 @@ protected:
                           const BSONObj& key,
                           const RecordId& id,
                           bool dupsAllowed) = 0;
+
+    void setKey(WT_CURSOR* cursor, const WT_ITEM* item);
 
     class BulkBuilder;
     class StandardBulkBuilder;

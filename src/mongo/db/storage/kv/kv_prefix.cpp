@@ -62,6 +62,10 @@ std::string KVPrefix::toString() const {
         return kNotPrefixed;
     }
 
+    return generateNextPrefix();
+}
+
+/* static */ KVPrefix KVPrefix::generateNextPrefix() {
     stdx::lock_guard<stdx::mutex> lk(_nextValueMutex);
     return KVPrefix(_nextValue++);
 }

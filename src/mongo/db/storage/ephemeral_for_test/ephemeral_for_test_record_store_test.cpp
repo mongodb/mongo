@@ -45,14 +45,24 @@ class EphemeralForTestHarnessHelper final : public RecordStoreHarnessHelper {
 public:
     EphemeralForTestHarnessHelper() {}
 
-    std::unique_ptr<RecordStore> newNonCappedRecordStore() final {
-        return stdx::make_unique<EphemeralForTestRecordStore>("a.b", &data);
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
+        return newNonCappedRecordStore("a.b");
     }
 
-    std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
-                                                      int64_t cappedMaxDocs) final {
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
+        return stdx::make_unique<EphemeralForTestRecordStore>(ns, &data);
+    }
+
+    virtual std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
+                                                              int64_t cappedMaxDocs) {
+        return newCappedRecordStore("a.b", cappedSizeBytes, cappedMaxDocs);
+    }
+
+    virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
+                                                              int64_t cappedSizeBytes,
+                                                              int64_t cappedMaxDocs) final {
         return stdx::make_unique<EphemeralForTestRecordStore>(
-            "a.b", &data, true, cappedSizeBytes, cappedMaxDocs);
+            ns, &data, true, cappedSizeBytes, cappedMaxDocs);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

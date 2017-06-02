@@ -50,19 +50,29 @@ public:
     MyHarnessHelper() {}
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
+        return newNonCappedRecordStore("a.b");
+    }
+
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
         OperationContextNoop opCtx;
         auto md = stdx::make_unique<DummyRecordStoreV1MetaData>(false, 0);
         md->setUserFlag(&opCtx, CollectionOptions::Flag_NoPadding);
-        return stdx::make_unique<SimpleRecordStoreV1>(&opCtx, "a.b", md.release(), &_em, false);
+        return stdx::make_unique<SimpleRecordStoreV1>(&opCtx, ns, md.release(), &_em, false);
     }
 
-    std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedMaxSize,
-                                                      int64_t cappedMaxDocs) final {
+    virtual std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedMaxSize,
+                                                              int64_t cappedMaxDocs) {
+        return newCappedRecordStore("a.b", cappedMaxSize, cappedMaxDocs);
+    }
+
+    virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
+                                                              int64_t cappedMaxSize,
+                                                              int64_t cappedMaxDocs) {
         OperationContextNoop opCtx;
         auto md = stdx::make_unique<DummyRecordStoreV1MetaData>(true, 0);
         auto md_ptr = md.get();
-        std::unique_ptr<RecordStore> rs = stdx::make_unique<CappedRecordStoreV1>(
-            &opCtx, nullptr, "a.b", md.release(), &_em, false);
+        std::unique_ptr<RecordStore> rs =
+            stdx::make_unique<CappedRecordStoreV1>(&opCtx, nullptr, ns, md.release(), &_em, false);
 
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};

@@ -61,7 +61,6 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/update/update_driver.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY

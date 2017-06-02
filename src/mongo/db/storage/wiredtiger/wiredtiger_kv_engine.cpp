@@ -526,8 +526,9 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
     _checkIdentPath(ident);
     WiredTigerSession session(_conn);
 
-    StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(_canonicalName, ns, options, _rsOptions);
+    const bool prefixed = prefix.isPrefixed();
+    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+        _canonicalName, ns, options, _rsOptions, prefixed);
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -545,32 +546,37 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getGroupedRecordStore(
     StringData ident,
     const CollectionOptions& options,
     KVPrefix prefix) {
+
+    WiredTigerRecordStore::Params params;
+    params.ns = ns;
+    params.uri = _uri(ident);
+    params.engineName = _canonicalName;
+    params.isCapped = options.capped;
+    params.isEphemeral = _ephemeral;
+    params.cappedCallback = nullptr;
+    params.sizeStorer = _sizeStorer.get();
+
+    params.cappedMaxSize = -1;
     if (options.capped) {
-        return stdx::make_unique<WiredTigerRecordStore>(
-            opCtx,
-            ns,
-            _uri(ident),
-            _canonicalName,
-            options.capped,
-            _ephemeral,
-            options.cappedSize ? options.cappedSize : 4096,
-            options.cappedMaxDocs ? options.cappedMaxDocs : -1,
-            nullptr,
-            _sizeStorer.get(),
-            prefix);
-    } else {
-        return stdx::make_unique<WiredTigerRecordStore>(opCtx,
-                                                        ns,
-                                                        _uri(ident),
-                                                        _canonicalName,
-                                                        false,
-                                                        _ephemeral,
-                                                        -1,
-                                                        -1,
-                                                        nullptr,
-                                                        _sizeStorer.get(),
-                                                        prefix);
+        if (options.cappedSize) {
+            params.cappedMaxSize = options.cappedSize;
+        } else {
+            params.cappedMaxSize = 4096;
+        }
     }
+    params.cappedMaxDocs = -1;
+    if (options.capped && options.cappedMaxDocs)
+        params.cappedMaxDocs = options.cappedMaxDocs;
+
+    std::unique_ptr<WiredTigerRecordStore> ret;
+    if (prefix == KVPrefix::kNotPrefixed) {
+        ret = stdx::make_unique<StandardWiredTigerRecordStore>(opCtx, params);
+    } else {
+        ret = stdx::make_unique<PrefixedWiredTigerRecordStore>(opCtx, params, prefix);
+    }
+    ret->postConstructorInit(opCtx);
+
+    return std::move(ret);
 }
 
 string WiredTigerKVEngine::_uri(StringData ident) const {
@@ -601,7 +607,7 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
     }
 
     StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-        _canonicalName, _indexOptions, collIndexOptions, *desc);
+        _canonicalName, _indexOptions, collIndexOptions, *desc, prefix.isPrefixed());
     if (!result.isOK()) {
         return result.getStatus();
     }
