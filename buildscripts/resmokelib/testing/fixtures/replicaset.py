@@ -104,23 +104,25 @@ class ReplicaSetFixture(interface.ReplFixture):
         # Wait for the primary to be elected.
         client = utils.new_mongo_client(port=self.port)
         while True:
+            self.logger.info("Waiting for primary on port %d to be elected.", self.port)
             is_master = client.admin.command("isMaster")["ismaster"]
             if is_master:
                 break
-            self.logger.info("Waiting for primary on port %d to be elected.", self.port)
             time.sleep(0.1)  # Wait a little bit before trying again.
+        self.logger.info("Primary on port %d successfully elected.", self.port)
 
         # Wait for the secondaries to become available.
         for secondary in self.get_secondaries():
             client = utils.new_mongo_client(port=secondary.port,
                                             read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
+                self.logger.info("Waiting for secondary on port %d to become available.",
+                                 secondary.port)
                 is_secondary = client.admin.command("isMaster")["secondary"]
                 if is_secondary:
                     break
-                self.logger.info("Waiting for secondary on port %d to become available.",
-                                 secondary.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.
+            self.logger.info("Secondary on port %d is now available.", secondary.port)
 
     def teardown(self):
         running_at_start = self.is_running()
