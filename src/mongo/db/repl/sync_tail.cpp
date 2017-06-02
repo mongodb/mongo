@@ -619,8 +619,8 @@ void fillWriterVectors(OperationContext* opCtx,
 
 }  // namespace
 
-// Applies a batch of oplog entries, by using a set of threads to apply the operations and then
-// writes the oplog entries to the local oplog.
+// Applies a batch of oplog entries, by writing the oplog entries to the local oplog
+// and then using a set of threads to apply the operations.
 OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     auto applyOperation = [this](MultiApplier::OperationPtrs* ops) -> Status {
         _applyFunc(ops, this);
@@ -1276,12 +1276,15 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
         ON_BLOCK_EXIT([&] { workerPool->join(); });
 
+        // Write batch of ops into oplog.
         consistencyMarkers->setOplogDeleteFromPoint(opCtx, ops.front().getTimestamp());
         scheduleWritesToOplog(opCtx, workerPool, ops);
         fillWriterVectors(opCtx, &ops, &writerVectors);
 
+        // Wait for writes to finish before applying ops.
         workerPool->join();
 
+        // Reset consistency markers in case the node fails while applying ops.
         consistencyMarkers->setOplogDeleteFromPoint(opCtx, Timestamp());
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
