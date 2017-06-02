@@ -101,15 +101,15 @@ TEST(UnsetNodeTest, UnsetNoOp) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root(),
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_TRUE(noop);
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 5}"), doc);
@@ -134,15 +134,15 @@ TEST(UnsetNodeTest, UnsetNoOpDottedPath) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_TRUE(noop);
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 5}"), doc);
@@ -167,15 +167,15 @@ TEST(UnsetNodeTest, UnsetNoOpThroughArray) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_TRUE(noop);
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{b:1}]}"), doc);
@@ -200,15 +200,15 @@ TEST(UnsetNodeTest, UnsetNoOpEmptyDoc) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root(),
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root(),
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_TRUE(noop);
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -233,15 +233,15 @@ TEST(UnsetNodeTest, UnsetTopLevelPath) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -266,15 +266,15 @@ TEST(UnsetNodeTest, UnsetNestedPath) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["b"]["c"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["b"]["c"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
@@ -299,15 +299,15 @@ TEST(UnsetNodeTest, UnsetObject) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["b"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
@@ -332,15 +332,15 @@ TEST(UnsetNodeTest, UnsetArrayElement) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["0"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["0"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[null], b:1}"), doc);
@@ -365,15 +365,15 @@ TEST(UnsetNodeTest, UnsetPositional) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["1"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["1"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, null, 2]}"), doc);
@@ -398,15 +398,15 @@ TEST(UnsetNodeTest, UnsetEntireArray) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -431,15 +431,15 @@ TEST(UnsetNodeTest, UnsetFromObjectInArray) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["0"]["b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["0"]["b"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{}]}"), doc);
@@ -464,15 +464,15 @@ TEST(UnsetNodeTest, CanUnsetInvalidField) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["0"]["$b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["0"]["$b"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1, a: [{}]}"), doc);
@@ -495,15 +495,15 @@ TEST(UnsetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     LogBuilder* logBuilder = nullptr;
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         indexData,
-                         logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               indexData,
+               logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -527,15 +527,15 @@ TEST(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_FALSE(indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -560,15 +560,15 @@ TEST(UnsetNodeTest, ApplyFieldWithDot) {
     LogBuilder logBuilder(logDoc.root());
     auto indexesAffected = false;
     auto noop = false;
-    ASSERT_OK(node.apply(doc.root()["a"]["b"],
-                         &pathToCreate,
-                         &pathTaken,
-                         matchedField,
-                         fromReplication,
-                         &indexData,
-                         &logBuilder,
-                         &indexesAffected,
-                         &noop));
+    node.apply(doc.root()["a"]["b"],
+               &pathToCreate,
+               &pathTaken,
+               matchedField,
+               fromReplication,
+               &indexData,
+               &logBuilder,
+               &indexesAffected,
+               &noop);
     ASSERT_FALSE(noop);
     ASSERT_TRUE(indexesAffected);
     ASSERT_EQUALS(fromjson("{'a.b':4, a: {}}"), doc);

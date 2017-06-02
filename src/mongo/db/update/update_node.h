@@ -86,18 +86,18 @@ public:
      * the document. 'fromReplication' is provided because some modifiers may ignore certain errors
      * when the update is from replication. Uses the index information in 'indexData' to determine
      * whether indexes are affected. If a LogBuilder is provided, logs the update. Outputs whether
-     * the operation was a no-op. Returns a non-OK status if the update node cannot be applied to
-     * the document.
+     * the operation was a no-op. Trips a uassert (which throws UserException) if the update node
+     * cannot be applied to the document.
      */
-    virtual Status apply(mutablebson::Element element,
-                         FieldRef* pathToCreate,
-                         FieldRef* pathTaken,
-                         StringData matchedField,
-                         bool fromReplication,
-                         const UpdateIndexData* indexData,
-                         LogBuilder* logBuilder,
-                         bool* indexesAffected,
-                         bool* noop) const = 0;
+    virtual void apply(mutablebson::Element element,
+                       FieldRef* pathToCreate,
+                       FieldRef* pathTaken,
+                       StringData matchedField,
+                       bool fromReplication,
+                       const UpdateIndexData* indexData,
+                       LogBuilder* logBuilder,
+                       bool* indexesAffected,
+                       bool* noop) const = 0;
 
     /**
      * Creates a new node by merging the contents of two input nodes. The semantics of the merge

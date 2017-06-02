@@ -83,15 +83,15 @@ public:
         _positionalChild->setCollator(collator);
     }
 
-    Status apply(mutablebson::Element element,
-                 FieldRef* pathToCreate,
-                 FieldRef* pathTaken,
-                 StringData matchedField,
-                 bool fromReplication,
-                 const UpdateIndexData* indexData,
-                 LogBuilder* logBuilder,
-                 bool* indexesAffected,
-                 bool* noop) const final;
+    void apply(mutablebson::Element element,
+               FieldRef* pathToCreate,
+               FieldRef* pathTaken,
+               StringData matchedField,
+               bool fromReplication,
+               const UpdateIndexData* indexData,
+               LogBuilder* logBuilder,
+               bool* indexesAffected,
+               bool* noop) const final;
 
     /**
      * Returns the child with field name 'field' or nullptr if there is no such child.

@@ -75,15 +75,15 @@ void applyChild(const UpdateNode& child,
     bool childAffectsIndexes = false;
     bool childNoop = false;
 
-    uassertStatusOK(child.apply(childElement,
-                                pathToCreate,
-                                pathTaken,
-                                matchedField,
-                                fromReplication,
-                                indexData,
-                                logBuilder,
-                                &childAffectsIndexes,
-                                &childNoop));
+    child.apply(childElement,
+                pathToCreate,
+                pathTaken,
+                matchedField,
+                fromReplication,
+                indexData,
+                logBuilder,
+                &childAffectsIndexes,
+                &childNoop);
 
     *indexesAffected = *indexesAffected || childAffectsIndexes;
     *noop = *noop && childNoop;
@@ -309,15 +309,15 @@ void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> c
     }
 }
 
-Status UpdateObjectNode::apply(mutablebson::Element element,
-                               FieldRef* pathToCreate,
-                               FieldRef* pathTaken,
-                               StringData matchedField,
-                               bool fromReplication,
-                               const UpdateIndexData* indexData,
-                               LogBuilder* logBuilder,
-                               bool* indexesAffected,
-                               bool* noop) const {
+void UpdateObjectNode::apply(mutablebson::Element element,
+                             FieldRef* pathToCreate,
+                             FieldRef* pathTaken,
+                             StringData matchedField,
+                             bool fromReplication,
+                             const UpdateIndexData* indexData,
+                             LogBuilder* logBuilder,
+                             bool* indexesAffected,
+                             bool* noop) const {
     *indexesAffected = false;
     *noop = true;
 
@@ -390,8 +390,6 @@ Status UpdateObjectNode::apply(mutablebson::Element element,
     if (applyPositional) {
         applyChildClosure(*_positionalChild.get(), matchedField);
     }
-
-    return Status::OK();
 }
 
 }  // namespace mongo

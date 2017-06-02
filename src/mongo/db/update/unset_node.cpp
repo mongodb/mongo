@@ -38,15 +38,15 @@ Status UnsetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-Status UnsetNode::apply(mutablebson::Element element,
-                        FieldRef* pathToCreate,
-                        FieldRef* pathTaken,
-                        StringData matchedField,
-                        bool fromReplication,
-                        const UpdateIndexData* indexData,
-                        LogBuilder* logBuilder,
-                        bool* indexesAffected,
-                        bool* noop) const {
+void UnsetNode::apply(mutablebson::Element element,
+                      FieldRef* pathToCreate,
+                      FieldRef* pathTaken,
+                      StringData matchedField,
+                      bool fromReplication,
+                      const UpdateIndexData* indexData,
+                      LogBuilder* logBuilder,
+                      bool* indexesAffected,
+                      bool* noop) const {
     *indexesAffected = false;
     *noop = false;
 
@@ -55,7 +55,7 @@ Status UnsetNode::apply(mutablebson::Element element,
         // to delete. We employ a simple and efficient strategy for deleting fields that don't yet
         // exist.
         *noop = true;
-        return Status::OK();
+        return;
     }
 
     // Determine if indexes are affected.
@@ -75,10 +75,8 @@ Status UnsetNode::apply(mutablebson::Element element,
 
     // Log the unset.
     if (logBuilder) {
-        return logBuilder->addToUnsets(pathTaken->dottedField());
+        uassertStatusOK(logBuilder->addToUnsets(pathTaken->dottedField()));
     }
-
-    return Status::OK();
 }
 
 }  // namespace mongo

@@ -51,8 +51,8 @@ public:
     void setCollator(const CollatorInterface* collator) final {}
 
 protected:
-    Status updateExistingElement(mutablebson::Element* element, bool* noop) const final;
-    Status setValueForNewElement(mutablebson::Element* element) const final;
+    void updateExistingElement(mutablebson::Element* element, bool* noop) const final;
+    void setValueForNewElement(mutablebson::Element* element) const final;
 
 private:
     ArithmeticOp _op;

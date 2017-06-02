@@ -42,20 +42,18 @@ Status SetNode::init(BSONElement modExpr, const CollatorInterface* collator) {
     return Status::OK();
 }
 
-Status SetNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
+void SetNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
     // If 'element' is deserialized, then element.getValue() will be EOO, which will never equal
     // _val.
     if (element->getValue().binaryEqualValues(_val)) {
         *noop = true;
     } else {
-        element->setValueBSONElement(_val);
+        invariantOK(element->setValueBSONElement(_val));
     }
-
-    return Status::OK();
 }
 
-Status SetNode::setValueForNewElement(mutablebson::Element* element) const {
-    return element->setValueBSONElement(_val);
+void SetNode::setValueForNewElement(mutablebson::Element* element) const {
+    invariantOK(element->setValueBSONElement(_val));
 }
 
 }  // namespace mongo

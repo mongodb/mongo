@@ -41,15 +41,15 @@ namespace mongo {
  */
 class PathCreatingNode : public UpdateLeafNode {
 public:
-    Status apply(mutablebson::Element element,
-                 FieldRef* pathToCreate,
-                 FieldRef* pathTaken,
-                 StringData matchedField,
-                 bool fromReplication,
-                 const UpdateIndexData* indexData,
-                 LogBuilder* logBuilder,
-                 bool* indexesAffected,
-                 bool* noop) const final;
+    void apply(mutablebson::Element element,
+               FieldRef* pathToCreate,
+               FieldRef* pathTaken,
+               StringData matchedField,
+               bool fromReplication,
+               const UpdateIndexData* indexData,
+               LogBuilder* logBuilder,
+               bool* indexesAffected,
+               bool* noop) const final;
 
 protected:
     /**
@@ -57,14 +57,14 @@ protected:
      * to an existing path. The child's implementation of this method is responsible for either
      * updating the given Element or setting *noop to true to indicate that no update is necessary.
      */
-    virtual Status updateExistingElement(mutablebson::Element* element, bool* noop) const = 0;
+    virtual void updateExistingElement(mutablebson::Element* element, bool* noop) const = 0;
 
     /**
      * PathCreatingNode::apply() calls the setValueForNewElement() method when it must materialize a
      * new field in order to apply its update. The child's implemenation of this method is
      * responsible for assigning a value to the new element (which will initially be null).
      */
-    virtual Status setValueForNewElement(mutablebson::Element* element) const = 0;
+    virtual void setValueForNewElement(mutablebson::Element* element) const = 0;
 };
 
 }  // namespace mongo

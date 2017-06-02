@@ -73,18 +73,18 @@ Status ArithmeticNode::init(BSONElement modExpr, const CollatorInterface* collat
     return Status::OK();
 }
 
-Status ArithmeticNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
+void ArithmeticNode::updateExistingElement(mutablebson::Element* element, bool* noop) const {
     if (!element->isNumeric()) {
         mutablebson::Element idElem =
             mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Cannot apply " << getModifierNameForOp(_op)
-                                    << " to a value of non-numeric type. {"
-                                    << idElem.toString()
-                                    << "} has the field '"
-                                    << element->getFieldName()
-                                    << "' of non-numeric type "
-                                    << typeName(element->getType()));
+        uasserted(ErrorCodes::TypeMismatch,
+                  str::stream() << "Cannot apply " << getModifierNameForOp(_op)
+                                << " to a value of non-numeric type. {"
+                                << idElem.toString()
+                                << "} has the field '"
+                                << element->getFieldName()
+                                << "' of non-numeric type "
+                                << typeName(element->getType()));
     }
 
     SafeNum originalValue = element->getValueSafeNum();
@@ -103,13 +103,11 @@ Status ArithmeticNode::updateExistingElement(mutablebson::Element* element, bool
     if (element->getValue().ok() && valueToSet.isIdentical(originalValue)) {
         *noop = true;
     } else {
-        element->setValueSafeNum(valueToSet);
+        invariantOK(element->setValueSafeNum(valueToSet));
     }
-
-    return Status::OK();
 }
 
-Status ArithmeticNode::setValueForNewElement(mutablebson::Element* element) const {
+void ArithmeticNode::setValueForNewElement(mutablebson::Element* element) const {
     SafeNum valueToSet = _val;
     switch (_op) {
         case ArithmeticOp::kAdd:
@@ -121,7 +119,7 @@ Status ArithmeticNode::setValueForNewElement(mutablebson::Element* element) cons
             valueToSet *= SafeNum(static_cast<int32_t>(0));
             break;
     }
-    return element->setValueSafeNum(valueToSet);
+    invariantOK(element->setValueSafeNum(valueToSet));
 }
 
 }  // namespace mongo

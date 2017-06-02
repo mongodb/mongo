@@ -34,15 +34,15 @@
 
 namespace mongo {
 
-Status PathCreatingNode::apply(mutablebson::Element element,
-                               FieldRef* pathToCreate,
-                               FieldRef* pathTaken,
-                               StringData matchedField,
-                               bool fromReplication,
-                               const UpdateIndexData* indexData,
-                               LogBuilder* logBuilder,
-                               bool* indexesAffected,
-                               bool* noop) const {
+void PathCreatingNode::apply(mutablebson::Element element,
+                             FieldRef* pathToCreate,
+                             FieldRef* pathTaken,
+                             StringData matchedField,
+                             bool fromReplication,
+                             const UpdateIndexData* indexData,
+                             LogBuilder* logBuilder,
+                             bool* indexesAffected,
+                             bool* noop) const {
     *indexesAffected = false;
     *noop = false;
 
@@ -51,12 +51,9 @@ Status PathCreatingNode::apply(mutablebson::Element element,
 
     if (pathToCreate->empty()) {
         // We found an existing element at the update path.
-        auto status = updateExistingElement(&element, noop);
-        if (!status.isOK()) {
-            return status;
-        }
+        updateExistingElement(&element, noop);
         if (*noop) {
-            return Status::OK();
+            return;  // Successful no-op update.
         }
 
         valueToLog = element;
@@ -64,13 +61,10 @@ Status PathCreatingNode::apply(mutablebson::Element element,
         // We did not find an element at the update path. Create one.
         auto newElementFieldName = pathToCreate->getPart(pathToCreate->numParts() - 1);
         auto newElement = element.getDocument().makeElementNull(newElementFieldName);
-        auto status = setValueForNewElement(&newElement);
-        if (!status.isOK()) {
-            return status;
-        }
+        setValueForNewElement(&newElement);
 
         invariant(newElement.ok());
-        status = pathsupport::createPathAt(*pathToCreate, 0, element, newElement);
+        auto status = pathsupport::createPathAt(*pathToCreate, 0, element, newElement);
         if (!status.isOK()) {
             // $sets on non-viable paths are ignored when the update came from replication. We do
             // not error because idempotency requires that any other update modifiers must still be
@@ -85,9 +79,10 @@ Status PathCreatingNode::apply(mutablebson::Element element,
             // true.)
             if (status.code() == ErrorCodes::PathNotViable && fromReplication) {
                 *noop = true;
-                return Status::OK();
+                return;
             }
-            return status;
+            uassertStatusOK(status);
+            MONGO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
         }
 
         valueToLog = newElement;
@@ -112,9 +107,7 @@ Status PathCreatingNode::apply(mutablebson::Element element,
         auto logElement =
             logBuilder->getDocument().makeElementWithNewFieldName(fullPath, valueToLog);
         invariant(logElement.ok());
-        return logBuilder->addToSets(logElement);
+        uassertStatusOK(logBuilder->addToSets(logElement));
     }
-
-    return Status::OK();
 }
 }  // namespace mongo
