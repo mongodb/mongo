@@ -78,16 +78,16 @@ o = {
 };
 assert.writeOK(t.insert(o));
 
-assert.writeError(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-assert.writeError(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+assert.writeOK(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+assert.writeOK(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
 
 assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
 assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
-assert.writeError(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+assert.writeOK(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+assert.writeOK(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+assert.writeOK(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
 
 assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
 assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
