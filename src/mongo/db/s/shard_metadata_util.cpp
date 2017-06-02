@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -49,6 +50,20 @@ namespace {
 const WriteConcernOptions kLocalWriteConcern(1,
                                              WriteConcernOptions::SyncMode::UNSET,
                                              Milliseconds(0));
+
+/**
+ * Processes a command result for errors, including write concern errors.
+ */
+Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
+    BatchedCommandResponse batchResponse;
+    std::string errmsg;
+    if (!batchResponse.parseBSON(commandResult, &errmsg)) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Failed to parse write response: " << errmsg);
+    }
+
+    return batchResponse.toStatus();
+}
 
 }  // namespace
 
@@ -177,7 +192,8 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
             "config", cmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), cmdObj);
         BSONObj responseReply = commandResponse->getCommandReply().getOwned();
 
-        Status commandStatus = getStatusFromCommandResult(commandResponse->getCommandReply());
+        Status commandStatus =
+            getStatusFromWriteCommandResponse(commandResponse->getCommandReply());
         if (!commandStatus.isOK()) {
             return commandStatus;
         }
@@ -300,9 +316,9 @@ Status updateShardChunks(OperationContext* opCtx,
                                               deleteCmdObj.firstElementFieldName(),
                                               rpc::makeEmptyMetadata(),
                                               deleteCmdObj);
-            auto deleteStatus =
-                getStatusFromCommandResult(deleteCommandResponse->getCommandReply());
 
+            auto deleteStatus =
+                getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply());
             if (!deleteStatus.isOK()) {
                 return deleteStatus;
             }
@@ -315,13 +331,14 @@ Status updateShardChunks(OperationContext* opCtx,
             insertRequest.setNS(chunkMetadataNss);
             const BSONObj insertCmdObj = insertRequest.toBSON();
 
-            rpc::UniqueReply commandResponse =
+            rpc::UniqueReply insertCommandResponse =
                 client.runCommandWithMetadata(chunkMetadataNss.db().toString(),
                                               insertCmdObj.firstElementFieldName(),
                                               rpc::makeEmptyMetadata(),
                                               insertCmdObj);
-            auto insertStatus = getStatusFromCommandResult(commandResponse->getCommandReply());
 
+            auto insertStatus =
+                getStatusFromWriteCommandResponse(insertCommandResponse->getCommandReply());
             if (!insertStatus.isOK()) {
                 return insertStatus;
             }
@@ -353,8 +370,9 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
 
         rpc::UniqueReply deleteCommandResponse = client.runCommandWithMetadata(
             "config", deleteCmdObj.firstElementFieldName(), rpc::makeEmptyMetadata(), deleteCmdObj);
-        auto deleteStatus = getStatusFromCommandResult(deleteCommandResponse->getCommandReply());
 
+        auto deleteStatus =
+            getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply());
         if (!deleteStatus.isOK()) {
             return deleteStatus;
         }
