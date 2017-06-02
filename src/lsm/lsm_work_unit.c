@@ -328,8 +328,9 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 */
 	saved_isolation = session->txn.isolation;
 	session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
-	WT_ERR(__wt_cache_op(session, WT_SYNC_WRITE_LEAVES));
+	ret = __wt_cache_op(session, WT_SYNC_WRITE_LEAVES);
 	session->txn.isolation = saved_isolation;
+	WT_ERR(ret);
 
 	__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing %s",
 	    chunk->uri);

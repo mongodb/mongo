@@ -235,8 +235,6 @@ stall:			__wt_cond_wait(
 		}
 	}
 
-	WT_ASSERT(session, l->u.s.readers_active > 0);
-
 	/*
 	 * Applications depend on a barrier here so that operations holding the
 	 * lock see consistent data.  The atomic operation above isn't
@@ -245,6 +243,8 @@ stall:			__wt_cond_wait(
 	 * meantime.
 	 */
 	WT_READ_BARRIER();
+
+	WT_ASSERT(session, l->u.s.readers_active > 0);
 }
 
 /*
