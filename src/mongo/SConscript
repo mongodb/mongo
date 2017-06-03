@@ -274,42 +274,6 @@ generateConfigHeaderFile = env.Substfile(
 )
 env.Alias('generated-sources', generateConfigHeaderFile)
 
-mongodLibDeps = [
-    'db/assemble_response',
-    'db/commands/core',
-    'db/conn_pool_options',
-    'db/catalog/catalog',
-    'db/clientcursor',
-    'db/dbdirectclient',
-    'db/ftdc/ftdc_mongod',
-    'db/index_d',
-    'db/initialize_snmp',
-    'db/mongod_options',
-    'db/mongodandmongos',
-    'db/op_observer_d',
-    'db/repl/repl_set_commands',
-    'db/repair_database',
-    'db/repl/storage_interface_impl',
-    'db/repl/topology_coordinator_impl',
-    'db/s/balancer',
-    'db/serveronly',
-    'db/service_context_d',
-    'db/startup_warnings_mongod',
-    'db/ttl_d',
-    'executor/network_interface_factory',
-    'rpc/rpc',
-    's/commands/shared_cluster_commands',
-    'transport/service_entry_point_utils',
-    'transport/transport_layer_legacy',
-    'util/clock_sources',
-    'util/fail_point',
-    'util/ntservice',
-    'util/version_impl',
-]
-
-if has_option('use-cpu-profiler'):
-    mongodLibDeps.append('db/commands/cpuprofiler')
-
 mongod = env.Program(
     target="mongod",
     source=[
@@ -317,7 +281,38 @@ mongod = env.Program(
         "db/mongod_options_init.cpp",
         "db/service_entry_point_mongod.cpp",
     ] + env.WindowsResourceFile("db/db.rc"),
-    LIBDEPS=mongodLibDeps,
+    LIBDEPS=[
+        'db/assemble_response',
+        'db/commands/core',
+        'db/conn_pool_options',
+        'db/catalog/catalog',
+        'db/clientcursor',
+        'db/dbdirectclient',
+        'db/ftdc/ftdc_mongod',
+        'db/index_d',
+        'db/initialize_snmp',
+        'db/mongod_options',
+        'db/mongodandmongos',
+        'db/op_observer_d',
+        'db/repl/repl_set_commands',
+        'db/repair_database',
+        'db/repl/storage_interface_impl',
+        'db/repl/topology_coordinator_impl',
+        'db/s/balancer',
+        'db/serveronly',
+        'db/service_context_d',
+        'db/startup_warnings_mongod',
+        'db/ttl_d',
+        'executor/network_interface_factory',
+        'rpc/rpc',
+        's/commands/shared_cluster_commands',
+        'transport/service_entry_point_utils',
+        'transport/transport_layer_legacy',
+        'util/clock_sources',
+        'util/fail_point',
+        'util/ntservice',
+        'util/version_impl',
+    ],
 )
 env.Default(env.Install('#/', mongod))
 

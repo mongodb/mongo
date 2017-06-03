@@ -292,13 +292,16 @@ env.CppUnitTest(
 if has_option('use-cpu-profiler'):
     profEnv = env.Clone()
     profEnv.InjectThirdPartyIncludePaths('gperftools')
-    profEnv.Library('cpuprofiler',
+    profEnv.Library(
+        target='cpuprofiler',
         source=[
             'cpuprofile.cpp',
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/commands',
+            '$BUILD_DIR/mongo/db/db_raii',
         ],
-        LIBDEPS_TAGS=[
-            'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        PROGDEPS_DEPENDENTS=[
+            '$BUILD_DIR/mongo/mongod',
         ],
     )
