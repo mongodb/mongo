@@ -31,9 +31,9 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
@@ -41,7 +41,7 @@ namespace mongo {
  * This class represents the layout and content of a delete document runCommand,
  * in the resquest side.
  */
-class BatchedDeleteDocument : public BSONSerializable {
+class BatchedDeleteDocument {
     MONGO_DISALLOW_COPYING(BatchedDeleteDocument);
 
 public:
@@ -53,29 +53,16 @@ public:
     static const BSONField<int> limit;
     static const BSONField<BSONObj> collation;
 
-    //
-    // construction / destruction
-    //
-
     BatchedDeleteDocument();
-    virtual ~BatchedDeleteDocument();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedDeleteDocument* other) const;
 
-    //
-    // bson serializable interface implementation
-    //
-
-    virtual bool isValid(std::string* errMsg) const;
-    virtual BSONObj toBSON() const;
-    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-    virtual void clear();
-    virtual std::string toString() const;
-
-    //
-    // individual field accessors
-    //
+    bool isValid(std::string* errMsg) const;
+    BSONObj toBSON() const;
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void clear();
+    std::string toString() const;
 
     void setQuery(const BSONObj& query);
     void unsetQuery();

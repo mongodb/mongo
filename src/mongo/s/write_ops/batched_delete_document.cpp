@@ -44,8 +44,6 @@ BatchedDeleteDocument::BatchedDeleteDocument() {
     clear();
 }
 
-BatchedDeleteDocument::~BatchedDeleteDocument() {}
-
 bool BatchedDeleteDocument::isValid(std::string* errMsg) const {
     std::string dummy;
     if (errMsg == NULL) {

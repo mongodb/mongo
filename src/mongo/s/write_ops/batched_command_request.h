@@ -56,10 +56,6 @@ public:
 
     enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown };
 
-    //
-    // construction / destruction
-    //
-
     BatchedCommandRequest(BatchType batchType);
 
     /**
@@ -80,11 +76,6 @@ public:
     BatchedCommandRequest(BatchedDeleteRequest* deleteReq)
         : _batchType(BatchType_Delete), _deleteReq(deleteReq) {}
 
-    ~BatchedCommandRequest(){};
-
-    /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(BatchedCommandRequest* other) const;
-
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;
     bool parseBSON(StringData dbName, const BSONObj& source, std::string* errMsg);
@@ -95,14 +86,19 @@ public:
     // Batch type accessors
     //
 
-    BatchType getBatchType() const;
+    BatchType getBatchType() const {
+        return _batchType;
+    }
+
     BatchedInsertRequest* getInsertRequest() const;
     BatchedUpdateRequest* getUpdateRequest() const;
     BatchedDeleteRequest* getDeleteRequest() const;
+
     // Index creation is also an insert, but a weird one.
     bool isInsertIndexRequest() const;
     bool isUniqueIndexRequest() const;
     bool isValidIndexRequest(std::string* errMsg) const;
+
     std::string getTargetingNS() const;
     const NamespaceString& getTargetingNSS() const;
     BSONObj getIndexKeyPattern() const;
