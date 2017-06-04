@@ -38,7 +38,6 @@
 #include <mach/mach_host.h>
 #include <mach/mach_init.h>
 #include <mach/mach_traps.h>
-#include <mach/shared_region.h>
 #include <mach/task.h>
 #include <mach/task_info.h>
 #include <mach/vm_map.h>

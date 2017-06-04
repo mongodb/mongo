@@ -37,7 +37,12 @@
 #include <pthread.h>
 #endif
 #if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if !TARGET_OS_TV && !TARGET_OS_IOS
 #include <sys/proc_info.h>
+#else
+#include <mach/thread_info.h>
+#endif
 #endif
 #if defined(__linux__)
 #include <sys/syscall.h>
