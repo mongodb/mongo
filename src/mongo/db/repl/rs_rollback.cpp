@@ -174,19 +174,20 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         return Status::OK();
 
     if (ourObj.objsize() > 512 * 1024 * 1024)
-        throw RSFatalException("rollback too large");
+        throw RSFatalException(str::stream() << "Rollback too large, oplog size: "
+                                             << ourObj.objsize());
 
     DocID doc;
     doc.ownedObj = ourObj.getOwned();
     doc.ns = doc.ownedObj.getStringField("ns");
     if (*doc.ns == '\0') {
-        throw RSFatalException(str::stream() << "local op on rollback has no ns: "
+        throw RSFatalException(str::stream() << "Local op on rollback has no ns: "
                                              << redact(doc.ownedObj));
     }
 
     BSONObj obj = doc.ownedObj.getObjectField(*op == 'u' ? "o2" : "o");
     if (obj.isEmpty()) {
-        throw RSFatalException(str::stream() << "local op on rollback has no object field: "
+        throw RSFatalException(str::stream() << "Local op on rollback has no object field: "
                                              << redact(doc.ownedObj));
     }
 
@@ -196,9 +197,9 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         string cmdname = first.fieldName();
         Command* cmd = Command::findCommand(cmdname.c_str());
         if (cmd == NULL) {
-            severe() << "rollback no such command " << first.fieldName();
+            severe() << "Rollback no such command " << first.fieldName();
             return Status(ErrorCodes::UnrecoverableRollbackError,
-                          str::stream() << "rollback no such command " << first.fieldName(),
+                          str::stream() << "Rollback no such command " << first.fieldName(),
                           18751);
         }
         if (cmdname == "create") {
@@ -214,25 +215,26 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
         } else if (cmdname == "dropIndexes" || cmdname == "deleteIndexes") {
             // TODO: this is bad.  we simply full resync the collection here,
             //       which could be very slow.
-            warning() << "rollback of dropIndexes is slow in this version of "
-                      << "mongod";
+            warning() << "Rollback of dropIndexes is slow in this version of "
+                      << "mongod.";
             string ns = nss.db().toString() + '.' + first.valuestr();
             fixUpInfo.collectionsToResyncData.insert(ns);
             return Status::OK();
         } else if (cmdname == "renameCollection") {
             // TODO: slow.
-            warning() << "rollback of renameCollection is slow in this version of "
-                      << "mongod";
+            warning() << "Rollback of renameCollection is slow in this version of "
+                      << "mongod.";
             string from = first.valuestr();
             string to = obj["to"].String();
             fixUpInfo.collectionsToResyncData.insert(from);
             fixUpInfo.collectionsToResyncData.insert(to);
             return Status::OK();
         } else if (cmdname == "dropDatabase") {
-            severe() << "rollback : can't rollback drop database full resync "
-                     << "will be required";
+            string message =
+                "Rollback : can't rollback drop database full resync will be required.";
+            severe() << message;
             log() << obj.toString();
-            throw RSFatalException();
+            throw RSFatalException(message);
         } else if (cmdname == "collMod") {
             const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
             for (auto field : obj) {
@@ -247,9 +249,9 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
                     continue;
                 }
-
-                severe() << "cannot rollback a collMod command: " << redact(obj);
-                throw RSFatalException();
+                string message = "Cannot rollback a collMod command: ";
+                severe() << message << redact(obj);
+                throw RSFatalException(message);
             }
             return Status::OK();
         } else if (cmdname == "applyOps") {
@@ -274,38 +276,44 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
             }
             return Status::OK();
         } else {
-            severe() << "can't rollback this command yet: " << redact(obj);
-            log() << "cmdname=" << cmdname;
-            throw RSFatalException();
+            std::string message = str::stream() << "Can't rollback this command yet: ";
+            severe() << message << redact(obj);
+            log() << "cmdname = " << cmdname;
+            throw RSFatalException(str::stream() << message << " cmdname = " << cmdname);
         }
     }
 
     NamespaceString nss(doc.ns);
     if (nss.isSystemDotIndexes()) {
         if (*op != 'i') {
-            severe() << "Unexpected operation type '" << *op << "' on system.indexes operation, "
-                     << "document: " << redact(doc.ownedObj);
-            throw RSFatalException();
+            std::string message = str::stream() << "Unexpected operation type '" << *op
+                                                << "' on system.indexes operation, "
+                                                << "document: ";
+            severe() << message << redact(doc.ownedObj);
+            throw RSFatalException(message);
         }
         string objNs;
         auto status = bsonExtractStringField(obj, "ns", &objNs);
         if (!status.isOK()) {
             severe() << "Missing collection namespace in system.indexes operation, document: "
                      << redact(doc.ownedObj);
-            throw RSFatalException();
+            throw RSFatalException("Missing collection namespace in system.indexes operation.");
         }
         NamespaceString objNss(objNs);
         if (!objNss.isValid()) {
             severe() << "Invalid collection namespace in system.indexes operation, document: "
                      << redact(doc.ownedObj);
-            throw RSFatalException();
+            throw RSFatalException(
+                str::stream()
+                << "Invalid collection namespace in system.indexes operation, namespace: "
+                << doc.ns);
         }
         string indexName;
         status = bsonExtractStringField(obj, "name", &indexName);
         if (!status.isOK()) {
             severe() << "Missing index name in system.indexes operation, document: "
                      << redact(doc.ownedObj);
-            throw RSFatalException();
+            throw RSFatalException("Missing index name in system.indexes operation.");
         }
         using ValueType = multimap<string, string>::value_type;
         ValueType pairToInsert = std::make_pair(objNs, indexName);
@@ -320,9 +328,9 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
 
     doc._id = obj["_id"];
     if (doc._id.eoo()) {
-        severe() << "cannot rollback op with no _id. ns: " << doc.ns
-                 << ", document: " << redact(doc.ownedObj);
-        throw RSFatalException();
+        std::string message = str::stream() << "Cannot rollback op with no _id. ns: " << doc.ns;
+        severe() << message << ", document: " << redact(doc.ownedObj);
+        throw RSFatalException(message);
     }
 
     fixUpInfo.docsToRefetch.insert(doc);
@@ -398,7 +406,7 @@ void syncFixUp(OperationContext* opCtx,
             BSONObj good = rollbackSource.findOne(NamespaceString(doc.ns), doc._id.wrap());
             totalSize += good.objsize();
             if (totalSize >= 300 * 1024 * 1024) {
-                throw RSFatalException("replSet too much data to roll back");
+                throw RSFatalException("replSet too much data to roll back.");
             }
 
             // Note good might be empty, indicating we should delete it.
@@ -410,7 +418,7 @@ void syncFixUp(OperationContext* opCtx,
             if (ex.getCode() == ErrorCodes::CommandNotSupportedOnView)
                 continue;
 
-            log() << "rollback couldn't re-get from ns: " << doc.ns << " _id: " << redact(doc._id)
+            log() << "Rollback couldn't re-get from ns: " << doc.ns << " _id: " << redact(doc._id)
                   << ' ' << numFetched << '/' << fixUpInfo.docsToRefetch.size() << ": "
                   << redact(ex);
             throw;
@@ -546,23 +554,28 @@ void syncFixUp(OperationContext* opCtx,
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
                 auto status = removeSaver.goingToDelete(curObj);
                 if (!status.isOK()) {
-                    severe() << "rolling back createCollection on " << *it
-                             << " failed to write document to remove saver file: " << status;
-                    throw RSFatalException();
+                    severe() << "Rolling back createCollection on " << *it
+                             << " failed to write document to remove saver file: "
+                             << redact(status);
+                    throw RSFatalException(
+                        "Rolling back createCollection. Failed to write document to remove saver "
+                        "file.");
                 }
             }
             if (execState != PlanExecutor::IS_EOF) {
                 if (execState == PlanExecutor::FAILURE &&
                     WorkingSetCommon::isValidStatusMemberObject(curObj)) {
                     Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
-                    severe() << "rolling back createCollection on " << *it << " failed with "
-                             << errorStatus << ". A full resync is necessary.";
+                    severe() << "Rolling back createCollection on " << *it << " failed with "
+                             << redact(errorStatus) << ". A full resync is necessary.";
+                    throw RSFatalException(
+                        "Rolling back createCollection failed. A full resync is necessary.");
                 } else {
-                    severe() << "rolling back createCollection on " << *it
+                    severe() << "Rolling back createCollection on " << *it
                              << " failed. A full resync is necessary.";
+                    throw RSFatalException(
+                        "Rolling back createCollection failed. A full resync is necessary.");
                 }
-
-                throw RSFatalException();
             }
 
             WriteUnitOfWork wunit(opCtx);
@@ -575,7 +588,7 @@ void syncFixUp(OperationContext* opCtx,
     for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
         const NamespaceString nss(it->first);
         const string& indexName = it->second;
-        log() << "rollback drop index: collection: " << nss.toString() << ". index: " << indexName;
+        log() << "Rollback drop index: collection: " << nss.toString() << ". index: " << indexName;
 
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         auto db = dbHolder().get(opCtx, nss.db());
@@ -594,16 +607,18 @@ void syncFixUp(OperationContext* opCtx,
         auto indexDescriptor =
             indexCatalog->findIndexByName(opCtx, indexName, includeUnfinishedIndexes);
         if (!indexDescriptor) {
-            warning() << "rollback failed to drop index " << indexName << " in " << nss.toString()
-                      << ": index not found";
+            warning() << "Rollback failed to drop index " << indexName << " in " << nss.toString()
+                      << ": index not found.";
             continue;
         }
         WriteUnitOfWork wunit(opCtx);
         auto status = indexCatalog->dropIndex(opCtx, indexDescriptor);
         if (!status.isOK()) {
-            severe() << "rollback failed to drop index " << indexName << " in " << nss.toString()
-                     << ": " << status;
-            throw RSFatalException();
+            severe() << "Rollback failed to drop index " << indexName << " in " << nss.toString()
+                     << ": " << redact(status);
+            throw RSFatalException(str::stream() << "Rollback failed to drop index " << indexName
+                                                 << " in "
+                                                 << nss.toString());
         }
         wunit.commit();
     }
@@ -626,7 +641,7 @@ void syncFixUp(OperationContext* opCtx,
             if (now - lastProgressUpdate > progressUpdateGap) {
                 log() << deletes << " delete and " << updates
                       << " update operations processed out of " << goodVersions.size()
-                      << " total operations";
+                      << " total operations.";
                 lastProgressUpdate = now;
             }
             const DocID& doc = idAndDoc.first;
@@ -654,12 +669,15 @@ void syncFixUp(OperationContext* opCtx,
                     if (found) {
                         auto status = removeSaver->goingToDelete(obj);
                         if (!status.isOK()) {
-                            severe() << "rollback cannot write document in namespace " << doc.ns
+                            severe() << "Rollback cannot write document in namespace " << doc.ns
                                      << " to archive file: " << redact(status);
-                            throw RSFatalException();
+                            throw RSFatalException(str::stream()
+                                                   << "Rollback cannot write document in namespace "
+                                                   << doc.ns
+                                                   << " to archive file.");
                         }
                     } else {
-                        error() << "rollback cannot find object: " << pattern << " in namespace "
+                        error() << "Rollback cannot find object: " << pattern << " in namespace "
                                 << doc.ns;
                     }
                 }
@@ -683,7 +701,7 @@ void syncFixUp(OperationContext* opCtx,
                                 const auto findOneStart = clock->now();
                                 RecordId loc = Helpers::findOne(opCtx, collection, pattern, false);
                                 if (clock->now() - findOneStart > Milliseconds(200))
-                                    warning() << "roll back slow no _id index for " << doc.ns
+                                    warning() << "Roll back slow no _id index for " << doc.ns
                                               << " perhaps?";
                                 // would be faster but requires index:
                                 // RecordId loc = Helpers::findById(nsd, pattern);
@@ -709,7 +727,7 @@ void syncFixUp(OperationContext* opCtx,
                                 // Replicated capped collections have many ways to become
                                 // inconsistent. We rely on age-out to make these problems go away
                                 // eventually.
-                                warning() << "ignoring failure to roll back change to capped "
+                                warning() << "Ignoring failure to roll back change to capped "
                                           << "collection " << doc.ns << " with _id "
                                           << redact(idAndDoc.first._id.toString(
                                                  /*includeFieldName*/ false))
@@ -740,7 +758,7 @@ void syncFixUp(OperationContext* opCtx,
                     update(opCtx, ctx.db(), request);
                 }
             } catch (const DBException& e) {
-                log() << "exception in rollback ns:" << doc.ns << ' ' << pattern.toString() << ' '
+                log() << "Exception in rollback ns:" << doc.ns << ' ' << pattern.toString() << ' '
                       << redact(e) << " ndeletes:" << deletes;
                 throw;
             }
@@ -769,7 +787,7 @@ void syncFixUp(OperationContext* opCtx,
 
     Status status = getGlobalAuthorizationManager()->initialize(opCtx);
     if (!status.isOK()) {
-        severe() << "Failed to reinitialize auth data after rollback: " << status;
+        severe() << "Failed to reinitialize auth data after rollback: " << redact(status);
         fassertFailedNoTrace(40366);
     }
 
@@ -817,7 +835,7 @@ Status _syncRollback(OperationContext* opCtx,
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError,
                       str::stream()
-                          << "need to rollback, but unable to determine common point between"
+                          << "Need to rollback, but unable to determine common point between"
                              " local and remote oplog: "
                           << e.what(),
                       18752);
@@ -918,8 +936,8 @@ void rollback(OperationContext* opCtx,
         // above.
         invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
 
-        warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
-                  << " appliedThrough=" << replCoord->getMyLastAppliedOpTime() << " minvalid="
+        warning() << "Rollback cannot complete at this time (retrying later): " << redact(ex)
+                  << " appliedThrough= " << replCoord->getMyLastAppliedOpTime() << " minvalid= "
                   << replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
 
         // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
