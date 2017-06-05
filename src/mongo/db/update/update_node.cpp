@@ -31,6 +31,7 @@
 #include "mongo/db/update/update_node.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_object_node.h"
 
 namespace mongo {
@@ -43,6 +44,12 @@ std::unique_ptr<UpdateNode> UpdateNode::createUpdateNodeByMerging(const UpdateNo
         return UpdateObjectNode::createUpdateNodeByMerging(
             static_cast<const UpdateObjectNode&>(leftNode),
             static_cast<const UpdateObjectNode&>(rightNode),
+            pathTaken);
+    } else if (leftNode.type == UpdateNode::Type::Array &&
+               rightNode.type == UpdateNode::Type::Array) {
+        return UpdateArrayNode::createUpdateNodeByMerging(
+            static_cast<const UpdateArrayNode&>(leftNode),
+            static_cast<const UpdateArrayNode&>(rightNode),
             pathTaken);
     } else {
         uasserted(

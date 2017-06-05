@@ -32,6 +32,7 @@
 
 #include "mongo/db/update/field_checker.h"
 #include "mongo/db/update/modifier_table.h"
+#include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -41,6 +42,50 @@ namespace {
 
 bool isPositionalElement(const std::string& field) {
     return field.length() == 1 && field[0] == '$';
+}
+
+bool isArrayFilterIdentifier(StringData field) {
+    return field.size() >= 3 && field[0] == '$' && field[1] == '[' &&
+        field[field.size() - 1] == ']';
+}
+
+/**
+ * Parses a field of the form $[<identifier>] into <identifier>. 'field' must be of the form
+ * $[<identifier>]. Returns a non-ok status if 'field' is in the first position in the path or the
+ * array filter identifier does not have a corresponding filter in 'arrayFilters'. Adds the
+ * identifier to 'foundIdentifiers'.
+ */
+StatusWith<std::string> parseArrayFilterIdentifier(
+    StringData field,
+    size_t position,
+    const FieldRef& fieldRef,
+    const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+    std::set<std::string>& foundIdentifiers) {
+    dassert(isArrayFilterIdentifier(field));
+
+    if (position == 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Cannot have array filter identifier (i.e. '$[<id>]') "
+                                       "element in the first position in path '"
+                                    << fieldRef.dottedField()
+                                    << "'");
+    }
+
+    auto identifier = field.substr(2, field.size() - 3);
+
+    if (!identifier.empty() && arrayFilters.find(identifier) == arrayFilters.end()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "No array filter found for identifier '" << identifier
+                                    << "' in path '"
+                                    << fieldRef.dottedField()
+                                    << "'");
+    }
+
+    if (!identifier.empty()) {
+        foundIdentifiers.emplace(identifier.toString());
+    }
+
+    return identifier.toString();
 }
 
 /**
@@ -127,10 +172,13 @@ void applyChild(const UpdateNode& child,
 }  // namespace
 
 // static
-StatusWith<bool> UpdateObjectNode::parseAndMerge(UpdateObjectNode* root,
-                                                 modifiertable::ModifierType type,
-                                                 BSONElement modExpr,
-                                                 const CollatorInterface* collator) {
+StatusWith<bool> UpdateObjectNode::parseAndMerge(
+    UpdateObjectNode* root,
+    modifiertable::ModifierType type,
+    BSONElement modExpr,
+    const CollatorInterface* collator,
+    const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
+    std::set<std::string>& foundIdentifiers) {
     // Check that the path is updatable.
     FieldRef fieldRef(modExpr.fieldNameStringData());
     auto status = fieldchecker::isUpdatable(fieldRef);
@@ -174,13 +222,28 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(UpdateObjectNode* root,
         return status;
     }
 
-    // Create UpdateObjectNodes along the path.
-    UpdateObjectNode* current = root;
+    // Create UpdateInternalNodes along the path.
+    UpdateInternalNode* current = static_cast<UpdateInternalNode*>(root);
     for (size_t i = 0; i < fieldRef.numParts() - 1; ++i) {
-        auto field = fieldRef.getPart(i).toString();
-        auto child = current->getChild(field);
+        auto fieldIsArrayFilterIdentifier = isArrayFilterIdentifier(fieldRef.getPart(i));
+
+        std::string childName;
+        if (fieldIsArrayFilterIdentifier) {
+            auto status = parseArrayFilterIdentifier(
+                fieldRef.getPart(i), i, fieldRef, arrayFilters, foundIdentifiers);
+            if (!status.isOK()) {
+                return status.getStatus();
+            }
+            childName = status.getValue();
+        } else {
+            childName = fieldRef.getPart(i).toString();
+        }
+
+        auto child = current->getChild(childName);
+        auto childShouldBeArrayNode = isArrayFilterIdentifier(fieldRef.getPart(i + 1));
         if (child) {
-            if (child->type != UpdateNode::Type::Object) {
+            if ((childShouldBeArrayNode && child->type != UpdateNode::Type::Array) ||
+                (!childShouldBeArrayNode && child->type != UpdateNode::Type::Object)) {
                 return Status(ErrorCodes::ConflictingUpdateOperators,
                               str::stream() << "Updating the path '" << fieldRef.dottedField()
                                             << "' would create a conflict at '"
@@ -188,67 +251,47 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(UpdateObjectNode* root,
                                             << "'");
             }
         } else {
-            auto ownedChild = stdx::make_unique<UpdateObjectNode>();
+            std::unique_ptr<UpdateInternalNode> ownedChild;
+            if (childShouldBeArrayNode) {
+                ownedChild = stdx::make_unique<UpdateArrayNode>(arrayFilters);
+            } else {
+                ownedChild = stdx::make_unique<UpdateObjectNode>();
+            }
             child = ownedChild.get();
-            current->setChild(std::move(field), std::move(ownedChild));
+            current->setChild(std::move(childName), std::move(ownedChild));
         }
-        current = static_cast<UpdateObjectNode*>(child);
+        current = static_cast<UpdateInternalNode*>(child);
     }
 
     // Add the leaf node to the end of the path.
-    auto field = fieldRef.getPart(fieldRef.numParts() - 1).toString();
-    if (current->getChild(field)) {
+    auto fieldIsArrayFilterIdentifier =
+        isArrayFilterIdentifier(fieldRef.getPart(fieldRef.numParts() - 1));
+
+    std::string childName;
+    if (fieldIsArrayFilterIdentifier) {
+        auto status = parseArrayFilterIdentifier(fieldRef.getPart(fieldRef.numParts() - 1),
+                                                 fieldRef.numParts() - 1,
+                                                 fieldRef,
+                                                 arrayFilters,
+                                                 foundIdentifiers);
+        if (!status.isOK()) {
+            return status.getStatus();
+        }
+        childName = status.getValue();
+    } else {
+        childName = fieldRef.getPart(fieldRef.numParts() - 1).toString();
+    }
+
+    if (current->getChild(childName)) {
         return Status(ErrorCodes::ConflictingUpdateOperators,
                       str::stream() << "Updating the path '" << fieldRef.dottedField()
                                     << "' would create a conflict at '"
                                     << fieldRef.dottedField()
                                     << "'");
     }
-    current->setChild(std::move(field), std::move(leaf));
+    current->setChild(std::move(childName), std::move(leaf));
 
     return positional;
-}
-
-namespace {
-/**
- * Helper class for appending to a FieldRef for the duration of the current scope and then restoring
- * the FieldRef at the end of the scope.
- */
-class FieldRefTempAppend {
-public:
-    FieldRefTempAppend(FieldRef& fieldRef, const std::string& part) : _fieldRef(fieldRef) {
-        _fieldRef.appendPart(part);
-    }
-
-    ~FieldRefTempAppend() {
-        _fieldRef.removeLastPart();
-    }
-
-private:
-    FieldRef& _fieldRef;
-};
-
-/**
- * Helper for when performMerge wants to create a merged child from children that exist in two
- * merging nodes. If there is only one child (leftNode or rightNode is NULL), we clone it. If there
- * are two different children, we merge them recursively. If there are no children (leftNode and
- * rightNode are null), we return nullptr.
- */
-std::unique_ptr<UpdateNode> copyOrMergeAsNecessary(UpdateNode* leftNode,
-                                                   UpdateNode* rightNode,
-                                                   FieldRef* pathTaken,
-                                                   const std::string& nextField) {
-    if (!leftNode && !rightNode) {
-        return nullptr;
-    } else if (!leftNode) {
-        return rightNode->clone();
-    } else if (!rightNode) {
-        return leftNode->clone();
-    } else {
-        FieldRefTempAppend tempAppend(*pathTaken, nextField);
-        return UpdateNode::createUpdateNodeByMerging(*leftNode, *rightNode, pathTaken);
-    }
-}
 }
 
 // static
@@ -256,27 +299,8 @@ std::unique_ptr<UpdateNode> UpdateObjectNode::createUpdateNodeByMerging(
     const UpdateObjectNode& leftNode, const UpdateObjectNode& rightNode, FieldRef* pathTaken) {
     auto mergedNode = stdx::make_unique<UpdateObjectNode>();
 
-    // Get the union of the field names we know about among the leftNode and rightNode children.
-    stdx::unordered_set<std::string> allFields;
-    for (const auto& child : leftNode._children) {
-        allFields.insert(child.first);
-    }
-    for (const auto& child : rightNode._children) {
-        allFields.insert(child.first);
-    }
-
-    // Create an entry in mergedNode->children for all the fields we found.
-    for (const std::string& fieldName : allFields) {
-        auto leftChildIt = leftNode._children.find(fieldName);
-        auto rightChildIt = rightNode._children.find(fieldName);
-        UpdateNode* leftChildPtr =
-            (leftChildIt != leftNode._children.end()) ? leftChildIt->second.get() : nullptr;
-        UpdateNode* rightChildPtr =
-            (rightChildIt != rightNode._children.end()) ? rightChildIt->second.get() : nullptr;
-        invariant(leftChildPtr || rightChildPtr);
-        mergedNode->_children.insert(std::make_pair(
-            fieldName, copyOrMergeAsNecessary(leftChildPtr, rightChildPtr, pathTaken, fieldName)));
-    }
+    mergedNode->_children =
+        createUpdateNodeMapByMerging(leftNode._children, rightNode._children, pathTaken);
 
     // The "positional" field ("$" notation) lives outside of the _children map, so we merge it
     // separately.

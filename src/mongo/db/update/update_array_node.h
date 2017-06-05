@@ -32,61 +32,43 @@
 #include <string>
 
 #include "mongo/base/clonable_ptr.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/db/update/array_filter.h"
-#include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_internal_node.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
 /**
  * An internal node in the prefix tree of update modifier expressions, representing updates to an
- * object. See comment in class definition of UpdateNode for more details.
+ * array using the $[<identifier>] syntax and array filters. See comment in class definition of
+ * UpdateNode for more details.
  */
-class UpdateObjectNode : public UpdateInternalNode {
-
+class UpdateArrayNode : public UpdateInternalNode {
 public:
     /**
-     * Parses 'modExpr' as an update modifier expression and merges with it with 'root'. Returns a
-     * non-OK status if 'modExpr' is not a valid update modifier expression, if merging would
-     * cause a conflict, or if there is an array filter identifier in 'modExpr' without a
-     * corresponding filter in 'arrayFilters'. Returns true if the path of 'modExpr' contains a
-     * positional $ element, e.g. 'a.$.b'. Any array filter identifiers are added to
-     * 'foundIdentifiers'.
+     * Creates a new UpdateArrayNode by merging two input UpdateArrayNode objects and their
+     * children. Each child that lives on one side of the merge but not the other (according to the
+     * array filter identifier) is cloned to the newly created UpdateArrayNode. Children that exist
+     * on both sides of the merge get merged recursively before being added to the resulting
+     * UpdateArrayNode. This merge operation is a deep copy: the new UpdateArrayNode is a brand new
+     * tree that does not contain any references to the objects in the original input trees.
+     * 'leftNode' and 'rightNode' are required to have the same array filters.
      */
-    static StatusWith<bool> parseAndMerge(
-        UpdateObjectNode* root,
-        modifiertable::ModifierType type,
-        BSONElement modExpr,
-        const CollatorInterface* collator,
-        const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters,
-        std::set<std::string>& foundIdentifiers);
-
-    /**
-     * Creates a new UpdateObjectNode by merging two input UpdateObjectNode objects and their
-     * children. Each field that lives on one side of the merge but not the other (according to
-     * field name) is cloned to the newly created UpdateObjectNode. Fields that exist on both sides
-     * of the merge get merged recursively before being added to the resulting UpdateObjectNode.
-     * This merge operation is a deep copy: the new UpdateObjectNode is a brand new tree that does
-     * not contain any references to the objects in the original input trees.
-     */
-    static std::unique_ptr<UpdateNode> createUpdateNodeByMerging(const UpdateObjectNode& leftNode,
-                                                                 const UpdateObjectNode& rightNode,
+    static std::unique_ptr<UpdateNode> createUpdateNodeByMerging(const UpdateArrayNode& leftNode,
+                                                                 const UpdateArrayNode& rightNode,
                                                                  FieldRef* pathTaken);
 
-    UpdateObjectNode() : UpdateInternalNode(Type::Object) {}
+    UpdateArrayNode(const std::map<StringData, std::unique_ptr<ArrayFilter>>& arrayFilters)
+        : UpdateInternalNode(Type::Array), _arrayFilters(arrayFilters) {}
 
     std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<UpdateObjectNode>(*this);
+        return stdx::make_unique<UpdateArrayNode>(*this);
     }
 
     void setCollator(const CollatorInterface* collator) final {
         for (auto&& child : _children) {
             child.second->setCollator(collator);
         }
-        _positionalChild->setCollator(collator);
     }
 
     void apply(mutablebson::Element element,
@@ -104,12 +86,14 @@ public:
     void setChild(std::string field, std::unique_ptr<UpdateNode> child) final;
 
 private:
+    const std::map<StringData, std::unique_ptr<ArrayFilter>>& _arrayFilters;
     std::map<std::string, clonable_ptr<UpdateNode>> _children;
-    clonable_ptr<UpdateNode> _positionalChild;
 
-    // When calling apply() causes us to merge an element of '_children' with '_positionalChild', we
-    // store the result of the merge in case we need it in a future call to apply().
-    mutable stdx::unordered_map<std::string, clonable_ptr<UpdateNode>> _mergedChildrenCache;
+    // When calling apply() causes us to merge elements of '_children', we store the result of the
+    // merge in case we need it for another array element or document.
+    mutable stdx::unordered_map<UpdateNode*,
+                                stdx::unordered_map<UpdateNode*, clonable_ptr<UpdateNode>>>
+        _mergedChildrenCache;
 };
 
 }  // namespace mongo
