@@ -159,6 +159,9 @@ BSONObj BatchedCommandRequest::toBSON() const {
         _shardVersion.get().appendForCommands(&builder);
     }
 
+    // Append the transaction info
+    _txnInfo.serialize(&builder);
+
     return builder.obj();
 }
 
@@ -184,17 +187,33 @@ bool BatchedCommandRequest::parseBSON(StringData dbName,
     if (!succeeded)
         return false;
 
-    // Now parse out the chunk version and optime.
+    // Parse the command's shard version
     auto chunkVersion = ChunkVersion::parseFromBSONForCommands(source);
     if (chunkVersion.isOK()) {
         _shardVersion = chunkVersion.getValue();
-        return true;
-    } else if (chunkVersion == ErrorCodes::NoSuchKey) {
-        return true;
+    } else if (chunkVersion != ErrorCodes::NoSuchKey) {
+        *errMsg = chunkVersion.getStatus().toString();
+        return false;
     }
 
-    *errMsg = causedBy(chunkVersion.getStatus());
-    return false;
+    // Parse the command's transaction info and do extra validation not done by the parser
+    try {
+        _txnInfo = WriteOpTxnInfo::parse(IDLParserErrorContext("WriteOpTxnInfo"), source);
+
+        const auto& stmtIds = _txnInfo.getStmtIds();
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "The size of the statement ids array (" << stmtIds->size()
+                              << ") does not match the number of operations ("
+                              << sizeWriteOps()
+                              << ")",
+                !stmtIds || stmtIds->size() == sizeWriteOps());
+    } catch (const DBException& ex) {
+        *errMsg = str::stream() << "Failed to parse the write op retriability information due to "
+                                << ex.toString();
+        return false;
+    }
+
+    return true;
 }
 
 std::string BatchedCommandRequest::toString() const {
@@ -367,6 +386,38 @@ bool BatchedCommandRequest::getIndexedNS(const BSONObj& writeCmdObj,
     }
 
     return true;
+}
+
+const boost::optional<std::int64_t> BatchedCommandRequest::getTxnNum() const& {
+    return _txnInfo.getTxnNum();
+}
+
+void BatchedCommandRequest::setTxnNum(boost::optional<std::int64_t> value) {
+    _txnInfo.setTxnNum(std::move(value));
+}
+
+const boost::optional<std::vector<std::int32_t>> BatchedCommandRequest::getStmtIds() const& {
+    return _txnInfo.getStmtIds();
+}
+
+void BatchedCommandRequest::setStmtIds(boost::optional<std::vector<std::int32_t>> value) {
+    invariant(_txnInfo.getTxnNum());
+    invariant(!value || value->size() == sizeWriteOps());
+
+    _txnInfo.setStmtIds(std::move(value));
+}
+
+int32_t BatchedCommandRequest::getStmtIdForWriteAt(size_t writePos) const {
+    invariant(getTxnNum());
+
+    const auto& stmtIds = _txnInfo.getStmtIds();
+
+    if (stmtIds) {
+        return stmtIds->at(writePos);
+    }
+
+    const int32_t kFirstStmtId = 0;
+    return kFirstStmtId + writePos;
 }
 
 }  // namespace mongo

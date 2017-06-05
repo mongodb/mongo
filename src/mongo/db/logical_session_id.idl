@@ -34,6 +34,14 @@ types:
     deserializer: "mongo::UUID::parse"
     serializer: "mongo::UUID::toBSON"
 
+  TxnNumber:
+    description: "A strictly-increasing per-session counter, which indicates to which transaction
+                  of a given session does the specified command belong. The combination of
+                  LogicalSessionId:TxnNumber is referred to as the transaction identifier."
+    bson_serialization_type: long
+    cpp_type: "std::int64_t"
+    deserializer: "mongo::BSONElement::_numberLong"
+
 structs:
 
   logical_session_id:

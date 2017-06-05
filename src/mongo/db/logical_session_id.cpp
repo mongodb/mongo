@@ -48,11 +48,6 @@ LogicalSessionId LogicalSessionId::gen() {
     return {UUID::gen()};
 }
 
-StatusWith<LogicalSessionId> LogicalSessionId::parse(const TxnId& txnId) {
-    // TODO: the TxnId class is not yet implemented.
-    MONGO_UNREACHABLE;
-}
-
 StatusWith<LogicalSessionId> LogicalSessionId::parse(const std::string& s) {
     auto res = UUID::parse(s);
     if (!res.isOK()) {

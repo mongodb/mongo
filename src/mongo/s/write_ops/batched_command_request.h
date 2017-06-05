@@ -35,6 +35,7 @@
 #include "mongo/s/write_ops/batched_delete_request.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
+#include "mongo/s/write_ops/write_ops_gen.h"
 
 namespace mongo {
 
@@ -135,6 +136,21 @@ public:
         return _shardVersion.get();
     }
 
+    const boost::optional<std::int64_t> getTxnNum() const&;
+    void setTxnNum(boost::optional<std::int64_t> value);
+
+    const boost::optional<std::vector<std::int32_t>> getStmtIds() const&;
+    void setStmtIds(boost::optional<std::vector<std::int32_t>> value);
+
+    /**
+     * Retrieves the statement id for the write at the specified position in the write batch entries
+     * array.
+     *
+     * This method may only be called if a TxnNumber has been given for the operation, otherwise it
+     * will fassert.
+     */
+    int32_t getStmtIdForWriteAt(size_t writePos) const;
+
     void setShouldBypassValidation(bool newVal);
     bool shouldBypassValidation() const;
 
@@ -181,6 +197,9 @@ private:
     std::unique_ptr<BatchedInsertRequest> _insertReq;
     std::unique_ptr<BatchedUpdateRequest> _updateReq;
     std::unique_ptr<BatchedDeleteRequest> _deleteReq;
+
+    // If this write is retriable, contains information about the retriability of the write
+    WriteOpTxnInfo _txnInfo;
 };
 
 /**

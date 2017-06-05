@@ -37,7 +37,6 @@
 namespace mongo {
 
 class BSONObjBuilder;
-class TxnId;
 
 /**
  * A 128-bit identifier for a logical session.
@@ -51,11 +50,6 @@ public:
      * Create and return a new LogicalSessionId with a random UUID.
      */
     static LogicalSessionId gen();
-
-    /**
-     * Construct a new LogicalSessionId out of a txnId received with an operation.
-     */
-    static StatusWith<LogicalSessionId> parse(const TxnId& txnId);
 
     /**
      * If the given string represents a valid LogicalSessionId, constructs and returns,
