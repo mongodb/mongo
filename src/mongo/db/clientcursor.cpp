@@ -259,6 +259,7 @@ ClientCursor* ClientCursorPin::getCursor() const {
     return _cursor;
 }
 
+namespace {
 //
 // ClientCursorMonitor
 //
@@ -287,7 +288,6 @@ public:
     }
 };
 
-namespace {
 // Only one instance of the ClientCursorMonitor exists
 ClientCursorMonitor clientCursorMonitor;
 

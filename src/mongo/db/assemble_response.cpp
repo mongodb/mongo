@@ -34,10 +34,10 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_metrics.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/diag_log.h"
 #include "mongo/db/introspect.h"

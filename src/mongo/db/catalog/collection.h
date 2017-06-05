@@ -1,4 +1,4 @@
-/*-
+/**
  *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -38,8 +38,8 @@
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_info_cache.h"
-#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"

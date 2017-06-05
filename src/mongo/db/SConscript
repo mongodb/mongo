@@ -606,16 +606,13 @@ env.Library(
     target="clientcursor",
     source=[
         "clientcursor.cpp",
+        "cursor_manager.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/background_job",
         "query/query",
-        #"catalog/catalog", # CYCLE (CursorManager)
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-03-10): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        "background",
     ],
 )
 

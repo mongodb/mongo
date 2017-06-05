@@ -1,5 +1,3 @@
-// cursor_manager.cpp
-
 /**
 *    Copyright (C) 2013 MongoDB Inc.
 *
@@ -28,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/catalog/cursor_manager.h"
+#include "mongo/db/cursor_manager.h"
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/init.h"
@@ -76,7 +74,6 @@ CursorId cursorIdFromParts(uint32_t collectionIdentifier, uint32_t cursor) {
     x |= cursor;
     return x;
 }
-}  // namespace
 
 class GlobalCursorIdCache {
 public:
@@ -268,6 +265,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 
     return totalTimedOut;
 }
+}  // namespace
 
 // ---
 

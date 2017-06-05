@@ -28,9 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
