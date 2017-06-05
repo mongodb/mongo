@@ -113,6 +113,7 @@ public:
         Stats sessionStats() override;
         void end(const transport::SessionHandle& session) override;
         void endAllSessions(transport::Session::TagMask tags) override;
+        Status setup() override;
         Status start() override;
         void shutdown() override;
 

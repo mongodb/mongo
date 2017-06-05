@@ -127,6 +127,10 @@ void TransportLayerMock::endAllSessions(Session::TagMask tags) {
     }
 }
 
+Status TransportLayerMock::setup() {
+    return Status::OK();
+}
+
 Status TransportLayerMock::start() {
     return Status::OK();
 }

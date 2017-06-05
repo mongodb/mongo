@@ -137,6 +137,13 @@ public:
         return _ticket.get();
     }
 
+    /**
+     * Return an owning pointer to the underlying TicketImpl type. This consumes the ticket
+     */
+    std::unique_ptr<TicketImpl> releaseImpl() && {
+        return std::move(_ticket);
+    }
+
 private:
     TransportLayer* _tl = nullptr;
     Status _status = Status::OK();

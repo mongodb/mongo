@@ -110,7 +110,8 @@ void ShardingTestFixture::setUp() {
         service->setTickSource(stdx::make_unique<TickSourceMock>());
         auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
         _transportLayer = tlMock.get();
-        service->addAndStartTransportLayer(std::move(tlMock));
+        service->setTransportLayer(std::move(tlMock));
+        _transportLayer->start();
 
         // Set the newly created service context to be the current global context so that tests,
         // which invoke code still referencing getGlobalServiceContext will work properly.

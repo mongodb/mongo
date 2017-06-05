@@ -31,11 +31,15 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/util/net/listen.h"  // For DEFAULT_MAX_CONN
+
+// TODO(SERVER-29687) Remove this include. A bunch of places assume they can call
+// getHostName()/getHostNameCached() by including server_options.h.
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
+constexpr auto DEFAULT_MAX_CONN = 1000000;
 
 enum class ClusterRole { None, ShardServer, ConfigServer };
 
@@ -50,7 +54,8 @@ struct ServerGlobalParams {
     }
 
     std::string bind_ip;  // --bind_ip
-    bool rest = false;    // --rest
+    bool enableIPv6 = false;
+    bool rest = false;  // --rest
 
     bool indexBuildRetry = true;  // --noIndexBuildRetry
 
@@ -68,10 +73,10 @@ struct ServerGlobalParams {
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
     bool moveParanoia = false;             // for move chunk paranoia
 
-    bool noUnixSocket = false;    // --nounixsocket
-    bool doFork = false;          // --fork
-    std::string socket = "/tmp";  // UNIX domain socket directory
-
+    bool noUnixSocket = false;        // --nounixsocket
+    bool doFork = false;              // --fork
+    std::string socket = "/tmp";      // UNIX domain socket directory
+    std::string transportLayer;       // --transportLayer (must be either "asio" or "legacy")
     int maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket

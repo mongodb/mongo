@@ -233,6 +233,9 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
         BSONObjBuilder bb;
+        if (!opCtx->getServiceContext()->getTransportLayer()) {
+            return bb.obj();
+        }
         auto stats = opCtx->getServiceContext()->getTransportLayer()->sessionStats();
         bb.append("current", static_cast<int>(stats.numOpenSessions));
         bb.append("available", static_cast<int>(stats.numAvailableSessions));

@@ -43,8 +43,6 @@
 
 namespace mongo {
 
-const int DEFAULT_MAX_CONN = 1000000;
-
 class ServiceContext;
 
 class Listener {

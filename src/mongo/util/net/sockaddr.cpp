@@ -133,6 +133,11 @@ SockAddr::SockAddr(const char* _iporhost, int port) : _hostOrIp(_iporhost) {
     _isValid = true;
 }
 
+SockAddr::SockAddr(struct sockaddr_storage& other, socklen_t size)
+    : addressSize(size), _hostOrIp(), sa(other), _isValid(true) {
+    _hostOrIp = toString(true);
+}
+
 bool SockAddr::isLocalHost() const {
     switch (getType()) {
         case AF_INET:

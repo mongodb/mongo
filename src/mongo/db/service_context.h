@@ -38,6 +38,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
@@ -56,7 +57,6 @@ class ServiceEntryPoint;
 
 namespace transport {
 class TransportLayer;
-class TransportLayerManager;
 }  // namespace transport
 
 /**
@@ -367,12 +367,17 @@ public:
     ServiceEntryPoint* getServiceEntryPoint() const;
 
     /**
-     * Add a new TransportLayer to this service context. The new TransportLayer will
-     * be added to the TransportLayerManager accessible via getTransportLayer().
+     * Waits for the ServiceContext to be fully initialized and for all TransportLayers to have been
+     * added/started.
      *
-     * It additionally calls start() on the TransportLayer after adding it.
+     * If startup is already complete this returns immediately.
      */
-    Status addAndStartTransportLayer(std::unique_ptr<transport::TransportLayer> tl);
+    void waitForStartupComplete();
+
+    /*
+     * Marks initialization as complete and all transport layers as started.
+     */
+    void notifyStartupComplete();
 
     //
     // Global OpObserver.
@@ -427,6 +432,14 @@ public:
      */
     void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
 
+    /**
+     * Binds the TransportLayer to the service context. The TransportLayer should have already
+     * had setup() called successfully, but not startup().
+     *
+     * This should be a TransportLayerManager created with the global server configuration.
+     */
+    void setTransportLayer(std::unique_ptr<transport::TransportLayer> tl);
+
 protected:
     ServiceContext();
 
@@ -462,9 +475,9 @@ private:
     std::unique_ptr<LogicalSessionCache> _sessionCache;
 
     /**
-     * The TransportLayerManager.
+     * The TransportLayer.
      */
-    std::unique_ptr<transport::TransportLayerManager> _transportLayerManager;
+    std::unique_ptr<transport::TransportLayer> _transportLayer;
 
     /**
      * The service entry point
@@ -498,6 +511,9 @@ private:
 
     // Counter for assigning operation ids.
     AtomicUInt32 _nextOpId{1};
+
+    bool _startupComplete = false;
+    stdx::condition_variable _startupCompleteCondVar;
 };
 
 /**

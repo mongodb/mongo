@@ -89,7 +89,7 @@
 #include "mongo/s/version_mongos.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/transport_layer_legacy.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -261,20 +261,17 @@ static ExitCode runMongosServer() {
 
     _initWireSpec();
 
-    transport::TransportLayerLegacy::Options opts;
-    opts.port = serverGlobalParams.port;
-    opts.ipList = serverGlobalParams.bind_ip;
-
     auto sep = stdx::make_unique<ServiceEntryPointMongos>(getGlobalServiceContext());
-    auto sepPtr = sep.get();
-
     getGlobalServiceContext()->setServiceEntryPoint(std::move(sep));
 
-    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sepPtr);
-    auto res = transportLayer->setup();
+    auto tl = transport::TransportLayerManager::createWithConfig(&serverGlobalParams,
+                                                                 getGlobalServiceContext());
+    auto res = tl->setup();
     if (!res.isOK()) {
+        error() << "Failed to set up listener: " << res;
         return EXIT_NET_ERROR;
     }
+    getGlobalServiceContext()->setTransportLayer(std::move(tl));
 
     auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(
@@ -353,11 +350,12 @@ static ExitCode runMongosServer() {
     // Set up the logical session cache
     getGlobalServiceContext()->setLogicalSessionCache(makeLogicalSessionCacheS());
 
-    auto start = getGlobalServiceContext()->addAndStartTransportLayer(std::move(transportLayer));
+    auto start = getGlobalServiceContext()->getTransportLayer()->start();
     if (!start.isOK()) {
         return EXIT_NET_ERROR;
     }
 
+    getGlobalServiceContext()->notifyStartupComplete();
 #if !defined(_WIN32)
     mongo::signalForkSuccess();
 #else

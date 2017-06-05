@@ -123,7 +123,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/transport_layer_legacy.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
@@ -488,18 +488,17 @@ ExitCode _initAndListen(int listenPort) {
 
     globalServiceContext->createLockFile();
 
-    transport::TransportLayerLegacy::Options options;
-    options.port = listenPort;
-    options.ipList = serverGlobalParams.bind_ip;
+    globalServiceContext->setServiceEntryPoint(
+        stdx::make_unique<ServiceEntryPointMongod>(globalServiceContext));
 
-    // Create, start, and attach the TL
-    auto transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(
-        options, globalServiceContext->getServiceEntryPoint());
-    auto res = transportLayer->setup();
+    auto tl = transport::TransportLayerManager::createWithConfig(&serverGlobalParams,
+                                                                 globalServiceContext);
+    auto res = tl->setup();
     if (!res.isOK()) {
         error() << "Failed to set up listener: " << res;
         return EXIT_NET_ERROR;
     }
+    globalServiceContext->setTransportLayer(std::move(tl));
 
     globalServiceContext->initializeGlobalStorageEngine();
 
@@ -724,12 +723,13 @@ ExitCode _initAndListen(int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = globalServiceContext->addAndStartTransportLayer(std::move(transportLayer));
+    auto start = globalServiceContext->getTransportLayer()->start();
     if (!start.isOK()) {
         error() << "Failed to start the listener: " << start.toString();
         return EXIT_NET_ERROR;
     }
 
+    globalServiceContext->notifyStartupComplete();
 #ifndef _WIN32
     mongo::signalForkSuccess();
 #else

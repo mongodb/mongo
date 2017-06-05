@@ -190,6 +190,12 @@ public:
      */
     virtual void shutdown() = 0;
 
+    /**
+     * Optional method for subclasses to setup their state before being ready to accept
+     * connections.
+     */
+    virtual Status setup() = 0;
+
 protected:
     TransportLayer() = default;
 
@@ -198,6 +204,10 @@ protected:
      */
     TicketImpl* getTicketImpl(const Ticket& ticket) {
         return ticket.impl();
+    }
+
+    std::unique_ptr<TicketImpl> getOwnedTicketImpl(Ticket&& ticket) {
+        return std::move(ticket).releaseImpl();
     }
 
     /**
