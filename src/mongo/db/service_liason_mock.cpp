@@ -31,13 +31,14 @@
 #include <algorithm>
 
 #include "mongo/db/service_liason_mock.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 MockServiceLiasonImpl::MockServiceLiasonImpl() {
-    auto timerFactory = std::make_unique<executor::AsyncTimerFactoryMock>();
+    auto timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
     _timerFactory = timerFactory.get();
-    _runner = std::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
+    _runner = stdx::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
     _runner->startup();
 }
 

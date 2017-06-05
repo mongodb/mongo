@@ -36,6 +36,7 @@
 #include "mongo/db/service_liason_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -61,10 +62,10 @@ public:
           _userId(OID::gen()) {}
 
     void setUp() override {
-        auto mockService = std::make_unique<MockServiceLiason>(_service);
-        auto mockSessions = std::make_unique<MockSessionsCollection>(_sessions);
+        auto mockService = stdx::make_unique<MockServiceLiason>(_service);
+        auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
         _cache =
-            std::make_unique<LogicalSessionCache>(std::move(mockService), std::move(mockSessions));
+            stdx::make_unique<LogicalSessionCache>(std::move(mockService), std::move(mockSessions));
     }
 
     void tearDown() override {

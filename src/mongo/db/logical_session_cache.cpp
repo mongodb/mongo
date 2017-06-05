@@ -99,7 +99,7 @@ StatusWith<LogicalSessionRecord::Owner> LogicalSessionCache::getOwner(LogicalSes
 
 StatusWith<LogicalSessionRecord::Owner> LogicalSessionCache::getOwnerFromCache(
     LogicalSessionId lsid) {
-    std::unique_lock<stdx::mutex> lk(_cacheMutex);
+    stdx::unique_lock<stdx::mutex> lk(_cacheMutex);
     auto it = _cache.find(lsid);
     if (it == _cache.end()) {
         return {ErrorCodes::NoSuchSession, "no matching session record found in the cache"};
