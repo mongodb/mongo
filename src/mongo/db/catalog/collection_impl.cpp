@@ -1265,12 +1265,7 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             // `results`.
             dassert(status.isOK());
 
-            // when there's an index key/document mismatch, both `if` and `else if` statements
-            // will be true. But if we only check tooFewIndexEntries(), we'll be able to see
-            // which specific index is invalid.
-            if (indexValidator->tooFewIndexEntries()) {
-                results->valid = false;
-            } else if (indexValidator->tooManyIndexEntries()) {
+            if (indexValidator->tooManyIndexEntries()) {
                 for (auto& it : indexNsResultsMap) {
                     // Marking all indexes as invalid since we don't know which one failed.
                     ValidateResults& r = it.second;
@@ -1278,6 +1273,8 @@ Status CollectionImpl::validate(OperationContext* opCtx,
                 }
                 string msg = "One or more indexes contain invalid index entries.";
                 results->errors.push_back(msg);
+                results->valid = false;
+            } else if (indexValidator->tooFewIndexEntries()) {
                 results->valid = false;
             }
         }
