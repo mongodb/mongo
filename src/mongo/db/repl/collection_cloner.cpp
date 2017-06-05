@@ -73,6 +73,10 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListIndexesAttempts, int, 3);
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
 }  // namespace
 
+// Failpoint which causes initial sync to hang after the initial 'find' command of collection
+// cloning, for a specific collection.
+MONGO_FP_DECLARE(initialSyncHangCollectionClonerAfterInitialFind);
+
 CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                    OldThreadPool* dbWorkThreadPool,
                                    const HostAndPort& source,
@@ -441,6 +445,20 @@ void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& f
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, newStatus);
         return;
+    }
+
+    MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerAfterInitialFind, nssData) {
+        const BSONObj& data = nssData.getData();
+        auto nss = data["nss"].str();
+        // Only hang when cloning the specified collection.
+        if (_destNss.toString() == nss) {
+            while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerAfterInitialFind) &&
+                   !_isShuttingDown()) {
+                log() << "initialSyncHangCollectionClonerAfterInitialFind fail point enabled for "
+                      << nss << ". Blocking until fail point is disabled.";
+                mongo::sleepsecs(1);
+            }
+        }
     }
 
     if (!lastBatch) {
