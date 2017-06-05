@@ -237,8 +237,7 @@ public:
         if (!shouldSample || _dbprofile <= 0)
             return false;
 
-        long long opMicros = isDone() ? totalTimeMicros() : elapsedMicros();
-        return opMicros >= serverGlobalParams.slowMS * 1000LL;
+        return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS};
     }
 
     /**
@@ -292,17 +291,67 @@ public:
         return _end > 0;
     }
 
-    long long totalTimeMicros() {
-        massert(12601, "CurOp not marked done yet", _end);
-        return _end - startTime();
+    /**
+     * Stops the operation latency timer from "ticking". Time spent paused is not included in the
+     * latencies returned by elapsedTimeExcludingPauses().
+     *
+     * Illegal to call if either the CurOp has not been started, or the CurOp is already in a paused
+     * state.
+     */
+    void pauseTimer() {
+        invariant(isStarted());
+        invariant(_lastPauseTime == 0);
+        _lastPauseTime = curTimeMicros64();
     }
 
-    long long elapsedMicros() {
-        return curTimeMicros64() - startTime();
+    /**
+     * Starts the operation latency timer "ticking" again. Illegal to call if the CurOp has not been
+     * started and then subsequently paused.
+     */
+    void resumeTimer() {
+        invariant(isStarted());
+        invariant(_lastPauseTime > 0);
+        _totalPausedDuration +=
+            Microseconds{static_cast<long long>(curTimeMicros64()) - _lastPauseTime};
+        _lastPauseTime = 0;
     }
 
-    int elapsedSeconds() {
-        return static_cast<int>(elapsedMicros() / (1000 * 1000));
+    /**
+     * If this op has been marked as done(), returns the wall clock duration between being marked as
+     * started with ensureStarted() and the call to done().
+     *
+     * Otherwise, returns the wall clock duration between the start time and now.
+     *
+     * If this op has not yet been started, returns 0.
+     */
+    Microseconds elapsedTimeTotal() {
+        if (!isStarted()) {
+            return Microseconds{0};
+        }
+
+        if (!_end) {
+            return Microseconds{static_cast<long long>(curTimeMicros64() - startTime())};
+        } else {
+            return Microseconds{static_cast<long long>(_end - startTime())};
+        }
+    }
+
+    /**
+     * Returns the total elapsed duration minus any time spent in a paused state. See
+     * elapsedTimeTotal() for the definition of the total duration and pause/resumeTimer() for
+     * details on pausing.
+     *
+     * If this op has not yet been started, returns 0.
+     *
+     * Illegal to call while the timer is paused.
+     */
+    Microseconds elapsedTimeExcludingPauses() {
+        invariant(!_lastPauseTime);
+        if (!isStarted()) {
+            return Microseconds{0};
+        }
+
+        return elapsedTimeTotal() - _totalPausedDuration;
     }
 
     /**
@@ -377,17 +426,6 @@ public:
     }
 
     /**
-     * Access to _expectedLatencyMs is not synchronized, so it is illegal for threads other than the
-     * one executing the operation to call getExpectedLatencyMs() and setExpectedLatencyMs().
-     */
-    long long getExpectedLatencyMs() const {
-        return _expectedLatencyMs;
-    }
-    void setExpectedLatencyMs(long long latency) {
-        _expectedLatencyMs = latency;
-    }
-
-    /**
      * this should be used very sparingly
      * generally the Context should set this up
      * but sometimes you want to do it ahead of time
@@ -416,8 +454,19 @@ private:
     CurOpStack* _stack;
     CurOp* _parent{nullptr};
     Command* _command{nullptr};
+
+    // The time at which this CurOp instance was marked as started.
     long long _start{0};
+
+    // The time at which this CurOp instance was marked as done.
     long long _end{0};
+
+    // The time at which this CurOp instance had its timer paused, or 0 if the timer is not
+    // currently paused.
+    long long _lastPauseTime{0};
+
+    // The cumulative duration for which the timer has been paused.
+    Microseconds _totalPausedDuration{0};
 
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
     NetworkOp _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
@@ -435,11 +484,6 @@ private:
     std::string _message;
     ProgressMeter _progressMeter;
     int _numYields{0};
-
-    // this is how much "extra" time a query might take
-    // a writebacklisten for example will block for 30s
-    // so this should be 30000 in that case
-    long long _expectedLatencyMs{0};
 
     std::string _planSummary;
 };

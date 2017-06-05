@@ -82,7 +82,8 @@ MONGO_FP_DECLARE(failAllRemoves);
 void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     try {
         curOp->done();
-        long long executionTimeMicros = curOp->totalTimeMicros();
+        long long executionTimeMicros =
+            durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses());
         curOp->debug().executionTimeMicros = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
@@ -91,7 +92,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
                     curOp->getNS(),
                     curOp->getLogicalOp(),
                     Top::LockType::WriteLocked,
-                    curOp->totalTimeMicros(),
+                    durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
                     curOp->isCommand(),
                     curOp->getReadWriteType());
 
@@ -102,8 +103,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 
         const bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
                                                                  logger::LogSeverity::Debug(1));
-        const bool logSlow = executionTimeMicros >
-            (serverGlobalParams.slowMS + curOp->getExpectedLatencyMs()) * 1000LL;
+        const bool logSlow = executionTimeMicros > (serverGlobalParams.slowMS * 1000LL);
 
         const bool shouldSample = serverGlobalParams.sampleRate == 1.0
             ? true
@@ -405,7 +405,7 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
                     wholeOp.ns.ns(),
                     LogicalOp::opInsert,
                     Top::LockType::WriteLocked,
-                    curOp.totalTimeMicros(),
+                    durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
                     curOp.isCommand(),
                     curOp.getReadWriteType());
 

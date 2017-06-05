@@ -320,7 +320,8 @@ public:
             stats.append("avgDistance", totalDistance / results);
         }
         stats.append("maxDistance", farthestDist);
-        stats.appendIntOrLL("time", curOp->elapsedMicros() / 1000);
+        stats.appendIntOrLL("time",
+                            durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()));
         stats.done();
 
         collection->infoCache()->notifyOfQuery(opCtx, summary.indexesUsed);

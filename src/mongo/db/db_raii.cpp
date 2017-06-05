@@ -38,8 +38,13 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+namespace {
+MONGO_FP_DECLARE(setAutoGetCollectionWait);
+}  // namespace
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode)
     : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {}
@@ -59,6 +64,12 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         db->getViewCatalog()->lookup(opCtx, nss.ns()))
         uasserted(ErrorCodes::CommandNotSupportedOnView,
                   str::stream() << "Namespace " << nss.ns() << " is a view, not a collection");
+
+    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled.
+    MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
+        const BSONObj& data = customWait.getData();
+        sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
+    }
 }
 
 AutoGetCollectionOrView::AutoGetCollectionOrView(OperationContext* opCtx,
@@ -107,7 +118,7 @@ AutoStatsTracker::~AutoStatsTracker() {
                 curOp->getNS(),
                 curOp->getLogicalOp(),
                 _lockType,
-                _timer.micros(),
+                durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
                 curOp->isCommand(),
                 curOp->getReadWriteType());
 }

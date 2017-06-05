@@ -209,7 +209,7 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
                 curOp->getNS(),
                 curOp->getLogicalOp(),
                 Top::LockType::WriteLocked,
-                curOp->elapsedMicros(),
+                durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
                 curOp->isCommand(),
                 curOp->getReadWriteType());
 }

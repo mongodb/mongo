@@ -349,8 +349,8 @@ void appendAsObjOrString(StringData name,
 
 void CurOp::reportState(BSONObjBuilder* builder) {
     if (_start) {
-        builder->append("secs_running", elapsedSeconds());
-        builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()));
+        builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal()));
+        builder->append("microsecs_running", durationCount<Microseconds>(elapsedTimeTotal()));
     }
 
     builder->append("op", logicalOpToString(_logicalOp));

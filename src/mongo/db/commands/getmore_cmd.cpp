@@ -168,21 +168,21 @@ public:
         // Cursors come in one of two flavors:
         // - Cursors owned by the collection cursor manager, such as those generated via the find
         //   command. For these cursors, we hold the appropriate collection lock for the duration of
-        //   the getMore using AutoGetCollectionForRead. This will automatically update the CurOp
-        //   object appropriately and record execution time via Top upon completion.
+        //   the getMore using AutoGetCollectionForRead.
         // - Cursors owned by the global cursor manager, such as those generated via the aggregate
         //   command. These cursors either hold no collection state or manage their collection state
-        //   internally, so we acquire no locks. In this case we use the AutoStatsTracker object to
-        //   update the CurOp object appropriately and record execution time via Top upon
-        //   completion.
+        //   internally, so we acquire no locks.
         //
-        // Thus, only one of 'readLock' and 'statsTracker' will be populated as we populate
-        // 'cursorManager'.
+        // While we only need to acquire locks in the case of a cursor which is *not* globally
+        // owned, we need to create an AutoStatsTracker in either case. This is responsible for
+        // updating statistics in CurOp and Top. We avoid using AutoGetCollectionForReadCommand
+        // because we may need to drop and reacquire locks when the cursor is awaitData, but we
+        // don't want to update the stats twice.
         //
-        // Note that we declare our locks before our ClientCursorPin, in order to ensure that
+        // Note that we acquire our locks before our ClientCursorPin, in order to ensure that
         // the pin's destructor is called before the lock's destructor (if there is one) so that the
         // cursor cleanup can occur under the lock.
-        boost::optional<AutoGetCollectionForReadCommand> readLock;
+        boost::optional<AutoGetCollectionForRead> readLock;
         boost::optional<AutoStatsTracker> statsTracker;
         CursorManager* cursorManager;
 
@@ -204,6 +204,13 @@ public:
                                                                ChunkVersion::IGNORED());
 
             readLock.emplace(opCtx, request.nss);
+            const int doNotChangeProfilingLevel = 0;
+            statsTracker.emplace(opCtx,
+                                 request.nss,
+                                 Top::LockType::ReadLocked,
+                                 readLock->getDb() ? readLock->getDb()->getProfilingLevel()
+                                                   : doNotChangeProfilingLevel);
+
             Collection* collection = readLock->getCollection();
             if (!collection) {
                 return appendCommandStatus(result,
@@ -368,15 +375,13 @@ public:
                 exec->saveState();
                 readLock.reset();
 
-                // Block waiting for data.
+                // Block waiting for data. Time spent blocking is not counted towards the total
+                // operation latency.
+                curOp->pauseTimer();
                 const auto timeout = opCtx->getRemainingMaxTimeMicros();
                 notifier->wait(notifierVersion, timeout);
                 notifier.reset();
-
-                // Set expected latency to match wait time. This makes sure the logs aren't spammed
-                // by awaitData queries that exceed slowms due to blocking on the
-                // CappedInsertNotifier.
-                curOp->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
+                curOp->resumeTimer();
 
                 readLock.emplace(opCtx, request.nss);
                 exec->restoreState();

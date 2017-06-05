@@ -238,7 +238,6 @@ public:
     ~AutoStatsTracker();
 
 private:
-    const Timer _timer;
     OperationContext* _opCtx;
     Top::LockType _lockType;
 };

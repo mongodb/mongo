@@ -493,12 +493,13 @@ mongo::DbResponse mongo::assembleResponse(OperationContext* opCtx, const Message
     }
     currentOp.ensureStarted();
     currentOp.done();
-    debug.executionTimeMicros = currentOp.totalTimeMicros();
+    debug.executionTimeMicros = durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses());
 
-    logThresholdMs += currentOp.getExpectedLatencyMs();
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(
-            opCtx, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
+            opCtx,
+            durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses()),
+            currentOp.getReadWriteType());
 
     const bool shouldSample = serverGlobalParams.sampleRate == 1.0
         ? true

@@ -763,7 +763,8 @@ void Explain::explainStages(PlanExecutor* exec,
 
         // Generate exec stats BSON for the winning plan.
         OperationContext* opCtx = exec->getOpCtx();
-        long long totalTimeMillis = CurOp::get(opCtx)->elapsedMicros() / 1000;
+        long long totalTimeMillis =
+            durationCount<Milliseconds>(CurOp::get(opCtx)->elapsedTimeTotal());
         generateExecStats(winningStats.get(), verbosity, &execBob, totalTimeMillis);
 
         // Also generate exec stats for all plans, if the verbosity level is high enough.
