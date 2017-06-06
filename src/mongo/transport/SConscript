@@ -55,6 +55,7 @@ env.Library(
     ],
     LIBDEPS=[
         'transport_layer_common',
+        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
     ],

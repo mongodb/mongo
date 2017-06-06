@@ -18,6 +18,18 @@ env.Library('auth_rolename', ['role_name.cpp'],
             ]
 )
 
+env.Library(
+    target = 'authentication_restriction',
+    source = [
+        'restriction_environment.cpp',
+    ],
+    LIBDEPS = [
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/decorable',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
 # Just the data structures used
 env.Library('authcore', ['action_set.cpp',
                          'action_type.cpp',
@@ -39,6 +51,7 @@ env.Library('authcore', ['action_set.cpp',
                          'user_name.cpp',
                          'user_set.cpp'],
             LIBDEPS=['auth_rolename',
+                     'authentication_restriction',
                      'sasl_options',
                      '$BUILD_DIR/mongo/base',
                      '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
