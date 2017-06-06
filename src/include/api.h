@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -12,21 +12,19 @@
 	const char *__oldname = (s)->name;				\
 	(s)->dhandle = (dh);						\
 	(s)->name = (s)->lastop = #h "." #n;				\
-
-#define	API_CALL_NOCONF(s, h, n, dh) do {				\
-	API_SESSION_INIT(s, h, n, dh);					\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n)
+
+#define	API_CALL_NOCONF(s, h, n, dh) do {				\
+	API_SESSION_INIT(s, h, n, dh)
 
 #define	API_CALL(s, h, n, dh, config, cfg) do {				\
 	const char *(cfg)[] =						\
 	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, dh);					\
-	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	if ((config) != NULL)						\
 		WT_ERR(__wt_config_check((s),				\
-		    WT_CONFIG_REF(session, h##_##n), (config), 0));	\
-	__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n)
+		    WT_CONFIG_REF(session, h##_##n), (config), 0))
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
@@ -49,9 +47,9 @@
 		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
 
 /* An API call wrapped in a transaction if necessary. */
-#define	TXN_API_CALL_NOCONF(s, h, n, bt) do {				\
+#define	TXN_API_CALL_NOCONF(s, h, n, dh) do {				\
 	bool __autotxn = false;						\
-	API_CALL_NOCONF(s, h, n, bt);					\
+	API_CALL_NOCONF(s, h, n, dh);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
@@ -135,17 +133,21 @@
 	CURSOR_REMOVE_API_CALL(cur, s, bt);				\
 	JOINABLE_CURSOR_CALL_CHECK(cur)
 
-#define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
+#define	CURSOR_UPDATE_API_CALL_BTREE(cur, s, n, bt)			\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	TXN_API_CALL_NOCONF(s, WT_CURSOR, n,				\
-	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle);	\
+	TXN_API_CALL_NOCONF(						\
+	    s, WT_CURSOR, n, ((WT_BTREE *)(bt))->dhandle);		\
 	if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) &&			\
 	    !F_ISSET((WT_BTREE *)(bt), WT_BTREE_IGNORE_CACHE) &&	\
 	    __wt_cache_full(s))						\
 		WT_ERR(WT_CACHE_FULL);
 
-#define	JOINABLE_CURSOR_UPDATE_API_CALL(cur, s, n, bt)			\
-	CURSOR_UPDATE_API_CALL(cur, s, n, bt);				\
+#define	CURSOR_UPDATE_API_CALL(cur, s, n)				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
+	TXN_API_CALL_NOCONF(s, WT_CURSOR, n, NULL);
+
+#define	JOINABLE_CURSOR_UPDATE_API_CALL(cur, s, n)			\
+	CURSOR_UPDATE_API_CALL(cur, s, n);				\
 	JOINABLE_CURSOR_CALL_CHECK(cur)
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\

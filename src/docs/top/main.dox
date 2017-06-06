@@ -6,12 +6,12 @@ WiredTiger is an high performance, scalable, production quality, NoSQL,
 @section releases Releases
 
 <table>
-@row{<b>WiredTiger 2.9.1</b> (current),
-	<a href="releases/wiredtiger-2.9.1.tar.bz2"><b>[Release package]</b></a>,
-	<a href="2.9.1/index.html"><b>[Documentation]</b></a>}
-@row{<b>WiredTiger 2.9.0</b> (previous),
-	<a href="releases/wiredtiger-2.9.0.tar.bz2"><b>[Release package]</b></a>,
-	<a href="2.9.0/index.html"><b>[Documentation]</b></a>}
+@row{<b>WiredTiger 2.9.2</b> (current),
+	<a href="releases/wiredtiger-2.9.2.tar.bz2"><b>[Release package]</b></a>,
+	<a href="2.9.2/index.html"><b>[Documentation]</b></a>}
+@row{<b>WiredTiger 2.8.0</b> (previous),
+	<a href="releases/wiredtiger-2.8.0.tar.bz2"><b>[Release package]</b></a>,
+	<a href="2.8.0/index.html"><b>[Documentation]</b></a>}
 @row{<b>Development branch</b>,
 	<a href="https://github.com/wiredtiger/wiredtiger"><b>[Source code]</b></a>,
 	<a href="develop/index.html"><b>[Documentation]</b></a>}

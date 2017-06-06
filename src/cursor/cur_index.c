@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -66,8 +66,8 @@ __curindex_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_CHECKKEY(a);
-	WT_CURSOR_CHECKKEY(b);
+	WT_ERR(__cursor_checkkey(a));
+	WT_ERR(__cursor_checkkey(b));
 
 	ret = __wt_compare(
 	    session, cindex->index->collator, &a->key, &b->key, cmpp);
@@ -449,8 +449,10 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	    __curindex_search,			/* search */
 	    __curindex_search_near,		/* search-near */
 	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_modify_notsup,		/* modify */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curindex_close);			/* close */
 	WT_CURSOR_INDEX *cindex;

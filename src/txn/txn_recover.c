@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -20,6 +20,7 @@ typedef struct {
 	} *files;
 	size_t file_alloc;		/* Allocated size of files array. */
 	u_int max_fileid;		/* Maximum file ID seen. */
+	WT_LSN max_lsn;			/* Maximum checkpoint LSN seen. */
 	u_int nfiles;			/* Number of files in the metadata. */
 
 	WT_LSN ckpt_lsn;		/* Start LSN for main recovery loop. */
@@ -342,6 +343,10 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	    "Recovering %s with id %" PRIu32 " @ (%" PRIu32 ", %" PRIu32 ")",
 	    uri, fileid, lsn.l.file, lsn.l.offset);
 
+	if ((!WT_IS_MAX_LSN(&lsn) && !WT_IS_INIT_LSN(&lsn)) &&
+	    (WT_IS_MAX_LSN(&r->max_lsn) || __wt_log_cmp(&lsn, &r->max_lsn) > 0))
+		r->max_lsn = lsn;
+
 	return (0);
 
 }
@@ -428,6 +433,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_RET(__wt_open_internal_session(conn, "txn-recover",
 	    false, WT_SESSION_NO_LOGGING, &session));
 	r.session = session;
+	WT_MAX_LSN(&r.max_lsn);
 
 	F_SET(conn, WT_CONN_RECOVERING);
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
@@ -441,11 +447,26 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * last checkpoint was done with logging disabled, recovery should not
 	 * run.  Scan the metadata to figure out the largest file ID.
 	 */
-	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_EXISTED) ||
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_EXISTED) ||
 	    WT_IS_MAX_LSN(&metafile->ckpt_lsn)) {
+		/*
+		 * Detect if we're going from logging disabled to enabled.
+		 * We need to know this to verify LSNs and start at the correct
+		 * log file later.  If someone ran with logging, then disabled
+		 * it and removed all the log files and then turned logging back
+		 * on, we have to start logging in the log file number that is
+		 * larger than any checkpoint LSN we have from the earlier time.
+		 */
 		WT_ERR(__recovery_file_scan(&r));
 		conn->next_file_id = r.max_fileid;
-		goto done;
+
+		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
+		    WT_IS_MAX_LSN(&metafile->ckpt_lsn) &&
+		    !WT_IS_MAX_LSN(&r.max_lsn)) {
+			WT_ERR(__wt_log_reset(session, r.max_lsn.l.file));
+			goto ckpt;
+		} else
+			goto done;
 	}
 
 	/*
@@ -535,6 +556,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * this is not a read-only connection.
 	 * We can consider skipping it in the future.
 	 */
+	if (needs_rec)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);
 	if (WT_IS_INIT_LSN(&r.ckpt_lsn))
 		WT_ERR(__wt_log_scan(session, NULL,
 		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
@@ -554,11 +577,12 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * open is fast and keep the metadata up to date with the checkpoint
 	 * LSN and archiving.
 	 */
-	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
+ckpt:	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
+	FLD_CLR(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);
 
 	if (ret != 0)
 		__wt_err(session, ret, "Recovery failed");

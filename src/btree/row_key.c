@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -470,6 +470,8 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t cell_offset, const void *key, size_t size, WT_IKEY **ikeyp)
 {
 	WT_IKEY *ikey;
+
+	WT_ASSERT(session, key != NULL);	/* quiet clang scan-build */
 
 	/*
 	 * Allocate memory for the WT_IKEY structure and the key, then copy

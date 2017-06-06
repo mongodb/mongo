@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -342,8 +342,10 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	    __curlog_search,			/* search */
 	    __wt_cursor_search_near_notsup,	/* search-near */
 	    __wt_cursor_notsup,			/* insert */
+	    __wt_cursor_modify_notsup,		/* modify */
 	    __wt_cursor_notsup,			/* update */
 	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curlog_close);			/* close */
 	WT_CURSOR *cursor;

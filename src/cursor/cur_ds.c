@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -42,7 +42,7 @@ __curds_key_set(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(__cursor_needkey(cursor));
 
 	source->recno = cursor->recno;
 	source->key.data = cursor->key.data;
@@ -63,7 +63,7 @@ __curds_value_set(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(__cursor_needvalue(cursor));
 
 	source->value.data = cursor->value.data;
 	source->value.size = cursor->value.size;
@@ -142,8 +142,8 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_NEEDKEY(a);
-	WT_CURSOR_NEEDKEY(b);
+	WT_ERR(__cursor_needkey(a));
+	WT_ERR(__cursor_needkey(b));
 
 	if (WT_CURSOR_RECNO(a)) {
 		if (a->recno < b->recno)
@@ -317,7 +317,7 @@ __curds_insert(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
+	CURSOR_UPDATE_API_CALL(cursor, session, insert);
 
 	__curds_txn_enter(session);
 
@@ -350,7 +350,7 @@ __curds_update(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
+	CURSOR_UPDATE_API_CALL(cursor, session, update);
 
 	WT_STAT_CONN_INCR(session, cursor_update);
 	WT_STAT_DATA_INCR(session, cursor_update);
@@ -458,8 +458,10 @@ __wt_curds_open(
 	    __curds_search,			/* search */
 	    __curds_search_near,		/* search-near */
 	    __curds_insert,			/* insert */
+	    __wt_cursor_modify_notsup,		/* modify */
 	    __curds_update,			/* update */
 	    __curds_remove,			/* remove */
+	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
 	    __curds_close);			/* close */
 	WT_CONFIG_ITEM cval, metadata;

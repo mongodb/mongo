@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -163,18 +163,16 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
  * __wt_cond_destroy --
  *	Destroy a condition variable.
  */
-int
+void
 __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 
 	cond = *condp;
 	if (cond == NULL)
-		return (0);
+		return;
 
 	/* Do nothing to delete Condition Variable */
 	DeleteCriticalSection(&cond->mtx);
 	__wt_free(session, *condp);
-
-	return (0);
 }

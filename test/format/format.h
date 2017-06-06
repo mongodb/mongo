@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -78,6 +78,8 @@
 
 #define	FORMAT_OPERATION_REPS	3		/* 3 thread operations sets */
 
+#define	MAX_MODIFY_ENTRIES	5		/* maximum change vectors */
+
 typedef struct {
 	char *home;				/* Home directory */
 	char *home_backup;			/* Hot-backup directory */
@@ -147,28 +149,28 @@ typedef struct {
 	uint32_t c_bloom_hash_count;
 	uint32_t c_bloom_oldest;
 	uint32_t c_cache;
-	uint32_t c_compact;
 	uint32_t c_checkpoints;
-	char *c_checksum;
+	char	*c_checksum;
 	uint32_t c_chunk_size;
-	char *c_compression;
-	char *c_encryption;
-	char *c_config_open;
+	uint32_t c_compact;
+	char	*c_compression;
+	char	*c_config_open;
 	uint32_t c_data_extend;
-	char *c_data_source;
+	char	*c_data_source;
 	uint32_t c_delete_pct;
 	uint32_t c_dictionary;
 	uint32_t c_direct_io;
+	char	*c_encryption;
 	uint32_t c_evict_max;
+	char	*c_file_type;
 	uint32_t c_firstfit;
-	char *c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_in_memory;
 	uint32_t c_insert_pct;
 	uint32_t c_internal_key_truncation;
 	uint32_t c_intl_page_max;
-	char *c_isolation;
+	char	*c_isolation;
 	uint32_t c_key_gap;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
@@ -176,22 +178,23 @@ typedef struct {
 	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_logging_archive;
-	char *c_logging_compression;
+	char	*c_logging_compression;
 	uint32_t c_logging_prealloc;
 	uint32_t c_long_running_txn;
 	uint32_t c_lsm_worker_threads;
 	uint32_t c_merge_max;
 	uint32_t c_mmap;
+	uint32_t c_modify_pct;
 	uint32_t c_ops;
-	uint32_t c_quiet;
 	uint32_t c_prefix_compression;
 	uint32_t c_prefix_compression_min;
+	uint32_t c_quiet;
+	uint32_t c_read_pct;
+	uint32_t c_rebalance;
 	uint32_t c_repeat_data_pct;
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
-	uint32_t c_read_pct;
-	uint32_t c_rebalance;
 	uint32_t c_salvage;
 	uint32_t c_split_pct;
 	uint32_t c_statistics;

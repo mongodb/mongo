@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -26,9 +26,11 @@ __wt_thread_create(WT_SESSION_IMPL *session,
 	WT_FULL_BARRIER();
 
 	/* Spawn a new thread of control. */
-	WT_SYSCALL_RETRY(pthread_create(tidret, NULL, func, arg), ret);
-	if (ret == 0)
+	WT_SYSCALL_RETRY(pthread_create(&tidret->id, NULL, func, arg), ret);
+	if (ret == 0) {
+		tidret->created = true;
 		return (0);
+	}
 	WT_RET_MSG(session, ret, "pthread_create");
 }
 
@@ -41,6 +43,10 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 {
 	WT_DECL_RET;
 
+	/* Only attempt to join if thread was created successfully */
+	if (!tid.created)
+		return (0);
+
 	/*
 	 * Joining a thread isn't a memory barrier, but WiredTiger commonly
 	 * sets flags and or state and then expects worker threads to halt.
@@ -48,9 +54,11 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 	 */
 	WT_FULL_BARRIER();
 
-	WT_SYSCALL(pthread_join(tid, NULL), ret);
-	if (ret == 0)
+	WT_SYSCALL(pthread_join(tid.id, NULL), ret);
+	if (ret == 0) {
+		tid.created = false;
 		return (0);
+	}
 
 	WT_RET_MSG(session, ret, "pthread_join");
 }

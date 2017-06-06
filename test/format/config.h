@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -238,6 +238,10 @@ static CONFIG c[] = {
 	  "configure for mmap operations",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_mmap, NULL },
 
+	{ "modify_pct",
+	  "percent operations that are value modifications",
+	  C_IGNORE, 0, 0, 100, &g.c_modify_pct, NULL },
+
 	{ "ops",
 	  "the number of modification operations done per run",
 	  0x0, 0, M(2), M(100), &g.c_ops, NULL },
@@ -323,7 +327,7 @@ static CONFIG c[] = {
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_config_open },
 
 	{ "write_pct",
-	  "percent operations that are writes",
+	  "percent operations that are value updates",
 	  C_IGNORE, 0, 0, 100, &g.c_write_pct, NULL },
 
 	{ NULL, NULL, 0x0, 0, 0, 0, NULL, NULL }

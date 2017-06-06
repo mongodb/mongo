@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2016 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -95,6 +95,11 @@ class test_pack(wttest.WiredTigerTestCase):
         self.check('3u', r"\x4")
         self.check('3uu', r"\x4", r"\x42" * 10)
         self.check('u3u', r"\x42" * 10, r"\x4")
+        self.check('u', '\x00')
+        self.check('u', '')
+        self.check('uu', '', '\x00')
+        self.check('uu', '\x00', '')
+        self.check('uu', '', '')
 
         self.check('s', "4")
         self.check("1s", "4")

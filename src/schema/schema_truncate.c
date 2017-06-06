@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -138,9 +138,9 @@ __wt_schema_range_truncate(
 	uri = start->internal_uri;
 
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_CURSOR_NEEDKEY(start);
+		WT_ERR(__cursor_needkey(start));
 		if (stop != NULL)
-			WT_CURSOR_NEEDKEY(stop);
+			WT_ERR(__cursor_needkey(stop));
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)start)->btree,
 		    ret = __wt_btcur_range_truncate(
 		    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -25,21 +25,21 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "wt_internal.h"			/* For __wt_XXX */
+#include "wt_internal.h"
 
 #ifdef _WIN32
-	#define DIR_DELIM '\\'
-	#define DIR_DELIM_STR "\\"
-	#define DIR_EXISTS_COMMAND "IF EXIST "
-	#define RM_COMMAND "rd /s /q "
+#define	DIR_DELIM		'\\'
+#define	DIR_DELIM_STR		"\\"
+#define	DIR_EXISTS_COMMAND	"IF EXIST "
+#define	RM_COMMAND		"rd /s /q "
 #else
-	#define	DIR_DELIM '/'
-	#define	DIR_DELIM_STR "/"
-	#define RM_COMMAND "rm -rf "
+#define	DIR_DELIM		'/'
+#define	DIR_DELIM_STR		"/"
+#define	RM_COMMAND		"rm -rf "
 #endif
 
-#define	DEFAULT_DIR "WT_TEST"
-#define	MKDIR_COMMAND "mkdir "
+#define	DEFAULT_DIR	"WT_TEST"
+#define	MKDIR_COMMAND	"mkdir "
 
 #ifdef _WIN32
 #include "windows_shim.h"

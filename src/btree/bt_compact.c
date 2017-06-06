@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -60,7 +60,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 */
 	if (mod->rec_result == WT_PM_REC_REPLACE ||
 	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
-		__wt_writelock(session, &page->page_lock);
+		WT_PAGE_LOCK(session, page);
 
 	if (mod->rec_result == WT_PM_REC_REPLACE)
 		ret = bm->compact_page_skip(bm, session,
@@ -80,7 +80,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	if (mod->rec_result == WT_PM_REC_REPLACE ||
 	    mod->rec_result == WT_PM_REC_MULTIBLOCK)
-		__wt_writeunlock(session, &page->page_lock);
+		WT_PAGE_UNLOCK(session, page);
 
 	return (ret);
 }
@@ -228,12 +228,8 @@ __wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 		    bm, session, addr, addr_size, skipp);
 	}
 
-	/*
-	 * Reset the WT_REF state and push the change. The full-barrier isn't
-	 * necessary, but it's better to keep pages in circulation than not.
-	 */
+	/* Reset the WT_REF state. */
 	ref->state = WT_REF_DISK;
-	WT_FULL_BARRIER();
 
 	return (ret);
 }

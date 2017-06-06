@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2014-2016 MongoDB, Inc.
+/*-
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -483,7 +483,7 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	set_codes(node, huffman->codes, 0, 0);
 
 	WT_ERR(__wt_calloc_def(
-	    session, 1U << huffman->max_depth, &huffman->code2symbol));
+	    session, (size_t)1U << huffman->max_depth, &huffman->code2symbol));
 	make_table(session, huffman->code2symbol,
 	    huffman->max_depth, huffman->codes, huffman->numSymbols);
 

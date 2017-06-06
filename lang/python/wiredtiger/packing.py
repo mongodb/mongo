@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2016 MongoDB, Inc.
+# Public Domain 2014-2017 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -94,6 +94,9 @@ def unpack(fmt, s):
                 elif f == 'S':
                     size = s.find('\0')
                 elif f == 'u' and offset == len(fmt) - 1:
+                    # A WT_ITEM with a NULL data field will be appear as None.
+                    if s == None:
+                        s = ''
                     size = len(s)
                 else:
                     # Note: 'U' is used internally, and may be exposed to us.
@@ -169,7 +172,7 @@ def pack(fmt, *values):
                 result += val[:l]
             if f == 'S' and not havesize:
                 result += '\0'
-            elif size > l:
+            elif size > l and havesize:
                 result += '\0' * (size - l)
         elif f in 't':
             # bit type, size is number of bits

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -242,8 +242,10 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
 	memset(percentile, 0, sizeof(percentile));
 	WT_EXT_FOREACH(ext, el->off)
 		for (i = 0; i < ext->size / 512; ++i) {
-			++decile[((ext->off + i * 512) * 10) / size];
-			++percentile[((ext->off + i * 512) * 100) / size];
+			++decile[
+			    ((ext->off + (wt_off_t)i * 512) * 10) / size];
+			++percentile[
+			    ((ext->off + (wt_off_t)i * 512) * 100) / size];
 		}
 
 #ifdef __VERBOSE_OUTPUT_PERCENTILE

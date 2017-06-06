@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -22,6 +22,7 @@ hazard_grow(WT_SESSION_IMPL *session)
 	WT_HAZARD *nhazard;
 	size_t size;
 	void *ohazard;
+	uint64_t hazard_gen;
 
 	/*
 	 * Allocate a new, larger hazard pointer array and copy the contents of
@@ -40,16 +41,21 @@ hazard_grow(WT_SESSION_IMPL *session)
 	ohazard = session->hazard;
 	WT_PUBLISH(session->hazard, nhazard);
 
-	__wt_spin_lock(session, &S2C(session)->api_lock);
-	__wt_conn_foc_add(session, ohazard);
-	__wt_spin_unlock(session, &S2C(session)->api_lock);
-
 	/*
 	 * Increase the size of the session's pointer array after swapping it
 	 * into place (the session's reference must be updated before eviction
 	 * can see the new size).
 	 */
 	WT_PUBLISH(session->hazard_size, (uint32_t)(size * 2));
+
+	/*
+	 * Threads using the hazard pointer array from now on will use the new
+	 * one. Increment the hazard pointer generation number, and schedule a
+	 * future free of the old memory. Ignore any failure, leak the memory.
+	 */
+	hazard_gen = __wt_gen_next(session, WT_GEN_HAZARD);
+	WT_IGNORE_RET(
+	    __wt_stash_add(session, WT_GEN_HAZARD, hazard_gen, ohazard, 0));
 
 	return (0);
 }
@@ -325,6 +331,13 @@ __wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_STAT_CONN_INCR(session, cache_hazard_checks);
 
 	/*
+	 * Hazard pointer arrays might grow and be freed underneath us; enter
+	 * the current hazard resource generation for the duration of the walk
+	 * to ensure that doesn't happen.
+	 */
+	__wt_session_gen_enter(session, WT_GEN_HAZARD);
+
+	/*
 	 * No lock is required because the session array is fixed size, but it
 	 * may contain inactive entries.  We must review any active session
 	 * that might contain a hazard pointer, so insert a read barrier after
@@ -350,12 +363,17 @@ __wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref)
 			if (hp->ref == ref) {
 				WT_STAT_CONN_INCRV(session,
 				    cache_hazard_walks, walk_cnt);
-				return (hp);
+				goto done;
 			}
 		}
 	}
 	WT_STAT_CONN_INCRV(session, cache_hazard_walks, walk_cnt);
-	return (NULL);
+	hp = NULL;
+
+done:	/* Leave the current resource generation. */
+	__wt_session_gen_leave(session, WT_GEN_HAZARD);
+
+	return (hp);
 }
 
 /*

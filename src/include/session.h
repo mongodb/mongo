@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -66,6 +66,7 @@ struct __wt_session_impl {
 					/* Session handle reference list */
 	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 	time_t last_sweep;		/* Last sweep for dead handles */
+	struct timespec last_epoch;	/* Last epoch time returned */
 
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
@@ -96,6 +97,10 @@ struct __wt_session_impl {
 	 * that lives across session close - so it is declared further down.
 	 */
 	TAILQ_HEAD(__tables, __wt_table) tables;
+
+	/* Current rwlock for callback. */
+	WT_RWLOCK *current_rwlock;
+	uint8_t current_rwticket;
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	  scratch_alloc;	/* Currently allocated */
@@ -167,25 +172,32 @@ struct __wt_session_impl {
 					/* Hashed table reference list array */
 	TAILQ_HEAD(__tables_hash, __wt_table) *tablehash;
 
-	/*
-	 * Split stash memory persists past session close because it's accessed
-	 * by threads of control other than the thread owning the session.
-	 *
-	 * Splits can "free" memory that may still be in use, and we use a
-	 * split generation number to track it, that is, the session stores a
-	 * reference to the memory and allocates a split generation; when no
-	 * session is reading from that split generation, the memory can be
-	 * freed for real.
-	 */
-	struct __wt_split_stash {
-		uint64_t    split_gen;	/* Split generation */
-		void       *p;		/* Memory, length */
-		size_t	    len;
-	} *split_stash;			/* Split stash array */
-	size_t  split_stash_cnt;	/* Array entries */
-	size_t  split_stash_alloc;	/* Allocated bytes */
+					/* Generations manager */
+#define	WT_GEN_CHECKPOINT	0	/* Checkpoint generation */
+#define	WT_GEN_EVICT		1	/* Eviction generation */
+#define	WT_GEN_HAZARD		2	/* Hazard pointer */
+#define	WT_GEN_SCHEMA		3	/* Schema version */
+#define	WT_GEN_SPLIT		4	/* Page splits */
+#define	WT_GENERATIONS		5	/* Total generation manager entries */
+	volatile uint64_t generations[WT_GENERATIONS];
 
-	uint64_t split_gen;		/* Reading split generation */
+	/*
+	 * Session memory persists past session close because it's accessed by
+	 * threads of control other than the thread owning the session. For
+	 * example, btree splits and hazard pointers can "free" memory that's
+	 * still in use. In order to eventually free it, it's stashed here with
+	 * with its generation number; when no thread is reading in generation,
+	 * the memory can be freed for real.
+	 */
+	struct __wt_session_stash {
+		struct __wt_stash {
+			void	*p;	/* Memory, length */
+			size_t	 len;
+			uint64_t gen;	/* Generation */
+		} *list;
+		size_t  cnt;		/* Array entries */
+		size_t  alloc;		/* Allocated bytes */
+	} stash[WT_GENERATIONS];
 
 	/*
 	 * Hazard pointers.

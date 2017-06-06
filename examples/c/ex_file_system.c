@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -583,13 +583,13 @@ demo_fs_size(WT_FILE_SYSTEM *file_system,
 static int
 demo_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
 {
-	DEMO_FILE_HANDLE *demo_fh;
+	DEMO_FILE_HANDLE *demo_fh, *demo_fh_tmp;
 	DEMO_FILE_SYSTEM *demo_fs;
 	int ret = 0, tret;
 
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
-	while ((demo_fh = TAILQ_FIRST(&demo_fs->fileq)) != NULL)
+	TAILQ_FOREACH_SAFE(demo_fh, &demo_fs->fileq, q, demo_fh_tmp)
 		if ((tret =
 		    demo_handle_remove(session, demo_fh)) != 0 && ret == 0)
 			ret = tret;

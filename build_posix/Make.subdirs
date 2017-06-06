@@ -1,10 +1,11 @@
 # List of sub-directories, used by makemake to create Makefile.am
 #
 # The format is:
-#   <dir> [<condition>]
+#   <dir> [<condition> ...]
 #
 # If the directory exists, it is added to AUTO_SUBDIRS.
-# If a condition is included, the subdir is made conditional via AM_CONDITIONAL
+# If condition(s) are included, the subdir is made conditional via
+# AM_CONDITIONAL.  All conditions must be true to include the directory.
 ext/collators/reverse
 ext/collators/revint
 ext/compressors/lz4 LZ4
@@ -45,4 +46,5 @@ test/syscall
 test/thread
 
 # Benchmark programs.
+bench/workgen PYTHON HAVE_CXX
 bench/wtperf

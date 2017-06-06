@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -110,8 +110,7 @@ __checkpoint_update_generation(WT_SESSION_IMPL *session)
 	if (WT_IS_METADATA(session->dhandle))
 		return;
 
-	WT_PUBLISH(btree->checkpoint_gen,
-	    S2C(session)->txn_global.checkpoint_gen);
+	WT_PUBLISH(btree->checkpoint_gen, __wt_gen(session, WT_GEN_CHECKPOINT));
 	WT_STAT_DATA_SET(session,
 	    btree_checkpoint_generation, btree->checkpoint_gen);
 }
@@ -533,7 +532,7 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session,
 	__wt_verbose(session,
 	    WT_VERB_CHECKPOINT, "time: %" PRIu64 " us, gen: %" PRIu64
 	    ": Full database checkpoint %s",
-	    msec, S2C(session)->txn_global.checkpoint_gen, msg);
+	    msec, __wt_gen(session, WT_GEN_CHECKPOINT), msg);
 
 	/* Update the timestamp so we are reporting intervals. */
 	memcpy(start, &stop, sizeof(*start));
@@ -667,7 +666,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN_ISOLATION saved_isolation;
 	void *saved_meta_next;
 	u_int i;
-	uint64_t fsync_duration_usecs;
+	uint64_t fsync_duration_usecs, generation;
 	bool failed, full, idle, logging, tracking;
 
 	conn = S2C(session);
@@ -733,9 +732,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * of the transaction table, or a thread evicting in a tree could
 	 * ignore the checkpoint's transaction.
 	 */
-	(void)__wt_atomic_addv64(&txn_global->checkpoint_gen, 1);
-	WT_STAT_CONN_SET(session,
-	    txn_checkpoint_generation, txn_global->checkpoint_gen);
+	generation = __wt_gen_next(session, WT_GEN_CHECKPOINT);
+	WT_STAT_CONN_SET(session, txn_checkpoint_generation, generation);
 
 	/* Keep track of handles acquired for locking. */
 	WT_ERR(__wt_meta_track_on(session));
@@ -945,13 +943,11 @@ __txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
 	txn_global->checkpoint_running = true;
-	WT_FULL_BARRIER();
 
 	ret = __txn_checkpoint(session, cfg);
 
 	WT_STAT_CONN_SET(session, txn_checkpoint_running, 0);
 	txn_global->checkpoint_running = false;
-	WT_FULL_BARRIER();
 
 	return (ret);
 }
@@ -1448,8 +1444,7 @@ __checkpoint_tree(
 	 * the checkpoint start, which might not be included, will re-set the
 	 * modified flag.  The "unless reconciliation skips updates" problem is
 	 * handled in the reconciliation code: if reconciliation skips updates,
-	 * it sets the modified flag itself.  Use a full barrier so we get the
-	 * store done quickly, this isn't a performance path.
+	 * it sets the modified flag itself.
 	 */
 	btree->modified = false;
 	WT_FULL_BARRIER();
@@ -1527,7 +1522,7 @@ err:	/*
 	 */
 	if (ret != 0) {
 		btree->modified = true;
-		S2C(session)->modified = true;
+		conn->modified = true;
 	}
 
 	__wt_meta_ckptlist_free(session, &btree->ckpt);
@@ -1549,8 +1544,8 @@ __checkpoint_presync(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
-	WT_ASSERT(session, btree->checkpoint_gen ==
-	    S2C(session)->txn_global.checkpoint_gen);
+	WT_ASSERT(session,
+	    btree->checkpoint_gen == __wt_gen(session, WT_GEN_CHECKPOINT));
 	btree->evict_walk_period = btree->evict_walk_saved;
 	return (0);
 }

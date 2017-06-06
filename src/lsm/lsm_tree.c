@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -134,11 +134,12 @@ int
 __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	WT_LSM_TREE *lsm_tree;
+	WT_LSM_TREE *lsm_tree, *lsm_tree_tmp;
 
 	/* We are shutting down: the handle list lock isn't required. */
 
-	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
+	WT_TAILQ_SAFE_REMOVE_BEGIN(lsm_tree,
+	    &S2C(session)->lsmqh, q, lsm_tree_tmp) {
 		/*
 		 * Tree close assumes that we have a reference to the tree
 		 * so it can tell when it's safe to do the close. We could
@@ -149,7 +150,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
 		__lsm_tree_close(session, lsm_tree, true);
 		WT_TRET(__lsm_tree_discard(session, lsm_tree, true));
-	}
+	} WT_TAILQ_SAFE_REMOVE_END
 
 	return (ret);
 }
@@ -471,7 +472,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_one(session, &lsm_tree));
-	__wt_rwlock_init(session, &lsm_tree->rwlock);
+	WT_ERR(__wt_rwlock_init(session, &lsm_tree->rwlock));
 
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 
@@ -499,7 +500,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	__wt_epoch(session, &lsm_tree->last_flush_ts);
 
 	/* Now the tree is setup, make it visible to others. */
-	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
+	TAILQ_INSERT_HEAD(&conn->lsmqh, lsm_tree, q);
 	if (!exclusive)
 		lsm_tree->active = true;
 	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
@@ -767,13 +768,13 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree, NULL));
 	lsm_tree->need_switch = false;
-	++lsm_tree->dsk_gen;
-
 	lsm_tree->modified = true;
+
 	/*
 	 * Ensure the updated disk generation is visible to all other threads
 	 * before updating the transaction ID.
 	 */
+	++lsm_tree->dsk_gen;
 	WT_FULL_BARRIER();
 
 	/*

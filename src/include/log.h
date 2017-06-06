@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -130,7 +130,7 @@ union __wt_lsn {
 #define	WT_LOG_SLOT_FLAGS(state)	((state) & WT_LOG_SLOT_MASK_ON)
 #define	WT_LOG_SLOT_JOINED(state)	(((state) & WT_LOG_SLOT_MASK_OFF) >> 32)
 #define	WT_LOG_SLOT_JOINED_BUFFERED(state)				\
-    (WT_LOG_SLOT_JOINED(state) &			\
+    (WT_LOG_SLOT_JOINED(state) &					\
     (WT_LOG_SLOT_UNBUFFERED - 1))
 #define	WT_LOG_SLOT_JOIN_REL(j, r, s)	(((j) << 32) + (r) + (s))
 #define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))

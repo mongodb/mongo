@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
+ * Public Domain 2014-2017 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -28,7 +28,7 @@
 #include "test_util.h"
 
 #define	KEY	"key"
-#define	VALUE	"value"
+#define	VALUE	"value,value,value"
 
 static int ignore_errors;
 
@@ -63,46 +63,55 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 {
 	struct {
 		const char *op;
-		enum { INSERT, SEARCH, SEARCH_NEAR,
+		enum { INSERT, MODIFY, SEARCH, SEARCH_NEAR,
 		    REMOVE, REMOVE_POS, RESERVE, UPDATE } func;
 		const char *config;
 	} *op, ops[] = {
 		/*
-		 * The ops order is fixed and shouldn't change, that is, insert
-		 * has to happen first so search, update and remove operations
-		 * are possible, and remove has to be last.
+		 * The ops order is specific: insert has to happen first so
+		 * other operations are possible, and remove has to be last.
 		 */
 		{ "insert", INSERT, NULL, },
 		{ "search", SEARCH, NULL, },
 		{ "search", SEARCH_NEAR, NULL, },
-#if 0
 		{ "reserve", RESERVE, NULL, },
-#endif
+		{ "insert", MODIFY, NULL, },
 		{ "update", UPDATE, NULL, },
 		{ "remove", REMOVE, NULL, },
 		{ "remove", REMOVE_POS, NULL, },
 		{ NULL, INSERT, NULL }
 	};
 	WT_CURSOR *cursor;
+#define	MODIFY_ENTRIES	2
+	WT_MODIFY entries[MODIFY_ENTRIES];
+	WT_ITEM vu;
 	uint64_t keyr;
-	const char *key, *value;
+	const char *key, *vs;
 	char keybuf[100], valuebuf[100];
 	int exact;
-	bool recno;
+	bool recno, vstring;
 
 	/* Reserve requires a running transaction. */
 	testutil_check(session->begin_transaction(session, NULL));
 
 	cursor = NULL;
 	for (op = ops; op->op != NULL; op++) {
-		key = value = NULL;
+		key = vs = NULL;
+		memset(&vu, 0, sizeof(vu));
 
 		/* Open a cursor. */
 		if (cursor != NULL)
 			testutil_check(cursor->close(cursor));
 		testutil_check(session->open_cursor(
 		    session, uri, NULL, op->config, &cursor));
+
+		/* Operations change based on the key/value formats. */
 		recno = strcmp(cursor->key_format, "r") == 0;
+		vstring = strcmp(cursor->value_format, "S") == 0;
+
+		/* Modify is only possible with "item" values. */
+		if (vstring && op->func == MODIFY)
+			continue;
 
 		/*
 		 * Set up application buffers so we can detect overwrites
@@ -116,7 +125,12 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 			cursor->set_key(cursor, keybuf);
 		}
 		strcpy(valuebuf, VALUE);
-		cursor->set_value(cursor, valuebuf);
+		if (vstring)
+			cursor->set_value(cursor, valuebuf);
+		else {
+			vu.size = strlen(vu.data = valuebuf);
+			cursor->set_value(cursor, &vu);
+		}
 
 		/*
 		 * The application must keep key and value memory valid until
@@ -128,6 +142,20 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 		switch (op->func) {
 		case INSERT:
 			testutil_check(cursor->insert(cursor));
+			break;
+		case MODIFY:
+			/* Modify, but don't really change anything. */
+			entries[0].data.data = &VALUE[0];
+			entries[0].data.size = 2;
+			entries[0].offset = 0;
+			entries[0].size = 2;
+			entries[1].data.data = &VALUE[3];
+			entries[1].data.size = 5;
+			entries[1].offset = 3;
+			entries[1].size = 5;
+
+			testutil_check(
+			    cursor->modify(cursor, entries, MODIFY_ENTRIES));
 			break;
 		case SEARCH:
 			testutil_check(cursor->search(cursor));
@@ -148,9 +176,7 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 			testutil_check(cursor->remove(cursor));
 			break;
 		case RESERVE:
-#if 0
 			testutil_check(cursor->reserve(cursor));
-#endif
 			break;
 		case UPDATE:
 			testutil_check(cursor->update(cursor));
@@ -184,7 +210,12 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 			else
 				testutil_assert(
 				    cursor->get_key(cursor, &key) != 0);
-			testutil_assert(cursor->get_value(cursor, &value) != 0);
+			if (vstring)
+				testutil_assert(
+				    cursor->get_value(cursor, &vs) != 0);
+			else
+				testutil_assert(
+				    cursor->get_value(cursor, &vu) != 0);
 			testutil_assert(ignore_errors == 0);
 			break;
 		case REMOVE_POS:
@@ -205,16 +236,22 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 				testutil_assert(strcmp(key, KEY) == 0);
 			}
 			ignore_errors = 1;
-			testutil_assert(cursor->get_value(cursor, &value) != 0);
+			if (vstring)
+				testutil_assert(
+				    cursor->get_value(cursor, &vs) != 0);
+			else
+				testutil_assert(
+				    cursor->get_value(cursor, &vu) != 0);
 			testutil_assert(ignore_errors == 0);
 			break;
+		case MODIFY:
 		case RESERVE:
 		case SEARCH:
 		case SEARCH_NEAR:
 		case UPDATE:
 			/*
-			 * Reserve, search, search-near and update position the
-			 * cursor and have both a key and value.
+			 * Modify, reserve, search, search-near and update all
+			 * position the cursor and have both a key and value.
 			 *
 			 * Any key/value should not reference application
 			 * memory.
@@ -229,9 +266,19 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 				testutil_assert(key != keybuf);
 				testutil_assert(strcmp(key, KEY) == 0);
 			}
-			testutil_assert(cursor->get_value(cursor, &value) == 0);
-			testutil_assert(value != valuebuf);
-			testutil_assert(strcmp(value, VALUE) == 0);
+			if (vstring) {
+				testutil_assert(
+				    cursor->get_value(cursor, &vs) == 0);
+				testutil_assert(vs != valuebuf);
+				testutil_assert(strcmp(vs, VALUE) == 0);
+			} else {
+				testutil_assert(
+				    cursor->get_value(cursor, &vu) == 0);
+				testutil_assert(vu.data != valuebuf);
+				testutil_assert(vu.size == strlen(VALUE));
+				testutil_assert(
+				    memcmp(vu.data, VALUE, strlen(VALUE)) == 0);
+			}
 			break;
 		}
 
@@ -243,9 +290,16 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
 			if (recno)
 				cursor->set_key(cursor, (uint64_t)1);
 			else {
-				cursor->set_key(cursor, KEY);
+				strcpy(keybuf, KEY);
+				cursor->set_key(cursor, keybuf);
 			}
-			cursor->set_value(cursor, VALUE);
+			strcpy(valuebuf, VALUE);
+			if (vstring)
+				cursor->set_value(cursor, valuebuf);
+			else {
+				vu.size = strlen(vu.data = valuebuf);
+				cursor->set_value(cursor, &vu);
+			}
 			testutil_check(cursor->insert(cursor));
 		}
 	}
@@ -276,11 +330,19 @@ main(int argc, char *argv[])
 	    wiredtiger_open(opts->home, &event_handler, "create", &opts->conn));
 
 	run(opts->conn, "file:file.SS", "key_format=S,value_format=S");
+	run(opts->conn, "file:file.Su", "key_format=S,value_format=u");
 	run(opts->conn, "file:file.rS", "key_format=r,value_format=S");
+	run(opts->conn, "file:file.ru", "key_format=r,value_format=u");
+
 	run(opts->conn, "lsm:lsm.SS", "key_format=S,value_format=S");
+	run(opts->conn, "lsm:lsm.Su", "key_format=S,value_format=S");
 	run(opts->conn, "lsm:lsm.rS", "key_format=r,value_format=S");
+	run(opts->conn, "lsm:lsm.ru", "key_format=r,value_format=S");
+
 	run(opts->conn, "table:table.SS", "key_format=S,value_format=S");
+	run(opts->conn, "table:table.Su", "key_format=S,value_format=u");
 	run(opts->conn, "table:table.rS", "key_format=r,value_format=S");
+	run(opts->conn, "table:table.ru", "key_format=r,value_format=u");
 
 	testutil_cleanup(opts);
 

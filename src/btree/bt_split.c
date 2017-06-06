@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -31,143 +31,6 @@ typedef enum {
 } WT_SPLIT_ERROR_PHASE;
 
 /*
- * __split_oldest_gen --
- *	Calculate the oldest active split generation.
- */
-static uint64_t
-__split_oldest_gen(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *s;
-	uint64_t gen, oldest;
-	u_int i, session_cnt;
-
-	conn = S2C(session);
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (i = 0, s = conn->sessions, oldest = conn->split_gen + 1;
-	    i < session_cnt;
-	    i++, s++)
-		if (((gen = s->split_gen) != 0) && gen < oldest)
-			oldest = gen;
-
-	return (oldest);
-}
-
-/*
- * __wt_split_obsolete --
- *	Check if it is safe to free / evict based on split generation.
- */
-bool
-__wt_split_obsolete(WT_SESSION_IMPL *session, uint64_t split_gen)
-{
-	return (split_gen < __split_oldest_gen(session));
-}
-
-/*
- * __split_stash_add --
- *	Add a new entry into the session's split stash list.
- */
-static int
-__split_stash_add(
-    WT_SESSION_IMPL *session, uint64_t split_gen, void *p, size_t len)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SPLIT_STASH *stash;
-
-	WT_ASSERT(session, p != NULL);
-
-	conn = S2C(session);
-
-	/* Grow the list as necessary. */
-	WT_RET(__wt_realloc_def(session, &session->split_stash_alloc,
-	    session->split_stash_cnt + 1, &session->split_stash));
-
-	stash = session->split_stash + session->split_stash_cnt++;
-	stash->split_gen = split_gen;
-	stash->p = p;
-	stash->len = len;
-
-	(void)__wt_atomic_add64(&conn->split_stashed_bytes, len);
-	(void)__wt_atomic_add64(&conn->split_stashed_objects, 1);
-
-	/* See if we can free any previous entries. */
-	if (session->split_stash_cnt > 1)
-		__wt_split_stash_discard(session);
-
-	return (0);
-}
-
-/*
- * __wt_split_stash_discard --
- *	Discard any memory from a session's split stash that we can.
- */
-void
-__wt_split_stash_discard(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SPLIT_STASH *stash;
-	uint64_t oldest;
-	size_t i;
-
-	conn = S2C(session);
-
-	/* Get the oldest split generation. */
-	oldest = __split_oldest_gen(session);
-
-	for (i = 0, stash = session->split_stash;
-	    i < session->split_stash_cnt;
-	    ++i, ++stash) {
-		if (stash->p == NULL)
-			continue;
-		if (stash->split_gen >= oldest)
-			break;
-		/*
-		 * It's a bad thing if another thread is in this memory after
-		 * we free it, make sure nothing good happens to that thread.
-		 */
-		(void)__wt_atomic_sub64(&conn->split_stashed_bytes, stash->len);
-		(void)__wt_atomic_sub64(&conn->split_stashed_objects, 1);
-		__wt_overwrite_and_free_len(session, stash->p, stash->len);
-	}
-
-	/*
-	 * If there are enough free slots at the beginning of the list, shuffle
-	 * everything down.
-	 */
-	if (i > 100 || i == session->split_stash_cnt)
-		if ((session->split_stash_cnt -= i) > 0)
-			memmove(session->split_stash, stash,
-			    session->split_stash_cnt * sizeof(*stash));
-}
-
-/*
- * __wt_split_stash_discard_all --
- *	Discard all memory from a session's split stash.
- */
-void
-__wt_split_stash_discard_all(
-    WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session)
-{
-	WT_SPLIT_STASH *stash;
-	size_t i;
-
-	/*
-	 * This function is called during WT_CONNECTION.close to discard any
-	 * memory that remains.  For that reason, we take two WT_SESSION_IMPL
-	 * arguments: session_safe is still linked to the WT_CONNECTION and
-	 * can be safely used for calls to other WiredTiger functions, while
-	 * session is the WT_SESSION_IMPL we're cleaning up.
-	 */
-	for (i = 0, stash = session->split_stash;
-	    i < session->split_stash_cnt;
-	    ++i, ++stash)
-		__wt_free(session_safe, stash->p);
-
-	__wt_free(session_safe, session->split_stash);
-	session->split_stash_cnt = session->split_stash_alloc = 0;
-}
-
-/*
  * __split_safe_free --
  *	Free a buffer if we can be sure no thread is accessing it, or schedule
  *	it to be freed otherwise.
@@ -177,13 +40,14 @@ __split_safe_free(WT_SESSION_IMPL *session,
     uint64_t split_gen, bool exclusive, void *p, size_t s)
 {
 	/* We should only call safe free if we aren't pinning the memory. */
-	WT_ASSERT(session, session->split_gen != split_gen);
+	WT_ASSERT(session,
+	    __wt_session_gen(session, WT_GEN_SPLIT) != split_gen);
 
 	/*
 	 * We have swapped something in a page: if we don't have exclusive
 	 * access, check whether there are other threads in the same tree.
 	 */
-	if (!exclusive && __split_oldest_gen(session) > split_gen)
+	if (!exclusive && __wt_gen_oldest(session, WT_GEN_SPLIT) > split_gen)
 		exclusive = true;
 
 	if (exclusive) {
@@ -191,7 +55,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	return (__split_stash_add(session, split_gen, p, s));
+	return (__wt_stash_add(session, WT_GEN_SPLIT, split_gen, p, s));
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -645,7 +509,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	 * generation to block splits in newly created pages, so get one.
 	 */
 	WT_ENTER_PAGE_INDEX(session);
-	__split_ref_prepare(session, alloc_index, session->split_gen, false);
+	__split_ref_prepare(session, alloc_index,
+	    __wt_session_gen(session, WT_GEN_SPLIT), false);
 
 	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
@@ -662,7 +527,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	 * after the new index is swapped into place in order to know that no
 	 * readers are looking at the old index.
 	 */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
 	root->pg_intl_split_gen = split_gen;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -848,7 +713,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * the new index is swapped into place in order to know that no readers
 	 * are looking at the old index.
 	 */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
 	parent->pg_intl_split_gen = split_gen;
 
 	/*
@@ -1173,7 +1038,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * generation to block splits in newly created pages, so get one.
 	 */
 	WT_ENTER_PAGE_INDEX(session);
-	__split_ref_prepare(session, alloc_index, session->split_gen, true);
+	__split_ref_prepare(session, alloc_index,
+	    __wt_session_gen(session, WT_GEN_SPLIT), true);
 
 	/* Split into the parent. */
 	if ((ret = __split_parent(session, page_ref, alloc_index->index,
@@ -1194,7 +1060,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * after the new index is swapped into place in order to know that no
 	 * readers are looking at the old index.
 	 */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	split_gen = __wt_gen_next(session, WT_GEN_SPLIT);
 	page->pg_intl_split_gen = split_gen;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -1300,13 +1166,19 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	for (;;) {
 		parent = ref->home;
 
+		/*
+		 * The page will be marked dirty, and we can only lock a page
+		 * with a modify structure.
+		 */
+		WT_RET(__wt_page_modify_init(session, parent));
+
 		if (trylock)
-			WT_RET(__wt_try_writelock(session, &parent->page_lock));
+			WT_RET(WT_PAGE_TRYLOCK(session, parent));
 		else
-			__wt_writelock(session, &parent->page_lock);
+			WT_PAGE_LOCK(session, parent);
 		if (parent == ref->home)
 			break;
-		__wt_writeunlock(session, &parent->page_lock);
+		WT_PAGE_UNLOCK(session, parent);
 	}
 
 	/*
@@ -1329,7 +1201,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	*parentp = parent;
 	return (0);
 
-err:	__wt_writeunlock(session, &parent->page_lock);
+err:	WT_PAGE_UNLOCK(session, parent);
 	return (ret);
 }
 
@@ -1345,7 +1217,7 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 	if (hazard)
 		ret = __wt_hazard_clear(session, parent->pg_intl_parent_ref);
 
-	__wt_writeunlock(session, &parent->page_lock);
+	WT_PAGE_UNLOCK(session, parent);
 	return (ret);
 }
 
@@ -1558,8 +1430,8 @@ __split_multi_inmem(
 			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_ERR(__wt_col_modify(
-			    session, &cbt, recno, NULL, upd, false));
+			WT_ERR(__wt_col_modify(session,
+			    &cbt, recno, NULL, upd, WT_UPDATE_STANDARD, true));
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
@@ -1580,8 +1452,8 @@ __split_multi_inmem(
 			WT_ERR(__wt_row_search(session, key, ref, &cbt, true));
 
 			/* Apply the modification. */
-			WT_ERR(__wt_row_modify(
-			    session, &cbt, key, NULL, upd, false));
+			WT_ERR(__wt_row_modify(session, &cbt,
+			    key, NULL, upd, WT_UPDATE_STANDARD, true));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -147,9 +147,13 @@ __wt_key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 
 	/*
-	 * We may already have an internal key, in which case the cursor may
-	 * not be set up to get another copy (for example, when we rely on a
-	 * search-function result).
+	 * We may already have an internal key and the cursor may not be set up
+	 * to get another copy, so we have to leave it alone. Consider a cursor
+	 * search followed by an update: the update doesn't repeat the search,
+	 * it simply updates the currently referenced key's value. We will end
+	 * up here with the correct internal key, but we can't "return" the key
+	 * again even if we wanted to do the additional work, the cursor isn't
+	 * set up for that because we didn't just complete a search.
 	 */
 	F_CLR(cursor, WT_CURSTD_KEY_EXT);
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_INT)) {

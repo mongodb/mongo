@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -9,6 +9,7 @@
 #define	WT_PTRDIFFT_FMT	"td"			/* ptrdiff_t format string */
 #define	WT_SIZET_FMT	"zu"			/* size_t format string */
 
+/* Lint-specific attributes. */
 #define	WT_PACKED_STRUCT_BEGIN(name)					\
 	struct name {
 #define	WT_PACKED_STRUCT_END						\

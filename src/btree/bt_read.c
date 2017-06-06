@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2017 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -90,7 +90,8 @@ __col_instantiate(WT_SESSION_IMPL *session,
 {
 	/* Search the page and add updates. */
 	WT_RET(__wt_col_search(session, recno, ref, cbt));
-	WT_RET(__wt_col_modify(session, cbt, recno, NULL, upd, false));
+	WT_RET(__wt_col_modify(
+	    session, cbt, recno, NULL, upd, WT_UPDATE_STANDARD, false));
 	return (0);
 }
 
@@ -104,7 +105,8 @@ __row_instantiate(WT_SESSION_IMPL *session,
 {
 	/* Search the page and add updates. */
 	WT_RET(__wt_row_search(session, key, ref, cbt, true));
-	WT_RET(__wt_row_modify(session, cbt, key, NULL, upd, false));
+	WT_RET(__wt_row_modify(
+	    session, cbt, key, NULL, upd, WT_UPDATE_STANDARD, false));
 	return (0);
 }
 
@@ -127,7 +129,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, total_incr;
 	uint64_t current_recno, las_counter, las_txnid, recno, upd_txnid;
-	uint32_t las_id, upd_size, session_flags;
+	uint32_t las_id, session_flags;
+	uint8_t upd_type;
 	int exact;
 	const uint8_t *p;
 
@@ -188,10 +191,10 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 
 		/* Allocate the WT_UPDATE structure. */
 		WT_ERR(cursor->get_value(
-		    cursor, &upd_txnid, &upd_size, las_value));
-		WT_ERR(__wt_update_alloc(session,
-		    (upd_size == WT_UPDATE_DELETED_VALUE) ? NULL : las_value,
-		    &upd, &incr));
+		    cursor, &upd_txnid, &upd_type, las_value));
+		WT_ERR(__wt_update_alloc(session, las_value, &upd, &incr,
+		    upd_type == WT_UPDATE_DELETED ?
+		    WT_UPDATE_DELETED : WT_UPDATE_STANDARD));
 		total_incr += incr;
 		upd->txnid = upd_txnid;
 
@@ -586,15 +589,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * if the page qualifies for forced eviction and update
 			 * the page's generation number. If eviction isn't being
 			 * done on this file, we're done.
-			 * In-memory split of large pages is allowed while
-			 * no_eviction is set on btree, whereas reconciliation
-			 * is not allowed.
 			 */
 			if (LF_ISSET(WT_READ_NO_EVICT) ||
 			    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
-			    btree->lsm_primary ||
-			    (btree->evict_disabled > 0 &&
-			    !F_ISSET(btree, WT_BTREE_ALLOW_SPLITS)))
+			    btree->evict_disabled > 0 || btree->lsm_primary)
 				goto skip_evict;
 
 			/*

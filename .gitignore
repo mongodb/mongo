@@ -62,6 +62,11 @@ tags
 WT_HOME/
 WT_TEST/
 
+# Bench/workgen
+/bench/workgen/_workgen.so
+/bench/workgen/workgen/workgen.py
+/bench/workgen/workgen_wrap.cxx
+
 # Python
 /lang/python/_wiredtiger.so
 /lang/python/wiredtiger.py

@@ -179,6 +179,7 @@ src/session/session_salvage.c
 src/support/cond_auto.c
 src/support/crypto.c
 src/support/err.c
+src/support/generation.c
 src/support/global.c
 src/support/hash_city.c
 src/support/hash_fnv.c
