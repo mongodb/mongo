@@ -53,7 +53,9 @@ const Minutes kMaxConnectionAge(30);
 
 ConnectionPool::ConnectionPool(int messagingPortTags,
                                std::unique_ptr<executor::NetworkConnectionHook> hook)
-    : _messagingPortTags(messagingPortTags), _hook(std::move(hook)) {}
+    : _messagingPortTags(messagingPortTags),
+      _lastCleanUpTime(Date_t::now()),
+      _hook(std::move(hook)) {}
 
 ConnectionPool::ConnectionPool(int messagingPortTags)
     : ConnectionPool(messagingPortTags, nullptr) {}
