@@ -2069,7 +2069,8 @@ Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& 
 Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCtx,
                                                           const ReplSetReconfigArgs& args,
                                                           BSONObjBuilder* resultObj) {
-    log() << "replSetReconfig admin command received from client";
+    log() << "replSetReconfig admin command received from client; new config: "
+          << args.newConfigObj;
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -2121,6 +2122,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     if (args.force) {
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
     }
+
     Status status = newConfig.initialize(
         newConfigObj, oldConfig.getProtocolVersion() == 1, oldConfig.getReplicaSetId());
     if (!status.isOK()) {
