@@ -7,6 +7,9 @@
  * - A user with the inprog privilege can see all ops.
  * - Non-local readConcerns are rejected.
  * - Collation rules are respected.
+ *
+ * This test requires replica set configuration and user credentials to persist across a restart.
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
