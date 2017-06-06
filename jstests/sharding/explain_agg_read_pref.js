@@ -85,7 +85,7 @@
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
                     "command.explain.comment": comment,
-                    "command.explain.$queryOptions.$readPreference.mode": pref,
+                    "command.$readPreference.mode": pref == 'primary' ? null : pref,
                     "exception": {"$exists": false}
                 });
 
@@ -95,8 +95,15 @@
                 //
                 comment = name + "_explain_wrapped_agg";
                 assert.commandWorked(mongosDB.runCommand({
-                    explain: {aggregate: "coll", pipeline: [], comment: comment, cursor: {}},
-                    $queryOptions: {$readPreference: {mode: pref, tags: tagSets}}
+                    $query: {
+                        explain: {
+                            aggregate: "coll",
+                            pipeline: [],
+                            comment: comment,
+                            cursor: {},
+                        }
+                    },
+                    $readPreference: {mode: pref, tags: tagSets}
                 }));
 
                 // Look for an operation without an exception, since the shard throws a stale config
@@ -106,7 +113,7 @@
                     "ns": coll.getFullName(),
                     "command.explain.aggregate": coll.getName(),
                     "command.explain.comment": comment,
-                    "command.explain.$queryOptions.$readPreference.mode": pref,
+                    "command.$readPreference.mode": pref == 'primary' ? null : pref,
                     "exception": {"$exists": false}
                 });
             });

@@ -80,19 +80,7 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        // Add the read preference to the aggregate command in the "unwrapped" format that
-        // runAggregate() expects: {aggregate: ..., $queryOptions: {$readPreference: ...}}.
-        const auto& readPref = ReadPreferenceSetting::get(opCtx);
-        BSONObjBuilder aggCmdBuilder;
-        aggCmdBuilder.appendElements(cmdObj);
-        if (readPref.canRunOnSecondary()) {
-            auto queryOptionsBuilder =
-                BSONObjBuilder(aggCmdBuilder.subobjStart(QueryRequest::kUnwrappedReadPrefField));
-            readPref.toContainingBSON(&queryOptionsBuilder);
-        }
-        BSONObj aggCmd = aggCmdBuilder.obj();
-
-        return _runAggCommand(opCtx, dbname, aggCmd, verbosity, out);
+        return _runAggCommand(opCtx, dbname, cmdObj, verbosity, out);
     }
 
 private:
