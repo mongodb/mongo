@@ -34,6 +34,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
@@ -190,6 +191,19 @@ public:
     void addPrivileges(const PrivilegeVector& privileges);
 
     /**
+     * Replaces any existing authentication restrictions with "restrictions".
+     */
+    void setRestrictions(RestrictionDocuments restrictions) &;
+
+    /**
+     * Gets any set authentication restrictions.
+     */
+    const RestrictionDocuments& getRestrictions() const& noexcept {
+        return _restrictions;
+    }
+    void getRestrictions() && = delete;
+
+    /**
      * Marks this instance of the User object as invalid, most likely because information about
      * the user has been updated and needs to be reloaded from the AuthorizationManager.
      *
@@ -234,6 +248,9 @@ private:
 
     // Credential information.
     CredentialData _credentials;
+
+    // Restrictions which must be met by a Client in order to authenticate as this user.
+    RestrictionDocuments _restrictions;
 
     // _refCount and _isInvalidated are modified exclusively by the AuthorizationManager
     // _isInvalidated can be read by any consumer of User, but _refCount can only be

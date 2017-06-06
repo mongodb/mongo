@@ -153,6 +153,10 @@ void User::addPrivileges(const PrivilegeVector& privileges) {
     }
 }
 
+void User::setRestrictions(RestrictionDocuments restrictions)& {
+    _restrictions = std::move(restrictions);
+}
+
 void User::invalidate() {
     _isValid.store(0);
 }
