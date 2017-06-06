@@ -95,3 +95,7 @@ structs:
                 type: objectid
                 optional: true
                 description: "An optional _id field for tests that manually insert oplog entries"
+            wt:
+                type: date
+                optional: true # Optional for older than 3.6 releases
+                description: "A wallclock time with MS resolution"

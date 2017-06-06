@@ -257,7 +257,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             const BSONObj* o2,
                             bool fromMigrate,
                             OpTime optime,
-                            long long hashNew) {
+                            long long hashNew,
+                            Date_t wallTime) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -273,6 +274,10 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         b.appendBool("fromMigrate", true);
     if (o2)
         b.append("o2", *o2);
+
+    if (wallTime != Date_t{}) {
+        b.appendDate("wt", wallTime);
+    }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
@@ -388,8 +393,9 @@ OpTime logOp(OperationContext* opCtx,
     auto replMode = replCoord->getReplicationMode();
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
-    auto writer =
-        _logOpWriter(opCtx, opstr, nss, uuid, obj, o2, fromMigrate, slot.opTime, slot.hash);
+
+    auto writer = _logOpWriter(
+        opCtx, opstr, nss, uuid, obj, o2, fromMigrate, slot.opTime, slot.hash, Date_t::now());
     const DocWriter* basePtr = &writer;
     _logOpsInner(opCtx, nss, &basePtr, 1, oplog, replMode, slot.opTime);
     return slot.opTime;
@@ -418,9 +424,18 @@ void logOps(OperationContext* opCtx,
     std::unique_ptr<OplogSlot[]> slots(new OplogSlot[count]);
     auto replMode = replCoord->getReplicationMode();
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
+    auto wallTime = Date_t::now();
     for (size_t i = 0; i < count; i++) {
-        writers.emplace_back(_logOpWriter(
-            opCtx, opstr, nss, uuid, begin[i], NULL, fromMigrate, slots[i].opTime, slots[i].hash));
+        writers.emplace_back(_logOpWriter(opCtx,
+                                          opstr,
+                                          nss,
+                                          uuid,
+                                          begin[i],
+                                          NULL,
+                                          fromMigrate,
+                                          slots[i].opTime,
+                                          slots[i].hash,
+                                          wallTime));
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);
