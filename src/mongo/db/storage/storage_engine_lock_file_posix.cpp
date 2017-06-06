@@ -151,9 +151,14 @@ Status StorageEngineLockFile::open() {
                               << _dbpath);
         }
         return Status(ErrorCodes::DBPathInUse,
-                      str::stream() << "Unable to create/open lock file: " << _filespec << ' '
+                      str::stream() << "Unable to create/open the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
-                                    << " Is a mongod instance already running?");
+                                    << ")."
+                                    << " Ensure the user executing mongod is the owner of the lock "
+                                       "file and has the appropriate permissions. Also make sure "
+                                       "that another mongod instance is not already running on the "
+                                    << _dbpath
+                                    << " directory");
     }
 #if !defined(__sun)
     int ret = ::flock(lockFile, LOCK_EX | LOCK_NB);
@@ -167,9 +172,12 @@ Status StorageEngineLockFile::open() {
         int errorcode = errno;
         ::close(lockFile);
         return Status(ErrorCodes::DBPathInUse,
-                      str::stream() << "Unable to lock file: " << _filespec << ' '
+                      str::stream() << "Unable to lock the lock file: " << _filespec << " ("
                                     << errnoWithDescription(errorcode)
-                                    << ". Is a mongod instance already running?");
+                                    << ")."
+                                    << " Another mongod instance is already running on the "
+                                    << _dbpath
+                                    << " directory");
     }
     _lockFileHandle->_fd = lockFile;
     return Status::OK();

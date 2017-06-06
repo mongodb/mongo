@@ -24,9 +24,9 @@
         assert(mongo2 === null);
         assert.soon(() => {
             var logContents = rawMongoProgramOutput();
-            return logContents.indexOf("Unable to lock file") > 0 ||
+            return logContents.indexOf("Unable to lock the lock file") > 0 ||
                 // Windows error message is different.
-                logContents.indexOf("Unable to create/open lock file") > 0;
+                logContents.indexOf("Unable to create/open the lock file") > 0;
         });
     } finally {
         MongoRunner.stopMongod(mongo1);
