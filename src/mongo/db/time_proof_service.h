@@ -31,14 +31,14 @@
 #include "mongo/base/status.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
 /**
- * TODO: SERVER-28127 Add key rotation to the TimeProofService
- *
  * The TimeProofService holds the key used by mongod and mongos processes to verify logical times
- * and contains the logic to generate this key, but not to store or retrieve it.
+ * and contains the logic to generate this key. As a performance optimization to avoid expensive
+ * signature generation the class also holds the cache.
  */
 class TimeProofService {
 public:
@@ -56,12 +56,38 @@ public:
     /**
      * Returns the proof matching the time argument.
      */
-    TimeProof getProof(const LogicalTime& time, const Key& key) const;
+    TimeProof getProof(LogicalTime time, const Key& key);
 
     /**
      * Verifies that the proof matches the time argument.
      */
-    Status checkProof(const LogicalTime& time, const TimeProof& proof, const Key& key) const;
+    Status checkProof(LogicalTime time, const TimeProof& proof, const Key& key);
+
+private:
+    /**
+     * Nested class to cache TimeProof. It holds proof for the greatest time allowed.
+     */
+    struct CacheEntry {
+        CacheEntry(TimeProof proof, LogicalTime time, const Key& key)
+            : _proof(std::move(proof)), _time(time), _key(key) {}
+
+        /**
+         * Returns true if it has proof for time greater or equal than the argument.
+         */
+        bool hasProof(LogicalTime time, const Key& key) const {
+            return key == _key && time <= _time;
+        }
+
+        TimeProof _proof;
+        LogicalTime _time;
+        Key _key;
+    };
+
+    // protects _cache
+    stdx::mutex _cacheMutex;
+
+    // one-entry cache
+    boost::optional<CacheEntry> _cache;
 };
 
 }  // namespace mongo

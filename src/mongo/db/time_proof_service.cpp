@@ -36,6 +36,13 @@
 
 namespace mongo {
 
+/**
+ * This value defines the range of times that match the cache. It is assumed that the cluster times
+ * are staying within the range so the range size is defined by the mask. This assumes that the
+ * implementation has a form or high 32 bit: secs low 32 bit: increment.
+ */
+const uint64_t kRangeMask = 0x0000'0000'0000'FFFF;
+
 TimeProofService::Key TimeProofService::generateRandomKey() {
     // SecureRandom only produces 64-bit numbers, so 3 is the minimum for 20 random bytes.
     const size_t kRandomNumbers = 3;
@@ -48,16 +55,24 @@ TimeProofService::Key TimeProofService::generateRandomKey() {
                                                  SHA1Block::kHashLength));
 }
 
-TimeProofService::TimeProof TimeProofService::getProof(const LogicalTime& time,
-                                                       const Key& key) const {
-    auto unsignedTimeArray = time.toUnsignedArray();
-    return SHA1Block::computeHmac(
-        key.data(), key.size(), unsignedTimeArray.data(), unsignedTimeArray.size());
+TimeProofService::TimeProof TimeProofService::getProof(LogicalTime time, const Key& key) {
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    if (_cache && _cache->hasProof(time, key)) {
+        return _cache->_proof;
+    }
+
+    auto timeCeil = LogicalTime(Timestamp(time.asTimestamp().asULL() | kRangeMask));
+    auto unsignedTimeArray = timeCeil.toUnsignedArray();
+    // update cache
+    _cache =
+        CacheEntry(SHA1Block::computeHmac(
+                       key.data(), key.size(), unsignedTimeArray.data(), unsignedTimeArray.size()),
+                   timeCeil,
+                   key);
+    return _cache->_proof;
 }
 
-Status TimeProofService::checkProof(const LogicalTime& time,
-                                    const TimeProof& proof,
-                                    const Key& key) const {
+Status TimeProofService::checkProof(LogicalTime time, const TimeProof& proof, const Key& key) {
     auto myProof = getProof(time, key);
     if (myProof != proof) {
         return Status(ErrorCodes::TimeProofMismatch, "Proof does not match the logical time");
