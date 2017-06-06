@@ -189,4 +189,12 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>
     }
     return true;
 }
+
+// get the number of CPUs available to the scheduler
+boost::optional<unsigned long> ProcessInfo::getNumAvailableCores() {
+    long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    if (nprocs)
+        return nprocs;
+    return boost::none;
 }
+}  // namespace mongo
