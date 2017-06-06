@@ -13,6 +13,8 @@ type LineFormatter interface {
 
 	// IsFinished returns true iff the formatter cannot print any more data
 	IsFinished() bool
+	// Finish() is called whem mongostat is shutting down so that the fomatter can clean up
+	Finish()
 }
 
 type limitableFormatter struct {

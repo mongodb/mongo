@@ -40,6 +40,9 @@ func init() {
 // headerInterval is the number of chunks before the header is re-printed in GridLineFormatter
 const headerInterval = 10
 
+func (glf *GridLineFormatter) Finish() {
+}
+
 // FormatLines formats the StatLines as a grid
 func (glf *GridLineFormatter) FormatLines(lines []*line.StatLine, headerKeys []string, keyNames map[string]string) string {
 	buf := &bytes.Buffer{}

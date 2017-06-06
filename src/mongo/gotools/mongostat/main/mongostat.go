@@ -229,6 +229,7 @@ func main() {
 
 	// kick it off
 	err = stat.Run()
+	formatter.Finish()
 	if err != nil {
 		log.Logvf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)

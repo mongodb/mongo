@@ -51,6 +51,8 @@ import (
 	"time"
 )
 
+//go:generate go run bson_corpus_spec_test_generator.go
+
 // --------------------------------------------------------------------------
 // The public API.
 
@@ -279,7 +281,7 @@ var nullBytes = []byte("null")
 func (id *ObjectId) UnmarshalJSON(data []byte) error {
 	if len(data) > 0 && (data[0] == '{' || data[0] == 'O') {
 		var v struct {
-			Id json.RawMessage `json:"$oid"`
+			Id   json.RawMessage `json:"$oid"`
 			Func struct {
 				Id json.RawMessage
 			} `json:"$oidFunc"`
@@ -561,6 +563,9 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 	case reflect.Map:
 		d := newDecoder(in)
 		d.readDocTo(v)
+		if d.i < len(d.in) {
+			return errors.New("Document is corrupted")
+		}
 	case reflect.Struct:
 		return errors.New("Unmarshal can't deal with struct values. Use a pointer.")
 	default:

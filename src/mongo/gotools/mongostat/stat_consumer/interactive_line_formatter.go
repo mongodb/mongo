@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/mongodb/mongo-tools/mongostat/stat_consumer/line"
 	"github.com/nsf/termbox-go"
@@ -19,6 +20,7 @@ type InteractiveLineFormatter struct {
 	table         []*column
 	row, col      int
 	showHelp      bool
+	sync.Mutex
 }
 
 func NewInteractiveLineFormatter(_ int64, includeHeader bool) LineFormatter {
@@ -30,6 +32,7 @@ func NewInteractiveLineFormatter(_ int64, includeHeader bool) LineFormatter {
 		fmt.Printf("Error setting up terminal UI: %v", err)
 		panic("could not set up interactive terminal interface")
 	}
+
 	go func() {
 		for {
 			ilf.handleEvent(termbox.PollEvent())
@@ -56,8 +59,15 @@ type cell struct {
 	header   bool
 }
 
+func (ilf *InteractiveLineFormatter) Finish() {
+	termbox.Close()
+}
+
 // FormatLines formats the StatLines as a table in the terminal ui
 func (ilf *InteractiveLineFormatter) FormatLines(lines []*line.StatLine, headerKeys []string, keyNames map[string]string) string {
+	defer ilf.update() // so that it runs after the unlock, bnecause update locks again
+	ilf.Lock()
+	defer ilf.Unlock()
 	// keep ordering consistent
 	sort.Sort(line.StatLines(lines))
 
@@ -99,14 +109,16 @@ func (ilf *InteractiveLineFormatter) FormatLines(lines []*line.StatLine, headerK
 		}
 	}
 
-	ilf.update()
 	return ""
 }
 
 func (ilf *InteractiveLineFormatter) handleEvent(ev termbox.Event) {
+	ilf.Lock()
+	defer ilf.Unlock()
 	if ev.Type != termbox.EventKey {
 		return
 	}
+
 	currSelected := ilf.table[ilf.col].cells[ilf.row].selected
 	switch {
 	case ev.Key == termbox.KeyCtrlC:
@@ -114,7 +126,6 @@ func (ilf *InteractiveLineFormatter) handleEvent(ev termbox.Event) {
 	case ev.Key == termbox.KeyEsc:
 		fallthrough
 	case ev.Ch == 'q':
-		termbox.Close()
 		// our max rowCount is set to 1; increment to exit
 		ilf.increment()
 	case ev.Key == termbox.KeyArrowRight:
@@ -190,6 +201,8 @@ func writeString(x, y int, text string, fg, bg termbox.Attribute) {
 }
 
 func (ilf *InteractiveLineFormatter) update() {
+	ilf.Lock()
+	defer ilf.Unlock()
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	x := 0
 	for i, column := range ilf.table {

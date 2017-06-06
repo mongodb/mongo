@@ -50,7 +50,7 @@ func TestParsing(t *testing.T) {
 	Convey("With a parser with a simple parser consumer", t, func() {
 		tc := &testConsumer{}
 		parser := Parser{}
-		Convey("a well formed header and body data parse correctly", func() {
+		Convey("a well formed header and body", func() {
 			buf := bytes.Buffer{}
 			b, _ := bson.Marshal(strStruct{"header"})
 			buf.Write(b)
@@ -58,15 +58,24 @@ func TestParsing(t *testing.T) {
 			buf.Write(b)
 			buf.Write(term)
 			parser.In = &buf
-			err := parser.ReadBlock(tc)
-			So(err, ShouldBeNil)
-			So(tc.eof, ShouldBeFalse)
-			So(tc.headers[0], ShouldEqual, "header")
-			So(tc.bodies[0], ShouldEqual, "body")
+			Convey("ReadBlock data parses correctly", func() {
+				err := parser.ReadBlock(tc)
+				So(err, ShouldBeNil)
+				So(tc.eof, ShouldBeFalse)
+				So(tc.headers[0], ShouldEqual, "header")
+				So(tc.bodies[0], ShouldEqual, "body")
 
-			err = parser.ReadBlock(tc)
-			So(err, ShouldEqual, io.EOF)
-			So(tc.eof, ShouldBeTrue)
+				err = parser.ReadBlock(tc)
+				So(err, ShouldEqual, io.EOF)
+			})
+			Convey("ReadAllBlock data parses correctly", func() {
+				err := parser.ReadAllBlocks(tc)
+				So(err, ShouldEqual, nil)
+				So(tc.eof, ShouldBeTrue)
+				So(tc.headers[0], ShouldEqual, "header")
+				So(tc.bodies[0], ShouldEqual, "body")
+
+			})
 		})
 		Convey("a well formed header and multiple body datas parse correctly", func() {
 			buf := bytes.Buffer{}
@@ -90,7 +99,7 @@ func TestParsing(t *testing.T) {
 
 			err = parser.ReadBlock(tc)
 			So(err, ShouldEqual, io.EOF)
-			So(tc.eof, ShouldBeTrue)
+			So(tc.eof, ShouldBeFalse)
 		})
 		Convey("an incorrect terminator should cause an error", func() {
 			buf := bytes.Buffer{}
@@ -108,13 +117,13 @@ func TestParsing(t *testing.T) {
 			parser.In = &buf
 			err := parser.ReadBlock(tc)
 			So(err, ShouldEqual, io.EOF)
-			So(tc.eof, ShouldBeTrue)
+			So(tc.eof, ShouldBeFalse)
 		})
 		Convey("an error comming from the consumer should propigate through the parser", func() {
 			tc.eof = true
 			buf := bytes.Buffer{}
 			parser.In = &buf
-			err := parser.ReadBlock(tc)
+			err := parser.ReadAllBlocks(tc)
 			So(err.Error(), ShouldContainSubstring, "double end")
 		})
 		Convey("a partial block should result in a non-EOF error", func() {

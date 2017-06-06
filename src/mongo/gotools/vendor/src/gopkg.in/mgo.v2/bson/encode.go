@@ -33,6 +33,7 @@ import (
 	"math"
 	"net/url"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -419,7 +420,9 @@ func (e *encoder) addElem(name string, v reflect.Value, minSize bool) {
 		case RegEx:
 			e.addElemName(0x0B, name)
 			e.addCStr(s.Pattern)
-			e.addCStr(s.Options)
+			options := runes(s.Options)
+			sort.Sort(options)
+			e.addCStr(string(options))
 
 		case JavaScript:
 			if s.Scope == nil {
@@ -454,6 +457,14 @@ func (e *encoder) addElem(name string, v reflect.Value, minSize bool) {
 		panic("Can't marshal " + v.Type().String() + " in a BSON document")
 	}
 }
+
+// -------------
+// Helper method for sorting regex options
+type runes []rune
+
+func (a runes) Len() int           { return len(a) }
+func (a runes) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a runes) Less(i, j int) bool { return a[i] < a[j] }
 
 // --------------------------------------------------------------------------
 // Marshaling of base types.

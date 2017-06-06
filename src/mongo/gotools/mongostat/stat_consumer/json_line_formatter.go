@@ -21,6 +21,8 @@ func NewJSONLineFormatter(maxRows int64, _ bool) LineFormatter {
 func init() {
 	FormatterConstructors["json"] = NewJSONLineFormatter
 }
+func (glf *JSONLineFormatter) Finish() {
+}
 
 // FormatLines formats the StatLines as JSON
 func (jlf *JSONLineFormatter) FormatLines(lines []*line.StatLine, headerKeys []string, keyNames map[string]string) string {

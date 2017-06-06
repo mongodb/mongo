@@ -131,7 +131,7 @@ func TestDecoder(t *testing.T) {
 		for _, c := range nlines(streamEncoded, i) {
 			// That's stupid isn't it!? nulltrue!?!? :/
 			//if c != '\n' {
-				buf.WriteRune(c)
+			buf.WriteRune(c)
 			//}
 		}
 		out := make([]interface{}, i)

@@ -132,6 +132,93 @@ func (s *S) TestURLParsing(c *C) {
 	}
 }
 
+func (s *S) TestURLReadPreference(c *C) {
+	type test struct {
+		url  string
+		mode mgo.Mode
+	}
+
+	tests := []test{
+		{"localhost:40001?readPreference=primary", mgo.Primary},
+		{"localhost:40001?readPreference=primaryPreferred", mgo.PrimaryPreferred},
+		{"localhost:40001?readPreference=secondary", mgo.Secondary},
+		{"localhost:40001?readPreference=secondaryPreferred", mgo.SecondaryPreferred},
+		{"localhost:40001?readPreference=nearest", mgo.Nearest},
+	}
+
+	for _, test := range tests {
+		info, err := mgo.ParseURL(test.url)
+		c.Assert(err, IsNil)
+		c.Assert(info.ReadPreference, NotNil)
+		c.Assert(info.ReadPreference.Mode, Equals, test.mode)
+	}
+}
+
+func (s *S) TestURLInvalidReadPreference(c *C) {
+	urls := []string{
+		"localhost:40001?readPreference=foo",
+		"localhost:40001?readPreference=primarypreferred",
+	}
+	for _, url := range urls {
+		_, err := mgo.ParseURL(url)
+		c.Assert(err, NotNil)
+	}
+}
+
+func (s *S) TestURLReadPreferenceTags(c *C) {
+	type test struct {
+		url     string
+		tagSets []bson.D
+	}
+
+	tests := []test{
+		{"localhost:40001?readPreference=secondary&readPreferenceTags=dc:ny,rack:1", []bson.D{{{"dc", "ny"}, {"rack", "1"}}}},
+		{"localhost:40001?readPreference=secondary&readPreferenceTags= dc : ny ,  rack :   1 ", []bson.D{{{"dc", "ny"}, {"rack", "1"}}}},
+		{"localhost:40001?readPreference=secondary&readPreferenceTags=dc:ny", []bson.D{{{"dc", "ny"}}}},
+		{"localhost:40001?readPreference=secondary&readPreferenceTags=rack:1&readPreferenceTags=dc:ny", []bson.D{{{"rack", "1"}}, {{"dc", "ny"}}}},
+	}
+
+	for _, test := range tests {
+		info, err := mgo.ParseURL(test.url)
+		c.Assert(err, IsNil)
+		c.Assert(info.ReadPreference, NotNil)
+		c.Assert(info.ReadPreference.TagSets, DeepEquals, test.tagSets)
+	}
+}
+
+func (s *S) TestURLInvalidReadPreferenceTags(c *C) {
+	urls := []string{
+		"localhost:40001?readPreference=secondary&readPreferenceTags=dc",
+		"localhost:40001?readPreference=secondary&readPreferenceTags=dc:ny,rack",
+		"localhost:40001?readPreference=secondary&readPreferenceTags=dc,rack",
+		"localhost:40001?readPreference=primary&readPreferenceTags=dc:ny",
+	}
+	for _, url := range urls {
+		_, err := mgo.ParseURL(url)
+		c.Assert(err, NotNil)
+	}
+}
+
+func (s *S) TestReadableServer(c *C) {
+	session, err := mgo.Dial("localhost:40011,localhost:40012,localhost:40013")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	session.SetMode(mgo.Primary, true)
+	primary_address, err := session.ReadableServer()
+	c.Assert(err, IsNil)
+	c.Assert(primary_address, Equals, "localhost:40011")
+
+	session.SetMode(mgo.Secondary, true)
+	secondary_address, err := session.ReadableServer()
+	c.Assert(err, IsNil)
+
+	valid_addresses := []string{"localhost:40012", "localhost:40013"}
+	if secondary_address != valid_addresses[0] && secondary_address != valid_addresses[1] {
+		c.Fatalf("secondary_address should be in %v, not: %v", valid_addresses, secondary_address)
+	}
+}
+
 func (s *S) TestInsertFindOne(c *C) {
 	session, err := mgo.Dial("localhost:40001")
 	c.Assert(err, IsNil)
@@ -4159,11 +4246,11 @@ func (s *S) TestBypassValidation(c *C) {
 
 func (s *S) TestVersionAtLeast(c *C) {
 	tests := [][][]int{
-		{{3,2,1}, {3,2,0}},
-		{{3,2,1}, {3,2}},
-		{{3,2,1}, {2,5,5,5}},
-		{{3,2,1}, {2,5,5}},
-		{{3,2,1}, {2,5}},
+		{{3, 2, 1}, {3, 2, 0}},
+		{{3, 2, 1}, {3, 2}},
+		{{3, 2, 1}, {2, 5, 5, 5}},
+		{{3, 2, 1}, {2, 5, 5}},
+		{{3, 2, 1}, {2, 5}},
 	}
 	for _, pair := range tests {
 		bi := mgo.BuildInfo{VersionArray: pair[0]}
@@ -4177,6 +4264,48 @@ func (s *S) TestVersionAtLeast(c *C) {
 
 		bi = mgo.BuildInfo{VersionArray: pair[1]}
 		c.Assert(bi.VersionAtLeast(pair[0]...), Equals, false)
+	}
+}
+
+func (s *S) TestCollationQueries(c *C) {
+	if !s.versionAtLeast(3, 3, 12) {
+		c.Skip("collations being released with 3.4")
+	}
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	docsToInsert := []bson.M{
+		{"text_number": "010"},
+		{"text_number": "2"},
+		{"text_number": "10"},
+	}
+
+	coll := session.DB("mydb").C("mycoll")
+	for _, doc := range docsToInsert {
+		err = coll.Insert(doc)
+		c.Assert(err, IsNil)
+	}
+
+	collation := &mgo.Collation{
+		Locale:          "en",
+		NumericOrdering: true,
+	}
+
+	err = coll.EnsureIndex(mgo.Index{
+		Key:       []string{"text_number"},
+		Collation: collation,
+	})
+	c.Assert(err, IsNil)
+
+	iter := coll.Find(nil).Sort("text_number").Collation(collation).Iter()
+	defer iter.Close()
+	for _, expectedRes := range []string{"2", "010", "10"} {
+		res := make(bson.M)
+		found := iter.Next(&res)
+		c.Assert(iter.Err(), IsNil)
+		c.Assert(found, Equals, true)
+		c.Assert(res["text_number"], Equals, expectedRes)
 	}
 }
 

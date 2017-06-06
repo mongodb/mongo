@@ -131,6 +131,9 @@ var extDecodeTests = []extDecodeTest{
 	{in: `Const1`, ptr: new(interface{}), out: const1},
 	{in: `{"c": Const1}`, ptr: new(struct{ C *const1Type }), out: struct{ C *const1Type }{const1}},
 
+	// Space after quoted key
+	{in: `{"c" : Const1}`, ptr: new(struct{ C *const1Type }), out: struct{ C *const1Type }{const1}},
+
 	// Keyed documents
 	{in: `{"v": {"$key1": 1}}`, ptr: new(interface{}), out: map[string]interface{}{"v": keyed(`{"$key1": 1}`)}},
 	{in: `{"k": {"$key1": 1}}`, ptr: new(keyedType), out: keyedType{K: keyed(`{"$key1": 1}`)}},

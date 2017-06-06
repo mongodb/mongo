@@ -6,7 +6,6 @@ command_type: system
 
 # run the same task in the previous revision if the current task fails
 stepback: true
-disable_cleanup: true
 
 mongo_tools_variables:
 
@@ -1235,7 +1234,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "latest"
+        mongo_version: "3.4"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1738,7 +1737,6 @@ buildvariants:
     excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
     resmoke_args: -j 2
     multiversion_override: "skip"
-    mongo_version_always_use_latest: true
     arch: "linux/s390x"
     edition: enterprise
     run_kinit: true
@@ -1762,7 +1760,6 @@ buildvariants:
     excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
     resmoke_args: -j 2
     multiversion_override: "skip"
-    mongo_version_always_use_latest: true
     arch: "linux/arm64"
     edition: ssl
     integration_test_args: integration

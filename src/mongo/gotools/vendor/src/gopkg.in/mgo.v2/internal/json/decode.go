@@ -773,7 +773,7 @@ func (d *decodeState) isNull(off int) bool {
 // name consumes a const or function from d.data[d.off-1:], decoding into the value v.
 // the first byte of the function name has been read already.
 func (d *decodeState) name(v reflect.Value) {
-	if d.isNull(d.off-1) {
+	if d.isNull(d.off - 1) {
 		d.literal(v)
 		return
 	}
@@ -1036,7 +1036,7 @@ func (d *decodeState) keyed() (interface{}, bool) {
 		break
 	}
 
-	name := d.data[d.off-1+start : d.off-1+end]
+	name := bytes.Trim(d.data[d.off-1+start:d.off-1+end], " \n\t")
 
 	var key []byte
 	var ok bool
@@ -1076,9 +1076,9 @@ func (d *decodeState) storeKeyed(v reflect.Value) bool {
 }
 
 var (
-	trueBytes = []byte("true")
+	trueBytes  = []byte("true")
 	falseBytes = []byte("false")
-	nullBytes = []byte("null")
+	nullBytes  = []byte("null")
 )
 
 func (d *decodeState) storeValue(v reflect.Value, from interface{}) {
