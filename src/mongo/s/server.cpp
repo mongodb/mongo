@@ -227,7 +227,7 @@ static Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
-    status = reloadShardRegistryUntilSuccess(opCtx);
+    status = waitForShardRegistryReload(opCtx);
     if (!status.isOK()) {
         return status;
     }

@@ -79,10 +79,11 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      ShardingCatalogManagerBuilder catalogManagerBuilder);
 
+
 /**
- * Tries to contact the config server and reload the shard registry and the cluster ID until it
- * succeeds or is interrupted.
- */
-Status reloadShardRegistryUntilSuccess(OperationContext* opCtx);
+ * Loads cluster ID and waits for the reload of the Shard Registry.
+*/
+
+Status waitForShardRegistryReload(OperationContext* opCtx);
 
 }  // namespace mongo

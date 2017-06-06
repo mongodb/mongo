@@ -250,7 +250,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status reloadShardRegistryUntilSuccess(OperationContext* opCtx) {
+Status waitForShardRegistryReload(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
