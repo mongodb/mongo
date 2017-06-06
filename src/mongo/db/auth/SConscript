@@ -21,6 +21,7 @@ env.Library('auth_rolename', ['role_name.cpp'],
 env.Library(
     target = 'authentication_restriction',
     source = [
+        'restriction.cpp',
         'restriction_environment.cpp',
     ],
     LIBDEPS = [
