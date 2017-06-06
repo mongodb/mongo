@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import os
 import os.path
 import shutil
+import sys
 import threading
 import unittest
 
@@ -299,9 +300,8 @@ class JSTestCase(TestCase):
         def run(self):
             try:
                 threading.Thread.run(self)
-            except Exception as e1:
-                self.err = e1
-                raise
+            except:
+                self.err = sys.exc_info()[1]
             else:
                 self.err = None
 
