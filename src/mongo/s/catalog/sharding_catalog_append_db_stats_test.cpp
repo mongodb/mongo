@@ -52,7 +52,7 @@ using ShardingCatalogClientAppendDbStatsTest = ShardingCatalogTestFixture;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
+    ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(&o);
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};

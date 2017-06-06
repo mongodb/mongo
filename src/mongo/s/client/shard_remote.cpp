@@ -156,18 +156,11 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
         metadata.writeToMetadata(&builder);
     }
 
-    if (isConfig()) {
-        if (readPref.pref == ReadPreference::PrimaryOnly) {
-            builder.appendElements(kReplMetadata);
-        } else {
-            builder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
-            builder.appendElements(kReplMetadata);
-        }
-    } else {
-        if (readPref.pref != ReadPreference::PrimaryOnly) {
-            builder.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
-        }
-    }
+    readPref.toContainingBSON(&builder);
+
+    if (isConfig())
+        builder.appendElements(kReplMetadata);
+
     return builder.obj();
 }
 

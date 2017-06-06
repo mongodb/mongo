@@ -74,7 +74,7 @@ using unittest::assertGet;
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
+    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};
@@ -738,8 +738,9 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
-        ASSERT_BSONOBJ_EQ(ReadPreferenceSetting::secondaryPreferredMetadata(),
-                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+        ASSERT_BSONOBJ_EQ(
+            ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+            rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "splitKeys"
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));

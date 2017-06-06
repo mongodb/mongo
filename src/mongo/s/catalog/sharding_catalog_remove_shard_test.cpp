@@ -66,7 +66,7 @@ static const Seconds kFutureTimeout{5};
 
 const BSONObj kReplSecondaryOkMetadata{[] {
     BSONObjBuilder o;
-    o.appendElements(ReadPreferenceSetting::secondaryPreferredMetadata());
+    ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
     o.append(rpc::kReplSetMetadataFieldName, 1);
     return o.obj();
 }()};
